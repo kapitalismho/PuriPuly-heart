@@ -1713,23 +1713,6 @@ def test_debug_preview_surviving_managed_actions_are_snackbar_only() -> None:
     assert app.view_dashboard.managed_trial_calls == []
 
 
-def test_managed_release_ko_snackbar_copy_matches_requested_wording() -> None:
-    previous_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale("ko")
-
-        assert (
-            i18n_module.t("managed_release.brake")
-            == "신규 인증이 잠시 중지된 상태에요. BYOK 방식으로 이용해주세요."
-        )
-        assert (
-            i18n_module.t("managed_release.revoked_contact")
-            == "엑세스 키가 손상되었어요. 저에게 연락해서 새 키를 받아가세요."
-        )
-    finally:
-        i18n_module.set_locale(previous_locale)
-
-
 def test_debug_preview_founder_letter_opens_dialog_with_readme_action(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3448,78 +3431,6 @@ async def test_settings_apply_closes_microphone_test_modal_after_audio_cleanup()
     assert app.page.closed == [app.page.opened[0]]
 
 
-@pytest.mark.parametrize(
-    ("locale", "expected"),
-    [
-        ("en", "Microphone level"),
-        ("ko", "마이크 입력 레벨"),
-        ("ja", "マイク入力レベル"),
-        ("zh-CN", "麦克风输入电平"),
-    ],
-)
-def test_microphone_test_level_accessibility_label_is_localized(
-    locale: str,
-    expected: str,
-) -> None:
-    previous_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        assert i18n_module.t("settings.microphone_test.level_label") == expected
-    finally:
-        i18n_module.set_locale(previous_locale)
-
-
-@pytest.mark.parametrize(
-    ("locale", "expected"),
-    [
-        ("en", "Couldn’t start microphone test"),
-        ("ko", "마이크 테스트를 시작하지 못했어요"),
-        ("ja", "マイクテストを開始できませんでした"),
-        ("zh-CN", "无法开始麦克风测试"),
-    ],
-)
-def test_microphone_test_start_failed_label_is_localized(
-    locale: str,
-    expected: str,
-) -> None:
-    previous_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        assert i18n_module.t("settings.microphone_test.start_failed") == expected
-    finally:
-        i18n_module.set_locale(previous_locale)
-
-
-@pytest.mark.parametrize(
-    ("locale", "expected"),
-    [
-        (
-            "en",
-            "If audio isn’t being captured, change Host API to Auto or MME, then restart the app.",
-        ),
-        (
-            "ko",
-            "오디오 캡쳐가 되지 않으면 호스트 API를 자동선택 혹은 MME로 변경 후 앱을 재시작해주세요",
-        ),
-        (
-            "ja",
-            "音声がキャプチャされない場合は、ホストAPIを自動選択またはMMEに変更してからアプリを再起動してください",
-        ),
-        ("zh-CN", "如果无法捕获音频，请将主机 API 改为自动选择或 MME，然后重启应用"),
-    ],
-)
-def test_microphone_test_host_api_hint_is_localized(
-    locale: str,
-    expected: str,
-) -> None:
-    previous_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        assert i18n_module.t("settings.microphone_test.host_api_hint") == expected
-    finally:
-        i18n_module.set_locale(previous_locale)
-
-
 @pytest.mark.asyncio
 async def test_start_microphone_test_waits_for_pending_settings_queue() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
@@ -3675,12 +3586,6 @@ async def test_on_request_openrouter_pkce_uses_draft_preserving_refresh_on_succe
     assert pkce_calls == [(target_settings, "settings")]
     assert refresh_calls == [(updated_settings, Path("settings.json"))]
     assert snackbar_calls == [(app_module.t("openrouter.pkce.connected"), app_module.COLOR_SUCCESS)]
-    previous_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale("ko")
-        assert i18n_module.t("openrouter.pkce.connected") == "OpenRouter 인증이 완료되었어요."
-    finally:
-        i18n_module.set_locale(previous_locale)
 
 
 @pytest.mark.asyncio

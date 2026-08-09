@@ -78,7 +78,8 @@ async def test_custom_http_control_preserves_the_previous_llm_selection() -> Non
 @pytest.mark.asyncio
 async def test_gemma_31b_control_keeps_an_active_cerebras_selection() -> None:
     current = AppSettings()
-    current.translation.model = TranslationModel.GEMMA4_31B_CEREBRAS
+    current.translation.model = TranslationModel.GEMMA4_31B
+    current.translation.connection = TranslationConnection.CEREBRAS
     applied = 0
 
     async def apply_settings(_settings: object) -> object:
@@ -96,7 +97,8 @@ async def test_gemma_31b_control_keeps_an_active_cerebras_selection() -> None:
 
     assert result is True
     assert applied == 0
-    assert current.translation.model is TranslationModel.GEMMA4_31B_CEREBRAS
+    assert current.translation.model is TranslationModel.GEMMA4_31B
+    assert current.translation.connection is TranslationConnection.CEREBRAS
 
 
 @pytest.mark.asyncio

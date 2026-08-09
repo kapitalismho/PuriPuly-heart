@@ -181,6 +181,7 @@ def _fallback_alias_from_settings(settings: Any) -> str:
         ("gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
         ("gemma4_26b_31b", "managed"): "managed_gemma4_26b_31b",
         ("gemma4_31b", "managed"): "managed_gemma4_31b",
+        ("gemma4_31b", "cerebras"): "cerebras_gemma4_31b",
         ("gemma4_31b_cerebras", "official_byok"): "cerebras_gemma4_31b",
     }
     return aliases.get((str(model), str(connection)), "none")

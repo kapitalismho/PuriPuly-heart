@@ -16,7 +16,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 34
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 35
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -84,7 +84,7 @@ _FALLBACK_ALIAS_FIELDS: Final = {
     "openrouter_gemma4_31b": (True, "gemma4_31b", "openrouter"),
     "managed_gemma4_26b_31b": (True, "gemma4_26b_31b", "managed"),
     "managed_gemma4_31b": (True, "gemma4_31b", "managed"),
-    "cerebras_gemma4_31b": (True, "gemma4_31b_cerebras", "official_byok"),
+    "cerebras_gemma4_31b": (True, "gemma4_31b", "cerebras"),
     "deepseek_v4_flash_china": (True, "deepseek_v4_flash", "managed_china"),
 }
 _FALLBACK_FIELDS_ALIAS: Final = {fields: alias for alias, fields in _FALLBACK_ALIAS_FIELDS.items()}

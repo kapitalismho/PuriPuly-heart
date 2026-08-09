@@ -46,7 +46,6 @@ TRANSLATION_MODEL_GEMINI_31_FLASH_LITE: Final = "gemini31_flash_lite"
 TRANSLATION_MODEL_QWEN_35_PLUS: Final = "qwen35_plus"
 TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH: Final = "openrouter_qwen35_flash"
 TRANSLATION_MODEL_LOCAL_LLM: Final = "local_llm"
-TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS: Final = "gemma4_31b_cerebras"
 TRANSLATION_MODEL_CUSTOM_HTTP: Final = "custom_http"
 
 _FIRST_HEDGE_DELAY_MS: Final = 1300
@@ -64,7 +63,6 @@ TranslationModelName: TypeAlias = Literal[
     "qwen35_plus",
     "openrouter_qwen35_flash",
     "local_llm",
-    "gemma4_31b_cerebras",
     "custom_http",
 ]
 TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
@@ -78,13 +76,13 @@ TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
     TRANSLATION_MODEL_QWEN_35_PLUS,
     TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH,
     TRANSLATION_MODEL_LOCAL_LLM,
-    TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS,
     TRANSLATION_MODEL_CUSTOM_HTTP,
 )
 
 TRANSLATION_CONNECTION_MANAGED: Final = "managed"
 TRANSLATION_CONNECTION_MANAGED_CHINA: Final = "managed_china"
 TRANSLATION_CONNECTION_OPENROUTER: Final = "openrouter"
+TRANSLATION_CONNECTION_CEREBRAS: Final = "cerebras"
 TRANSLATION_CONNECTION_OFFICIAL_BYOK: Final = "official_byok"
 TRANSLATION_CONNECTION_OLLAMA: Final = "ollama"
 TRANSLATION_CONNECTION_CUSTOM_HTTP: Final = "custom_http"
@@ -93,6 +91,7 @@ TranslationConnectionName: TypeAlias = Literal[
     "managed",
     "managed_china",
     "openrouter",
+    "cerebras",
     "official_byok",
     "ollama",
     "custom_http",
@@ -101,6 +100,7 @@ TRANSLATION_CONNECTIONS: Final[tuple[TranslationConnectionName, ...]] = (
     TRANSLATION_CONNECTION_MANAGED,
     TRANSLATION_CONNECTION_MANAGED_CHINA,
     TRANSLATION_CONNECTION_OPENROUTER,
+    TRANSLATION_CONNECTION_CEREBRAS,
     TRANSLATION_CONNECTION_OFFICIAL_BYOK,
     TRANSLATION_CONNECTION_OLLAMA,
     TRANSLATION_CONNECTION_CUSTOM_HTTP,
@@ -116,6 +116,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
         TRANSLATION_MODEL_GEMMA4_31B: (
             TRANSLATION_CONNECTION_MANAGED,
             TRANSLATION_CONNECTION_OPENROUTER,
+            TRANSLATION_CONNECTION_CEREBRAS,
         ),
         TRANSLATION_MODEL_GEMMA4: (
             TRANSLATION_CONNECTION_MANAGED,
@@ -142,7 +143,6 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
             TRANSLATION_CONNECTION_OPENROUTER,
         ),
         TRANSLATION_MODEL_LOCAL_LLM: (TRANSLATION_CONNECTION_OLLAMA,),
-        TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS: (TRANSLATION_CONNECTION_OFFICIAL_BYOK,),
         TRANSLATION_MODEL_CUSTOM_HTTP: (TRANSLATION_CONNECTION_CUSTOM_HTTP,),
     }
 )
@@ -1034,8 +1034,8 @@ def derive_translation_runtime_intent_from_compatibility(
 
     if provider == PROVIDER_CEREBRAS:
         return TranslationRuntimeIntent(
-            model=TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS,
-            connection=TRANSLATION_CONNECTION_OFFICIAL_BYOK,
+            model=TRANSLATION_MODEL_GEMMA4_31B,
+            connection=TRANSLATION_CONNECTION_CEREBRAS,
             concurrency_limit=concurrency,
         )
 
@@ -1257,6 +1257,15 @@ def _resolve_translation_target(
         )
 
     if translation.model == TRANSLATION_MODEL_GEMMA4_31B:
+        if translation.connection == TRANSLATION_CONNECTION_CEREBRAS:
+            return _resolved_direct_provider_target(
+                provider=PROVIDER_CEREBRAS,
+                model=direct.cerebras_model,
+                credential=_required_credential(
+                    CREDENTIAL_SOURCE_SECRET_STORE,
+                    CREDENTIAL_REF_CEREBRAS_BYOK,
+                ),
+            )
         return _resolved_openrouter_target(
             model=OPENROUTER_MODEL_GEMMA_4_31B_IT,
             source=_openrouter_source_for_translation(translation.connection, openrouter),
@@ -1383,16 +1392,6 @@ def _resolve_translation_target(
             managed_credential_kind=_openrouter_managed_credential_kind_for_translation(
                 translation.connection,
                 openrouter,
-            ),
-        )
-
-    if translation.model == TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS:
-        return _resolved_direct_provider_target(
-            provider=PROVIDER_CEREBRAS,
-            model=direct.cerebras_model,
-            credential=_required_credential(
-                CREDENTIAL_SOURCE_SECRET_STORE,
-                CREDENTIAL_REF_CEREBRAS_BYOK,
             ),
         )
 
@@ -1581,6 +1580,7 @@ __all__ = [
     "STT_PROVIDER_SONIOX",
     "STT_PROVIDERS",
     "STTRuntimeIntent",
+    "TRANSLATION_CONNECTION_CEREBRAS",
     "TRANSLATION_CONNECTION_MANAGED",
     "TRANSLATION_CONNECTION_MANAGED_CHINA",
     "TRANSLATION_CONNECTION_OFFICIAL_BYOK",
@@ -1596,7 +1596,6 @@ __all__ = [
     "TRANSLATION_MODEL_GEMMA4",
     "TRANSLATION_MODEL_GEMMA4_26B_31B",
     "TRANSLATION_MODEL_GEMMA4_31B",
-    "TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS",
     "TRANSLATION_MODEL_CUSTOM_HTTP",
     "TRANSLATION_MODEL_LOCAL_LLM",
     "TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH",

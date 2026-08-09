@@ -53,19 +53,21 @@ def test_state_publisher_full_snapshot_republishes_after_discovery() -> None:
 
 
 @pytest.mark.parametrize(
-    ("model", "expected_id"),
+    ("model", "connection", "expected_id"),
     [
-        (TranslationModel.GEMMA4_31B, 1),
-        (TranslationModel.GEMMA4_31B_CEREBRAS, 1),
-        (TranslationModel.CUSTOM_HTTP, 9),
+        (TranslationModel.GEMMA4_31B, TranslationConnection.MANAGED, 1),
+        (TranslationModel.GEMMA4_31B, TranslationConnection.CEREBRAS, 1),
+        (TranslationModel.CUSTOM_HTTP, TranslationConnection.CUSTOM_HTTP, 9),
     ],
 )
 def test_state_publisher_uses_product_level_translation_model_ids(
     model: TranslationModel,
+    connection: TranslationConnection,
     expected_id: int,
 ) -> None:
     settings = AppSettings()
     settings.translation.model = model
+    settings.translation.connection = connection
     state = state_from_settings(settings)
     sender = FakeSender()
 
@@ -97,8 +99,8 @@ def test_state_publisher_uses_product_level_translation_model_ids(
         (TranslationModel.GEMMA4_26B_31B, TranslationConnection.MANAGED, "managed_gemma4_26b_31b"),
         (TranslationModel.GEMMA4_31B, TranslationConnection.MANAGED, "managed_gemma4_31b"),
         (
-            TranslationModel.GEMMA4_31B_CEREBRAS,
-            TranslationConnection.OFFICIAL_BYOK,
+            TranslationModel.GEMMA4_31B,
+            TranslationConnection.CEREBRAS,
             "cerebras_gemma4_31b",
         ),
     ],

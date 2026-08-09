@@ -203,8 +203,8 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
                 "managed",
             ),
             "cerebras_gemma4_31b": (
-                "gemma4_31b_cerebras",
-                "official_byok",
+                "gemma4_31b",
+                "cerebras",
             ),
         }
         model, connection = specs[alias]
