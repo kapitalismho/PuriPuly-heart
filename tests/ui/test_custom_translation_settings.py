@@ -126,7 +126,7 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     assert pending.translation.previous_llm_model is TranslationModel.QWEN_35_PLUS
     assert pending.provider.llm is LLMProviderName.QWEN
     assert pending.translation.fallback == fallback
-    assert view._http_extension_card.visible is True
+    assert view._http_extension_row.visible is True
     assert view._translation_connection_row.visible is False
     assert view._openrouter_fallback_card.visible is False
     assert view._local_llm_connection_card.visible is False
@@ -135,7 +135,7 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     assert view._deepseek_key.visible is False
     assert view._cerebras_key.visible is False
 
-    view._on_http_extension_selected(SimpleNamespace(control=SimpleNamespace(value="demo")))
+    view._on_http_extension_selected("demo")
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
@@ -143,7 +143,6 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     assert set(view._http_extension_secret_fields) == {"api_key"}
     assert view._http_extension_secret_fields["api_key"].value == ""
     assert "saved-secret" not in repr(view._http_extension_secret_fields["api_key"])
-    assert view._http_extension_directory.value == str(tmp_path)
     assert not hasattr(view, "_http_extension_request_editor")
 
     view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
@@ -254,11 +253,38 @@ def test_custom_http_card_surfaces_missing_selected_extension_without_fallback(
     (tmp_path / "demo.json").unlink()
     view._on_http_extension_reload(None)
 
-    assert view._http_extension_dropdown.value == ""
+    assert view._http_extension_text.content.value == settings_view.t(
+        "settings.http_extension.none"
+    )
     assert view._http_extension_selected_id == "demo"
     assert view.build_provider_apply_settings().translation.http_extension_id == "demo"
-    assert len(view._http_extension_credentials.controls) == 1
+    assert len(view._http_extension_credentials.controls) == 0
     assert changed == [True]
+
+
+def test_custom_http_form_shows_only_when_extension_declares_secrets(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_extension(tmp_path)
+    extension_path = tmp_path / "demo.json"
+    extension_data = json.loads(extension_path.read_text(encoding="utf-8"))
+    extension_data["request"]["body"]["value"].pop("api_key")
+    extension_data["secrets"] = []
+    extension_path.write_text(json.dumps(extension_data), encoding="utf-8")
+    registry = HttpExtensionRegistry(tmp_path)
+    registry.reload()
+    view = _view(monkeypatch, registry, SecretStore())
+    settings = _custom_settings()
+    settings.translation.model = TranslationModel.CUSTOM_HTTP
+    settings.translation.connection = TranslationConnection.CUSTOM_HTTP
+    settings.translation.http_extension_id = "demo"
+    view.load_from_settings(settings, config_path=tmp_path / "settings.json")
+
+    assert view._http_extension_credentials in view._api_keys_column.controls
+    assert view._http_extension_credentials.visible is True
+    assert view._http_extension_secret_fields == {}
+    assert len(view._http_extension_credentials.controls) == 0
 
 
 def test_custom_http_open_folder_uses_resolved_registry_directory(

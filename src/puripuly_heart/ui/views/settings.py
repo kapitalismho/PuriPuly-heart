@@ -98,6 +98,7 @@ from puripuly_heart.ui.settings.contract import (
     SettingsSurfaceIntents,
 )
 from puripuly_heart.ui.settings.renderer import (
+    SETTINGS_ROW_SPACING,
     compose_settings_api_surface,
     compose_settings_general_surface,
     compose_settings_overlay_surface,
@@ -280,6 +281,25 @@ def _make_text_button(label: str, **kwargs) -> ft.TextButton:
     return ft.TextButton(content=label, **kwargs)
 
 
+def _settings_secondary_text_button_style() -> ft.ButtonStyle:
+    return ft.ButtonStyle(
+        color={
+            ft.ControlState.HOVERED: COLOR_PRIMARY,
+            ft.ControlState.DEFAULT: COLOR_SECONDARY,
+        },
+        icon_color={
+            ft.ControlState.HOVERED: COLOR_PRIMARY,
+            ft.ControlState.DEFAULT: COLOR_SECONDARY,
+        },
+        text_style=ft.TextStyle(
+            size=20,
+            font_family=font_for_language(get_locale()),
+        ),
+        overlay_color=ft.Colors.TRANSPARENT,
+        animation_duration=0,
+    )
+
+
 def _set_text_button_label(button: ft.TextButton, label: str) -> None:
     button.content = label
 
@@ -453,7 +473,7 @@ class SettingsView(ft.Column):
         return self._translation_connection_card
 
     def http_extension_control(self) -> ft.Control:
-        return self._http_extension_card
+        return ft.Container(content=self._http_extension_row)
 
     def set_http_extension_registry(
         self,
@@ -463,7 +483,6 @@ class SettingsView(ft.Column):
             return
         self._http_extensions = registry
         self._http_extension_snapshot = registry.snapshot
-        self._http_extension_directory.value = str(registry.directory)
         self._sync_http_extension_card(force_credentials=True)
 
     def translation_fallback_control(self) -> ft.Control:
@@ -657,6 +676,8 @@ class SettingsView(ft.Column):
             self._translation_connection_text,
             self._openrouter_fallback_text,
             self._telemetry_consent_text,
+            self._http_extension_text,
+            self._http_extension_path_text,
         )
 
     def _sync_clickable_text_control_fonts(self, font_family: str | None) -> None:
@@ -2086,72 +2107,71 @@ class SettingsView(ft.Column):
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        self._http_extension_dropdown = ft.Dropdown(
-            label=t("settings.http_extension.extension"),
-            options=[],
-            value="",
-            expand=True,
-            text_size=20,
-            border_radius=12,
-            border_color=COLOR_DIVIDER,
-            focused_border_color=COLOR_PRIMARY,
-            on_select=self._on_http_extension_selected,
+        self._http_extension_text = self._build_clickable_text(
+            t("settings.http_extension.none"),
+            self._on_http_extension_click,
+            no_wrap=True,
+            max_lines=1,
+            overflow=ft.TextOverflow.ELLIPSIS,
         )
-        self._http_extension_description = ft.Text(
-            "",
-            size=16,
-            color=COLOR_SECONDARY,
-            visible=False,
+        self._http_extension_selection_card = self._wrap_unit_card(
+            title=self._http_extension_title,
+            value=self._http_extension_text,
         )
-        self._http_extension_credentials_title = ft.Text(
-            t("settings.http_extension.credentials"),
-            size=18,
+
+        self._http_extension_path_title = ft.Text(
+            t("settings.http_extension.path"),
+            size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_ON_BACKGROUND,
-        )
-        self._http_extension_credentials = ft.Column([], spacing=8)
-        self._http_extension_directory_label = ft.Text(
-            t("settings.http_extension.directory"),
-            size=16,
-            color=COLOR_ON_BACKGROUND,
-        )
-        self._http_extension_directory = ft.Text(
-            str(self._http_extensions.directory),
-            size=14,
             color=COLOR_SECONDARY,
-            selectable=True,
         )
-        self._http_extension_open_button = _make_text_button(
-            t("settings.http_extension.open_folder"),
-            on_click=self._on_http_extension_open_folder,
+        self._http_extension_path_text = self._build_clickable_text(
+            t("settings.http_extension.open"),
+            self._on_http_extension_open_folder,
+            no_wrap=True,
+            max_lines=1,
+            overflow=ft.TextOverflow.ELLIPSIS,
         )
-        self._http_extension_reload_button = _make_text_button(
-            t("settings.http_extension.reload"),
-            on_click=self._on_http_extension_reload,
+        self._http_extension_path_card = self._wrap_unit_card(
+            title=self._http_extension_path_title,
+            value=self._http_extension_path_text,
         )
-        self._http_extension_card = self._wrap_card(
-            ft.Column(
-                [
-                    self._http_extension_title,
-                    self._http_extension_dropdown,
-                    self._http_extension_description,
-                    self._http_extension_credentials_title,
-                    self._http_extension_credentials,
-                    self._http_extension_directory_label,
-                    self._http_extension_directory,
-                    ft.Row(
-                        [
-                            self._http_extension_open_button,
-                            self._http_extension_reload_button,
-                        ],
-                        spacing=12,
-                    ),
-                ],
-                spacing=8,
+
+        self._http_extension_refresh_title = ft.Text(
+            t("settings.http_extension.refresh"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._http_extension_refresh_icon = ft.Container(
+            content=ft.Icon(
+                ft.Icons.REFRESH_ROUNDED,
+                size=44,
+                color=COLOR_ON_BACKGROUND,
             ),
-            height=None,
+            alignment=_CENTER_ALIGNMENT,
+            expand=True,
+            on_click=self._on_http_extension_reload,
+            on_hover=self._on_text_hover,
         )
-        self._http_extension_card.visible = False
+        self._http_extension_refresh_card = self._wrap_unit_card(
+            title=self._http_extension_refresh_title,
+            value=self._http_extension_refresh_icon,
+        )
+
+        self._http_extension_credentials = ft.Column([], spacing=12, visible=False)
+        self._api_keys_column.controls.append(self._http_extension_credentials)
+
+        self._http_extension_row = ft.Row(
+            [
+                self._http_extension_selection_card,
+                self._http_extension_path_card,
+                self._http_extension_refresh_card,
+            ],
+            spacing=SETTINGS_ROW_SPACING,
+            expand=True,
+        )
+        self._http_extension_row.visible = False
 
         # === Row 8: Persona (2x2) - Licenses style ===
         self._prompt_editor = PromptEditor(
@@ -2171,22 +2191,7 @@ class SettingsView(ft.Column):
         self._reset_prompt_btn = _make_text_button(
             t("settings.reset_prompt"),
             icon=ft.Icons.REFRESH_ROUNDED,
-            style=ft.ButtonStyle(
-                color={
-                    ft.ControlState.HOVERED: COLOR_PRIMARY,
-                    ft.ControlState.DEFAULT: COLOR_SECONDARY,
-                },
-                icon_color={
-                    ft.ControlState.HOVERED: COLOR_PRIMARY,
-                    ft.ControlState.DEFAULT: COLOR_SECONDARY,
-                },
-                text_style=ft.TextStyle(
-                    size=20,
-                    font_family=font_for_language(get_locale()),
-                ),
-                overlay_color=ft.Colors.TRANSPARENT,
-                animation_duration=0,
-            ),
+            style=_settings_secondary_text_button_style(),
             on_click=self._on_reset_prompt,
         )
 
@@ -2372,53 +2377,36 @@ class SettingsView(ft.Column):
             ft.dropdown.Option(key=code, text=locale_label(code)) for code in available_locales()
         ]
 
-    def _http_extension_option_list(self) -> list[ft.dropdown.Option]:
-        return [
-            ft.dropdown.Option(
-                key=loaded.definition.id,
-                text=f"{loaded.definition.name} · {loaded.definition.id}",
+    def _http_extension_modal_options(self) -> list[OptionItem]:
+        options = [OptionItem(value="", label=t("settings.http_extension.none"))]
+        options.extend(
+            OptionItem(
+                value=loaded.definition.id,
+                label=loaded.definition.name,
+                description=loaded.definition.description or None,
             )
             for loaded in self._http_extension_snapshot.extensions
-        ]
+        )
+        return options
 
     def _sync_http_extension_credentials(self, extension) -> None:
         self._http_extension_secret_fields = {}
         self._http_extension_secret_dirty.clear()
         controls: list[ft.Control] = []
-        if extension is None:
-            controls.append(
-                ft.Text(
-                    t(
-                        "settings.http_extension.no_extensions"
-                        if not self._http_extension_snapshot.extensions
-                        else "settings.http_extension.unavailable"
-                    ),
-                    size=15,
-                    color=COLOR_SECONDARY,
-                )
-            )
-        elif not extension.secrets:
-            controls.append(
-                ft.Text(
-                    t("settings.http_extension.no_credentials"),
-                    size=15,
-                    color=COLOR_SECONDARY,
-                )
-            )
-        else:
+        if extension is not None:
             for secret in extension.secrets:
                 field = ft.TextField(
-                    label=secret.label,
+                    label=f"{t('settings.http_extension.title')} · {secret.label}",
                     password=True,
-                    can_reveal_password=True,
+                    can_reveal_password=False,
                     border_radius=12,
                     border_color=COLOR_DIVIDER,
                     focused_border_color=COLOR_PRIMARY,
                     expand=True,
-                    text_size=20,
+                    text_size=24,
                     color=COLOR_NEUTRAL_DARK,
                     label_style=ft.TextStyle(
-                        size=17,
+                        size=18,
                         weight=ft.FontWeight.BOLD,
                         color=COLOR_NEUTRAL_DARK,
                     ),
@@ -2429,9 +2417,32 @@ class SettingsView(ft.Column):
                         self._on_http_extension_secret_blur(secret_id)
                     ),
                 )
+                reveal_button = ft.IconButton(
+                    icon=ft.Icons.VISIBILITY_OFF_ROUNDED,
+                    icon_color=COLOR_DIVIDER,
+                    icon_size=24,
+                )
+
+                def _on_toggle_secret_reveal(
+                    _event,
+                    field: ft.TextField = field,
+                    button: ft.IconButton = reveal_button,
+                ) -> None:
+                    field.password = not field.password
+                    button.icon = (
+                        ft.Icons.VISIBILITY_OFF_ROUNDED
+                        if field.password
+                        else ft.Icons.VISIBILITY_ROUNDED
+                    )
+                    update_control_if_mounted(field)
+                    update_control_if_mounted(button)
+
+                reveal_button.on_click = _on_toggle_secret_reveal
+                field.suffix = reveal_button
                 self._http_extension_secret_fields[secret.id] = field
                 controls.append(field)
         self._http_extension_credentials.controls = controls
+        _update_control_if_mounted(self._http_extension_credentials)
 
     def _sync_http_extension_card(
         self,
@@ -2439,44 +2450,48 @@ class SettingsView(ft.Column):
         *,
         force_credentials: bool = False,
     ) -> None:
-        if not hasattr(self, "_http_extension_card"):
+        if not hasattr(self, "_http_extension_row"):
             return
         if settings is None:
             settings = self._build_settings_with_provider_draft()
         if settings is None:
             return
         is_custom = settings.translation.model == TranslationModel.CUSTOM_HTTP
-        self._http_extension_card.visible = is_custom
+        self._http_extension_row.visible = is_custom
+        self._http_extension_credentials.visible = is_custom
         if not is_custom:
             return
-        self._http_extension_dropdown.options = self._http_extension_option_list()
         selected_id = settings.translation.http_extension_id
         loaded = self._http_extension_snapshot.get(selected_id)
         selected_changed = selected_id != self._http_extension_selected_id
-        self._http_extension_dropdown.value = loaded.definition.id if loaded else ""
-        if loaded is None:
-            self._http_extension_description.value = (
-                t("settings.http_extension.no_extensions")
-                if not self._http_extension_snapshot.extensions
-                else t("settings.http_extension.unavailable")
-            )
-            self._http_extension_description.visible = True
-        else:
-            self._http_extension_description.value = loaded.definition.description or ""
-            self._http_extension_description.visible = bool(loaded.definition.description)
+        self._set_unit_card_value_text(
+            self._http_extension_text,
+            loaded.definition.name if loaded else t("settings.http_extension.none"),
+        )
         if selected_changed or force_credentials:
             self._sync_http_extension_credentials(loaded.definition if loaded else None)
             self._http_extension_selected_id = selected_id
-        _update_control_if_mounted(self._http_extension_card)
+        _update_control_if_mounted(self._http_extension_row)
+        _update_control_if_mounted(self._http_extension_credentials)
 
-    def _on_http_extension_selected(self, event) -> None:
+    def _on_http_extension_click(self, _event) -> None:
+        if not is_control_mounted(self):
+            return
+        settings = self._build_settings_with_provider_draft()
+        selected = settings.translation.http_extension_id if settings is not None else ""
+        SettingsModal(
+            self.page,
+            t("settings.http_extension.title"),
+            self._http_extension_modal_options(),
+            self._on_http_extension_selected,
+            show_description=True,
+        ).open(selected)
+
+    def _on_http_extension_selected(self, value: str) -> None:
         if self._settings is None:
             return
-        value = getattr(getattr(event, "control", None), "value", None) or ""
-        if not value or self._http_extension_snapshot.get(value) is None:
-            return
         draft = self._ensure_provider_settings_draft()
-        draft.translation.http_extension_id = value
+        draft.translation.http_extension_id = value or ""
         self.has_provider_changes = True
         self._sync_http_extension_card(draft, force_credentials=True)
 
@@ -3644,6 +3659,9 @@ class SettingsView(ft.Column):
         if is_custom_http:
             self._managed_key_card.visible = False
             self._managed_trial_usage_bar.visible = False
+        if hasattr(self, "_http_extension_credentials"):
+            self._http_extension_credentials.visible = is_custom_http
+            _update_control_if_mounted(self._http_extension_credentials)
         openrouter_byok_selected = bool(
             not is_custom_http
             and llm == LLMProviderName.OPENROUTER
@@ -3992,9 +4010,9 @@ class SettingsView(ft.Column):
             self._llm_text.update()
             self._translation_connection_row.update()
             self._local_llm_connection_card.update()
-            http_extension_card = getattr(self, "_http_extension_card", None)
-            if http_extension_card is not None:
-                http_extension_card.update()
+            http_extension_row = getattr(self, "_http_extension_row", None)
+            if http_extension_row is not None:
+                http_extension_row.update()
 
     def _on_llm_selected(self, value: str) -> None:
         """Handle LLM provider selection from modal."""
@@ -5467,17 +5485,13 @@ class SettingsView(ft.Column):
         self._openrouter_fallback_title.value = t("settings.fallback")
         self._local_llm_connection_title.value = t("settings.local_llm.connection")
         self._http_extension_title.value = t("settings.http_extension.title")
-        self._http_extension_dropdown.label = t("settings.http_extension.extension")
-        self._http_extension_credentials_title.value = t("settings.http_extension.credentials")
-        self._http_extension_directory_label.value = t("settings.http_extension.directory")
-        _set_text_button_label(
-            self._http_extension_open_button,
-            t("settings.http_extension.open_folder"),
+        self._http_extension_path_title.value = t("settings.http_extension.path")
+        self._http_extension_refresh_title.value = t("settings.http_extension.refresh")
+        self._set_unit_card_value_text(
+            self._http_extension_path_text,
+            t("settings.http_extension.open"),
         )
-        _set_text_button_label(
-            self._http_extension_reload_button,
-            t("settings.http_extension.reload"),
-        )
+        self._sync_http_extension_card()
         self._local_llm_base_url.label = t("settings.local_llm.base_url")
         self._local_llm_model.label = t("settings.local_llm.model")
         self._local_llm_api_key.apply_locale()
