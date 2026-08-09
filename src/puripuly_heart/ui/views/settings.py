@@ -182,22 +182,37 @@ _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
     TranslationConnection.CEREBRAS: "settings.translation_connection.cerebras.description",
 }
 _TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY = "settings.translation_connection.only_supported"
-_TRANSLATION_MODEL_RECOMMENDED_SECTION_KEY = "settings.translation_model.section.recommended"
-_TRANSLATION_MODEL_OTHERS_SECTION_KEY = "settings.translation_model.section.others"
-_RECOMMENDED_TRANSLATION_MODELS = (
+_TRANSLATION_MODELS = (
     TranslationModel.GEMMA4_26B_31B,
-    TranslationModel.DEEPSEEK_V4_FLASH,
-)
-_OTHER_TRANSLATION_MODELS = (
     TranslationModel.GEMMA4_31B,
     TranslationModel.GEMMA4,
-    TranslationModel.LOCAL_LLM,
+    TranslationModel.DEEPSEEK_V4_FLASH,
     TranslationModel.DEEPSEEK_V4_PRO,
+    TranslationModel.LOCAL_LLM,
+    TranslationModel.CUSTOM_HTTP,
     TranslationModel.GEMINI_3_FLASH,
     TranslationModel.GEMINI_31_FLASH_LITE,
     TranslationModel.QWEN_35_PLUS,
-    TranslationModel.CUSTOM_HTTP,
 )
+_TRANSLATION_MODEL_SECTION_ORDER = (
+    "settings.translation_model.section.recommended",
+    "settings.translation_model.section.gemma",
+    "settings.translation_model.section.deepseek",
+    "settings.translation_model.section.user_settings",
+    "settings.translation_model.section.others",
+)
+_TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
+    TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended",
+    TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended",
+    TranslationModel.GEMMA4_31B: "settings.translation_model.section.gemma",
+    TranslationModel.GEMMA4: "settings.translation_model.section.gemma",
+    TranslationModel.DEEPSEEK_V4_PRO: "settings.translation_model.section.deepseek",
+    TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
+    TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
+    TranslationModel.GEMINI_3_FLASH: "settings.translation_model.section.others",
+    TranslationModel.GEMINI_31_FLASH_LITE: "settings.translation_model.section.others",
+    TranslationModel.QWEN_35_PLUS: "settings.translation_model.section.others",
+}
 _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str], ...] = (
     (
         "none",
@@ -3911,11 +3926,9 @@ class SettingsView(ft.Column):
                 description=t(f"settings.translation_model.{model.value}.description", default=""),
                 section=t(section_key),
             )
-            for section_key, models in (
-                (_TRANSLATION_MODEL_RECOMMENDED_SECTION_KEY, _RECOMMENDED_TRANSLATION_MODELS),
-                (_TRANSLATION_MODEL_OTHERS_SECTION_KEY, _OTHER_TRANSLATION_MODELS),
-            )
-            for model in models
+            for section_key in _TRANSLATION_MODEL_SECTION_ORDER
+            for model in _TRANSLATION_MODELS
+            if _TRANSLATION_MODEL_SECTION_BY_MODEL.get(model) == section_key
         ]
         display_settings = self._build_settings_with_provider_draft()
         current = (

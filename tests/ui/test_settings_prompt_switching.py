@@ -347,16 +347,29 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         TranslationModel.DEEPSEEK_V4_FLASH.value,
         TranslationModel.GEMMA4_31B.value,
         TranslationModel.GEMMA4.value,
-        TranslationModel.LOCAL_LLM.value,
         TranslationModel.DEEPSEEK_V4_PRO.value,
+        TranslationModel.LOCAL_LLM.value,
+        TranslationModel.CUSTOM_HTTP.value,
         TranslationModel.GEMINI_3_FLASH.value,
         TranslationModel.GEMINI_31_FLASH_LITE.value,
         TranslationModel.QWEN_35_PLUS.value,
-        TranslationModel.CUSTOM_HTTP.value,
     ]
     assert TranslationModel.QWEN_35_PLUS.value in values
     assert TranslationModel.LOCAL_LLM.value in values
     assert all("qwen35_flash" not in value for value in values)
+    assert len(values) == len(set(values))
+
+    sections: list[str] = []
+    for option in options:
+        if option.section and option.section not in sections:
+            sections.append(option.section)
+    assert sections == [
+        t("settings.translation_model.section.recommended"),
+        t("settings.translation_model.section.gemma"),
+        t("settings.translation_model.section.deepseek"),
+        t("settings.translation_model.section.user_settings"),
+        t("settings.translation_model.section.others"),
+    ]
 
 
 def test_gemma31_connection_modal_lists_managed_openrouter_and_cerebras(monkeypatch) -> None:
