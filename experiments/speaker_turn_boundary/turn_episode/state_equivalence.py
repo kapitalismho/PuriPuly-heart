@@ -16,9 +16,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, is_dataclass
 from pathlib import Path
 from typing import Any, Callable
+from uuid import UUID
 
 import numpy as np
 
@@ -65,6 +66,76 @@ def _pending_start_id(replay: Any) -> str | None:
         return None
     pending = getattr(gating, "_pending_start_id", None)
     return str(pending) if pending is not None else None
+
+
+def _pending_content(replay: Any) -> dict[str, Any] | None:
+    """Pending-start payload without the per-instance random UUID.
+
+    The UUID is regenerated per utterance instance, so round-trip comparisons use
+    presence plus this deterministic content (pre-roll size, probability, buffered
+    chunk sizes, debounce state), never UUID equality.
+    """
+    gating = getattr(replay, "_gating", None)
+    if gating is None or gating._pending_start_id is None:
+        return None
+    pre_roll = gating._pending_start_pre_roll
+    return {
+        "pre_roll_samples": (int(np.asarray(pre_roll).size) if pre_roll is not None else None),
+        "prob": (
+            float(gating._pending_start_prob) if gating._pending_start_prob is not None else None
+        ),
+        "pending_chunk_samples": int(
+            sum(int(np.asarray(c).size) for c in gating._pending_start_chunks)
+        ),
+        "debounce_reached": bool(gating._pending_debounce_reached),
+    }
+
+
+def _ring_payload(ring: Any) -> dict[str, Any] | None:
+    """Full pre-roll ring payload (fill state, write position, buffer contents)."""
+    if ring is None:
+        return None
+    return {
+        "filled": bool(ring._filled),
+        "write_pos": int(ring._write_pos),
+        "buffer": np.asarray(ring._buffer).tolist(),
+    }
+
+
+def _ring_payload_summary(ring: Any) -> dict[str, Any] | None:
+    """Compact ring evidence: metadata plus a hash of the buffer contents.
+
+    The full buffer is compared in memory; the report records only the summary
+    so per-episode evidence stays small while still binding the buffer content.
+    """
+    if ring is None:
+        return None
+    return {
+        "filled": bool(ring._filled),
+        "write_pos": int(ring._write_pos),
+        "buffer_sha256": sha256_bytes(np.asarray(ring._buffer).tobytes()),
+    }
+
+
+def _jsonable(value: Any) -> Any:
+    """JSON-serializable projection of a captured state (for capture hashing)."""
+    if isinstance(value, dict):
+        return {k: _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, bytes):
+        return value.hex()
+    if hasattr(value, "_buffer") and hasattr(value, "_write_pos"):
+        return _ring_payload(value)
+    if isinstance(value, UUID):
+        return str(value)
+    if is_dataclass(value) and not isinstance(value, type):
+        return {f.name: _jsonable(getattr(value, f.name)) for f in fields(value)}
+    return value
 
 
 def _progress_rows(replay: Any) -> list[dict[str, int]]:
@@ -361,7 +432,7 @@ def capture_state(replay: Any) -> dict[str, Any]:
     replay_state = {
         name: _deep_copy_value(getattr(replay, name))
         for name in _slots_of(replay)
-        if name != "_gating"
+        if name not in ("_gating", "engine_factory", "monotonic_ns")
     }
     return {
         "gating": gating_state,
@@ -388,34 +459,37 @@ def snapshot_round_trip(
 ) -> dict[str, Any]:
     """Capture -> restore -> resume round trip (bundle Section 8.5).
 
-    The state is captured from the source-prefix (full-session) replay at the scored
-    start; a fresh replay is restored from that capture and resumed with the scored
-    audio. The round trip passes iff the resumed rows exactly reproduce the
-    source-prefix replay's rows from the scored start onward (boundaries and
-    progress, canonical coordinates).
+    The state is captured from the source-prefix replay exactly at the scored
+    start ([0, scored_start) consumed; nothing beyond it); a fresh replay is
+    restored from that capture and resumed with the scored audio. The round trip
+    passes iff the resumed rows exactly reproduce the source-prefix replay's rows
+    from the scored start onward (boundaries and progress, canonical coordinates),
+    and the full ring/pending payloads agree both before resuming (fidelity) and
+    after the identical resumed chunks (parity). The serialized capture itself is
+    hashed and persisted so the capture is reproducible.
     """
     samples = _load_wav(Path(wav_path))
     effective_end = min(session_end, int(samples.size))
     samples = samples[:effective_end]
-    source = _replay_region(samples, 0, effective_end)
-    cursor = 0
-    while cursor + CHUNK_SAMPLES <= bounds.scored_start:
-        source.process_chunk(samples[cursor : cursor + CHUNK_SAMPLES])
-        cursor += CHUNK_SAMPLES
+    capture_end = min(bounds.scored_start, effective_end)
+    source = _replay_region(samples, 0, capture_end)
     capture = capture_state(source)
     captured_rows = (len(source.boundaries), len(source.progress))
-    source_ring = capture["gating"].get("_ring")
-    ring_filled = bool(source_ring._filled) if source_ring is not None else None
-    ring_write_pos = int(source_ring._write_pos) if source_ring is not None else None
-    pending_captured = _pending_start_id(source)
+    capture_sha256 = sha256_bytes(json.dumps(_jsonable(capture), sort_keys=True).encode("utf-8"))
+    capture_ring = _ring_payload(capture["gating"].get("_ring"))
+    capture_pending_id = _pending_start_id(source)
+    capture_pending_content = _pending_content(source)
 
     restored = _make_replay(_b0_engine_factory)
     restored.start_epoch(0)
     restore_state(restored, capture)
-    restored_ring_before_resume = restored._gating._ring
-    ring_filled_before_resume = bool(restored_ring_before_resume._filled)
-    ring_write_pos_before_resume = int(restored_ring_before_resume._write_pos)
-    pending_before_resume = _pending_start_id(restored)
+    ring_fidelity = _ring_payload(restored._gating._ring) == capture_ring
+    # The restored replay is a byte-exact copy of the captured replay, including the
+    # pending-start UUID, so fidelity compares the full payload including the UUID.
+    pending_fidelity = (
+        _pending_start_id(restored) == capture_pending_id
+        and _pending_content(restored) == capture_pending_content
+    )
     cursor = bounds.scored_start
     while cursor + CHUNK_SAMPLES <= min(bounds.tail_end, effective_end):
         chunk = samples[cursor : cursor + CHUNK_SAMPLES]
@@ -427,24 +501,14 @@ def snapshot_round_trip(
     restored_new = _boundary_rows(restored)[captured_rows[0] :]
     source_progress_new = _progress_rows(source)[captured_rows[1] :]
     restored_progress_new = _progress_rows(restored)[captured_rows[1] :]
-    # Capture/restore fidelity: the restored ring equals the captured ring before
-    # resuming; behavioral parity: after identical chunks the restored ring equals
-    # the source ring (write position and fill state).
-    ring_fidelity = (
-        ring_filled_before_resume == ring_filled and ring_write_pos_before_resume == ring_write_pos
-    )
-    source_ring = source._gating._ring
-    restored_ring = restored._gating._ring
-    ring_parity = bool(restored_ring._filled) == bool(source_ring._filled) and int(
-        restored_ring._write_pos
-    ) == int(source_ring._write_pos)
-    # Pending starts carry a fresh random UUID per utterance instance, so the
-    # round-trip checks are presence comparisons, never UUID equality: the
-    # restored state must match the captured presence before resuming (fidelity)
-    # and must evolve identically to the source after identical chunks (parity);
-    # the trace rows above are the exact behavioral evidence.
-    pending_fidelity = (pending_before_resume is None) == (pending_captured is None)
-    pending_parity = (_pending_start_id(restored) is None) == (_pending_start_id(source) is None)
+    # Behavioral parity: after identical resumed chunks the full ring payload
+    # (fill, write position, buffer contents) and the pending payload agree. A
+    # pending start created during the resume carries a fresh random UUID in both
+    # replays, so parity compares presence plus deterministic content.
+    ring_parity = _ring_payload(restored._gating._ring) == _ring_payload(source._gating._ring)
+    pending_parity = (_pending_start_id(restored) is None) == (
+        _pending_start_id(source) is None
+    ) and _pending_content(restored) == _pending_content(source)
     passed = (
         source_new == restored_new
         and source_progress_new == restored_progress_new
@@ -457,23 +521,24 @@ def snapshot_round_trip(
         "episode_class": "b0/peer",
         "passed": passed,
         "captured_at_scored_start": True,
+        "capture_sha256": capture_sha256,
         "source_rows_after_capture": len(source_new),
         "restored_rows_after_capture": len(restored_new),
         "source_progress_after_capture": len(source_progress_new),
         "restored_progress_after_capture": len(restored_progress_new),
-        "ring_filled_captured": ring_filled,
-        "ring_filled_before_resume": ring_filled_before_resume,
-        "ring_write_pos_captured": ring_write_pos,
-        "ring_write_pos_before_resume": ring_write_pos_before_resume,
+        "ring_payload_captured": _ring_payload_summary(capture["gating"].get("_ring")),
+        "ring_payload_before_resume": _ring_payload_summary(restored._gating._ring),
         "ring_fidelity": ring_fidelity,
-        "ring_filled_restored": bool(restored_ring._filled),
-        "ring_write_pos_restored": int(restored_ring._write_pos),
+        "ring_payload_restored": _ring_payload_summary(restored._gating._ring),
+        "ring_payload_source": _ring_payload_summary(source._gating._ring),
         "ring_parity": ring_parity,
-        "pending_start_captured": pending_captured,
-        "pending_start_before_resume": pending_before_resume,
+        "pending_start_captured": capture_pending_id,
+        "pending_content_captured": capture_pending_content,
+        "pending_start_before_resume": _pending_start_id(restored),
+        "pending_content_before_resume": _pending_content(restored),
+        "pending_fidelity": pending_fidelity,
         "pending_start_restored": _pending_start_id(restored),
         "pending_start_source": _pending_start_id(source),
-        "pending_fidelity": pending_fidelity,
         "pending_parity": pending_parity,
     }
 

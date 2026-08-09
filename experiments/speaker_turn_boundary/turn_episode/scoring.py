@@ -166,6 +166,8 @@ def benefit_attribution(
         if a.owner == "b0"
         and a.action_id != action.action_id
         and in_eligibility_window(a.boundary_source_sample, reference)
+        and a.observed_source_sample_at_emit - reference.evidence_onset_sample
+        <= MATCH_DEADLINE_MS * SAMPLES_PER_MS
     ]
     if b0_actions and action.observed_source_sample_at_emit < min(
         a.observed_source_sample_at_emit for a in b0_actions
@@ -174,89 +176,133 @@ def benefit_attribution(
     return "recovered_b0_hard_miss"
 
 
+def _match_weight(ref: ReferenceAction, act: Action) -> tuple[int, int, int, int]:
+    """Per-pair objective weight (Section 12.2) for one ordered match.
+
+    Returns ``(1, b0_retained, -availability_delay_ms, -localization_error_ms)``
+    so the lexicographic maximum over a matching maximizes the number of matched
+    references, then B0-retained hard successes, then lower total causal delay,
+    then lower total localization distance. Pre-existing VAD gap boundaries
+    report delay 0 (Section 15, invariant 9).
+    """
+    raw_delay = act.observed_source_sample_at_emit - ref.evidence_onset_sample
+    pre_existing = act.owner == "b0" and raw_delay < 0
+    delay_ms = (
+        max(0, round(raw_delay / SAMPLES_PER_MS))
+        if pre_existing
+        else round(raw_delay / SAMPLES_PER_MS)
+    )
+    b0_retained = 1 if act.owner == "b0" and ref.action_kind == "hard_boundary" else 0
+    return (
+        1,
+        b0_retained,
+        -delay_ms,
+        -localization_error_ms(act.boundary_source_sample, ref),
+    )
+
+
 def match_episode(
     actions: list[Action],
     references: list[ReferenceAction],
     scored_start: int,
     processed_scored_end: int,
 ) -> tuple[list[Match], list[str], dict[str, int]]:
-    """Deterministic maximum-cardinality ordered one-to-one matching.
+    """Deterministic ordered maximum-weight one-to-one matching.
 
     Objective (Section 12.2): maximize (1) the number of compatible matched
     references, then (2) B0-retained hard successes, (3) lower causal availability
     delay, (4) lower interval localization distance, (5) deterministic lexical ids.
-    Implemented with augmenting paths in reference order, so a later reference can
-    remap an earlier one's action when that yields more total matches; ties resolve
-    by the lexicographic cost tuple.
+    References are matched in evidence-onset order and actions in source order, so
+    the resulting matching never crosses source order (Section 12.1.6: ordered
+    one-to-one matching is preserved). Implemented as an exact dynamic program
+    over the reference x action grid.
     """
-    eligible_refs = [
+    refs = [
         r
         for r in sorted(references, key=lambda r: (r.evidence_onset_sample, r.reference_id))
         if r.scorable and r.action_kind in ("hard_boundary", "soft_overlap_marker")
     ]
-    match_of_ref: dict[str, str] = {}
-    action_of_ref: dict[str, Action] = {}
-    matched_action: dict[str, str] = {}
+    ordered_actions = sorted(
+        actions,
+        key=lambda a: (
+            a.boundary_source_sample,
+            a.observed_source_sample_at_emit,
+            a.action_id,
+        ),
+    )
+    n, m = len(refs), len(ordered_actions)
 
-    def try_match(ref: ReferenceAction, used_actions: set[str]) -> bool:
-        candidates = [
-            a
-            for a in actions
-            if a.action_id not in used_actions
-            and action_eligible(a, ref, scored_start, processed_scored_end)
-        ]
-        candidates.sort(key=lambda a: _cost_tuple(a, ref))
-        for action in candidates:
-            if action.action_id not in matched_action:
-                match_of_ref[ref.reference_id] = action.action_id
-                action_of_ref[ref.reference_id] = action
-                matched_action[action.action_id] = ref.reference_id
-                return True
-            other_ref_id = matched_action[action.action_id]
-            other_ref = next(r for r in eligible_refs if r.reference_id == other_ref_id)
-            saved = (match_of_ref.pop(other_ref_id), action_of_ref.pop(other_ref_id))
-            matched_action.pop(action.action_id)
-            if try_match(other_ref, used_actions | {action.action_id}):
-                match_of_ref[ref.reference_id] = action.action_id
-                action_of_ref[ref.reference_id] = action
-                matched_action[action.action_id] = ref.reference_id
-                return True
-            match_of_ref[other_ref_id], action_of_ref[other_ref_id] = saved
-            matched_action[saved[0]] = other_ref_id
-        return False
+    def better(
+        left: tuple[tuple[int, int, int, int], tuple[tuple[str, str], ...]] | None,
+        right: tuple[tuple[int, int, int, int], tuple[tuple[str, str], ...]] | None,
+    ) -> tuple[tuple[int, int, int, int], tuple[tuple[str, str], ...]] | None:
+        if left is None:
+            return right
+        if right is None:
+            return left
+        if left[0] != right[0]:
+            return left if left[0] > right[0] else right
+        return left if left[1] < right[1] else right
 
-    for ref in eligible_refs:
-        try_match(ref, set())
+    empty: tuple[tuple[int, int, int, int], tuple[tuple[str, str], ...]] = ((0, 0, 0, 0), ())
+    dp: list[list[tuple[tuple[int, int, int, int], tuple[tuple[str, str], ...]] | None]] = [
+        [None] * (m + 1) for _ in range(n + 1)
+    ]
+    for j in range(m + 1):
+        dp[0][j] = empty
+    for i in range(1, n + 1):
+        for j in range(1, m + 1):
+            # Standard ordered DP: skip the reference (dp[i-1][j]), skip the
+            # action (dp[i][j-1]), or match ref[i-1] to action[j-1] on top of
+            # dp[i-1][j-1].
+            best = better(dp[i - 1][j], dp[i][j - 1])
+            prev = dp[i - 1][j - 1]
+            if prev is not None:
+                ref = refs[i - 1]
+                act = ordered_actions[j - 1]
+                if action_eligible(act, ref, scored_start, processed_scored_end):
+                    weight = _match_weight(ref, act)
+                    obj = tuple(prev[0][k] + weight[k] for k in range(4))
+                    ids = tuple(sorted(prev[1] + ((ref.reference_id, act.action_id),)))
+                    best = better(best, (obj, ids))
+            dp[i][j] = best
 
-    matches: list[Match] = []
-    for reference_id, action_id in sorted(match_of_ref.items()):
-        ref = next(r for r in eligible_refs if r.reference_id == reference_id)
-        action = action_of_ref[reference_id]
-        raw_delay = action.observed_source_sample_at_emit - ref.evidence_onset_sample
-        # Section 12.1/15: a VAD-owned boundary available before B onset is a
-        # valid pre-existing product category, never a negative availability
-        # delay; it is reported as pre-existing with delay 0.
-        pre_existing = action.owner == "b0" and raw_delay < 0
-        delay_ms = (
-            max(0, round(raw_delay / SAMPLES_PER_MS))
-            if pre_existing
-            else round(raw_delay / SAMPLES_PER_MS)
-        )
-        matches.append(
-            Match(
-                reference_id=reference_id,
-                action_id=action_id,
-                benefit_attribution=benefit_attribution(action, ref, delay_ms, actions),
-                availability_delay_ms=delay_ms,
-                localization_error_ms=localization_error_ms(action.boundary_source_sample, ref),
-                pre_existing=pre_existing,
+    best_state = dp[n][m]
+    if best_state is None or not best_state[1]:
+        matches: list[Match] = []
+    else:
+        matched_pairs: list[tuple[ReferenceAction, Action]] = []
+        for reference_id, action_id in best_state[1]:
+            ref = next(r for r in refs if r.reference_id == reference_id)
+            act = next(a for a in ordered_actions if a.action_id == action_id)
+            matched_pairs.append((ref, act))
+        matches = []
+        for ref, action in matched_pairs:
+            raw_delay = action.observed_source_sample_at_emit - ref.evidence_onset_sample
+            # Section 12.1/15: a VAD-owned boundary available before B onset is a
+            # valid pre-existing product category, never a negative availability
+            # delay; it is reported as pre-existing with delay 0.
+            pre_existing = action.owner == "b0" and raw_delay < 0
+            delay_ms = (
+                max(0, round(raw_delay / SAMPLES_PER_MS))
+                if pre_existing
+                else round(raw_delay / SAMPLES_PER_MS)
             )
-        )
+            matches.append(
+                Match(
+                    reference_id=ref.reference_id,
+                    action_id=action.action_id,
+                    benefit_attribution=benefit_attribution(action, ref, delay_ms, actions),
+                    availability_delay_ms=delay_ms,
+                    localization_error_ms=localization_error_ms(action.boundary_source_sample, ref),
+                    pre_existing=pre_existing,
+                )
+            )
     matches.sort(key=lambda m: m.reference_id)
     matched_refs = {m.reference_id for m in matches}
     hard_misses = [
         r.reference_id
-        for r in eligible_refs
+        for r in refs
         if r.action_kind == "hard_boundary"
         and r.primary_case
         and r.reference_id not in matched_refs
@@ -361,6 +407,7 @@ def score_episode(
     scored_start: int,
     scored_end: int,
     unscored_intervals: list[tuple[int, int]] | None = None,
+    overlap_intervals: list[tuple[int, int]] | None = None,
 ) -> dict[str, Any]:
     matches, hard_misses, deadline_views = match_episode(
         actions, references, scored_start, scored_end
@@ -399,6 +446,9 @@ def score_episode(
             <= action.boundary_source_sample
             <= ref.acceptable_interval[1]
             for ref in references
+        ) or any(
+            overlap[0] <= action.boundary_source_sample < overlap[1]
+            for overlap in (overlap_intervals or [])
         ):
             harm_flags["overlap_hard_action"] += 1
         split = lexical_split(
@@ -533,6 +583,43 @@ def known_answer_fixtures() -> list[dict[str, Any]]:
         return (
             len(matches) == 1 and matches[0].pre_existing and matches[0].availability_delay_ms == 0
         )
+
+    # Exit-gate P2-SCORE-001 (round 3): the matcher is globally lexicographic and
+    # ordered. Two clean references and actions A/B (B0) plus D (detector) must
+    # match r1->A, r2->B (two B0 successes preserved), never r1->D, r2->A, and the
+    # matching must not cross source order (Section 12.1.6).
+    def fordered() -> bool:
+        r1 = ref("gt0", "hard_boundary", 12000, (8000, 12000), 12000)
+        r2 = ref("gt1", "hard_boundary", 15000, (11000, 15000), 15000)
+        a = act("A", 11000, 13000, "hard", "b0")
+        b = act("B", 13000, 15000, "hard", "b0")
+        d = act("D", 11500, 13000, "hard", "detector")
+        matches, _, _ = match_episode([a, b, d], [r1, r2], 0, 50000)
+        pairs = {m.reference_id.split(":")[-1]: m.action_id for m in matches}
+        return (
+            len(matches) == 2
+            and pairs.get("gt0") == "A"
+            and pairs.get("gt1") == "B"
+            and sum(1 for m in matches if m.benefit_attribution == "retained_b0_success") == 2
+        )
+
+    run("p2_score001_ordered_globally_lexicographic", fordered)
+
+    # Exit-gate P2-SCORE-001 (round 3): a detector action is never labeled
+    # accelerated_b0_success against a B0 action that misses the matching deadline
+    # (a deadline miss is recovered_b0_hard_miss, Sections 12.2-12.3).
+    def facc() -> bool:
+        r = ref("gt0", "hard_boundary", 24000, (16000, 24000), 24000, gap=True)
+        late_b0 = act("b0late", 20000, 24000 + 3500 * SAMPLES_PER_MS, "hard", "b0")
+        det = act("det", 22000, 24000 + 1000 * SAMPLES_PER_MS, "hard", "detector")
+        matches, _, _ = match_episode([late_b0, det], [r], 0, 50000)
+        return (
+            len(matches) == 1
+            and matches[0].action_id == "det"
+            and matches[0].benefit_attribution == "recovered_b0_hard_miss"
+        )
+
+    run("p2_score001_no_acceleration_from_deadline_miss_b0", facc)
 
     run("p2_score001_pre_existing_vad_disposition", fpre)
 
@@ -808,6 +895,7 @@ def run_b0_smoke(out: Path, corpus_root: Path | None = None) -> dict[str, Any]:
     from ..corpus import external
     from ..corpus.phase2_schemas import Phase2Manifest
     from .build_episodes import (
+        STABLE_INTERVAL_MS,
         SessionData,
         floor_to_chunk,
         load_session_data,
@@ -905,6 +993,17 @@ def run_b0_smoke(out: Path, corpus_root: Path | None = None) -> dict[str, Any]:
             for r in references
             if r.action_kind == "unscored" and r.acceptable_interval[1] > r.acceptable_interval[0]
         ]
+        overlap_intervals = [
+            (
+                max(r.start_sample, bounds["scored_start"]),
+                min(r.end_sample, processed_end),
+            )
+            for r in session.regions
+            if len(r.speakers) > 1
+            and not r.ambiguous
+            and (r.end_sample - r.start_sample) / SAMPLES_PER_MS >= STABLE_INTERVAL_MS
+            and max(r.start_sample, bounds["scored_start"]) < min(r.end_sample, processed_end)
+        ]
         word_intervals: list[tuple[int, int]] | None = None
         if session.corpus == "ami":
             word_intervals = _load_word_intervals_ami(
@@ -922,6 +1021,7 @@ def run_b0_smoke(out: Path, corpus_root: Path | None = None) -> dict[str, Any]:
             bounds["scored_start"],
             processed_end,
             unscored_intervals,
+            overlap_intervals,
         )
         episodes_scored += 1
         rows.append(
@@ -975,3 +1075,7 @@ def run_b0_smoke(out: Path, corpus_root: Path | None = None) -> dict[str, Any]:
         "rows": rows,
         "note": "baseline dev evidence only; never confirmatory; never natural rates",
     }
+
+
+if __name__ == "__main__":
+    main()

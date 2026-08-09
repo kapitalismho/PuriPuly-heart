@@ -621,8 +621,22 @@ def rebuilt_reference_ids(
     return sorted(rows, key=lambda r: r["reference_id"])
 
 
-def rebuilt_tag(clipped: list[dict[str, Any]]) -> str:
+def rebuilt_tag(
+    clipped: list[dict[str, Any]],
+    scored_start: int,
+    processed_end: int,
+    regions: list[Any],
+) -> str:
     if any(r["action_kind"] == "soft_overlap_marker" for r in clipped):
+        return "overlap_present"
+    if any(
+        not region.ambiguous
+        and len(region.speakers) > 1
+        and region.end_sample - region.start_sample >= 100 * SAMPLES_PER_MS
+        and region.start_sample < processed_end
+        and scored_start < region.end_sample
+        for region in regions
+    ):
         return "overlap_present"
     if any(r["action_kind"] == "hard_boundary" for r in clipped):
         return "hard_only"
@@ -651,6 +665,7 @@ def audit_episode(
     episode: dict[str, Any],
     wav_path: str | None,
     independent_refs: list[dict[str, Any]],
+    regions: list[Any] | None = None,
 ) -> dict[str, Any]:
     bounds = episode["bounds"]
     warm_start = int(bounds["warm_start"])
@@ -706,7 +721,7 @@ def audit_episode(
             else {"registered": registered[:5], "rebuilt": rebuilt[:5]}
         ),
     }
-    rebuilt_tag_value = rebuilt_tag(clipped)
+    rebuilt_tag_value = rebuilt_tag(clipped, scored_start, processed_end, regions or [])
     result["tag_consistency"] = rebuilt_tag_value == episode["tag"] and all(
         r["episode_pool_tag"] == episode["tag"] for r in episode["references"]
     )
@@ -768,6 +783,7 @@ def main() -> None:
         row = details_rows.get(session_id)
         wav_abs = None
         independent: list[dict[str, Any]] = []
+        regions: list[Any] = []
         if row is not None and row.get("wav_path"):
             wav_abs = str((corpus_root / row["wav_path"]).resolve())
         if row is not None:
@@ -813,7 +829,7 @@ def main() -> None:
                         )
                 regions = _regions_from_spans(spans, duration_samples)
                 independent = independent_references(regions, None, duration_samples)
-        public_results.append(audit_episode(episode, wav_abs, independent))
+        public_results.append(audit_episode(episode, wav_abs, independent, regions))
 
     diag_results: list[dict[str, Any]] = []
     for episode in sample_diag:
@@ -821,6 +837,7 @@ def main() -> None:
         row = details_rows.get(session_id)
         wav_abs = None
         independent: list[dict[str, Any]] = []
+        regions: list[Any] = []
         if row is not None and row.get("wav_path"):
             wav_abs = str((corpus_root / row["wav_path"]).resolve())
         if row is not None:
@@ -866,7 +883,7 @@ def main() -> None:
                         )
                 regions = _regions_from_spans(spans, duration_samples)
                 independent = independent_references(regions, None, duration_samples)
-        diag_results.append(audit_episode(episode, wav_abs, independent))
+        diag_results.append(audit_episode(episode, wav_abs, independent, regions))
 
     syn_sessions: dict[str, Any] = {}
     for manifest_name in ("ls_dev", "ls_held_out_clean", "ls_held_out_other", "mixed_dev_pool"):
@@ -880,7 +897,7 @@ def main() -> None:
             continue
         wav_abs = str((corpus_root / str(case.wav_relative_path)).resolve())
         independent = independent_references(list(case.regions), None, case.duration_samples)
-        synthetic_results.append(audit_episode(episode, wav_abs, independent))
+        synthetic_results.append(audit_episode(episode, wav_abs, independent, list(case.regions)))
 
     all_results = public_results + diag_results + synthetic_results
     waveform_failures = [
@@ -922,6 +939,7 @@ def main() -> None:
         "annotation_failures": annotation_failures,
         "tag_failures": tag_failures,
         "passed": not waveform_failures
+        and not waveform_unavailable
         and not slice_failures
         and not annotation_failures
         and not tag_failures,

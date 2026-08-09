@@ -154,11 +154,33 @@ def split_candidates(
     return sorted(set(candidates))
 
 
-def tag_episode(references: list[ReferenceAction]) -> str:
+def has_stable_overlap(regions: list[Any], scored_start: int, scored_end: int) -> bool:
+    """True when a stable multi-speaker (overlap) interval intersects the scored
+    region (PRD Sections 5.1/13.4/14.5): a scored region containing any overlap
+    reference OR stable overlap interval is ``overlap_present`` and never
+    contributes to the clean/gap headline. An overlap interval that began before
+    the scored start still qualifies when it continues into the scored region."""
+    for region in regions:
+        if region.ambiguous:
+            continue
+        if len(region.speakers) <= 1:
+            continue
+        if (region.end_sample - region.start_sample) / SAMPLES_PER_MS < STABLE_INTERVAL_MS:
+            continue
+        if region.start_sample < scored_end and scored_start < region.end_sample:
+            return True
+    return False
+
+
+def tag_episode(
+    references: list[ReferenceAction],
+    scored_start: int,
+    scored_end: int,
+    regions: list[Any],
+) -> str:
     has_overlap = any(
-        r.action_kind == "soft_overlap_marker" or (r.action_kind == "unscored" and False)
-        for r in references
-    )
+        r.action_kind == "soft_overlap_marker" for r in references
+    ) or has_stable_overlap(regions, scored_start, scored_end)
     hard = [r for r in references if r.action_kind == "hard_boundary"]
     if has_overlap:
         return "overlap_present"
@@ -834,7 +856,12 @@ def finalize_episodes(
             "hard_only",
             True,
         )
-        tag = tag_episode(refs_placeholder)
+        tag = tag_episode(
+            refs_placeholder,
+            bounds.scored_start,
+            processed_scored_end,
+            session.regions,
+        )
         anchor_suffix = ".".join(sorted(a[0] for a in draft.anchors))
         episode_id = f"{session.pool}:{session.session_id}:{bounds.scored_start}:{bounds.scored_end}:{anchor_suffix}"
         refs = references_for_episode(
@@ -932,7 +959,7 @@ def synthetic_episodes(manifests_dir: Path) -> tuple[list[EpisodeRecord], dict[s
             refs = references_for_episode(
                 specs, session_id, episode_id, 0, processed_end, "hard_only", True
             )
-            tag = tag_episode(refs)
+            tag = tag_episode(refs, 0, processed_end, [])
             refs = references_for_episode(
                 specs, session_id, episode_id, 0, processed_end, tag, True
             )
@@ -1001,7 +1028,7 @@ def natural_window_episodes(
         refs_placeholder = references_for_episode(
             session.specs, session_id, episode_id, start_sample, processed_end, "hard_only", True
         )
-        tag = tag_episode(refs_placeholder)
+        tag = tag_episode(refs_placeholder, start_sample, processed_end, session.regions)
         refs = references_for_episode(
             session.specs, session_id, episode_id, start_sample, processed_end, tag, True
         )
@@ -1038,6 +1065,18 @@ def write_hashed_manifest(
     episode_hashes: list[tuple[str, str]],
     excluded_keys: tuple[str, ...],
 ) -> str:
+    """Write a self-hashed manifest with a non-circular per-episode content hash.
+
+    Each episode records ``episode_content_sha256`` over its own payload (without
+    that key), and the manifest ``content_sha256`` covers the episode dicts
+    including their per-episode hashes, so the two hashes never depend on each
+    other cyclically.
+    """
+    hashes_by_id = dict(episode_hashes)
+    for episode in payload["episodes"]:
+        episode_hash = hashes_by_id.get(episode["episode_id"])
+        if episode_hash:
+            episode["episode_content_sha256"] = episode_hash
     hashed_payload = {k: v for k, v in payload.items() if k not in excluded_keys}
     content_sha256 = sha256_bytes(canonical_json(hashed_payload).encode("utf-8"))
     payload["content_sha256"] = content_sha256
@@ -1053,6 +1092,15 @@ def verify_manifest(path: Path) -> None:
     raw = json.loads(path.read_text(encoding="utf-8"))
     payload = {k: v for k, v in raw.items() if k != "content_sha256"}
     for episode in payload.get("episodes") or []:
+        recorded_hash = episode.get("episode_content_sha256")
+        without_hash = {k: v for k, v in episode.items() if k != "episode_content_sha256"}
+        without_hash.pop("episode_manifest_id", None)
+        if recorded_hash is not None:
+            actual = sha256_bytes(canonical_json(without_hash).encode("utf-8"))
+            if actual != recorded_hash:
+                raise Phase2Error(
+                    f"episode content hash mismatch in {path.name}: " f"{episode.get('episode_id')}"
+                )
         episode.pop("episode_manifest_id", None)
     expected = sha256_bytes(canonical_json(payload).encode("utf-8"))
     if expected != raw["content_sha256"]:
@@ -1216,7 +1264,10 @@ def main() -> None:
     }
     dev_path = out / "episode_manifest_dev.json"
     write_hashed_manifest(
-        dev_path, dev_payload, [(r.episode_id, "") for r in dev_episodes], ("content_sha256",)
+        dev_path,
+        dev_payload,
+        [(r.episode_id, r.content_hash()) for r in dev_episodes],
+        ("content_sha256",),
     )
     verify_manifest(dev_path)
 
@@ -1246,7 +1297,10 @@ def main() -> None:
     }
     natural_path = out / "natural_exposure_manifest.json"
     write_hashed_manifest(
-        natural_path, natural_payload, [(r.episode_id, "") for r in natural], ("content_sha256",)
+        natural_path,
+        natural_payload,
+        [(r.episode_id, r.content_hash()) for r in natural],
+        ("content_sha256",),
     )
     verify_manifest(natural_path)
 

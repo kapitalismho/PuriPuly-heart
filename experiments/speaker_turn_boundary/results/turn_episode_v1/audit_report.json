@@ -1,11 +1,11 @@
 {
   "annotation_failures": [],
-  "content_sha256": "41de0f4cd887ec1f463fd24fabab1f2eb51c3cc9c53ba6d2d78c8c816fa58994",
+  "content_sha256": "6b9963e8849af2ad13dd5632b813d7bd05b0e65462a739b1f237fa1ebd310475",
   "diagnostic_sampled": 9,
   "generated_from": {
-    "audit": "694f310aad722297445bf277f5e94440dea1cf13bec7e0b3ac103938dc0d5a75",
-    "build_episodes": "71912519c0cb9bdff214b0dff667e44b9199ec221cddfa785d65089c8475e955",
-    "episode_manifest_dev": "8cca25757ebef14af7386e902ea09f584fbc231ee555a46f435ae097d9b4c0e8",
+    "audit": "7408f12a3ee00cb9c2713e25ac3b447024b4370a5eb5cff576582e475cb6e543",
+    "build_episodes": "6deec51274cedf49a70cd299700547f39cbbbc16e200eb8e3056d15887784c7d",
+    "episode_manifest_dev": "deb1713cd581c93cc13c47103643041c7551993985379869cfa0ca9a407dff68",
     "schemas": "a9fa4571b1bab3cf88d6739a3732c1cc62f753a46d51d59c2db7526468eb8868"
   },
   "passed": true,
@@ -609,8 +609,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 131200,
+        "passed": true,
+        "samples": 65600
       }
     },
     {
@@ -629,8 +630,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 64000,
+        "passed": true,
+        "samples": 32000
       }
     },
     {
@@ -649,8 +651,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 137600,
+        "passed": true,
+        "samples": 68800
       }
     },
     {
@@ -669,8 +672,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 124800,
+        "passed": true,
+        "samples": 62400
       }
     },
     {
@@ -689,8 +693,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 105600,
+        "passed": true,
+        "samples": 52800
       }
     },
     {
@@ -709,8 +714,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 64000,
+        "passed": true,
+        "samples": 32000
       }
     },
     {
@@ -729,8 +735,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 131200,
+        "passed": true,
+        "samples": 65600
       }
     },
     {
@@ -749,8 +756,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 54400,
+        "passed": true,
+        "samples": 27200
       }
     },
     {
@@ -769,8 +777,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 38400,
+        "passed": true,
+        "samples": 19200
       }
     },
     {
@@ -789,8 +798,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 60800,
+        "passed": true,
+        "samples": 30400
       }
     },
     {
@@ -809,8 +819,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 92800,
+        "passed": true,
+        "samples": 46400
       }
     },
     {
@@ -829,8 +840,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 51200,
+        "passed": true,
+        "samples": 25600
       }
     },
     {
@@ -849,8 +861,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 160000,
+        "passed": true,
+        "samples": 80000
       }
     },
     {
@@ -869,8 +882,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 80000,
+        "passed": true,
+        "samples": 40000
       }
     },
     {
@@ -889,8 +903,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 112000,
+        "passed": true,
+        "samples": 56000
       }
     },
     {
@@ -909,8 +924,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 51200,
+        "passed": true,
+        "samples": 25600
       }
     },
     {
@@ -929,8 +945,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 38400,
+        "passed": true,
+        "samples": 19200
       }
     },
     {
@@ -949,8 +966,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 38400,
+        "passed": true,
+        "samples": 19200
       }
     },
     {
@@ -969,8 +987,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 67200,
+        "passed": true,
+        "samples": 33600
       }
     },
     {
@@ -989,8 +1008,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 64000,
+        "passed": true,
+        "samples": 32000
       }
     },
     {
@@ -1009,8 +1029,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 134400,
+        "passed": true,
+        "samples": 67200
       }
     },
     {
@@ -1029,8 +1050,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 80000,
+        "passed": true,
+        "samples": 40000
       }
     },
     {
@@ -1049,8 +1071,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 52480,
+        "passed": true,
+        "samples": 26240
       }
     },
     {
@@ -1069,8 +1092,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 73600,
+        "passed": true,
+        "samples": 36800
       }
     },
     {
@@ -1089,8 +1113,9 @@
       "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "passed": null,
-        "reason": "wav_missing"
+        "bytes": 37120,
+        "passed": true,
+        "samples": 18560
       }
     }
   ],
@@ -1101,106 +1126,5 @@
   "synthetic_sampled": 25,
   "tag_failures": [],
   "waveform_failures": [],
-  "waveform_unavailable": [
-    {
-      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_overlap_d200_o0100_01:0:65600:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d075_g0300_02:0:32000:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d200_g0100_01:0:68800:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d200_o0300_01:0:62400:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d150_g0100_00:0:52800:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d075_g0300_00:0:32000:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d200_o0100_03:0:65600:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d075_g0000_00:0:27200:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d050_g0000_01:0:19200:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d100_o0300_02:0:30400:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d150_o0300_03:0:46400:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d075_o0100_02:0:25600:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_same_speaker_d200_g0800_00:0:80000:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_gap_d100_g0300_00:0:40000:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_gap_d150_g0300_03:0:56000:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d075_o0100_00:0:25600:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_overlap_d075_o0500_01:0:19200:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d030_g0300_02:0:19200:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_overlap_d100_o0100_02:0:33600:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_dev:dev-clean_same_speaker_d050_g0800_01:0:32000:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d200_g0000_03:0:67200:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d100_g0300_01:0:40000:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_gap_d030_g0800_01:0:26240:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_same_speaker_d100_g0100_01:0:36800:",
-      "reason": "wav_missing"
-    },
-    {
-      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d030_g0300_01:0:18560:",
-      "reason": "wav_missing"
-    }
-  ]
+  "waveform_unavailable": []
 }

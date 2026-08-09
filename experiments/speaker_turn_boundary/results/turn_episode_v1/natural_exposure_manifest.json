@@ -1,5 +1,5 @@
 {
-  "content_sha256": "2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+  "content_sha256": "e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
   "episode_count": 74,
   "episodes": [
     {
@@ -14,8 +14,9 @@
         "warm_start": 10560000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "d8033101b6d525e98687d94805cec56f38c2caea8c33a4b2912e2e4fa20900cf",
       "episode_id": "natural_exposure_validation:alimeeting_R8001_M8004:10560000:11040000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -210,8 +211,9 @@
         "warm_start": 14400000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "60249eafa7311388e25977e6804d4fa4f13d88d8315db0b3670bf5a8e7b15c73",
       "episode_id": "natural_exposure_validation:alimeeting_R8003_M8001:14400000:14880000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -496,8 +498,9 @@
         "warm_start": 16800000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "e4adbcd7370a2107624e2e39a5a625c80dd37779c0b1eaaf9a572b6bb3b46a83",
       "episode_id": "natural_exposure_validation:alimeeting_R8003_M8001:16800000:17280000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -647,8 +650,9 @@
         "warm_start": 18240000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "ba31b6bc8b943b33ae1c3c3c8e279d6670501aad6845a819ea2737b9cd37f576",
       "episode_id": "natural_exposure_validation:alimeeting_R8003_M8001:18240000:18720000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -873,8 +877,9 @@
         "warm_start": 24480000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "4b273ed214382b0494716d214a17a23e09664c1ad5726b91612f1d0d7a7ac7e7",
       "episode_id": "natural_exposure_validation:alimeeting_R8003_M8001:24480000:24960000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -1084,8 +1089,9 @@
         "warm_start": 25440000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "1ac7d1b0a6d0d7ee10f0611f607d71981c0ffe07d843958f2418b293230b6826",
       "episode_id": "natural_exposure_validation:alimeeting_R8003_M8001:25440000:25920000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -1280,8 +1286,9 @@
         "warm_start": 29760000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "589383c6ff76084516cfe9cde0f2d2c862657077e2aa1ef02f1f397a99d819e6",
       "episode_id": "natural_exposure_validation:alimeeting_R8003_M8001:29760000:30240000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -1386,8 +1393,9 @@
         "warm_start": 30720000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "89d93fdb8f575c38d4755848c0c2979fabccc80c86b78fb51a11e29719dd7d9a",
       "episode_id": "natural_exposure_validation:alimeeting_R8003_M8001:30720000:31200000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -1657,8 +1665,9 @@
         "warm_start": 6720000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "1018a359f327298389e9ff9602d0cae2f11fee7c241ac832a99d429ab8ea03ed",
       "episode_id": "natural_exposure_validation:alimeeting_R8003_M8001:6720000:7200000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -1853,8 +1862,9 @@
         "warm_start": 18240000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "436e64001573c9e258f2ae0b7f5a3a741a80b491a75a6d29ecc6a6eafe540416",
       "episode_id": "natural_exposure_validation:alimeeting_R8007_M8010:18240000:18720000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -2109,8 +2119,9 @@
         "warm_start": 4800000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "89899842eb94b592487be927b57b9f2910b5048f4539189d933948a5a71e9c6d",
       "episode_id": "natural_exposure_validation:alimeeting_R8007_M8010:4800000:5280000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -2440,8 +2451,9 @@
         "warm_start": 7200000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "2728f77eec733d99f5f70dfc7949be7106c36cd33b459ad2cf516f14ffe859fe",
       "episode_id": "natural_exposure_validation:alimeeting_R8007_M8010:7200000:7680000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -2786,8 +2798,9 @@
         "warm_start": 9120000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "91c5ef879266d68667f68f7a320f115b9e2dd4c27ce25c6c19c50b7ae91ad0ae",
       "episode_id": "natural_exposure_validation:alimeeting_R8007_M8010:9120000:9600000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -3207,8 +3220,9 @@
         "warm_start": 25440000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "01f726105071305b4069e483e75e8e4c482d35131001ea3587812024538753db",
       "episode_id": "natural_exposure_validation:alimeeting_R8007_M8011:25440000:25920000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -3538,8 +3552,9 @@
         "warm_start": 3840000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "cadf0f73562421308cbad0efd6d8a262fdb82cad19c0ec7997c33a2bdee4c601",
       "episode_id": "natural_exposure_validation:alimeeting_R8007_M8011:3840000:4320000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -3809,8 +3824,9 @@
         "warm_start": 11040000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "c8afd6e3057799be00a378bcd4f9a5c2b8f62cd14411e9a13733debbd671b310",
       "episode_id": "natural_exposure_validation:alimeeting_R8008_M8013:11040000:11520000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -4005,8 +4021,9 @@
         "warm_start": 13440000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "01adfcd6f84816970a00b03cc5224e91d16397a5109ad479c904159f9f8ef1fe",
       "episode_id": "natural_exposure_validation:alimeeting_R8008_M8013:13440000:13920000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -4171,8 +4188,9 @@
         "warm_start": 4800000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "82016c7760c99361423fee73cef0799d141c253509f9b8fc8bbb85187e679222",
       "episode_id": "natural_exposure_validation:alimeeting_R8008_M8013:4800000:5280000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -4307,8 +4325,9 @@
         "warm_start": 4800000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "88a659fb179fc6e49495da9c0477f25383b6a6ef3b83a632477a917b1fa0adf1",
       "episode_id": "natural_exposure_validation:alimeeting_R8009_M8018:4800000:5280000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -4443,8 +4462,9 @@
         "warm_start": 15360000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "8ada7f525fc856065933eaa0f5ee504985fe245d9c6eac32cc0a7e044dc663af",
       "episode_id": "natural_exposure_validation:alimeeting_R8009_M8019:15360000:15840000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -4594,8 +4614,9 @@
         "warm_start": 22080000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "42d918daf9f5d2bb41fa28fb922845362cbac1e7e1178f794359e73655970fde",
       "episode_id": "natural_exposure_validation:alimeeting_R8009_M8019:22080000:22560000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -4730,8 +4751,9 @@
         "warm_start": 13920000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "992ee55bbeed8b5ea6e6540113148dec16046613733deb316b8ab69da0d92eb6",
       "episode_id": "natural_exposure_validation:alimeeting_R8009_M8020:13920000:14400000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -4986,8 +5008,9 @@
         "warm_start": 1440000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "24680b249638c6eed68d543db22a80388f09b6cfc18c640de9dbc4411a45c0ad",
       "episode_id": "natural_exposure_validation:alimeeting_R8009_M8020:1440000:1920000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -5167,8 +5190,9 @@
         "warm_start": 29280000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "b7c911709acd801a8489a38b088286ea83a5a435b8f3353f87c2ba094e0e491c",
       "episode_id": "natural_exposure_validation:alimeeting_R8009_M8020:29280000:29760000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -5288,8 +5312,9 @@
         "warm_start": 6720000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "ebd778eca53198c0cdc08e1505d50d30bf68e0cbaf94237f54359fd3983828d2",
       "episode_id": "natural_exposure_validation:alimeeting_R8009_M8020:6720000:7200000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -5469,8 +5494,9 @@
         "warm_start": 17280000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "d8b364dcc221a32a94b36e97f34ddcd52722974ea3ebd5cfc0feda1f28d31825",
       "episode_id": "natural_exposure_validation:ami_EN2001d:17280000:17760000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -5620,8 +5646,9 @@
         "warm_start": 24480000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "cb57a99840f1255c8088bc0f45e96df0ed27d4968977a60ab7e4491b551a320a",
       "episode_id": "natural_exposure_validation:ami_EN2001d:24480000:24960000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -5741,8 +5768,9 @@
         "warm_start": 30720000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "edc0cd1acd2c575055004f70b4e7311f008b8752e9171a56fe097e5c0fd33f3f",
       "episode_id": "natural_exposure_validation:ami_EN2001d:30720000:31200000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -5892,8 +5920,9 @@
         "warm_start": 31680000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "916d3810c01b79ceadc49dd2caf0965c67e082bbdfca22b2841c0a8445325c2c",
       "episode_id": "natural_exposure_validation:ami_EN2001d:31680000:32160000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -5998,8 +6027,9 @@
         "warm_start": 32640000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "91377e8add7b5f1a92ff3b10bde83ba282d3635523f5053414de0847224ab92b",
       "episode_id": "natural_exposure_validation:ami_EN2001d:32640000:33120000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -6134,8 +6164,9 @@
         "warm_start": 37920000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "2936d2e9bb3aafcaf3e1aff5e75a0f23527c2c9630bb08ce5ea182b966822e09",
       "episode_id": "natural_exposure_validation:ami_EN2001d:37920000:38400000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -6285,8 +6316,9 @@
         "warm_start": 4800000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "11198c6c2e4a1df8710c4dc99c48fa3badece8b41bed559ea71fc5872cfa8986",
       "episode_id": "natural_exposure_validation:ami_EN2001d:4800000:5280000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -6481,8 +6513,9 @@
         "warm_start": 51360000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "415ae45454882ba95501f34f752d700d896846e1cf66b900008cc7e472ed3e3b",
       "episode_id": "natural_exposure_validation:ami_EN2001d:51360000:51840000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -6692,8 +6725,9 @@
         "warm_start": 51840000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "5c0ceaf6d810f7da885b781ec3704eb10f66c3ee8a0a554c5b9be59c5543d453",
       "episode_id": "natural_exposure_validation:ami_EN2001d:51840000:52320000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -6858,8 +6892,9 @@
         "warm_start": 6240000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "1465ca2fd08c478d14a844852fb0a922652050441eb3051ab0f5ac370fb85c93",
       "episode_id": "natural_exposure_validation:ami_EN2001d:6240000:6720000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -7069,8 +7104,9 @@
         "warm_start": 8640000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "0432685e024225341dc206603df819fe5490c554bc919f404a95de2bb00cde58",
       "episode_id": "natural_exposure_validation:ami_EN2001d:8640000:9120000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -7205,8 +7241,9 @@
         "warm_start": 11520000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "d07ce2307451a66740359f99660ef3acc3ab12ee2d22adbf768ed3d686695da3",
       "episode_id": "natural_exposure_validation:ami_EN2002c:11520000:12000000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -7401,8 +7438,9 @@
         "warm_start": 21120000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "1163daf022e894edab35fcba734a2420b2e02615fb1c026e412bab8350ed668a",
       "episode_id": "natural_exposure_validation:ami_EN2002c:21120000:21600000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -7567,8 +7605,9 @@
         "warm_start": 22080000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "12d11c0498b83b5da52d68e8d2fb1113dc2895601965a7ea5b64e4120deace0d",
       "episode_id": "natural_exposure_validation:ami_EN2002c:22080000:22560000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -7778,8 +7817,9 @@
         "warm_start": 22560000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "15472ec07610bc12aa85adb17e48106126f823aab657c52664e25a22e1bc8621",
       "episode_id": "natural_exposure_validation:ami_EN2002c:22560000:23040000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -7914,8 +7954,9 @@
         "warm_start": 23520000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "4ac66c95e80961c40ae383cec5d02a54eaff201091b287a4bc6f16d341582555",
       "episode_id": "natural_exposure_validation:ami_EN2002c:23520000:24000000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -8095,8 +8136,9 @@
         "warm_start": 30240000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "56cc4e80f3e7bd02f5c7781f9e62a1397a0706027513c74288a81d7a3984b474",
       "episode_id": "natural_exposure_validation:ami_EN2002c:30240000:30720000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -8261,8 +8303,9 @@
         "warm_start": 3360000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "f43276c9ad3cd981309d82f32451ae3414edd19fabab2dbe3a8d8c15365aee5a",
       "episode_id": "natural_exposure_validation:ami_EN2002c:3360000:3840000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -8397,8 +8440,9 @@
         "warm_start": 12480000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "605d71c8fdbf31ed7593c6a0d9bafc63723a2647f6f2a1da0dd1d30b89c46690",
       "episode_id": "natural_exposure_validation:ami_ES2003a:12480000:12960000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -8473,8 +8517,9 @@
         "warm_start": 12960000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "e8bdcaebd19f1304b1912c08d5eaaeffe89225ec6e039d6d505d63c23bac72b6",
       "episode_id": "natural_exposure_validation:ami_ES2004a:12960000:13440000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -8729,8 +8774,9 @@
         "warm_start": 1920000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "95a1850d9976452773fd8dd4331c302837d02cdb4019482f787bd9a5a4d8d465",
       "episode_id": "natural_exposure_validation:ami_ES2004a:1920000:2400000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -8790,8 +8836,9 @@
         "warm_start": 18240000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "8b3490eb1b5d48b44427f9ac500a5474b8bc418fff866c8efb534da7873240cd",
       "episode_id": "natural_exposure_validation:ami_ES2015d:18240000:18720000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -9121,8 +9168,9 @@
         "warm_start": 29760000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "7cf4bbce7bb7b0f18d2f1ae698871df77b69713ae1e6279116049130f40961e1",
       "episode_id": "natural_exposure_validation:ami_ES2015d:29760000:30240000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -9407,8 +9455,9 @@
         "warm_start": 6720000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "5cc55d52681a387c7463b52a909a6e6b5a4d845965a3d88f43d556189bef2547",
       "episode_id": "natural_exposure_validation:ami_ES2015d:6720000:7200000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -9588,8 +9637,9 @@
         "warm_start": 10080000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "35b18febf5a52a6d203eefc4174c2bde2934515215c5bb6aa20f08f4e8107dd2",
       "episode_id": "natural_exposure_validation:ami_IS1008a:10080000:10560000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -9739,8 +9789,9 @@
         "warm_start": 14880000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "a5a471009ae555b464d1e998ad6caeaad875ec6611e9689f74c6a72b95423e3d",
       "episode_id": "natural_exposure_validation:ami_IS1008a:14880000:15101328:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -9800,8 +9851,9 @@
         "warm_start": 0
       },
       "coverage_loss": [],
+      "episode_content_sha256": "0b34649d069df450efd27754b5ced166fe7d711ed0d5b2a55e1de8a7815e1000",
       "episode_id": "natural_exposure_validation:ami_IS1009a:0:480000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -9861,8 +9913,9 @@
         "warm_start": 12960000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "cd84f05f7cf2ecedd42d10ae623cff235ca94339f761a86c5349c32a475a5e66",
       "episode_id": "natural_exposure_validation:ami_TS3005b:12960000:13440000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -9997,8 +10050,9 @@
         "warm_start": 14880000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "753950ca718c29a84dc9f73e6ea7b89119c7e427a21628349e8d0e9fe1c28dca",
       "episode_id": "natural_exposure_validation:ami_TS3005b:14880000:15360000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -10058,8 +10112,9 @@
         "warm_start": 20640000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "3374735577e60f7c9c58f35c2cc4d2d8c434e9182fc212c4e3a097193af83941",
       "episode_id": "natural_exposure_validation:ami_TS3005b:20640000:21120000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -10329,8 +10384,9 @@
         "warm_start": 23040000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "170e8774c5ce9ffbf15a0953203f684983dcff62924aaebe52029f2fcafb5723",
       "episode_id": "natural_exposure_validation:ami_TS3005b:23040000:23520000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -10615,8 +10671,9 @@
         "warm_start": 34560000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "a007fe07789a848af72724b89d67101e4a85baadfdd69d2271afed461832b237",
       "episode_id": "natural_exposure_validation:ami_TS3005b:34560000:35040000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -10856,8 +10913,9 @@
         "warm_start": 37920000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "8eb486a80c71826ce160911a4cb922c1c44219e45ad5c796ee193cd4d5f896b9",
       "episode_id": "natural_exposure_validation:ami_TS3005b:37920000:38400000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -11022,8 +11080,9 @@
         "warm_start": 6720000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "01fb7eb5f84b610f206cfc315c2dfb3dc0e451eb7e4abf4c0ac2d9fa9f3e086f",
       "episode_id": "natural_exposure_validation:ami_TS3005b:6720000:7200000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -11203,8 +11262,9 @@
         "warm_start": 12960000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "b40b2dfc25d39b88ae19a5586fa14008875ab90593c2e13791defe556a25618d",
       "episode_id": "natural_exposure_validation:ami_TS3006a:12960000:13440000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -11339,8 +11399,9 @@
         "warm_start": 16800000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "baabc97d006b99cec68883347eb661c7172327798207efc97e7db76c227742fd",
       "episode_id": "natural_exposure_validation:ami_TS3006a:16800000:17280000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -11550,8 +11611,9 @@
         "warm_start": 4320000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "74e9950283432f8bd62e5f1ad6aa3ad7810c7422adc159eb2754f10d62cbaf55",
       "episode_id": "natural_exposure_validation:ami_TS3006a:4320000:4800000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -11836,8 +11898,9 @@
         "warm_start": 5280000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "46bbb4efdd61de3cbc6245cdf4723023746e0e63c1daceba6a64e9de5fba5bfa",
       "episode_id": "natural_exposure_validation:ami_TS3006a:5280000:5760000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -12047,8 +12110,9 @@
         "warm_start": 20640000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "5a8335652f84a48e08d48c5117619da80a889870b05e386b7a1c118d5a618d60",
       "episode_id": "natural_exposure_validation:ami_TS3007a:20640000:21120000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": false,
@@ -12243,8 +12307,9 @@
         "warm_start": 14880000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "e279417285aa11e5bb328a507ba1fa2561390b48334cc295b13b772ade64d488",
       "episode_id": "natural_exposure_validation:ami_TS3009b:14880000:15360000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -12334,8 +12399,9 @@
         "warm_start": 18720000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "af352fb11ce6fdaff3fdd411b25c253f5515e5ea95077515e4198d7539bbaf90",
       "episode_id": "natural_exposure_validation:ami_TS3009b:18720000:19200000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -12500,8 +12566,9 @@
         "warm_start": 20640000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "a93b84802cff1fa451639d001cf3e7377e732dee7b878fba5241be5353874df3",
       "episode_id": "natural_exposure_validation:ami_TS3009b:20640000:21120000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -12741,8 +12808,9 @@
         "warm_start": 34080000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "c7913844ae3588a842c91934a1fffa934bfb788474d10bf79a9451ca4a828b53",
       "episode_id": "natural_exposure_validation:ami_TS3009b:34080000:34560000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -12982,8 +13050,9 @@
         "warm_start": 37440000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "cbee4d20eeaca0a7ca479c4ff4758928b024c07792118013d1dc0549a7633258",
       "episode_id": "natural_exposure_validation:ami_TS3009b:37440000:37920000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -13193,8 +13262,9 @@
         "warm_start": 9600000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "dbfafab37db9b6c09894d569e55033d7b2248cb5980d4efb49e471b8ea8d36e4",
       "episode_id": "natural_exposure_validation:ami_TS3009b:9600000:10080000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -13359,8 +13429,9 @@
         "warm_start": 14400000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "85097a851be3a8f9d769aeabedbf5357114b522d5fde066beea937c148fe77be",
       "episode_id": "natural_exposure_validation:ami_TS3012c:14400000:14880000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -13600,8 +13671,9 @@
         "warm_start": 19680000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "a982e466a571d227526d5661b95553130151a5b5979bfb84c17058d2858608d3",
       "episode_id": "natural_exposure_validation:ami_TS3012c:19680000:20160000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -13766,8 +13838,9 @@
         "warm_start": 27840000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "2b42fe5ab6ec21b1e83340de16c63628ebf63f42ba9f8e2c6cc61f0f61f619d1",
       "episode_id": "natural_exposure_validation:ami_TS3012c:27840000:28320000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -14022,8 +14095,9 @@
         "warm_start": 29280000
       },
       "coverage_loss": [],
+      "episode_content_sha256": "7723b54a887577e9b1346758e268e15b18f073f1dd6018c2989858272011acb6",
       "episode_id": "natural_exposure_validation:ami_TS3012c:29280000:29760000:",
-      "episode_manifest_id": "natural_exposure_manifest:2bc7b6907f4001ff3955abac4d5fc3a4c585828f677e6a28c0de1e686dcd7189",
+      "episode_manifest_id": "natural_exposure_manifest:e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3",
       "flags": {
         "tail_truncated": true,
         "unaligned_source_end": true,
@@ -14253,7 +14327,7 @@
     }
   ],
   "generated_from": {
-    "build_episodes": "71912519c0cb9bdff214b0dff667e44b9199ec221cddfa785d65089c8475e955",
+    "build_episodes": "6deec51274cedf49a70cd299700547f39cbbbc16e200eb8e3056d15887784c7d",
     "contracts": "b207d3f8b9720df5dd228aa8bd8b479c54622abb905a9ca04f580820a6fc3c03",
     "inventory": "6cded8163dbac15682905bdda7aa5eb5c464635260045ae5693cee0cc0e564fd",
     "schemas": "a9fa4571b1bab3cf88d6739a3732c1cc62f753a46d51d59c2db7526468eb8868"

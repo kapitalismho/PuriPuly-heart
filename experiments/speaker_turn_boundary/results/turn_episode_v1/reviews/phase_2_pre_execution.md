@@ -53,7 +53,7 @@ rate estimation (Phase 7+).
 
 The B0/peer class **fails** the state-equivalence gate: the Silero VAD v5 RNN hidden
 state carries long context; source_prefix vs episode_reset scored-region traces
-differ in 186/186 episodes with the frozen 5 s warm-up. A convergence diagnostic
+differ in 74/186 episodes with the frozen 5 s warm-up. A convergence diagnostic
 shows exact parity only from ~60 s warm-up. Per PRD Section 5.4 and invariant 26,
 **B0 scored evaluation must use source-prefix state** (full-session replay with the
 episode scored region sliced from the source-prefix trace); reset-plus-warm-up is
@@ -99,7 +99,36 @@ P2-STATE-001/002, P2-INTEGRITY-001/002. All findings were resolved in candidate
   `generated_from` ledger and `structural_taxonomy_status` in every artifact
   (P2-INTEGRITY-001/002).
 
-Final Phase 2 evidence (all self-hash verified): `episode_manifest_dev.json` (804
-episodes), `natural_exposure_manifest.json` (74 windows), `state_equivalence_report.json`,
-`scoring_fixture_report.json` (16/16 fixtures), `audit_report.json` (12 public + 25
-synthetic, zero failures).
+Round 2 independently re-reviewed candidate `1ba8a362` and returned `fix` with nine
+findings (six blocker, three important). Candidate `f410c380` remediated reference
+coverage, audit independence, ordered matching/scoring, state capture/fallback,
+artifact integrity, and split enforcement findings.
+
+Round 3 independently re-reviewed candidate `f410c380` and returned `fix` with seven
+findings (five blocker, two important): capture timing at scored start, stable-overlap
+episode classification, fail-closed missing-waveform audit, globally lexicographic
+ordered matching, deadline-valid B0 acceleration attribution, live-code provenance,
+and per-episode content hashes. The working-tree remediation produces:
+
+- `episode_manifest_dev.json`: 804 episodes, content SHA-256
+  `deb1713cd581c93cc13c47103643041c7551993985379869cfa0ca9a407dff68`,
+  804/804 per-episode hashes verified.
+- `natural_exposure_manifest.json`: 74 windows, content SHA-256
+  `e7c8562602685925e4ccb1964801d384c555813d3f565d5a67c7750770b088f3`,
+  74/74 per-episode hashes verified.
+- `state_equivalence_report.json`: 423,276 bytes, content SHA-256
+  `74f2d122c40e66e0f9212900b42fe7b6b3ec1d2c722a60a9ea9d58cba7a3eeec`;
+  capture/restore round-trip 186/186, capture hashes 186/186, parity 112 pass/74
+  fail, disposition `source_prefix_required`.
+- `scoring_fixture_report.json`: content SHA-256
+  `331a8d54394dbc30ad59d208f470ebafc3c5c2abcb9016b4550b8b52522b625a`,
+  25/25 fixtures pass and the B0 baseline smoke covers 186 episodes.
+- `audit_report.json`: content SHA-256
+  `6b9963e8849af2ad13dd5632b813d7bd05b0e65462a739b1f237fa1ebd310475`;
+  12 public, 9 diagnostic, and 25 synthetic samples with zero waveform unavailable,
+  waveform, slice, annotation, or tag failures.
+
+All five candidate artifacts pass their canonical self-hash and `generated_from`
+checks against the formatted live code. The full experiment test suite collects and
+passes 280 tests. Round 4 exit-gate re-review is pending; these results are candidate
+evidence until that review accepts the exact commit.
