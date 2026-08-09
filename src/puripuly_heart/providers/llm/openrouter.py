@@ -137,13 +137,13 @@ def _build_provider_preferences(
 ) -> dict[str, object]:
     if provider_routing == OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY:
         return {
-            "only": ["cloudflare", "coreweave/bf16", "open-inference/bf16"],
+            "only": ["cloudflare", "coreweave/bf16", "friendli"],
             "sort": {"by": "latency", "partition": "none"},
             "allow_fallbacks": True,
         }
     if provider_routing == OpenRouterProviderRouting.GEMMA4_31B_LATENCY:
         return {
-            "only": ["coreweave/bf16", "open-inference/bf16"],
+            "only": ["coreweave/bf16", "friendli"],
             "sort": {"by": "latency"},
             "allow_fallbacks": True,
         }
