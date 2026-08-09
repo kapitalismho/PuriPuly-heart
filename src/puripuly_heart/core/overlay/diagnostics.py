@@ -16,12 +16,26 @@ from puripuly_heart.core.diagnostic_validation import (
     redact_text_for_sink,
 )
 
-_PROCESS_EVENT_LIMIT = 50
+_PROCESS_EVENT_LIMIT = 256
 _CHILD_LINE_LIMIT = 100
 _PRESENTER_SNAPSHOT_LIMIT = 30
 _PRESENTER_REMOVAL_LIMIT = 50
 _BRIDGE_EVENT_LIMIT = 30
 _TRANSLATION_EVENT_LIMIT = 50
+_SENSITIVE_DIAGNOSTIC_FIELD_KEYS = {
+    "accesstoken",
+    "apikey",
+    "audio",
+    "audiobytes",
+    "authorization",
+    "credentials",
+    "idtoken",
+    "refreshtoken",
+    "sessiontoken",
+    "subtitlecontent",
+    "text",
+    "transcript",
+}
 
 
 def default_overlay_diagnostics_dir() -> Path:
@@ -44,6 +58,10 @@ def _json_safe_fields(fields: dict[Any, Any]) -> dict[str, Any]:
     safe_fields: dict[str, Any] = {}
     for key, value in fields.items():
         key_text = str(key)
+        normalized_key = "".join(character for character in key_text.lower() if character.isalnum())
+        if normalized_key in _SENSITIVE_DIAGNOSTIC_FIELD_KEYS:
+            safe_fields[f"redacted_field_{len(safe_fields) + 1}"] = DIAGNOSTIC_REDACTION_MARKER
+            continue
         raw_assignment = f"{key_text}={value}"
         redacted_assignment = _redact_failure_jsonl_text(raw_assignment)
         if redacted_assignment != raw_assignment:
@@ -89,10 +107,10 @@ class OverlayDiagnosticsRecorder:
     last_dump_path: Path | None = None
 
     _sequence: int = field(init=False, default=0)
+    _started_at: float = field(init=False, default_factory=time.monotonic)
 
     def record_process(self, event: str, **fields: Any) -> dict[str, Any]:
-        _ = (event, fields)
-        return {}
+        return self._append(self.process_events, category="process", event=event, **fields)
 
     def record_child_line(self, stream: str, line: str) -> dict[str, Any]:
         target = self.child_stderr_lines if stream == "stderr" else self.child_stdout_lines
@@ -150,14 +168,19 @@ class OverlayDiagnosticsRecorder:
 
     def _event(self, *, category: str, event: str, **fields: Any) -> dict[str, Any]:
         self._sequence += 1
+        safe_fields = _json_safe_fields(dict(fields))
+        source_monotonic_ms = safe_fields.pop("monotonic_ms", None)
         payload: dict[str, Any] = {
             "sequence": self._sequence,
             "recorded_at": time.time(),
+            "monotonic_ms": round((time.monotonic() - self._started_at) * 1000, 3),
             "overlay_instance_id": self.overlay_instance_id,
             "category": category,
             "event": event,
         }
-        payload.update(_json_safe_fields(dict(fields)))
+        if source_monotonic_ms is not None:
+            payload["source_monotonic_ms"] = source_monotonic_ms
+        payload.update(safe_fields)
         return payload
 
     def _sorted_events(self) -> list[dict[str, Any]]:
@@ -167,5 +190,6 @@ class OverlayDiagnosticsRecorder:
         )
 
     def _iter_all_events(self) -> Iterable[dict[str, Any]]:
+        yield from self.process_events
         yield from self.child_stdout_lines
         yield from self.child_stderr_lines

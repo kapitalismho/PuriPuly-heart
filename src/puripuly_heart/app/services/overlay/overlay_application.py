@@ -5,7 +5,7 @@ import contextlib
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import cast
+from typing import Literal, cast
 
 from puripuly_heart.app.ports.translation_diagnostics_runtime import (
     TranslationOverlayDiagnosticsPort,
@@ -51,6 +51,7 @@ from .overlay_session_transition import (
 
 OVERLAY_STARTUP_TIMEOUT_MS = 3000
 OVERLAY_SHUTDOWN_GRACE_S = 0.05
+OVERLAY_STEAMVR_FALLBACK_POLICY: Literal["retry_every_enable"] = "retry_every_enable"
 OVERLAY_FAILURE_REASONS = frozenset(
     {
         "missing_executable",
@@ -84,6 +85,7 @@ class OverlayApplicationSnapshot:
     auto_restart_scheduled: bool
     active_target: str | None
     fallback_active: bool
+    fallback_policy: Literal["retry_every_enable"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,7 +170,7 @@ class OverlayApplicationOwner:
         )
         self._fallback_owner = OverlaySessionFallbackOwner(
             can_start=self._can_start_fallback,
-            start_overlay=self.begin_start,
+            start_overlay=self._begin_fallback_start,
             publish_notice=self.fallback_notice_sink,
             diagnostics_sink=self._on_fallback_diagnostic,
         )
@@ -233,6 +235,7 @@ class OverlayApplicationOwner:
             auto_restart_scheduled=self._auto_restart_scheduled,
             active_target=self._active_target,
             fallback_active=self._fallback_owner.active,
+            fallback_policy=OVERLAY_STEAMVR_FALLBACK_POLICY,
         )
 
     @staticmethod
@@ -451,7 +454,29 @@ class OverlayApplicationOwner:
             return
         await self._transition_owner.begin_start(self._start_execution)
 
-    def _start_execution(self) -> OverlaySessionStartExecution:
+    async def _begin_fallback_start(self) -> None:
+        generation = self._fallback_owner.generation
+        reason = self._fallback_owner.reason
+        try:
+            status = await self._transition_owner.begin_start(
+                lambda: self._start_execution(replace_starting=True)
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            await self._complete_fallback_failure(reason, generation=generation)
+            raise
+        if status == "started":
+            return
+        if status == "already_active" and self._state in {"starting", "connected"}:
+            return
+        await self._complete_fallback_failure(reason, generation=generation)
+
+    def _start_execution(
+        self,
+        *,
+        replace_starting: bool = False,
+    ) -> OverlaySessionStartExecution:
         return OverlaySessionStartExecution(
             state=self._state,
             previous_runtime=self._runtime,
@@ -460,15 +485,17 @@ class OverlayApplicationOwner:
             resolve_target=self.effective_target_for_start,
             on_starting=self._mark_starting,
             run_start=self.run_start,
+            replace_starting=replace_starting,
         )
 
     def _mark_starting(self, runtime: OverlayRuntimeHandle, target: str) -> None:
         if self._runtime is not runtime:
             raise RuntimeError("overlay start transition runtime is not current")
         self._active_target = target
-        self._transition_state("starting")
         self._auto_restart_scheduled = False
-        self._notify_state()
+        if self._state != "starting":
+            self._transition_state("starting")
+            self._notify_state()
 
     async def _apply_retry_ownership(
         self,
@@ -507,7 +534,15 @@ class OverlayApplicationOwner:
             target=target,
             clock=self.clock,
             startup_timeout_ms=OVERLAY_STARTUP_TIMEOUT_MS,
+            fallback_reason=self._fallback_owner.reason if self._fallback_owner.active else None,
         )
+
+    def record_lifecycle_trace(self, event: str, **fields: object) -> None:
+        runtime = self._runtime
+        manager = runtime.process_manager if runtime is not None else None
+        record_trace = getattr(manager, "record_lifecycle_trace", None)
+        if callable(record_trace):
+            record_trace("peer_application", event, **fields)
 
     def _generation_effects(self) -> OverlayGenerationStartEffects:
         return OverlayGenerationStartEffects(
@@ -632,21 +667,58 @@ class OverlayApplicationOwner:
         reason = self.normalize_failure_reason(failure_reason)
         if self.should_fallback(reason):
             self.log_basic(
-                f"[Overlay] Session fallback to desktop: reason={reason}",
+                "[Overlay] Session fallback to desktop: "
+                f"policy={OVERLAY_STEAMVR_FALLBACK_POLICY} reason={reason}",
                 logging.INFO,
             )
-            self._fallback_owner.activate()
-            await self.teardown(preserve_presenter_state=True)
+            self._fallback_owner.activate(reason)
+            teardown_succeeded = await self.teardown(preserve_presenter_state=True)
+            if not teardown_succeeded and self.runtime_has_resources(self._runtime):
+                await self._complete_fallback_failure(reason)
+                return
             self._failure_reason = None
-            self._transition_state("off")
-            await self.refresh_peer_dependencies()
-            self._notify_state()
+            try:
+                await self.refresh_peer_dependencies()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self.log_detailed(
+                    "[Overlay] Peer dependency refresh failed during desktop fallback",
+                    logging.WARNING,
+                    exc,
+                )
+                await self._complete_fallback_failure(reason)
+                return
             self.publish_fallback(True)
-            self._fallback_owner.schedule()
+            if not self._fallback_owner.schedule():
+                await self._complete_fallback_failure(reason)
             return
         self.on_start_failed(failure_reason)
         await self.teardown(preserve_presenter_state=True)
         await self.refresh_peer_dependencies()
+
+    async def _complete_fallback_failure(
+        self,
+        failure_reason: str | None,
+        *,
+        generation: int | None = None,
+    ) -> None:
+        if generation is not None and not self._fallback_owner.is_current(generation):
+            return
+        reason = self.normalize_failure_reason(failure_reason or self._fallback_owner.reason)
+        self._fallback_owner.clear()
+        await self.teardown(preserve_presenter_state=True)
+        self.on_start_failed(reason)
+        try:
+            await self.refresh_peer_dependencies()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self.log_detailed(
+                "[Overlay] Peer dependency refresh failed after terminal fallback",
+                logging.WARNING,
+                exc,
+            )
 
     def on_start_failed(self, failure_reason: str | None) -> None:
         self._failure_reason = self.normalize_failure_reason(failure_reason)
@@ -771,12 +843,17 @@ class OverlayApplicationOwner:
             return failure_reason
         return "unknown"
 
-    def _transition_state(self, next_state: str) -> None:
+    def _transition_state(
+        self,
+        next_state: str,
+        *,
+        preserve_peer_activation: bool = False,
+    ) -> None:
         previous = self._state
         self._state = next_state
         self._log_state_transition(previous, next_state)
         self.sync_peer_effective()
-        if next_state not in {"starting", "connected"}:
+        if next_state not in {"starting", "connected"} and not preserve_peer_activation:
             self.cancel_peer_activation()
 
     def _notify_state(self) -> None:
@@ -838,12 +915,12 @@ class OverlayApplicationOwner:
 
     def _on_fallback_diagnostic(
         self,
-        _event: str,
+        event: str,
         _metadata: object,
         exception: Exception | None,
     ) -> None:
         self.log_detailed(
-            "[Overlay] Failed to schedule session desktop fallback",
+            f"[Overlay] Session desktop fallback failed: event={event}",
             logging.WARNING,
             exception,
         )
@@ -854,7 +931,7 @@ class OverlayApplicationOwner:
             not self._ingress_stopped
             and state.settings_available
             and state.overlay_intent_enabled
-            and self._state not in {"starting", "connected"}
+            and self._state == "starting"
         )
 
     def stop_ingress(self) -> None:
@@ -871,6 +948,7 @@ class OverlayApplicationOwner:
 __all__ = [
     "OVERLAY_FAILURE_REASONS",
     "OVERLAY_SHUTDOWN_GRACE_S",
+    "OVERLAY_STEAMVR_FALLBACK_POLICY",
     "OVERLAY_STARTUP_TIMEOUT_MS",
     "OverlayApplicationState",
     "OverlayApplicationOwner",

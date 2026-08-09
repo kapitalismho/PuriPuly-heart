@@ -149,20 +149,26 @@ class OverlayBridge:
                     await connection.send(json.dumps({"type": "auth_error"}))
                     return
                 self._token_consumed = True
-                await connection.send(
-                    json.dumps(
-                        {
-                            "type": "snapshot",
-                            "payload": self._snapshot.to_dict(),
-                        }
+                initial_message: dict[str, Any] = {
+                    "type": "snapshot",
+                    "payload": self._snapshot.to_dict(),
+                }
+                if self.desktop_runtime_controls_enabled:
+                    startup_runtime_controls: list[dict[str, Any]] = []
+                    if self.runtime_logging_mode is not None:
+                        startup_runtime_controls.append(
+                            dict(self._runtime_control_payload()["payload"])
+                        )
+                    startup_runtime_controls.extend(
+                        dict(payload) for payload in self._initial_desktop_runtime_controls
                     )
-                )
-                if self.runtime_logging_mode is not None:
+                    initial_message["startup_runtime_controls"] = startup_runtime_controls
+                await connection.send(json.dumps(initial_message))
+                if (
+                    not self.desktop_runtime_controls_enabled
+                    and self.runtime_logging_mode is not None
+                ):
                     await connection.send(json.dumps(self._runtime_control_payload()))
-                for payload in self._initial_desktop_runtime_controls:
-                    await connection.send(
-                        json.dumps(self._desktop_runtime_control_message(payload))
-                    )
                 self._authenticated_connections.add(connection)
                 authenticated = True
                 logger.info(

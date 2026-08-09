@@ -12,6 +12,7 @@ from typing import Literal, cast
 from puripuly_heart.app.adapters.application_runtime_shutdown import (
     ApplicationRuntimeShutdownAdapter,
 )
+from puripuly_heart.app.adapters.system_directory_opener import SystemDirectoryOpener
 from puripuly_heart.app.adapters.ui_runtime import (
     UiDiagnosticsRuntimeAdapter,
     UiEngagementRuntimeAdapter,
@@ -69,6 +70,9 @@ from puripuly_heart.app.services.gpu_provider_recovery_application import (
 from puripuly_heart.app.services.gpu_runtime_interaction import (
     GpuRuntimeInteractionOwner,
     GpuRuntimeInteractionState,
+)
+from puripuly_heart.app.services.http_extension_registry import (
+    HttpExtensionRegistryService,
 )
 from puripuly_heart.app.services.local_asr_diagnostics import LocalASRDiagnosticsOwner
 from puripuly_heart.app.services.local_asr_gpu_provisioning import (
@@ -178,7 +182,7 @@ from puripuly_heart.composition.application_startup import (
     compose_application_startup,
 )
 from puripuly_heart.composition.application_state import ApplicationUiStateAdapter
-from puripuly_heart.config.paths import user_config_dir
+from puripuly_heart.config.paths import default_http_extensions_dir, user_config_dir
 from puripuly_heart.config.settings import (
     OVERLAY_TARGET_STEAMVR,
     AppSettings,
@@ -186,6 +190,7 @@ from puripuly_heart.config.settings import (
     OpenRouterCredentialSource,
     QwenLLMModel,
     STTProviderName,
+    TranslationModel,
     build_managed_openrouter_byok_target_settings,
     materialize_translation_settings,
     with_telemetry_consent,
@@ -193,6 +198,7 @@ from puripuly_heart.config.settings import (
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.clipboard.watcher import create_clipboard_watcher
 from puripuly_heart.core.clock import SystemClock
+from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
 )
@@ -353,10 +359,12 @@ def compose_application_runtime(
     ) = None,
 ) -> UiApplicationPort:
     settings = compose_settings_owner(config_path)
+    http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
+    http_extensions.reload()
     clock = SystemClock()
     ingress = ApplicationIngressGate()
     pipeline = RuntimePipelineHandle()
-    signatures = ProviderRuntimeSignatures()
+    signatures = ProviderRuntimeSignatures(http_extensions=http_extensions)
     effects_state = SettingsRuntimeEffectsState()
     manual_fallback = ManualLocalASRFallbackOwner()
     event_bridge: UIEventBridgePort | None = None
@@ -1504,6 +1512,7 @@ def compose_application_runtime(
         translation_runtime_configuration_provider=(
             lambda: pipeline.translation_runtime_configuration
         ),
+        http_extensions=http_extensions,
         self_capture_provider=lambda: pipeline.self_capture,
         self_capture_owner=self_capture_owner,
         peer=lambda: require_peer().owner,
@@ -1633,6 +1642,7 @@ def compose_application_runtime(
         configure_vrc_mic=lambda *, enabled: (require_vrc_mic_sync().configure(enabled=enabled)),
         stt_failure_sink=log_error,
         cleanup_failure_sink=lambda message, exc: log_error(f"{message}: {exc}"),
+        http_extensions=http_extensions,
     )
 
     runtime_components = RuntimeCompositionComponents(
@@ -1652,6 +1662,9 @@ def compose_application_runtime(
         return "alibaba_singapore"
 
     def llm_requires_secret(provider: LLMProviderName) -> bool:
+        value = current_settings()
+        if value is not None and value.translation.model == TranslationModel.CUSTOM_HTTP:
+            return False
         return provider in {
             LLMProviderName.GEMINI,
             LLMProviderName.OPENROUTER,
@@ -1664,6 +1677,7 @@ def compose_application_runtime(
         llm_runtime = pipeline.llm_runtime
         return bool(
             value is not None
+            and value.translation.model != TranslationModel.CUSTOM_HTTP
             and value.provider.llm == LLMProviderName.OPENROUTER
             and value.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
             and llm_runtime is not None
@@ -1842,6 +1856,10 @@ def compose_application_runtime(
         runtime_shutdown=runtime_shutdown,
         runtime_logging=runtime_logging,
         osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
+        http_extension_registry=HttpExtensionRegistryService(
+            http_extensions,
+            SystemDirectoryOpener(),
+        ),
     )
 
     async def initialize_local_asr_evidence(value: object) -> None:

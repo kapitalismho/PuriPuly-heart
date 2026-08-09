@@ -55,7 +55,7 @@ def test_owner_applies_session_fallback_policy_without_changing_configured_targe
         steamvr_target="steamvr",
     )
 
-    owner.activate()
+    owner.activate("steamvr_not_running")
 
     assert not owner.should_fallback(
         reason="steamvr_not_running",
@@ -65,6 +65,11 @@ def test_owner_applies_session_fallback_policy_without_changing_configured_targe
         desktop_target="desktop",
         steamvr_target="steamvr",
     )
+    assert owner.reason == "steamvr_not_running"
+
+    owner.clear()
+
+    assert owner.reason is None
 
 
 @pytest.mark.asyncio
@@ -77,7 +82,7 @@ async def test_owner_schedules_one_generation_checked_fallback_start() -> None:
     owner, notices, _ = _owner(start_overlay=start)
     owner.activate()
     owner.publish(True)
-    owner.schedule()
+    assert owner.schedule() is True
     task = owner.task
 
     assert task is not None
@@ -99,7 +104,7 @@ async def test_owner_clear_cancels_stale_start_and_notice() -> None:
     owner, notices, _ = _owner(start_overlay=start)
     owner.activate()
     owner.publish(True)
-    owner.schedule()
+    assert owner.schedule() is True
 
     owner.clear()
     await asyncio.sleep(0)
@@ -119,7 +124,7 @@ async def test_owner_reports_task_factory_failure_and_closes_coroutine() -> None
 
     owner.task_factory = fail
     owner.activate()
-    owner.schedule()
+    assert owner.schedule() is False
 
     assert owner.task is None
     assert diagnostics == [
@@ -141,7 +146,7 @@ async def test_owner_close_cancels_task_and_clears_session_state() -> None:
     owner, notices, _ = _owner(start_overlay=start)
     owner.activate()
     owner.publish(True)
-    owner.schedule()
+    assert owner.schedule() is True
     await asyncio.sleep(0)
 
     await owner.close()
@@ -151,7 +156,7 @@ async def test_owner_close_cancels_task_and_clears_session_state() -> None:
     assert notices == [True, False]
 
     owner.activate()
-    owner.schedule()
+    assert owner.schedule() is False
 
     assert owner.accepting_ingress is False
     assert owner.active is False
@@ -167,10 +172,10 @@ async def test_owner_clear_invalidates_pending_start_without_freezing_ingress() 
 
     owner, _, _ = _owner(start_overlay=start)
     owner.activate()
-    owner.schedule()
+    assert owner.schedule() is True
     owner.clear()
     owner.activate()
-    owner.schedule()
+    assert owner.schedule() is True
     task = owner.task
 
     assert owner.accepting_ingress is True

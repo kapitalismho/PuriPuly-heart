@@ -56,6 +56,8 @@ VNEXT_NATIVE_PERSISTED_LEAF_PATHS = frozenset(
         "intent.desktop_audio.capture_target.kind",
         "intent.desktop_audio.capture_target.device_name",
         "intent.desktop_audio.capture_target.process",
+        "intent.translation.http_extension_id",
+        "intent.translation.previous_llm_model",
     }
 ) | frozenset(
     f"state.provider_verification.{provider}.{field}"
@@ -560,11 +562,11 @@ def _current_migration_classification() -> dict[str, FieldClassification]:
         notes="Schema metadata, not a user/state setting field; v24 fixture must remain version 24.",
     )
     table["overlay.calibration.anchor"] = FieldClassification(
-        category="singleton_supported_value",
+        category="supported_enum_value",
         destination="intent.overlay.calibration.anchor",
-        status="singleton_supported_value",
+        status="default_supported_value",
         fixture=MAXIMAL_V24_FIXTURE_NAME,
-        notes="Current overlay calibration supports only 'head_locked'; non-default values fail validation.",
+        notes="Current overlay calibration supports 'head_locked' and 'spatial_locked'; other values fail validation.",
     )
     for path, destination in ADR_RESOLVED_CURRENT_DESTINATIONS.items():
         if path in table:

@@ -4,19 +4,20 @@ import asyncio
 from dataclasses import dataclass, field
 
 import pytest
-
 from puripuly_heart.app.services.overlay_session_transition import (
     OverlaySessionShutdownExecution,
     OverlaySessionStartExecution,
     OverlaySessionTransitionDiagnostic,
     OverlaySessionTransitionOwner,
 )
+
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 
 
 @dataclass
 class StartHarness:
     state: str = "off"
+    replace_starting: bool = False
     teardown_result: bool = True
     events: list[str] = field(default_factory=list)
     teardown_started: asyncio.Event = field(default_factory=asyncio.Event)
@@ -57,6 +58,7 @@ class StartHarness:
             resolve_target=lambda: "desktop",
             on_starting=self.on_starting,
             run_start=self.run_start,
+            replace_starting=self.replace_starting,
         )
 
 
@@ -101,6 +103,32 @@ async def test_start_skips_an_already_active_session() -> None:
 
     assert await owner.begin_start(harness.execution) == "already_active"
     assert harness.events == []
+
+
+@pytest.mark.asyncio
+async def test_start_skips_an_existing_start_without_replacement_authority() -> None:
+    harness = StartHarness(state="starting")
+
+    assert await OverlaySessionTransitionOwner().begin_start(harness.execution) == (
+        "already_active"
+    )
+    assert harness.events == []
+
+
+@pytest.mark.asyncio
+async def test_fallback_can_replace_a_starting_generation_without_visible_off_state() -> None:
+    harness = StartHarness(state="starting", replace_starting=True)
+    harness.teardown_release.set()
+
+    assert await OverlaySessionTransitionOwner().begin_start(harness.execution) == "started"
+    await harness.start_started.wait()
+
+    assert harness.events == ["teardown", "create", "starting:desktop", "run"]
+
+    harness.start_release.set()
+    task = harness.runtime.start_task
+    if task is not None:
+        await task
 
 
 @pytest.mark.asyncio

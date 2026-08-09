@@ -29,6 +29,7 @@ _install_moved_module_aliases(
         "wiring_translation_runtime_configuration": (
             "puripuly_heart.app.wiring.wiring_translation_runtime_configuration"
         ),
+        "wiring_translation_backend": "puripuly_heart.app.wiring.wiring_translation_backend",
         "wiring_vrc_mic_sync": "puripuly_heart.app.wiring.wiring_vrc_mic_sync",
     },
 )

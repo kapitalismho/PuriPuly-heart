@@ -26,6 +26,7 @@ from puripuly_heart.core.runtime_logging import (
     LATENCY_TRACE_POINT_CONTRACTS,
     SessionLoggingMode,
 )
+from puripuly_heart.core.translation_backend import LlmTranslationBackend
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.domain.events import STTFinalEvent, STTPartialEvent, UIEventType
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
@@ -1694,7 +1695,7 @@ async def test_closed_parent_rejects_late_duplicate_final_without_child_output()
     )
     first_peer_turn_id = next(iter(harness.peer_runtime.utterances))
 
-    harness.llm_runtime.attach_provider_reference(llm)
+    harness.llm_runtime.attach_provider_reference(LlmTranslationBackend(llm))
     harness.clock.advance(0.01)
     await harness.dispatch_stt_event(
         STTFinalEvent(

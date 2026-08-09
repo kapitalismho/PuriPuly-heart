@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/kapitalismho/PuriPuly/main/docs/http-extension.schema.json",
+  "title": "PuriPuly HTTP extension",
+  "description": "Declarative custom HTTP translation API extension for PuriPuly. See docs/http-extensions.md in the repository for the full field reference. A declared secret must be referenced through a {{secret:<id>}} placeholder, and the URL must not contain placeholders or credentials.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "name",
+    "url",
+    "request",
+    "response"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+      "description": "Lowercase identifier, unique within the http_extensions directory."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Display name shown in the settings UI."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description shown in the settings UI."
+    },
+    "url": {
+      "type": "string",
+      "pattern": "^(?!.*\\{\\{)(?!.*\\}\\})https?://[^\\s/@]+(/.*)?$",
+      "description": "Absolute HTTP(S) endpoint. The request method is always POST. The URL must not contain credentials or {{placeholders}}."
+    },
+    "headers": {
+      "type": "object",
+      "patternProperties": {
+        "^(?![Cc][Oo][Nn][Nn][Ee][Cc][Tt][Ii][Oo][Nn]$|[Cc][Oo][Nn][Tt][Ee][Nn][Tt]-[Ll][Ee][Nn][Gg][Tt][Hh]$|[Hh][Oo][Ss][Tt]$|[Tt][Rr][Aa][Nn][Ss][Ff][Ee][Rr]-[Ee][Nn][Cc][Oo][Dd][Ii][Nn][Gg]$)[^\\s]+$": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Static HTTP headers. These names are forbidden case-insensitively: connection, content-length, host, transfer-encoding."
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "body"
+      ],
+      "properties": {
+        "query": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Query parameters sent with every request."
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "json",
+                "form",
+                "none"
+              ],
+              "description": "json sends application/json, form sends application/x-www-form-urlencoded, none sends no body."
+            },
+            "value": {
+              "description": "Body template. Required for json and form: json accepts any JSON value, form requires a string-to-string object. Forbidden when type is none."
+            }
+          },
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "json"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              "then": {
+                "required": [
+                  "value"
+                ]
+              },
+              "else": {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "form"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "else": {
+                  "not": {
+                    "required": [
+                      "value"
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "response": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "json",
+            "text"
+          ],
+          "description": "json extracts the translation through a JSON Pointer; text uses the raw response body."
+        },
+        "pointer": {
+          "type": "string",
+          "pattern": "^(/([^/~]|~[01])*)*$",
+          "description": "RFC 6901 JSON Pointer selecting the translated string. Required for json responses, forbidden for text responses. Example: /responseData/translatedText."
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "json"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "pointer"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "pointer"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "secrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+            "description": "Identifier referenced by {{secret:<id>}} placeholders. Must be unique across the extension."
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-readable label shown as the credential input in the settings UI."
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Credential declarations. Every declared secret must be used by a {{secret:<id>}} placeholder in headers, query, or body. Secret values are stored by the system credential store."
+    },
+    "language_map": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Maps PuriPuly source language codes to API language codes."
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Maps PuriPuly target language codes to API language codes."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Optional language code remapping applied before the {{source_language}} and {{target_language}} placeholders are rendered."
+    }
+  },
+  "additionalProperties": false
+}

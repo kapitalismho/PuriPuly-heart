@@ -91,7 +91,7 @@ TRANSLATION_MODEL_IDS: Final[Mapping[int, str]] = MappingProxyType(
         6: "gemini31_flash_lite",
         7: "qwen35_plus",
         8: "local_llm",
-        9: "gemma4_31b_cerebras",
+        9: "custom_http",
     }
 )
 
@@ -155,7 +155,10 @@ ASR_ID_BY_PROVIDER: Final[Mapping[str, int]] = MappingProxyType(
     {value: identifier for identifier, value in ASR_IDS.items()}
 )
 TRANSLATION_MODEL_ID_BY_VALUE: Final[Mapping[str, int]] = MappingProxyType(
-    {value: identifier for identifier, value in TRANSLATION_MODEL_IDS.items()}
+    {
+        **{value: identifier for identifier, value in TRANSLATION_MODEL_IDS.items()},
+        "gemma4_31b_cerebras": 1,
+    }
 )
 FALLBACK_ID_BY_ALIAS: Final[Mapping[str, int]] = MappingProxyType(
     {value: identifier for identifier, value in FALLBACK_IDS.items()}

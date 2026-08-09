@@ -88,7 +88,8 @@ def test_public_surface_functions_are_owned_by_the_renderer_module() -> None:
         assert function.__module__ == overlay_renderer.__name__
 
 
-def test_reveal_boundary_stays_public_on_the_runner() -> None:
+def test_visibility_confirmation_boundary_stays_on_the_runner() -> None:
     source = (SOURCE_ROOT / "ui" / "desktop_overlay.py").read_text(encoding="utf-8")
-    assert "_reveal_window_through_platform_port" in source
-    assert "reveal_window(" in source
+    assert "_confirm_window_visible" in source
+    assert "confirm_window_visible(" in source
+    assert "reveal_window(" not in source

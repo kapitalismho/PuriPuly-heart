@@ -16,13 +16,16 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     ProviderRuntimeOwner,
     ProviderRuntimeState,
 )
+from puripuly_heart.config.paths import default_http_extensions_dir
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
     OpenRouterCredentialSource,
+    TranslationModel,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
+from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
@@ -32,7 +35,6 @@ from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import SelfCaptureSessionSnapshot
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
-from .wiring_llm_factory import create_llm_provider
 from .wiring_managed_account import ManagedOpenRouterReleaseRuntime
 from .wiring_provider_runtime_policy import (
     build_llm_provider_signature,
@@ -46,6 +48,7 @@ from .wiring_stt_factory import (
     build_self_stt_provider_signature,
     build_self_stt_runtime_signature,
 )
+from .wiring_translation_backend import create_translation_backend
 from .wiring_translation_runtime_configuration import (
     replace_translation_runtime_settings,
 )
@@ -75,6 +78,7 @@ def project_translation_runtime_settings(
 
 @dataclass(slots=True)
 class ProviderRuntimeSignatures:
+    http_extensions: HttpExtensionRegistry | None = None
     last_self_runtime: tuple[object, ...] | None = None
     last_self_provider: tuple[object, ...] | None = None
     last_llm_provider: tuple[object, ...] | None = None
@@ -89,7 +93,10 @@ class ProviderRuntimeSignatures:
     ) -> None:
         self.last_self_runtime = build_self_stt_runtime_signature(settings)
         self.last_self_provider = build_self_stt_provider_signature(settings)
-        self.last_llm_provider = build_llm_provider_signature(settings)
+        self.last_llm_provider = build_llm_provider_signature(
+            settings,
+            http_extensions=self.http_extensions,
+        )
         peer.last_runtime_signature = build_peer_stt_runtime_signature(
             settings,
             canonical_settings=canonical,
@@ -194,7 +201,8 @@ class ProviderRuntimeEffects:
         self.clear_local_pending()
         self.sync_local_notice()
         if (
-            settings.provider.llm != LLMProviderName.OPENROUTER
+            settings.translation.model == TranslationModel.CUSTOM_HTTP
+            or settings.provider.llm != LLMProviderName.OPENROUTER
             or settings.openrouter.selected_source != OpenRouterCredentialSource.MANAGED
         ):
             self.managed_pending_sink(False)
@@ -257,6 +265,7 @@ def compose_provider_runtime(
     config_path: Path,
     settings: SettingsOwner,
     llm_runtime_provider: Callable[[], ProviderRuntimeHandle | None],
+    http_extensions: HttpExtensionRegistry | None = None,
     local_asr_runtime_provider: Callable[[], LocalASRProviderRuntimePort | None],
     translation_runtime_configuration_provider: Callable[
         [],
@@ -289,7 +298,13 @@ def compose_provider_runtime(
     additional_signature_sink: Callable[[AppSettings], None],
     signatures: ProviderRuntimeSignatures | None = None,
 ) -> ProviderRuntimeComponents:
+    effective_http_extensions = http_extensions
+    if effective_http_extensions is None:
+        effective_http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
+        effective_http_extensions.reload()
     signature_state = signatures or ProviderRuntimeSignatures()
+    if signature_state.http_extensions is None:
+        signature_state.http_extensions = effective_http_extensions
     effects = ProviderRuntimeEffects(
         settings=settings,
         llm_runtime_provider=llm_runtime_provider,
@@ -327,27 +342,42 @@ def compose_provider_runtime(
         return LlmProviderRebuildContext(
             settings=current,
             replace_provider=replace_provider,
-            requires_secret=current.provider.llm
-            in {
-                LLMProviderName.GEMINI,
-                LLMProviderName.OPENROUTER,
-                LLMProviderName.QWEN,
-                LLMProviderName.DEEPSEEK,
-            },
+            requires_secret=(
+                current.translation.model != TranslationModel.CUSTOM_HTTP
+                and current.provider.llm
+                in {
+                    LLMProviderName.GEMINI,
+                    LLMProviderName.OPENROUTER,
+                    LLMProviderName.QWEN,
+                    LLMProviderName.DEEPSEEK,
+                }
+            ),
+            resource_label=(
+                "Translation backend"
+                if current.translation.model == TranslationModel.CUSTOM_HTTP
+                else "LLM provider"
+            ),
         )
 
     async def create_llm(settings_value: object) -> object | None:
         if not isinstance(settings_value, AppSettings):
             raise TypeError("LLM provider rebuild settings must be AppSettings")
         secrets = create_secret_store(settings_value.secrets, config_path=config_path)
+        if settings_value.translation.model == TranslationModel.CUSTOM_HTTP:
+            return create_translation_backend(
+                settings_value,
+                secrets=secrets,
+                http_extensions=effective_http_extensions,
+            )
         release = managed_release()
         await release.rebuild(secrets=secrets)
-        return create_llm_provider(
+        return create_translation_backend(
             settings_value,
             secrets=secrets,
             managed_release_service=release.service,
             managed_delegate_ready=managed_delegate_ready,
             runtime_logging=runtime_logging,
+            http_extensions=effective_http_extensions,
         )
 
     llm_rebuild = LlmProviderRebuildOwner(
@@ -392,7 +422,10 @@ def compose_provider_runtime(
         peer_signature_builder=lambda current, canonical: (
             build_peer_stt_provider_signature_from_vnext(canonical or canonical_settings(current))
         ),
-        llm_signature_builder=build_llm_provider_signature,
+        llm_signature_builder=lambda current: build_llm_provider_signature(
+            current,
+            http_extensions=effective_http_extensions,
+        ),
         gpu_restart_decision=provider_runtime_requires_gpu_restart,
     )
     return ProviderRuntimeComponents(

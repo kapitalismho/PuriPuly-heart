@@ -53,6 +53,28 @@ def test_state_publisher_full_snapshot_republishes_after_discovery() -> None:
 
 
 @pytest.mark.parametrize(
+    ("model", "expected_id"),
+    [
+        (TranslationModel.GEMMA4_31B, 1),
+        (TranslationModel.GEMMA4_31B_CEREBRAS, 1),
+        (TranslationModel.CUSTOM_HTTP, 9),
+    ],
+)
+def test_state_publisher_uses_product_level_translation_model_ids(
+    model: TranslationModel,
+    expected_id: int,
+) -> None:
+    settings = AppSettings()
+    settings.translation.model = model
+    state = state_from_settings(settings)
+    sender = FakeSender()
+
+    OscStatePublisher(sender).start(state)
+
+    assert ("/avatar/parameters/PuriPuly_Translator", expected_id) in sender.messages
+
+
+@pytest.mark.parametrize(
     ("model", "connection", "expected"),
     [
         (

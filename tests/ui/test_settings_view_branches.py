@@ -3546,10 +3546,12 @@ def test_llm_modal_lists_logical_translation_models_once(
         TranslationModel.GEMINI_3_FLASH.value,
         TranslationModel.GEMINI_31_FLASH_LITE.value,
         TranslationModel.QWEN_35_PLUS.value,
+        TranslationModel.CUSTOM_HTTP.value,
     ]
     assert [option.section for option in options] == [
         t("settings.translation_model.section.recommended"),
         t("settings.translation_model.section.recommended"),
+        t("settings.translation_model.section.others"),
         t("settings.translation_model.section.others"),
         t("settings.translation_model.section.others"),
         t("settings.translation_model.section.others"),
@@ -4464,8 +4466,13 @@ def test_overlay_anchor_click_opens_modal_with_current_selection(
     view._on_overlay_anchor_click(None)
 
     assert captured["title"] == t("settings.overlay.calibration.anchor")
-    assert captured["show_description"] is False
-    assert [option.value for option in captured["options"]] == ["head_locked"]
+    assert captured["show_description"] is True
+    assert [option.value for option in captured["options"]] == [
+        "head_locked",
+        "spatial_locked",
+    ]
+    assert captured["options"][1].label == t("settings.overlay.calibration.anchor.spatial_locked")
+    assert captured["options"][1].description == ""
     assert captured["current"] == "head_locked"
 
 
@@ -5485,7 +5492,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     view, _ = _make_settings_view(monkeypatch)
     api_controls = _subtab_controls(view, "api")
 
-    assert len(api_controls) == 7
+    assert len(api_controls) == 8
     assert _row_card_titles(api_controls[0]) == [
         t("settings.section.stt"),
         t("settings.section.peer_stt"),
@@ -5495,15 +5502,21 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
         t("settings.translation_connection"),
         t("settings.fallback"),
     ]
-    assert _row_card_titles(api_controls[2]) == [t("settings.gpu_device.title")]
+    assert api_controls[2].content is view._http_extension_row
+    assert _row_card_titles(api_controls[2]) == [
+        t("settings.http_extension.title"),
+        t("settings.http_extension.path"),
+        t("settings.http_extension.refresh"),
+    ]
+    assert _row_card_titles(api_controls[3]) == [t("settings.gpu_device.title")]
     assert view._gpu_device_card.visible is False
-    assert _row_card_titles(api_controls[3]) == [t("settings.local_llm.connection")]
-    assert api_controls[3] is view._local_llm_connection_card
-    assert api_controls[4] is view._managed_key_card
-    assert _row_card_titles(api_controls[4]) == [t("settings.managed_key.title")]
-    assert api_controls[5] is view._peer_auto_languages_card
-    assert api_controls[6] is not view._api_keys_column
-    assert _row_card_titles(api_controls[6]) == [t("settings.section.api_keys")]
+    assert _row_card_titles(api_controls[4]) == [t("settings.local_llm.connection")]
+    assert api_controls[4] is view._local_llm_connection_card
+    assert api_controls[5] is view._managed_key_card
+    assert _row_card_titles(api_controls[5]) == [t("settings.managed_key.title")]
+    assert api_controls[6] is view._peer_auto_languages_card
+    assert api_controls[7] is not view._api_keys_column
+    assert _row_card_titles(api_controls[7]) == [t("settings.section.api_keys")]
 
 
 def test_api_tab_primary_value_typography_is_consistent_across_rows(

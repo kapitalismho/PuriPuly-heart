@@ -17,7 +17,8 @@ def test_config_overlay_calibration_exports_canonical_constants_and_defaults() -
     module = _canonical_overlay_calibration_module()
 
     assert module.OVERLAY_CALIBRATION_ANCHOR_HEAD_LOCKED == "head_locked"
-    assert module.OVERLAY_CALIBRATION_ANCHORS == ("head_locked",)
+    assert module.OVERLAY_CALIBRATION_ANCHOR_SPATIAL_LOCKED == "spatial_locked"
+    assert module.OVERLAY_CALIBRATION_ANCHORS == ("head_locked", "spatial_locked")
 
     calibration = module.OverlayCalibration()
 
@@ -51,6 +52,7 @@ def test_config_overlay_calibration_preserves_serialization_copy_and_validation(
     assert clone == calibration
     assert clone is not calibration
     calibration.validate()
+    module.OverlayCalibration(anchor="spatial_locked").validate()
 
     invalid_cases = (
         ({"anchor": "unsupported"}, "unsupported overlay calibration anchor"),
@@ -72,5 +74,9 @@ def test_ui_overlay_calibration_facade_reexports_canonical_objects() -> None:
     assert (
         facade.OVERLAY_CALIBRATION_ANCHOR_HEAD_LOCKED
         == canonical.OVERLAY_CALIBRATION_ANCHOR_HEAD_LOCKED
+    )
+    assert (
+        facade.OVERLAY_CALIBRATION_ANCHOR_SPATIAL_LOCKED
+        == canonical.OVERLAY_CALIBRATION_ANCHOR_SPATIAL_LOCKED
     )
     assert facade.OVERLAY_CALIBRATION_ANCHORS is canonical.OVERLAY_CALIBRATION_ANCHORS

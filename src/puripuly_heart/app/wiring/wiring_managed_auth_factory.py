@@ -58,6 +58,7 @@ from puripuly_heart.config.settings import (
     LLMProviderName,
     OpenRouterCredentialSource,
     TranslationConnection,
+    TranslationModel,
     normalize_owned_referral_id,
 )
 from puripuly_heart.core.discord_oauth_loopback import (
@@ -1203,24 +1204,41 @@ class ManagedTranslationRuntimeAdapter:
         settings = self.settings_provider()
         runtime_available, translation_enabled, llm = self.runtime_snapshot_provider()
         auth_state = self.auth.state()
+        is_custom_http = (
+            settings is not None and settings.translation.model == TranslationModel.CUSTOM_HTTP
+        )
         return TranslationEnableState(
             runtime_available=runtime_available,
             translation_enabled=translation_enabled,
             llm_available=llm is not None,
             settings_available=settings is not None,
-            provider_name=(settings.provider.llm.value if settings is not None else None),
-            qwen_region=(settings.qwen.region.value if settings is not None else None),
-            managed_selected=auth_state.managed_selected,
-            managed_china=auth_state.managed_china,
-            managed_local_key_available=auth_state.local_key_available,
-            managed_release_service_available=(auth_state.release_service_available),
+            provider_name=(
+                "custom_http"
+                if is_custom_http
+                else (settings.provider.llm.value if settings is not None else None)
+            ),
+            qwen_region=(
+                None
+                if is_custom_http
+                else (settings.qwen.region.value if settings is not None else None)
+            ),
+            managed_selected=auth_state.managed_selected and not is_custom_http,
+            managed_china=auth_state.managed_china and not is_custom_http,
+            managed_local_key_available=auth_state.local_key_available and not is_custom_http,
+            managed_release_service_available=(
+                auth_state.release_service_available and not is_custom_http
+            ),
             ingress_frozen=self.ingress_provider(),
         )
 
     async def prepare(self) -> ManagedTranslationPreparation:
         settings = self.settings_provider()
         service = self.release_service_provider()
-        if settings is None or service is None:
+        if (
+            settings is None
+            or service is None
+            or settings.translation.model == TranslationModel.CUSTOM_HTTP
+        ):
             return ManagedTranslationPreparation(ready=True)
         claim_guard = None
         if not self.auth.state().managed_china:

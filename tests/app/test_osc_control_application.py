@@ -49,6 +49,57 @@ async def test_translation_model_control_materializes_provider_and_connection() 
 
 
 @pytest.mark.asyncio
+async def test_custom_http_control_preserves_the_previous_llm_selection() -> None:
+    current = AppSettings()
+    current.translation.model = TranslationModel.DEEPSEEK_V4_PRO
+    current.translation.connection = TranslationConnection.OFFICIAL_BYOK
+    current.translation.http_extension_id = "demo"
+
+    async def apply_settings(settings: object) -> object:
+        nonlocal current
+        assert isinstance(settings, AppSettings)
+        current = settings
+        return settings
+
+    application = SettingsBackedOscControlApplication(
+        settings_provider=lambda: current,
+        apply_settings=apply_settings,
+        translation_model_normalizer=materialize_translation_settings,
+    )
+
+    await application.set_translation_model(TranslationModel.CUSTOM_HTTP.value)
+
+    assert current.translation.model is TranslationModel.CUSTOM_HTTP
+    assert current.translation.connection is TranslationConnection.CUSTOM_HTTP
+    assert current.translation.http_extension_id == "demo"
+    assert current.translation.previous_llm_model is TranslationModel.DEEPSEEK_V4_PRO
+
+
+@pytest.mark.asyncio
+async def test_gemma_31b_control_keeps_an_active_cerebras_selection() -> None:
+    current = AppSettings()
+    current.translation.model = TranslationModel.GEMMA4_31B_CEREBRAS
+    applied = 0
+
+    async def apply_settings(_settings: object) -> object:
+        nonlocal applied
+        applied += 1
+        return True
+
+    application = SettingsBackedOscControlApplication(
+        settings_provider=lambda: current,
+        apply_settings=apply_settings,
+        translation_model_normalizer=materialize_translation_settings,
+    )
+
+    result = await application.set_translation_model(TranslationModel.GEMMA4_31B.value)
+
+    assert result is True
+    assert applied == 0
+    assert current.translation.model is TranslationModel.GEMMA4_31B_CEREBRAS
+
+
+@pytest.mark.asyncio
 async def test_settings_control_rejects_when_application_keeps_the_previous_state() -> None:
     current = AppSettings()
 

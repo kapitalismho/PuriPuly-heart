@@ -32,6 +32,7 @@ UI_APPLICATION_NON_INTENT_MEMBERS = {
     "emit_application_shutdown_diagnostic",
     "effective_osc_ports",
     "get_event_language_codes",
+    "http_extension_registry",
     "is_current_github_star_prompt_generation",
     "list_loopback_capture_options",
     "list_loopback_device_options",

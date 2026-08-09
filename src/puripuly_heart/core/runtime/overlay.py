@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, TypeVar
 
 _TaskResultT = TypeVar("_TaskResultT")
+_PROCESS_EVENT_READER_TASK_PREFIXES = ("process-read-",)
 
 
 class OverlayRuntimeHandle:
@@ -282,7 +283,10 @@ class OverlayRuntimeHandle:
                 if emit_shutdown:
                     await self._attempt(failures, self._mark_process_shutdown_requested)
                     await self._attempt(failures, self._broadcast_shutdown_with_grace)
-                await self._cancel_owned_tasks(failures)
+                await self._cancel_owned_tasks(
+                    failures,
+                    preserve_child_task_prefixes=_PROCESS_EVENT_READER_TASK_PREFIXES,
+                )
                 await self._close_presenter(
                     preserve_presenter_state,
                     failures,
@@ -292,6 +296,7 @@ class OverlayRuntimeHandle:
                     diagnostics_detach=diagnostics_detach,
                 )
                 await self._stop_process_manager(failures)
+                await self._cancel_owned_tasks(failures)
                 await self._stop_bridge(failures)
                 self._renderer_events = None
                 if not preserve_presenter_state:
@@ -406,14 +411,23 @@ class OverlayRuntimeHandle:
             return False
         return await overlay_sink_detach(presenter)
 
-    async def _cancel_owned_tasks(self, failures: list[Exception]) -> None:
+    async def _cancel_owned_tasks(
+        self,
+        failures: list[Exception],
+        *,
+        preserve_child_task_prefixes: tuple[str, ...] = (),
+    ) -> None:
         current_task = asyncio.current_task()
         primary_tasks = tuple(
             task
             for task in (self._start_task, self._monitor_task, self._renderer_event_task)
             if task is not None and task is not current_task
         )
-        child_tasks = tuple(task for task in self._child_task_names if task is not current_task)
+        child_tasks = tuple(
+            task
+            for task, task_name in self._child_task_names.items()
+            if task is not current_task and not task_name.startswith(preserve_child_task_prefixes)
+        )
         tasks = primary_tasks + child_tasks
         for task in tasks:
             if not task.done():

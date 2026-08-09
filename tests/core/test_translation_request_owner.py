@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field, replace
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.http_extensions import parse_http_extension
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
@@ -25,7 +27,12 @@ from puripuly_heart.core.orchestrator.translation_request import (
     TranslationRequestOwner,
 )
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
+from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackend
 from puripuly_heart.domain.models import ChannelId, Translation
+from puripuly_heart.providers.extensions.http_extension_backend import (
+    HttpExtensionTranslationBackend,
+)
 
 
 @dataclass
@@ -85,6 +92,21 @@ class BlockingProvider(RecordingProvider):
 
 
 @dataclass
+class BlockingHttpClient:
+    entered: asyncio.Event = field(default_factory=asyncio.Event)
+    release: asyncio.Event = field(default_factory=asyncio.Event)
+    closed: bool = False
+
+    async def post(self, _url: str, **_kwargs: object) -> SimpleNamespace:
+        self.entered.set()
+        await self.release.wait()
+        return SimpleNamespace(status_code=200, text="Hola")
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+@dataclass
 class OwnerFixture:
     owner: TranslationRequestOwner
     configuration: TranslationRuntimeConfigurationOwner
@@ -119,7 +141,12 @@ def build_owner(provider: object | None = None) -> OwnerFixture:
         clock=clock,
         config_snapshot=configuration.snapshot,
     )
-    provider_runtime = ProviderRuntimeHandle(name="llm", provider=provider)
+    backend = (
+        provider
+        if provider is None or isinstance(provider, TranslationBackend)
+        else LlmTranslationBackend(provider)
+    )
+    provider_runtime = ProviderRuntimeHandle(name="llm", provider=backend)
     presentation = RecordingPresentation()
     owner = TranslationRequestOwner(
         config_snapshot=configuration.snapshot,
@@ -247,11 +274,49 @@ async def test_direct_request_rejects_stale_provider_completion() -> None:
         fixture.owner.translate(DirectTranslationRequest(utterance_id=uuid4(), text="hello"))
     )
     await old_provider.entered.wait()
-    await fixture.provider_runtime.replace_provider(RecordingProvider(), start=False)
+    await fixture.provider_runtime.replace_provider(
+        LlmTranslationBackend(RecordingProvider()),
+        start=False,
+    )
     old_provider.release.set()
 
     with pytest.raises(StaleProviderCompletion):
         await task
+
+
+@pytest.mark.asyncio
+async def test_http_backend_rejects_completion_after_runtime_replacement() -> None:
+    client = BlockingHttpClient()
+    extension = parse_http_extension(
+        {
+            "schema_version": 1,
+            "id": "demo",
+            "name": "Demo",
+            "url": "http://127.0.0.1:1/translate",
+            "request": {"body": {"type": "none"}},
+            "response": {"type": "text"},
+        }
+    )
+    backend = HttpExtensionTranslationBackend(
+        extension,
+        InMemorySecretStore(),
+        client_factory=lambda **_kwargs: client,
+    )
+    fixture = build_owner(backend)
+    task = asyncio.create_task(
+        fixture.owner.translate(DirectTranslationRequest(utterance_id=uuid4(), text="hello"))
+    )
+    await client.entered.wait()
+
+    await fixture.provider_runtime.replace_provider(
+        LlmTranslationBackend(RecordingProvider()),
+        start=False,
+    )
+    client.release.set()
+
+    with pytest.raises(StaleProviderCompletion):
+        await task
+    assert client.closed is True
 
 
 @pytest.mark.asyncio
@@ -273,7 +338,10 @@ async def test_process_contains_stale_provider_completion_without_output_error()
     fixture = build_owner(old_provider)
     task = asyncio.create_task(fixture.owner.process(process_request(fixture)))
     await old_provider.entered.wait()
-    await fixture.provider_runtime.replace_provider(RecordingProvider(), start=False)
+    await fixture.provider_runtime.replace_provider(
+        LlmTranslationBackend(RecordingProvider()),
+        start=False,
+    )
     old_provider.release.set()
 
     result = await task

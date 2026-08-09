@@ -594,6 +594,8 @@ def from_legacy_app_settings(
                 translation=TranslationIntent(
                     model=data["translation"]["model"],
                     connection=data["translation"]["connection"],
+                    http_extension_id=data["translation"].get("http_extension_id"),
+                    previous_llm_model=data["translation"].get("previous_llm_model"),
                     connection_history=dict(data["translation"]["connection_history"]),
                     concurrency_limit=int(data["llm"]["concurrency_limit"]),
                     fallback=fallback,
@@ -910,9 +912,15 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
     state = settings.state
     data = legacy_settings.to_dict(legacy_settings.AppSettings())
     data["settings_version"] = legacy_settings.SETTINGS_SCHEMA_VERSION
+    previous_model = intent.translation.previous_llm_model
+    previous_connection = (
+        intent.translation.connection_history.get(previous_model)
+        if previous_model is not None
+        else None
+    )
     data["provider"]["llm"] = _legacy_provider_llm_for_translation(
-        intent.translation.model,
-        intent.translation.connection,
+        previous_model or intent.translation.model,
+        previous_connection or intent.translation.connection,
     )
     data["provider"]["stt"] = intent.stt.provider
     data["provider"]["peer_stt"] = intent.peer_stt.provider
@@ -926,6 +934,13 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
             "connection": intent.translation.fallback.connection,
         },
     }
+    if (
+        intent.translation.model == "custom_http"
+        or intent.translation.http_extension_id is not None
+    ):
+        data["translation"]["http_extension_id"] = intent.translation.http_extension_id
+    if intent.translation.previous_llm_model is not None:
+        data["translation"]["previous_llm_model"] = intent.translation.previous_llm_model
     data["languages"] = {
         "source_language": intent.languages.source_language,
         "target_language": intent.languages.target_language,

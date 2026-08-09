@@ -34,7 +34,7 @@ def test_osc_abi_registries_are_explicit_and_cover_current_languages() -> None:
         7: "soniox",
     }
     assert TRANSLATION_MODEL_IDS[0] == "gemma4_26b_31b"
-    assert TRANSLATION_MODEL_IDS[9] == "gemma4_31b_cerebras"
+    assert TRANSLATION_MODEL_IDS[9] == "custom_http"
     assert FALLBACK_IDS[0] == "none"
     assert set(LANGUAGE_IDS.values()) == set(SUPPORTED_LANGUAGES)
     assert len(LANGUAGE_IDS) == len(set(LANGUAGE_IDS.values()))
@@ -147,7 +147,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         6: "gemini31_flash_lite",
         7: "qwen35_plus",
         8: "local_llm",
-        9: "gemma4_31b_cerebras",
+        9: "custom_http",
     }
     assert dict(FALLBACK_IDS) == {
         0: "none",

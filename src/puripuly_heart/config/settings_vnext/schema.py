@@ -16,7 +16,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 32
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 34
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -366,6 +366,8 @@ def _default_translation_fallback_intent() -> TranslationFallbackIntent:
 class TranslationIntent:
     model: str = "gemma4_26b_31b"
     connection: str = "managed"
+    http_extension_id: str | None = None
+    previous_llm_model: str | None = None
     connection_history: dict[str, str] = field(
         default_factory=_default_translation_connection_history
     )

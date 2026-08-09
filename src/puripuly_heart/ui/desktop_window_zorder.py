@@ -13,10 +13,8 @@ _GW_OWNER = 4
 _HWND_TOPMOST = -1
 _SWP_NOSIZE = 0x0001
 _SWP_NOMOVE = 0x0002
-_SWP_NOZORDER = 0x0004
 _SWP_NOACTIVATE = 0x0010
 _SWP_ASYNCWINDOWPOS = 0x4000
-_SW_SHOWNOACTIVATE = 4
 _WINDOW_TITLE_MAX_CHARS = 512
 _WS_EX_TOPMOST = 0x00000008
 _WS_EX_TRANSPARENT = 0x00000020
@@ -38,29 +36,32 @@ class WindowEnumerationResult:
 
 
 @dataclass(frozen=True, slots=True)
-class WindowRevealResult:
-    applied: bool
+class WindowVisibilityConfirmation:
+    confirmed: bool
     reason: str
     hwnd: int | None = None
     title_confirmed: bool = False
     visible_confirmed: bool = False
+    bounds_confirmed: bool = False
     win32_error: int | None = None
+    observed_bounds: tuple[int, int, int, int] | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class WindowPlacementResult:
-    applied: bool
+class WindowBoundsConfirmation:
+    confirmed: bool
     reason: str
     hwnd: int | None = None
     title_confirmed: bool = False
     bounds_confirmed: bool = False
     win32_error: int | None = None
+    observed_bounds: tuple[int, int, int, int] | None = None
 
 
 class WindowZOrderPort(Protocol):
     def bind_process(self, pid: int) -> None: ...
 
-    async def place_window_before_show(
+    async def confirm_window_bounds(
         self,
         expected_title: str,
         *,
@@ -68,11 +69,19 @@ class WindowZOrderPort(Protocol):
         y: int,
         width: int,
         height: int,
-    ) -> WindowPlacementResult: ...
+    ) -> WindowBoundsConfirmation: ...
 
     async def reassert_topmost_after_click_through(self) -> WindowZOrderResult: ...
 
-    async def reveal_window(self, expected_title: str) -> WindowRevealResult: ...
+    async def confirm_window_visible(
+        self,
+        expected_title: str,
+        *,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+    ) -> WindowVisibilityConfirmation: ...
 
     def close(self) -> None: ...
 
@@ -90,17 +99,6 @@ class Win32WindowApi(Protocol):
 
     def window_bounds(self, hwnd: int) -> tuple[int, int, int, int] | None: ...
 
-    def set_window_bounds_no_activate(
-        self,
-        hwnd: int,
-        x: int,
-        y: int,
-        width: int,
-        height: int,
-    ) -> tuple[bool, int | None]: ...
-
-    def show_window_no_activate(self, hwnd: int) -> tuple[bool, int | None]: ...
-
     def process_id(self, hwnd: int) -> int | None: ...
 
     def extended_style(self, hwnd: int) -> int: ...
@@ -115,7 +113,7 @@ class NoopWindowZOrderPort:
     async def reassert_topmost_after_click_through(self) -> WindowZOrderResult:
         return WindowZOrderResult(applied=False, reason="unsupported_platform")
 
-    async def place_window_before_show(
+    async def confirm_window_bounds(
         self,
         expected_title: str,
         *,
@@ -123,11 +121,31 @@ class NoopWindowZOrderPort:
         y: int,
         width: int,
         height: int,
-    ) -> WindowPlacementResult:
-        return WindowPlacementResult(applied=False, reason="unsupported_platform")
+    ) -> WindowBoundsConfirmation:
+        return WindowBoundsConfirmation(
+            confirmed=True,
+            reason="framework_authority",
+            bounds_confirmed=True,
+            observed_bounds=(x, y, width, height),
+        )
 
-    async def reveal_window(self, expected_title: str) -> WindowRevealResult:
-        return WindowRevealResult(applied=False, reason="unsupported_platform")
+    async def confirm_window_visible(
+        self,
+        expected_title: str,
+        *,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+    ) -> WindowVisibilityConfirmation:
+        _ = (expected_title, x, y, width, height)
+        return WindowVisibilityConfirmation(
+            confirmed=True,
+            reason="framework_authority",
+            visible_confirmed=True,
+            bounds_confirmed=True,
+            observed_bounds=(x, y, width, height),
+        )
 
     def close(self) -> None:
         return None
@@ -140,23 +158,23 @@ class WindowsWindowZOrderPort:
         api: Win32WindowApi | None = None,
         timeout_s: float = 0.5,
         poll_interval_s: float = 0.01,
-        placement_retain_s: float = 0.05,
-        reveal_timeout_s: float = 5.0,
-        reveal_retain_s: float = 0.6,
+        bounds_retain_s: float = 0.05,
+        visibility_timeout_s: float = 5.0,
+        visibility_retain_s: float = 0.6,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self._api = api or _CtypesWin32WindowApi()
         self._timeout_s = max(0.0, float(timeout_s))
         self._poll_interval_s = max(0.001, float(poll_interval_s))
-        self._placement_retain_s = max(0.0, float(placement_retain_s))
-        self._reveal_timeout_s = max(0.0, float(reveal_timeout_s))
-        self._reveal_retain_s = max(0.0, float(reveal_retain_s))
+        self._bounds_retain_s = max(0.0, float(bounds_retain_s))
+        self._visibility_timeout_s = max(0.0, float(visibility_timeout_s))
+        self._visibility_retain_s = max(0.0, float(visibility_retain_s))
         self._sleep = sleep
         self._pid: int | None = None
         self._binding_generation = 0
         self._closed = False
 
-    async def place_window_before_show(
+    async def confirm_window_bounds(
         self,
         expected_title: str,
         *,
@@ -164,13 +182,13 @@ class WindowsWindowZOrderPort:
         y: int,
         width: int,
         height: int,
-    ) -> WindowPlacementResult:
+    ) -> WindowBoundsConfirmation:
         pid = self._pid
         generation = self._binding_generation
         if self._closed:
-            return WindowPlacementResult(applied=False, reason="closed")
+            return WindowBoundsConfirmation(confirmed=False, reason="closed")
         if pid is None:
-            return WindowPlacementResult(applied=False, reason="process_unbound")
+            return WindowBoundsConfirmation(confirmed=False, reason="process_unbound")
 
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self._timeout_s
@@ -178,11 +196,11 @@ class WindowsWindowZOrderPort:
         title_confirmed = False
         while True:
             if not self._binding_is_current(pid, generation):
-                return WindowPlacementResult(applied=False, reason="binding_changed")
+                return WindowBoundsConfirmation(confirmed=False, reason="binding_changed")
             enumeration = self._api.all_top_level_windows_for_process(pid)
             if enumeration.win32_error is not None:
-                return WindowPlacementResult(
-                    applied=False,
+                return WindowBoundsConfirmation(
+                    confirmed=False,
                     reason="enum_windows_failed",
                     win32_error=enumeration.win32_error,
                 )
@@ -205,96 +223,95 @@ class WindowsWindowZOrderPort:
                 break
             remaining = deadline - loop.time()
             if remaining <= 0:
-                return WindowPlacementResult(
-                    applied=False,
+                return WindowBoundsConfirmation(
+                    confirmed=False,
                     reason="ambiguous_window" if candidates else "window_not_found",
                 )
             await self._sleep(min(self._poll_interval_s, remaining))
 
         logical_bounds = (int(x), int(y), int(width), int(height))
         target_bounds: tuple[int, int, int, int] | None = None
+        observed_bounds: tuple[int, int, int, int] | None = None
         confirmed_since: float | None = None
-        win32_error: int | None = None
         while True:
             if not self._binding_is_current(pid, generation):
-                return WindowPlacementResult(
-                    applied=False,
+                return WindowBoundsConfirmation(
+                    confirmed=False,
                     reason="binding_changed",
                     hwnd=hwnd,
                     title_confirmed=title_confirmed,
                 )
             if not self._window_belongs_to_process(hwnd, pid):
-                return WindowPlacementResult(
-                    applied=False,
+                return WindowBoundsConfirmation(
+                    confirmed=False,
                     reason="window_changed",
                     hwnd=hwnd,
                     title_confirmed=title_confirmed,
                 )
             now = loop.time()
-            actual_bounds = self._api.window_bounds(hwnd)
-            if actual_bounds is not None:
-                scaled_target = _native_target_bounds(logical_bounds, actual_bounds)
+            observed_bounds = self._api.window_bounds(hwnd)
+            if observed_bounds is not None:
+                scaled_target = _native_target_bounds(logical_bounds, observed_bounds)
                 if scaled_target is not None and scaled_target != target_bounds:
                     target_bounds = scaled_target
                     confirmed_since = None
             if (
-                actual_bounds is not None
+                observed_bounds is not None
                 and target_bounds is not None
-                and _window_bounds_close(actual_bounds, target_bounds)
+                and _window_bounds_close(observed_bounds, target_bounds)
             ):
                 if confirmed_since is None:
                     confirmed_since = now
-                if now - confirmed_since >= self._placement_retain_s:
-                    return WindowPlacementResult(
-                        applied=True,
-                        reason="applied",
+                if now - confirmed_since >= self._bounds_retain_s:
+                    return WindowBoundsConfirmation(
+                        confirmed=True,
+                        reason="confirmed",
                         hwnd=hwnd,
                         title_confirmed=title_confirmed,
                         bounds_confirmed=True,
+                        observed_bounds=observed_bounds,
                     )
-            elif target_bounds is not None:
+            else:
                 confirmed_since = None
-                applied, error = self._api.set_window_bounds_no_activate(
-                    hwnd,
-                    *target_bounds,
-                )
-                if not applied:
-                    win32_error = error
             remaining = deadline - now
             if remaining <= 0:
-                return WindowPlacementResult(
-                    applied=False,
-                    reason=(
-                        "set_window_pos_failed"
-                        if win32_error is not None
-                        else "bounds_not_retained"
-                    ),
+                return WindowBoundsConfirmation(
+                    confirmed=False,
+                    reason="bounds_not_retained",
                     hwnd=hwnd,
                     title_confirmed=title_confirmed,
                     bounds_confirmed=confirmed_since is not None,
-                    win32_error=win32_error,
+                    observed_bounds=observed_bounds,
                 )
             await self._sleep(min(self._poll_interval_s, remaining))
 
-    async def reveal_window(self, expected_title: str) -> WindowRevealResult:
+    async def confirm_window_visible(
+        self,
+        expected_title: str,
+        *,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+    ) -> WindowVisibilityConfirmation:
         pid = self._pid
         generation = self._binding_generation
         if self._closed:
-            return WindowRevealResult(applied=False, reason="closed")
+            return WindowVisibilityConfirmation(confirmed=False, reason="closed")
         if pid is None:
-            return WindowRevealResult(applied=False, reason="process_unbound")
+            return WindowVisibilityConfirmation(confirmed=False, reason="process_unbound")
 
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + self._reveal_timeout_s
+        deadline = loop.time() + self._visibility_timeout_s
         hwnd: int | None = None
         title_confirmed = False
         while True:
             if not self._binding_is_current(pid, generation):
-                return WindowRevealResult(applied=False, reason="binding_changed")
+                return WindowVisibilityConfirmation(confirmed=False, reason="binding_changed")
             enumeration = self._api.all_top_level_windows_for_process(pid)
             if enumeration.win32_error is not None:
-                return WindowRevealResult(
-                    applied=False,
+                return WindowVisibilityConfirmation(
+                    confirmed=False,
                     reason="enum_windows_failed",
                     win32_error=enumeration.win32_error,
                 )
@@ -320,45 +337,68 @@ class WindowsWindowZOrderPort:
             await self._sleep(min(self._poll_interval_s, remaining))
 
         if hwnd is None:
-            return WindowRevealResult(applied=False, reason="window_not_found")
+            return WindowVisibilityConfirmation(confirmed=False, reason="window_not_found")
         if not self._window_belongs_to_process(hwnd, pid):
-            return WindowRevealResult(applied=False, reason="window_changed")
+            return WindowVisibilityConfirmation(confirmed=False, reason="window_changed")
 
-        show_calls = 0
-        win32_error: int | None = None
-        visible_since: float | None = None
-        deadline = loop.time() + self._reveal_timeout_s
+        logical_bounds = (x, y, width, height)
+        target_bounds: tuple[int, int, int, int] | None = None
+        observed_bounds: tuple[int, int, int, int] | None = None
+        confirmed_since: float | None = None
+        visible_confirmed = False
+        bounds_confirmed = False
+        deadline = loop.time() + self._visibility_timeout_s
         while True:
             if not self._binding_is_current(pid, generation):
-                return WindowRevealResult(applied=False, reason="binding_changed", hwnd=hwnd)
+                return WindowVisibilityConfirmation(
+                    confirmed=False,
+                    reason="binding_changed",
+                    hwnd=hwnd,
+                )
             if not self._window_belongs_to_process(hwnd, pid):
-                return WindowRevealResult(applied=False, reason="window_changed", hwnd=hwnd)
+                return WindowVisibilityConfirmation(
+                    confirmed=False,
+                    reason="window_changed",
+                    hwnd=hwnd,
+                )
             now = loop.time()
-            if self._api.is_window_visible(hwnd):
-                if visible_since is None:
-                    visible_since = now
-                elif now - visible_since >= self._reveal_retain_s:
-                    return WindowRevealResult(
-                        applied=True,
-                        reason="applied" if show_calls else "already_visible",
+            visible_confirmed = self._api.is_window_visible(hwnd)
+            observed_bounds = self._api.window_bounds(hwnd)
+            if observed_bounds is not None:
+                scaled_target = _native_target_bounds(logical_bounds, observed_bounds)
+                if scaled_target is not None and scaled_target != target_bounds:
+                    target_bounds = scaled_target
+                    confirmed_since = None
+            bounds_confirmed = (
+                observed_bounds is not None
+                and target_bounds is not None
+                and _window_bounds_close(observed_bounds, target_bounds)
+            )
+            if visible_confirmed and bounds_confirmed:
+                if confirmed_since is None:
+                    confirmed_since = now
+                elif now - confirmed_since >= self._visibility_retain_s:
+                    return WindowVisibilityConfirmation(
+                        confirmed=True,
+                        reason="confirmed",
                         hwnd=hwnd,
                         title_confirmed=title_confirmed,
                         visible_confirmed=True,
+                        bounds_confirmed=True,
+                        observed_bounds=observed_bounds,
                     )
             else:
-                visible_since = None
-                applied, error = self._api.show_window_no_activate(hwnd)
-                show_calls += 1
-                win32_error = None if applied else error
+                confirmed_since = None
             remaining = deadline - loop.time()
             if remaining <= 0:
-                return WindowRevealResult(
-                    applied=False,
-                    reason="visibility_not_retained",
+                return WindowVisibilityConfirmation(
+                    confirmed=False,
+                    reason="visible_bounds_not_retained",
                     hwnd=hwnd,
                     title_confirmed=title_confirmed,
-                    visible_confirmed=visible_since is not None,
-                    win32_error=win32_error,
+                    visible_confirmed=visible_confirmed,
+                    bounds_confirmed=bounds_confirmed,
+                    observed_bounds=observed_bounds,
                 )
             await self._sleep(min(self._poll_interval_s, remaining))
 
@@ -531,8 +571,6 @@ class _CtypesWin32WindowApi:
             wintypes.UINT,
         ]
         self._user32.SetWindowPos.restype = wintypes.BOOL
-        self._user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
-        self._user32.ShowWindow.restype = wintypes.BOOL
         self._user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
         self._user32.GetWindowTextW.restype = ctypes.c_int
         self._user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
@@ -576,35 +614,6 @@ class _CtypesWin32WindowApi:
             int(rect.right - rect.left),
             int(rect.bottom - rect.top),
         )
-
-    def set_window_bounds_no_activate(
-        self,
-        hwnd: int,
-        x: int,
-        y: int,
-        width: int,
-        height: int,
-    ) -> tuple[bool, int | None]:
-        ctypes.set_last_error(0)
-        applied = bool(
-            self._user32.SetWindowPos(
-                hwnd,
-                wintypes.HWND(0),
-                x,
-                y,
-                width,
-                height,
-                _SWP_NOZORDER | _SWP_NOACTIVATE | _SWP_ASYNCWINDOWPOS,
-            )
-        )
-        return applied, None if applied else ctypes.get_last_error()
-
-    def show_window_no_activate(self, hwnd: int) -> tuple[bool, int | None]:
-        ctypes.set_last_error(0)
-        applied = bool(self._user32.ShowWindow(hwnd, _SW_SHOWNOACTIVATE))
-        if self._user32.IsWindowVisible(hwnd):
-            return True, None
-        return applied, None if applied else ctypes.get_last_error()
 
     def top_level_windows_for_process(self, pid: int) -> WindowEnumerationResult:
         windows: list[int] = []

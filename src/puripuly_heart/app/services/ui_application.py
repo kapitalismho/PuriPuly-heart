@@ -142,6 +142,7 @@ class UiApplicationBoundary:
         runtime_shutdown: ApplicationRuntimeShutdownPort,
         runtime_logging: ApplicationRuntimeLoggingPort,
         osc_state_publisher: Callable[[], object] | None = None,
+        http_extension_registry: object | None = None,
     ) -> None:
         self._startup = startup
         self._input_runtime = input_runtime
@@ -154,6 +155,7 @@ class UiApplicationBoundary:
         self._engagement = engagement
         self._diagnostics = diagnostics
         self._runtime_logging = runtime_logging
+        self._http_extension_registry = http_extension_registry
         self._runtime_shutdown = runtime_shutdown
         self._state_owner = state
         self._osc_state_publisher = osc_state_publisher
@@ -191,6 +193,9 @@ class UiApplicationBoundary:
                 callback=self.close_managed_auth_tasks,
             ),
         )
+
+    def http_extension_registry(self) -> object | None:
+        return self._http_extension_registry
 
     def state(self) -> UiApplicationState:
         return self._state_owner.snapshot()
@@ -350,21 +355,50 @@ class UiApplicationBoundary:
         settings: Any | None = None,
         *,
         force_rebuild_llm: bool = False,
+        persist_settings: bool = True,
+        refresh_ui: bool = True,
     ) -> object:
-        if force_rebuild_llm:
+        if not refresh_ui:
+            result = await self._provider.apply_providers(
+                settings,
+                force_rebuild_llm=force_rebuild_llm,
+                persist_settings=persist_settings,
+                refresh_ui=False,
+            )
+        elif force_rebuild_llm:
             if settings is None:
-                result = await self._provider.apply_providers(force_rebuild_llm=True)
+                if persist_settings:
+                    result = await self._provider.apply_providers(force_rebuild_llm=True)
+                else:
+                    result = await self._provider.apply_providers(
+                        force_rebuild_llm=True,
+                        persist_settings=False,
+                    )
+            else:
+                if persist_settings:
+                    result = await self._provider.apply_providers(
+                        settings,
+                        force_rebuild_llm=True,
+                    )
+                else:
+                    result = await self._provider.apply_providers(
+                        settings,
+                        force_rebuild_llm=True,
+                        persist_settings=False,
+                    )
+        elif settings is None:
+            if persist_settings:
+                result = await self._provider.apply_providers()
+            else:
+                result = await self._provider.apply_providers(persist_settings=False)
+        else:
+            if persist_settings:
+                result = await self._provider.apply_providers(settings)
             else:
                 result = await self._provider.apply_providers(
                     settings,
-                    force_rebuild_llm=True,
+                    persist_settings=False,
                 )
-            await self._publish_osc_state()
-            return result
-        if settings is None:
-            result = await self._provider.apply_providers()
-        else:
-            result = await self._provider.apply_providers(settings)
         await self._publish_osc_state()
         return result
 

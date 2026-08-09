@@ -34,6 +34,7 @@ class OverlaySessionFallbackOwner:
     diagnostics_sink: OverlaySessionFallbackDiagnosticsSink | None = None
     _active: bool = field(init=False, default=False, repr=False)
     _notice_active: bool = field(init=False, default=False, repr=False)
+    _reason: str | None = field(init=False, default=None, repr=False)
     _generation: int = field(init=False, default=0, repr=False)
     _task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _accepting_ingress: bool = field(init=False, default=True, repr=False)
@@ -51,6 +52,14 @@ class OverlaySessionFallbackOwner:
         return self._task
 
     @property
+    def reason(self) -> str | None:
+        return self._reason
+
+    @property
+    def generation(self) -> int:
+        return self._generation
+
+    @property
     def accepting_ingress(self) -> bool:
         return self._accepting_ingress
 
@@ -59,6 +68,7 @@ class OverlaySessionFallbackOwner:
             "owner": self.owner_name,
             "resource_fields": (
                 "_active",
+                "_reason",
                 "_generation",
                 "_task",
                 "_accepting_ingress",
@@ -87,10 +97,14 @@ class OverlaySessionFallbackOwner:
             and configured_target == steamvr_target
         )
 
-    def activate(self) -> None:
+    def activate(self, reason: str | None = None) -> None:
         if not self._accepting_ingress:
             return
         self._active = True
+        self._reason = reason
+
+    def is_current(self, generation: int) -> bool:
+        return bool(self._accepting_ingress and self._active and generation == self._generation)
 
     def publish(self, active: bool) -> None:
         active = bool(active)
@@ -102,9 +116,9 @@ class OverlaySessionFallbackOwner:
         except Exception:
             return
 
-    def schedule(self) -> None:
-        if not self._accepting_ingress:
-            return
+    def schedule(self) -> bool:
+        if not self._accepting_ingress or not self._active:
+            return False
         self._generation += 1
         generation = self._generation
         task = self._task
@@ -116,7 +130,7 @@ class OverlaySessionFallbackOwner:
                 coroutine,
                 f"overlay-session-desktop-fallback-{generation}",
             )
-        except RuntimeError as exc:
+        except Exception as exc:
             coroutine.close()
             self._task = None
             self._emit(
@@ -124,12 +138,14 @@ class OverlaySessionFallbackOwner:
                 {"error_type": type(exc).__name__},
                 exc,
             )
-            return
+            return False
         self._task = task
         task.add_done_callback(self._on_task_done)
+        return True
 
     def clear(self) -> None:
         self._active = False
+        self._reason = None
         self._invalidate_pending()
         self.publish(False)
 
@@ -140,7 +156,7 @@ class OverlaySessionFallbackOwner:
     def _invalidate_pending(self) -> None:
         self._generation += 1
         task = self._task
-        if task is not None and not task.done():
+        if task is not None and not task.done() and task is not asyncio.current_task():
             task.cancel()
 
     async def close(self) -> None:
@@ -150,6 +166,7 @@ class OverlaySessionFallbackOwner:
         if task is not None:
             await asyncio.gather(task, return_exceptions=True)
         self._active = False
+        self._reason = None
         self.publish(False)
 
     async def _run(self, generation: int) -> None:

@@ -245,6 +245,7 @@ class OscControlRouter:
             self._republish_canonical_state()
             self._report_error(f"{message.name}: application_rejected")
             return OscDispatchResult(False, message.name, error="application_rejected")
+        self._publish_canonical_delta()
         return OscDispatchResult(True, message.name, error=None if result is None else None)
 
     async def _invoke(self, message: OscControlMessage) -> object:
@@ -313,6 +314,13 @@ class OscControlRouter:
 
     def _republish_canonical_state(self) -> None:
         callback = self._canonical_state_full_republisher or self._canonical_state_republisher
+        if callback is None:
+            return
+        with contextlib.suppress(Exception):
+            callback()
+
+    def _publish_canonical_delta(self) -> None:
+        callback = self._canonical_state_republisher
         if callback is None:
             return
         with contextlib.suppress(Exception):

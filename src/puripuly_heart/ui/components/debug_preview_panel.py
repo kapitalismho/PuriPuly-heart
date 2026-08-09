@@ -55,6 +55,7 @@ class DebugPreviewPanel(ft.Container):
         on_telemetry_consent: Callable[[], None],
         on_foundation_primitives: Callable[[], None],
         on_stt_loading_button_cycle: Callable[[], None] | None = None,
+        on_http_extension_form: Callable[[], None] | None = None,
     ) -> None:
         actions = [
             _PreviewAction("brake_notice", "debug_preview.brake_notice", on_brake_notice),
@@ -137,6 +138,13 @@ class DebugPreviewPanel(ft.Container):
                 "foundation_primitives",
                 "debug_preview.foundation_primitives",
                 on_foundation_primitives,
+            )
+        )
+        actions.append(
+            _PreviewAction(
+                "http_extension_form",
+                "debug_preview.http_extension_form",
+                on_http_extension_form,
             )
         )
         self._actions = tuple(actions)

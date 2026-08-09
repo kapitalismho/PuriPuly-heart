@@ -91,6 +91,27 @@ async def test_router_routes_boolean_and_language_controls() -> None:
 
 
 @pytest.mark.asyncio
+async def test_router_publishes_canonical_delta_after_successful_application() -> None:
+    application = FakeApplication()
+    delta_calls = 0
+
+    def publish_delta() -> None:
+        nonlocal delta_calls
+        delta_calls += 1
+
+    router = OscControlRouter(
+        application,
+        canonical_state_republisher=publish_delta,
+    )
+
+    result = await router.dispatch_packet("/avatar/parameters/PuriPuly_Trans", True)
+
+    assert result.applied is True
+    assert delta_calls == 1
+    await router.close()
+
+
+@pytest.mark.asyncio
 async def test_router_routes_the_complete_public_control_matrix() -> None:
     application = FakeApplication()
     application.gate.set()

@@ -136,6 +136,10 @@ def compose_peer_application(
         log_basic=log_basic,
         log_detailed=log_detailed,
         log_failure=lambda message: log_basic(message, level=logging.ERROR),
+        lifecycle_trace_sink=lambda event, fields: overlay_provider().record_lifecycle_trace(
+            event,
+            **fields,
+        ),
     )
     target = PeerCaptureTargetApplicationOwner(
         settings=settings_owner,

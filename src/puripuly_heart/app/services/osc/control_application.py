@@ -96,6 +96,11 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         )
 
     async def set_translation_model(self, model: str) -> object:
+        current = self.settings_provider()
+        if current is not None and _osc_translation_model_value(
+            current.translation.model
+        ) == model:
+            return True
         return await self._apply_settings(
             lambda settings: self._set_translation_model(settings, model)
         )
@@ -154,6 +159,10 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         settings.languages.peer_target_language = peer_target
 
     def _set_translation_model(self, settings: object, model: str) -> None:
+        current_model = settings.translation.model
+        current_value = getattr(current_model, "value", current_model)
+        if model == "custom_http" and current_value != "custom_http":
+            settings.translation.previous_llm_model = current_model
         settings.translation.model = _enum_value(settings.translation.model, model)
         self.translation_model_normalizer(settings)
 
@@ -230,6 +239,9 @@ def _settings_control_values_match(actual: object | None, expected: object) -> b
         ("provider", "stt"),
         ("provider", "peer_stt"),
         ("translation", "model"),
+        ("translation", "connection"),
+        ("translation", "http_extension_id"),
+        ("translation", "previous_llm_model"),
         ("translation.fallback", "enabled"),
         ("translation.fallback", "model"),
         ("translation.fallback", "connection"),
@@ -246,6 +258,13 @@ def _settings_control_values_match(actual: object | None, expected: object) -> b
         if actual_value != expected_value:
             return False
     return True
+
+
+def _osc_translation_model_value(model: object) -> str:
+    value = str(getattr(model, "value", model))
+    if value == "gemma4_31b_cerebras":
+        return "gemma4_31b"
+    return value
 
 
 def _nested_attribute(value: object, path: str) -> object | None:
