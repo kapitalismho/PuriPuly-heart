@@ -1,5 +1,6 @@
 use futures_util::{SinkExt, StreamExt};
 use serde_json::json;
+use std::path::Path;
 use std::process::Command;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -7,6 +8,7 @@ use std::sync::{
 };
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::net::TcpListener;
+use tokio::sync::Semaphore;
 use tokio_tungstenite::{accept_async, tungstenite::Message};
 
 use puripuly_heart_overlay::logging::OverlayLogger;
@@ -516,6 +518,69 @@ impl Drop for OwnedSubmitterProbe {
     }
 }
 
+struct PresenterTraceSubmitterState {
+    operations: Mutex<Vec<String>>,
+    submissions: Semaphore,
+}
+
+impl Default for PresenterTraceSubmitterState {
+    fn default() -> Self {
+        Self {
+            operations: Mutex::new(Vec::new()),
+            submissions: Semaphore::new(0),
+        }
+    }
+}
+
+struct PresenterTraceSubmitter {
+    state: Arc<PresenterTraceSubmitterState>,
+}
+
+impl OverlayFrameSubmitter for PresenterTraceSubmitter {
+    fn apply_calibration(
+        &mut self,
+        calibration: &OverlayPresentationCalibration,
+    ) -> Result<(), OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push(format!("calibration:{}", calibration.anchor));
+        Ok(())
+    }
+
+    fn reanchor_spatial_locked(&mut self) -> Result<SpatialReanchorOutcome, OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push("reanchor".to_string());
+        Ok(SpatialReanchorOutcome::Applied)
+    }
+
+    fn submit_frame(&mut self, frame: &RenderedFrame) -> Result<(), OpenVrError> {
+        self.state.operations.lock().unwrap().push(
+            if frame.layout().visible_blocks.is_empty() {
+                "submit:empty"
+            } else {
+                "submit:text"
+            }
+            .to_string(),
+        );
+        self.state.submissions.add_permits(1);
+        Ok(())
+    }
+
+    fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push(if visible { "show" } else { "hide" }.to_string());
+        Ok(())
+    }
+}
+
 struct DelayedSecondSubmitter {
     state: Arc<OwnedSubmitterState>,
     submissions: usize,
@@ -654,6 +719,35 @@ async fn test_logger(name: &str) -> OverlayLogger {
     OverlayLogger::open(unique_log_dir(name), OverlayLoggingMode::Detailed)
         .await
         .unwrap()
+}
+
+fn production_presenter_refresh_trace_contract() -> &'static serde_json::Value {
+    static CONTRACT: OnceLock<serde_json::Value> = OnceLock::new();
+    CONTRACT.get_or_init(|| {
+        let repository_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap();
+        let output = Command::new("uv")
+            .current_dir(&repository_root)
+            .env("PYTHONPATH", &repository_root)
+            .args([
+                "run",
+                "--extra",
+                "dev",
+                "python",
+                "-m",
+                "tests.helpers.overlay_refresh_trace",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice(&output.stdout).unwrap()
+    })
 }
 
 #[tokio::test]
@@ -2459,6 +2553,588 @@ async fn spatial_peer_and_self_refresh_keep_fresh_submit_cadence_without_reancho
         drop(bridge);
         let _ = server.await.unwrap();
     }
+}
+
+async fn run_refresh_parity_sequence(
+    anchor: &str,
+    channel: &str,
+) -> (
+    usize,
+    usize,
+    Vec<u64>,
+    Vec<u64>,
+    Vec<u64>,
+    Vec<&'static str>,
+) {
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    let logger = test_logger(&format!("{anchor}-{channel}-refresh-parity")).await;
+    let (mut bridge, server) = connect_test_bridge().await;
+    let mut calibration = OverlayPresentationCalibration::default();
+    calibration.anchor = anchor.to_string();
+    let mut runtime =
+        OverlayRuntime::new(presentation_snapshot(0, calibration.clone(), Vec::new()));
+    let mut submitter = RecordingSubmitter::default();
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+
+    let id = format!("{channel}:refresh-parity");
+    for revision in 1..=4 {
+        let mut refreshed = block(&id, channel, "stable caption", "stable source", true);
+        if revision < 4 {
+            refreshed.session_scope = Some(format!("{channel}_presentation_refresh={revision}"));
+        }
+        runtime.apply_snapshot(presentation_snapshot(
+            revision,
+            calibration.clone(),
+            vec![refreshed],
+        ));
+        runtime
+            .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+            .await
+            .unwrap();
+    }
+
+    let render_generations = runtime
+        .presentation_diagnostics()
+        .records()
+        .iter()
+        .filter(|record| {
+            record.stage == PresentationStage::RenderReturned
+                && record.outcome == PresentationOutcome::Success
+        })
+        .filter_map(|record| record.render_generation)
+        .collect::<Vec<_>>();
+    let readiness_generations = runtime
+        .presentation_diagnostics()
+        .records()
+        .iter()
+        .filter(|record| {
+            record.stage == PresentationStage::ReadinessObserved
+                && record.outcome == PresentationOutcome::Ready
+        })
+        .filter_map(|record| record.render_generation)
+        .collect::<Vec<_>>();
+    let submission_generations = runtime
+        .presentation_diagnostics()
+        .records()
+        .iter()
+        .filter(|record| {
+            record.stage == PresentationStage::SubmissionReturned
+                && record.outcome == PresentationOutcome::Success
+        })
+        .filter_map(|record| record.render_generation)
+        .collect::<Vec<_>>();
+    let submission_operations = submitter
+        .operations
+        .iter()
+        .copied()
+        .filter(|operation| operation.starts_with("submit"))
+        .collect::<Vec<_>>();
+    let result = (
+        submitter.calls,
+        submitter.spatial_reanchor_calls,
+        render_generations,
+        readiness_generations,
+        submission_generations,
+        submission_operations,
+    );
+    drop(bridge);
+    let _ = server.await.unwrap();
+    result
+}
+
+fn successful_stage_generations(runtime: &OverlayRuntime, stage: PresentationStage) -> Vec<u64> {
+    runtime
+        .presentation_diagnostics()
+        .records()
+        .iter()
+        .filter(|record| {
+            record.stage == stage
+                && match stage {
+                    PresentationStage::RenderReturned | PresentationStage::SubmissionReturned => {
+                        record.outcome == PresentationOutcome::Success
+                    }
+                    PresentationStage::ReadinessObserved => {
+                        record.outcome == PresentationOutcome::Ready
+                    }
+                    _ => false,
+                }
+        })
+        .filter_map(|record| record.render_generation)
+        .collect()
+}
+
+struct OwnerTraceResult {
+    snapshot_count: usize,
+    operations: Vec<String>,
+    completed_fresh_retries: usize,
+}
+
+async fn consume_submission_permit(
+    state: &PresenterTraceSubmitterState,
+    trace_name: &str,
+    snapshot_index: usize,
+) {
+    let permit = tokio::time::timeout(Duration::from_secs(5), state.submissions.acquire())
+        .await
+        .unwrap_or_else(|_| {
+            panic!("submission timeout trace={trace_name} snapshot_index={snapshot_index}")
+        })
+        .unwrap();
+    permit.forget();
+}
+
+async fn run_production_presenter_trace_through_native_owner(trace_name: &str) -> OwnerTraceResult {
+    let snapshots = production_presenter_refresh_trace_contract()["traces"][trace_name]
+        ["snapshots"]
+        .as_array()
+        .unwrap()
+        .clone();
+    let parsed = snapshots
+        .iter()
+        .cloned()
+        .map(serde_json::from_value::<OverlayPresentationSnapshot>)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    let mut previous_generations = parsed[0].native_fresh_render_generations.clone();
+    let mut previous_calibration = parsed[0].calibration.clone();
+    let mut previous_blocks = parsed[0].blocks.clone();
+    let mut expected_submissions = vec![true];
+    for snapshot in parsed.iter().skip(1) {
+        let visual_changed =
+            snapshot.calibration != previous_calibration || snapshot.blocks != previous_blocks;
+        let generation_started = snapshot.native_fresh_render_generations.is_some()
+            && snapshot.native_fresh_render_generations != previous_generations;
+        expected_submissions.push(visual_changed || generation_started);
+        previous_generations = snapshot.native_fresh_render_generations.clone();
+        previous_calibration = snapshot.calibration.clone();
+        previous_blocks = snapshot.blocks.clone();
+    }
+    let state = Arc::new(PresenterTraceSubmitterState::default());
+    let server_state = state.clone();
+    let server_trace_name = trace_name.to_string();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        ws.send(Message::Text(
+            json!({"type": "snapshot", "payload": snapshots[0]})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        loop {
+            let message = ws.next().await.unwrap().unwrap();
+            if message
+                .to_text()
+                .is_ok_and(|text| text.contains("overlay_ready"))
+            {
+                break;
+            }
+        }
+        consume_submission_permit(&server_state, &server_trace_name, 0).await;
+        for (snapshot_index, (snapshot, expects_submission)) in snapshots
+            .iter()
+            .skip(1)
+            .zip(expected_submissions.iter().skip(1))
+            .enumerate()
+        {
+            ws.send(Message::Text(
+                json!({"type": "snapshot", "payload": snapshot})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+            if *expects_submission {
+                consume_submission_permit(&server_state, &server_trace_name, snapshot_index + 1)
+                    .await;
+            } else {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        }
+        ws.send(Message::Text(
+            json!({"type": "shutdown"}).to_string().into(),
+        ))
+        .await
+        .unwrap();
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, initial_snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    assert_eq!(initial_snapshot, parsed[0]);
+    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
+        initial_snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        PresenterTraceSubmitter {
+            state: state.clone(),
+        },
+        Duration::from_millis(1),
+        Duration::from_millis(50),
+        1,
+    );
+    owner
+        .run(
+            &mut bridge,
+            &test_logger(&format!("presenter-trace-{trace_name}")).await,
+        )
+        .await
+        .unwrap();
+    server.await.unwrap();
+    assert!(owner.resources_released());
+    let result = OwnerTraceResult {
+        snapshot_count: parsed.len(),
+        operations: state.operations.lock().unwrap().clone(),
+        completed_fresh_retries: owner
+            .fresh_retry_audit_for_test()
+            .iter()
+            .filter(|fact| fact.2 == "completed")
+            .count(),
+    };
+    result
+}
+
+#[tokio::test]
+async fn head_and_spatial_refresh_bursts_keep_baseline_equivalent_render_submit_counts() {
+    for channel in ["peer", "self"] {
+        let head = run_refresh_parity_sequence("head_locked", channel).await;
+        let spatial = run_refresh_parity_sequence("spatial_locked", channel).await;
+
+        assert_eq!(head.0, 5);
+        assert_eq!(spatial.0, head.0);
+        assert_eq!(head.1, 0);
+        assert_eq!(spatial.1, 1);
+        assert_eq!(head.2, vec![1, 2, 3, 4, 5]);
+        assert_eq!(spatial.2, head.2);
+        assert_eq!(head.3, head.2);
+        assert_eq!(head.4, head.2);
+        assert_eq!(spatial.3, head.3);
+        assert_eq!(spatial.4, head.4);
+        assert_eq!(spatial.5, head.5);
+        assert_eq!(
+            spatial.5,
+            vec![
+                "submit:empty",
+                "submit:text",
+                "submit:text",
+                "submit:text",
+                "submit:text"
+            ]
+        );
+    }
+}
+
+#[tokio::test]
+async fn spatial_new_turn_during_refresh_reanchors_once_without_skipping_ticks() {
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    let logger = test_logger("spatial-new-turn-during-refresh").await;
+    let (mut bridge, server) = connect_test_bridge().await;
+    let calibration = spatial_calibration();
+    let mut runtime =
+        OverlayRuntime::new(presentation_snapshot(0, calibration.clone(), Vec::new()));
+    let mut submitter = RecordingSubmitter::default();
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+
+    for revision in 1..=6 {
+        let mut a = block("peer:A", "peer", "A", "source A", true);
+        let mut blocks = vec![a.clone()];
+        match revision {
+            1..=3 => {
+                a.session_scope = Some(format!("peer_presentation_refresh={revision}"));
+                blocks = vec![a];
+            }
+            4..=5 => {
+                a.session_scope = Some(format!("peer_presentation_refresh={revision}"));
+                let mut b = block("peer:B", "peer", "B", "source B", true);
+                b.session_scope = Some(format!("peer_presentation_refresh={revision}"));
+                blocks = vec![a, b];
+            }
+            6 => {
+                blocks.push(block("peer:B", "peer", "B", "source B", true));
+            }
+            _ => unreachable!(),
+        }
+        runtime.apply_snapshot(presentation_snapshot(revision, calibration.clone(), blocks));
+        runtime
+            .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+            .await
+            .unwrap();
+    }
+
+    assert_eq!(submitter.calls, 7);
+    assert_eq!(submitter.spatial_reanchor_calls, 2);
+    assert_eq!(
+        submitter.operations,
+        vec![
+            "submit:empty",
+            "reanchor",
+            "submit:text",
+            "show",
+            "submit:text",
+            "submit:text",
+            "reanchor",
+            "submit:text",
+            "submit:text",
+            "submit:text"
+        ]
+    );
+    assert_eq!(
+        successful_stage_generations(&runtime, PresentationStage::RenderReturned),
+        vec![1, 2, 3, 4, 5, 6, 7]
+    );
+    assert_eq!(
+        successful_stage_generations(&runtime, PresentationStage::ReadinessObserved),
+        vec![1, 2, 3, 4, 5, 6, 7]
+    );
+    assert_eq!(
+        successful_stage_generations(&runtime, PresentationStage::SubmissionReturned),
+        vec![1, 2, 3, 4, 5, 6, 7]
+    );
+    drop(bridge);
+    let _ = server.await.unwrap();
+}
+
+#[tokio::test]
+async fn mode_and_calibration_changes_during_refresh_preserve_every_submission() {
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    let logger = test_logger("mode-calibration-during-refresh").await;
+    let (mut bridge, server) = connect_test_bridge().await;
+    let head = OverlayPresentationCalibration::default();
+    let mut spatial = spatial_calibration();
+    let mut initial = block("self:A", "self", "A", "", true);
+    initial.session_scope = Some("self_presentation_refresh=1".to_string());
+    let mut runtime = OverlayRuntime::new(presentation_snapshot(1, head.clone(), vec![initial]));
+    let mut submitter = RecordingSubmitter::default();
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+
+    for revision in 2..=8 {
+        let calibration = match revision {
+            2 => head.clone(),
+            3..=4 => spatial.clone(),
+            5 => {
+                spatial.offset_x = 0.35;
+                spatial.clone()
+            }
+            6 => spatial.clone(),
+            7..=8 => head.clone(),
+            _ => unreachable!(),
+        };
+        let mut refreshed = block("self:A", "self", "A", "", true);
+        if revision != 8 {
+            refreshed.session_scope = Some(format!("self_presentation_refresh={revision}"));
+        }
+        runtime.apply_snapshot(presentation_snapshot(
+            revision,
+            calibration,
+            vec![refreshed],
+        ));
+        runtime
+            .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+            .await
+            .unwrap();
+    }
+
+    assert_eq!(submitter.calls, 8);
+    assert_eq!(submitter.spatial_reanchor_calls, 2);
+    assert_eq!(
+        submitter.calibration_anchors,
+        vec![
+            "head_locked",
+            "head_locked",
+            "spatial_locked",
+            "spatial_locked",
+            "spatial_locked",
+            "spatial_locked",
+            "head_locked",
+            "head_locked"
+        ]
+    );
+    assert_eq!(
+        successful_stage_generations(&runtime, PresentationStage::RenderReturned),
+        vec![1, 2, 3, 4, 5, 6, 7, 8]
+    );
+    assert_eq!(
+        successful_stage_generations(&runtime, PresentationStage::ReadinessObserved),
+        vec![1, 2, 3, 4, 5, 6, 7, 8]
+    );
+    assert_eq!(
+        successful_stage_generations(&runtime, PresentationStage::SubmissionReturned),
+        vec![1, 2, 3, 4, 5, 6, 7, 8]
+    );
+    drop(bridge);
+    let _ = server.await.unwrap();
+}
+
+#[tokio::test]
+async fn refresh_cleanup_cancellation_and_target_replacement_follow_stable_identity() {
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    let logger = test_logger("spatial-refresh-target-lifecycle").await;
+    let (mut bridge, server) = connect_test_bridge().await;
+    let calibration = spatial_calibration();
+    let mut a = block("peer:A", "peer", "A", "source A", true);
+    a.session_scope = Some("peer_presentation_refresh=1".to_string());
+    let mut runtime = OverlayRuntime::new(presentation_snapshot(
+        1,
+        calibration.clone(),
+        vec![a.clone()],
+    ));
+    let mut submitter = RecordingSubmitter::default();
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+
+    a.session_scope = Some("peer_presentation_refresh=2".to_string());
+    runtime.apply_snapshot(presentation_snapshot(
+        2,
+        calibration.clone(),
+        vec![a.clone()],
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    runtime.apply_snapshot(presentation_snapshot(3, calibration.clone(), Vec::new()));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+
+    let mut b = block("peer:B", "peer", "B", "source B", true);
+    b.session_scope = Some("peer_presentation_refresh=1".to_string());
+    runtime.apply_snapshot(presentation_snapshot(
+        4,
+        calibration.clone(),
+        vec![b.clone()],
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    b.session_scope = None;
+    runtime.apply_snapshot(presentation_snapshot(5, calibration.clone(), vec![b]));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    a.session_scope = None;
+    runtime.apply_snapshot(presentation_snapshot(6, calibration, vec![a]));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+
+    assert_eq!(submitter.calls, 6);
+    assert_eq!(submitter.spatial_reanchor_calls, 2);
+    assert_eq!(
+        submitter
+            .operations
+            .iter()
+            .filter(|operation| operation.starts_with("submit"))
+            .count(),
+        6
+    );
+    assert_eq!(
+        successful_stage_generations(&runtime, PresentationStage::RenderReturned),
+        vec![1, 2, 3, 4, 5, 6]
+    );
+    assert_eq!(
+        successful_stage_generations(&runtime, PresentationStage::ReadinessObserved),
+        vec![1, 2, 3, 4, 5, 6]
+    );
+    assert_eq!(
+        successful_stage_generations(&runtime, PresentationStage::SubmissionReturned),
+        vec![1, 2, 3, 4, 5, 6]
+    );
+    drop(bridge);
+    let _ = server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_presenter_traces_preserve_native_owner_burst_and_ownership_semantics() {
+    let peer_head = run_production_presenter_trace_through_native_owner("peer_head_natural").await;
+    let peer_spatial =
+        run_production_presenter_trace_through_native_owner("peer_spatial_natural").await;
+    let self_head = run_production_presenter_trace_through_native_owner("self_head_natural").await;
+    let self_spatial =
+        run_production_presenter_trace_through_native_owner("self_spatial_natural").await;
+
+    for (head, spatial) in [(&peer_head, &peer_spatial), (&self_head, &self_spatial)] {
+        let head_submissions = head
+            .operations
+            .iter()
+            .filter(|operation| operation.starts_with("submit"))
+            .count();
+        let spatial_submissions = spatial
+            .operations
+            .iter()
+            .filter(|operation| operation.starts_with("submit"))
+            .count();
+        assert_eq!(head_submissions, head.snapshot_count);
+        assert_eq!(spatial_submissions, spatial.snapshot_count);
+        assert_eq!(spatial_submissions, head_submissions);
+        assert_eq!(
+            head.operations
+                .iter()
+                .filter(|operation| operation.as_str() == "reanchor")
+                .count(),
+            0
+        );
+        assert_eq!(
+            spatial
+                .operations
+                .iter()
+                .filter(|operation| operation.as_str() == "reanchor")
+                .count(),
+            1
+        );
+    }
+
+    let lifecycle = run_production_presenter_trace_through_native_owner("spatial_lifecycle").await;
+    assert_eq!(
+        lifecycle
+            .operations
+            .iter()
+            .filter(|operation| operation.starts_with("submit"))
+            .count(),
+        lifecycle.snapshot_count
+    );
+    assert_eq!(
+        lifecycle
+            .operations
+            .iter()
+            .filter(|operation| operation.as_str() == "reanchor")
+            .count(),
+        3
+    );
+
+    let ownership = run_production_presenter_trace_through_native_owner("spatial_ownership").await;
+    let ownership_submission_count = ownership
+        .operations
+        .iter()
+        .filter(|operation| operation.starts_with("submit"))
+        .count();
+    assert_eq!(ownership_submission_count, ownership.snapshot_count - 1);
+    assert_eq!(ownership.completed_fresh_retries, 1);
+    assert_eq!(
+        ownership
+            .operations
+            .iter()
+            .filter(|operation| operation.as_str() == "reanchor")
+            .count(),
+        1
+    );
 }
 
 #[tokio::test]
