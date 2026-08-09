@@ -1325,35 +1325,15 @@ class SettingsView(ft.Column):
             t("settings.osc.mode.automatic"),
             self._on_osc_connection_click,
         )
-        self._osc_connection_label = ft.Text(
-            t("settings.osc.connection"),
-            size=20,
-            color=COLOR_SECONDARY,
-        )
-        self._osc_connection_chevron = ft.Icon(
-            ft.Icons.CHEVRON_RIGHT,
-            size=24,
-            color=COLOR_SECONDARY,
-        )
-        self._osc_connection_row = ft.Row(
-            controls=[
-                self._osc_connection_label,
-                self._osc_connection_text,
-                self._osc_connection_chevron,
-            ],
-            spacing=8,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            expand=True,
-        )
         self._osc_connection_title = ft.Text(
-            t("settings.vrchat_osc"),
+            t("settings.osc.connection.title"),
             size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
         self._vrchat_osc_card = self._wrap_unit_card(
             title=self._osc_connection_title,
-            value=self._osc_connection_row,
+            value=self._osc_connection_text,
         )
 
         self._clipboard_auto_translate_text = self._build_clickable_text(
@@ -5243,8 +5223,7 @@ class SettingsView(ft.Column):
         self._persona_title.value = t("settings.section.persona")
         self._custom_vocab_title.value = t("settings.section.custom_vocabulary")
         self._vrc_mic_title.value = t("settings.vrc_mic_intercept")
-        self._osc_connection_title.value = t("settings.vrchat_osc")
-        self._osc_connection_label.value = t("settings.osc.connection")
+        self._osc_connection_title.value = t("settings.osc.connection.title")
         self._chatbox_source_title.value = t("settings.chatbox_include_source")
         self._clipboard_auto_translate_title.value = t("settings.clipboard_auto_translate")
         self._telemetry_consent_title.value = t("settings.telemetry.title")

@@ -5307,7 +5307,7 @@ def test_general_tab_keeps_fixed_three_slot_rows_with_vrchat_osc_card(
     assert _row_card_titles(general_controls[0]) == [
         t("settings.section.ui"),
         t("settings.chatbox_include_source"),
-        t("settings.vrchat_osc"),
+        t("settings.osc.connection.title"),
     ]
     assert _row_card_titles(general_controls[1]) == [
         t("settings.audio_host_api"),
@@ -5331,11 +5331,10 @@ def test_general_tab_keeps_fixed_three_slot_rows_with_vrchat_osc_card(
     assert osc_card.height == SettingsUnitCard.DEFAULT_HEIGHT
     assert osc_card.expand is True
     osc_column = _wrapped_card_column(osc_card)
-    osc_row = osc_column.controls[1].content
-    assert isinstance(osc_row, ft.Row)
-    assert osc_row.controls[0].value == t("settings.osc.connection")
-    assert osc_row.controls[1] is view._osc_connection_text
-    assert osc_row.controls[2].icon == ft.Icons.CHEVRON_RIGHT
+    value_slot = osc_column.controls[1]
+    assert isinstance(value_slot, ft.Container)
+    assert value_slot.content is view._osc_connection_text
+    assert view._osc_connection_text.content.value == t("settings.osc.mode.automatic")
 
 
 def test_api_translation_connection_row_keeps_empty_fast_translation_slot(
@@ -5384,7 +5383,7 @@ def test_general_osc_card_is_locale_independent(
         assert _row_card_titles(general_row) == [
             t("settings.section.ui"),
             t("settings.chatbox_include_source"),
-            t("settings.vrchat_osc"),
+            t("settings.osc.connection.title"),
         ]
         assert _row_card_titles(api_row) == [
             t("settings.translation_connection"),
@@ -5674,7 +5673,7 @@ def test_general_tab_labels_and_section_headings_render_from_i18n(
         assert view._peer_hangover_field.label == t("settings.vad.peer_hangover_ms")
         assert view._peer_pre_roll_field.label == t("settings.vad.peer_pre_roll_ms")
         assert view._vrc_mic_title.value == t("settings.vrc_mic_intercept")
-        assert view._osc_connection_title.value == t("settings.vrchat_osc")
+        assert view._osc_connection_title.value == t("settings.osc.connection.title")
         assert view._chatbox_source_title.value == t("settings.chatbox_include_source")
         assert view._clipboard_auto_translate_title.value == t("settings.clipboard_auto_translate")
     finally:
@@ -6990,7 +6989,7 @@ def test_general_cards_use_settings_unit_card_defaults(
         _general_tab_card(view, t("settings.chatbox_include_source")),
         _general_tab_card(view, t("settings.clipboard_auto_translate")),
         _general_tab_card(view, t("settings.vrc_mic_intercept")),
-        _general_tab_card(view, t("settings.vrchat_osc")),
+        _general_tab_card(view, t("settings.osc.connection.title")),
         _general_tab_card(view, t("settings.audio_host_api")),
         _general_tab_card(view, t("settings.section.microphone_audio")),
         _general_tab_card(view, t("settings.section.loopback_audio")),
