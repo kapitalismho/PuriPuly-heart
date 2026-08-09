@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import tempfile
+import wave
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Iterable
@@ -26,6 +27,8 @@ PRIMARY_WINDOW = 8000
 STABLE_EXCLUSION = 16000
 LS_RTF_FORECAST = 0.05
 ERES_SECONDS_PER_EMBEDDING = 0.037
+ERES_PARALLEL_WORKERS = 10
+ERES_THROUGHPUT_MARGIN = 0.75
 LS_CACHE_BYTES_PER_AUDIO_SECOND = 4096
 ERES_CACHE_BYTES_PER_EMBEDDING = 2048
 ACOUSTIC_CACHE_BYTES_PER_WINDOW = 1024
@@ -510,6 +513,7 @@ def coordinate_ledger(
     windows: set[tuple[str, int, int]] = set()
     acoustic_windows: set[tuple[str, int, int]] = set()
     profile_counts: Counter[str] = Counter()
+    public_source_rows: dict[str, dict[str, Any]] = {}
     for episode in episodes:
         bounds = episode["bounds"]
         warm_start = int(bounds["warm_start"])
@@ -517,6 +521,19 @@ def coordinate_ledger(
         scored_end = int(bounds["scored_end"])
         tail_end = int(bounds["tail_end"])
         wav = str(episode["wav_sha256"])
+        session_id = str(episode["session_id"])
+        if synthetic_manifest_name(session_id) is None:
+            source = public_source_rows.setdefault(
+                wav,
+                {
+                    "source_id": session_id,
+                    "wav_sha256": wav,
+                    "maximum_tail_end": tail_end,
+                    "episode_count": 0,
+                },
+            )
+            source["maximum_tail_end"] = max(int(source["maximum_tail_end"]), tail_end)
+            source["episode_count"] = int(source["episode_count"]) + 1
         for window in ADJACENT_WINDOWS:
             for step in LONG_STEPS if window >= 24000 else STEPS:
                 lo = max(scored_start, warm_start + window)
@@ -552,6 +569,50 @@ def coordinate_ledger(
                     )
                     profile_counts[profile] += 1
                     windows.add((wav, end - window, end))
+    source_prefix_counts: Counter[str] = Counter()
+    state_snapshot_rows: list[dict[str, Any]] = []
+    for wav, source in sorted(public_source_rows.items()):
+        maximum_tail = int(source["maximum_tail_end"])
+        for window in ANCHOR_WINDOWS:
+            for step in STEPS:
+                profile = f"source_prefix_probe:W{window}:S{step}"
+                for end in range(ceil_grid(window, step), maximum_tail + 1, step):
+                    rows.append(
+                        {
+                            "source_id": source["source_id"],
+                            "kind": "source_prefix_probe_grid",
+                            "profile": profile,
+                            "boundary": end - window,
+                            "observation_frontier": end,
+                        }
+                    )
+                    source_prefix_counts[profile] += 1
+                    windows.add((wav, end - window, end))
+    for episode in episodes:
+        session_id = str(episode["session_id"])
+        if synthetic_manifest_name(session_id) is not None:
+            continue
+        warm_start = int(episode["bounds"]["warm_start"])
+        for window in ANCHOR_WINDOWS:
+            for step in STEPS:
+                last_probe_end = (warm_start // step) * step
+                for state_mode in (
+                    "stable_no_update",
+                    "stable_ema",
+                    "confirmed_anchor",
+                    "prototype_memory_4",
+                ):
+                    row = {
+                        "episode_id": episode["episode_id"],
+                        "kind": "source_prefix_state_snapshot",
+                        "state_mode": state_mode,
+                        "window_samples": window,
+                        "step_samples": step,
+                        "snapshot_frontier": warm_start,
+                        "last_probe_end": last_probe_end if last_probe_end >= window else None,
+                    }
+                    rows.append(row)
+                    state_snapshot_rows.append(row)
     episode_by_id = {str(episode["episode_id"]): episode for episode in episodes}
     candidate_by_id = {str(candidate["candidate_id"]): candidate for candidate in candidates}
     measurement_counts: Counter[str] = Counter()
@@ -646,6 +707,17 @@ def coordinate_ledger(
         "coordinate_row_count": len(rows),
         "coordinate_rows_sha256": row_digest.hexdigest(),
         "grid_profile_counts": dict(sorted(profile_counts.items())),
+        "source_prefix_profile_counts": dict(sorted(source_prefix_counts.items())),
+        "source_prefix_public_sources": sorted(
+            public_source_rows.values(), key=lambda row: row["source_id"]
+        ),
+        "source_prefix_state_snapshot_count": len(state_snapshot_rows),
+        "source_prefix_state_snapshot_rows_sha256": sha256_bytes(
+            b"".join(
+                canonical_json(row).encode("utf-8") + b"\n"
+                for row in sorted(state_snapshot_rows, key=canonical_json)
+            )
+        ),
         "measurement_profile_counts": dict(sorted(measurement_counts.items())),
         "ls_acoustic_profile_counts": dict(sorted(ls_acoustic_counts.items())),
         "ls_paired_valid_by_horizon": paired_valid,
@@ -707,7 +779,13 @@ def fixture_ledger(experiment_dir: Path) -> dict[str, Any]:
     }
 
 
-def runtime_forecast(episodes: list[dict[str, Any]], coordinate: dict[str, Any]) -> dict[str, Any]:
+def runtime_forecast(
+    experiment_dir: Path,
+    inventory: dict[str, Any],
+    details: dict[str, dict[str, Any]],
+    episodes: list[dict[str, Any]],
+    coordinate: dict[str, Any],
+) -> dict[str, Any]:
     public_sessions: dict[str, int] = {}
     synthetic_seconds = 0.0
     for episode in episodes:
@@ -719,12 +797,65 @@ def runtime_forecast(episodes: list[dict[str, Any]], coordinate: dict[str, Any])
             public_sessions[session_id] = max(
                 public_sessions.get(session_id, 0), int(bounds["tail_end"])
             )
-    public_source_seconds = 18813.025
+    corpus_root = Path(str(inventory["corpus_root"]))
+    source_duration_rows: list[dict[str, Any]] = []
+    for session_id in sorted(public_sessions):
+        path = corpus_root / str(details[session_id]["wav_path"])
+        with wave.open(str(path), "rb") as handle:
+            actual_samples = handle.getnframes()
+            if (
+                handle.getnchannels() != 1
+                or handle.getframerate() != SAMPLE_RATE
+                or handle.getsampwidth() != 2
+            ):
+                raise RuntimeError(f"public WAV format drift: {session_id}")
+        declared_samples = int(details[session_id]["duration_samples"])
+        if int(public_sessions[session_id]) > actual_samples:
+            raise RuntimeError(f"public scored tail exceeds WAV: {session_id}")
+        source_duration_rows.append(
+            {
+                "source_id": session_id,
+                "declared_samples": declared_samples,
+                "actual_wav_samples": actual_samples,
+                "difference_samples": actual_samples - declared_samples,
+                "maximum_diagnostic_tail": int(public_sessions[session_id]),
+            }
+        )
+    public_source_seconds = (
+        sum(int(row["actual_wav_samples"]) for row in source_duration_rows) / SAMPLE_RATE
+    )
     ls_audio_seconds_per_checkpoint = public_source_seconds + synthetic_seconds
     ls_jobs_seconds = 4 * ls_audio_seconds_per_checkpoint
-    embedding_jobs = 2 * int(coordinate["unique_embedding_window_count"])
+    windows_per_checkpoint = int(coordinate["unique_embedding_window_count"])
+    embedding_jobs = 2 * windows_per_checkpoint
     ls_wall_seconds = ls_jobs_seconds * LS_RTF_FORECAST
-    eres_wall_seconds = embedding_jobs * ERES_SECONDS_PER_EMBEDDING
+    benchmark_path = (
+        experiment_dir / "results" / "turn_episode_v1" / "phase_4_parallel_benchmark.json"
+    )
+    benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
+    benchmark_body = {key: value for key, value in benchmark.items() if key != "content_sha256"}
+    if benchmark.get("content_sha256") != sha256_bytes(
+        canonical_json(benchmark_body).encode("utf-8")
+    ):
+        raise RuntimeError("parallel benchmark content hash drift")
+    if (
+        benchmark.get("workers") != ERES_PARALLEL_WORKERS
+        or benchmark.get("throughput_margin") != ERES_THROUGHPUT_MARGIN
+    ):
+        raise RuntimeError("parallel benchmark contract drift")
+    throughput = {
+        checkpoint: float(row["conservative_jobs_per_second"])
+        for checkpoint, row in benchmark["results"].items()
+    }
+    if set(throughput) != {"E-standard", "E-w24s4ep4"} or any(
+        value <= 0 for value in throughput.values()
+    ):
+        raise RuntimeError("parallel benchmark throughput invalid")
+    eres_wall_by_checkpoint = {
+        checkpoint: windows_per_checkpoint / value for checkpoint, value in throughput.items()
+    }
+    eres_wall_seconds = sum(eres_wall_by_checkpoint.values())
+    serial_eres_wall_seconds = embedding_jobs * ERES_SECONDS_PER_EMBEDDING
     fixed_overhead_seconds = 900.0
     wall_seconds = ls_wall_seconds + eres_wall_seconds + fixed_overhead_seconds
     cache_bytes = int(
@@ -733,28 +864,42 @@ def runtime_forecast(episodes: list[dict[str, Any]], coordinate: dict[str, Any])
         + int(coordinate["unique_acoustic_window_count"]) * ACOUSTIC_CACHE_BYTES_PER_WINDOW
     )
     return {
-        "public_source_seconds": public_source_seconds,
+        "public_source_seconds": round(public_source_seconds, 6),
         "public_session_count": len(public_sessions),
+        "public_source_duration_rows": source_duration_rows,
         "synthetic_episode_seconds": round(synthetic_seconds, 6),
         "ls_checkpoint_count": 4,
         "ls_audio_seconds_all_checkpoints": round(ls_jobs_seconds, 6),
         "ls_rtf_forecast": LS_RTF_FORECAST,
         "ls_wall_seconds": round(ls_wall_seconds, 3),
         "eres_checkpoint_count": 2,
+        "eres_parallel_workers": ERES_PARALLEL_WORKERS,
+        "eres_parallel_benchmark_content_sha256": benchmark["content_sha256"],
+        "eres_parallel_benchmark_code_sha256": benchmark["generated_from"][
+            "phase4_parallel_benchmark.py"
+        ],
+        "eres_conservative_jobs_per_second": dict(sorted(throughput.items())),
+        "eres_windows_per_checkpoint": windows_per_checkpoint,
         "eres_embedding_jobs": embedding_jobs,
         "eres_seconds_per_embedding": ERES_SECONDS_PER_EMBEDDING,
+        "eres_serial_counterfactual_wall_seconds": round(serial_eres_wall_seconds, 3),
+        "eres_parallel_wall_seconds_by_checkpoint": {
+            key: round(value, 3) for key, value in sorted(eres_wall_by_checkpoint.items())
+        },
         "eres_wall_seconds": round(eres_wall_seconds, 3),
         "fixed_overhead_seconds": fixed_overhead_seconds,
         "total_wall_seconds": round(wall_seconds, 3),
         "total_wall_hours": round(wall_seconds / 3600, 6),
         "new_cache_bytes": cache_bytes,
-        "peak_rss_bytes": 6 * 1024**3,
+        "peak_rss_bytes": 8 * 1024**3,
         "ceilings": {
-            "wall_seconds": 21600,
+            "wall_seconds": 16 * 3600,
             "new_cache_bytes": 8 * 1024**3,
             "peak_rss_bytes": 16 * 1024**3,
         },
-        "within_ceilings": wall_seconds <= 21600 and cache_bytes <= 8 * 1024**3,
+        "within_ceilings": (
+            wall_seconds <= 16 * 3600 and cache_bytes <= 8 * 1024**3 and 8 * 1024**3 <= 16 * 1024**3
+        ),
     }
 
 
@@ -845,7 +990,13 @@ def build_payload(experiment_dir: Path) -> dict[str, Any]:
         },
         "fixture_ledger": fixture_ledger(experiment_dir),
     }
-    payload["runtime_forecast"] = runtime_forecast(episodes, coordinate)
+    payload["runtime_forecast"] = runtime_forecast(
+        experiment_dir,
+        inventory,
+        details,
+        episodes,
+        coordinate,
+    )
     return payload
 
 

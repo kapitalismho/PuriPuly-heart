@@ -5,8 +5,8 @@ signal experiment before any new large neural inference or full diagnostic sweep
 Historical cache inspection and previously committed tiny parity evidence were read to
 make the contract concrete; no Phase 4 scientific result has been generated.
 
-Revision: 3.
-Candidate: `working-tree` based on `85a8c702c5e18f06e2d1f8ef36ca063056877da1`.
+Revision: 5.
+Candidate: `working-tree` based on `aad402be25b02a54aba7ae1ce3f4066eeaf460a0`.
 
 ## 1. Authority and accepted entry gate
 
@@ -47,9 +47,12 @@ signal question and determines how much Phase 5 compute each family is allowed.
 | `turn_episode/build_episodes.py` | `6deec51274cedf49a70cd299700547f39cbbbc16e200eb8e3056d15887784c7d` | accepted source/reference reconstruction |
 | `turn_episode/contracts.py` | `b207d3f8b9720df5dd228aa8bd8b479c54622abb905a9ca04f580820a6fc3c03` | scientific invariants |
 | `turn_episode/schemas.py` | `a9fa4571b1bab3cf88d6739a3732c1cc62f753a46d51d59c2db7526468eb8868` | source-coordinate proposal/action schemas |
-| `turn_episode/phase4_design.py` | `529edc2887707c34876c2fa7e5fc77bacbadd18c9981509729d9417e0c4585a0` | metadata-only coordinate, candidate, pair, fixture, and forecast generator |
+| `turn_episode/phase4_design.py` | `bbec4e069165dad309c1dd4103521269494bd8c1dcd115a0d2265f632b6edd4a` | metadata-only coordinate, source-prefix state declaration, candidate, pair, fixture, and forecast generator |
+| `turn_episode/phase4_parallel_benchmark.py` | `5a9cb9b1f6bcbe380873c492e94a93d3c1f40e1539c0c96ae4d4cf3ba7e2e07c` | fixed 10-worker model-load-inclusive CPU benchmark |
 | `tests/test_phase4_design.py` | `04acfead6bb5e45b3aecda1599bce59a856bb93c614cf9a257eee556da557069` | 20 matcher, weight-dominance, and reference-aligned LS acoustic-support fixtures |
-| `phase_4_design_ledger.json` | `a3d95083e1262a1d63839415703519c3f3078bfbbce61f39c85136c83f12af79` | content SHA-256 `149fd07404aee0248df97a14d8bf83e79842419937989862355d0c97104bca20`; 186,091 bytes |
+| `tests/test_phase4_signal.py` | `15c4624b96dae375db778362d3891468368555fa41a58bc47a984a83c107fd3f` | 25 input, LS/ERes all-hit/mixed-hit cache, independent state-replay, exact-threshold, scalar, and public-mutation fixtures |
+| `phase_4_design_ledger.json` | `0a86788a4817d4a205d92b0afb6ee05dc97d11da3e99d4c0501d74be30473691` | content SHA-256 `c8336c2665b28047b1a169fc9605a6c6a3c400afe553dc3a2d35ca9b20b41536`; 190,275 bytes |
+| `phase_4_parallel_benchmark.json` | `0d0a5beb673b83c7267cd8ff94bdc8689e8eecf6dca83b60b5016d9e32453649` | content SHA-256 `9057b5c0b0dbb1b4d6f9ea1fba60c9dc438db3509d4c16c701e4953e959c5f2f`; 1,930 bytes |
 
 The three historical synthetic manifests are frozen at SHA-256
 `14347cdb...` (`ls_dev`), `c0aabc5a...` (`ls_held_out_clean`), and `f0d16939...`
@@ -156,7 +159,27 @@ legacy imports only. A new neutral cache root
   contract hash;
 - capture payload byte hash and canonical content hash;
 - state mode and source-origin mapping;
-- for ERes, every absolute `[start,end)` source window and every embedding payload hash.
+- for ERes, every absolute `[start,end)` source window, normalized 192-vector payload,
+  normalized 80-bin acoustic shadow, and log-RMS payload hash.
+
+ERes cache schema `turn_episode_phase4_eres_cache.v2` does not write a per-source NPZ.
+Each source/checkpoint is an ordered set of deterministic `mtime=0` gzip binary shards.
+The canonical binary header freezes little-endian `int64 [N,2]` windows, `float32
+[N,192]` embeddings, `float32 [N,80]` acoustic shadows, and `float32 [N]` log RMS.
+The uncompressed target is 16 MiB and any compressed shard above 20 MiB is split until
+it passes. Metadata binds shard ordinal, row count, first/last coordinate, uncompressed
+content hash, compressed byte hash, and byte size; its aggregate payload identity is a
+canonical hash of those ordered receipts. Shards are atomically replaced before the
+self-hashed metadata is published. Missing metadata therefore leaves an incomplete
+cache, never an apparent hit. This replaces the unsafe possibility of a 38-111 MiB
+single public-source NPZ and applies the user's bounded-file policy to caches as well as
+result rows.
+
+WAV byte hash and format remain mandatory. Cache duration uses the authoritative WAV
+header, not a copied inventory count. Three accepted public files have exact audited
+header/inventory differences: `ami_EN2001d -5`, `ami_ES2015d -5`, and `ami_TS3009b +5`
+samples; the other seven are exact. Every maximum diagnostic tail is well inside the
+header duration. No sample is padded, truncated, or synthesized to erase this drift.
 
 An imported LS capture is accepted only after shapes, frame centers, availability
 frontiers, source length, and WAV identity match and 32 deterministic case captures per
@@ -170,7 +193,9 @@ comparison.
 
 Cache files are written to same-directory temporary files and atomically replaced only
 after payload count, size, byte hash, and content hash pass. A partial session remains
-explicitly partial and cannot enter a complete summary.
+explicitly partial and cannot enter a complete summary. The independent loader and
+verifier recompute every shard, coordinate, embedding/shadow row hash, aggregate receipt,
+shape, finiteness, and embedding norm before any scientific row can cite that cache.
 
 ## 5. LS source-time, frontend, and causal contract
 
@@ -268,6 +293,19 @@ silence, or a reference transition are therefore eligible and are tagged after a
 and annotation reads as `pure_singleton`, `transition_mixed`, `silence`, or `other`.
 Those tags stratify reports but cannot change the coordinate universe.
 
+For each of the ten public source sessions, rev 4 additionally enumerates the same
+trailing-probe profiles from absolute source sample zero through that source's maximum
+diagnostic tail. This is the direct-replay fallback universe required by Section 5.4,
+not an episode-local approximation. Its eight profile counts are frozen in the design
+ledger (`68,273-170,779` each), and it contributes the previously missing 744,442 unique
+windows. For every public episode, checkpoint-independent window/step combination, and
+four state modes, a `source_prefix_state_snapshot` declaration binds the manifest
+warm-start and last absolute probe end. There are 2,848 declarations with row SHA-256
+`f1c906ab3f283551169927cb4e295ada0da7ea89be59f4f98dcdcfcae7cfd360`.
+The implementation uses deterministic source-prefix replay rather than serializing
+opaque Python or ONNX Runtime state; the report persists the state hash at each declared
+snapshot frontier and hashes the exact subsequent raw/proposal/cluster/progress trace.
+
 Matched raw-signal measurement adds an explicitly GT-indexed, diagnostic-only boundary
 at each positive or negative candidate coordinate `c`. It evaluates exact adjacent
 windows `[c-W,c)` and `[c,c+W)` and a read-only anchor/prototype probe `[c,c+W)` when
@@ -304,7 +342,10 @@ is reset at the accepted episode/source-prefix boundary and processed by increas
 
 Every transition records pre-state IDs, selected anchor/prototype ordinal, both cosine
 values when applicable, the decision, post-state payload hash, and exact source windows.
-No profile retains state across episodes.
+No profile retains state across episodes. Public Phase 4 scoring is fail-closed per
+checkpoint/profile class: when any fixed parity case fails, its scored state is rebuilt
+from source sample zero. Synthetic complete episodes begin at zero and remain
+episode-local.
 
 The six hash-pinned parity clips are rerun after approval, followed by the deterministic
 sampled-window import check. Frontend maximum absolute error against the pinned research
@@ -346,12 +387,40 @@ bounded episode-local prototype memory. Prototype state is always cleared at epi
 start and never carries speaker identity across episodes.
 
 At identical absolute source coordinates, LS posterior maximum L1 must be at most
-`1e-2`; ERes aligned-window cosine must be at least `0.99`. Proposal count/kind,
+`1e-2`; ERes aligned-window cosine must be at least `0.99`, and aligned causal
+similarity-score maximum absolute error must be at most `1e-2`. Proposal count/kind,
 boundary coordinate, observation frontier, one frozen no-search sentinel cluster, and
 safe-frontier progression must match exactly. A coordinate grid with no common aligned
 frames is a failure, not an implicit interpolation pass. The sentinel uses debounce 0,
 radius 250 ms, and refractory 0 solely to exercise state propagation; it is not a Phase
 5 policy result.
+
+The LS sentinel executes, rather than infers, three reducer traces. New-track and
+dominant-replacement use threshold `0.50`, persistence `2`, and median width `1` through
+the committed streaming reducer. Hysteretic activity state uses low/high `0.40/0.60`.
+Each trace binds scored proposal count/kind/boundary/frontier, the debounce-0 cluster,
+and every aligned `(observed,safe-frontier)` progress row. Proposal IDs are normalized
+inside the scored interval so irrelevant prefix ordinals cannot manufacture a mismatch.
+
+The ERes sentinel executes every adjacent grid and every `(W,S,state-mode)` trailing
+probe grid for both checkpoints. Diagnostic proposals require change score strictly
+greater than `0.50`, equivalently cosine strictly below `0.50`; an exact `0.50` score is
+not a change candidate. Confirmed-anchor and prototype modes keep a pending boundary unsafe until the
+second-probe decision; progress therefore remains before that retrospective boundary.
+Per-episode records bind profile count, failed profile IDs, snapshot hashes, aligned raw
+window count/cosine, similarity-score difference, pre/post-state trace, proposal trace,
+sentinel-cluster trace, progress trace, and cache payload. The aggregate remains below
+10 MiB by storing a canonical profile-receipt hash per episode/class while the
+independent verifier replays the same deterministic cache coordinates.
+
+The verifier does not trust the persisted state-class rows. After verifying LS cache
+payloads and every ERes binary-v2 window/embedding/acoustic row, it independently reruns
+episode-reset LS inference from the bound WAVs and models, reconstructs raw-posterior and
+all reducer receipts, independently reconstructs every adjacent/anchor/prototype ERes
+state transition from the decoded cache universe, and requires exact equality with the
+persisted class records, record hashes, failure counts, and dispositions. Its coherent
+state-evidence mutation changes a record and refreshes the enclosing record hash,
+disposition, pass flag, and artifact self-hash; only independent replay can reject it.
 
 A class passes only if every fixed parity case passes. Otherwise its Phase 4 scored
 result and all later uses require deterministic source-prefix replay or a round-trip
@@ -478,7 +547,7 @@ against exhaustive assignments for every random 1x1 through 4x4 rectangular fixt
 The pair ledger stores every assignment and all unused/unmatched counts; primary AUC
 uses only these pairs.
 
-The metadata-only rev-3 ledger contains 450 positives and 360 negatives: 132 neutral
+The metadata-only rev-4 ledger contains 450 positives and 360 negatives: 132 neutral
 pauses, 18 additional same-speaker transitions, 9 additional gain transitions, and 201
 stable-singleton candidates. It globally matches 313 pairs across 13 blocks, leaving
 137 positives unmatched and 47 negatives unused; no eligible group lacks a negative.
@@ -552,6 +621,9 @@ Phase 4 proposes these experiment artifacts under `results/turn_episode_v1/`:
 ```text
 proposal_contract.json
 phase_4_design_ledger.json
+phase_4_parallel_benchmark.json
+phase_4_preflight.json
+phase_4_smoke.json
 phase_4_cache_inventory.json
 phase_4_frontend_parity.json
 phase_4_state_equivalence.json
@@ -560,6 +632,7 @@ phase_4_eres_signal_report.json
 phase_4_acoustic_controls.json
 phase_4_signal_disposition.json
 phase_4_signal_details/<family>/<checkpoint>-<shard>.jsonl.gz
+phase_4_completion.json
 phase_4_verification.json
 reviews/phase_4_pre_execution.md
 ```
@@ -571,6 +644,12 @@ JSON report is forbidden. A shard index binds first/last row key, row count, unc
 content hash, compressed byte hash, and size. The independent verifier streams shards
 and never requires materializing a 100+ MiB object in memory.
 
+ERes neural caches obey the same 20 MiB compressed-file maximum using the binary-v2
+shards in Section 4.2. Cache metadata and all result aggregates obey the 10 MiB JSON
+maximum. The formerly observed 165.7 MiB monolithic state report is forbidden and is no
+longer present; state evidence is compact hashes plus bounded detail receipts, never a
+dump of full audio/model ring buffers.
+
 Completeness joins the exact 695-episode population, all six checkpoints, every declared
 extractor/horizon, every expected exact window, all parity classes, all pair-ledger rows,
 and 10,000 bootstrap replicates for every estimable primary comparison. It rejects
@@ -580,8 +659,8 @@ not recompute from detail rows.
 
 The independent verifier must reject at least these mutations through its public entry
 point: posterior score change, ERes window-coordinate change, observation frontier moved
-earlier, pair/block reassignment, cache payload hash change, AUC summary change, and
-family disposition change.
+earlier, pair/block reassignment, cache payload hash change, AUC summary change, family
+disposition change, and coherently rehashed state-equivalence evidence change.
 
 ## 13. Runtime, data access, and failure boundaries
 
@@ -594,23 +673,35 @@ measured approximately 30-37 ms per missing window on this machine. The prefligh
 forecast expected window count, wall time, peak RSS, and cache bytes from the finalized
 coordinate ledger before the full run.
 
-The rev-3 generator deterministically emits 258,543 coordinate declarations with row
-SHA-256 `727d96a92fd06c8c020c63275891128c52fbfb73c459067e3d7584dfc8a007b7`,
-151,214 deduplicated embedding windows with row SHA-256
-`42b316ca0c4e1c89e6aa746db0584d38b27bf75e9b4ed39735edb3f8024b266c`,
+The rev-5 contract retains the rev-4 generator's 1,217,509 coordinate declarations with row
+SHA-256 `58cbd9eaf4554761bf71e698bc4b1f251ae722c4281be35d0270dbc0ab285470`,
+895,656 deduplicated embedding windows with row SHA-256
+`de3646936555280a01dcf2461d3d02bccc722a55a088aa15b5a8c97f639e3118`,
 and 4,371 deduplicated reference-aligned LS acoustic windows with row SHA-256
 `3fe0ffef5a2dc79ec385f89924181ff2e98c6f61f812ca39007eccb6083b148a`.
-Two ERes checkpoints therefore expose 302,428 embedding jobs. Four LS checkpoints expose
-81,343.7 audio-seconds: the 18,813.025-second public source-prefix set plus 1,522.9
-synthetic seconds per checkpoint. Forecast inputs are conservative historical LS RTF
-`0.05`, ERes service time `0.037` seconds/window, 4,096 LS cache bytes/audio-second,
-2,048 ERes bytes/embedding, and 900 seconds fixed verification overhead. The resulting
-forecast is 16,157.021 seconds (4.488061 hours), 957,032,243 new cache bytes, and 6 GiB
-peak RSS. All are below the frozen ceilings. Preflight recomputes these values and stops
-on any count or bound drift; a favorable cache hit may reduce actual work but cannot
-expand coordinates or the ceiling.
+The coordinate ledger and complete file regenerate byte-identically in two independent
+runs at byte SHA-256 `0a86788a...`.
 
-Conservative authorization ceiling after approval: six wall-clock hours, 8 GiB new
+Two ERes checkpoints expose 1,791,312 embedding jobs. The frozen benchmark runs 500
+deterministic diagnostic windows per checkpoint across ten independent one-thread ORT
+sessions, includes model load in wall time, samples process RSS, and applies a `0.75`
+throughput margin. Selection SHA-256 is
+`8c4166100e99022ffedf8ce5f1c203a81589b292a5126410b6c6dc9ceb968fd6`.
+Measured/conservative throughput is `112.5145/84.3859` jobs/s for E-standard and
+`37.2971/27.9728` jobs/s for E-w24s4ep4; peak process RSS is 1.696/3.873 GB. The full
+runner uses the same ten-worker ownership rule, greedily balances whole source caches,
+constructs one ORT session per worker, and never shares a session concurrently.
+
+Four LS checkpoints expose 81,343.70325 audio-seconds: the audited
+18,813.025813-second public source-prefix set plus 1,522.9 synthetic seconds per
+checkpoint. Forecast inputs retain conservative LS RTF `0.05`, 4,096 LS cache
+bytes/audio-second, 2,048 ERes bytes/window (covering embedding plus acoustic shadow),
+and 900 seconds fixed overhead. The resulting forecast is 47,599.810 seconds
+(13.222169 hours): LS 4,067.185 seconds, ERes 42,632.625 seconds, fixed 900 seconds.
+Forecast cache is 4,006,266,688 bytes and peak RSS is 8 GiB. The historical serial
+counterfactual is 66,278.544 ERes seconds and is not used to claim feasibility.
+
+Conservative authorization ceiling after approval: sixteen wall-clock hours, 8 GiB new
 cache, 16 GiB peak RSS, no GPU, no network, no credential, and zero provider cost. The
 runner stops before inference if the forecast exceeds a ceiling. During execution it
 records model load/warm-up, mean/p50/p95 service time, RTF, peak RSS, cache size, and
@@ -638,8 +729,8 @@ Phase-stopping conditions include:
 1. Persist the approved review artifact and exact accepted bundle byte hash.
 2. Implement the registry, preflight, runner, cache writer, verifier, and focused tests
    exactly under the experiment tree.
-3. Run formatting, focused pure fixtures, tiny frontend/export parity, and cache-import
-   sampling; stop on any mismatch.
+3. Run formatting, focused pure fixtures, tiny frontend/export parity, first-write plus
+   all-hit and mixed-hit cache retry paths, and cache-import sampling; stop on any mismatch.
 4. Materialize the exact window/example/pair/block ledger and runtime forecast without
    opening `frontier_dev` or confirmatory content; stop if counts or ceilings drift.
 5. Execute one full source-prefix/raw-cache pass and deterministic diagnostics.
@@ -681,5 +772,13 @@ is recorded as `accepted`, `repair_required`, `not_reviewable`, or
 | LS terminal timing and parity/export provenance were incomplete | important | terminal exclusion, six-clip ledger, code receipts, exact ONNX contract, source revisions, and fail-closed export rule frozen in rev 2 |
 | rev-2 LS center-bound acoustic support yielded zero primary 500 ms pairs | blocking | candidate-aligned 250/500/1000 ms diagnostic supports and nonzero paired-valid invariants frozen in rev 3 |
 | rev-2 terminal wording forbade committed frontend analysis padding and decode-only flush | important | forbidden source-audio ingestion is separated from frozen STFT/context padding and `ingest=0, decode=1` terminal mechanics in rev 3 |
+| rev-3 episode-only ERes ledger could not execute source-prefix fallback | blocking | rev 4 adds 744,442 missing public-prefix windows, 2,848 snapshot declarations, fail-closed source-zero replay, and deterministic bounded cache-v2 shards |
+| rev-3 ERes state-equivalence rows were declarations rather than executed inference/cache traces | blocking | rev 4 executes every checkpoint/profile/episode raw, state, proposal, sentinel-cluster, and progress comparison and records mechanical per-class fallback |
+| rev-3 LS reducer classes copied the raw-posterior result without reducer/sentinel execution | blocking | rev 4 freezes and executes new-track, dominant-replacement, hysteretic-state, cluster, and safe-frontier traces separately |
+| rev-3 six-hour forecast omitted the required public-prefix window universe | blocking | rev 4 binds a 10-session benchmark, 0.75 throughput margin, 13.222169-hour forecast, and revised 16-hour ceiling |
+| rev-4 verifier only shallow-checked persisted state-equivalence classes | blocking | rev 5 independently reruns LS reset inference and reconstructs every LS/ERes raw, reducer/state, proposal, cluster, progress, record-hash, failure-count, and disposition receipt from verified caches and the frozen universe; a coherently rehashed state mutation must fail |
+| rev-4 high-level ERes cache-hit path unpacked two values from a three-value loader result | blocking | rev 5 fixes the unpack and executes first-write, all-hit, and one-hit/one-miss high-level retries for both checkpoints |
+| rev-5 repeated smoke exposed the inverse LS cache-hit unpack mismatch | blocking | rev 5 fixes the two-value LS loader unpack and requires two consecutive complete smoke runs so the second run exercises LS and ERes all-hit paths |
+| rev-4 exact cosine 0.50 was scored inclusively despite strict state advancement | important | rev 5 freezes change score `>0.50` / cosine `<0.50` and adds exact-threshold confirmed-anchor and prototype-memory state/proposal fixtures |
 
 Final verdict: **pending same-reviewer repair verification**.
