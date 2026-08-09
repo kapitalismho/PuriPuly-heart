@@ -517,8 +517,8 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             None,
         ),
         (
-            "gemma4_31b_cerebras",
-            "official_byok",
+            "gemma4_31b",
+            "cerebras",
             "byok",
             "cerebras",
             "gemma-4-31b",
@@ -640,8 +640,8 @@ def test_translation_model_connection_matrix_resolves_llm_config(
         (
             "cerebras_gemma4_31b",
             True,
-            "gemma4_31b_cerebras",
-            "official_byok",
+            "gemma4_31b",
+            "cerebras",
             "secret_store",
             "cerebras:byok",
             "cerebras",
@@ -1242,8 +1242,8 @@ def test_derive_runtime_from_cerebras_compatibility_values() -> None:
         )
     )
 
-    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS
-    assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_OFFICIAL_BYOK
+    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_GEMMA4_31B
+    assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_CEREBRAS
     assert config.provider == "cerebras"
     assert config.model == "gemma-4-31b"
     assert config.credential == resolved.ResolvedCredentialRequirement(

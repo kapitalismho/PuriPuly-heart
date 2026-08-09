@@ -158,7 +158,7 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
-    TranslationModel.GEMMA4_31B: "provider.gemma4_31b_openrouter",
+    TranslationModel.GEMMA4_31B: "provider.gemma4_31b",
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
     TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
     TranslationModel.DEEPSEEK_V4_PRO: "provider.deepseek_v4_pro",
@@ -166,24 +166,19 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.GEMINI_31_FLASH_LITE: "provider.gemini31_flash_lite",
     TranslationModel.QWEN_35_PLUS: "provider.qwen35_plus",
     TranslationModel.LOCAL_LLM: "provider.local_llms",
-    TranslationModel.GEMMA4_31B_CEREBRAS: "provider.gemma4_31b_cerebras",
     TranslationModel.CUSTOM_HTTP: "provider.custom_http",
 }
 _TRANSLATION_CONNECTION_LABEL_KEYS = {
     TranslationConnection.MANAGED: "settings.translation_connection.managed",
     TranslationConnection.MANAGED_CHINA: "settings.translation_connection.managed_china",
     TranslationConnection.OPENROUTER: "settings.translation_connection.openrouter",
+    TranslationConnection.CEREBRAS: "settings.translation_connection.cerebras",
     TranslationConnection.OFFICIAL_BYOK: "settings.translation_connection.official_byok",
     TranslationConnection.OLLAMA: "settings.translation_connection.ollama",
     TranslationConnection.CUSTOM_HTTP: "settings.translation_connection.custom_http",
 }
 _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
-    TranslationConnection.MANAGED: "settings.translation_connection.managed.description",
-    TranslationConnection.MANAGED_CHINA: "settings.translation_connection.managed_china.description",
-    TranslationConnection.OPENROUTER: "settings.translation_connection.openrouter.description",
-    TranslationConnection.OFFICIAL_BYOK: "settings.translation_connection.official_byok.description",
-    TranslationConnection.OLLAMA: "settings.translation_connection.ollama.description",
-    TranslationConnection.CUSTOM_HTTP: "settings.translation_connection.custom_http.description",
+    TranslationConnection.CEREBRAS: "settings.translation_connection.cerebras.description",
 }
 _TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY = "settings.translation_connection.only_supported"
 _TRANSLATION_MODEL_RECOMMENDED_SECTION_KEY = "settings.translation_model.section.recommended"
@@ -195,7 +190,6 @@ _RECOMMENDED_TRANSLATION_MODELS = (
 _OTHER_TRANSLATION_MODELS = (
     TranslationModel.GEMMA4_31B,
     TranslationModel.GEMMA4,
-    TranslationModel.GEMMA4_31B_CEREBRAS,
     TranslationModel.LOCAL_LLM,
     TranslationModel.DEEPSEEK_V4_PRO,
     TranslationModel.GEMINI_3_FLASH,
@@ -258,8 +252,8 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str
         "cerebras_gemma4_31b",
         TranslationFallbackSettings(
             enabled=True,
-            model=TranslationModel.GEMMA4_31B_CEREBRAS,
-            connection=TranslationConnection.OFFICIAL_BYOK,
+            model=TranslationModel.GEMMA4_31B,
+            connection=TranslationConnection.CEREBRAS,
         ),
         "settings.fallback.cerebras_gemma4_31b",
     ),
@@ -3690,8 +3684,8 @@ class SettingsView(ft.Column):
                 llm == LLMProviderName.CEREBRAS
                 or (
                     fallback.enabled
-                    and fallback.model == TranslationModel.GEMMA4_31B_CEREBRAS
-                    and fallback.connection == TranslationConnection.OFFICIAL_BYOK
+                    and fallback.model == TranslationModel.GEMMA4_31B
+                    and fallback.connection == TranslationConnection.CEREBRAS
                 )
             )
         )
@@ -4048,6 +4042,11 @@ class SettingsView(ft.Column):
             OptionItem(
                 value=connection.value,
                 label=self._translation_connection_display_label(connection),
+                description=(
+                    self._translation_connection_display_description(connection)
+                    if connection == TranslationConnection.CEREBRAS
+                    else ""
+                ),
             )
             for connection in connections
         ]
@@ -4061,7 +4060,7 @@ class SettingsView(ft.Column):
             t("settings.translation_connection"),
             options,
             self._on_translation_connection_selected,
-            show_description=False,
+            show_description=True,
         )
         modal.open(current)
 

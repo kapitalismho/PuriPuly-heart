@@ -511,7 +511,7 @@ def test_china_first_run_defaults_project_to_vnext_intent() -> None:
         ),
         (
             "cerebras_gemma4_31b",
-            (True, "gemma4_31b_cerebras", "official_byok", "cerebras_gemma4_31b"),
+            (True, "gemma4_31b", "cerebras", "cerebras_gemma4_31b"),
         ),
     ],
 )
@@ -605,6 +605,70 @@ def test_current_vnext_explicit_none_fallback_alias_disables_stale_enabled_field
     loaded = serialization.from_dict(raw)
 
     assert loaded.intent.translation.fallback == TranslationFallbackIntent()
+
+
+def test_v33_cerebras_model_migrates_to_gemma31_connection_and_preserves_return_target() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 33
+    raw["intent"]["translation"].update(
+        {
+            "model": "custom_http",
+            "connection": "custom_http",
+            "previous_llm_model": "gemma4_31b_cerebras",
+            "connection_history": {
+                "gemma4_31b": "openrouter",
+                "gemma4_31b_cerebras": "official_byok",
+            },
+            "fallback": {
+                "enabled": True,
+                "model": "gemma4_31b_cerebras",
+                "connection": "official_byok",
+                "selection_alias": "cerebras_gemma4_31b",
+            },
+        }
+    )
+
+    loaded = migration.from_dict(raw)
+    translated = loaded.intent.translation
+
+    assert loaded.settings_version == VNEXT_SETTINGS_SCHEMA_VERSION
+    assert translated.previous_llm_model == "gemma4_31b"
+    assert translated.connection_history == {"gemma4_31b": "cerebras"}
+    assert translated.fallback == TranslationFallbackIntent(selection_alias="cerebras_gemma4_31b")
+    assert "gemma4_31b_cerebras" not in json.dumps(serialization.to_dict(loaded))
+
+
+def test_v33_active_cerebras_model_migrates_without_losing_explicit_disabled_fallback() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 33
+    raw["intent"]["translation"].update(
+        {
+            "model": "gemma4_31b_cerebras",
+            "connection": "official_byok",
+            "connection_history": {
+                "gemma4_31b": "openrouter",
+                "gemma4_31b_cerebras": "official_byok",
+            },
+            "fallback": {
+                "enabled": True,
+                "model": "gemma4_31b_cerebras",
+                "connection": "official_byok",
+                "selection_alias": "none",
+            },
+        }
+    )
+
+    loaded = migration.from_dict(raw)
+    translated = loaded.intent.translation
+
+    assert translated.model == "gemma4_31b"
+    assert translated.connection == "cerebras"
+    assert translated.connection_history == {"gemma4_31b": "cerebras"}
+    assert translated.fallback == TranslationFallbackIntent()
 
 
 def test_current_vnext_missing_fallback_alias_still_infers_compatibility_fields() -> None:
