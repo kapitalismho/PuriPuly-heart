@@ -17,6 +17,13 @@ from puripuly_heart.core.http_extensions.schema import (
     extract_translation_text,
     render_translation_request,
 )
+from puripuly_heart.core.messages import (
+    DIAGNOSTIC_CATEGORY_AUTH,
+    DIAGNOSTIC_CATEGORY_INVALID_RESPONSE,
+    DIAGNOSTIC_CATEGORY_NETWORK,
+    DIAGNOSTIC_CATEGORY_TIMEOUT,
+    DiagnosticCategory,
+)
 from puripuly_heart.core.translation_backend import (
     TranslationBackend,
     TranslationBackendRequest,
@@ -76,11 +83,28 @@ _install_http_privacy_filters()
 
 
 class HttpExtensionTranslationError(RuntimeError):
-    def __init__(self, category: str, *, status_code: int | None = None) -> None:
+    diagnostic_provider = "custom_http"
+
+    def __init__(
+        self,
+        category: str,
+        *,
+        status_code: int | None = None,
+        diagnostic_category: DiagnosticCategory | None = None,
+    ) -> None:
         self.category = category
         self.status_code = status_code
+        self.diagnostic_category = diagnostic_category or _diagnostic_category(category)
         detail = f"{category} ({status_code})" if status_code is not None else category
         super().__init__(detail)
+
+
+def _diagnostic_category(category: str) -> DiagnosticCategory:
+    if category == "timeout":
+        return DIAGNOSTIC_CATEGORY_TIMEOUT
+    if category in {"connect error", "TLS error", "transport error", "HTTP request error"}:
+        return DIAGNOSTIC_CATEGORY_NETWORK
+    return DIAGNOSTIC_CATEGORY_INVALID_RESPONSE
 
 
 def _is_tls_connect_error(error: BaseException) -> bool:
@@ -198,7 +222,8 @@ class HttpExtensionTranslationBackend(TranslationBackend):
             value = self.secret_store.get(http_extension_secret_key(self.extension.id, secret.id))
             if value is None or not value.strip():
                 raise HttpExtensionConfigurationError(
-                    f"missing required credential: {secret.label}"
+                    f"missing required credential: {secret.label}",
+                    diagnostic_category=DIAGNOSTIC_CATEGORY_AUTH,
                 )
             values[secret.id] = value
         return values

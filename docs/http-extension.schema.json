@@ -32,13 +32,13 @@
     },
     "url": {
       "type": "string",
-      "pattern": "^https?://[^\\s/@]+(/.*)?$",
+      "pattern": "^(?!.*\\{\\{)(?!.*\\}\\})https?://[^\\s/@]+(/.*)?$",
       "description": "Absolute HTTP(S) endpoint. The request method is always POST. The URL must not contain credentials or {{placeholders}}."
     },
     "headers": {
       "type": "object",
       "patternProperties": {
-        "^(?!connection$|content-length$|host$|transfer-encoding$)[^\\s]+$": {
+        "^(?![Cc][Oo][Nn][Nn][Ee][Cc][Tt][Ii][Oo][Nn]$|[Cc][Oo][Nn][Tt][Ee][Nn][Tt]-[Ll][Ee][Nn][Gg][Tt][Hh]$|[Hh][Oo][Ss][Tt]$|[Tt][Rr][Aa][Nn][Ss][Ff][Ee][Rr]-[Ee][Nn][Cc][Oo][Dd][Ii][Nn][Gg]$)[^\\s]+$": {
           "type": "string"
         }
       },

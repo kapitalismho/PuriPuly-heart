@@ -22,6 +22,7 @@ from puripuly_heart.core.orchestrator.self_translation_channel import (
 )
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime_logging import SessionLoggingMode
+from puripuly_heart.core.translation_backend import LlmTranslationBackend
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.domain.events import (
     STTFinalEvent,
@@ -362,7 +363,7 @@ async def test_public_low_latency_final_uses_declared_provider_generation_port()
         low_latency_mode=True,
     )
     provider_runtime = ProtocolOnlyProviderRuntime(
-        provider=llm,
+        provider=LlmTranslationBackend(llm),
         current_generation=41,
     )
     harness.translation_requests.provider_runtime = provider_runtime

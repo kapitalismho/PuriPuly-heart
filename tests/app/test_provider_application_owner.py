@@ -309,3 +309,20 @@ async def test_provider_application_owner_runtime_only_apply_does_not_persist() 
 
     assert result is True
     assert events == ["preserve", "capture", "plan", "runtime", "sync_ui"]
+
+
+@pytest.mark.asyncio
+async def test_provider_application_owner_runtime_only_apply_can_preserve_ui_draft() -> None:
+    events: list[object] = []
+    owner = _owner(
+        settings=FakeSettingsOwner(AppSettings(), events),
+        runtime=FakeRuntimeOwner(events),
+        service=RecordingMutationService([]),
+        results=SettingsTransactionResultOwner(),
+        events=events,
+    )
+
+    result = await owner.apply(persist_settings=False, refresh_ui=False)
+
+    assert result is True
+    assert events == ["preserve", "capture", "plan", "runtime"]

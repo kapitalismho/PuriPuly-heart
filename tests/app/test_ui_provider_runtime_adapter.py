@@ -56,6 +56,7 @@ async def test_active_custom_http_secret_change_rebuilds_runtime_backend() -> No
         None,
         force_rebuild_llm=True,
         persist_settings=False,
+        refresh_ui=True,
     )
 
 

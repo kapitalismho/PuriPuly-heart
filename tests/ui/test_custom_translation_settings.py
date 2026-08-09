@@ -8,6 +8,9 @@ import pytest
 
 pytest.importorskip("flet")
 
+from puripuly_heart.app.services.http_extension_registry import (
+    HttpExtensionRegistryService,
+)
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -67,12 +70,18 @@ def _view(
     monkeypatch: pytest.MonkeyPatch,
     registry: HttpExtensionRegistry,
     store: SecretStore,
+    directory_opener: object | None = None,
 ) -> settings_view.SettingsView:
     monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
     monkeypatch.setattr(settings_view, "create_secret_store", lambda *_args, **_kwargs: store)
-    return settings_view.SettingsView(http_extension_registry=registry)
+    return settings_view.SettingsView(
+        http_extension_registry=HttpExtensionRegistryService(
+            registry,
+            directory_opener,
+        )
+    )
 
 
 def _custom_settings() -> AppSettings:
@@ -258,16 +267,15 @@ def test_custom_http_open_folder_uses_resolved_registry_directory(
 ) -> None:
     registry = HttpExtensionRegistry(tmp_path / "http_extensions")
     registry.reload()
-    view = _view(monkeypatch, registry, SecretStore())
-    calls: list[list[str]] = []
-    monkeypatch.setattr(settings_view.sys, "platform", "win32")
-    monkeypatch.setattr(
-        settings_view.subprocess,
-        "Popen",
-        lambda command: calls.append(command),
+    calls: list[Path] = []
+    view = _view(
+        monkeypatch,
+        registry,
+        SecretStore(),
+        SimpleNamespace(open=lambda directory: calls.append(directory)),
     )
 
     view._on_http_extension_open_folder(None)
 
     assert (tmp_path / "http_extensions").is_dir()
-    assert calls == [["explorer", str(tmp_path / "http_extensions")]]
+    assert calls == [tmp_path / "http_extensions"]

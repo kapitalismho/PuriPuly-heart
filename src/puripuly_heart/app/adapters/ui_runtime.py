@@ -268,16 +268,19 @@ class UiProviderRuntimeAdapter:
         *,
         force_rebuild_llm: bool = False,
         persist_settings: bool = True,
+        refresh_ui: bool = True,
     ) -> object:
         if persist_settings:
             return await self.provider_application.apply(
                 settings,
                 force_rebuild_llm=force_rebuild_llm,
+                refresh_ui=refresh_ui,
             )
         return await self.provider_application.apply(
             settings,
             force_rebuild_llm=force_rebuild_llm,
             persist_settings=persist_settings,
+            refresh_ui=refresh_ui,
         )
 
     async def install_selected_gpu_model_if_needed(self) -> None:

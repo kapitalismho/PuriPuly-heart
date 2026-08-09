@@ -122,6 +122,7 @@ class ProviderApplicationOwner:
         *,
         force_rebuild_llm: bool = False,
         persist_settings: bool = True,
+        refresh_ui: bool = True,
     ) -> bool:
         next_settings = self.settings.current if pending is None else self.merge_settings(pending)
         if next_settings is None:
@@ -141,7 +142,8 @@ class ProviderApplicationOwner:
                 persist_settings=persist_settings,
             )
         finally:
-            self.sync_ui()
+            if refresh_ui:
+                self.sync_ui()
 
     async def _apply_combined(self, next_settings: AppSettings) -> bool:
         base_settings = self.settings.current

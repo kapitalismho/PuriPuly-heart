@@ -330,7 +330,15 @@ class UiApplicationBoundary:
         *,
         force_rebuild_llm: bool = False,
         persist_settings: bool = True,
+        refresh_ui: bool = True,
     ) -> object:
+        if not refresh_ui:
+            return await self._provider.apply_providers(
+                settings,
+                force_rebuild_llm=force_rebuild_llm,
+                persist_settings=persist_settings,
+                refresh_ui=False,
+            )
         if force_rebuild_llm:
             if settings is None:
                 if persist_settings:

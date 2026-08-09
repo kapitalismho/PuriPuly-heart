@@ -12,6 +12,7 @@ from typing import Literal, cast
 from puripuly_heart.app.adapters.application_runtime_shutdown import (
     ApplicationRuntimeShutdownAdapter,
 )
+from puripuly_heart.app.adapters.system_directory_opener import SystemDirectoryOpener
 from puripuly_heart.app.adapters.ui_runtime import (
     UiDiagnosticsRuntimeAdapter,
     UiEngagementRuntimeAdapter,
@@ -1801,7 +1802,10 @@ def compose_application_runtime(
         ),
         runtime_shutdown=runtime_shutdown,
         runtime_logging=runtime_logging,
-        http_extension_registry=HttpExtensionRegistryService(http_extensions),
+        http_extension_registry=HttpExtensionRegistryService(
+            http_extensions,
+            SystemDirectoryOpener(),
+        ),
     )
 
     async def initialize_local_asr_evidence(value: object) -> None:

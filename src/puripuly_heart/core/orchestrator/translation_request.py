@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Protocol, cast
 from uuid import UUID
 
 from puripuly_heart.config.prompts import render_translation_prompt_template, warm_prompt_cache
@@ -39,7 +39,6 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnProcessResult,
 )
 from puripuly_heart.core.translation_backend import (
-    LlmTranslationBackend,
     TranslationBackend,
     TranslationBackendRequest,
 )
@@ -347,7 +346,7 @@ class TranslationRequestOwner:
         provider_request = self._capture_provider_request()
         if provider_request is None:
             raise RuntimeError("translation backend is not configured")
-        provider, backend, generation = provider_request
+        backend, generation = provider_request
         prepared = self.prepare(
             request.text,
             channel=request.channel,
@@ -368,9 +367,9 @@ class TranslationRequestOwner:
                 )
             )
         except Exception:
-            self._raise_if_stale_provider_request(provider, generation)
+            self._raise_if_stale_provider_request(backend, generation)
             raise
-        self._raise_if_stale_provider_request(provider, generation)
+        self._raise_if_stale_provider_request(backend, generation)
         if request.record_latency:
             self._record_latency(request.channel, request.utterance_id, "llm_done")
         return self._normalize_translation(
@@ -408,7 +407,7 @@ class TranslationRequestOwner:
                 "translation_unavailable",
                 source_language=request.detected_language,
             )
-        provider, backend, generation = provider_request
+        backend, generation = provider_request
         request_source = self._request_source_language(
             request.channel,
             detected_language=request.detected_language,
@@ -459,9 +458,9 @@ class TranslationRequestOwner:
                     )
                 )
             except Exception:
-                self._raise_if_stale_provider_request(provider, generation)
+                self._raise_if_stale_provider_request(backend, generation)
                 raise
-            self._raise_if_stale_provider_request(provider, generation)
+            self._raise_if_stale_provider_request(backend, generation)
             if cancellation_requested is not None and cancellation_requested():
                 raise asyncio.CancelledError
             translation = self._normalize_translation(
@@ -508,16 +507,11 @@ class TranslationRequestOwner:
             ),
         )
 
-    def _capture_provider_request(self) -> tuple[object, TranslationBackend, int] | None:
-        provider, generation = self.provider_runtime.current_provider_generation()
-        if provider is None:
+    def _capture_provider_request(self) -> tuple[TranslationBackend, int] | None:
+        backend, generation = self.provider_runtime.current_provider_generation()
+        if backend is None:
             return None
-        backend = (
-            provider
-            if isinstance(provider, TranslationBackend)
-            else LlmTranslationBackend(provider)
-        )
-        return provider, backend, generation
+        return cast(TranslationBackend, backend), generation
 
     def _raise_if_stale_provider_request(
         self,

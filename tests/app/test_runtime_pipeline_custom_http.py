@@ -96,11 +96,6 @@ async def test_custom_http_pipeline_skips_managed_rebuild_and_owns_backend_close
     )
     monkeypatch.setattr(
         runtime_module,
-        "create_llm_provider",
-        lambda *_a, **_k: pytest.fail("LLM provider path used"),
-    )
-    monkeypatch.setattr(
-        runtime_module,
         "create_translation_backend",
         lambda *_a, **_k: (created.append(backend), backend)[1],
     )

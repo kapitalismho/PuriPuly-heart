@@ -10,8 +10,6 @@ import json
 import logging
 import math
 import re
-import subprocess
-import sys
 from pathlib import Path
 from typing import Callable
 
@@ -2512,15 +2510,8 @@ class SettingsView(ft.Column):
             page.run_task(callback, *args)
 
     def _on_http_extension_open_folder(self, _event) -> None:
-        directory = self._http_extensions.directory
         try:
-            directory.mkdir(parents=True, exist_ok=True)
-            if sys.platform == "win32":
-                subprocess.Popen(["explorer", str(directory)])
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", str(directory)])
-            else:
-                subprocess.Popen(["xdg-open", str(directory)])
+            self._http_extensions.open_directory()
         except Exception:
             if self.show_snackbar is not None:
                 self.show_snackbar(

@@ -16,6 +16,7 @@ from puripuly_heart.config.settings import (
 )
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.core.translation_backend import LlmTranslationBackend
 from puripuly_heart.providers.extensions.http_extension_backend import (
     HttpExtensionTranslationBackend,
 )
@@ -110,7 +111,8 @@ def test_llm_factory_path_remains_delegated(monkeypatch: pytest.MonkeyPatch) -> 
         http_extensions=HttpExtensionRegistry(Path("unused")),
     )
 
-    assert result is expected
+    assert isinstance(result, LlmTranslationBackend)
+    assert result.provider is expected
     assert calls == [settings]
 
 

@@ -9,6 +9,12 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlsplit
 
+from puripuly_heart.core.messages import (
+    DIAGNOSTIC_CATEGORY_AUTH,
+    DIAGNOSTIC_CATEGORY_INVALID_RESPONSE,
+    DIAGNOSTIC_CATEGORY_LIFECYCLE,
+    DiagnosticCategory,
+)
 from puripuly_heart.core.translation_backend import TranslationBackendRequest
 
 type JSONValue = None | bool | int | float | str | list[JSONValue] | dict[str, JSONValue]
@@ -24,7 +30,7 @@ _DANGEROUS_HEADERS = {
 
 
 class HttpExtensionError(ValueError):
-    pass
+    diagnostic_provider = "custom_http"
 
 
 class HttpExtensionValidationError(HttpExtensionError):
@@ -32,11 +38,18 @@ class HttpExtensionValidationError(HttpExtensionError):
 
 
 class HttpExtensionConfigurationError(HttpExtensionError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        diagnostic_category: DiagnosticCategory = DIAGNOSTIC_CATEGORY_LIFECYCLE,
+    ) -> None:
+        self.diagnostic_category = diagnostic_category
+        super().__init__(message)
 
 
 class HttpExtensionResponseError(HttpExtensionError):
-    pass
+    diagnostic_category = DIAGNOSTIC_CATEGORY_INVALID_RESPONSE
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,7 +247,10 @@ def render_translation_request(
     for secret in extension.secrets:
         value = secrets.get(secret.id)
         if value is None or not value.strip():
-            raise HttpExtensionConfigurationError(f"missing required credential: {secret.label}")
+            raise HttpExtensionConfigurationError(
+                f"missing required credential: {secret.label}",
+                diagnostic_category=DIAGNOSTIC_CATEGORY_AUTH,
+            )
         secret_values[secret.id] = value
 
     def replace(value: str) -> str:

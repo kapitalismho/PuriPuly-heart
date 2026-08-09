@@ -1431,7 +1431,10 @@ class TranslatorApp:
         ):
 
             async def _runtime_only_task():
-                await self.application.apply_providers(persist_settings=False)
+                await self.application.apply_providers(
+                    persist_settings=False,
+                    refresh_ui=False,
+                )
 
             self._queue_settings_mutation_task(_runtime_only_task)
             return

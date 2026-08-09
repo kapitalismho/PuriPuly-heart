@@ -63,7 +63,6 @@ from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
 from puripuly_heart.domain.events import UIEvent
 
-from .wiring_llm_factory import create_llm_provider
 from .wiring_managed_account import ManagedOpenRouterReleaseRuntime
 from .wiring_provider_runtime import (
     project_translation_runtime_settings,
@@ -705,21 +704,14 @@ async def _compose_runtime_pipeline(
 
     llm = None
     with contextlib.suppress(Exception):
-        if settings.translation.model == TranslationModel.CUSTOM_HTTP:
-            llm = create_translation_backend(
-                settings,
-                secrets=secrets,
-                http_extensions=http_extensions
-                or HttpExtensionRegistry(default_http_extensions_dir()),
-            )
-        else:
-            llm = create_llm_provider(
-                settings,
-                secrets=secrets,
-                managed_release_service=managed_release.service,
-                managed_delegate_ready=managed_delegate_ready,
-                runtime_logging=runtime_logging,
-            )
+        llm = create_translation_backend(
+            settings,
+            secrets=secrets,
+            http_extensions=http_extensions or HttpExtensionRegistry(default_http_extensions_dir()),
+            managed_release_service=managed_release.service,
+            managed_delegate_ready=managed_delegate_ready,
+            runtime_logging=runtime_logging,
+        )
         resources.pending_llm = llm
 
     prepare_self_provider = settings.provider.stt != STTProviderName.LOCAL_QWEN_GPU

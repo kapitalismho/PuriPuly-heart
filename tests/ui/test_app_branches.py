@@ -2939,10 +2939,18 @@ async def test_on_providers_changed_runtime_only_reload_does_not_consume_provide
         consume_http_extension_runtime_reload=lambda: consumed.__setitem__("reload", False) or True,
         consume_provider_apply_settings=lambda: consumed.__setitem__("draft", True),
     )
-    seen: list[object] = []
+    seen: list[tuple[bool, bool]] = []
 
-    async def fake_apply_providers(*, persist_settings: bool = True) -> None:
-        seen.append(persist_settings)
+    async def fake_apply_providers(
+        settings=None,
+        *,
+        force_rebuild_llm: bool = False,
+        persist_settings: bool = True,
+        refresh_ui: bool = True,
+    ) -> None:
+        assert settings is None
+        assert force_rebuild_llm is False
+        seen.append((persist_settings, refresh_ui))
 
     app.controller = SimpleNamespace(apply_providers=fake_apply_providers)
 
@@ -2950,7 +2958,7 @@ async def test_on_providers_changed_runtime_only_reload_does_not_consume_provide
     assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
 
-    assert seen == [False]
+    assert seen == [(False, False)]
     assert consumed == {"draft": False, "reload": False}
 
 

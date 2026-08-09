@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from uuid import uuid4
 
@@ -345,3 +346,23 @@ def test_docs_schema_file_is_valid_json() -> None:
     assert schema["additionalProperties"] is False
     assert schema["properties"]["schema_version"]["const"] == 1
     assert schema["properties"]["request"]["required"] == ["body"]
+
+
+def test_docs_schema_rejects_parser_forbidden_urls_and_header_names() -> None:
+    schema = json.loads(Path("docs/http-extension.schema.json").read_text(encoding="utf-8"))
+    url_pattern = schema["properties"]["url"]["pattern"]
+    header_patterns = tuple(schema["properties"]["headers"]["patternProperties"])
+
+    assert len(header_patterns) == 1
+    header_pattern = header_patterns[0]
+    assert re.fullmatch(url_pattern, "https://example.test/translate") is not None
+    assert re.fullmatch(url_pattern, "https://example.test/{{target_language}}") is None
+    assert re.fullmatch(header_pattern, "X-Api-Key") is not None
+    for forbidden in (
+        "connection",
+        "Connection",
+        "CONTENT-LENGTH",
+        "Host",
+        "TRANSFER-ENCODING",
+    ):
+        assert re.fullmatch(header_pattern, forbidden) is None

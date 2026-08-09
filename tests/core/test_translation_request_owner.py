@@ -28,6 +28,7 @@ from puripuly_heart.core.orchestrator.translation_request import (
 )
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackend
 from puripuly_heart.domain.models import ChannelId, Translation
 from puripuly_heart.providers.extensions.http_extension_backend import (
     HttpExtensionTranslationBackend,
@@ -140,7 +141,12 @@ def build_owner(provider: object | None = None) -> OwnerFixture:
         clock=clock,
         config_snapshot=configuration.snapshot,
     )
-    provider_runtime = ProviderRuntimeHandle(name="llm", provider=provider)
+    backend = (
+        provider
+        if provider is None or isinstance(provider, TranslationBackend)
+        else LlmTranslationBackend(provider)
+    )
+    provider_runtime = ProviderRuntimeHandle(name="llm", provider=backend)
     presentation = RecordingPresentation()
     owner = TranslationRequestOwner(
         config_snapshot=configuration.snapshot,
@@ -268,7 +274,10 @@ async def test_direct_request_rejects_stale_provider_completion() -> None:
         fixture.owner.translate(DirectTranslationRequest(utterance_id=uuid4(), text="hello"))
     )
     await old_provider.entered.wait()
-    await fixture.provider_runtime.replace_provider(RecordingProvider(), start=False)
+    await fixture.provider_runtime.replace_provider(
+        LlmTranslationBackend(RecordingProvider()),
+        start=False,
+    )
     old_provider.release.set()
 
     with pytest.raises(StaleProviderCompletion):
@@ -299,7 +308,10 @@ async def test_http_backend_rejects_completion_after_runtime_replacement() -> No
     )
     await client.entered.wait()
 
-    await fixture.provider_runtime.replace_provider(RecordingProvider(), start=False)
+    await fixture.provider_runtime.replace_provider(
+        LlmTranslationBackend(RecordingProvider()),
+        start=False,
+    )
     client.release.set()
 
     with pytest.raises(StaleProviderCompletion):
@@ -326,7 +338,10 @@ async def test_process_contains_stale_provider_completion_without_output_error()
     fixture = build_owner(old_provider)
     task = asyncio.create_task(fixture.owner.process(process_request(fixture)))
     await old_provider.entered.wait()
-    await fixture.provider_runtime.replace_provider(RecordingProvider(), start=False)
+    await fixture.provider_runtime.replace_provider(
+        LlmTranslationBackend(RecordingProvider()),
+        start=False,
+    )
     old_provider.release.set()
 
     result = await task
