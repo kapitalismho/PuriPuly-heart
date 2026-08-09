@@ -450,7 +450,7 @@
   "provider.gemma4_31b_cerebras": "Gemma 4 31B (Cerebras)",
   "provider.gemma4_31b_cerebras.description": "",
   "provider.local_cpu_auto": "Автовыбор\n(CPU-вывод)",
-  "provider.local_cpu_auto.description": "Использует оптимальную модель для выбранного языка",
+  "provider.local_cpu_auto.description": "Выбирает локальную ASR-модель для выбранного языка",
   "provider.local_cpu_auto.unavailable": "Доступно после установки всех трёх CPU-моделей ASR",
   "provider.local_parakeet_v3": "Parakeet TDT 0.6B v3",
   "provider.local_parakeet_v3.description": "",

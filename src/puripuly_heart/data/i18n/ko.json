@@ -450,7 +450,7 @@
   "provider.gemma4_31b_cerebras": "Gemma 4 31B (Cerebras)",
   "provider.gemma4_31b_cerebras.description": "",
   "provider.local_cpu_auto": "자동 선택 (CPU 추론)",
-  "provider.local_cpu_auto.description": "설정한 언어에 맞춰서 최적의 모델을 사용해요",
+  "provider.local_cpu_auto.description": "설정한 언어에 맞춰서 로컬 ASR 모델을 선택해요",
   "provider.local_cpu_auto.unavailable": "CPU ASR 모델 3개가 모두 설치되면 사용할 수 있어요",
   "provider.local_parakeet_v3": "Parakeet TDT 0.6B v3",
   "provider.local_parakeet_v3.description": "",
