@@ -1,0 +1,247 @@
+{
+  "accepted_r1_checkpoint": {
+    "commit": "f3f234f9bcef00810a1b2eadd5ee2ffcc53e7ede",
+    "review_verdict": "accepted",
+    "technical_validity_sha256": "fe8195e6b7b64784d35b0a9279bbc13b0c16ece7319d493a894f05376b35d838"
+  },
+  "artifact_role": "r3_legacy_common_gt_gate",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "bf1727a62dcd9c8c28cc095c46ebeaaab8e3f723a0c1c6440ed19a9968d590be"
+  },
+  "authorization": {
+    "cache_calibration": false,
+    "confirmatory_access": false,
+    "full_extraction": false,
+    "r3_forecast": true,
+    "r3_prepare": true,
+    "r3_probe": true,
+    "r3_promote": true,
+    "training": false
+  },
+  "dependencies": {
+    "cache": {
+      "coordinate_ledger": {
+        "relative_to_cache_root": "manifests/r2/legacy_common_gt/coordinate_ledger.json",
+        "self_sha256": "362eaf17bd538e1badd49bbfe6500cf88b7ddbce22bc8e38df4700302573b2c5",
+        "sha256": "390e77f52e3cd2b1cc3c545036e23f1ffcdaa543d748a58cba0eb86aef90d528"
+      },
+      "environment_sync_receipt": {
+        "relative_to_cache_root": "manifests/r1_environment_sync.json",
+        "self_sha256": "ac02743e2871f833aaf0a6a7f48dbd7464f7d5b8f4088f077c3f56d9c4952ee4",
+        "sha256": "ba32f3c8ebb7adb7f66d0b3f9ff13b5b41abf82ba220927b293be38cedc97e09"
+      },
+      "model_acquisition_receipt": {
+        "relative_to_cache_root": "manifests/r1_model_acquisition.json",
+        "self_sha256": "55085db57c02f2aaacb57497ae135697846a9df7646d87b3fb1d6f262217865e",
+        "sha256": "7b20c28aaa528717fab399ad471cada6393896c15046a2ed1a1fda9db7a37c1f"
+      },
+      "validation_receipt": {
+        "relative_to_cache_root": "manifests/r2/legacy_common_gt/validation_receipt.json",
+        "self_sha256": "7c5e149f82cfbc2e729eef6316b807895b28c100ce030f14b4a7d2f43b40b945",
+        "sha256": "cd9c1fd6f60a73c52aba913d8304d573dc84b3d6e0fb85e7127cd9e066d9d693"
+      }
+    },
+    "environment": {
+      "backend": "cpu",
+      "lock": {
+        "path": "environment/uv.lock",
+        "sha256": "2865f5c05352ba1dc99d2899cc583a3844a2ab1a590388aeee3a0eb0644b9af1"
+      },
+      "project_root": "environment",
+      "pyproject": {
+        "path": "environment/pyproject.toml",
+        "sha256": "4f82330869d8e4dede12ebc6346422a518ebff2245b8875b3a092e5b666bb3c6"
+      },
+      "python": "3.12.10",
+      "runtime_packages": {
+        "huggingface-hub": "0.31.4",
+        "matplotlib": "3.10.3",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "psutil": "7.0.0",
+        "pyarrow": "20.0.0",
+        "pyyaml": "6.0.2",
+        "safetensors": "0.5.3",
+        "scikit-learn": "1.6.1",
+        "soundfile": "0.13.1",
+        "torch": "2.7.1+cpu",
+        "torchaudio": "2.7.1+cpu",
+        "transformers": "4.52.3"
+      },
+      "uv": "0.9.17 (2b5d65e61 2025-12-09)"
+    },
+    "forecast_contract": {
+      "path": "configs/r1/full_job_forecast_contract.json",
+      "self_sha256": "3115382954018f54cefa2b691cc56a84fdf5b8998a23d153a2ea3b40e55773e8",
+      "sha256": "6a258094a9a75deb09a4d6685b90dd83f2f9170194b3644bb855d40cf1da4980"
+    },
+    "protocol_screen": {
+      "path": "configs/protocol/reduced_pretraining_screen.json",
+      "self_sha256": "78719c6b10392b8d051f8d90884b73d4ceea845275966cbe8bfa7ae0d2710338",
+      "sha256": "587e9afd3c50f46da7aa022679c5222e8f0437458dd601de6b0a0fe8ca4855b7"
+    },
+    "source_registry": {
+      "path": "models/source_registry.json",
+      "self_sha256": "cc09d72b7f05e0375972f9f427c2dc3b6c6cf6a45399a3d91b18c44d6c1716bf",
+      "sha256": "0cc07fa30294a2ae9a4d30ef4bcb7201f6b03d700ce815139975678704d182bb"
+    },
+    "technical_validity": {
+      "path": "results/r1/technical_validity.json",
+      "self_sha256": "9a276d1ced9fb17cdd2f5e0efddf6d8691fcf043b6798ea8081c7ce0b08c7109",
+      "sha256": "fe8195e6b7b64784d35b0a9279bbc13b0c16ece7319d493a894f05376b35d838"
+    }
+  },
+  "execution_code": {
+    "files": [
+      {
+        "path": "execution_guard.py",
+        "sha256": "24b72f4c08688173a48ce31889045b565f6bd4cf1cb37a1f72c154d263299210"
+      },
+      {
+        "path": "provenance.py",
+        "sha256": "1c19652a1f66bcc428edf5ff4f66cd44263a8f43ee718c77babbb32551ab0615"
+      },
+      {
+        "path": "r1_forecast.py",
+        "sha256": "9813bdbaba4a09155712a679d456470749177cc9f1a470f607e57d26945785d8"
+      },
+      {
+        "path": "r1_gate.py",
+        "sha256": "0588af099eaaf948ed7ae357e1f589023f4384e54de0d4d624fddd50a7a1f160"
+      },
+      {
+        "path": "r2l_gate.py",
+        "sha256": "372cbe49157f11c5aff6c5ca871199d35cfe6e1fa81764b832b51ec91a81a711"
+      },
+      {
+        "path": "r2l_materialize.py",
+        "sha256": "aff1fe1efb3dd93563898a4f4262725ceb24696798ec8e772a442bafd416939c"
+      },
+      {
+        "path": "r3_execute.py",
+        "sha256": "959b81c0a3360159ab820b55476e71949735e8d0147ae43f61c97507faeb4dbe"
+      },
+      {
+        "path": "r3_forecast.py",
+        "sha256": "efa9d0ea34b1bee4e439ef5b726456d5fe318f0563c866d03a8bca490115e3c8"
+      },
+      {
+        "path": "r3_gate.py",
+        "sha256": "35ca85943afd5a22143c876889a7a75aeb3948552b819d26e6bd9b682ac9f8de"
+      },
+      {
+        "path": "r3_prepare.py",
+        "sha256": "8ee62b8a9665c73e9a0c6cd8f9141f6874d40094894248cbbf7bec87ff6f0b29"
+      },
+      {
+        "path": "r3_probe.py",
+        "sha256": "de683eafc111813edf24c7609d9e3c6399369c462f4d705e6b64f94c01a21a7c"
+      },
+      {
+        "path": "run_provenance.py",
+        "sha256": "7a086c012a8de99dbeb73914d99df58ab13adda859eff52e593f635a1959c766"
+      },
+      {
+        "path": "validate_r3_gate.py",
+        "sha256": "f8911d78d21e54319871511b694469a00360a92d179cb3880fc58d76e4962083"
+      },
+      {
+        "path": "windows_job.py",
+        "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
+      }
+    ],
+    "manifest_sha256": "4ed201ea4830008dc0b1290bc2dff7322fba0bdde46c9668656fc97063c524b4"
+  },
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r3-legacy-common-gt-1",
+  "r3": {
+    "adjacent_offsets_ms": [
+      -100,
+      0
+    ],
+    "anchor_counts": {
+      "matched_pairs": 313,
+      "negative": 360,
+      "positive": 450
+    },
+    "bootstrap_replicates": 1000,
+    "bootstrap_seed": 0,
+    "contexts_ms": [
+      100,
+      300,
+      500
+    ],
+    "fallback_context_ms": 500,
+    "hop_samples": 1600,
+    "layers_by_encoder": {
+      "eres2netv2-standard-prepool": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "FUSED"
+      ],
+      "mhubert-147": [
+        "L1",
+        "L3",
+        "L6",
+        "L9",
+        "L12"
+      ],
+      "unispeech-sat-base-plus": [
+        "L1",
+        "L3",
+        "L6",
+        "L9",
+        "L12"
+      ],
+      "wavlm-base-plus": [
+        "L1",
+        "L3",
+        "L6",
+        "L9",
+        "L12"
+      ]
+    },
+    "primary_context_ms": 300,
+    "primary_hop_ms": 100,
+    "prototype": {
+      "negative_rule": "leave_one_out_block_kind_mean_then_block_mean",
+      "positive_rule": "l2_normalized_mean_of_entirely_old_trajectory_vectors_in_minus_1000_to_minus_100_ms"
+    },
+    "window_counts": {
+      "r3_primary": 2379,
+      "r3_trajectory": 31567
+    }
+  },
+  "schema_version": 1,
+  "self_sha256": "35a8ca5b1c4f2b3b2e4e86b3a94010e5c94f3d5db74e1de690b1d51e6594be32",
+  "storage": {
+    "cache_root_env": "SRSCD_CACHE_ROOT",
+    "max_derived_cache_gib": 20,
+    "max_external_storage_gib": 50,
+    "max_source_download_gib": 25,
+    "min_free_gib_before_download": 55,
+    "must_be_outside_repository": true,
+    "required_volume": "C:"
+  },
+  "supervision": {
+    "action_receipt_authority": "unique_completed_usage_attestation",
+    "direct_worker_execution_allowed": false,
+    "entrypoint": "python -m experiments.speaker_representation_scd.r3_execute",
+    "hard_memory_boundary": "windows_job_object_job_memory",
+    "legacy_process_scan": "continuous_fail_closed",
+    "max_action_wall_hours": 24,
+    "max_cpu_threads": 8,
+    "max_cumulative_wall_hours": 96,
+    "max_parallel_actions": 1,
+    "max_process_tree_resident_ram_gib": 24,
+    "max_worker_processes": 1,
+    "orphan_receipt_policy": "quarantine_and_retry",
+    "prepare_worker_environment": "repository_root_venv",
+    "probe_worker_environment": "environment_venv",
+    "process_inspection_failure": "abort",
+    "shared_execution_lease": "control/r1_execution.lock"
+  }
+}
