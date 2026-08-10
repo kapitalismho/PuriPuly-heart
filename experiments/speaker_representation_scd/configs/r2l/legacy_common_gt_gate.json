@@ -1,0 +1,262 @@
+{
+  "accepted_r1_checkpoint": {
+    "commit": "f3f234f9bcef00810a1b2eadd5ee2ffcc53e7ede",
+    "review_verdict": "accepted",
+    "technical_validity_sha256": "fe8195e6b7b64784d35b0a9279bbc13b0c16ece7319d493a894f05376b35d838"
+  },
+  "artifact_role": "r2l_legacy_common_gt_gate",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "bf1727a62dcd9c8c28cc095c46ebeaaab8e3f723a0c1c6440ed19a9968d590be"
+  },
+  "authorization": {
+    "cache_calibration": false,
+    "confirmatory_access": false,
+    "coordinate_materialization": true,
+    "full_extraction": false,
+    "legacy_validation": true,
+    "legacy_wav_read": true,
+    "metadata_read": true,
+    "reduced_forecast": true,
+    "training": false
+  },
+  "dependencies": {
+    "compute_ceiling": {
+      "path": "configs/protocol/compute_ceiling.json",
+      "self_sha256": "29b0225a39f38d9a03584286f932be2722f276be95cfa922bda305155ef312c6",
+      "sha256": "7ea9a68238e03a67771b8064c4933149c67dd44c28a8225d25b1af7b94810330"
+    },
+    "confirmatory_access_policy": {
+      "path": "data/confirmatory_access_policy.json",
+      "self_sha256": "dafae80be50a36f78f116ccf80964e712df5a5869893eba0a0c538e1e38efa8b",
+      "sha256": "bdd91dcaa5aca3a6e043acfdc00ae6d94e10909a85bf6cc4d14fca529a38d287"
+    },
+    "forecast_contract": {
+      "path": "configs/r1/full_job_forecast_contract.json",
+      "self_sha256": "3115382954018f54cefa2b691cc56a84fdf5b8998a23d153a2ea3b40e55773e8",
+      "sha256": "6a258094a9a75deb09a4d6685b90dd83f2f9170194b3644bb855d40cf1da4980"
+    },
+    "protocol_screen": {
+      "path": "configs/protocol/reduced_pretraining_screen.json",
+      "self_sha256": "78719c6b10392b8d051f8d90884b73d4ceea845275966cbe8bfa7ae0d2710338",
+      "sha256": "587e9afd3c50f46da7aa022679c5222e8f0437458dd601de6b0a0fe8ca4855b7"
+    },
+    "source_ledger": {
+      "path": "data/source_ledger.json",
+      "self_sha256": "26a29b8bc8ab7ff7a4d52459d04e2bb112cd60044001ebe74797b27520ad97fc",
+      "sha256": "ca81f5eda28b0674b98ead4cb363b1da711fbf33b40c4ddd8ffddb95721177b4"
+    },
+    "split_contract": {
+      "path": "data/split_contract.json",
+      "self_sha256": "df90e37bca150675bbb4780363fb41a6dd57f64fc505910a35b3cae5b1bf97e8",
+      "sha256": "2c68d3b100db099115eb8cfcfb50f70a3c664c4b256c8c87103efd3cb6204d48"
+    },
+    "technical_validity": {
+      "path": "results/r1/technical_validity.json",
+      "self_sha256": "9a276d1ced9fb17cdd2f5e0efddf6d8691fcf043b6798ea8081c7ce0b08c7109",
+      "sha256": "fe8195e6b7b64784d35b0a9279bbc13b0c16ece7319d493a894f05376b35d838"
+    }
+  },
+  "execution_code": {
+    "files": [
+      {
+        "path": "execution_guard.py",
+        "sha256": "24b72f4c08688173a48ce31889045b565f6bd4cf1cb37a1f72c154d263299210"
+      },
+      {
+        "path": "provenance.py",
+        "sha256": "1c19652a1f66bcc428edf5ff4f66cd44263a8f43ee718c77babbb32551ab0615"
+      },
+      {
+        "path": "r1_forecast.py",
+        "sha256": "9813bdbaba4a09155712a679d456470749177cc9f1a470f607e57d26945785d8"
+      },
+      {
+        "path": "r1_gate.py",
+        "sha256": "0588af099eaaf948ed7ae357e1f589023f4384e54de0d4d624fddd50a7a1f160"
+      },
+      {
+        "path": "r2l_execute.py",
+        "sha256": "8cc222b32b62fbd8c0df7ed8f3271feaafb208f806cb8ecd52520a9827b268f1"
+      },
+      {
+        "path": "r2l_forecast.py",
+        "sha256": "3f5066710aa0a1362955d444ce9267928ddfd9ed3182cbcc7d879ea3f8f36379"
+      },
+      {
+        "path": "r2l_gate.py",
+        "sha256": "372cbe49157f11c5aff6c5ca871199d35cfe6e1fa81764b832b51ec91a81a711"
+      },
+      {
+        "path": "r2l_materialize.py",
+        "sha256": "aff1fe1efb3dd93563898a4f4262725ceb24696798ec8e772a442bafd416939c"
+      },
+      {
+        "path": "run_provenance.py",
+        "sha256": "7a086c012a8de99dbeb73914d99df58ab13adda859eff52e593f635a1959c766"
+      },
+      {
+        "path": "validate_r2l_gate.py",
+        "sha256": "2d2028ff50b808d38c5464c39c3b7046cfe33f6bc4fe6ba54fbad10774bb716b"
+      },
+      {
+        "path": "windows_job.py",
+        "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
+      }
+    ],
+    "manifest_sha256": "dc6cb6a3ebb0084cc7cf06d990f21580e8c1831802f605fd1fc78617788ac522"
+  },
+  "experiment_id": "speaker_representation_scd_v1",
+  "legacy_scope": {
+    "confirmatory_payload_read_allowed": false,
+    "forbidden_source_ids": [
+      "zeroth-korean-development",
+      "jvs-development",
+      "voxconverse-v03-confirmatory-natural",
+      "aishell4-confirmatory-natural-zh",
+      "zeroth-korean-confirmatory",
+      "jvs-confirmatory",
+      "D5"
+    ],
+    "legacy_eres_final_rerun": false,
+    "legacy_lseend_rerun": false,
+    "new_corpus_acquisition": false,
+    "required_source_ids": [
+      "legacy-common-gt-v1"
+    ],
+    "tier": "development_known"
+  },
+  "materialization": {
+    "canonical_audio": {
+      "channels": 1,
+      "sample_rate_hz": 16000,
+      "sample_width_bytes": 2
+    },
+    "coordinate_contract": {
+      "contexts_ms": [
+        100,
+        300,
+        500
+      ],
+      "frontier_rule": "eligible_start_plus_context_through_eligible_end",
+      "hop_samples": 1600,
+      "maximum_jsonl_row_bytes": 1024,
+      "one_shard_per_waveform": true,
+      "r3_primary_frontier_rule": "candidate_coordinate_plus_context",
+      "r3_trajectory_offsets_ms": [
+        -1000,
+        -750,
+        -500,
+        -300,
+        -200,
+        -100,
+        0,
+        100,
+        200,
+        300,
+        500,
+        750,
+        1000,
+        1500,
+        2000
+      ]
+    },
+    "coordinate_ledger": "manifests/r2/legacy_common_gt/coordinate_ledger.json",
+    "corpus_download": false,
+    "network_access": false,
+    "neural_inference": false,
+    "output_namespace": "legacy-common-gt-v1",
+    "r4_panel": {
+      "cumulative_cap_rule": "include_while_total_seconds_at_or_below_21600",
+      "maximum_source_hours": 6,
+      "source_order_rule": "stratum_then_sha256",
+      "stratum_a": "sources_hosting_at_least_one_matched_pair_anchor"
+    },
+    "reduced_forecast": "manifests/r2/legacy_common_gt/reduced_r3_r4_forecast.json",
+    "source_metadata": "data/r2/legacy_common_gt/source_metadata.jsonl",
+    "training": false,
+    "validation_receipt": "manifests/r2/legacy_common_gt/validation_receipt.json",
+    "waveform_inventory": "data/r2/legacy_common_gt/waveform_inventory.jsonl"
+  },
+  "protocol_version": "r2l-legacy-common-gt-1",
+  "schema_version": 1,
+  "self_sha256": "27dd28b45d316792c16c65bc783e02b830d85a7b90099c20d1dee9c72b8a8e9d",
+  "sources": [
+    {
+      "expected_diagnostic_episode_count": 695,
+      "expected_episode_count": 804,
+      "expected_matched_pair_count": 313,
+      "expected_negative_anchor_count": 360,
+      "expected_positive_anchor_count": 450,
+      "expected_source_identity_count": 616,
+      "expected_unique_waveform_count": 600,
+      "kind": "existing_verified",
+      "legacy_code": {
+        "module": "experiments.speaker_turn_boundary.turn_episode.phase4_design",
+        "phase4_design_py_sha256": "bbec4e069165dad309c1dd4103521269494bd8c1dcd115a0d2265f632b6edd4a"
+      },
+      "license": "mixed-upstream-see-legacy-ledger",
+      "repository_artifacts": [
+        {
+          "content_sha256": "deb1713cd581c93cc13c47103643041c7551993985379869cfa0ca9a407dff68",
+          "path": "experiments/speaker_turn_boundary/results/turn_episode_v1/episode_manifest_dev.json",
+          "sha256": "a5df5e56c2917ba174fca7892fbaa092f2b57705cad7a77bf9a347ba94cddfee"
+        },
+        {
+          "path": "experiments/speaker_turn_boundary/results/turn_episode_v1/coverage_inventory.json",
+          "sha256": "02a6a118fc90c0d747e9548f07003177b3fc703f33d408d5338427cb6163dd46"
+        },
+        {
+          "path": "experiments/speaker_turn_boundary/results/turn_episode_v1/coverage_inventory_details.jsonl",
+          "sha256": "15b2e4f0efa270985c3bbc6d848ee9ed25496089268e561bff921c5c1be3ef8c"
+        },
+        {
+          "content_sha256": "c8336c2665b28047b1a169fc9605a6c6a3c400afe553dc3a2d35ca9b20b41536",
+          "path": "experiments/speaker_turn_boundary/results/turn_episode_v1/phase_4_design_ledger.json",
+          "sha256": "0a86788a4817d4a205d92b0afb6ee05dc97d11da3e99d4c0501d74be30473691"
+        },
+        {
+          "path": "experiments/speaker_turn_boundary/data/manifests/ls_dev.json",
+          "sha256": "14347cdbdb2eff4cc73489f1b59d6755723d9098089dad66ae222984e90370dd"
+        },
+        {
+          "path": "experiments/speaker_turn_boundary/data/manifests/ls_held_out_clean.json",
+          "sha256": "c0aabc5ad8c3f00ec53d45f3b372b8ebca7ca9237720a1bb7a70b8de7dda2581"
+        },
+        {
+          "path": "experiments/speaker_turn_boundary/data/manifests/ls_held_out_other.json",
+          "sha256": "f0d169394a9fdee9e708bc9cad46c0547946bf967799fa4e2e1a398ddb984079"
+        }
+      ],
+      "selection": "diagnostic_dev episodes from exact episode_manifest_dev",
+      "source_id": "legacy-common-gt-v1",
+      "wav_reference_policy": "read_only_in_place"
+    }
+  ],
+  "storage": {
+    "cache_root_env": "SRSCD_CACHE_ROOT",
+    "max_derived_cache_gib": 20,
+    "max_external_storage_gib": 50,
+    "max_source_download_gib": 25,
+    "min_free_gib_before_download": 55,
+    "must_be_outside_repository": true,
+    "required_volume": "C:"
+  },
+  "supervision": {
+    "action_receipt_authority": "unique_completed_usage_attestation",
+    "direct_worker_execution_allowed": false,
+    "entrypoint": "python -m experiments.speaker_representation_scd.r2l_execute",
+    "hard_memory_boundary": "windows_job_object_job_memory",
+    "legacy_process_scan": "continuous_fail_closed",
+    "max_action_wall_hours": 24,
+    "max_cpu_threads": 8,
+    "max_cumulative_wall_hours": 24,
+    "max_parallel_actions": 1,
+    "max_process_tree_resident_ram_gib": 24,
+    "max_worker_processes": 1,
+    "orphan_receipt_policy": "quarantine_and_retry",
+    "process_inspection_failure": "abort",
+    "shared_execution_lease": "control/r1_execution.lock",
+    "worker_environment": "repository_root_venv"
+  }
+}
