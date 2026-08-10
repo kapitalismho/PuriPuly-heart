@@ -770,7 +770,7 @@ def _extract_context(
                 batches += 1
     if pooled is not None:
         pooled.flush()
-        pooled.close()
+        del pooled
     if pooled_rows != total_windows:
         raise R3ProbeError(f"pooled window row count differs: {pooled_rows} != {total_windows}")
     return {"context_ms": context_ms, "window_rows": pooled_rows, "batches": batches}
