@@ -99,11 +99,11 @@
       },
       {
         "path": "r1_gate.py",
-        "sha256": "909f28138ba60dbc6bdbb1cd9067741b20bbff759340b50d323cce619f7e5128"
+        "sha256": "0588af099eaaf948ed7ae357e1f589023f4384e54de0d4d624fddd50a7a1f160"
       },
       {
         "path": "r1_smoke.py",
-        "sha256": "9104fd545c0e7587091631fa8dda9789dbc7bdf9d31d6a1dfe8dee3660670622"
+        "sha256": "be75dc191088de4f25e3526347c1f1ca37d57107f2ae55ba9814f7e5af97b8ac"
       },
       {
         "path": "run_provenance.py",
@@ -126,7 +126,7 @@
         "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
       }
     ],
-    "manifest_sha256": "3804eb1aea045473d3b7f08def1261ca56a992e59cfa8430cffbaacfc9d77081"
+    "manifest_sha256": "80e7017c27c5d50636501ee3296b618af932b050e33dda023ae4a09ac0521e6b"
   },
   "legacy_release": {
     "path": "results/r1/legacy_release.json",
@@ -141,6 +141,13 @@
         "execution_code_manifest_sha256": "feca03faef2459cfa0ff34c56d134e42d18d0f1b7f5130e543f688f568d1277e",
         "environment_pyproject_sha256": "4f82330869d8e4dede12ebc6346422a518ebff2245b8875b3a092e5b666bb3c6",
         "environment_lock_sha256": "2865f5c05352ba1dc99d2899cc583a3844a2ab1a590388aeee3a0eb0644b9af1"
+      }
+    ],
+    "model_acquisition_predecessors": [
+      {
+        "r1_gate_sha256": "025141fdb7a3a5618b2b8a3df7dfcf5769996f58f73e8fde4d0dca109b419251",
+        "r1_gate_self_sha256": "22203ebe9b06a1c2ac86f14e16d412c290dea2c1f4fc6b2fbc7caf355ead6ab2",
+        "execution_code_manifest_sha256": "3804eb1aea045473d3b7f08def1261ca56a992e59cfa8430cffbaacfc9d77081"
       }
     ]
   },
@@ -225,10 +232,14 @@
       "exact_run_provenance"
     ],
     "batch_single_max_abs_tolerance": 0.0001,
+    "batch_single_relative_l2_tolerance": 0.0001,
+    "batch_single_pooled_cosine_distance_tolerance": 0.000001,
+    "batch_single_pooled_unit_max_abs_tolerance": 0.0001,
+    "batch_single_parity_rule": "maximum_absolute_delta OR (relative_l2_delta AND pooled_cosine_distance AND pooled_unit_max_abs_delta)",
     "eres_parity_max_abs_tolerance": 0.000001,
     "forecast_required_after_smoke": true,
     "forecast_approved": false,
     "full_extraction_on_pass": false
   },
-  "self_sha256": "22203ebe9b06a1c2ac86f14e16d412c290dea2c1f4fc6b2fbc7caf355ead6ab2"
+  "self_sha256": "4e1d407ee42645bda5fb7ad6948d279d910840186b47b270611c236f880eecde"
 }

@@ -47,8 +47,11 @@ from experiments.speaker_representation_scd.r1_gate import (
     validate_r1_gate,
 )
 from experiments.speaker_representation_scd.r1_smoke import (
+    _batch_single_parity,
     _expected_eres_lengths,
     _expected_ssl_length,
+    _fixture_check,
+    _model_acquisition_gate_identity_accepted,
     _timestamp_mapping,
 )
 from experiments.speaker_representation_scd.r1_smoke import (
@@ -58,6 +61,32 @@ from experiments.speaker_representation_scd.validate_r0 import DEFAULT_PATHS
 from experiments.speaker_representation_scd.windows_job import MAX_JOB_MEMORY_BYTES
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _batch_single_contract() -> dict[str, object]:
+    return load_json(ROOT / GATE_PATH)["smoke"]
+
+
+class _BatchRowDriftExtractor:
+    model_id = "wavlm-base-plus"
+
+    def extract(self, waveforms, observed_source_samples):
+        rows = list(waveforms)
+        output_length = _expected_ssl_length(rows[0].shape[0])
+        values = np.zeros((len(rows), output_length, 2), dtype=np.float32)
+        values[:, :, 0] = 1.0
+        if len(rows) == 2:
+            values[1, :, 1] = 0.01
+        return ExtractionBatch(
+            model_id=self.model_id,
+            layers={"L1": values},
+            valid_lengths={
+                "L1": np.full(len(rows), output_length, dtype=np.int64)
+            },
+            observed_source_samples=np.asarray(
+                tuple(observed_source_samples), dtype=np.int64
+            ),
+        )
 
 
 def test_r1_source_registry_is_self_hashed_and_bridges_r0_artifacts() -> None:
@@ -105,6 +134,111 @@ def test_r1_acquisition_gate_is_valid_without_a_live_process_scan() -> None:
     release = load_json(ROOT / "results" / "r1" / "legacy_release.json")
     assert self_sha256_valid(gate)
     assert self_sha256_valid(release)
+
+
+def test_batch_single_parity_accepts_strict_absolute_identity() -> None:
+    single = np.asarray([[1.0, -2.0], [0.5, 0.25]], dtype=np.float32)
+    batched = single + np.float32(5e-5)
+    result = _batch_single_parity(single, batched, _batch_single_contract())
+    assert result["strict_absolute_passed"]
+    assert result["passed"]
+
+
+def test_batch_single_parity_accepts_only_small_representation_geometry_drift() -> None:
+    single = np.asarray([[100.0, -50.0], [75.0, 25.0]], dtype=np.float32)
+    batched = single * np.float32(1.00005)
+    result = _batch_single_parity(single, batched, _batch_single_contract())
+    assert result["maximum_absolute_delta"] > 0.0001
+    assert not result["strict_absolute_passed"]
+    assert result["representation_geometry_passed"]
+    assert result["passed"]
+
+
+def test_batch_single_parity_rejects_scale_or_direction_change() -> None:
+    single = np.asarray([[1.0, 0.0], [1.0, 0.0]], dtype=np.float32)
+    batched = np.asarray([[1.0, 0.01], [1.0, 0.01]], dtype=np.float32)
+    result = _batch_single_parity(single, batched, _batch_single_contract())
+    assert not result["strict_absolute_passed"]
+    assert not result["representation_geometry_passed"]
+    assert not result["passed"]
+
+
+def test_batch_single_parity_rejects_relative_scale_only() -> None:
+    single = np.asarray([[2.0, -1.0], [1.0, 0.5]], dtype=np.float32)
+    batched = single * np.float32(1.001)
+    result = _batch_single_parity(single, batched, _batch_single_contract())
+    assert result["maximum_absolute_delta"] > 0.0001
+    assert result["relative_l2_delta"] > 0.0001
+    assert result["pooled_cosine_distance"] <= 0.000001
+    assert result["pooled_unit_max_abs_delta"] <= 0.0001
+    assert not result["passed"]
+
+
+def test_batch_single_parity_rejects_pooled_cosine_only() -> None:
+    single = np.zeros((2, 512), dtype=np.float32)
+    single[0, 0] = 1000.0
+    single[1, 0] = -999.0
+    batched = single.copy()
+    batched[0, 1:] = 0.00012
+    batched[1, 1:] = -0.00004
+    result = _batch_single_parity(single, batched, _batch_single_contract())
+    assert result["maximum_absolute_delta"] > 0.0001
+    assert result["relative_l2_delta"] <= 0.0001
+    assert result["pooled_cosine_distance"] > 0.000001
+    assert result["pooled_unit_max_abs_delta"] <= 0.0001
+    assert not result["passed"]
+
+
+def test_batch_single_parity_rejects_pooled_unit_coordinate_only() -> None:
+    single = np.asarray([[1000.0, 0.0], [-999.0, 0.0]], dtype=np.float32)
+    batched = single.copy()
+    batched[:, 1] = 0.00011
+    result = _batch_single_parity(single, batched, _batch_single_contract())
+    assert result["maximum_absolute_delta"] > 0.0001
+    assert result["relative_l2_delta"] <= 0.0001
+    assert result["pooled_cosine_distance"] <= 0.000001
+    assert result["pooled_unit_max_abs_delta"] > 0.0001
+    assert not result["passed"]
+
+
+def test_fixture_check_requires_and_records_every_batch_row() -> None:
+    fixture = d0_fixtures()[1]
+    result = _fixture_check(
+        _BatchRowDriftExtractor(), fixture, _batch_single_contract()
+    )
+    parity = result["layers"]["L1"]["batch_single_parity"]
+    assert parity["row_count"] == 2
+    assert [row["batch_row_index"] for row in parity["rows"]] == [0, 1]
+    assert parity["rows"][0]["passed"]
+    assert not parity["rows"][1]["passed"]
+    assert parity["thresholds"] == parity["rows"][0]["thresholds"]
+    assert parity["rule"] == _batch_single_contract()["batch_single_parity_rule"]
+    assert not parity["passed"]
+    assert not result["layers"]["L1"]["passed"]
+    assert not result["passed"]
+
+
+def test_model_acquisition_gate_identity_accepts_only_current_or_exact_predecessor() -> None:
+    gate = load_json(ROOT / GATE_PATH)
+    current = {
+        "r1_gate_sha256": sha256_file(ROOT / GATE_PATH),
+        "r1_gate_self_sha256": gate["self_sha256"],
+        "execution_code_manifest_sha256": gate["execution_code"]["manifest_sha256"],
+    }
+    predecessor = dict(
+        gate["receipt_compatibility"]["model_acquisition_predecessors"][0]
+    )
+    unrelated = dict(predecessor)
+    unrelated["execution_code_manifest_sha256"] = "0" * 64
+    assert _model_acquisition_gate_identity_accepted(
+        current, gate, current["r1_gate_sha256"]
+    )
+    assert _model_acquisition_gate_identity_accepted(
+        predecessor, gate, current["r1_gate_sha256"]
+    )
+    assert not _model_acquisition_gate_identity_accepted(
+        unrelated, gate, current["r1_gate_sha256"]
+    )
 
 
 def test_rehashed_r1_action_expansion_is_rejected(tmp_path: Path) -> None:

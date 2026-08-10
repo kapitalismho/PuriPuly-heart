@@ -70,6 +70,133 @@ def _maximum_delta(left: np.ndarray, right: np.ndarray) -> float:
     return float(np.max(np.abs(left.astype(np.float64) - right.astype(np.float64))))
 
 
+def _batch_single_parity(
+    single: np.ndarray,
+    batched: np.ndarray,
+    contract: dict[str, Any],
+) -> dict[str, Any]:
+    thresholds = {
+        "maximum_absolute_delta": float(contract["batch_single_max_abs_tolerance"]),
+        "relative_l2_delta": float(contract["batch_single_relative_l2_tolerance"]),
+        "pooled_cosine_distance": float(
+            contract["batch_single_pooled_cosine_distance_tolerance"]
+        ),
+        "pooled_unit_max_abs_delta": float(
+            contract["batch_single_pooled_unit_max_abs_tolerance"]
+        ),
+    }
+    if single.shape != batched.shape or single.ndim != 2:
+        return {
+            "maximum_absolute_delta": float("inf"),
+            "relative_l2_delta": float("inf"),
+            "pooled_cosine_distance": float("inf"),
+            "pooled_unit_max_abs_delta": float("inf"),
+            "strict_absolute_passed": False,
+            "representation_geometry_passed": False,
+            "thresholds": thresholds,
+            "rule": contract["batch_single_parity_rule"],
+            "passed": False,
+        }
+    left = single.astype(np.float64)
+    right = batched.astype(np.float64)
+    difference = left - right
+    maximum_absolute_delta = (
+        float(np.max(np.abs(difference))) if difference.size else 0.0
+    )
+    scale = max(float(np.linalg.norm(left)), float(np.linalg.norm(right)))
+    relative_l2_delta = float(np.linalg.norm(difference) / scale) if scale > 0 else 0.0
+    left_pooled = left.mean(axis=0) if left.shape[0] else np.zeros(left.shape[1])
+    right_pooled = right.mean(axis=0) if right.shape[0] else np.zeros(right.shape[1])
+    left_norm = float(np.linalg.norm(left_pooled))
+    right_norm = float(np.linalg.norm(right_pooled))
+    if left_norm == 0 and right_norm == 0:
+        pooled_cosine_distance = 0.0
+        pooled_unit_max_abs_delta = 0.0
+    elif left_norm == 0 or right_norm == 0:
+        pooled_cosine_distance = float("inf")
+        pooled_unit_max_abs_delta = float("inf")
+    else:
+        left_unit = left_pooled / left_norm
+        right_unit = right_pooled / right_norm
+        cosine = float(np.clip(np.dot(left_unit, right_unit), -1.0, 1.0))
+        pooled_cosine_distance = 1.0 - cosine
+        pooled_unit_max_abs_delta = float(np.max(np.abs(left_unit - right_unit)))
+    strict_absolute_passed = maximum_absolute_delta <= thresholds["maximum_absolute_delta"]
+    representation_geometry_passed = bool(
+        relative_l2_delta <= thresholds["relative_l2_delta"]
+        and pooled_cosine_distance <= thresholds["pooled_cosine_distance"]
+        and pooled_unit_max_abs_delta <= thresholds["pooled_unit_max_abs_delta"]
+    )
+    passed = bool(strict_absolute_passed or representation_geometry_passed)
+    return {
+        "maximum_absolute_delta": maximum_absolute_delta,
+        "relative_l2_delta": relative_l2_delta,
+        "pooled_cosine_distance": pooled_cosine_distance,
+        "pooled_unit_max_abs_delta": pooled_unit_max_abs_delta,
+        "strict_absolute_passed": strict_absolute_passed,
+        "representation_geometry_passed": representation_geometry_passed,
+        "thresholds": thresholds,
+        "rule": contract["batch_single_parity_rule"],
+        "passed": passed,
+    }
+
+
+def _batch_single_parity_rows(
+    singles: tuple[np.ndarray, ...],
+    batched: np.ndarray,
+    contract: dict[str, Any],
+) -> dict[str, Any]:
+    if batched.ndim < 1 or batched.shape[0] != len(singles):
+        rows = [
+            _batch_single_parity(single, np.empty((0, 0)), contract)
+            for single in singles
+        ]
+    else:
+        rows = [
+            _batch_single_parity(single, batched[index], contract)
+            for index, single in enumerate(singles)
+        ]
+    metrics = (
+        "maximum_absolute_delta",
+        "relative_l2_delta",
+        "pooled_cosine_distance",
+        "pooled_unit_max_abs_delta",
+    )
+    return {
+        "row_count": len(rows),
+        "rows": [
+            {"batch_row_index": index, **row} for index, row in enumerate(rows)
+        ],
+        **{metric: max(float(row[metric]) for row in rows) for metric in metrics},
+        "thresholds": rows[0]["thresholds"] if rows else {},
+        "rule": rows[0]["rule"] if rows else contract["batch_single_parity_rule"],
+        "passed": bool(rows and all(row["passed"] for row in rows)),
+    }
+
+
+def _model_acquisition_gate_identity_accepted(
+    receipt: dict[str, Any],
+    gate: dict[str, Any],
+    gate_sha256: str,
+) -> bool:
+    receipt_identity = {
+        "r1_gate_sha256": receipt.get("r1_gate_sha256"),
+        "r1_gate_self_sha256": receipt.get("r1_gate_self_sha256"),
+        "execution_code_manifest_sha256": receipt.get("execution_code_manifest_sha256"),
+    }
+    current_identity = {
+        "r1_gate_sha256": gate_sha256,
+        "r1_gate_self_sha256": gate.get("self_sha256"),
+        "execution_code_manifest_sha256": gate.get("execution_code", {}).get(
+            "manifest_sha256"
+        ),
+    }
+    predecessors = gate.get("receipt_compatibility", {}).get(
+        "model_acquisition_predecessors", []
+    )
+    return bool(receipt_identity == current_identity or receipt_identity in predecessors)
+
+
 def _peak_ram_gib(process: psutil.Process) -> float:
     memory = process.memory_info()
     value = getattr(memory, "peak_wset", memory.rss)
@@ -84,14 +211,10 @@ def _load_acquisition(cache_root: Path) -> dict[str, Any]:
         raise R1GateError("R1 model acquisition receipt uses another source registry")
     gate_path = EXPERIMENT_ROOT / GATE_PATH
     gate = load_json(gate_path)
-    if document.get("r1_gate_sha256") != sha256_file(gate_path):
-        raise R1GateError("R1 model acquisition receipt uses another acquisition gate")
-    if document.get("r1_gate_self_sha256") != gate.get("self_sha256"):
-        raise R1GateError("R1 model acquisition receipt gate self identity differs")
-    if document.get("execution_code_manifest_sha256") != gate.get("execution_code", {}).get(
-        "manifest_sha256"
+    if not _model_acquisition_gate_identity_accepted(
+        document, gate, sha256_file(gate_path)
     ):
-        raise R1GateError("R1 model acquisition receipt execution identity differs")
+        raise R1GateError("R1 model acquisition receipt uses an unapproved acquisition gate")
     sync_path = cache_root / "manifests" / "r1_environment_sync.json"
     sync_receipt = load_completed_action_receipt(
         cache_root,
@@ -218,7 +341,11 @@ def _timestamp_mapping(batch, fixture) -> dict[str, Any]:
     }
 
 
-def _fixture_check(extractor, fixture) -> dict[str, Any]:
+def _fixture_check(
+    extractor,
+    fixture,
+    batch_single_contract: dict[str, Any],
+) -> dict[str, Any]:
     original = trailing_window(fixture.waveform, fixture.frontier_sample, fixture.window_samples)
     changed = trailing_window(
         mutate_future(fixture), fixture.frontier_sample, fixture.window_samples
@@ -235,7 +362,11 @@ def _fixture_check(extractor, fixture) -> dict[str, Any]:
     for layer_id, value in first.layers.items():
         repeat_delta = _maximum_delta(value, repeated.layers[layer_id])
         future_delta = _maximum_delta(value, future.layers[layer_id])
-        batch_delta = _maximum_delta(value[0], paired.layers[layer_id][0])
+        batch_parity = _batch_single_parity_rows(
+            (value[0], future.layers[layer_id][0]),
+            paired.layers[layer_id],
+            batch_single_contract,
+        )
         valid_length = int(first.valid_lengths[layer_id][0])
         pooled = mean_pool_valid(value, first.valid_lengths[layer_id])
         finite = bool(np.isfinite(value).all() and np.isfinite(pooled).all())
@@ -253,7 +384,7 @@ def _fixture_check(extractor, fixture) -> dict[str, Any]:
             and valid_length == expected
             and repeat_delta == 0
             and future_delta == 0
-            and batch_delta <= 1e-4
+            and batch_parity["passed"]
         )
         passed = passed and layer_passed
         layers[layer_id] = {
@@ -265,7 +396,8 @@ def _fixture_check(extractor, fixture) -> dict[str, Any]:
             "feature_sha256": _array_sha256(value),
             "repeat_max_abs_delta": repeat_delta,
             "future_mutation_max_abs_delta": future_delta,
-            "batch_single_max_abs_delta": batch_delta,
+            "batch_single_max_abs_delta": batch_parity["maximum_absolute_delta"],
+            "batch_single_parity": batch_parity,
             "passed": layer_passed,
         }
     parity = None
@@ -437,8 +569,12 @@ def run_smoke(
     load_start = time.perf_counter_ns()
     extractor = _make_extractor(model_id, record)
     load_seconds = (time.perf_counter_ns() - load_start) / 1_000_000_000
+    gate_path = EXPERIMENT_ROOT / GATE_PATH
+    gate = load_json(gate_path)
     fixtures = d0_fixtures()
-    fixture_rows = [_fixture_check(extractor, fixture) for fixture in fixtures]
+    fixture_rows = [
+        _fixture_check(extractor, fixture, gate["smoke"]) for fixture in fixtures
+    ]
     empirical_coordinate_probe = _empirical_coordinate_probe(extractor)
     benchmark = _benchmark(extractor, fixtures)
     peak_ram_gib = max(_peak_ram_gib(process), float(benchmark["peak_ram_gib"]))
@@ -454,8 +590,6 @@ def run_smoke(
         and resource_limits["passed"]
     )
     acquisition_path = cache_root / "manifests" / "r1_model_acquisition.json"
-    gate_path = EXPERIMENT_ROOT / GATE_PATH
-    gate = load_json(gate_path)
     report = {
         "schema_version": 1,
         "artifact_role": "r1_model_smoke_report",

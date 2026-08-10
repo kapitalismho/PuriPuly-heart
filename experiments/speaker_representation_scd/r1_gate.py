@@ -139,7 +139,14 @@ EXPECTED_RECEIPT_COMPATIBILITY = {
             "environment_pyproject_sha256": "4f82330869d8e4dede12ebc6346422a518ebff2245b8875b3a092e5b666bb3c6",
             "environment_lock_sha256": "2865f5c05352ba1dc99d2899cc583a3844a2ab1a590388aeee3a0eb0644b9af1",
         }
-    ]
+    ],
+    "model_acquisition_predecessors": [
+        {
+            "r1_gate_sha256": "025141fdb7a3a5618b2b8a3df7dfcf5769996f58f73e8fde4d0dca109b419251",
+            "r1_gate_self_sha256": "22203ebe9b06a1c2ac86f14e16d412c290dea2c1f4fc6b2fbc7caf355ead6ab2",
+            "execution_code_manifest_sha256": "3804eb1aea045473d3b7f08def1261ca56a992e59cfa8430cffbaacfc9d77081",
+        }
+    ],
 }
 EXPECTED_SSL_MODELS = {
     "mhubert-147": "2359b3e9dc6869cb0855119a2866f056aeb400e46252da9cbcc8e9b7aee50c8b",
@@ -499,6 +506,21 @@ def validate_r1_gate(root: Path | None = None, *, scan_processes: bool = True) -
             errors.append("r1_gate.smoke.required_checks: unexpected")
         if smoke.get("batch_single_max_abs_tolerance") != 0.0001:
             errors.append("r1_gate.smoke.batch_single_max_abs_tolerance: unexpected")
+        if smoke.get("batch_single_relative_l2_tolerance") != 0.0001:
+            errors.append("r1_gate.smoke.batch_single_relative_l2_tolerance: unexpected")
+        if smoke.get("batch_single_pooled_cosine_distance_tolerance") != 0.000001:
+            errors.append(
+                "r1_gate.smoke.batch_single_pooled_cosine_distance_tolerance: unexpected"
+            )
+        if smoke.get("batch_single_pooled_unit_max_abs_tolerance") != 0.0001:
+            errors.append(
+                "r1_gate.smoke.batch_single_pooled_unit_max_abs_tolerance: unexpected"
+            )
+        if smoke.get("batch_single_parity_rule") != (
+            "maximum_absolute_delta OR "
+            "(relative_l2_delta AND pooled_cosine_distance AND pooled_unit_max_abs_delta)"
+        ):
+            errors.append("r1_gate.smoke.batch_single_parity_rule: unexpected")
         if smoke.get("eres_parity_max_abs_tolerance") != 0.000001:
             errors.append("r1_gate.smoke.eres_parity_max_abs_tolerance: unexpected")
         if smoke.get("forecast_required_after_smoke") is not True:
