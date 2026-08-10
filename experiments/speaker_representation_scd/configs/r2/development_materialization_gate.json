@@ -1,0 +1,291 @@
+{
+  "schema_version": 1,
+  "artifact_role": "r2_development_materialization_gate",
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r2-development-1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+  },
+  "accepted_r1_checkpoint": {
+    "commit": "ac35b473e4ff932a3ab358a011ad9b21cbf63ca6",
+    "review_verdict": "accepted",
+    "technical_validity_sha256": "fe8195e6b7b64784d35b0a9279bbc13b0c16ece7319d493a894f05376b35d838"
+  },
+  "dependencies": {
+    "source_ledger": {
+      "path": "data/source_ledger.json",
+      "sha256": "ca81f5eda28b0674b98ead4cb363b1da711fbf33b40c4ddd8ffddb95721177b4",
+      "self_sha256": "26a29b8bc8ab7ff7a4d52459d04e2bb112cd60044001ebe74797b27520ad97fc"
+    },
+    "split_contract": {
+      "path": "data/split_contract.json",
+      "sha256": "2c68d3b100db099115eb8cfcfb50f70a3c664c4b256c8c87103efd3cb6204d48",
+      "self_sha256": "df90e37bca150675bbb4780363fb41a6dd57f64fc505910a35b3cae5b1bf97e8"
+    },
+    "confirmatory_access_policy": {
+      "path": "data/confirmatory_access_policy.json",
+      "sha256": "bdd91dcaa5aca3a6e043acfdc00ae6d94e10909a85bf6cc4d14fca529a38d287",
+      "self_sha256": "dafae80be50a36f78f116ccf80964e712df5a5869893eba0a0c538e1e38efa8b"
+    },
+    "compute_ceiling": {
+      "path": "configs/protocol/compute_ceiling.json",
+      "sha256": "7ea9a68238e03a67771b8064c4933149c67dd44c28a8225d25b1af7b94810330",
+      "self_sha256": "29b0225a39f38d9a03584286f932be2722f276be95cfa922bda305155ef312c6"
+    },
+    "technical_validity": {
+      "path": "results/r1/technical_validity.json",
+      "sha256": "fe8195e6b7b64784d35b0a9279bbc13b0c16ece7319d493a894f05376b35d838",
+      "self_sha256": "9a276d1ced9fb17cdd2f5e0efddf6d8691fcf043b6798ea8081c7ce0b08c7109"
+    },
+    "forecast_contract": {
+      "path": "configs/r1/full_job_forecast_contract.json",
+      "sha256": "91ecd3457a82723267e185f2d356576efbf2d6cc873389f4d4066678a79f1489",
+      "self_sha256": "0d88708ded18b921d7c2f1edda03de38aad6eff5af17dececf598a7f64dda107"
+    }
+  },
+  "development_scope": {
+    "required_source_ids": [
+      "legacy-common-gt-v1",
+      "zeroth-korean-development",
+      "jvs-development"
+    ],
+    "forbidden_source_ids": [
+      "voxconverse-v03-confirmatory-natural",
+      "aishell4-confirmatory-natural-zh",
+      "zeroth-korean-confirmatory",
+      "jvs-confirmatory"
+    ],
+    "tier": "development_known",
+    "confirmatory_payload_read_allowed": false,
+    "confirmatory_member_extraction_allowed": false
+  },
+  "sources": [
+    {
+      "source_id": "legacy-common-gt-v1",
+      "kind": "existing_verified",
+      "license": "mixed-upstream-see-legacy-ledger",
+      "selection": "diagnostic_dev episodes from exact episode_manifest_dev",
+      "expected_episode_count": 695,
+      "expected_source_identity_count": 616,
+      "expected_unique_waveform_count": 600,
+      "repository_artifacts": [
+        {
+          "path": "experiments/speaker_turn_boundary/results/turn_episode_v1/episode_manifest_dev.json",
+          "sha256": "a5df5e56c2917ba174fca7892fbaa092f2b57705cad7a77bf9a347ba94cddfee"
+        },
+        {
+          "path": "experiments/speaker_turn_boundary/results/turn_episode_v1/coverage_inventory.json",
+          "sha256": "02a6a118fc90c0d747e9548f07003177b3fc703f33d408d5338427cb6163dd46"
+        },
+        {
+          "path": "experiments/speaker_turn_boundary/results/turn_episode_v1/coverage_inventory_details.jsonl",
+          "sha256": "15b2e4f0efa270985c3bbc6d848ee9ed25496089268e561bff921c5c1be3ef8c"
+        },
+        {
+          "path": "experiments/speaker_turn_boundary/data/manifests/ls_dev.json",
+          "sha256": "14347cdbdb2eff4cc73489f1b59d6755723d9098089dad66ae222984e90370dd"
+        },
+        {
+          "path": "experiments/speaker_turn_boundary/data/manifests/ls_held_out_clean.json",
+          "sha256": "c0aabc5ad8c3f00ec53d45f3b372b8ebca7ca9237720a1bb7a70b8de7dda2581"
+        },
+        {
+          "path": "experiments/speaker_turn_boundary/data/manifests/ls_held_out_other.json",
+          "sha256": "f0d169394a9fdee9e708bc9cad46c0547946bf967799fa4e2e1a398ddb984079"
+        }
+      ]
+    },
+    {
+      "source_id": "zeroth-korean-development",
+      "kind": "public_combined_release_selective_materialization",
+      "license": "CC-BY-4.0",
+      "official_page": "https://www.openslr.org/40/",
+      "download_url": "https://storage.googleapis.com/zeroth_project/zeroth_korean.tar.gz",
+      "archive_name": "zeroth_korean.tar.gz",
+      "archive_type": "tar.gz",
+      "maximum_archive_bytes": 12884901888,
+      "development_partition": "train_data_01",
+      "forbidden_payload_partition": "test_data_01",
+      "expected_train_speaker_count": 105,
+      "expected_test_speaker_count": 10,
+      "selection": "first_20_train_speakers_sorted_by_sha256_then_id_disjoint_from_test"
+    },
+    {
+      "source_id": "jvs-development",
+      "kind": "public_combined_release_selective_materialization",
+      "license": "JVS-academic-noncommercial-terms",
+      "official_page": "https://sites.google.com/site/shinnosuketakamichi/research-topics/jvs_corpus",
+      "official_drive_file_id": "19oAw8wWn3Y7z6CKChRdAyGOB9yupL_Xt",
+      "archive_name": "jvs_ver1.zip",
+      "archive_type": "zip",
+      "maximum_archive_bytes": 5368709120,
+      "development_speakers": [
+        "jvs046", "jvs095", "jvs089", "jvs081", "jvs064",
+        "jvs060", "jvs028", "jvs009", "jvs068", "jvs015",
+        "jvs030", "jvs053", "jvs047", "jvs078", "jvs032",
+        "jvs055", "jvs048", "jvs022", "jvs024", "jvs097"
+      ],
+      "forbidden_confirmatory_speakers": [
+        "jvs050", "jvs003", "jvs094", "jvs011", "jvs052",
+        "jvs023", "jvs002", "jvs016", "jvs013", "jvs025",
+        "jvs093", "jvs019", "jvs066", "jvs058", "jvs051",
+        "jvs086", "jvs059", "jvs029", "jvs033", "jvs077"
+      ],
+      "allowed_conditions": [
+        "parallel100",
+        "nonpara30",
+        "whisper10",
+        "falsetto10"
+      ],
+      "expected_release_speaker_count": 100,
+      "expected_condition_member_counts": {
+        "parallel100": 100,
+        "nonpara30": 30,
+        "whisper10": 10,
+        "falsetto10": 10
+      }
+    }
+  ],
+  "archive_safety": {
+    "metadata_enumeration_allowed": true,
+    "forbid_absolute_parent_drive_and_backslash_paths": true,
+    "forbid_links_devices_duplicates_and_case_collisions": true,
+    "selected_member_payload_only": true,
+    "forbid_member_payloads_for_source_ids": [
+      "voxconverse-v03-confirmatory-natural",
+      "aishell4-confirmatory-natural-zh",
+      "zeroth-korean-confirmatory",
+      "jvs-confirmatory"
+    ],
+    "zeroth_forbidden_payload_partition": "test_data_01",
+    "jvs_forbidden_payload_speakers": [
+      "jvs050", "jvs003", "jvs094", "jvs011", "jvs052",
+      "jvs023", "jvs002", "jvs016", "jvs013", "jvs025",
+      "jvs093", "jvs019", "jvs066", "jvs058", "jvs051",
+      "jvs086", "jvs059", "jvs029", "jvs033", "jvs077"
+    ],
+    "archive_hash_registered_before_materialization": true,
+    "release_population_verified_before_payload_read": true,
+    "development_source_root_must_be_empty_before_download": true,
+    "interrupted_download_policy": "preserve_and_fail_closed_for_review"
+  },
+  "materialization": {
+    "output_source_ids": [
+      "legacy-common-gt-v1",
+      "zeroth-korean-development",
+      "jvs-development"
+    ],
+    "canonical_audio": {
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "sample_width_bytes": 2,
+      "eligible_range": "full_pcm_0_to_num_samples"
+    },
+    "jvs_resampler": {
+      "implementation": "torchaudio.functional.resample",
+      "source_rate_hz": 24000,
+      "target_rate_hz": 16000,
+      "method": "sinc_interp_kaiser",
+      "lowpass_filter_width": 64,
+      "rolloff": 0.9475937167399596,
+      "beta": 14.769656459379492
+    },
+    "waveform_inventory": "data/r2/development/waveform_inventory.jsonl",
+    "source_metadata": "data/r2/development/source_metadata.jsonl",
+    "development_acquisition_receipt": "manifests/r2/development/development_acquisition_receipt.json",
+    "development_coordinate_ledger": "manifests/r2/development/development_coordinate_ledger.json",
+    "coordinate_contract": {
+      "contexts_ms": [100, 200, 300, 500, 750, 1000],
+      "hop_samples": 800,
+      "frontier_rule": "eligible_start_plus_context_through_eligible_end",
+      "one_shard_per_waveform": true,
+      "maximum_jsonl_row_bytes": 1024
+    },
+    "auxiliary_output_reserve_bytes": 67108864,
+    "continuous_storage_enforcement": true,
+    "full_feature_extraction": false,
+    "neural_inference": false
+  },
+  "storage": {
+    "cache_root_env": "SRSCD_CACHE_ROOT",
+    "required_volume": "C:",
+    "must_be_outside_repository": true,
+    "min_free_gib_before_download": 55,
+    "max_source_download_gib": 25,
+    "max_derived_cache_gib": 20,
+    "max_external_storage_gib": 50
+  },
+  "authorization": {
+    "metadata_read": true,
+    "development_archive_download": true,
+    "development_waveform_materialization": true,
+    "development_coordinate_materialization": true,
+    "cache_calibration": false,
+    "full_extraction": false,
+    "confirmatory_access": false,
+    "training": false
+  },
+  "supervision": {
+    "shared_execution_lease": "control/r1_execution.lock",
+    "entrypoint": "python -m experiments.speaker_representation_scd.r2_execute",
+    "direct_worker_execution_allowed": false,
+    "legacy_process_scan": "continuous_fail_closed",
+    "process_inspection_failure": "abort",
+    "max_parallel_actions": 1,
+    "max_worker_processes": 1,
+    "max_cpu_threads": 8,
+    "max_process_tree_resident_ram_gib": 24,
+    "max_action_wall_hours": 24,
+    "max_cumulative_wall_hours": 96,
+    "hard_memory_boundary": "windows_job_object_job_memory",
+    "action_receipt_authority": "unique_completed_usage_attestation",
+    "orphan_receipt_policy": "quarantine_and_retry"
+  },
+  "execution_code": {
+    "files": [
+      {
+        "path": "execution_guard.py",
+        "sha256": "24b72f4c08688173a48ce31889045b565f6bd4cf1cb37a1f72c154d263299210"
+      },
+      {
+        "path": "provenance.py",
+        "sha256": "1c19652a1f66bcc428edf5ff4f66cd44263a8f43ee718c77babbb32551ab0615"
+      },
+      {
+        "path": "r1_forecast.py",
+        "sha256": "ccd3874871b4042587fe6400b4ed94b69a8ccf629e9d7594830772fbb61f1ffb"
+      },
+      {
+        "path": "r1_gate.py",
+        "sha256": "0588af099eaaf948ed7ae357e1f589023f4384e54de0d4d624fddd50a7a1f160"
+      },
+      {
+        "path": "r2_execute.py",
+        "sha256": "713c825addbc2fb08bc55104db7b1e2294c5f414b97a6e255ccff6e86f7e6787"
+      },
+      {
+        "path": "r2_gate.py",
+        "sha256": "f159a84ea667561b62bb116e4ee6d219382976672ffb87e4d020ec80b4b929e6"
+      },
+      {
+        "path": "r2_materialize.py",
+        "sha256": "bb0403531e4e84a54d508e10c13d2595a6110fa98da02dbf2a905f0ddeb9cad7"
+      },
+      {
+        "path": "run_provenance.py",
+        "sha256": "7a086c012a8de99dbeb73914d99df58ab13adda859eff52e593f635a1959c766"
+      },
+      {
+        "path": "validate_r2_gate.py",
+        "sha256": "9461e755cc10f141ac7edcd24f1d36badd4c3933d3bf844f043c71cf4ca004f6"
+      },
+      {
+        "path": "windows_job.py",
+        "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
+      }
+    ],
+    "manifest_sha256": "bdb03bc161a940d303fc82ebd0b3221b4ed57b5db4c58e2a110be2055bee445b"
+  },
+  "self_sha256": "084cf4182d74a39c42fa74c25f7c9f2b31aaec26c9609a6a51c44debd697b0d5"
+}
