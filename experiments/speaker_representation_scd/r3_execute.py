@@ -36,7 +36,8 @@ def _r3_legacy_scan():
     tolerated = {
         row["pid"]
         for row in matches
-        if row.get("module") and "phase5_" in str(row["module"])
+        if row.get("name") not in ("python.exe", "pythonw.exe")
+        or (row.get("module") and "phase5_" in str(row["module"]))
     }
     return (
         tuple(row for row in matches if row["pid"] not in tolerated),
