@@ -63,7 +63,7 @@
       },
       {
         "path": "acquire_r1.py",
-        "sha256": "147a3487f5738c84dc09668a27df720c6f6874faae0ad5901e528dc33d1f736f"
+        "sha256": "c020892101d85295c168e1843820d5f8c6babb8d27bb87d04ebb4dd1fd3e6f40"
       },
       {
         "path": "execution_guard.py",
@@ -126,7 +126,7 @@
         "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
       }
     ],
-    "manifest_sha256": "4118355ce130fff7e66d3ae7eacfe637f243756fa592da8a120bf990daf2a192"
+    "manifest_sha256": "dff3b5fb62df48cbc3e473870fa269650de6cd2723018a3aa61b73fc65c46d77"
   },
   "legacy_release": {
     "path": "results/r1/legacy_release.json",
@@ -230,5 +230,5 @@
     "forecast_approved": false,
     "full_extraction_on_pass": false
   },
-  "self_sha256": "e095956e107c052e941d8146eaf9d91b2167c1470c7440ae45088f8cf8e400b7"
+  "self_sha256": "8528fce19b6019c4d87a4872ef0b7f9ad07d90655305013866aaaca3ad808a30"
 }

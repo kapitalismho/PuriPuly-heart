@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import psutil
+
 from experiments.speaker_representation_scd.execution_guard import (
     load_completed_action_receipt,
     validate_worker_execution,
@@ -17,6 +19,8 @@ from experiments.speaker_representation_scd.execution_guard import (
 )
 from experiments.speaker_representation_scd.provenance import (
     load_json,
+    self_sha256_valid,
+    sha256_bytes,
     sha256_file,
     verify_file_identity,
     with_self_sha256,
@@ -29,6 +33,7 @@ from experiments.speaker_representation_scd.r1_gate import (
     validated_cache_root,
 )
 from experiments.speaker_representation_scd.run_provenance import run_provenance
+from experiments.speaker_representation_scd.windows_job import MAX_JOB_MEMORY_BYTES
 
 EXPECTED_RUNTIME = {
     "huggingface-hub": "0.31.4",
@@ -251,9 +256,315 @@ def _is_exact_empty_no_checkout(target: Path) -> bool:
     )
 
 
+def _active_git_processes() -> tuple[dict[str, Any], ...]:
+    matches: list[dict[str, Any]] = []
+    failures: list[dict[str, Any]] = []
+    for process in psutil.process_iter(["pid", "name"]):
+        name = str(process.info.get("name") or "").lower()
+        if name not in {"git.exe", "git-lfs.exe"}:
+            continue
+        try:
+            command = [str(value) for value in process.cmdline()]
+        except psutil.NoSuchProcess:
+            continue
+        except (psutil.AccessDenied, psutil.ZombieProcess) as exc:
+            failures.append(
+                {
+                    "pid": int(process.info["pid"]),
+                    "name": name,
+                    "reason": type(exc).__name__,
+                }
+            )
+            continue
+        matches.append(
+            {
+                "pid": int(process.info["pid"]),
+                "name": name,
+                "command": command,
+            }
+        )
+    if failures:
+        raise R1GateError(f"Git process inspection failed: {failures}")
+    return tuple(sorted(matches, key=lambda row: row["pid"]))
+
+
+def _usage_document(path: Path) -> dict[str, Any]:
+    try:
+        document = load_json(path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise R1GateError(f"cannot validate R1 usage receipt {path}: {exc}") from exc
+    execution_id = document.get("execution_id")
+    elapsed = document.get("elapsed_seconds")
+    if (
+        not self_sha256_valid(document)
+        or document.get("schema_version") != 1
+        or document.get("artifact_role") != "r1_resource_usage"
+        or not isinstance(execution_id, str)
+        or len(execution_id) != 32
+        or any(character not in "0123456789abcdef" for character in execution_id)
+        or path.name != f"{execution_id}.json"
+        or not isinstance(document.get("action"), str)
+        or document.get("status") not in {"completed", "aborted"}
+        or not isinstance(elapsed, (int, float))
+        or elapsed < 0
+    ):
+        raise R1GateError(f"invalid R1 usage receipt contract: {path}")
+    return document
+
+
+def _aborted_model_usage(path: Path) -> dict[str, Any]:
+    document = _usage_document(path)
+    if (
+        document.get("action") != "models"
+        or document.get("status") != "aborted"
+        or document.get("action_receipt") is not None
+        or document.get("expected_action_receipt_relative_path")
+        != "manifests/r1_model_acquisition.json"
+        or not isinstance(document.get("failure_reason"), str)
+        or not document["failure_reason"]
+    ):
+        raise R1GateError(f"usage receipt is not an aborted model action: {path}")
+    boundary = document.get("hard_memory_boundary")
+    if not isinstance(boundary, dict):
+        raise R1GateError(f"aborted R1 usage lacks hard Job accounting: {path}")
+    accounting = (
+        boundary.get("enforced_job_memory_limit_bytes"),
+        boundary.get("reserved_headroom_bytes"),
+        boundary.get("preassignment_commit_bytes"),
+    )
+    peak = boundary.get("authoritative_peak_job_memory_bytes")
+    if (
+        boundary.get("mechanism") != "windows_job_object_job_memory"
+        or boundary.get("contract_ceiling_bytes") != MAX_JOB_MEMORY_BYTES
+        or boundary.get("applied") is not True
+        or not all(isinstance(value, int) and value >= 0 for value in accounting)
+        or sum(accounting) != MAX_JOB_MEMORY_BYTES
+        or not isinstance(peak, int)
+        or peak < 0
+        or peak > MAX_JOB_MEMORY_BYTES
+    ):
+        raise R1GateError(f"aborted R1 usage has invalid hard Job accounting: {path}")
+    try:
+        started = datetime.fromisoformat(str(document["started_at_utc"]))
+        completed = datetime.fromisoformat(str(document["completed_at_utc"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise R1GateError(f"aborted R1 usage timestamps are invalid: {path}") from exc
+    if started.tzinfo is None or completed.tzinfo is None or completed < started:
+        raise R1GateError(f"aborted R1 usage timestamps are invalid: {path}")
+    return document
+
+
+def _aborted_usage_for_git_lock(cache_root: Path, lock_mtime: datetime) -> dict[str, Any]:
+    matches: list[dict[str, Any]] = []
+    usage_root = cache_root / "control" / "usage"
+    for path in sorted(usage_root.glob("*.json")):
+        document = _usage_document(path)
+        if document.get("action") != "models" or document.get("status") != "aborted":
+            continue
+        document = _aborted_model_usage(path)
+        started = datetime.fromisoformat(document["started_at_utc"])
+        completed = datetime.fromisoformat(document["completed_at_utc"])
+        if started <= lock_mtime <= completed:
+            matches.append({"path": path, "document": document})
+    if len(matches) != 1:
+        raise R1GateError(
+            f"stale Git lock does not map to exactly one aborted model action: {len(matches)}"
+        )
+    return matches[0]
+
+
+def _recovery_receipt_path(cache_root: Path, relative_lock: str, source_id: str) -> Path:
+    path_hash = sha256_bytes(relative_lock.encode("utf-8"))[:16]
+    return cache_root / "control" / "recoveries" / f"{source_id}-{path_hash}.json"
+
+
+def _load_recovery_receipt(path: Path, cache_root: Path) -> dict[str, Any]:
+    try:
+        document = load_json(path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise R1GateError(f"cannot validate Git lock recovery receipt {path}: {exc}") from exc
+    if (
+        not self_sha256_valid(document)
+        or document.get("schema_version") != 1
+        or document.get("artifact_role") != "r1_git_index_lock_recovery_authorization"
+        or document.get("expected_action_receipt_relative_path")
+        != "manifests/r1_model_acquisition.json"
+    ):
+        raise R1GateError(f"invalid Git lock recovery receipt contract: {path}")
+    source = document.get("source_usage")
+    lock = document.get("lock")
+    authorizer = document.get("recovery_authorized_execution_id")
+    if not isinstance(source, dict) or not isinstance(lock, dict):
+        raise R1GateError(f"invalid Git lock recovery receipt fields: {path}")
+    relative_source = source.get("relative_path")
+    relative_lock = lock.get("relative_path")
+    try:
+        created = datetime.fromisoformat(str(document["created_at_utc"]))
+        lock_time = datetime.fromisoformat(str(lock["last_write_time_utc"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise R1GateError(f"invalid Git lock recovery timestamps: {path}") from exc
+    if (
+        created.tzinfo is None
+        or lock_time.tzinfo is None
+        or set(lock) != {"relative_path", "sha256", "size_bytes", "last_write_time_utc"}
+        or not isinstance(relative_lock, str)
+        or not relative_lock
+        or Path(relative_lock).is_absolute()
+        or not relative_lock.endswith("/.git/index.lock")
+        or not isinstance(lock.get("sha256"), str)
+        or len(lock["sha256"]) != 64
+        or any(character not in "0123456789abcdef" for character in lock["sha256"])
+        or lock.get("size_bytes") != 0
+        or set(source) != {"relative_path", "sha256", "self_sha256", "execution_id"}
+        or not isinstance(relative_source, str)
+        or not relative_source
+        or Path(relative_source).is_absolute()
+    ):
+        raise R1GateError(f"invalid Git lock recovery receipt fields: {path}")
+    resolved_cache = cache_root.resolve()
+    source_path = cache_root / relative_source
+    try:
+        normalized_source = source_path.resolve().relative_to(resolved_cache).as_posix()
+        (cache_root / relative_lock).resolve().relative_to(resolved_cache)
+    except ValueError as exc:
+        raise R1GateError(f"Git lock recovery receipt escapes the external cache: {path}") from exc
+    source_document = _aborted_model_usage(source_path)
+    expected_source = {
+        "relative_path": normalized_source,
+        "sha256": sha256_file(source_path),
+        "self_sha256": source_document["self_sha256"],
+        "execution_id": source_document["execution_id"],
+    }
+    expected_path = _recovery_receipt_path(
+        cache_root, str(lock.get("relative_path")), source_document["execution_id"]
+    )
+    if source != expected_source or path.resolve() != expected_path.resolve():
+        raise R1GateError(f"Git lock recovery receipt source identity differs: {path}")
+    if (
+        not isinstance(authorizer, str)
+        or len(authorizer) != 32
+        or any(character not in "0123456789abcdef" for character in authorizer)
+    ):
+        raise R1GateError(f"Git lock recovery authorizer identity is invalid: {path}")
+    return document
+
+
+def _recovery_reference(path: Path, cache_root: Path, document: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "relative_path": path.resolve().relative_to(cache_root.resolve()).as_posix(),
+        "sha256": sha256_file(path),
+        "self_sha256": document["self_sha256"],
+        "source_execution_id": document["source_usage"]["execution_id"],
+        "source_usage_self_sha256": document["source_usage"]["self_sha256"],
+        "recovery_authorized_execution_id": document["recovery_authorized_execution_id"],
+    }
+
+
+def _existing_recoveries(
+    cache_root: Path, relative_lock: str, current_execution_id: str
+) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for path in sorted((cache_root / "control" / "recoveries").glob("*.json")):
+        document = _load_recovery_receipt(path, cache_root)
+        if document["lock"].get("relative_path") != relative_lock:
+            continue
+        authorizer = document["recovery_authorized_execution_id"]
+        if authorizer != current_execution_id:
+            _aborted_model_usage(cache_root / "control" / "usage" / f"{authorizer}.json")
+        records.append(_recovery_reference(path, cache_root, document))
+    return records
+
+
+def _recover_stale_git_index_lock(
+    target: Path, cache_root: Path, current_execution_id: str
+) -> list[dict[str, Any]]:
+    if (
+        len(current_execution_id) != 32
+        or any(character not in "0123456789abcdef" for character in current_execution_id)
+    ):
+        raise R1GateError("current R1 execution identity is invalid for Git lock recovery")
+    resolved_cache = cache_root.resolve()
+    try:
+        resolved_target = target.resolve()
+        relative_target = resolved_target.relative_to(resolved_cache)
+    except ValueError as exc:
+        raise R1GateError("Git lock recovery target is outside the external cache") from exc
+    relative_lock = (relative_target / ".git" / "index.lock").as_posix()
+    lock = target / ".git" / "index.lock"
+    recoveries = _existing_recoveries(cache_root, relative_lock, current_execution_id)
+    if not lock.exists() and not lock.is_symlink():
+        return recoveries
+    if lock.is_symlink() or not lock.is_file():
+        raise R1GateError(f"Git index lock is not the expected zero-byte file: {lock}")
+    lock_stat = lock.stat()
+    if lock_stat.st_size != 0:
+        raise R1GateError(f"Git index lock is not the expected zero-byte file: {lock}")
+    if (cache_root / "manifests" / "r1_model_acquisition.json").exists():
+        raise R1GateError("Git lock recovery is forbidden after model acquisition completion")
+    active = _active_git_processes()
+    if active:
+        raise R1GateError(f"Git lock recovery found active Git processes: {active}")
+    if not _is_exact_empty_no_checkout(target):
+        raise R1GateError("Git lock recovery target is not the exact empty no-checkout state")
+    lock_mtime = datetime.fromtimestamp(lock_stat.st_mtime, UTC)
+    source = _aborted_usage_for_git_lock(cache_root, lock_mtime)
+    source_path = source["path"]
+    source_document = source["document"]
+    receipt_path = _recovery_receipt_path(
+        cache_root, relative_lock, source_document["execution_id"]
+    )
+    lock_identity = {
+        "relative_path": relative_lock,
+        "sha256": sha256_file(lock),
+        "size_bytes": lock_stat.st_size,
+        "last_write_time_utc": lock_mtime.isoformat(),
+    }
+    source_identity = {
+        "relative_path": source_path.resolve().relative_to(resolved_cache).as_posix(),
+        "sha256": sha256_file(source_path),
+        "self_sha256": source_document["self_sha256"],
+        "execution_id": source_document["execution_id"],
+    }
+    if receipt_path.exists():
+        receipt = _load_recovery_receipt(receipt_path, cache_root)
+        if receipt.get("lock") != lock_identity or receipt.get("source_usage") != source_identity:
+            raise R1GateError("existing Git lock recovery receipt identity differs")
+    else:
+        _write_json(
+            receipt_path,
+            {
+                "schema_version": 1,
+                "artifact_role": "r1_git_index_lock_recovery_authorization",
+                "created_at_utc": datetime.now(UTC).isoformat(),
+                "recovery_authorized_execution_id": current_execution_id,
+                "expected_action_receipt_relative_path": (
+                    "manifests/r1_model_acquisition.json"
+                ),
+                "lock": lock_identity,
+                "source_usage": source_identity,
+            },
+        )
+        receipt = _load_recovery_receipt(receipt_path, cache_root)
+    if (
+        lock.stat().st_size != lock_identity["size_bytes"]
+        or sha256_file(lock) != lock_identity["sha256"]
+        or datetime.fromtimestamp(lock.stat().st_mtime, UTC).isoformat()
+        != lock_identity["last_write_time_utc"]
+    ):
+        raise R1GateError("Git index lock changed during recovery authorization")
+    lock.unlink()
+    return _existing_recoveries(cache_root, relative_lock, current_execution_id)
+
+
 def _git_checkout(
-    repository: str, revision: str, target: Path, *, lfs_file: str | None = None
-) -> None:
+    repository: str,
+    revision: str,
+    target: Path,
+    *,
+    cache_root: Path,
+    current_execution_id: str,
+    lfs_file: str | None = None,
+) -> list[dict[str, Any]]:
     if not target.exists():
         target.parent.mkdir(parents=True, exist_ok=True)
         environment = os.environ.copy()
@@ -269,6 +580,7 @@ def _git_checkout(
     ).strip()
     if origin.rstrip("/") != repository.rstrip("/"):
         raise R1GateError(f"Git acquisition target has another origin: {target}")
+    recoveries = _recover_stale_git_index_lock(target, cache_root, current_execution_id)
     status = subprocess.check_output(["git", "status", "--porcelain"], cwd=target, text=True)
     if status.strip() and not _is_exact_empty_no_checkout(target):
         raise R1GateError(f"Git acquisition target is dirty before checkout: {target}")
@@ -281,15 +593,20 @@ def _git_checkout(
     status = subprocess.check_output(["git", "status", "--porcelain"], cwd=target, text=True)
     if status.strip():
         raise R1GateError(f"Git acquisition target is dirty: {target}")
+    return recoveries
 
 
-def _acquire_eres(registry: dict[str, Any], cache_root: Path) -> dict[str, Any]:
+def _acquire_eres(
+    registry: dict[str, Any], cache_root: Path, current_execution_id: str
+) -> dict[str, Any]:
     model = registry["eres2netv2"]
     checkpoint_root = cache_root / "models" / model["model_id"] / model["checkpoint_revision"]
-    _git_checkout(
+    checkpoint_lock_recoveries = _git_checkout(
         model["checkpoint_repository"],
         model["checkpoint_revision"],
         checkpoint_root,
+        cache_root=cache_root,
+        current_execution_id=current_execution_id,
         lfs_file=model["checkpoint_file"]["path"],
     )
     checkpoint_files = _verify_files(
@@ -297,7 +614,13 @@ def _acquire_eres(registry: dict[str, Any], cache_root: Path) -> dict[str, Any]:
         [model["checkpoint_file"], model["checkpoint_config"]],
     )
     source_root = cache_root / "sources" / "3d-speaker" / model["source_revision"]
-    _git_checkout(model["source_repository"], model["source_revision"], source_root)
+    source_lock_recoveries = _git_checkout(
+        model["source_repository"],
+        model["source_revision"],
+        source_root,
+        cache_root=cache_root,
+        current_execution_id=current_execution_id,
+    )
     source_files = _verify_files(source_root, model["source_files"] + [model["source_license"]])
     return {
         "model_id": model["model_id"],
@@ -309,6 +632,7 @@ def _acquire_eres(registry: dict[str, Any], cache_root: Path) -> dict[str, Any]:
         "source_revision": model["source_revision"],
         "source_root": str(source_root.resolve()),
         "source_files": source_files,
+        "stale_git_lock_recoveries": checkpoint_lock_recoveries + source_lock_recoveries,
     }
 
 
@@ -402,7 +726,7 @@ def acquire_models(
         if model["model_id"] in requested:
             records.append(_acquire_huggingface(model, cache_root))
     if registry["eres2netv2"]["model_id"] in requested:
-        records.append(_acquire_eres(registry, cache_root))
+        records.append(_acquire_eres(registry, cache_root, execution.execution_id))
     r0_registry = load_json(EXPERIMENT_ROOT / "models" / "registry.json")
     license_by_model = {model["model_id"]: model["license_id"] for model in r0_registry["models"]}
     model_contracts = []

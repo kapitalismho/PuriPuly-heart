@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -339,7 +340,13 @@ def test_git_checkout_accepts_only_the_exact_interrupted_no_checkout_state(
         check=True,
     )
     assert not [path for path in target.iterdir() if path.name != ".git"]
-    _git_checkout(repository, revision, target)
+    _git_checkout(
+        repository,
+        revision,
+        target,
+        cache_root=tmp_path,
+        current_execution_id="2" * 32,
+    )
     assert (target / "artifact.txt").read_text(encoding="utf-8") == "reviewed artifact\n"
     assert not subprocess.check_output(
         ["git", "status", "--porcelain"], cwd=target, text=True
@@ -357,7 +364,211 @@ def test_git_checkout_rejects_unexpected_content_in_no_checkout_target(
     )
     (target / "unexpected.txt").write_text("not acquisition state\n", encoding="utf-8")
     with pytest.raises(R1GateError, match="dirty before checkout"):
-        _git_checkout(repository, revision, target)
+        _git_checkout(
+            repository,
+            revision,
+            target,
+            cache_root=tmp_path,
+            current_execution_id="2" * 32,
+        )
+
+
+def _aborted_model_usage_for_lock(
+    cache_root: Path, lock: Path, execution_id: str = "3" * 32
+) -> dict:
+    lock_time = datetime.fromtimestamp(lock.stat().st_mtime, UTC)
+    usage = with_self_sha256(
+        {
+            "schema_version": 1,
+            "artifact_role": "r1_resource_usage",
+            "execution_id": execution_id,
+            "action": "models",
+            "status": "aborted",
+            "elapsed_seconds": 2.0,
+            "failure_reason": "ExecutionGuardError: interrupted",
+            "started_at_utc": (lock_time - timedelta(seconds=1)).isoformat(),
+            "completed_at_utc": (lock_time + timedelta(seconds=1)).isoformat(),
+            "expected_action_receipt_relative_path": "manifests/r1_model_acquisition.json",
+            "action_receipt": None,
+            "hard_memory_boundary": {
+                "mechanism": "windows_job_object_job_memory",
+                "contract_ceiling_bytes": MAX_JOB_MEMORY_BYTES,
+                "enforced_job_memory_limit_bytes": MAX_JOB_MEMORY_BYTES - 1024**3,
+                "reserved_headroom_bytes": 1024**3,
+                "preassignment_commit_bytes": 0,
+                "authoritative_peak_job_memory_bytes": 1024,
+                "applied": True,
+            },
+        }
+    )
+    path = cache_root / "control" / "usage" / f"{execution_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(usage), encoding="utf-8")
+    return usage
+
+
+def test_git_checkout_recovers_only_a_job_attributed_zero_byte_stale_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, revision = _local_git_repository(tmp_path / "source")
+    target = tmp_path / "target"
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    lock = target / ".git" / "index.lock"
+    lock.write_bytes(b"")
+    usage = _aborted_model_usage_for_lock(tmp_path, lock)
+    monkeypatch.setattr(acquire_r1, "_active_git_processes", lambda: ())
+    recoveries = _git_checkout(
+        repository,
+        revision,
+        target,
+        cache_root=tmp_path,
+        current_execution_id="2" * 32,
+    )
+    assert not lock.exists()
+    assert len(recoveries) == 1
+    assert recoveries[0]["source_execution_id"] == usage["execution_id"]
+    assert recoveries[0]["source_usage_self_sha256"] == usage["self_sha256"]
+    recovery_path = tmp_path / recoveries[0]["relative_path"]
+    recovery = load_json(recovery_path)
+    assert self_sha256_valid(recovery)
+    assert recovery["lock"]["size_bytes"] == 0
+    assert recovery["recovery_authorized_execution_id"] == "2" * 32
+
+
+def test_git_checkout_rejects_stale_lock_without_one_aborted_job_attribution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, revision = _local_git_repository(tmp_path / "source")
+    target = tmp_path / "target"
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    (target / ".git" / "index.lock").write_bytes(b"")
+    monkeypatch.setattr(acquire_r1, "_active_git_processes", lambda: ())
+    with pytest.raises(R1GateError, match="exactly one aborted model action"):
+        _git_checkout(
+            repository,
+            revision,
+            target,
+            cache_root=tmp_path,
+            current_execution_id="2" * 32,
+        )
+
+
+def test_git_checkout_rejects_nonempty_index_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, revision = _local_git_repository(tmp_path / "source")
+    target = tmp_path / "target"
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    lock = target / ".git" / "index.lock"
+    lock.write_bytes(b"owned")
+    monkeypatch.setattr(acquire_r1, "_active_git_processes", lambda: ())
+    with pytest.raises(R1GateError, match="expected zero-byte file"):
+        _git_checkout(
+            repository,
+            revision,
+            target,
+            cache_root=tmp_path,
+            current_execution_id="2" * 32,
+        )
+    assert lock.read_bytes() == b"owned"
+
+
+def test_git_checkout_rejects_stale_lock_while_git_is_active(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, revision = _local_git_repository(tmp_path / "source")
+    target = tmp_path / "target"
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    lock = target / ".git" / "index.lock"
+    lock.write_bytes(b"")
+    _aborted_model_usage_for_lock(tmp_path, lock)
+    monkeypatch.setattr(
+        acquire_r1,
+        "_active_git_processes",
+        lambda: ({"pid": 42, "name": "git.exe", "command": ["git"]},),
+    )
+    with pytest.raises(R1GateError, match="active Git processes"):
+        _git_checkout(
+            repository,
+            revision,
+            target,
+            cache_root=tmp_path,
+            current_execution_id="2" * 32,
+        )
+    assert lock.exists()
+    assert not (tmp_path / "control" / "recoveries").exists()
+
+
+def test_git_checkout_rejects_multiple_temporal_usage_attributions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, revision = _local_git_repository(tmp_path / "source")
+    target = tmp_path / "target"
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    lock = target / ".git" / "index.lock"
+    lock.write_bytes(b"")
+    _aborted_model_usage_for_lock(tmp_path, lock, "3" * 32)
+    _aborted_model_usage_for_lock(tmp_path, lock, "4" * 32)
+    monkeypatch.setattr(acquire_r1, "_active_git_processes", lambda: ())
+    with pytest.raises(R1GateError, match="exactly one aborted model action: 2"):
+        _git_checkout(
+            repository,
+            revision,
+            target,
+            cache_root=tmp_path,
+            current_execution_id="2" * 32,
+        )
+    assert lock.exists()
+
+
+def test_git_checkout_reuses_crash_safe_recovery_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, revision = _local_git_repository(tmp_path / "source")
+    target = tmp_path / "target"
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    lock = target / ".git" / "index.lock"
+    lock.write_bytes(b"")
+    _aborted_model_usage_for_lock(tmp_path, lock, "3" * 32)
+    monkeypatch.setattr(acquire_r1, "_active_git_processes", lambda: ())
+    first = _git_checkout(
+        repository,
+        revision,
+        target,
+        cache_root=tmp_path,
+        current_execution_id="2" * 32,
+    )
+    clock = tmp_path / "recovery-attempt.clock"
+    clock.write_bytes(b"")
+    _aborted_model_usage_for_lock(tmp_path, clock, "2" * 32)
+    second = _git_checkout(
+        repository,
+        revision,
+        target,
+        cache_root=tmp_path,
+        current_execution_id="5" * 32,
+    )
+    assert second == first
+    assert len(second) == 1
+    assert second[0]["recovery_authorized_execution_id"] == "2" * 32
 
 
 def _authoritative_predecessor_environment_receipt(
