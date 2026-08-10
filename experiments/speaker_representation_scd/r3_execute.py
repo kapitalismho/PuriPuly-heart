@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from experiments.speaker_representation_scd import execution_guard as _execution_guard
+from experiments.speaker_representation_scd import r3_gate as _r3_gate_module
 from experiments.speaker_representation_scd.execution_guard import (
     ExecutionGuardError,
     ExecutionLease,
@@ -75,7 +76,6 @@ def _run_action(
     python: Path,
     argv: list[str],
 ) -> Path:
-    _execution_guard.strict_legacy_scan = _r3_legacy_scan
     with ExecutionLease(
         cache_root,
         execution_action,
@@ -105,6 +105,8 @@ def _run_action(
 
 
 def execute(action: str, requested_argv: tuple[str, ...], encoder: str | None) -> Path:
+    _execution_guard.strict_legacy_scan = _r3_legacy_scan
+    _r3_gate_module.strict_legacy_scan = _r3_legacy_scan
     cache_root = validated_r3_cache_root(f"r3_{action}")
     if action == "prepare":
         receipt = cache_root / ANCHOR_RECEIPT
