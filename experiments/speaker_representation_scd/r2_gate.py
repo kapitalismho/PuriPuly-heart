@@ -161,8 +161,8 @@ EXPECTED_ARCHIVE_SAFETY = {
     "jvs_forbidden_payload_speakers": EXPECTED_SOURCES[2]["forbidden_confirmatory_speakers"],
     "archive_hash_registered_before_materialization": True,
     "release_population_verified_before_payload_read": True,
-    "development_source_root_must_be_empty_before_download": True,
-    "interrupted_download_policy": "preserve_and_fail_closed_for_review",
+    "preexisting_source_policy": "empty_or_exact_approved_zeroth_recovery",
+    "interrupted_download_policy": "preserve_fail_closed_then_exact_verified_reuse",
 }
 EXPECTED_MATERIALIZATION = {
     "output_source_ids": list(DEVELOPMENT_SOURCE_IDS),

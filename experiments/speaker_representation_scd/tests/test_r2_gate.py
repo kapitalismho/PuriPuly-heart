@@ -29,6 +29,7 @@ from experiments.speaker_representation_scd.r2_materialize import (
     _materialize_jvs,
     _materialize_zeroth,
     _member_parts,
+    _reuse_completed_zeroth,
     select_jvs_development_members,
     select_zeroth_development_members,
 )
@@ -330,6 +331,50 @@ def test_download_refuses_preexisting_target_or_partial(tmp_path: Path) -> None:
     partial.write_bytes(b"partial")
     with pytest.raises(R2GateError, match="empty fixed target"):
         _download("https://example.invalid/archive", target, partial, max_bytes=100)
+
+
+def test_exact_completed_zeroth_recovery_is_identity_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "sources/r2/development/zeroth/archive.tar.gz"
+    partial = tmp_path / "control/downloads/r2/archive.tar.gz.part"
+    target.parent.mkdir(parents=True)
+    with tarfile.open(target, "w:gz"):
+        pass
+    execution_id = "a" * 32
+    usage_relative = f"control/usage/{execution_id}.json"
+    usage_path = tmp_path / usage_relative
+    usage_path.parent.mkdir(parents=True)
+    usage = with_self_sha256(
+        {
+            "execution_id": execution_id,
+            "action": "r2-archives",
+            "status": "aborted",
+            "action_receipt": None,
+            "expected_action_receipt_relative_path": (
+                "manifests/r2/development/development_archive_receipt.json"
+            ),
+        }
+    )
+    usage_path.write_text(json.dumps(usage), encoding="utf-8")
+    monkeypatch.setattr(
+        materialize_module,
+        "RECOVERABLE_ZEROTH",
+        {
+            "execution_id": execution_id,
+            "usage_relative_path": usage_relative,
+            "archive_relative_path": target.relative_to(tmp_path).as_posix(),
+            "size_bytes": target.stat().st_size,
+            "sha256": materialize_module.sha256_file(target),
+        },
+    )
+
+    transfer = _reuse_completed_zeroth(tmp_path, target, partial)
+    assert transfer["reused_from_aborted_execution"] == execution_id
+
+    target.write_bytes(target.read_bytes() + b"changed")
+    with pytest.raises(R2GateError, match="identity differs"):
+        _reuse_completed_zeroth(tmp_path, target, partial)
 
 
 def test_materialization_budget_rejects_derived_projection(

@@ -167,8 +167,8 @@
     ],
     "archive_hash_registered_before_materialization": true,
     "release_population_verified_before_payload_read": true,
-    "development_source_root_must_be_empty_before_download": true,
-    "interrupted_download_policy": "preserve_and_fail_closed_for_review"
+    "preexisting_source_policy": "empty_or_exact_approved_zeroth_recovery",
+    "interrupted_download_policy": "preserve_fail_closed_then_exact_verified_reuse"
   },
   "materialization": {
     "output_source_ids": [
@@ -266,11 +266,11 @@
       },
       {
         "path": "r2_gate.py",
-        "sha256": "a42f2a748b31c1fae3c2a28758b65376a6f02d072bfabce6f4b846869a7c5c1e"
+        "sha256": "9b0ddbd7dbd3f6780d61c50272f379cd344c22ff04236bb067a3e008ac6bc0e0"
       },
       {
         "path": "r2_materialize.py",
-        "sha256": "240a1c42abe24c64a49682e1e058b48df60fc7dd62249090c9adb8e4e09bc3dc"
+        "sha256": "86b7c532d2c50a0193896d7484afdf536f1ff55da97d17240eb87e6231322f3b"
       },
       {
         "path": "run_provenance.py",
@@ -285,7 +285,7 @@
         "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
       }
     ],
-    "manifest_sha256": "0f43f0e40890187643fc2a8519076cc3692fe475959e2ceec2318ca2a46a38f1"
+    "manifest_sha256": "6246d60ef3b9ca8703fd4c92e405f6c0962697b955c153c6ed68ec5b214aef01"
   },
-  "self_sha256": "b3f26cef0873cb033189e3b85928437efabc06b9cda2223e3b95a4dded387744"
+  "self_sha256": "746e2a2adefb1d90a2309b6ec37fbdd9a9eacfbf43919c9a1e7b868e69e69d53"
 }

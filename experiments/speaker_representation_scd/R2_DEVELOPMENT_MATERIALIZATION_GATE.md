@@ -3,7 +3,7 @@
 ## Status
 
 - Scope: development-known data only
-- Execution state: gate candidate; no corpus archive has been downloaded
+- Execution state: Zeroth archive acquired; JVS acquisition pending after official Google Drive quota failure
 - Upstream checkpoint: accepted R1 commit `ac35b473e4ff932a3ab358a011ad9b21cbf63ca6`
 - Confirmatory state: sealed
 - Training state: forbidden
@@ -36,8 +36,11 @@ fixed Drive file ID is `19oAw8wWn3Y7z6CKChRdAyGOB9yupL_Xt`. JVS audio remains re
 the published academic/non-commercial research terms and is not product evidence.
 
 Neither release publishes a checksum used by this repository. The first supervised acquisition
-therefore freezes the exact downloaded archive bytes in the archive receipt. A pre-existing final
-archive or partial file is rejected rather than silently trusted or resumed.
+therefore freezes the exact downloaded archive bytes in the archive receipt. The failed
+`ceedae35b2b76d0bafd12af426efe85e` attempt completed Zeroth before JVS returned Google's quota
+page, so the retry may reuse only that exact 10,339,720,618-byte Zeroth artifact with SHA-256
+`6e109897f4d866eb1a3d31cbb2220c0b5e3dc74704208189ecc3bec787740e5f` and its self-hash-valid
+aborted usage receipt. Every other pre-existing final archive or partial file remains rejected.
 
 ## Combined-archive isolation
 

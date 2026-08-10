@@ -26,6 +26,7 @@ from experiments.speaker_representation_scd.execution_guard import (
 )
 from experiments.speaker_representation_scd.provenance import (
     load_json,
+    self_sha256_valid,
     sha256_bytes,
     sha256_file,
     with_self_sha256,
@@ -117,6 +118,15 @@ MAX_COORDINATE_ROW_BYTES = 1024
 AUXILIARY_OUTPUT_RESERVE_BYTES = 64 * 1024**2
 CONTEXTS_MS = (100, 300, 500)
 HOP_SAMPLES = 1600
+RECOVERABLE_ZEROTH = {
+    "execution_id": "ceedae35b2b76d0bafd12af426efe85e",
+    "usage_relative_path": "control/usage/ceedae35b2b76d0bafd12af426efe85e.json",
+    "archive_relative_path": (
+        "sources/r2/development/zeroth-korean-development/zeroth_korean.tar.gz"
+    ),
+    "size_bytes": 10339720618,
+    "sha256": "6e109897f4d866eb1a3d31cbb2220c0b5e3dc74704208189ecc3bec787740e5f",
+}
 
 
 class MaterializationBudget:
@@ -231,6 +241,37 @@ def _archive_magic(path: Path, archive_type: str) -> None:
         raise R2GateError("JVS archive zip magic differs")
 
 
+def _reuse_completed_zeroth(cache_root: Path, target: Path, partial: Path) -> dict[str, Any]:
+    expected = RECOVERABLE_ZEROTH
+    if target.relative_to(cache_root).as_posix() != expected["archive_relative_path"]:
+        raise R2GateError("preexisting archive is not the approved Zeroth recovery target")
+    if partial.exists() or not target.is_file():
+        raise R2GateError("approved Zeroth recovery requires one complete archive and no partial")
+    if target.stat().st_size != expected["size_bytes"] or sha256_file(target) != expected["sha256"]:
+        raise R2GateError("preexisting Zeroth archive identity differs from the approved recovery")
+    usage_path = cache_root / expected["usage_relative_path"]
+    usage = load_json(usage_path)
+    if (
+        not self_sha256_valid(usage)
+        or usage.get("execution_id") != expected["execution_id"]
+        or usage.get("action") != "r2-archives"
+        or usage.get("status") != "aborted"
+        or usage.get("action_receipt") is not None
+        or usage.get("expected_action_receipt_relative_path") != ARCHIVE_RECEIPT.as_posix()
+    ):
+        raise R2GateError("approved Zeroth recovery usage receipt differs")
+    _archive_magic(target, "tar.gz")
+    return {
+        "requested_url": ZEROTH_URL,
+        "final_url": ZEROTH_URL,
+        "resumed_from_bytes": expected["size_bytes"],
+        "response_headers": {},
+        "reused_from_aborted_execution": expected["execution_id"],
+        "usage_receipt_relative_path": expected["usage_relative_path"],
+        "usage_receipt_self_sha256": usage["self_sha256"],
+    }
+
+
 def _tree_size(root: Path) -> int:
     total = 0
     for path in root.rglob("*"):
@@ -262,8 +303,14 @@ def acquire_archives(cache_root: Path, requested_argv: tuple[str, ...]) -> dict[
         raise R2GateError(f"refusing to rerun R2 archive acquisition: {receipt_path}")
     free_bytes = shutil.disk_usage(cache_root.anchor).free
     source_root = cache_root / "sources" / "r2" / "development"
-    if source_root.exists() and any(source_root.rglob("*")):
-        raise R2GateError("R2 development source root must be empty before archive acquisition")
+    existing_files = (
+        sorted(path for path in source_root.rglob("*") if path.is_file())
+        if source_root.exists()
+        else []
+    )
+    recoverable_target = cache_root / RECOVERABLE_ZEROTH["archive_relative_path"]
+    if existing_files and existing_files != [recoverable_target]:
+        raise R2GateError("R2 development source root contains unapproved preexisting files")
     current_external_bytes = _tree_size(cache_root)
     if current_external_bytes + 17 * 1024**3 > 50 * 1024**3:
         raise R2GateError("projected archive acquisition exceeds the 50 GiB external ceiling")
@@ -287,7 +334,11 @@ def acquire_archives(cache_root: Path, requested_argv: tuple[str, ...]) -> dict[
     for source_id, url, name, archive_type, maximum in sources:
         target = cache_root / "sources" / "r2" / "development" / source_id / name
         partial = cache_root / "control" / "downloads" / "r2" / f"{name}.part"
-        transfer = _download(url, target, partial, max_bytes=maximum)
+        transfer = (
+            _reuse_completed_zeroth(cache_root, target, partial)
+            if source_id == "zeroth-korean-development" and target.exists()
+            else _download(url, target, partial, max_bytes=maximum)
+        )
         _archive_magic(target, archive_type)
         population = (
             _zeroth_release_population(target)
