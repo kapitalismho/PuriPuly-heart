@@ -33,10 +33,12 @@ selected HTTP identity headers before any member is materialized.
 
 JVS is acquired from the 3.5 GB Google Drive file linked by the official JVS project page. The
 fixed Drive file ID is `19oAw8wWn3Y7z6CKChRdAyGOB9yupL_Xt`. JVS audio remains restricted to
-the published academic/non-commercial research terms and is not product evidence. Because Google
-Drive currently returns a quota HTML page to a plain GET but serves the official file to a range
-request, acquisition uses `Range: bytes=0-` and accepts HTTP 206 only when `Content-Range` proves
-that the response covers the complete file from byte zero through `total - 1`.
+the published academic/non-commercial research terms and is not product evidence. Acquisition
+uses `Range: bytes=0-` and accepts HTTP 206 only when `Content-Range` proves that the response
+covers the complete file from byte zero through `total - 1`. Google Drive currently returns its
+quota HTML page to both plain and complete-file range requests, so execution remains paused until
+the provider again serves a full response. Bounded partial ranges are not assembled to circumvent
+that quota.
 
 Neither release publishes a checksum used by this repository. The first supervised acquisition
 therefore freezes the exact downloaded archive bytes in the archive receipt. The failed
