@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "artifact_role": "model_registry",
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r0-1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+  },
+  "models": [
+    {
+      "model_id": "mhubert-147",
+      "family": "HuBERT multilingual SSL",
+      "repository": "https://huggingface.co/utter-project/mHuBERT-147",
+      "revision": "7ad3fc0bc5106c58c9c13526abccad527150d135",
+      "artifact": {
+        "file_name": "model.safetensors",
+        "sha256": "2359b3e9dc6869cb0855119a2866f056aeb400e46252da9cbcc8e9b7aee50c8b",
+        "size_bytes": 377510584,
+        "format": "safetensors"
+      },
+      "metadata": {
+        "config_sha256": "9a67db4e9afb5f02772395bb442a0eb4b0275d5d19e074b98076f4ceada111da",
+        "processor_sha256": "e850c9afcd068b4f7f226000ccee047349368a23e1dc5f5784838f822b2d185c",
+        "parameter_count": null,
+        "parameter_count_status": "pending_r1_verified_count"
+      },
+      "sample_rate_hz": 16000,
+      "layer_or_tap_candidates": ["L1", "L3", "L6", "L9", "L12"],
+      "license_id": "CC-BY-NC-SA-4.0",
+      "acquisition_status": "metadata_pinned_unacquired",
+      "extraction_status": "blocked_environment_and_artifact_unacquired",
+      "unresolved": ["verified_parameter_count", "locked_research_environment", "frame_timestamp_fixture"]
+    },
+    {
+      "model_id": "wavlm-base-plus",
+      "family": "WavLM speaker-friendly SSL",
+      "repository": "https://huggingface.co/microsoft/wavlm-base-plus",
+      "revision": "4c66d4806a428f2e922ccfa1a962776e232d487b",
+      "artifact": {
+        "file_name": "pytorch_model.bin",
+        "sha256": "3bb273a6ace99408b50cfc81afdbb7ef2de02da2eab0234e18db608ce692fe51",
+        "size_bytes": 377617425,
+        "format": "pytorch_pickle_trusted_source"
+      },
+      "metadata": {
+        "config_sha256": "fea6df1c2700a3954fc07e70588aecc9055eeb28db2ff57151a2db0d19180ed4",
+        "processor_sha256": "99272fe8ccfab114b68b478681ea47ee3a1ce62bb788cb92dd6e4f69fb1f1da2",
+        "parameter_count": null,
+        "parameter_count_status": "pending_r1_verified_count"
+      },
+      "sample_rate_hz": 16000,
+      "layer_or_tap_candidates": ["L1", "L3", "L6", "L9", "L12"],
+      "license_id": "Microsoft-UniSpeech-Attribution-ShareAlike-3.0-Unported",
+      "acquisition_status": "metadata_pinned_unacquired",
+      "extraction_status": "blocked_environment_and_artifact_unacquired",
+      "unresolved": ["verified_parameter_count", "safe_pickle_load_and_conversion_path", "frame_timestamp_fixture"]
+    },
+    {
+      "model_id": "unispeech-sat-base-plus",
+      "family": "UniSpeech-SAT speaker-aware SSL",
+      "repository": "https://huggingface.co/microsoft/unispeech-sat-base-plus",
+      "revision": "74f559583458188867750f1b8cb6710b11f5be41",
+      "artifact": {
+        "file_name": "pytorch_model.bin",
+        "sha256": "0ebc4dd3edc1e10e21a4d16791ad65b9217033d9205317e999a973304b27eda4",
+        "size_bytes": 382236294,
+        "format": "pytorch_pickle_trusted_source"
+      },
+      "metadata": {
+        "config_sha256": "1818b3201e43c032ac763520c6f82820f32b16aaa4edae78e700832bdf116a71",
+        "processor_sha256": "4a93853b74278b7c769d07f5a861e5d12ceb5db2bced5620d335f87238cb9e86",
+        "parameter_count": null,
+        "parameter_count_status": "pending_r1_verified_count"
+      },
+      "sample_rate_hz": 16000,
+      "layer_or_tap_candidates": ["L1", "L3", "L6", "L9", "L12"],
+      "license_id": "Microsoft-UniSpeech-Attribution-ShareAlike-3.0-Unported",
+      "acquisition_status": "metadata_pinned_unacquired",
+      "extraction_status": "blocked_environment_and_artifact_unacquired",
+      "unresolved": ["verified_parameter_count", "safe_pickle_load_and_conversion_path", "frame_timestamp_fixture"]
+    },
+    {
+      "model_id": "eres2netv2-standard-prepool",
+      "family": "ERes2NetV2 speaker verification network",
+      "repository": "https://modelscope.cn/models/iic/speech_eres2netv2_sv_zh-cn_16k-common",
+      "revision": "1cf80d41fb3435bd3d8df185b5c423333b2db42a",
+      "artifact": {
+        "file_name": "pretrained_eres2netv2.ckpt",
+        "sha256": "0eb4057106b2573dd7b132cf0c36273ab29afd192c1610f80baa9c556dbb963c",
+        "size_bytes": 71768231,
+        "format": "pytorch_checkpoint"
+      },
+      "metadata": {
+        "config_sha256": null,
+        "processor_sha256": null,
+        "parameter_count": null,
+        "parameter_count_status": "pending_r1_verified_count"
+      },
+      "sample_rate_hz": 16000,
+      "layer_or_tap_candidates": ["stage_taps_pending_source_audit", "final_fused_prepool"],
+      "license_id": "Apache-2.0-registry-provisional",
+      "acquisition_status": "metadata_pinned_unacquired",
+      "extraction_status": "blocked_prepool_source_graph_and_parity_unresolved",
+      "unresolved": ["official_source_revision", "tap_module_name", "tap_receptive_field", "frontend_hash", "tap_to_final_reconstruction_parity", "exact_source_license"]
+    }
+  ],
+  "self_sha256": "54d0538fa74130dcfafc2b272f3399de9ca1269f15c35e678432884b26e789a5"
+}

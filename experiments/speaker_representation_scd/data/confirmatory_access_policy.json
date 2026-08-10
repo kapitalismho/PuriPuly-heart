@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "artifact_role": "confirmatory_access_policy",
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r0-1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+  },
+  "state": "sealed",
+  "allowed_prelock_operations": [
+    "license_metadata",
+    "release_metadata",
+    "participant_connectivity_metadata",
+    "declared_duration_metadata",
+    "archive_availability_header_64_bytes",
+    "deterministic_identifier_selection"
+  ],
+  "forbidden_prelock_operations": [
+    "audio_content",
+    "annotation_content",
+    "derived_gt",
+    "features",
+    "scores",
+    "aggregates"
+  ],
+  "lock_requirements": [
+    "one_zero_shot_configuration_per_encoder",
+    "all_thresholds_and_hysteresis_frozen",
+    "run_contract_sha256",
+    "code_sha256",
+    "model_registry_sha256",
+    "split_contract_sha256",
+    "analysis_contract_sha256",
+    "evaluation_environment_identity",
+    "development_promotion_ledger",
+    "independent_verifier_ready"
+  ],
+  "lock": {
+    "run_contract_sha256": null,
+    "code_sha256": null,
+    "model_registry_sha256": null,
+    "split_contract_sha256": null,
+    "analysis_contract_sha256": null,
+    "evaluation_environment_sha256": null,
+    "development_promotion_ledger_sha256": null,
+    "verifier_sha256": null,
+    "locked_encoder_configuration_ids": [],
+    "locked_at_utc": null
+  },
+  "access_ledger": [],
+  "self_sha256": "dafae80be50a36f78f116ccf80964e712df5a5869893eba0a0c538e1e38efa8b"
+}

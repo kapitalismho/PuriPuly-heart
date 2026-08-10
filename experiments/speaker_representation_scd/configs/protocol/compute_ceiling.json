@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "artifact_role": "compute_ceiling",
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r0-1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+  },
+  "hardware_identity": {
+    "host_class": "local_windows_research_host",
+    "cpu": "AMD Ryzen 7 9800X3D 8C16T",
+    "ram_gib": 33.9,
+    "backend": "cpu",
+    "gpu": "none_visible",
+    "python": "3.12.10",
+    "environment": "separate_locked_research_environment_required"
+  },
+  "ceilings": {
+    "max_parallel_models": 1,
+    "max_worker_processes": 1,
+    "max_cpu_threads": 8,
+    "max_resident_ram_gib": 24,
+    "max_source_download_gib": 25,
+    "max_derived_cache_gib": 20,
+    "max_external_storage_gib": 50,
+    "min_free_disk_gib_before_download": 55,
+    "max_total_wall_hours": 96,
+    "max_per_model_wall_hours": 24
+  },
+  "smoke_gate": {
+    "fixtures_per_model": 10,
+    "benchmark_windows_per_model": 100,
+    "batch_modes": ["single", "batch"],
+    "required_measurements": [
+      "seconds_per_window",
+      "peak_ram_gib",
+      "projected_wall_hours",
+      "projected_cache_gib",
+      "job_count"
+    ],
+    "forecast_required": true,
+    "forecast_approved": false,
+    "fail_closed": true
+  },
+  "legacy_contention_guard": {
+    "experiment": "experiments/speaker_turn_boundary",
+    "required_state": "inactive",
+    "release_evidence": null,
+    "on_conflict": "abort"
+  },
+  "execution_state": {
+    "metadata_and_contract_work_allowed": true,
+    "downloads_enabled": false,
+    "neural_smoke_enabled": false,
+    "full_extraction_enabled": false,
+    "gpu_path_requires_protocol_amendment": true
+  },
+  "self_sha256": "29b0225a39f38d9a03584286f932be2722f276be95cfa922bda305155ef312c6"
+}

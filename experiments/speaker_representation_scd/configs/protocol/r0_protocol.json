@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "artifact_role": "r0_protocol",
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r0-1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+  },
+  "scope": {
+    "authorized_phases": ["R0", "R1", "R2", "R3", "R4", "R6-Z"],
+    "deferred_phases": ["R5", "R6-T", "R7", "R8", "R9"],
+    "training_authorized": false,
+    "public_data_only": true
+  },
+  "timeline": {
+    "sample_rate_hz": 16000,
+    "coordinate_unit": "source_sample",
+    "interval_convention": "half_open",
+    "event_times": [
+      "boundary_source_sample",
+      "observed_source_sample_at_emit",
+      "compute_completed_monotonic_ns"
+    ]
+  },
+  "context_modes": [
+    {
+      "id": "local_trailing_window",
+      "use": "primary_low_latency",
+      "waveform_interval": "[t-P,t)",
+      "future_audio_allowed": false,
+      "streaming_claim_allowed": true
+    },
+    {
+      "id": "left_context_tail_pool",
+      "use": "secondary_context",
+      "waveform_interval": "[t-C,t)",
+      "tail_pool_ms": [100, 200, 300, 500, 750, 1000],
+      "primary_left_context_ms": 2000,
+      "future_audio_allowed": false,
+      "streaming_claim_allowed": true
+    },
+    {
+      "id": "offline_full_context",
+      "use": "diagnostic_upper_bound",
+      "future_audio_allowed": true,
+      "streaming_claim_allowed": false
+    }
+  ],
+  "representation_grid": {
+    "pooling_ms": [100, 200, 300, 500, 750, 1000],
+    "continuous_hop_ms": {
+      "primary": 50,
+      "sensitivity": [20, 100]
+    },
+    "ssl_layers": ["L1", "L3", "L6", "L9", "L12"],
+    "pooling": "valid_frame_mean",
+    "normalization": "l2_after_pooling"
+  },
+  "event_taxonomy": {
+    "primary": ["new_speaker_onset_clean", "new_speaker_onset_gap", "overlap_start_new_speaker"],
+    "secondary": ["exclusive_new_speaker", "backchannel_onset"],
+    "negative": ["initial_speech_start", "same_speaker_resume", "acoustic_nuisance"],
+    "handoff_target_authorized": false
+  },
+  "speech_activity_conditions": [
+    "common_causal_vad",
+    "ungated_full_stream",
+    "oracle_activity"
+  ],
+  "comparison_panels": {
+    "matched_budget": "same_context_hop_detector_frontier_and_matching",
+    "best_operating_point": "development_selected_accuracy_latency_compute_pareto",
+    "lseend": "event_context_only"
+  },
+  "contract_paths": {
+    "analysis_contract": "configs/protocol/analysis_contract.json",
+    "compute_ceiling": "configs/protocol/compute_ceiling.json",
+    "license_disposition": "configs/protocol/license_disposition.json",
+    "source_ledger": "data/source_ledger.json",
+    "split_contract": "data/split_contract.json",
+    "confirmatory_access_policy": "data/confirmatory_access_policy.json",
+    "model_registry": "models/registry.json"
+  },
+  "amendment_policy": {
+    "before_confirmatory_access": "increment_protocol_version_and_rehash",
+    "after_confirmatory_access": "reclassify_results_exploratory_and_require_new_untouched_test",
+    "unknown_or_missing": "record_structured_missingness_never_silent_drop"
+  },
+  "self_sha256": "b104bee3f76356916cac48250eca6d45fe7dce695f43c8f768aec74d911c3e35"
+}

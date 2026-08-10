@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "artifact_role": "source_ledger",
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r0-1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+  },
+  "sources": [
+    {
+      "source_id": "legacy-common-gt-v1",
+      "corpus": "legacy ERes/LS-EEND common-GT panel",
+      "tier": "development_known",
+      "language": "mixed-en-zh-controlled",
+      "claim_scope": "development_pair_and_event_context",
+      "release": "episode_manifest_dev",
+      "source_url": "experiments/speaker_turn_boundary/results/turn_episode_v1/episode_manifest_dev.json",
+      "license_id": "mixed-upstream-see-legacy-ledger",
+      "usage_status": "research_allowed",
+      "acquisition_status": "existing_verified",
+      "artifact_sha256": "a5df5e56c2917ba174fca7892fbaa092f2b57705cad7a77bf9a347ba94cddfee",
+      "artifact_size_bytes": 2936679,
+      "selection": {
+        "frozen": true,
+        "rule": "exact_manifest_identity",
+        "episode_count": 804,
+        "diagnostic_episode_count": 695,
+        "matched_pair_count": 313,
+        "canonical_content_sha256": "deb1713cd581c93cc13c47103643041c7551993985379869cfa0ca9a407dff68"
+      }
+    },
+    {
+      "source_id": "zeroth-korean-development",
+      "corpus": "Zeroth-Korean",
+      "tier": "development_known",
+      "language": "ko",
+      "claim_scope": "controlled_pair_and_synthetic_scd",
+      "release": "OpenSLR SLR40 training partition",
+      "source_url": "https://www.openslr.org/40/",
+      "license_id": "CC-BY-4.0",
+      "usage_status": "research_allowed",
+      "acquisition_status": "unacquired",
+      "artifact_sha256": null,
+      "artifact_size_bytes": null,
+      "selection": {
+        "frozen": true,
+        "rule": "first_20_train_speakers_sorted_by_sha256_then_id_disjoint_from_official_test"
+      }
+    },
+    {
+      "source_id": "jvs-development",
+      "corpus": "JVS",
+      "tier": "development_known",
+      "language": "ja",
+      "claim_scope": "controlled_pair_nuisance_and_synthetic_scd",
+      "release": "JVS corpus public release",
+      "source_url": "https://sites.google.com/site/shinnosuketakamichi/research-topics/jvs_corpus",
+      "license_id": "JVS-academic-noncommercial-terms",
+      "usage_status": "restricted",
+      "acquisition_status": "unacquired",
+      "artifact_sha256": null,
+      "artifact_size_bytes": null,
+      "selection": {
+        "frozen": true,
+        "rule": "fixed_20_hash_reserved_development_speakers"
+      }
+    },
+    {
+      "source_id": "voxconverse-v03-confirmatory-natural",
+      "corpus": "VoxConverse",
+      "tier": "confirmatory_test",
+      "language": "language_audit_pending",
+      "claim_scope": "natural_in_the_wild_scd_event_metrics",
+      "release": "v0.3 official test partition at 24bf60be297701cd7e4ef18550c6d390c1b87365",
+      "source_url": "https://github.com/joonson/voxconverse",
+      "license_id": "CC-BY-4.0-original-video-copyright-retained",
+      "usage_status": "research_allowed",
+      "acquisition_status": "unacquired",
+      "artifact_sha256": null,
+      "artifact_size_bytes": null,
+      "selection": {
+        "frozen": true,
+        "rule": "complete_official_v03_test_partition_no_recording_selection",
+        "annotation_repository_revision": "24bf60be297701cd7e4ef18550c6d390c1b87365",
+        "prior_repo_exposure": "none_before_selection",
+        "audio_acquisition": "official_or_byte_parity_proven_mirror_required"
+      }
+    },
+    {
+      "source_id": "aishell4-confirmatory-natural-zh",
+      "corpus": "AISHELL-4",
+      "tier": "confirmatory_test",
+      "language": "zh",
+      "claim_scope": "natural_scd_event_metrics",
+      "release": "OpenSLR SLR111 official test.tar.gz",
+      "source_url": "https://www.openslr.org/111/",
+      "license_id": "CC-BY-SA-4.0",
+      "usage_status": "research_allowed",
+      "acquisition_status": "unacquired",
+      "artifact_sha256": null,
+      "artifact_size_bytes": null,
+      "selection": {
+        "frozen": true,
+        "rule": "first_8_official_test_sessions_sorted_by_sha256_then_id_after_archive_registry"
+      }
+    },
+    {
+      "source_id": "zeroth-korean-confirmatory",
+      "corpus": "Zeroth-Korean",
+      "tier": "confirmatory_test",
+      "language": "ko",
+      "claim_scope": "controlled_pair_and_synthetic_scd_only",
+      "release": "OpenSLR SLR40 official test partition",
+      "source_url": "https://www.openslr.org/40/",
+      "license_id": "CC-BY-4.0",
+      "usage_status": "research_allowed",
+      "acquisition_status": "unacquired",
+      "artifact_sha256": null,
+      "artifact_size_bytes": null,
+      "selection": {
+        "frozen": true,
+        "rule": "all_official_test_speakers",
+        "declared_speaker_count": 10
+      }
+    },
+    {
+      "source_id": "jvs-confirmatory",
+      "corpus": "JVS",
+      "tier": "confirmatory_test",
+      "language": "ja",
+      "claim_scope": "controlled_pair_nuisance_and_synthetic_scd_only",
+      "release": "JVS corpus public release",
+      "source_url": "https://sites.google.com/site/shinnosuketakamichi/research-topics/jvs_corpus",
+      "license_id": "JVS-academic-noncommercial-terms",
+      "usage_status": "restricted",
+      "acquisition_status": "unacquired",
+      "artifact_sha256": null,
+      "artifact_size_bytes": null,
+      "selection": {
+        "frozen": true,
+        "rule": "fixed_first_20_speakers_sorted_by_sha256_then_id"
+      }
+    }
+  ],
+  "forbidden_inheritance": [
+    "legacy_thresholds",
+    "legacy_shortlists",
+    "legacy_go_stop",
+    "legacy_feature_caches",
+    "legacy_reducer_state",
+    "legacy_heldout_status_as_confirmatory",
+    "lseend_as_representation_row"
+  ],
+  "self_sha256": "26a29b8bc8ab7ff7a4d52459d04e2bb112cd60044001ebe74797b27520ad97fc"
+}

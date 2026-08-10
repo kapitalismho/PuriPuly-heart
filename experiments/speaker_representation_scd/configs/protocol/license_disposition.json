@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "artifact_role": "license_disposition",
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r0-1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+  },
+  "allowed_statuses": ["research_allowed", "product_allowed", "restricted", "unknown"],
+  "policy": {
+    "restricted_models_research_only": true,
+    "product_ranking_requires_product_allowed": true,
+    "derived_student_rights_inherited": "unknown_requires_separate_review",
+    "legal_advice_claimed": false
+  },
+  "models": [
+    {
+      "model_id": "mhubert-147",
+      "license_id": "CC-BY-NC-SA-4.0",
+      "license_sha256": null,
+      "research_status": "research_allowed",
+      "product_status": "restricted",
+      "product_claim_allowed": false,
+      "notes": "Research teacher only; derived-student disposition requires separate review."
+    },
+    {
+      "model_id": "wavlm-base-plus",
+      "license_id": "Microsoft-UniSpeech-Attribution-ShareAlike-3.0-Unported",
+      "license_sha256": "74295d561f60f770a4aa7525b71c0d119ec70422e9f5c601ee3c77e1b7822c91",
+      "research_status": "research_allowed",
+      "product_status": "unknown",
+      "product_claim_allowed": false,
+      "notes": "Official model card license path audited; product eligibility remains unresolved."
+    },
+    {
+      "model_id": "unispeech-sat-base-plus",
+      "license_id": "Microsoft-UniSpeech-Attribution-ShareAlike-3.0-Unported",
+      "license_sha256": "74295d561f60f770a4aa7525b71c0d119ec70422e9f5c601ee3c77e1b7822c91",
+      "research_status": "research_allowed",
+      "product_status": "unknown",
+      "product_claim_allowed": false,
+      "notes": "Official model card license path audited; product eligibility remains unresolved."
+    },
+    {
+      "model_id": "eres2netv2-standard-prepool",
+      "license_id": "Apache-2.0-registry-provisional",
+      "license_sha256": null,
+      "research_status": "research_allowed",
+      "product_status": "unknown",
+      "product_claim_allowed": false,
+      "notes": "Checkpoint registry is Apache-2.0; exact pre-pooling source graph license is unresolved."
+    }
+  ],
+  "self_sha256": "a9c027a006a9fb1aa5207e25fd37a688135f35885be30f415b5deafe0d4e855d"
+}

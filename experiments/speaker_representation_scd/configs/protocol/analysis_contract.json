@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "artifact_role": "analysis_contract",
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r0-1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+  },
+  "primary_endpoints": {
+    "representation": {
+      "metric": "prototype_distance_roc_auc_and_eer",
+      "key_contexts_ms": [300, 500]
+    },
+    "continuous_zero_shot": {
+      "selection": "integer_false_event_pareto_frontier",
+      "reference_false_events_per_hour": 1,
+      "priority": "maximize_recall_within_500ms_at_fixed_false_cost",
+      "reference_budgets_per_hour": [0.5, 1, 2, 5]
+    }
+  },
+  "metrics": {
+    "representation": [
+      "roc_auc",
+      "eer",
+      "distribution_overlap",
+      "boundary_response_onset",
+      "post_boundary_recovery",
+      "nuisance_false_change_score"
+    ],
+    "events": [
+      "precision_recall_f1_at_100_250_500ms",
+      "recall_at_100_200_300_500_750_1000_1500_2000ms",
+      "availability_latency_median_p90_p95",
+      "signed_localization_error",
+      "false_events_per_source_hour",
+      "missed_change_rate",
+      "duplicate_event_rate"
+    ],
+    "compute": [
+      "checkpoint_bytes",
+      "cold_load_time",
+      "warm_batch1_p50_p90_p95",
+      "one_stream_rtf",
+      "algorithmic_latency",
+      "compute_latency",
+      "end_to_end_latency",
+      "peak_ram",
+      "cache_bytes_per_audio_hour"
+    ]
+  },
+  "matching": {
+    "cardinality": "one_to_one",
+    "epoch_isolation": true,
+    "optimization": [
+      "maximize_matches",
+      "minimize_availability_latency",
+      "minimize_absolute_localization_error"
+    ],
+    "localization_tolerances_ms": [100, 250, 500],
+    "availability_deadlines_ms": [100, 200, 300, 500, 750, 1000, 1500, 2000]
+  },
+  "uncertainty": {
+    "unit": "whole_connected_block",
+    "confidence_interval": "percentile_95",
+    "bootstrap_replicates": 10000,
+    "bootstrap_seed": 20260810,
+    "paired_comparison": true,
+    "primary_missingness_panel": "all_encoder_intersection"
+  },
+  "promotion": {
+    "development_only": true,
+    "sentinel_per_encoder": 1,
+    "continuous_configurations_per_encoder_max": 3,
+    "test_rows_per_encoder": 1,
+    "test_selection_forbidden": true,
+    "learned_fusion_forbidden": true
+  },
+  "missing_reasons": [
+    "insufficient_input_samples",
+    "no_valid_output_frame",
+    "ambiguous_gt",
+    "missing_speaker_metadata",
+    "failed_frontend_parity",
+    "nonfinite_representation",
+    "unavailable_model_artifact",
+    "compute_abort"
+  ],
+  "reporting": {
+    "natural_and_controlled_separate": true,
+    "per_language_macro_and_worst_group": true,
+    "full_context_excluded_from_streaming_tables": true,
+    "trained_results_excluded": true,
+    "single_weighted_ranking_forbidden": true
+  },
+  "self_sha256": "eb070c15d930d00b3b5f791ba482b34fb1210d504e8b0513f0b8d55f097051e1"
+}
