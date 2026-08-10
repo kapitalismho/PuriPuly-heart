@@ -216,6 +216,41 @@ def _acquire_huggingface(model: dict[str, Any], cache_root: Path) -> dict[str, A
     }
 
 
+def _git_output_lines(target: Path, *args: str) -> tuple[str, ...]:
+    output = subprocess.check_output(["git", *args], cwd=target, text=True)
+    return tuple(line for line in output.splitlines() if line)
+
+
+def _is_exact_empty_no_checkout(target: Path) -> bool:
+    if any(entry.name != ".git" for entry in target.iterdir()):
+        return False
+    head_paths = tuple(sorted(_git_output_lines(target, "ls-tree", "-r", "--name-only", "HEAD")))
+    if not head_paths:
+        return False
+    index_paths = _git_output_lines(target, "ls-files")
+    unstaged_paths = _git_output_lines(target, "diff", "--name-only")
+    untracked_paths = _git_output_lines(target, "ls-files", "--others", "--exclude-standard")
+    cached_paths = tuple(sorted(_git_output_lines(target, "diff", "--cached", "--name-only")))
+    deleted_paths = tuple(
+        sorted(
+            _git_output_lines(
+                target,
+                "diff",
+                "--cached",
+                "--diff-filter=D",
+                "--name-only",
+            )
+        )
+    )
+    return (
+        not index_paths
+        and not unstaged_paths
+        and not untracked_paths
+        and cached_paths == head_paths
+        and deleted_paths == head_paths
+    )
+
+
 def _git_checkout(
     repository: str, revision: str, target: Path, *, lfs_file: str | None = None
 ) -> None:
@@ -229,14 +264,14 @@ def _git_checkout(
         )
     if not (target / ".git").is_dir():
         raise R1GateError(f"existing acquisition target is not a Git checkout: {target}")
-    status = subprocess.check_output(["git", "status", "--porcelain"], cwd=target, text=True)
-    if status.strip():
-        raise R1GateError(f"Git acquisition target is dirty before checkout: {target}")
     origin = subprocess.check_output(
         ["git", "remote", "get-url", "origin"], cwd=target, text=True
     ).strip()
     if origin.rstrip("/") != repository.rstrip("/"):
         raise R1GateError(f"Git acquisition target has another origin: {target}")
+    status = subprocess.check_output(["git", "status", "--porcelain"], cwd=target, text=True)
+    if status.strip() and not _is_exact_empty_no_checkout(target):
+        raise R1GateError(f"Git acquisition target is dirty before checkout: {target}")
     _run(["git", "checkout", "--detach", revision], cwd=target)
     actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=target, text=True).strip()
     if actual != revision:
@@ -277,6 +312,49 @@ def _acquire_eres(registry: dict[str, Any], cache_root: Path) -> dict[str, Any]:
     }
 
 
+def _environment_receipt_gate_identity(receipt: dict[str, Any]) -> dict[str, Any]:
+    environment = receipt.get("environment_contract")
+    if not isinstance(environment, dict):
+        raise R1GateError("R1 environment sync receipt lacks its environment contract")
+    pyproject = environment.get("pyproject")
+    lock = environment.get("lock")
+    if not isinstance(pyproject, dict) or not isinstance(lock, dict):
+        raise R1GateError("R1 environment sync receipt environment identity is invalid")
+    return {
+        "r1_gate_sha256": receipt.get("r1_gate_sha256"),
+        "r1_gate_self_sha256": receipt.get("r1_gate_self_sha256"),
+        "execution_code_manifest_sha256": receipt.get("execution_code_manifest_sha256"),
+        "environment_pyproject_sha256": pyproject.get("sha256"),
+        "environment_lock_sha256": lock.get("sha256"),
+    }
+
+
+def _validate_environment_receipt_gate(
+    receipt: dict[str, Any], gate: dict[str, Any], gate_path: Path
+) -> None:
+    if receipt.get("environment_contract") != gate.get("environment"):
+        raise R1GateError("R1 environment sync receipt uses another environment contract")
+    identity = _environment_receipt_gate_identity(receipt)
+    current = {
+        "r1_gate_sha256": sha256_file(gate_path),
+        "r1_gate_self_sha256": gate.get("self_sha256"),
+        "execution_code_manifest_sha256": gate.get("execution_code", {}).get(
+            "manifest_sha256"
+        ),
+        "environment_pyproject_sha256": gate.get("environment", {})
+        .get("pyproject", {})
+        .get("sha256"),
+        "environment_lock_sha256": gate.get("environment", {}).get("lock", {}).get("sha256"),
+    }
+    if identity == current:
+        return
+    predecessors = gate.get("receipt_compatibility", {}).get(
+        "environment_sync_predecessors"
+    )
+    if not isinstance(predecessors, list) or identity not in predecessors:
+        raise R1GateError("R1 environment sync receipt uses another acquisition gate")
+
+
 def acquire_models(
     cache_root: Path,
     selected: set[str] | None,
@@ -300,8 +378,7 @@ def acquire_models(
         sync_path,
         "sync-environment",
     )
-    if sync_receipt.get("r1_gate_sha256") != sha256_file(gate_path):
-        raise R1GateError("R1 environment sync receipt uses another acquisition gate")
+    _validate_environment_receipt_gate(sync_receipt, gate, gate_path)
     available = {model["model_id"] for model in registry["models"]} | {
         registry["eres2netv2"]["model_id"]
     }

@@ -63,7 +63,7 @@
       },
       {
         "path": "acquire_r1.py",
-        "sha256": "013b372f2a73f751358dea589200319682aefc83c5ad5b850a461c1f5605c934"
+        "sha256": "147a3487f5738c84dc09668a27df720c6f6874faae0ad5901e528dc33d1f736f"
       },
       {
         "path": "execution_guard.py",
@@ -99,7 +99,7 @@
       },
       {
         "path": "r1_gate.py",
-        "sha256": "a93cf5e2f23a5d631b18e2345393075dbe31d7539a5fea23b2362f3602ca7693"
+        "sha256": "909f28138ba60dbc6bdbb1cd9067741b20bbff759340b50d323cce619f7e5128"
       },
       {
         "path": "r1_smoke.py",
@@ -126,12 +126,23 @@
         "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
       }
     ],
-    "manifest_sha256": "feca03faef2459cfa0ff34c56d134e42d18d0f1b7f5130e543f688f568d1277e"
+    "manifest_sha256": "4118355ce130fff7e66d3ae7eacfe637f243756fa592da8a120bf990daf2a192"
   },
   "legacy_release": {
     "path": "results/r1/legacy_release.json",
     "sha256": "8227d67d02c354d987ae5f81ab8f5e00094dc9f629ed76994a0cc837bfb142b7",
     "self_sha256": "a00be1e4f07cd119107fbf93a73e6194d21f37ce586f489f467af08b89e14cb1"
+  },
+  "receipt_compatibility": {
+    "environment_sync_predecessors": [
+      {
+        "r1_gate_sha256": "ac07d6366cda4ac1a2655363fe66fff3a77eeb7213a81c2f24a97064fc4c636f",
+        "r1_gate_self_sha256": "58d848cfbc292f12efa6365aa674de6a098d1e57fb89d5773251b71950a6cd30",
+        "execution_code_manifest_sha256": "feca03faef2459cfa0ff34c56d134e42d18d0f1b7f5130e543f688f568d1277e",
+        "environment_pyproject_sha256": "4f82330869d8e4dede12ebc6346422a518ebff2245b8875b3a092e5b666bb3c6",
+        "environment_lock_sha256": "2865f5c05352ba1dc99d2899cc583a3844a2ab1a590388aeee3a0eb0644b9af1"
+      }
+    ]
   },
   "storage": {
     "cache_root_env": "SRSCD_CACHE_ROOT",
@@ -219,5 +230,5 @@
     "forecast_approved": false,
     "full_extraction_on_pass": false
   },
-  "self_sha256": "58d848cfbc292f12efa6365aa674de6a098d1e57fb89d5773251b71950a6cd30"
+  "self_sha256": "e095956e107c052e941d8146eaf9d91b2167c1470c7440ae45088f8cf8e400b7"
 }

@@ -130,6 +130,17 @@ EXPECTED_SUPERVISION = {
     "model_acquisition_receipt": "manifests/r1_model_acquisition.json",
     "evidence_collision_policy": "abort_before_action",
 }
+EXPECTED_RECEIPT_COMPATIBILITY = {
+    "environment_sync_predecessors": [
+        {
+            "r1_gate_sha256": "ac07d6366cda4ac1a2655363fe66fff3a77eeb7213a81c2f24a97064fc4c636f",
+            "r1_gate_self_sha256": "58d848cfbc292f12efa6365aa674de6a098d1e57fb89d5773251b71950a6cd30",
+            "execution_code_manifest_sha256": "feca03faef2459cfa0ff34c56d134e42d18d0f1b7f5130e543f688f568d1277e",
+            "environment_pyproject_sha256": "4f82330869d8e4dede12ebc6346422a518ebff2245b8875b3a092e5b666bb3c6",
+            "environment_lock_sha256": "2865f5c05352ba1dc99d2899cc583a3844a2ab1a590388aeee3a0eb0644b9af1",
+        }
+    ]
+}
 EXPECTED_SSL_MODELS = {
     "mhubert-147": "2359b3e9dc6869cb0855119a2866f056aeb400e46252da9cbcc8e9b7aee50c8b",
     "wavlm-base-plus": "3bb273a6ace99408b50cfc81afdbb7ef2de02da2eab0234e18db608ce692fe51",
@@ -356,6 +367,7 @@ def validate_r1_gate(root: Path | None = None, *, scan_processes: bool = True) -
             "storage",
             "authorization",
             "supervision",
+            "receipt_compatibility",
             "smoke",
             "self_sha256",
         }
@@ -381,6 +393,8 @@ def validate_r1_gate(root: Path | None = None, *, scan_processes: bool = True) -
             errors.append("r1_gate.authorization: action boundary differs")
         if gate.get("supervision") != EXPECTED_SUPERVISION:
             errors.append("r1_gate.supervision: execution ceiling enforcement differs")
+        if gate.get("receipt_compatibility") != EXPECTED_RECEIPT_COMPATIBILITY:
+            errors.append("r1_gate.receipt_compatibility: predecessor identity differs")
         environment = gate.get("environment", {})
         if environment != EXPECTED_ENVIRONMENT:
             errors.append("r1_gate.environment: differs from the reviewed CPU lock")

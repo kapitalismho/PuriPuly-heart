@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+from experiments.speaker_representation_scd import acquire_r1
+from experiments.speaker_representation_scd.acquire_r1 import _git_checkout
 from experiments.speaker_representation_scd.acquire_r1 import (
     _write_json as write_acquisition_json,
 )
+from experiments.speaker_representation_scd.execution_guard import WorkerExecution
 from experiments.speaker_representation_scd.extraction.common import (
     ExtractionBatch,
     l2_normalize,
@@ -50,6 +54,7 @@ from experiments.speaker_representation_scd.r1_smoke import (
     _write_json as write_smoke_json,
 )
 from experiments.speaker_representation_scd.validate_r0 import DEFAULT_PATHS
+from experiments.speaker_representation_scd.windows_job import MAX_JOB_MEMORY_BYTES
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -310,3 +315,161 @@ def test_r1_evidence_writers_refuse_overwrite(tmp_path: Path, writer) -> None:
     writer(path, {"schema_version": 1})
     with pytest.raises(R1GateError, match="refusing to overwrite"):
         writer(path, {"schema_version": 1})
+
+
+def _local_git_repository(path: Path) -> tuple[str, str]:
+    path.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=path, check=True)
+    subprocess.run(["git", "config", "user.email", "r1@example.invalid"], cwd=path, check=True)
+    subprocess.run(["git", "config", "user.name", "R1 Test"], cwd=path, check=True)
+    (path / "artifact.txt").write_text("reviewed artifact\n", encoding="utf-8")
+    subprocess.run(["git", "add", "artifact.txt"], cwd=path, check=True)
+    subprocess.run(["git", "commit", "--quiet", "-m", "fixture"], cwd=path, check=True)
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=path, text=True).strip()
+    return str(path.resolve()), revision
+
+
+def test_git_checkout_accepts_only_the_exact_interrupted_no_checkout_state(
+    tmp_path: Path,
+) -> None:
+    repository, revision = _local_git_repository(tmp_path / "source")
+    target = tmp_path / "target"
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    assert not [path for path in target.iterdir() if path.name != ".git"]
+    _git_checkout(repository, revision, target)
+    assert (target / "artifact.txt").read_text(encoding="utf-8") == "reviewed artifact\n"
+    assert not subprocess.check_output(
+        ["git", "status", "--porcelain"], cwd=target, text=True
+    ).strip()
+
+
+def test_git_checkout_rejects_unexpected_content_in_no_checkout_target(
+    tmp_path: Path,
+) -> None:
+    repository, revision = _local_git_repository(tmp_path / "source")
+    target = tmp_path / "target"
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    (target / "unexpected.txt").write_text("not acquisition state\n", encoding="utf-8")
+    with pytest.raises(R1GateError, match="dirty before checkout"):
+        _git_checkout(repository, revision, target)
+
+
+def _authoritative_predecessor_environment_receipt(
+    cache_root: Path, gate: dict, *, mutate_environment: bool = False
+) -> dict:
+    execution_id = "1" * 32
+    relative = "manifests/r1_environment_sync.json"
+    environment = json.loads(json.dumps(gate["environment"]))
+    if mutate_environment:
+        environment["backend"] = "changed"
+    predecessor = gate["receipt_compatibility"]["environment_sync_predecessors"][0]
+    receipt = with_self_sha256(
+        {
+            "schema_version": 1,
+            "artifact_role": "r1_environment_sync_receipt",
+            "supervision_binding": {
+                "execution_id": execution_id,
+                "expected_receipt_relative_path": relative,
+                "authority": "requires_completed_usage_attestation",
+            },
+            "r1_gate_sha256": predecessor["r1_gate_sha256"],
+            "r1_gate_self_sha256": predecessor["r1_gate_self_sha256"],
+            "execution_code_manifest_sha256": predecessor[
+                "execution_code_manifest_sha256"
+            ],
+            "environment_contract": environment,
+        }
+    )
+    receipt_path = cache_root / relative
+    receipt_path.parent.mkdir(parents=True)
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    usage = with_self_sha256(
+        {
+            "schema_version": 1,
+            "artifact_role": "r1_resource_usage",
+            "execution_id": execution_id,
+            "action": "sync-environment",
+            "status": "completed",
+            "elapsed_seconds": 1.0,
+            "failure_reason": None,
+            "expected_action_receipt_relative_path": relative,
+            "action_receipt": {
+                "relative_path": relative,
+                "sha256": sha256_file(receipt_path),
+                "self_sha256": receipt["self_sha256"],
+                "execution_id": execution_id,
+            },
+            "hard_memory_boundary": {
+                "mechanism": "windows_job_object_job_memory",
+                "contract_ceiling_bytes": MAX_JOB_MEMORY_BYTES,
+                "enforced_job_memory_limit_bytes": MAX_JOB_MEMORY_BYTES - 1024**3,
+                "reserved_headroom_bytes": 1024**3,
+                "preassignment_commit_bytes": 0,
+                "authoritative_peak_job_memory_bytes": 1024,
+                "applied": True,
+            },
+        }
+    )
+    usage_path = cache_root / "control" / "usage" / f"{execution_id}.json"
+    usage_path.parent.mkdir(parents=True)
+    usage_path.write_text(json.dumps(usage), encoding="utf-8")
+    return receipt
+
+
+def test_acquire_models_accepts_authoritative_predecessor_environment_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gate = load_json(ROOT / GATE_PATH)
+    sync_receipt = _authoritative_predecessor_environment_receipt(tmp_path, gate)
+    requested_argv = ("r1_execute", "models")
+    monkeypatch.setattr(acquire_r1, "validated_cache_root", lambda _action: tmp_path)
+    monkeypatch.setattr(acquire_r1, "_runtime_versions", lambda: acquire_r1.EXPECTED_RUNTIME)
+    monkeypatch.setattr(
+        acquire_r1,
+        "validate_worker_execution",
+        lambda _root, _receipt: WorkerExecution(
+            "2" * 32,
+            requested_argv,
+            "manifests/r1_model_acquisition.json",
+        ),
+    )
+    monkeypatch.setattr(
+        acquire_r1,
+        "_acquire_huggingface",
+        lambda model, _root: {"model_id": model["model_id"]},
+    )
+    monkeypatch.setattr(acquire_r1, "run_provenance", lambda *_args, **_kwargs: {})
+    result = acquire_r1.acquire_models(
+        tmp_path,
+        {"mhubert-147"},
+        requested_argv,
+    )
+    assert result["models"] == [{"model_id": "mhubert-147"}]
+    assert result["environment_sync_receipt_self_sha256"] == sync_receipt["self_sha256"]
+
+
+def test_acquire_models_rejects_predecessor_receipt_with_changed_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gate = load_json(ROOT / GATE_PATH)
+    _authoritative_predecessor_environment_receipt(tmp_path, gate, mutate_environment=True)
+    requested_argv = ("r1_execute", "models")
+    monkeypatch.setattr(acquire_r1, "validated_cache_root", lambda _action: tmp_path)
+    monkeypatch.setattr(acquire_r1, "_runtime_versions", lambda: acquire_r1.EXPECTED_RUNTIME)
+    monkeypatch.setattr(
+        acquire_r1,
+        "validate_worker_execution",
+        lambda _root, _receipt: WorkerExecution(
+            "2" * 32,
+            requested_argv,
+            "manifests/r1_model_acquisition.json",
+        ),
+    )
+    with pytest.raises(R1GateError, match="another environment contract"):
+        acquire_r1.acquire_models(tmp_path, {"mhubert-147"}, requested_argv)
