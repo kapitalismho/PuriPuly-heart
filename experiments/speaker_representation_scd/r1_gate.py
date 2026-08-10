@@ -103,6 +103,7 @@ EXPECTED_SUPERVISION = {
     "entrypoint": "python -m experiments.speaker_representation_scd.r1_execute",
     "direct_worker_execution_allowed": False,
     "lease_relative_path": "control/r1_execution.lock",
+    "lease_owner_validation": "identity_bound_ancestor_depth_2",
     "monitor_interval_seconds": 0.25,
     "legacy_process_scan": "continuous_fail_closed",
     "process_inspection_failure": "abort",

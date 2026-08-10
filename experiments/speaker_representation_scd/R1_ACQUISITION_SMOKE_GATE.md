@@ -19,8 +19,10 @@ training.
   hashes.
 
 The gate is revalidated immediately before every environment sync, model acquisition, and neural
-smoke command. A single external lease prevents concurrent R1 actions. Before a worker can run, it
-is created suspended and assigned with all descendants to a Windows Job Object. The Job Object
+smoke command. A single external lease prevents concurrent R1 actions. The worker verifies the
+lease owner by PID and process creation time within at most two ancestor hops, which permits only
+the observed Windows virtual-environment launcher hop. Before a worker can run, it is created
+suspended and assigned with all descendants to a Windows Job Object. The Job Object
 uses a conservative job-memory limit with 1 GiB reserved headroom under the 24 GiB contract,
 kills the tree when its handle closes, and supplies the authoritative peak-memory value stored in
 the usage receipt. The supervisor additionally scans every 250 ms for legacy work,

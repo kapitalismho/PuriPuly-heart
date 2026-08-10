@@ -22,6 +22,7 @@ from experiments.speaker_representation_scd.provenance import (
     self_sha256_valid,
     with_self_sha256,
 )
+from experiments.speaker_representation_scd.r1_gate import REPOSITORY_ROOT
 from experiments.speaker_representation_scd.windows_job import (
     MAX_JOB_MEMORY_BYTES,
     WindowsMemoryJob,
@@ -191,6 +192,29 @@ def test_direct_worker_without_supervisor_is_rejected(
     monkeypatch.delenv("SRSCD_EXECUTION_LEASE_TOKEN", raising=False)
     with pytest.raises(ExecutionGuardError, match="supervised execution lease"):
         validate_worker_lease(tmp_path)
+
+
+def test_live_supervised_worker_accepts_the_windows_venv_launcher_ancestor(
+    tmp_path: Path,
+) -> None:
+    environment_key = "SRSCD_TEST_CACHE_ROOT"
+    worker = (
+        "import os; "
+        "from pathlib import Path; "
+        "from experiments.speaker_representation_scd.execution_guard import validate_worker_lease; "
+        f"validate_worker_lease(Path(os.environ['{environment_key}']))"
+    )
+    with ExecutionLease(tmp_path, "smoke", ("r1_execute", "smoke")) as lease:
+        environment = lease.worker_environment()
+        environment[environment_key] = str(tmp_path)
+        run_supervised(
+            lease,
+            [sys.executable, "-c", worker],
+            cwd=REPOSITORY_ROOT,
+            environment=environment,
+            poll_seconds=0.01,
+        )
+        lease.complete()
 
 
 def test_supervisor_terminates_worker_when_legacy_contention_appears(

@@ -67,7 +67,7 @@
       },
       {
         "path": "execution_guard.py",
-        "sha256": "a84931613979b6dda5ff512b3c6d476568a53a5983c16aa117422bfd160d11c0"
+        "sha256": "24b72f4c08688173a48ce31889045b565f6bd4cf1cb37a1f72c154d263299210"
       },
       {
         "path": "extraction/__init__.py",
@@ -99,7 +99,7 @@
       },
       {
         "path": "r1_gate.py",
-        "sha256": "d9f138fdbec3b1694bdc0960e9f45aa8965c480e49fee772c8b0ac3cd3b10075"
+        "sha256": "a93cf5e2f23a5d631b18e2345393075dbe31d7539a5fea23b2362f3602ca7693"
       },
       {
         "path": "r1_smoke.py",
@@ -126,7 +126,7 @@
         "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
       }
     ],
-    "manifest_sha256": "8c7252b00e2aa5af76fce9f701183eb080346253f3f91448b40032f308cd7cd7"
+    "manifest_sha256": "feca03faef2459cfa0ff34c56d134e42d18d0f1b7f5130e543f688f568d1277e"
   },
   "legacy_release": {
     "path": "results/r1/legacy_release.json",
@@ -159,6 +159,7 @@
     "entrypoint": "python -m experiments.speaker_representation_scd.r1_execute",
     "direct_worker_execution_allowed": false,
     "lease_relative_path": "control/r1_execution.lock",
+    "lease_owner_validation": "identity_bound_ancestor_depth_2",
     "monitor_interval_seconds": 0.25,
     "legacy_process_scan": "continuous_fail_closed",
     "process_inspection_failure": "abort",
@@ -218,5 +219,5 @@
     "forecast_approved": false,
     "full_extraction_on_pass": false
   },
-  "self_sha256": "21c1ca50794c51fdbe0f3cbfa18ab56285f981190800001fb5c17f2ac5114e2b"
+  "self_sha256": "58d848cfbc292f12efa6365aa674de6a098d1e57fb89d5773251b71950a6cd30"
 }

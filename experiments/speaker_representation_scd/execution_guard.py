@@ -35,6 +35,7 @@ POTENTIAL_HOSTS = {
 MAX_RESIDENT_RAM_GIB = 24.0
 MAX_ACTION_SECONDS = 24 * 60 * 60
 MAX_CUMULATIVE_SECONDS = 96 * 60 * 60
+MAX_LEASE_OWNER_ANCESTOR_DEPTH = 2
 
 
 class ExecutionGuardError(RuntimeError):
@@ -230,10 +231,15 @@ class ExecutionLease:
             raise ExecutionGuardError(f"legacy process inspection failed: {failures}")
         if matches:
             raise ExecutionGuardError(f"legacy contention detected: {matches}")
+        try:
+            owner_create_time_ns = round(psutil.Process(os.getpid()).create_time() * 1_000_000_000)
+        except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess) as exc:
+            raise ExecutionGuardError("cannot establish the R1 lease-owner identity") from exc
         lock = {
             "schema_version": 1,
             "artifact_role": "r1_execution_lease",
             "pid": os.getpid(),
+            "pid_create_time_ns": owner_create_time_ns,
             "action": self.action,
             "requested_argv": list(self.requested_argv),
             "expected_action_receipt_relative_path": (self.expected_receipt_relative_path),
@@ -421,9 +427,29 @@ def validate_worker_execution(
         raise ExecutionGuardError("R1 execution lease self identity is invalid")
     if document.get("token") != token:
         raise ExecutionGuardError("R1 execution lease token differs")
-    parent_pid = int(document.get("pid", -1))
-    if parent_pid != os.getppid() or not psutil.pid_exists(parent_pid):
-        raise ExecutionGuardError("R1 worker parent does not own the execution lease")
+    owner_pid = document.get("pid")
+    owner_create_time_ns = document.get("pid_create_time_ns")
+    if not isinstance(owner_pid, int) or not isinstance(owner_create_time_ns, int):
+        raise ExecutionGuardError("R1 lease-owner identity is invalid")
+    try:
+        ancestors = psutil.Process(os.getpid()).parents()
+        owner = next(
+            (
+                process
+                for depth, process in enumerate(ancestors, start=1)
+                if depth <= MAX_LEASE_OWNER_ANCESTOR_DEPTH and process.pid == owner_pid
+            ),
+            None,
+        )
+        if owner is None:
+            raise ExecutionGuardError("R1 lease owner is not an allowed worker ancestor")
+        observed_create_time_ns = round(owner.create_time() * 1_000_000_000)
+    except ExecutionGuardError:
+        raise
+    except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess) as exc:
+        raise ExecutionGuardError("cannot validate the R1 lease-owner process identity") from exc
+    if observed_create_time_ns != owner_create_time_ns:
+        raise ExecutionGuardError("R1 lease-owner process identity differs")
     requested = os.environ.get("SRSCD_REQUESTED_ARGV")
     try:
         values = json.loads(requested or "[]")
