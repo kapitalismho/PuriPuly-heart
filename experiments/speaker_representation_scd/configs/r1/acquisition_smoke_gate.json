@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "artifact_role": "r1_acquisition_smoke_gate",
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r1-smoke-1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+  },
+  "r0_dependencies": {
+    "r0_protocol": {
+      "path": "configs/protocol/r0_protocol.json",
+      "sha256": "4a7767a966f27ff85e20b315922b47a8f8d16356a5701cf55c09b292b87bab0d"
+    },
+    "compute_ceiling": {
+      "path": "configs/protocol/compute_ceiling.json",
+      "sha256": "7ea9a68238e03a67771b8064c4933149c67dd44c28a8225d25b1af7b94810330"
+    },
+    "model_registry": {
+      "path": "models/registry.json",
+      "sha256": "ba5bfa5201b08e41f350ec1c6995eea2688db564b14ea1dedefc3a30e492bbe2"
+    }
+  },
+  "environment": {
+    "python": "3.12.10",
+    "uv": "0.9.17 (2b5d65e61 2025-12-09)",
+    "backend": "cpu",
+    "project_root": "environment",
+    "pyproject": {
+      "path": "environment/pyproject.toml",
+      "sha256": "4f82330869d8e4dede12ebc6346422a518ebff2245b8875b3a092e5b666bb3c6"
+    },
+    "lock": {
+      "path": "environment/uv.lock",
+      "sha256": "2865f5c05352ba1dc99d2899cc583a3844a2ab1a590388aeee3a0eb0644b9af1"
+    },
+    "runtime_packages": {
+      "huggingface-hub": "0.31.4",
+      "matplotlib": "3.10.3",
+      "numpy": "1.26.4",
+      "pandas": "2.2.3",
+      "psutil": "7.0.0",
+      "pyarrow": "20.0.0",
+      "pyyaml": "6.0.2",
+      "safetensors": "0.5.3",
+      "scikit-learn": "1.6.1",
+      "soundfile": "0.13.1",
+      "torch": "2.7.1+cpu",
+      "torchaudio": "2.7.1+cpu",
+      "transformers": "4.52.3"
+    }
+  },
+  "source_registry": {
+    "path": "models/source_registry.json",
+    "sha256": "0cc07fa30294a2ae9a4d30ef4bcb7201f6b03d700ce815139975678704d182bb",
+    "self_sha256": "cc09d72b7f05e0375972f9f427c2dc3b6c6cf6a45399a3d91b18c44d6c1716bf"
+  },
+  "execution_code": {
+    "files": [
+      {
+        "path": "__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "acquire_r1.py",
+        "sha256": "013b372f2a73f751358dea589200319682aefc83c5ad5b850a461c1f5605c934"
+      },
+      {
+        "path": "execution_guard.py",
+        "sha256": "a84931613979b6dda5ff512b3c6d476568a53a5983c16aa117422bfd160d11c0"
+      },
+      {
+        "path": "extraction/__init__.py",
+        "sha256": "e1d0ba43c66fc6150e6cdc942a8b67a422e8fdb6e2ebb263c017080a6b7a87e0"
+      },
+      {
+        "path": "extraction/common.py",
+        "sha256": "d7e14931ea25654f58698aa25679210ff1e910d8971508c4b79cae4b49ead755"
+      },
+      {
+        "path": "extraction/eres_prepooling.py",
+        "sha256": "7309544a6920ac85aa35ff6c358434474ed154757118f1e1d3e4b54e6400c57b"
+      },
+      {
+        "path": "extraction/fixtures.py",
+        "sha256": "f1350bcdd957f2537a389c9bbb13d5f15d3da27c1df787110dbc052462e7fe1b"
+      },
+      {
+        "path": "extraction/ssl.py",
+        "sha256": "67ee2e8e26ad46850ef3c32d72f9cf4a0d2da0ef9d59fb6510d6f8323b940ebb"
+      },
+      {
+        "path": "provenance.py",
+        "sha256": "1c19652a1f66bcc428edf5ff4f66cd44263a8f43ee718c77babbb32551ab0615"
+      },
+      {
+        "path": "r1_execute.py",
+        "sha256": "0a9196676ae0b1d9d03a5c85f8e2c06ecbcd3b83fcabaaab722fa27b64b95ce4"
+      },
+      {
+        "path": "r1_gate.py",
+        "sha256": "d9f138fdbec3b1694bdc0960e9f45aa8965c480e49fee772c8b0ac3cd3b10075"
+      },
+      {
+        "path": "r1_smoke.py",
+        "sha256": "9104fd545c0e7587091631fa8dda9789dbc7bdf9d31d6a1dfe8dee3660670622"
+      },
+      {
+        "path": "run_provenance.py",
+        "sha256": "7a086c012a8de99dbeb73914d99df58ab13adda859eff52e593f635a1959c766"
+      },
+      {
+        "path": "schemas.py",
+        "sha256": "8abb748ee4ce7f8808ea7f7dafec1c5b4f0fafb4c48f1f9fedcbb89759d597db"
+      },
+      {
+        "path": "validate_r0.py",
+        "sha256": "7dd4ee85c34e0c46a80a3dd4891479fc4d2c5f05475619e6276f466f9dce6960"
+      },
+      {
+        "path": "validate_r1_gate.py",
+        "sha256": "d760108fe763e7f5dcdcfd7e061b6eca46c119ab98c8394fd258b3d8b992e895"
+      },
+      {
+        "path": "windows_job.py",
+        "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
+      }
+    ],
+    "manifest_sha256": "8c7252b00e2aa5af76fce9f701183eb080346253f3f91448b40032f308cd7cd7"
+  },
+  "legacy_release": {
+    "path": "results/r1/legacy_release.json",
+    "sha256": "8227d67d02c354d987ae5f81ab8f5e00094dc9f629ed76994a0cc837bfb142b7",
+    "self_sha256": "a00be1e4f07cd119107fbf93a73e6194d21f37ce586f489f467af08b89e14cb1"
+  },
+  "storage": {
+    "cache_root_env": "SRSCD_CACHE_ROOT",
+    "required_volume": "C:",
+    "must_be_outside_repository": true,
+    "min_free_gib_before_download": 55,
+    "max_source_download_gib": 25,
+    "max_derived_cache_gib": 20,
+    "max_external_storage_gib": 50,
+    "expected_model_files_bytes": 1209138839
+  },
+  "authorization": {
+    "metadata_read": true,
+    "environment_sync": true,
+    "source_checkout": true,
+    "model_artifact_download": true,
+    "d0_fixture_materialization": true,
+    "neural_smoke": true,
+    "corpus_download": false,
+    "full_extraction": false,
+    "confirmatory_access": false,
+    "training": false
+  },
+  "supervision": {
+    "entrypoint": "python -m experiments.speaker_representation_scd.r1_execute",
+    "direct_worker_execution_allowed": false,
+    "lease_relative_path": "control/r1_execution.lock",
+    "monitor_interval_seconds": 0.25,
+    "legacy_process_scan": "continuous_fail_closed",
+    "process_inspection_failure": "abort",
+    "max_parallel_actions": 1,
+    "max_parallel_models": 1,
+    "max_worker_processes": 1,
+    "max_cpu_threads": 8,
+    "max_process_tree_resident_ram_gib": 24,
+    "hard_memory_boundary": "windows_job_object_job_memory",
+    "hard_memory_contract_ceiling_bytes": 25769803776,
+    "hard_memory_reserved_headroom_bytes": 1073741824,
+    "authoritative_peak_receipt_field": "hard_memory_boundary.authoritative_peak_job_memory_bytes",
+    "sampled_process_tree_rss_role": "diagnostic_fail_closed",
+    "max_action_wall_hours": 24,
+    "max_cumulative_wall_hours": 96,
+    "usage_receipts": "control/usage/*.json",
+    "worker_receipt_binding": "execution_id_and_expected_relative_path",
+    "action_receipt_authority": "unique_completed_usage_attestation",
+    "orphan_receipt_policy": "quarantine_and_retry",
+    "downstream_completed_attestation_required": true,
+    "environment_sync_receipt": "manifests/r1_environment_sync.json",
+    "model_acquisition_receipt": "manifests/r1_model_acquisition.json",
+    "evidence_collision_policy": "abort_before_action"
+  },
+  "smoke": {
+    "fixtures_per_model": 10,
+    "benchmark_windows_per_model": 100,
+    "fixture_manifest_sha256": "5a82813fd5f1b8b40ff1f7ccc4e16fd7cdd05afee6f7df07a6e165e63dedee53",
+    "batch_modes": [
+      "single",
+      "batch"
+    ],
+    "required_checks": [
+      "feature_shape",
+      "valid_length",
+      "independent_input_length_mapping",
+      "empirical_source_coordinate_response",
+      "exact_availability_frontier",
+      "finite_prepool_representation",
+      "repeated_run_determinism",
+      "future_audio_mutation_invariance",
+      "scenario_window_event_straddling",
+      "batch_single_parity",
+      "eres_fused_to_final_parity",
+      "seconds_per_window",
+      "peak_ram_gib",
+      "supervised_resource_enforcement",
+      "hard_job_memory_limit",
+      "authoritative_peak_job_memory",
+      "completed_usage_action_receipt_binding",
+      "aborted_orphan_receipt_rejection_and_retry",
+      "exact_run_provenance"
+    ],
+    "batch_single_max_abs_tolerance": 0.0001,
+    "eres_parity_max_abs_tolerance": 0.000001,
+    "forecast_required_after_smoke": true,
+    "forecast_approved": false,
+    "full_extraction_on_pass": false
+  },
+  "self_sha256": "21c1ca50794c51fdbe0f3cbfa18ab56285f981190800001fb5c17f2ac5114e2b"
+}

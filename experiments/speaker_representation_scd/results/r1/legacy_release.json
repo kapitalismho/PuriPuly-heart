@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "artifact_role": "r1_legacy_release_evidence",
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r1-smoke-1",
+  "checked_at_utc": "2026-08-10T05:41:04.7370774Z",
+  "process_match_rule": "python -m experiments.speaker_turn_boundary*",
+  "legacy_process_match_count": 0,
+  "artifacts": [
+    {
+      "role": "completion",
+      "path": "experiments/speaker_turn_boundary/results/turn_episode_v1/phase_4_completion.json",
+      "sha256": "368a5c23a30e10f1884fd3797166b23ee93df0a1d0f84fc7006010b17fdec565",
+      "content_sha256": "db75772938fc4a59f21784e9fbc279ad3003bffc72b32594d7844fec8a28f14c"
+    },
+    {
+      "role": "verification",
+      "path": "experiments/speaker_turn_boundary/results/turn_episode_v1/phase_4_verification.json",
+      "sha256": "dda1f1c1d9f51e9eec919e31f31635f07d22e0e84369cf87d6a755186ab12740",
+      "content_sha256": "f8ba0e6498d2bc6d87854b6bdaefb5f7f15a7263ea9f98c399cd8b56d8bab51c"
+    }
+  ],
+  "free_disk_gib_by_volume": {
+    "C:": 838.626034,
+    "D:": 17.843506
+  },
+  "legacy_outputs_modified_by_r1": false,
+  "self_sha256": "a00be1e4f07cd119107fbf93a73e6194d21f37ce586f489f467af08b89e14cb1"
+}

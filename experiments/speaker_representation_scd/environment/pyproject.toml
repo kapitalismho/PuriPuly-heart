@@ -1,0 +1,37 @@
+[project]
+name = "speaker-representation-scd-research"
+version = "0.1.0"
+requires-python = "==3.12.*"
+dependencies = [
+  "huggingface-hub==0.31.4",
+  "matplotlib==3.10.3",
+  "numpy==1.26.4",
+  "pandas==2.2.3",
+  "psutil==7.0.0",
+  "pyarrow==20.0.0",
+  "pyyaml==6.0.2",
+  "safetensors==0.5.3",
+  "scikit-learn==1.6.1",
+  "soundfile==0.13.1",
+  "torch==2.7.1",
+  "torchaudio==2.7.1",
+  "transformers==4.52.3",
+]
+
+[dependency-groups]
+dev = [
+  "pytest==8.4.1",
+  "ruff==0.12.4",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchaudio = { index = "pytorch-cpu" }
+
+[tool.uv]
+package = false

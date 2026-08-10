@@ -35,3 +35,38 @@ Primary documents:
 
 No model or corpus binary belongs in Git. External material must use an explicit
 `SRSCD_CACHE_ROOT` after its acquisition and storage gate is satisfied.
+
+R1 preparation adds an experiment-local CPU research lock, an exact model/source bridge, a
+fail-closed acquisition gate, and deterministic extractor smoke tests. Validate that checkpoint
+from the repository root with:
+
+```powershell
+uv lock --project experiments/speaker_representation_scd/environment --check --python .venv/Scripts/python.exe --no-python-downloads
+uv run python -m experiments.speaker_representation_scd.validate_r1_gate
+```
+
+The R1 validator is expected to fail until the independent legacy verifier has completed and the
+reviewed acquisition gate has been materialized. A passing R1 acquisition gate permits only the
+locked environment sync, exact model/source acquisition, and ten-fixture/100-window smoke. It does
+not permit corpus download, full extraction, confirmatory access, or training.
+
+All stateful R1 actions use the supervised entrypoint rather than invoking acquisition or smoke
+workers directly:
+
+```powershell
+$env:SRSCD_CACHE_ROOT = 'C:\Users\salee\AppData\Local\puripuly-heart-research\speaker_representation_scd_v1'
+uv run python -m experiments.speaker_representation_scd.r1_execute sync-environment
+uv run python -m experiments.speaker_representation_scd.r1_execute models
+uv run python -m experiments.speaker_representation_scd.r1_execute smoke --model mhubert-147
+```
+
+The entrypoint holds one external lease, creates each worker suspended inside a Windows Job Object,
+keeps every descendant under a conservative hard-memory limit below the 24 GiB contract, and
+persists the Job Object's authoritative peak in a no-overwrite usage receipt. It also continuously
+monitors legacy-process contention and diagnostic process-tree RSS while enforcing the 24-hour
+action and 96-hour cumulative ceilings.
+
+Action receipts are lease-bound but non-authoritative on their own. Each downstream phase requires
+one unique completed usage attestation containing the same execution ID, receipt path/hash, and
+hard-memory accounting. A receipt left by an aborted action is preserved under `control/orphans/`
+and retried safely rather than unlocking the next phase or blocking the final receipt path.

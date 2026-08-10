@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "artifact_role": "r1_model_source_registry",
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r1-smoke-1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+  },
+  "r0_registry": {
+    "path": "models/registry.json",
+    "sha256": "ba5bfa5201b08e41f350ec1c6995eea2688db564b14ea1dedefc3a30e492bbe2"
+  },
+  "ssl_frontend": {
+    "implementation": "transformers-4.52.3",
+    "sample_rate_hz": 16000,
+    "convolution_kernel_samples": [10, 3, 3, 3, 3, 2, 2],
+    "convolution_strides": [5, 2, 2, 2, 2, 2, 2],
+    "output_stride_samples": 320,
+    "output_receptive_field_samples": 400,
+    "first_output_support_samples": [0, 400],
+    "hidden_state_numbering": "L0_is_feature_projection_then_L1_through_L12_are_transformer_block_outputs",
+    "attention_scope": "bidirectional_within_each_supplied_trailing_window",
+    "availability_frontier": "window_end_sample",
+    "timestamp_status": "analytic_geometry_pinned_empirical_fixture_required"
+  },
+  "models": [
+    {
+      "model_id": "mhubert-147",
+      "loader_class": "transformers.HubertModel",
+      "repository": "https://huggingface.co/utter-project/mHuBERT-147",
+      "revision": "7ad3fc0bc5106c58c9c13526abccad527150d135",
+      "required_files": [
+        {"path": "config.json", "sha256": "9a67db4e9afb5f02772395bb442a0eb4b0275d5d19e074b98076f4ceada111da", "size_bytes": 1587},
+        {"path": "preprocessor_config.json", "sha256": "e850c9afcd068b4f7f226000ccee047349368a23e1dc5f5784838f822b2d185c", "size_bytes": 227},
+        {"path": "model.safetensors", "sha256": "2359b3e9dc6869cb0855119a2866f056aeb400e46252da9cbcc8e9b7aee50c8b", "size_bytes": 377510584}
+      ],
+      "processor": {"do_normalize": true, "return_attention_mask": false},
+      "trust_remote_code": false
+    },
+    {
+      "model_id": "wavlm-base-plus",
+      "loader_class": "transformers.WavLMModel",
+      "repository": "https://huggingface.co/microsoft/wavlm-base-plus",
+      "revision": "4c66d4806a428f2e922ccfa1a962776e232d487b",
+      "required_files": [
+        {"path": "config.json", "sha256": "fea6df1c2700a3954fc07e70588aecc9055eeb28db2ff57151a2db0d19180ed4", "size_bytes": 2232},
+        {"path": "preprocessor_config.json", "sha256": "99272fe8ccfab114b68b478681ea47ee3a1ce62bb788cb92dd6e4f69fb1f1da2", "size_bytes": 215},
+        {"path": "pytorch_model.bin", "sha256": "3bb273a6ace99408b50cfc81afdbb7ef2de02da2eab0234e18db608ce692fe51", "size_bytes": 377617425}
+      ],
+      "processor": {"do_normalize": false, "return_attention_mask": true},
+      "trust_remote_code": false
+    },
+    {
+      "model_id": "unispeech-sat-base-plus",
+      "loader_class": "transformers.UniSpeechSatModel",
+      "repository": "https://huggingface.co/microsoft/unispeech-sat-base-plus",
+      "revision": "74f559583458188867750f1b8cb6710b11f5be41",
+      "required_files": [
+        {"path": "config.json", "sha256": "1818b3201e43c032ac763520c6f82820f32b16aaa4edae78e700832bdf116a71", "size_bytes": 1477},
+        {"path": "preprocessor_config.json", "sha256": "4a93853b74278b7c769d07f5a861e5d12ceb5db2bced5620d335f87238cb9e86", "size_bytes": 213},
+        {"path": "pytorch_model.bin", "sha256": "0ebc4dd3edc1e10e21a4d16791ad65b9217033d9205317e999a973304b27eda4", "size_bytes": 382236294}
+      ],
+      "processor": {"do_normalize": true, "return_attention_mask": false},
+      "trust_remote_code": false
+    }
+  ],
+  "eres2netv2": {
+    "model_id": "eres2netv2-standard-prepool",
+    "checkpoint_repository": "https://www.modelscope.cn/iic/speech_eres2netv2_sv_zh-cn_16k-common.git",
+    "checkpoint_revision": "1cf80d41fb3435bd3d8df185b5c423333b2db42a",
+    "checkpoint_tag": "v1.0.0",
+    "checkpoint_file": {"path": "pretrained_eres2netv2.ckpt", "sha256": "0eb4057106b2573dd7b132cf0c36273ab29afd192c1610f80baa9c556dbb963c", "size_bytes": 71768231},
+    "checkpoint_config": {"path": "configuration.json", "sha256": "e5f9570df8867e8a50285205ba38fb468a70aa436e5c994935986e4c435dc168", "size_bytes": 354},
+    "checkpoint_equivalence": {
+      "lfs_oid_sha256": "0eb4057106b2573dd7b132cf0c36273ab29afd192c1610f80baa9c556dbb963c",
+      "same_oid_commits": [
+        "1cf80d41fb3435bd3d8df185b5c423333b2db42a",
+        "c0df10ae7e0dec76f922b2cd2dcef25f92225f09",
+        "cdcc197880394b3e1955a0e3ed42702be961d249"
+      ]
+    },
+    "source_repository": "https://github.com/modelscope/3D-Speaker.git",
+    "source_revision": "707eef4eb9b95fd4a9886776df0022390049a5a6",
+    "source_license": {"id": "Apache-2.0", "path": "LICENSE", "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"},
+    "source_files": [
+      {"path": "speakerlab/models/eres2net/ERes2NetV2.py", "sha256": "e9cd8540d69dbc24ccc855cbcdb668175f09b8f2d91c2d1546efb5eeacd0018d"},
+      {"path": "speakerlab/models/eres2net/fusion.py", "sha256": "b76cfbf8adb99336f10ea43953e90228bda85a56de97cda122d9c436a4c94c53"},
+      {"path": "speakerlab/models/eres2net/pooling_layers.py", "sha256": "46c6b480ffdd284af90da90ac1bbf9a0e00bd46229e567c0828d7ebe0e178a0a"},
+      {"path": "speakerlab/process/processor.py", "sha256": "53295b44e41a39fe18ab90fd710d1a853ee1c54d3c09650c721d887bd456a976"},
+      {"path": "speakerlab/process/augmentation.py", "sha256": "5a7be1ca47f11c658c225ba167ad9a42c6655cf2b6a4cef8b2794572c003cae5"},
+      {"path": "speakerlab/utils/fileio.py", "sha256": "3d555e17603e0ca2d55c2c7bf289465b6e38a524b773a7ab0d8e05ce50f12d56"},
+      {"path": "speakerlab/bin/infer_sv.py", "sha256": "799ccf14c4c8e409451c8088523724f09fb1dce7cf6a15bb0806c607161828be"}
+    ],
+    "official_frontend": {
+      "class": "speakerlab.process.processor.FBank",
+      "arguments": {"n_mels": 80, "sample_rate": 16000, "mean_nor": true, "dither": 0},
+      "frame_length_samples": 400,
+      "frame_shift_samples": 160,
+      "snip_edges": true,
+      "frontend_parity_status": "empirical_fixture_required"
+    },
+    "architecture_arguments": {"feat_dim": 80, "embedding_size": 192, "m_channels": 64, "base_width": 26, "scale": 2, "expansion": 2, "pooling": "TSTP"},
+    "taps": [
+      {"tap_id": "S1", "tensor": "out1", "module": "layer1", "shape": "B,128,80,T1", "temporal_stride_ms": 10, "maximum_receptive_field_ms": 165, "flattened_dimension": 10240, "official_pool_input": false},
+      {"tap_id": "S2", "tensor": "out2", "module": "layer2", "shape": "B,256,40,T2", "temporal_stride_ms": 20, "maximum_receptive_field_ms": 485, "flattened_dimension": 10240, "official_pool_input": false},
+      {"tap_id": "S3", "tensor": "out3", "module": "layer3", "shape": "B,512,20,T3", "temporal_stride_ms": 40, "maximum_receptive_field_ms": 1445, "flattened_dimension": 10240, "official_pool_input": false},
+      {"tap_id": "S4", "tensor": "out4", "module": "layer4", "shape": "B,1024,10,T4", "temporal_stride_ms": 80, "maximum_receptive_field_ms": 2405, "flattened_dimension": 10240, "official_pool_input": false},
+      {"tap_id": "FUSED", "tensor": "fuse_out34", "module": "fuse34", "shape": "B,1024,10,T4", "temporal_stride_ms": 80, "maximum_receptive_field_ms": 2405, "flattened_dimension": 10240, "official_pool_input": true}
+    ],
+    "pooling_projection": "flatten_channel_frequency_per_time_then_valid_frame_mean_for_R3",
+    "parity_requirement": "FUSED_through_official_TSTP_and_seg_1_must_match_official_forward"
+  },
+  "execution_constraints": {
+    "eval_mode": true,
+    "gradient_disabled": true,
+    "primary_dtype": "float32",
+    "same_length_batches_only": true,
+    "remote_code_allowed": false,
+    "unverified_artifact_execution_allowed": false,
+    "pickle_weights_require_trusted_source_and_weights_only_load": true
+  },
+  "self_sha256": "cc09d72b7f05e0375972f9f427c2dc3b6c6cf6a45399a3d91b18c44d6c1716bf"
+}
