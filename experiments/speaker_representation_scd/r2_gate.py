@@ -110,7 +110,7 @@ EXPECTED_SOURCES = [
         "kind": "public_combined_release_selective_materialization",
         "license": "CC-BY-4.0",
         "official_page": "https://www.openslr.org/40/",
-        "download_url": "https://storage.googleapis.com/zeroth_project/zeroth_korean.tar.gz",
+        "download_url": "https://openslr.elda.org/resources/40/zeroth_korean.tar.gz",
         "archive_name": "zeroth_korean.tar.gz",
         "archive_type": "tar.gz",
         "maximum_archive_bytes": 12 * 1024**3,

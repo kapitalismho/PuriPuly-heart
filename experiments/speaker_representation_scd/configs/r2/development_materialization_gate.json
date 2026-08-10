@@ -101,7 +101,7 @@
       "kind": "public_combined_release_selective_materialization",
       "license": "CC-BY-4.0",
       "official_page": "https://www.openslr.org/40/",
-      "download_url": "https://storage.googleapis.com/zeroth_project/zeroth_korean.tar.gz",
+      "download_url": "https://openslr.elda.org/resources/40/zeroth_korean.tar.gz",
       "archive_name": "zeroth_korean.tar.gz",
       "archive_type": "tar.gz",
       "maximum_archive_bytes": 12884901888,
@@ -266,11 +266,11 @@
       },
       {
         "path": "r2_gate.py",
-        "sha256": "d1b27bcfd3578c56e868296c4c9b0bd954621974dd5d5751b411a89795fd85bc"
+        "sha256": "a42f2a748b31c1fae3c2a28758b65376a6f02d072bfabce6f4b846869a7c5c1e"
       },
       {
         "path": "r2_materialize.py",
-        "sha256": "e8bed0b1d529d3756b6f0a0bd18d3b99e678863d1abbb72dc8de29b7868031ed"
+        "sha256": "240a1c42abe24c64a49682e1e058b48df60fc7dd62249090c9adb8e4e09bc3dc"
       },
       {
         "path": "run_provenance.py",
@@ -285,7 +285,7 @@
         "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
       }
     ],
-    "manifest_sha256": "1e0ee994ff30ad16a0354d5f433137fe835025090975ec759d4722b7039d00bd"
+    "manifest_sha256": "0f43f0e40890187643fc2a8519076cc3692fe475959e2ceec2318ca2a46a38f1"
   },
-  "self_sha256": "e37c45a2982e284c296d6d6712d1b4d382cbe052f2e6b21418f10b0889b42e0b"
+  "self_sha256": "b3f26cef0873cb033189e3b85928437efabc06b9cda2223e3b95a4dded387744"
 }

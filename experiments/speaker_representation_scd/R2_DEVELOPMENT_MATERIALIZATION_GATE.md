@@ -27,9 +27,9 @@ thresholds, detector states, feature caches, and shortlist conclusions are not i
 
 ## Official public-source identity
 
-Zeroth-Korean is acquired from the official SLR40 external archive URL recorded by OpenSLR. The
-gate records the returned archive byte count, SHA-256, final URL, and selected HTTP identity
-headers before any member is materialized.
+Zeroth-Korean is acquired from the official OpenSLR-listed ELDA mirror because the SLR40 external
+GCS URL returns HTTP 403. The gate records the returned archive byte count, SHA-256, final URL, and
+selected HTTP identity headers before any member is materialized.
 
 JVS is acquired from the 3.5 GB Google Drive file linked by the official JVS project page. The
 fixed Drive file ID is `19oAw8wWn3Y7z6CKChRdAyGOB9yupL_Xt`. JVS audio remains restricted to

@@ -53,7 +53,7 @@ MATERIALIZATION_RECEIPT = Path(
     "manifests/r2/development/development_materialization_receipt.json"
 )
 SOURCE_METADATA_PATH = Path("data/r2/development/source_metadata.jsonl")
-ZEROTH_URL = "https://storage.googleapis.com/zeroth_project/zeroth_korean.tar.gz"
+ZEROTH_URL = "https://openslr.elda.org/resources/40/zeroth_korean.tar.gz"
 JVS_URL = (
     "https://drive.usercontent.google.com/download?"
     "id=19oAw8wWn3Y7z6CKChRdAyGOB9yupL_Xt&export=download&confirm=t"
