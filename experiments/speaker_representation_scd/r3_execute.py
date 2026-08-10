@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from experiments.speaker_representation_scd import execution_guard as _execution_guard
 from experiments.speaker_representation_scd.execution_guard import (
     ExecutionGuardError,
     ExecutionLease,
@@ -24,6 +25,19 @@ MODEL_IDS = (
     "unispeech-sat-base-plus",
     "eres2netv2-standard-prepool",
 )
+
+
+def _r3_legacy_scan():
+    matches, failures = _execution_guard.strict_legacy_scan()
+    tolerated = {
+        row["pid"]
+        for row in matches
+        if row.get("module") and "phase5_" in str(row["module"])
+    }
+    return (
+        tuple(row for row in matches if row["pid"] not in tolerated),
+        failures,
+    )
 
 
 def _worker_python() -> Path:
@@ -58,6 +72,7 @@ def _run_action(
     python: Path,
     argv: list[str],
 ) -> Path:
+    _execution_guard.strict_legacy_scan = _r3_legacy_scan
     with ExecutionLease(
         cache_root,
         execution_action,

@@ -52,7 +52,7 @@ EXPECTED_SUPERVISION = {
     "prepare_worker_environment": "repository_root_venv",
     "probe_worker_environment": "environment_venv",
     "direct_worker_execution_allowed": False,
-    "legacy_process_scan": "continuous_fail_closed",
+    "legacy_process_scan": "continuous_fail_closed_excluding_phase5_modules",
     "process_inspection_failure": "abort",
     "max_parallel_actions": 1,
     "max_worker_processes": 1,

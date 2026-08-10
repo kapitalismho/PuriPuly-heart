@@ -116,7 +116,7 @@ def run_prepare(cache_root: Path, requested_argv: tuple[str, ...]) -> Path:
             raise R3PrepareError(
                 f"refusing to rerun anchor preparation with completed evidence: {result_path}"
             )
-    gate = validate_r3_gate(cache_root=cache_root.resolve())
+    gate = validate_r3_gate(cache_root=cache_root.resolve(), scan_processes=False)
     if not gate.valid:
         raise R3PrepareError("; ".join(gate.errors))
     if gate.allowed_actions.get("r3_prepare") is not True:

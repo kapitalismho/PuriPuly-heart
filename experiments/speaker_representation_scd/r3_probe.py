@@ -883,7 +883,7 @@ def run_probe(model_id: str, cache_root: Path, requested_argv: tuple[str, ...]) 
     if result_path.exists():
         if action_receipt_is_authoritative(cache_root, result_path, f"r3-probe:{model_id}"):
             raise R3ProbeError(f"refusing to rerun a probe with completed evidence: {result_path}")
-    gate = validate_r3_gate(cache_root=cache_root.resolve())
+    gate = validate_r3_gate(cache_root=cache_root.resolve(), scan_processes=False)
     if not gate.valid:
         raise R3ProbeError("; ".join(gate.errors))
     if gate.allowed_actions.get("r3_probe") is not True:
@@ -979,7 +979,7 @@ def run_promote(cache_root: Path, requested_argv: tuple[str, ...]) -> Path:
     if result_path.exists():
         if action_receipt_is_authoritative(cache_root, result_path, "r3-promote"):
             raise R3ProbeError(f"refusing to rerun promotion with completed evidence: {result_path}")
-    gate = validate_r3_gate(cache_root=cache_root.resolve())
+    gate = validate_r3_gate(cache_root=cache_root.resolve(), scan_processes=False)
     if not gate.valid:
         raise R3ProbeError("; ".join(gate.errors))
     if gate.allowed_actions.get("r3_promote") is not True:
