@@ -196,19 +196,29 @@ def _download(
     partial: Path,
     *,
     max_bytes: int,
+    request_complete_range: bool = False,
 ) -> dict[str, Any]:
     if target.exists() or partial.exists():
         raise R2GateError("archive acquisition requires empty fixed target and partial paths")
     partial.parent.mkdir(parents=True, exist_ok=True)
     headers = {"User-Agent": "speaker-representation-scd-v1-r2"}
+    if request_complete_range:
+        headers["Range"] = "bytes=0-"
     request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(request, timeout=60) as response:
         status = int(getattr(response, "status", response.getcode()))
-        if status != 200:
+        if status not in ({200, 206} if request_complete_range else {200}):
             raise R2GateError(f"archive endpoint returned HTTP {status}")
         content_type = str(response.headers.get("Content-Type") or "").lower()
         if "text/html" in content_type:
             raise R2GateError("archive endpoint returned HTML")
+        expected_response_bytes = None
+        if status == 206:
+            expected_response_bytes = _complete_range_bytes(
+                str(response.headers.get("Content-Range") or "")
+            )
+            if expected_response_bytes > max_bytes:
+                raise R2GateError("archive range response exceeded its source ceiling")
         with partial.open("xb") as handle:
             while True:
                 block = response.read(1 << 20)
@@ -217,6 +227,8 @@ def _download(
                 handle.write(block)
                 if handle.tell() > max_bytes:
                     raise R2GateError("archive download exceeded its source ceiling")
+            if expected_response_bytes is not None and handle.tell() != expected_response_bytes:
+                raise R2GateError("archive range response was incomplete")
         result = {
             "requested_url": url,
             "final_url": response.geturl(),
@@ -230,6 +242,21 @@ def _download(
     target.parent.mkdir(parents=True, exist_ok=True)
     partial.replace(target)
     return result
+
+
+def _complete_range_bytes(content_range: str) -> int:
+    try:
+        unit, value = content_range.split(" ", 1)
+        interval, total_text = value.split("/", 1)
+        start_text, end_text = interval.split("-", 1)
+        start = int(start_text)
+        end = int(end_text)
+        total = int(total_text)
+    except (ValueError, TypeError) as exc:
+        raise R2GateError("archive Content-Range is invalid") from exc
+    if unit.lower() != "bytes" or start != 0 or end + 1 != total or total <= 0:
+        raise R2GateError("archive Content-Range does not cover the complete file")
+    return total
 
 
 def _archive_magic(path: Path, archive_type: str) -> None:
@@ -337,7 +364,13 @@ def acquire_archives(cache_root: Path, requested_argv: tuple[str, ...]) -> dict[
         transfer = (
             _reuse_completed_zeroth(cache_root, target, partial)
             if source_id == "zeroth-korean-development" and target.exists()
-            else _download(url, target, partial, max_bytes=maximum)
+            else _download(
+                url,
+                target,
+                partial,
+                max_bytes=maximum,
+                request_complete_range=source_id == "jvs-development",
+            )
         )
         _archive_magic(target, archive_type)
         population = (

@@ -25,6 +25,7 @@ from experiments.speaker_representation_scd.r2_materialize import (
     JVS_DEVELOPMENT,
     MaterializationBudget,
     R2GateError,
+    _complete_range_bytes,
     _download,
     _materialize_jvs,
     _materialize_zeroth,
@@ -331,6 +332,13 @@ def test_download_refuses_preexisting_target_or_partial(tmp_path: Path) -> None:
     partial.write_bytes(b"partial")
     with pytest.raises(R2GateError, match="empty fixed target"):
         _download("https://example.invalid/archive", target, partial, max_bytes=100)
+
+
+def test_complete_range_requires_the_entire_file() -> None:
+    assert _complete_range_bytes("bytes 0-99/100") == 100
+    for value in ("", "bytes 1-99/100", "bytes 0-98/100", "items 0-99/100"):
+        with pytest.raises(R2GateError):
+            _complete_range_bytes(value)
 
 
 def test_exact_completed_zeroth_recovery_is_identity_bound(

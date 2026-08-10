@@ -270,7 +270,7 @@
       },
       {
         "path": "r2_materialize.py",
-        "sha256": "86b7c532d2c50a0193896d7484afdf536f1ff55da97d17240eb87e6231322f3b"
+        "sha256": "ad6d096352c201f050db51f5ca96c102aab61106d849639dae43ffd49e00e2e9"
       },
       {
         "path": "run_provenance.py",
@@ -285,7 +285,7 @@
         "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
       }
     ],
-    "manifest_sha256": "6246d60ef3b9ca8703fd4c92e405f6c0962697b955c153c6ed68ec5b214aef01"
+    "manifest_sha256": "4cc9de6c119ade876bf927029a93d5b6ea8dda7f0d3a77ce0b504b6efb62abb6"
   },
-  "self_sha256": "746e2a2adefb1d90a2309b6ec37fbdd9a9eacfbf43919c9a1e7b868e69e69d53"
+  "self_sha256": "2e389f8ed0d4393ec16fde8d4c7a173d92a967b18737b6dd19cebfce4e875a47"
 }
