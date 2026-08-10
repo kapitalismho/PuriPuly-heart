@@ -27,8 +27,11 @@ MODEL_IDS = (
 )
 
 
+_ORIGINAL_LEGACY_SCAN = _execution_guard.strict_legacy_scan
+
+
 def _r3_legacy_scan():
-    matches, failures = _execution_guard.strict_legacy_scan()
+    matches, failures = _ORIGINAL_LEGACY_SCAN()
     tolerated = {
         row["pid"]
         for row in matches
