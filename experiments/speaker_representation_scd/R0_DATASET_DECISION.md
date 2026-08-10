@@ -9,6 +9,25 @@
 - Acquisition boundary: existing or public data only; no participant recruitment or private recording
 - Execution state: metadata decision only; no new corpus or model download, feature extraction, or confirmatory access occurred
 
+## Owner Amendment — Reduced Pre-Training Screen
+
+The current authorized experiment ends after R2, bounded R3, reduced R4, and encoder-candidate
+selection. The sections below describing sealed confirmatory panels are retained only as a future
+learned-head test-reserve design. Under the current scope:
+
+- only `development-known` payloads are acquired and materialized;
+- the future-test identifiers remain reserved and their waveform, annotation, derived-GT, feature,
+  score, and aggregate payloads are not opened;
+- when Zeroth/JVS development and reserved speakers share one official release archive, R2 may
+  store and hash that opaque archive and enumerate member names/sizes, but it may extract, decode,
+  copy, inspect, or materialize only the selected development members;
+- no R6-Z zero-shot confirmatory run occurs;
+- the first final public test is deferred until a separately approved learned-head configuration
+  and R6-T evaluation contract are frozen.
+
+This amendment changes the execution timing of the reserved panels, not their speaker/session
+separation rules.
+
 ---
 
 ## 1. Decision
@@ -20,7 +39,7 @@ development-known
   existing ERes/LS-EEND common-GT data
   plus public KO/JA controlled-development speakers
 
-sealed public confirmatory
+future public test reserve
   VoxConverse v0.3 official test partition
   AISHELL-4 official test sessions
   Zeroth-Korean official test speakers
@@ -108,16 +127,16 @@ Use the complete official VoxConverse v0.3 `test` partition at annotation reposi
 annotation, coverage, and result artifacts before this selection. No VoxConverse audio, RTTM,
 derived GT, feature, score, or aggregate has been opened locally.
 
-The whole named test partition is selected, so no recording is chosen from its event counts,
-speaker counts, duration, language, or model behavior. R2 must register exact audio and annotation
-bytes and prove audio/RTTM parity before use. The official project currently states that audio is
+The whole named test partition is reserved, so no recording is chosen from its event counts,
+speaker counts, duration, language, or model behavior. A future R6-T gate must register exact audio
+and annotation bytes and prove audio/RTTM parity before use. The official project currently states that audio is
 not available from its website even though the v0.3 repository references download links;
 therefore acquisition remains `unacquired` and fail-closed. A third-party mirror may be used only
 after its bytes are reconciled to the official release identity. If parity cannot be established,
 this source is `not_evaluable`; it is not silently replaced after development results are viewed.
 
 VoxConverse contains in-the-wild debates, talk shows, and news clips rather than controlled
-meetings. Language coverage shall be audited only after the R6-Z lock. Report the natural-English
+meetings. Language coverage shall be audited only after a future R6-T access contract is frozen. Report the natural-English
 stratum only for recordings whose language identity can be established independently of model
 scores; otherwise report the panel as natural in-the-wild speech without an English-only claim.
 The official repository describes research availability under CC BY 4.0 while noting that video
@@ -188,11 +207,10 @@ same source audio and GT/time contract. The new study reuses timeline, episode, 
 matching, block, and provenance identities. It does not reuse legacy thresholds, shortlist
 conclusions, detector-specific state, or raw feature caches.
 
-Existing ERes/LS-EEND results may appear in a development-known contextual table. After the current
-experiment finishes and one ERes-final configuration and one LS-EEND configuration are frozen,
-those configurations may also be run once on the sealed natural VoxConverse/AISHELL-4 panels. Such new runs
-may enter the confirmatory event-level table because their configuration was fixed before D5
-access. LS-EEND never enters representation AUC/EER or layer-ranking tables.
+Existing ERes/LS-EEND results may appear in a development-known contextual table. The current screen
+reuses only their existing machine-readable outputs on the shared development GT. No new ERes-final
+or LS-EEND inference is authorized. Any future reserved-test comparison requires separate approval
+and remains outside representation AUC/EER or layer-ranking tables.
 
 This yields two valid comparisons:
 

@@ -64,7 +64,7 @@ EXPECTED_SUPERVISION = {
     "max_cpu_threads": 8,
     "max_process_tree_resident_ram_gib": 24,
     "max_action_wall_hours": 24,
-    "max_cumulative_wall_hours": 96,
+    "max_cumulative_wall_hours": 24,
     "hard_memory_boundary": "windows_job_object_job_memory",
     "action_receipt_authority": "unique_completed_usage_attestation",
     "orphan_receipt_policy": "quarantine_and_retry",
@@ -186,8 +186,8 @@ EXPECTED_MATERIALIZATION = {
     "development_acquisition_receipt": "manifests/r2/development/development_acquisition_receipt.json",
     "development_coordinate_ledger": "manifests/r2/development/development_coordinate_ledger.json",
     "coordinate_contract": {
-        "contexts_ms": [100, 200, 300, 500, 750, 1000],
-        "hop_samples": 800,
+        "contexts_ms": [100, 300, 500],
+        "hop_samples": 1600,
         "frontier_rule": "eligible_start_plus_context_through_eligible_end",
         "one_shard_per_waveform": True,
         "maximum_jsonl_row_bytes": 1024,
@@ -339,7 +339,7 @@ def validate_r2_gate(
             errors.append("r2_gate.artifact_role: unexpected")
         if gate.get("experiment_id") != "speaker_representation_scd_v1":
             errors.append("r2_gate.experiment_id: unexpected")
-        if gate.get("protocol_version") != "r2-development-1":
+        if gate.get("protocol_version") != "r2-development-2":
             errors.append("r2_gate.protocol_version: unexpected")
         if gate.get("authority") != AUTHORITY:
             errors.append("r2_gate.authority: differs")
@@ -377,8 +377,8 @@ def validate_r2_gate(
             },
             "forecast_contract": {
                 "path": "configs/r1/full_job_forecast_contract.json",
-                "sha256": "91ecd3457a82723267e185f2d356576efbf2d6cc873389f4d4066678a79f1489",
-                "self_sha256": "0d88708ded18b921d7c2f1edda03de38aad6eff5af17dececf598a7f64dda107",
+                "sha256": "6a258094a9a75deb09a4d6685b90dd83f2f9170194b3644bb855d40cf1da4980",
+                "self_sha256": "3115382954018f54cefa2b691cc56a84fdf5b8998a23d153a2ea3b40e55773e8",
             },
         }
         dependencies = gate.get("dependencies")

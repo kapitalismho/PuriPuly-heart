@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "artifact_role": "reduced_pretraining_screen",
+  "experiment_id": "speaker_representation_scd_v1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "32cfea1779be54b7db2b7094bc35da928b74514d47d2fdd96581ef18d7f84aec"
+  },
+  "authorized_sequence": ["R2", "R3", "R4", "candidate_selection"],
+  "data_scope": {
+    "payload_tier": "development_known_only",
+    "required_source_ids": [
+      "legacy-common-gt-v1",
+      "zeroth-korean-development",
+      "jvs-development"
+    ],
+    "future_test_payload_access": false,
+    "legacy_eres_final_rerun": false,
+    "legacy_lseend_rerun": false
+  },
+  "r2_coordinates": {
+    "contexts_ms": [100, 300, 500],
+    "hop_ms": 100,
+    "hop_samples": 1600
+  },
+  "r3": {
+    "maximum_shared_anchor_count": 4000,
+    "maximum_positive_anchor_count": 2000,
+    "maximum_negative_or_nuisance_anchor_count": 2000,
+    "contexts_ms": [100, 300, 500],
+    "all_valid_representative_layers_or_taps": true,
+    "shared_rows_across_encoders": true,
+    "promotion": {
+      "complete_finite_anchor_rows_required": true,
+      "layer_rank_order": [
+        "macro_prototype_roc_auc_desc",
+        "eer_asc",
+        "worst_block_roc_auc_desc",
+        "registry_order_asc"
+      ],
+      "use_unrounded_values": true,
+      "primary_context_ms": 300,
+      "fallback_context_ms": 500,
+      "fallback_requires_all_evaluable_300ms_auc_below": 0.60,
+      "fallback_requires_mean_auc_improvement_at_least": 0.02,
+      "no_eligible_layer_status": "not_evaluable",
+      "zero_evaluable_encoder_action": "stop_before_r4"
+    }
+  },
+  "r4": {
+    "maximum_source_hours": 6,
+    "configurations_per_encoder": 1,
+    "primary_context_ms": 300,
+    "all_encoder_fallback_context_ms": 500,
+    "primary_hop_ms": 100,
+    "top_encoder_sensitivity_count": 2,
+    "sensitivity_hop_ms": 50,
+    "disabled_hops_ms": [20],
+    "disabled_contexts_ms": [750, 1000],
+    "left_context_tail_pool_enabled": false,
+    "offline_full_context_enabled": false,
+    "top_two_sensitivity_selection": {
+      "operating_point_false_events_per_hour_max": 1.0,
+      "operating_point_rank_order": [
+        "recall_within_500ms_desc",
+        "false_events_per_hour_asc",
+        "f1_at_250ms_desc",
+        "median_availability_latency_asc",
+        "canonical_detector_config_id_asc"
+      ],
+      "no_budget_feasible_rank_prefix": ["false_events_per_hour_asc"],
+      "encoder_rank_order": [
+        "recall_within_500ms_desc",
+        "false_events_per_hour_asc",
+        "f1_at_250ms_desc",
+        "median_availability_latency_asc",
+        "r3_macro_prototype_roc_auc_desc",
+        "model_id_asc"
+      ],
+      "complete_primary_panel_rows_required": true,
+      "use_unrounded_values": true,
+      "fewer_than_two_policy": "run_available_only"
+    }
+  },
+  "reporting": {
+    "claim_level": "exploratory_candidate_selection",
+    "bootstrap_replicates": 1000,
+    "confirmatory_significance_claims": false,
+    "future_test_remains_sealed": true
+  },
+  "resource_ceiling": {
+    "max_total_wall_hours": 24,
+    "max_per_model_wall_hours": 8,
+    "max_parallel_models": 1,
+    "max_cpu_threads": 8
+  },
+  "deferred_until_separate_approval": [
+    "R5_learned_head",
+    "R6-T_future_test",
+    "fine_tuning",
+    "handoff_training",
+    "distillation"
+  ],
+  "self_sha256": "cdf0ec32017ed1636e31642a4c36b81830db5394dc35c92fe21478044382022d"
+}

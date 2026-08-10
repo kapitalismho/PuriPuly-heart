@@ -119,9 +119,9 @@ does not accept arbitrary ledger or calibration paths. It verifies the exact fro
 contracts, every source and coordinate-shard file, independent source/context/total row recounts,
 and actual float32 NPZ shapes plus sample-manifest membership before calculating a candidate. The
 development acquisition receipt also binds a complete 16 kHz mono PCM waveform inventory. For
-each waveform, the calculator independently regenerates the full trailing-window coordinate shard:
-the first frontier is `eligible_start + context`, subsequent frontiers advance by exactly 800
-samples (50 ms), and the final frontier cannot exceed `eligible_end`. Every coordinate binds the
+each waveform, the calculator independently regenerates the reduced trailing-window coordinate shard:
+the first frontier is `eligible_start + context`, subsequent frontiers advance by exactly 1600
+samples (100 ms), and the final frontier cannot exceed `eligible_end`. Every coordinate binds the
 waveform SHA-256 and exact window start, window end, observation frontier, context, and hop. Missing,
 extra, reordered, or geometrically altered coordinates fail even when all declared counts and shard
 hashes are internally consistent.

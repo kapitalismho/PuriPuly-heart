@@ -76,9 +76,9 @@ kept separately in `source_metadata.jsonl` so the forecast inventory schema rema
 
 ## Coordinate contract
 
-For every canonical waveform, one JSONL shard is generated for each combined set of trailing
-windows at 100, 200, 300, 500, 750, and 1000 ms. The first frontier is
-`eligible_start + context`; subsequent frontiers advance by exactly 800 samples (50 ms) through
+For every canonical waveform, one JSONL shard is generated for the reduced set of trailing
+windows at 100, 300, and 500 ms. The first frontier is
+`eligible_start + context`; subsequent frontiers advance by exactly 1600 samples (100 ms) through
 the eligible end. The existing R1 forecast code independently regenerates every expected row and
 rejects omissions, additions, reordering, altered frontiers, and waveform-binding changes.
 
@@ -95,7 +95,7 @@ python -m experiments.speaker_representation_scd.r2_execute materialize
 
 Both actions reuse the accepted experiment-wide Windows Job Object and exclusive execution lease.
 They run sequentially with one worker, eight CPU threads, a 24 GiB hard job-memory ceiling, a
-24-hour per-action ceiling, a 96-hour cumulative ceiling, and continuous fail-closed detection of
+24-hour per-action ceiling, a 24-hour cumulative reduced-screen ceiling, and continuous fail-closed detection of
 the legacy experiment. Every authoritative action receipt requires one matching completed usage
 attestation.
 

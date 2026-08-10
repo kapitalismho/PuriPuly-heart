@@ -4,7 +4,7 @@
   "experiment_id": "speaker_representation_scd_v1",
   "authority": {
     "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
-    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+    "sha256": "32cfea1779be54b7db2b7094bc35da928b74514d47d2fdd96581ef18d7f84aec"
   },
   "technical_validity_receipt": {
     "path": "results/r1/technical_validity.json",
@@ -46,16 +46,16 @@
   },
   "coordinate_contract": {
     "context_mode": "local_trailing_window",
-    "pooling_ms": [100, 200, 300, 500, 750, 1000],
-    "primary_continuous_hop_ms": 50,
+    "pooling_ms": [100, 300, 500],
+    "primary_continuous_hop_ms": 100,
     "ledger_role": "r2_development_coordinate_ledger",
     "complete_source_coverage_required": true,
     "actual_hashed_jsonl_shards_required": true,
     "waveform_inventory_role": "r2_development_waveform_inventory",
     "coordinate_row_schema": "r2_primary_continuous_coordinate_v1",
     "sample_rate_hz": 16000,
-    "hop_samples": 800,
-    "frontier_rule": "eligible_start_plus_context_then_50ms_hops_through_eligible_end"
+    "hop_samples": 1600,
+    "frontier_rule": "eligible_start_plus_context_then_100ms_hops_through_eligible_end"
   },
   "model_storage_contracts": [
     {
@@ -102,8 +102,8 @@
     "max_derived_cache_gib": 20,
     "max_external_storage_gib": 50,
     "min_free_disk_gib_before_download": 55,
-    "max_total_wall_hours": 96,
-    "max_per_model_wall_hours": 24
+    "max_total_wall_hours": 24,
+    "max_per_model_wall_hours": 8
   },
   "approval": {
     "forecast_approved": false,
@@ -116,5 +116,5 @@
       "reviewed_ceiling_decision"
     ]
   },
-  "self_sha256": "0d88708ded18b921d7c2f1edda03de38aad6eff5af17dececf598a7f64dda107"
+  "self_sha256": "3115382954018f54cefa2b691cc56a84fdf5b8998a23d153a2ea3b40e55773e8"
 }

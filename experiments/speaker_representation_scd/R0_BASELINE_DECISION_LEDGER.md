@@ -5,10 +5,19 @@
 - Experiment: `speaker_representation_scd_v1`
 - Goal: `GOAL-EXPERIMENT-PLAN-EN`
 - Authority: `EXPERIMENT_PLAN.en.md`
-- Authority SHA-256: `ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191`
+- Authority SHA-256: `32cfea1779be54b7db2b7094bc35da928b74514d47d2fdd96581ef18d7f84aec`
 - Audit date: `2026-08-10`
 - Ledger status: working R0 input, not an accepted evidence boundary
 - Current checkpoint: R0 protocol candidate repair
+
+## Owner Amendment — Reduced Pre-Training Screen
+
+The current execution now ends at `R2 → bounded R3 → reduced R4 → candidate selection`. Historical
+R6-Z and D5 planning below is retained only as provenance for a future learned-head test reserve;
+it no longer authorizes zero-shot confirmatory acquisition or evaluation. The reduced primary grid
+uses 100/300/500 ms R3 contexts, at most 4,000 shared anchors, one promoted layer/tap per encoder,
+a 300 ms matched R4 context, a 100 ms primary hop, and at most six source hours. Existing ERes-final
+and LS-EEND results may be normalized on the shared development GT but shall not be rerun.
 
 This ledger maps reusable local assets, forbidden inheritance, environment constraints, model
 metadata, and the owner decisions required before an R0 contract can be frozen. It does not
@@ -158,7 +167,7 @@ outputs or contend for its compute resources.
 ### 4.3 Public-only D4/D5 decision matrix
 
 The detailed decision is recorded in `R0_DATASET_DECISION.md`, SHA-256
-`777fea6786e823601f0425b98c7c7fa52a844648b0e39ae1165683150c209308`.
+`a326ea469cd5907b3374b7004aca3e5c7ba3a3b7763dd122e4170013c812f0e2`.
 It does not authorize download, waveform inspection, or confirmatory-label access. Exact release
 file hashes are added to the R0 source ledger when acquisition is separately authorized.
 
@@ -172,11 +181,11 @@ file hashes are added to the R0 source ledger when acquisition is separately aut
 | JVS hash-reserved speakers | D4 development or D5 controlled Japanese/nuisance candidate | 100 speakers with normal, whisper, and falsetto recordings | Audio permits non-commercial research but is not generally product-cleared; read/studio speech cannot support natural-handoff claims |
 | Unused AliMeeting official sessions | D5 same-domain Mandarin sensitivity | Natural public meeting domain matching the existing Mandarin panel | Same-corpus generalization is weaker than AISHELL-4; must exclude all eight legacy session IDs and connected speakers |
 
-Frozen decision: use the legacy common-GT panel for development selection; construct R6-Z from
-the complete VoxConverse v0.3 official test partition, eight hash-selected AISHELL-4 official test sessions,
-all Zeroth-Korean official test speakers, and 20 fixed JVS speakers. Report KO/JA as controlled
-representation/SCD evidence, not natural handoff; do not claim VoxConverse as English-only until a
-post-lock metadata audit supports that stratum.
+Current decision: use the legacy common-GT panel and public development speakers only for the
+bounded R3/R4 screen. Preserve the complete VoxConverse v0.3 official test partition, eight
+hash-selected AISHELL-4 official test sessions, all Zeroth-Korean official test speakers, and 20
+fixed JVS speakers as a future learned-head test-reserve design; do not acquire or score those
+reserved payloads in the current execution.
 
 Metadata sources:
 
@@ -284,10 +293,10 @@ decisions are now frozen in authority Section 30 and the machine contracts.
 | D30-1 | D4 recruitment scale and language combinations | The owner cannot collect private data | Replace recruitment with approved public multilingual development data and limit claims to observed public-language/scenario coverage | Resolved by owner |
 | D30-2 | New untouched confirmatory data | AMI is GT-exposed in tracked coverage artifacts; only public data are available | Use the complete VoxConverse v0.3 test partition plus fixed AISHELL-4/Zeroth-Korean/JVS rules in `R0_DATASET_DECISION.md` | Resolved; AMI permanently development-known |
 | D30-3 | Primary false-event budget | Existing development sessions are too small for precise rate claims | Use integer false-event Pareto frontier as primary during development; retain `1/hour` as a labeled reference and freeze a rate operating point only if preflight proves estimability | Resolved by owner resume |
-| D30-4 | Primary R5 head | The owner limited the current execution to pre-training zero-shot work | Defer all learned probes/heads and their architecture decision to separate approval after R6-Z | Resolved as not applicable to current execution |
-| D30-5 | Hardware and ceilings | Local host has no visible CUDA and a legacy CPU experiment is active | Sequential CPU only after legacy release; one model/worker, 8 threads, 24 GiB RAM, 25 GiB source, 20 GiB cache, 50 GiB external storage, 96 total and 24 per-model wall hours; smoke forecast required | Resolved by owner resume |
+| D30-4 | Primary R5 head | The owner limited the current execution to pre-training zero-shot work | Defer all learned probes/heads and their architecture decision to separate approval after R4 candidate selection | Resolved as not applicable to current execution |
+| D30-5 | Hardware and ceilings | Local host has no visible CUDA and a legacy CPU experiment is active | Sequential CPU only after legacy release; one model/worker, 8 threads, 24 GiB RAM, 25 GiB source, 20 GiB cache, 50 GiB external storage, 24 total and 8 per-model wall hours for the reduced screen; measured forecast required | Resolved by owner amendment |
 | D30-6 | Restricted-license teachers | mHuBERT is non-commercial; Microsoft model product status is unresolved | Include restricted/unresolved models as research-only candidates; exclude product claims until a separate legal gate records product_allowed | Resolved by owner resume |
-| D30-7 | LS-EEND contextual table | The owner authorized reuse of the exact ERes/LS-EEND measurement data | Use manifest byte SHA-256 `a5df5e56c2917ba174fca7892fbaa092f2b57705cad7a77bf9a347ba94cddfee` for development context; a newly run, pre-locked LS-EEND configuration may enter only the D5 natural-event table | Resolved by owner and dataset decision |
+| D30-7 | LS-EEND contextual table | The owner authorized reuse of the exact ERes/LS-EEND measurement data | Use manifest byte SHA-256 `a5df5e56c2917ba174fca7892fbaa092f2b57705cad7a77bf9a347ba94cddfee` for development context; no new LS-EEND or ERes-final inference is authorized | Resolved by owner amendment |
 
 No downstream artifact-acquisition, environment, smoke, parity, or confirmatory-access gate is
 implied by these owner decisions.

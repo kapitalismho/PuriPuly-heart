@@ -47,6 +47,10 @@ MODEL_IDS = (
 )
 AUTHORITY = {
     "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "32cfea1779be54b7db2b7094bc35da928b74514d47d2fdd96581ef18d7f84aec",
+}
+PREDECESSOR_AUTHORITY = {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
     "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191",
 }
 ACCEPTED_IMPLEMENTATION_COMMIT = "f3f234f9bcef00810a1b2eadd5ee2ffcc53e7ede"
@@ -61,7 +65,8 @@ CONFIRMATORY_SOURCE_IDS = (
     "zeroth-korean-confirmatory",
     "jvs-confirmatory",
 )
-POOLING_MS = (100, 200, 300, 500, 750, 1000)
+POOLING_MS = (100, 300, 500)
+HOP_SAMPLES = 1600
 SMOKE_WINDOW_MS = (100, 200, 300, 500, 750, 1000, 500, 750, 1000, 300)
 FROZEN_INPUTS = {
     "source_ledger": {
@@ -95,8 +100,8 @@ EXPECTED_CEILINGS = {
     "max_derived_cache_gib": 20,
     "max_external_storage_gib": 50,
     "min_free_disk_gib_before_download": 55,
-    "max_total_wall_hours": 96,
-    "max_per_model_wall_hours": 24,
+    "max_total_wall_hours": 24,
+    "max_per_model_wall_hours": 8,
 }
 
 
@@ -185,7 +190,7 @@ def validate_technical_validity(
         errors.append("technical_validity: unexpected schema version")
     if document.get("experiment_id") != "speaker_representation_scd_v1":
         errors.append("technical_validity: unexpected experiment")
-    if document.get("authority") != AUTHORITY:
+    if document.get("authority") != PREDECESSOR_AUTHORITY:
         errors.append("technical_validity: authority differs")
     if document.get("accepted_implementation_commit") != ACCEPTED_IMPLEMENTATION_COMMIT:
         errors.append("technical_validity: implementation commit differs")
@@ -391,15 +396,15 @@ def validate_forecast_contract(document: dict[str, Any]) -> list[str]:
     if document.get("coordinate_contract") != {
         "context_mode": "local_trailing_window",
         "pooling_ms": list(POOLING_MS),
-        "primary_continuous_hop_ms": 50,
+        "primary_continuous_hop_ms": 100,
         "ledger_role": "r2_development_coordinate_ledger",
         "complete_source_coverage_required": True,
         "actual_hashed_jsonl_shards_required": True,
         "waveform_inventory_role": "r2_development_waveform_inventory",
         "coordinate_row_schema": "r2_primary_continuous_coordinate_v1",
         "sample_rate_hz": 16000,
-        "hop_samples": 800,
-        "frontier_rule": "eligible_start_plus_context_then_50ms_hops_through_eligible_end",
+        "hop_samples": HOP_SAMPLES,
+        "frontier_rule": "eligible_start_plus_context_then_100ms_hops_through_eligible_end",
     }:
         errors.append("forecast_contract: coordinate contract differs")
     if document.get("forecast_method") != {
@@ -434,7 +439,7 @@ def _coordinate_row(
         "window_start_sample": frontier_sample - context_ms * 16,
         "window_end_sample": frontier_sample,
         "observed_frontier_sample": frontier_sample,
-        "hop_samples": 800,
+        "hop_samples": HOP_SAMPLES,
     }
     return {
         "coordinate_id": sha256_bytes(canonical_json_bytes(payload)),
@@ -450,7 +455,7 @@ def _expected_coordinate_rows(waveform: dict[str, Any]) -> list[dict[str, Any]]:
         first_frontier = start + context_ms * 16
         rows.extend(
             _coordinate_row(waveform, context_ms, frontier)
-            for frontier in range(first_frontier, end + 1, 800)
+            for frontier in range(first_frontier, end + 1, HOP_SAMPLES)
         )
     return rows
 
@@ -472,7 +477,7 @@ def _coordinate_row_is_expected(
     first = waveform["eligible_start_sample"] + context_ms * 16
     if frontier < first or frontier > waveform["eligible_end_sample"]:
         return False
-    if (frontier - first) % 800:
+    if (frontier - first) % HOP_SAMPLES:
         return False
     return row == _coordinate_row(waveform, context_ms, frontier)
 

@@ -115,7 +115,8 @@ MAX_DERIVED_BYTES = 20 * 1024**3
 MAX_EXTERNAL_BYTES = 50 * 1024**3
 MAX_COORDINATE_ROW_BYTES = 1024
 AUXILIARY_OUTPUT_RESERVE_BYTES = 64 * 1024**2
-CONTEXTS_MS = (100, 200, 300, 500, 750, 1000)
+CONTEXTS_MS = (100, 300, 500)
+HOP_SAMPLES = 1600
 
 
 class MaterializationBudget:
@@ -728,7 +729,10 @@ def _planned_waveform(
 
 def _coordinate_count(waveform: dict[str, Any]) -> int:
     end = int(waveform["num_samples"])
-    return sum(max(0, (end - context_ms * 16) // 800 + 1) for context_ms in CONTEXTS_MS)
+    return sum(
+        max(0, (end - context_ms * 16) // HOP_SAMPLES + 1)
+        for context_ms in CONTEXTS_MS
+    )
 
 
 def _materialization_projection(

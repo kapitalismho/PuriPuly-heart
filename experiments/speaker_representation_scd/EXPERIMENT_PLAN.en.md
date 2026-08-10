@@ -2,12 +2,12 @@
 
 ## Document Status
 
-- Document version: `0.4-r0-protocol-candidate`
+- Document version: `0.5-reduced-pretraining-screen`
 - Date: `2026-08-10`
 - Experiment ID: `speaker_representation_scd_v1`
 - Status: owner-amended R0 protocol candidate; review acceptance is recorded separately
-- Core scope: frozen-representation comparison, continuous zero-shot SCD, and a public-data zero-shot confirmatory report
-- Conditional follow-up scope: any learned SCD head, partial fine-tuning, handoff extension, and teacher-to-student distillation
+- Core scope: bounded frozen-representation screening, reduced continuous zero-shot SCD, and encoder-candidate selection
+- Conditional follow-up scope: any learned SCD head, untouched public-data confirmation, partial fine-tuning, handoff extension, and teacher-to-student distillation
 
 This document does not propose modifying the existing `experiments/speaker_turn_boundary/`
 experiment. It uses the existing experiment's data and validated evaluation concepts as prior
@@ -15,8 +15,9 @@ assets, while defining an independent experiment with its own research questions
 configuration freeze, result directory, test split, and conclusions.
 
 This study uses only existing or public data. It requires no participant recruitment or private
-recording. No model downloads, large-scale feature extraction, or confirmatory evaluation shall
-be performed before R0 approval. No model or detector training is authorized by the core study.
+recording. No model downloads or feature extraction shall be performed before the applicable gate
+and owner approval. No model or detector training and no confirmatory/test evaluation are
+authorized by the core study.
 
 ---
 
@@ -25,7 +26,8 @@ be performed before R0 approval. No model or detector training is authorized by 
 > Compare how reliably mHuBERT-147, WavLM Base+, UniSpeech-SAT Base+, and
 > ERes2NetV2 pre-pooling representations provide speaker-change information from short,
 > causal observations of the same 16 kHz speech using frozen encoders and zero-shot detector
-> logic, with development on reused common-GT data and confirmation on sealed public data.
+> logic on a bounded public-development panel, ending with selection of the encoder candidates
+> that warrant a separately approved learned-head study.
 
 The final result must answer the following questions rather than merely rank encoders.
 
@@ -48,7 +50,7 @@ following candidates separately.
 | Candidate | Selection criteria |
 | --- | --- |
 | Representation winner | Short context, nuisance robustness, and layer stability |
-| Zero-shot event winner | Confirmatory event performance under identical detector logic |
+| Zero-shot event leader | Reduced development-panel event performance under identical detector logic |
 | Multilingual evidence leader | Worst-group and language-shift stability over the public-language coverage actually obtained |
 | Efficient backbone winner | Accuracy-latency-compute Pareto frontier |
 | Learned-head follow-up candidate | Provides enough zero-shot signal to justify a separately approved training study |
@@ -69,23 +71,23 @@ The core study that must be completed under this document is:
 R0  Protocol, model, data, split freeze
 R1  Model extraction and causal-timing parity
 R2  Dataset and ground-truth materialization
-R3  Frozen zero-shot representation probe
-R4  Frozen continuous zero-shot SCD
-R6-Z  Locked public-data zero-shot confirmatory comparison and final report
+R3  Bounded frozen zero-shot representation probe
+R4  Reduced frozen continuous zero-shot SCD and candidate-selection report
 ```
 
 R5 is intentionally omitted from the authorized sequence because it contains learned probes and
-heads. The core study is complete only when the R6-Z report and reproducible raw artifacts have been
-produced.
+heads. The current core study is complete when R4 produces reproducible raw artifacts, the reduced
+development comparison, and an explicit candidate-selection decision. This is an exploratory
+screen, not a confirmatory claim.
 
 ### 3.2 Conditional follow-up
 
-The following phases shall be executed only after the R6-Z result passes its gate and receives
+The following phases shall be executed only after the R4 candidate-selection report receives
 separate approval.
 
 ```text
 R5   Frozen encoder + identical small causal SCD head
-R6-T Locked confirmatory comparison of learned heads on a new untouched partition
+R6-T Locked public-data comparison of learned heads on an untouched partition
 R7   Top-layer partial fine-tuning
 R8   VAD + OSD + SCD multi-task and handoff state
 R9   Teacher-to-causal-student distillation and deployment study
@@ -98,6 +100,7 @@ R9   Teacher-to-causal-student distillation and deployment study
 - Applying downstream heads of different sizes to the four encoders
 - Reporting full-context features as streaming results
 - Selecting thresholds, layers, pooling, or head architecture on the test set
+- Accessing or scoring the sealed confirmatory/test partition in the current core study
 - Treating an SCD event directly as conversational-handoff ground truth
 - Converting LS-EEND output into an artificial cosine representation
 - Modifying the product runtime or application composition
@@ -258,9 +261,9 @@ sensitivity only after the standard checkpoint's pre-pooling hypothesis is suppo
 
 LS-EEND shall not be included in raw-feature AUC/EER comparisons. Existing results may appear only
 in a development-known contextual comparison of Boundary F1, availability latency, and false
-events/hour against the same GT events. After one LS-EEND configuration is frozen without D5
-access, a new one-shot run of that fixed configuration may enter the R6-Z natural-event
-confirmatory table; it remains excluded from representation ranking.
+events/hour against the same GT events. No new LS-EEND inference is authorized in the current
+screen; it remains excluded from representation ranking and any future confirmatory claim unless
+separately approved.
 
 ---
 
@@ -348,8 +351,9 @@ The following three modes shall never be mixed in reporting.
 
 #### A. `local_trailing_window` — primary low-latency mode
 
-At observation frontier `t`, provide exactly the `[t-P, t)` waveform to the encoder. `P` is one
-of 100, 200, 300, 500, 750, and 1000 ms. Mean-pool all valid output frames into one vector.
+At observation frontier `t`, provide exactly the `[t-P, t)` waveform to the encoder. In the
+current screen, `P` is one of 100, 300, and 500 ms. Mean-pool all valid output frames into one
+vector. The 200, 750, and 1000 ms settings belong to a future expanded study and are not run here.
 
 ```text
 [ observed past P ms ][frontier t]
@@ -363,23 +367,24 @@ Even for a standard bidirectional Transformer, this invocation is causal on the 
 because the input contains no waveform after `t`. The report shall still record that frames
 within the window attend bidirectionally to each other and that every hop requires recomputation.
 
-#### B. `left_context_tail_pool` — secondary context study
+#### B. `left_context_tail_pool` — deferred context study
 
-Provide `[t-C, t)` as input but pool only valid frames from the final `P` ms. After top
-configurations are selected, use 2000 ms as the primary `C`, with 1000/4000 ms sensitivities only
-if necessary. Past context does not add algorithmic lookahead, but it does add compute and memory.
+Provide `[t-C, t)` as input but pool only valid frames from the final `P` ms. This mode is not
+authorized in the current screen. A future amendment may define `C`, compute limits, and reporting
+rules. Past context does not add algorithmic lookahead, but it does add compute and memory.
 
-#### C. `offline_full_context` — diagnostic upper bound
+#### C. `offline_full_context` — deferred diagnostic upper bound
 
 Extract hidden states from an entire recording. Because audio after a boundary can affect earlier
-frames, this mode is restricted to representation interpretation and visualization. Its results
-cannot enter streaming-latency tables or final winner selection.
+frames, this mode cannot enter streaming-latency tables or winner selection and is not authorized
+in the current screen.
 
 ### 8.4 Hop and observation schedule
 
 - Candidate-conditioned probe: exact frontier defined by a GT or pseudo-boundary
-- Continuous primary hop: 50 ms
-- Continuous sensitivity: 20 ms and 100 ms
+- Continuous primary hop: 100 ms
+- Continuous sensitivity: 50 ms for the deterministically selected top two encoders only
+- The 20 ms hop is deferred and not authorized in the current screen
 - Validate model frame timestamps with input-length/output-length experiments and
   source-coordinate fixtures rather than trusting nominal config stride alone
 - Record output-frame center and required input frontier in the registry
@@ -403,7 +408,7 @@ Primary ground truth is generated from the time-varying active-speaker set.
 | `backchannel_onset` | `{A}` → `{A,B}` or `{B}` | Brief appearance of B | SCD yes, handoff no |
 | `acoustic_nuisance` | `{A}` → `{A}` | Loud/whisper/language/noise change | No |
 
-The primary target for core phases R3–R4 and R6-Z is `new_speaker_onset_*`.
+The primary target for core phases R3–R4 is `new_speaker_onset_*`.
 `exclusive_new_speaker` is reported with a separate latency and is not mixed into the primary SCD
 positive class.
 
@@ -431,20 +436,25 @@ frozen separately, and a subset shall be independently annotated and adjudicated
 | D2 natural English conversation | AMI and approved meeting/conversation sources | Natural overlap and turn-taking |
 | D3 natural Mandarin conversation | AliMeeting and approved sources | Mandarin far-field and overlap |
 | D4 public multilingual development | Approved public speech/conversation corpora with usable speaker/session IDs | Publicly obtainable language, language-shift, and nuisance coverage |
-| D5 untouched public confirmatory | A separately sealed public corpus or public speaker/session partition | One-time R6-Z evaluation |
+| D5 untouched public test reserve | A separately sealed public corpus or public speaker/session partition | Deferred final evaluation after a learned head exists |
 
 All existing D1–D3 data and any previously inspected public data begin as `development-known`.
 A legacy held-out name does not guarantee confirmatory status in the new experiment.
 
-### 10.2 Public-only multilingual and confirmatory acquisition
+### 10.2 Public-only multilingual development and deferred test reserve
 
-No participant recruitment or private recording is required or authorized. D4 and D5 shall be
-obtained only from public corpora whose terms permit the intended research use.
+No participant recruitment or private recording is required or authorized. D4 development data
+and any future D5 test reserve shall come only from public corpora whose terms permit the intended
+research use.
 
 - Reuse the exact ERes/LS-EEND common-GT intersection as development-known data.
 - Select D4 public multilingual development sources through a metadata/license/coverage audit.
-- Reserve D5 before score extraction as either a never-inspected public corpus or a public
-  speaker/session partition whose waveforms, labels, and aggregate outcomes remain unopened.
+- Preserve D5 identifiers as a deferred test reserve. Do not acquire a dedicated D5 release or
+  download, materialize, open, derive, or score its waveform or annotation payloads in the current
+  core study. If development and reserved members are inseparable within one official Zeroth or
+  JVS release archive, R2 may store and hash that opaque combined archive and enumerate member
+  names/sizes needed to enforce the split. It must not decompress, decode, copy, inspect, or
+  materialize any reserved member payload.
 - Keep all sessions, transformations, and language samples from one known person in one split.
 - Record corpus release, download URL, file hashes, license/terms, speaker/session keys, and all
   exclusions in the dataset registry.
@@ -456,7 +466,7 @@ code-switch examples. The report shall restrict multilingual claims to the langu
 strata actually supported; missing KO/JA/EN/ZH strata are limitations, not imputed results.
 
 The corrected dataset decision is frozen in `R0_DATASET_DECISION.md`, SHA-256
-`777fea6786e823601f0425b98c7c7fa52a844648b0e39ae1165683150c209308`:
+`a326ea469cd5907b3374b7004aca3e5c7ba3a3b7763dd122e4170013c812f0e2`:
 
 - Development uses the exact legacy common-GT manifest plus 20 hash-selected Zeroth-Korean train
   speakers and 20 fixed JVS development speakers.
@@ -503,8 +513,8 @@ The following partitions shall be frozen when the data are first materialized.
 development
   layer, pooling, prototype, threshold, and hysteresis selection
 
-confirmatory_test
-  sealed public speakers/sessions opened once after the zero-shot configuration hash is frozen
+future_test
+  sealed public speakers/sessions retained for a separately approved learned-head evaluation
 
 future_train
   not materialized or used under the current authorization
@@ -517,9 +527,9 @@ Required invariants:
 - Transformation-family-disjoint
 - All synthetic cases derived from the same original remain in one split
 - A recurring participant appearing across corpora/sessions belongs to one connected block
-- Confirmatory waveforms, labels, and aggregate statistics are not read before configuration selection;
-  metadata needed to prove identity, license, and split eligibility may be audited without scoring
-- Test access is recorded in a ledger with command, timestamp, and config hash
+- Future-test waveforms, labels, and aggregate statistics are not read in the current core study;
+  metadata needed to prove identity, license, and split eligibility may be audited without payload access
+- Any later test access is recorded in a ledger with command, timestamp, and config hash
 
 ### 10.5 Annotation quality
 
@@ -635,7 +645,7 @@ A tap that does not pass this test cannot be evaluated under the name `ERes pre-
 The R3 primary pooling operation is a simple mean over valid temporal frames.
 
 ```text
-100, 200, 300, 500, 750, 1000 ms
+100, 300, 500 ms
 ```
 
 L2-normalize the vector after pooling and before cosine calculation. Standard-deviation
@@ -783,8 +793,9 @@ onset, that delay shall not be removed from the detector observation frontier.
 #### Work
 
 1. Import existing manifests into the new schema and revalidate source hashes.
-2. Audit and materialize approved public D4 development sources; register and seal the public D5
-   confirmatory corpus/partition without reading scores or aggregate labels.
+2. Audit and materialize approved public D4 development sources. Preserve D5 identifiers and
+   access controls without opening D5 payloads. An inseparable Zeroth/JVS combined-release archive
+   may be acquired opaquely under Section 10.2, but only development members may be extracted.
 3. Generate active-speaker regions and the event taxonomy.
 4. Build positive, negative, nuisance, overlap, and backchannel inventories.
 5. Check speaker/session/transformation leakage.
@@ -793,10 +804,10 @@ onset, that delay shall not be removed from the detector observation frontier.
 
 #### Exit criteria
 
-- No overlap among development/confirmatory speakers or sources
+- No overlap among development and reserved future-test speakers or sources
 - Every WAV and annotation hash is frozen
 - Event/block counts for every primary stratum are disclosed
-- Insufficient language/scenario coverage is predeclared as excluded from confirmatory claims
+- Insufficient language/scenario coverage is reported as a limitation of the exploratory screen
 - Test ledger remains sealed
 
 ### R3. Frozen zero-shot representation probe
@@ -823,16 +834,36 @@ For every encoder/layer/pooling condition, calculate:
 
 Do not run the entire layer × pooling × hop grid over continuous audio.
 
-1. Evaluate representative layers and pooling settings for every encoder on candidate-conditioned
-   examples.
-2. Select at most three nondominated configurations per encoder.
-3. Preserve at least one sentinel per encoder rather than retaining only the global top model.
-4. Perform R4 continuous extraction only for promoted configurations.
+1. Build at most 4,000 deterministic development anchors shared by every encoder: at most 2,000
+   speaker-change positives and at most 2,000 matched same-speaker, nuisance, or stable-region
+   negatives, stratified over the available source, language, and scenario groups.
+2. Evaluate every valid encoder at 100, 300, and 500 ms on those anchors. Representative layers
+   and ERes taps are retained because they come from the same bounded forward passes.
+3. Select the common R4 context and promote exactly one layer/tap per encoder with the deterministic
+   rules below.
+4. Preserve one sentinel configuration for every valid encoder. Do not run a model-specific
+   multi-configuration continuous grid.
 
 Do not eliminate a valid encoder from R4 merely because one layer or pooling condition has weak
 zero-shot cosine. Every encoder with a valid extractor retains at least one sentinel configuration
 through continuous zero-shot evaluation. The report may recommend a future learned probe because
 cosine geometry does not prove supervised extractability, but no such probe is run here.
+
+#### Deterministic R3 promotion and common-context rule
+
+- A layer/tap is promotion-eligible only when it produces finite vectors for every shared R3
+  anchor. Missing or invalid rows make that layer/tap ineligible; an encoder with no eligible
+  layer/tap is recorded as `not_evaluable` and is not silently replaced.
+- At a fixed context, rank eligible layers/taps lexicographically by: highest macro ROC-AUC of
+  prototype distance over the frozen source/language/scenario blocks; lowest EER; highest
+  worst-block ROC-AUC; then earliest registry order. Exact unrounded values determine ties.
+- Compute each evaluable encoder's best 300 ms and best 500 ms layer/tap by that rule. Use 500 ms
+  for every evaluable encoder only when every best 300 ms macro ROC-AUC is below `0.60` and the
+  across-encoder mean of the best 500 ms macro ROC-AUC exceeds the corresponding 300 ms mean by at
+  least `0.02`. Otherwise use 300 ms for every evaluable encoder.
+- After the common context is fixed, promote that context's top-ranked eligible layer/tap for each
+  encoder. If fewer than four encoders are evaluable, apply the same rule to the evaluable set and
+  disclose every missing encoder; if none is evaluable, stop before R4.
 
 #### Exit criteria
 
@@ -841,24 +872,42 @@ cosine geometry does not prove supervised extractability, but no such probe is r
 - Candidate-conditioned results are not confused with continuous claims
 - R4 promotion ledger is generated without test access
 
-### R4. Frozen continuous zero-shot SCD
+### R4. Reduced frozen continuous zero-shot SCD
 
 #### Work
 
-1. Run causal replay at a 50 ms hop.
-2. Evaluate adjacent/prototype and hysteresis grids on development data.
-3. Build recall-latency-false-event Pareto frontiers across thresholds.
-4. Run 20/100 ms hop sensitivities only for top configurations.
-5. Decompose errors by clean, gap, overlap, backchannel, and nuisance conditions.
+1. Freeze a deterministic stratified continuous development panel of at most six source hours,
+   combining event-centered excerpts with stable/hard-negative exposure.
+2. Run the one promoted configuration per encoder at a 100 ms primary hop.
+3. Evaluate adjacent/prototype and hysteresis grids on development data and build exploratory
+   recall-latency-false-event Pareto frontiers across thresholds.
+4. Run a 50 ms hop sensitivity only for the top two encoders after the primary matched panel.
+   Do not run a 20 ms hop, 750/1000 ms context, left-context-tail, or offline-full-context sweep.
+5. Decompose errors by clean, gap, overlap, backchannel, and nuisance conditions where available.
 6. Include LS-EEND or legacy ERes results in a contextual table only when they can be mapped to the
    same GT/time contract.
+
+#### Deterministic top-two sensitivity rule
+
+- For every evaluable encoder, select its primary 100 ms-hop operating point by maximizing recall
+  within 500 ms subject to observed false events per source hour `<=1.0`. Break ties by lower false
+  events/hour, higher F1@250 ms, lower median availability latency, then the canonical serialized
+  detector-config ID. If no operating point meets the budget, select the lowest false-event rate
+  first and apply the remaining tie-breaks in the same order.
+- Rank encoders by the selected operating point using, in order: higher recall within 500 ms, lower
+  false events/hour, higher F1@250 ms, lower median availability latency, higher promoted-layer R3
+  macro ROC-AUC, then lexical model ID. Exact unrounded values determine ties.
+- Run the 50 ms sensitivity for the first two evaluable encoders. If only one is evaluable, run it
+  for that encoder only; if none is evaluable, omit the sensitivity and stop candidate selection.
+  Missing primary-panel rows disqualify an encoder from the top-two sensitivity but remain reported.
 
 #### Exit criteria
 
 - Free-running false events/hour are available in addition to candidate-conditioned AUC
 - Event matching is deterministic and one-to-one
 - Localization and availability latency are separated
-- A dev-selected zero-shot operating point is locked for each model
+- A dev-selected zero-shot operating point and candidate-selection rationale are recorded for each model
+- The report states that the bounded panel is exploratory and does not establish final generalization
 
 ### R5. Frozen encoder + small causal SCD head — deferred and not authorized
 
@@ -952,28 +1001,27 @@ optimization variance.
 - Nested data curves and seed-level results are preserved
 - Dev-selected encoder configuration/head checkpoint is locked before test access
 
-### R6-Z. Public-data zero-shot confirmatory test and final report
+### R4-C. Candidate-selection report
 
 #### Execution order
 
-1. Record exact code/model/data/config hashes in the frozen evaluation contract.
-2. Open the test access ledger.
-3. Run the four encoders' locked zero-shot conditions once on the sealed public confirmatory
-   partition. Do not train or evaluate a learned head.
-4. Independently recompute aggregates from raw rows.
-5. Validate missingness, causal frontiers, pair identity, and split leakage.
-6. Produce final tables, plots, error analysis, and recommendations.
+1. Record exact code/model/data/config hashes for the bounded R3/R4 development screen.
+2. Recompute aggregate metrics from the retained raw development rows.
+3. Validate missingness, causal frontiers, pair identity, and split leakage within the bounded panel.
+4. Produce comparison tables, trajectories, error analysis, compute measurements, and the shortlist
+   for a separately approved learned-head study.
+5. Leave the future-test access ledger sealed and untouched.
 
-If a threshold or configuration is changed after viewing test results, reclassify that result as
-exploratory. A new confirmatory claim requires a new untouched test set.
+The R4-C report is explicitly exploratory. It may select candidates and reject clearly unsuitable
+representations, but it may not claim final public-data generalization or statistical superiority.
 
 ---
 
-## 15. Conditional Learned Phases After the Zero-Shot Core
+## 15. Conditional Learned and Confirmatory Phases After the Zero-Shot Screen
 
-R5 and every phase in this section require a new explicit owner approval. A future learned-head
-confirmatory evaluation shall use a new untouched public partition rather than reusing R6-Z as
-confirmatory evidence.
+R5 and every phase in this section require a new explicit owner approval. The sealed public test
+reserve is opened only after the learned-head configuration, threshold, and evaluation contract are
+frozen for R6-T.
 
 ### R7. Partial fine-tuning
 
@@ -1090,8 +1138,8 @@ GPU batched throughput shall not be reported as real-time batch=1 latency.
 ### 17.1 Representation stage
 
 The R3 primary diagnostic is the ROC-AUC and EER of prototype distance over matched hard
-positive/negative examples. Designate 300 ms and 500 ms as key contexts and report the remaining
-contexts as sensitivities forming the latency curve.
+positive/negative examples. Designate 300 ms as the primary context and report 100 and 500 ms as
+bounded latency sensitivities.
 
 ### 17.2 Continuous zero-shot
 
@@ -1144,7 +1192,8 @@ Do not use the number of frames, windows, or pairs as the number of independent 
 - Controlled recording: speaker component
 - Synthetic data: component connected by common source speaker/utterance/transformation seed
 
-Calculate 95% percentile intervals with 10,000 deterministic whole-block bootstrap replicates.
+Calculate exploratory 95% percentile intervals with 1,000 deterministic whole-block bootstrap
+replicates. These intervals quantify development-panel uncertainty and are not confirmatory tests.
 
 ### 18.3 Paired comparison
 
@@ -1152,14 +1201,13 @@ Calculate 95% percentile intervals with 10,000 deterministic whole-block bootstr
 - Block-paired bootstrap AUC, recall, false-event, and latency differences
 - If missing examples differ across encoders, report both the intersection primary analysis and a
   missingness sensitivity
-- Only one locked primary configuration per encoder enters the test set
+- Only one primary configuration per encoder enters the reduced continuous panel
 
 ### 18.4 Multiple comparisons
 
-The layer/pooling grid is a development exploration. On the confirmatory test set, run only the
-predeclared pairwise comparisons among the four locked encoder conditions. If a statistical
-significance claim is made, freeze the family-wise correction method at protocol freeze. It is not
-permitted to select the best test row among many layers and claim superiority without correction.
+The layer/pooling grid is a development exploration. Report all screened rows and avoid
+confirmatory significance language. Any later R6-T test shall freeze its pairwise comparisons and
+correction method before the future-test reserve is opened.
 
 ### 18.5 Missingness
 
@@ -1373,8 +1421,8 @@ Every run records at least:
 
 ### 22.2 Independent verification
 
-Before the R6-Z report is accepted, the verifier shall distrust aggregate JSON and recompute the following from raw rows and
-the frozen contract.
+Before the R4-C candidate-selection report is accepted, the checker shall distrust aggregate JSON
+and recompute the following from raw development rows and the frozen contract.
 
 - Example/pair/session population
 - ROC-AUC and EER
@@ -1405,10 +1453,12 @@ production dependency surface for this experiment.
 
 ### Compute-reduction funnel
 
-- Screen layers/pooling on R3 candidate windows
-- Run R4 continuous evaluation for at most three configurations per encoder
+- Screen all valid layers/taps only on at most 4,000 shared R3 anchors and three contexts
+- Run R4 on at most six source hours, one promoted layer/tap per encoder, one common context, and a
+  100 ms primary hop
+- Restrict the 50 ms sensitivity to the top two encoders and omit the 20 ms sensitivity
 - Cache pooled vectors instead of complete hidden-state tensors
-- Restrict offline full-context evaluation to a small diagnostic subset
+- Omit left-context-tail and offline-full-context evaluation from the current scope
 
 ### Runtime claims
 
@@ -1571,11 +1621,10 @@ underfitting. Do not perform full fine-tuning merely because the zero-shot ranki
 - Continuous zero-shot event report
 - Accuracy-latency-false-event Pareto plots
 
-### R6-Z
+### R4-C
 
-- Locked public confirmatory raw scores and events
-- Independent verification report
-- Final zero-shot comparison report
+- Reduced-panel raw scores and events
+- Candidate-selection comparison report
 - Recommendation on whether a separately approved R5 study is warranted
 
 ### Conditional R5/R6-T
@@ -1650,11 +1699,9 @@ The final report follows this order.
 [ ] Per-encoder configuration funnel
 [ ] R4 continuous zero-shot replay
 [ ] Zero-shot operating points locked
-[ ] Public confirmatory corpus/partition sealed
-[ ] Zero-shot test configuration hash locked
-[ ] R6-Z confirmatory test executed once
-[ ] Independent recomputation/verifier
-[ ] Plots and final report
+[ ] Future public test reserve remains sealed and unaccessed
+[ ] R4-C candidate-selection report
+[ ] Plots and exploratory comparison report
 [ ] Separate R5/R7/R8/R9 go/no-go recommendation
 ```
 
@@ -1664,23 +1711,29 @@ The final report follows this order.
 
 ### 30.1 Owner-resolved constraints
 
-1. The current execution stops after frozen zero-shot representation, continuous zero-shot SCD,
-   and a zero-shot confirmatory report. R5 and every learned phase require separate approval.
-2. No participant recruitment or private recording is available. D4 and D5 use public data only.
+1. The current execution stops after bounded frozen zero-shot representation screening, reduced
+   continuous zero-shot SCD, and candidate selection. R5, R6-T, and every learned or test phase
+   require separate approval.
+2. No participant recruitment or private recording is available. Development and any future test
+   reserve use public data only.
 3. The exact legacy ERes/LS-EEND common-GT data may be reused as `development-known` paired
    comparison data, never as untouched confirmatory evidence.
-4. D5 shall be a separately sealed public corpus or public speaker/session partition that was not
-   used to select layers, pooling, detector logic, thresholds, or operating points.
+4. D5 remains a separately sealed public corpus or public speaker/session partition. Its payload is
+   not opened, materialized, or evaluated until a separately approved learned-head study has frozen
+   its final R6-T evaluation contract. The only current exception is opaque acquisition and
+   member-name/size enumeration of an inseparable official Zeroth/JVS combined archive; reserved
+   member payloads remain unopened and unmaterialized.
 5. Existing LS-EEND results may enter only a development-known event-level contextual table on
-   the exact common-GT/time-contract subset. They do not enter representation ranking or R6-Z
+   the exact common-GT/time-contract subset. They do not enter representation ranking or future
    confirmatory claims.
 6. The integer development false-event Pareto frontier is primary. `1/hour` remains a labeled
    reference and becomes an operating point only if the development exposure supports it.
 7. The accepted research path is sequential CPU-only execution on the identified local host after
    the legacy run releases resources. The machine-readable contract limits execution to one model
    and one worker, eight CPU threads, 24 GiB resident RAM, 25 GiB source downloads, 20 GiB derived
-   cache, 50 GiB external storage, 96 total wall hours, and 24 wall hours per model. Full extraction
-   remains disabled until a 10-fixture/100-window smoke forecast passes and is explicitly recorded.
+   cache, 50 GiB external storage, 24 total wall hours for the reduced R3/R4 screen, and 8 wall
+   hours per model. R3/R4 extraction remains disabled until the reduced coordinate/sample forecast
+   passes and is explicitly approved.
    Any GPU path requires a protocol amendment with a new hardware identity.
 8. Restricted or legally unresolved encoders remain eligible only for research comparison. They
    are excluded from product-eligibility claims unless a separate legal/license gate records
@@ -1689,7 +1742,7 @@ The final report follows this order.
 ### 30.2 Remaining R0 decisions
 
 No owner-level R0 decision remains open. Artifact acquisition, ERes source/tap parity, environment
-locking, smoke forecasting, and confirmatory unlock are downstream gates that must satisfy the
+locking and reduced-scope smoke forecasting are downstream gates that must satisfy the
 frozen contracts; they do not authorize changing the decisions above.
 
 These decisions cannot be changed after viewing test results. If a change is necessary, increment
