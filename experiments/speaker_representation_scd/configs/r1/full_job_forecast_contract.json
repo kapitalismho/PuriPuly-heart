@@ -1,0 +1,120 @@
+{
+  "schema_version": 2,
+  "artifact_role": "r1_full_job_forecast_contract",
+  "experiment_id": "speaker_representation_scd_v1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+  },
+  "technical_validity_receipt": {
+    "path": "results/r1/technical_validity.json",
+    "sha256": "fe8195e6b7b64784d35b0a9279bbc13b0c16ece7319d493a894f05376b35d838",
+    "self_sha256": "9a276d1ced9fb17cdd2f5e0efddf6d8691fcf043b6798ea8081c7ce0b08c7109"
+  },
+  "frozen_inputs": {
+    "source_ledger": {
+      "path": "data/source_ledger.json",
+      "sha256": "ca81f5eda28b0674b98ead4cb363b1da711fbf33b40c4ddd8ffddb95721177b4",
+      "self_sha256": "26a29b8bc8ab7ff7a4d52459d04e2bb112cd60044001ebe74797b27520ad97fc"
+    },
+    "split_contract": {
+      "path": "data/split_contract.json",
+      "sha256": "2c68d3b100db099115eb8cfcfb50f70a3c664c4b256c8c87103efd3cb6204d48",
+      "self_sha256": "df90e37bca150675bbb4780363fb41a6dd57f64fc505910a35b3cae5b1bf97e8"
+    }
+  },
+  "canonical_external_inputs": {
+    "development_acquisition_receipt": "manifests/r2/development/development_acquisition_receipt.json",
+    "development_coordinate_ledger": "manifests/r2/development/development_coordinate_ledger.json",
+    "pooled_cache_calibration": "manifests/r2/development/pooled_cache_calibration.json",
+    "development_waveform_inventory": "data/r2/development/waveform_inventory.jsonl",
+    "arbitrary_input_paths_allowed": false
+  },
+  "development_scope": {
+    "required_source_ids": [
+      "legacy-common-gt-v1",
+      "zeroth-korean-development",
+      "jvs-development"
+    ],
+    "forbidden_source_ids": [
+      "voxconverse-v03-confirmatory-natural",
+      "aishell4-confirmatory-natural-zh",
+      "zeroth-korean-confirmatory",
+      "jvs-confirmatory"
+    ],
+    "confirmatory_coordinate_access_before_unlock": false
+  },
+  "coordinate_contract": {
+    "context_mode": "local_trailing_window",
+    "pooling_ms": [100, 200, 300, 500, 750, 1000],
+    "primary_continuous_hop_ms": 50,
+    "ledger_role": "r2_development_coordinate_ledger",
+    "complete_source_coverage_required": true,
+    "actual_hashed_jsonl_shards_required": true,
+    "waveform_inventory_role": "r2_development_waveform_inventory",
+    "coordinate_row_schema": "r2_primary_continuous_coordinate_v1",
+    "sample_rate_hz": 16000,
+    "hop_samples": 800,
+    "frontier_rule": "eligible_start_plus_context_then_50ms_hops_through_eligible_end"
+  },
+  "model_storage_contracts": [
+    {
+      "model_id": "mhubert-147",
+      "retained_layer_ids": ["L1", "L3", "L6", "L9", "L12"],
+      "pooled_dimension_per_layer": 768,
+      "dtype_bytes": 4
+    },
+    {
+      "model_id": "wavlm-base-plus",
+      "retained_layer_ids": ["L1", "L3", "L6", "L9", "L12"],
+      "pooled_dimension_per_layer": 768,
+      "dtype_bytes": 4
+    },
+    {
+      "model_id": "unispeech-sat-base-plus",
+      "retained_layer_ids": ["L1", "L3", "L6", "L9", "L12"],
+      "pooled_dimension_per_layer": 768,
+      "dtype_bytes": 4
+    },
+    {
+      "model_id": "eres2netv2-standard-prepool",
+      "retained_layer_ids": ["S1", "S2", "S3", "S4", "FUSED"],
+      "pooled_dimension_per_layer": 10240,
+      "dtype_bytes": 4
+    }
+  ],
+  "forecast_method": {
+    "runtime_measurement": "balanced_ten_fixture_worst_case_upper_bound",
+    "runtime_upper_bound_factor": 10,
+    "runtime_safety_multiplier": 1.25,
+    "cold_load_once_per_model": true,
+    "cache_calibration_role": "r2_pooled_cache_calibration",
+    "actual_npz_and_sample_manifest_required": true,
+    "cache_projection_uses_max_measured_or_raw_bytes": true,
+    "current_external_root_bytes_included": true
+  },
+  "ceilings": {
+    "max_parallel_models": 1,
+    "max_worker_processes": 1,
+    "max_cpu_threads": 8,
+    "max_resident_ram_gib": 24,
+    "max_source_download_gib": 25,
+    "max_derived_cache_gib": 20,
+    "max_external_storage_gib": 50,
+    "min_free_disk_gib_before_download": 55,
+    "max_total_wall_hours": 96,
+    "max_per_model_wall_hours": 24
+  },
+  "approval": {
+    "forecast_approved": false,
+    "full_extraction_enabled": false,
+    "required_before_approval": [
+      "authoritative_four_model_smoke",
+      "verified_r2_development_acquisition",
+      "complete_r2_development_coordinate_ledger",
+      "r2_pooled_cache_calibration",
+      "reviewed_ceiling_decision"
+    ]
+  },
+  "self_sha256": "0d88708ded18b921d7c2f1edda03de38aad6eff5af17dececf598a7f64dda107"
+}

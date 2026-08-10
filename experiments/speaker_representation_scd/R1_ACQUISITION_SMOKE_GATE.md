@@ -103,3 +103,43 @@ Each model produces a self-hashed report with:
 Passing smoke does not enable full extraction. A separate reviewed forecast checkpoint must combine
 the measured seconds/window and cache bytes with the complete R2 coordinate ledger before
 `full_extraction` can become true.
+
+## Technical-validity and forecast split
+
+`results/r1/technical_validity.json` records the accepted four-extractor G0 result separately from
+R1 phase exit. Its external receipt references are valid only when the exact completed usage
+attestations and report identities revalidate under `SRSCD_CACHE_ROOT`.
+
+`configs/r1/full_job_forecast_contract.json` defines the next fail-closed calculation. Until the
+verified development acquisition receipt, complete development coordinate ledger, and measured
+pooled-cache serialization calibration all exist at their canonical external-cache paths, the
+forecast status is `not_ready`, `forecast_approved` remains false, and full extraction remains
+disabled. The public calculator accepts only `SRSCD_CACHE_ROOT`; it derives those three paths and
+does not accept arbitrary ledger or calibration paths. It verifies the exact frozen source/split
+contracts, every source and coordinate-shard file, independent source/context/total row recounts,
+and actual float32 NPZ shapes plus sample-manifest membership before calculating a candidate. The
+development acquisition receipt also binds a complete 16 kHz mono PCM waveform inventory. For
+each waveform, the calculator independently regenerates the full trailing-window coordinate shard:
+the first frontier is `eligible_start + context`, subsequent frontiers advance by exactly 800
+samples (50 ms), and the final frontier cannot exceed `eligible_end`. Every coordinate binds the
+waveform SHA-256 and exact window start, window end, observation frontier, context, and hop. Missing,
+extra, reordered, or geometrically altered coordinates fail even when all declared counts and shard
+hashes are internally consistent.
+
+Runtime uses a conservative per-window upper bound equal to ten times each model's balanced
+ten-fixture single-window mean, followed by the 1.25 safety multiplier. The factor is valid because
+the accepted smoke benchmark runs each of the ten recorded fixture contexts exactly ten times.
+Storage checks separately enforce the 25 GiB source-download limit, the recorded 55 GiB
+pre-download free-space condition, the 20 GiB derived-cache limit, and the 50 GiB total external
+root limit. The last total includes the current external root, including environment, models,
+sources, receipts, and retained evidence, plus the projected derived cache.
+
+The required development scope contains only the legacy common-GT panel, Zeroth-Korean development
+speakers, and JVS development speakers. Canonical paths must remain under the development namespace
+after resolution. Confirmatory VoxConverse, AISHELL-4, Zeroth-Korean test, reserved JVS coordinates,
+aliases, and sealed D5 paths are rejected before they are opened.
+
+Every calculator result, including `not_ready`, binds the authority, forecast-contract byte/self
+identity, calculator byte identity, unique execution ID, process/time identity, Git commit and dirty
+status, argv, interpreter, and host. A modified calculator or contract therefore cannot emit a
+structurally equivalent ceiling candidate under the reviewed identity.

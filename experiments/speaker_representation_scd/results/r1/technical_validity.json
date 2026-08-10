@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "artifact_role": "r1_extractor_technical_validity",
+  "experiment_id": "speaker_representation_scd_v1",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "ca46bce33b90c89597b5c9f2092b952a3f76d638c9c5524d4ca7ba23800e9191"
+  },
+  "accepted_implementation_commit": "f3f234f9bcef00810a1b2eadd5ee2ffcc53e7ede",
+  "environment_receipt": {
+    "relative_to_cache_root": "manifests/r1_environment_sync.json",
+    "sha256": "ba32f3c8ebb7adb7f66d0b3f9ff13b5b41abf82ba220927b293be38cedc97e09",
+    "self_sha256": "ac02743e2871f833aaf0a6a7f48dbd7464f7d5b8f4088f077c3f56d9c4952ee4"
+  },
+  "model_acquisition_receipt": {
+    "relative_to_cache_root": "manifests/r1_model_acquisition.json",
+    "sha256": "7b20c28aaa528717fab399ad471cada6393896c15046a2ed1a1fda9db7a37c1f",
+    "self_sha256": "55085db57c02f2aaacb57497ae135697846a9df7646d87b3fb1d6f262217865e"
+  },
+  "model_smoke_reports": [
+    {
+      "model_id": "mhubert-147",
+      "relative_to_cache_root": "results/r1/smoke/mhubert-147.json",
+      "sha256": "8d656b0270faa82ea4f59c27632e74d99817aa55dbb1649b99b67843a088f94b",
+      "self_sha256": "3a6d6f958e88dbc8b504d2a2c3c315cea1023386de1e964ddcceff4f5a43fff3",
+      "execution_id": "d59c18e6a13f79a804cef1b7b0aa2539",
+      "usage_self_sha256": "00eec839df0ef0d9d1aa6da2189eb9c20d6416a599517382c6be7a5444672ce4",
+      "parameter_count": 94371712,
+      "cold_load_seconds": 3.7231353,
+      "single_seconds_per_window": 0.023426052,
+      "batch_seconds_per_window": 0.011958960999999999,
+      "authoritative_peak_job_memory_bytes": 1610625024,
+      "passed": true
+    },
+    {
+      "model_id": "wavlm-base-plus",
+      "relative_to_cache_root": "results/r1/smoke/wavlm-base-plus.json",
+      "sha256": "4a7a18e4cc417022955d5bc1cf9b7f4dfa1c1d28f6db928cb71d769ff9ddca2b",
+      "self_sha256": "5c891ff6811d2c998c76ffa114577e7a06502dd1f2f771ad95e268aa24450b32",
+      "execution_id": "ace5df5063d45bebc2d993218870f49f",
+      "usage_self_sha256": "ccf5b8c90b162e3d9d9e8d3bec709be77c5175b3e8cefcc4edf6a3bd376a4235",
+      "parameter_count": 94381936,
+      "cold_load_seconds": 3.0667799,
+      "single_seconds_per_window": 0.024693422,
+      "batch_seconds_per_window": 0.01261116,
+      "authoritative_peak_job_memory_bytes": 1621860352,
+      "passed": true
+    },
+    {
+      "model_id": "unispeech-sat-base-plus",
+      "relative_to_cache_root": "results/r1/smoke/unispeech-sat-base-plus.json",
+      "sha256": "43f497de21c3c94fb3be8db5d16a2fd97ee10efc5ea41a8fb5390872cda3fc3f",
+      "self_sha256": "c6e41e6a5617a8dd94fe156b0fc6bd13aaa2a0aba961977d5c609f58bdafe664",
+      "execution_id": "6bfed59bf43919ed116512b9f435c317",
+      "usage_self_sha256": "8759dc5f2b8cdcc6e37f08819a01c3938737e5746ada83805b1cfb8791432a76",
+      "parameter_count": 94371712,
+      "cold_load_seconds": 3.0263633,
+      "single_seconds_per_window": 0.023437896,
+      "batch_seconds_per_window": 0.011937604,
+      "authoritative_peak_job_memory_bytes": 1615421440,
+      "passed": true
+    },
+    {
+      "model_id": "eres2netv2-standard-prepool",
+      "relative_to_cache_root": "results/r1/smoke/eres2netv2-standard-prepool.json",
+      "sha256": "9589b221a9de56a6058c3b4f3c0f8183393d96ff0bea9f458c217a48b11aff74",
+      "self_sha256": "6ec5b749cbed5a452626d849204b3482371cae7119b93dc0654de1a18b4f7282",
+      "execution_id": "f98f049191d02933a94b4f8edaddaf13",
+      "usage_self_sha256": "4851e8f6e9370fa98c6d8e80228c1dfb1d67821e8f9763f4c73be8d15f630cdc",
+      "parameter_count": 17859632,
+      "cold_load_seconds": 0.9788934,
+      "single_seconds_per_window": 0.019388073,
+      "batch_seconds_per_window": 0.010098534999999999,
+      "authoritative_peak_job_memory_bytes": 1480216576,
+      "passed": true
+    }
+  ],
+  "technical_validity": {
+    "extractor_valid": true,
+    "causal_future_mutation_valid": true,
+    "timestamp_mapping_valid": true,
+    "batch_single_parity_valid": true,
+    "eres_reconstruction_valid": true
+  },
+  "phase_state": {
+    "g0_extraction_valid": true,
+    "r1_phase_exit": false,
+    "forecast_approved": false,
+    "full_extraction_enabled": false,
+    "blocking_reason": "r2_development_coordinate_ledger_and_cache_calibration_missing"
+  },
+  "self_sha256": "9a276d1ced9fb17cdd2f5e0efddf6d8691fcf043b6798ea8081c7ce0b08c7109"
+}
