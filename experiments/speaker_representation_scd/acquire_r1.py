@@ -256,6 +256,99 @@ def _is_exact_empty_no_checkout(target: Path) -> bool:
     )
 
 
+def _interrupted_checkout_state(target: Path, revision: str) -> dict[str, Any] | None:
+    observed_head = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=target, text=True
+    ).strip()
+    requested_revision = subprocess.check_output(
+        ["git", "rev-parse", revision], cwd=target, text=True
+    ).strip()
+    if requested_revision != revision:
+        return None
+    head_paths = tuple(
+        sorted(_git_output_lines(target, "ls-tree", "-r", "--name-only", observed_head))
+    )
+    revision_paths = tuple(
+        sorted(_git_output_lines(target, "ls-tree", "-r", "--name-only", revision))
+    )
+    if not head_paths or not revision_paths:
+        return None
+    index_paths = _git_output_lines(target, "ls-files")
+    unstaged_paths = _git_output_lines(target, "diff", "--name-only")
+    untracked_paths = tuple(
+        sorted(_git_output_lines(target, "ls-files", "--others", "--exclude-standard"))
+    )
+    cached_paths = tuple(sorted(_git_output_lines(target, "diff", "--cached", "--name-only")))
+    deleted_paths = tuple(
+        sorted(
+            _git_output_lines(
+                target,
+                "diff",
+                "--cached",
+                "--diff-filter=D",
+                "--name-only",
+            )
+        )
+    )
+    allowed_paths = set(head_paths) | set(revision_paths)
+    allowed_directories = {
+        parent.as_posix()
+        for relative in allowed_paths
+        for parent in Path(relative).parents
+        if parent != Path(".")
+    }
+    filesystem_files: list[Path] = []
+    filesystem_valid = True
+    for current, directories, files in os.walk(target):
+        current_path = Path(current)
+        if current_path == target:
+            directories[:] = [name for name in directories if name != ".git"]
+        for name in tuple(directories):
+            path = current_path / name
+            relative = path.relative_to(target).as_posix()
+            if path.is_symlink() or relative not in allowed_directories:
+                filesystem_valid = False
+        for name in files:
+            path = current_path / name
+            relative = path.relative_to(target).as_posix()
+            if path.is_symlink() or not path.is_file() or relative not in allowed_paths:
+                filesystem_valid = False
+            filesystem_files.append(path)
+    filesystem_paths = tuple(
+        sorted(path.relative_to(target).as_posix() for path in filesystem_files)
+    )
+    if (
+        index_paths
+        or unstaged_paths
+        or not filesystem_valid
+        or not filesystem_paths
+        or not set(untracked_paths).issubset(filesystem_paths)
+        or cached_paths != head_paths
+        or deleted_paths != head_paths
+    ):
+        return None
+    materialized: list[dict[str, Any]] = []
+    for relative in filesystem_paths:
+        path = target / relative
+        materialized.append(
+            {
+                "path": relative,
+                "sha256": sha256_file(path),
+                "size_bytes": path.stat().st_size,
+            }
+        )
+    return {
+        "observed_head": observed_head,
+        "observed_head_paths": list(head_paths),
+        "requested_revision": revision,
+        "requested_revision_paths": list(revision_paths),
+        "cached_deleted_paths": list(cached_paths),
+        "git_untracked_paths": list(untracked_paths),
+        "materialized_files": materialized,
+        "porcelain_status": list(_git_output_lines(target, "status", "--porcelain")),
+    }
+
+
 def _active_git_processes() -> tuple[dict[str, Any], ...]:
     matches: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
@@ -451,6 +544,7 @@ def _load_recovery_receipt(path: Path, cache_root: Path) -> dict[str, Any]:
 
 def _recovery_reference(path: Path, cache_root: Path, document: dict[str, Any]) -> dict[str, Any]:
     return {
+        "kind": "stale_index_lock_unlink",
         "relative_path": path.resolve().relative_to(cache_root.resolve()).as_posix(),
         "sha256": sha256_file(path),
         "self_sha256": document["self_sha256"],
@@ -556,6 +650,333 @@ def _recover_stale_git_index_lock(
     return _existing_recoveries(cache_root, relative_lock, current_execution_id)
 
 
+def _checkout_quarantine_paths(
+    cache_root: Path, relative_target: str, source_id: str
+) -> tuple[Path, Path]:
+    path_hash = sha256_bytes(relative_target.encode("utf-8"))[:16]
+    name = f"{source_id}-{path_hash}"
+    receipt = cache_root / "control" / "quarantine_receipts" / f"{name}.json"
+    quarantine = cache_root / "control" / "orphans" / "git-checkouts" / name
+    return receipt, quarantine
+
+
+def _load_checkout_quarantine_receipt(path: Path, cache_root: Path) -> dict[str, Any]:
+    try:
+        document = load_json(path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise R1GateError(f"cannot validate checkout quarantine receipt {path}: {exc}") from exc
+    if (
+        not self_sha256_valid(document)
+        or document.get("schema_version") != 1
+        or document.get("artifact_role") != "r1_git_checkout_quarantine_authorization"
+        or document.get("expected_action_receipt_relative_path")
+        != "manifests/r1_model_acquisition.json"
+    ):
+        raise R1GateError(f"invalid checkout quarantine receipt contract: {path}")
+    source = document.get("source_usage")
+    lock = document.get("lock")
+    state = document.get("interrupted_checkout_state")
+    authorizer = document.get("recovery_authorized_execution_id")
+    original_relative = document.get("original_target_relative_path")
+    quarantine_relative = document.get("quarantine_target_relative_path")
+    repository = document.get("repository")
+    revision = document.get("revision")
+    try:
+        created = datetime.fromisoformat(str(document["created_at_utc"]))
+        lock_time = datetime.fromisoformat(str(lock["last_write_time_utc"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise R1GateError(f"invalid checkout quarantine timestamps: {path}") from exc
+    if (
+        not isinstance(source, dict)
+        or not isinstance(lock, dict)
+        or not isinstance(state, dict)
+        or created.tzinfo is None
+        or lock_time.tzinfo is None
+        or not isinstance(original_relative, str)
+        or not original_relative
+        or Path(original_relative).is_absolute()
+        or Path(original_relative).parts[0] not in {"models", "sources"}
+        or not isinstance(quarantine_relative, str)
+        or not quarantine_relative
+        or Path(quarantine_relative).is_absolute()
+        or not quarantine_relative.startswith("control/orphans/git-checkouts/")
+        or not isinstance(repository, str)
+        or not repository
+        or not isinstance(revision, str)
+        or len(revision) != 40
+        or any(character not in "0123456789abcdef" for character in revision)
+        or not isinstance(document.get("observed_head"), str)
+        or len(document["observed_head"]) != 40
+        or any(
+            character not in "0123456789abcdef"
+            for character in document["observed_head"]
+        )
+        or not isinstance(authorizer, str)
+        or len(authorizer) != 32
+        or any(character not in "0123456789abcdef" for character in authorizer)
+        or set(source) != {"relative_path", "sha256", "self_sha256", "execution_id"}
+        or set(lock) != {"relative_path", "sha256", "size_bytes", "last_write_time_utc"}
+        or lock.get("relative_path") != f"{original_relative}/.git/index.lock"
+        or lock.get("size_bytes") != 0
+        or not isinstance(lock.get("sha256"), str)
+        or len(lock["sha256"]) != 64
+        or any(character not in "0123456789abcdef" for character in lock["sha256"])
+        or set(state)
+        != {
+            "observed_head",
+            "observed_head_paths",
+            "requested_revision",
+            "requested_revision_paths",
+            "cached_deleted_paths",
+            "git_untracked_paths",
+            "materialized_files",
+            "porcelain_status",
+        }
+        or state.get("observed_head") != document.get("observed_head")
+        or not isinstance(state.get("observed_head_paths"), list)
+        or not state["observed_head_paths"]
+        or state.get("requested_revision") != revision
+        or not isinstance(state.get("requested_revision_paths"), list)
+        or not state["requested_revision_paths"]
+        or state.get("cached_deleted_paths") != state["observed_head_paths"]
+        or not isinstance(state.get("git_untracked_paths"), list)
+        or not isinstance(state.get("materialized_files"), list)
+        or not state["materialized_files"]
+        or not isinstance(state.get("porcelain_status"), list)
+    ):
+        raise R1GateError(f"invalid checkout quarantine receipt fields: {path}")
+    resolved_cache = cache_root.resolve()
+    source_path = cache_root / str(source.get("relative_path"))
+    original = cache_root / original_relative
+    quarantine = cache_root / quarantine_relative
+    try:
+        normalized_source = source_path.resolve().relative_to(resolved_cache).as_posix()
+        original.resolve().relative_to(resolved_cache)
+        quarantine.resolve().relative_to(resolved_cache)
+    except ValueError as exc:
+        raise R1GateError(f"checkout quarantine receipt escapes the external cache: {path}") from exc
+    source_document = _aborted_model_usage(source_path)
+    expected_source = {
+        "relative_path": normalized_source,
+        "sha256": sha256_file(source_path),
+        "self_sha256": source_document["self_sha256"],
+        "execution_id": source_document["execution_id"],
+    }
+    expected_receipt, expected_quarantine = _checkout_quarantine_paths(
+        cache_root, original_relative, source_document["execution_id"]
+    )
+    if (
+        source != expected_source
+        or path.resolve() != expected_receipt.resolve()
+        or quarantine.resolve() != expected_quarantine.resolve()
+    ):
+        raise R1GateError(f"checkout quarantine receipt identity differs: {path}")
+    return document
+
+
+def _checkout_quarantine_reference(
+    path: Path, cache_root: Path, document: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "kind": "interrupted_checkout_quarantine",
+        "relative_path": path.resolve().relative_to(cache_root.resolve()).as_posix(),
+        "sha256": sha256_file(path),
+        "self_sha256": document["self_sha256"],
+        "source_execution_id": document["source_usage"]["execution_id"],
+        "source_usage_self_sha256": document["source_usage"]["self_sha256"],
+        "recovery_authorized_execution_id": document["recovery_authorized_execution_id"],
+        "quarantine_target_relative_path": document["quarantine_target_relative_path"],
+    }
+
+
+def _validate_preserved_checkout(
+    cache_root: Path, document: dict[str, Any]
+) -> None:
+    quarantine = cache_root / document["quarantine_target_relative_path"]
+    if not quarantine.is_dir() or not (quarantine / ".git").is_dir():
+        raise R1GateError("preserved interrupted checkout is missing")
+    origin = subprocess.check_output(
+        ["git", "remote", "get-url", "origin"], cwd=quarantine, text=True
+    ).strip()
+    observed_head = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=quarantine, text=True
+    ).strip()
+    requested_revision = subprocess.check_output(
+        ["git", "rev-parse", document["revision"]], cwd=quarantine, text=True
+    ).strip()
+    if (
+        origin.rstrip("/") != document["repository"].rstrip("/")
+        or observed_head != document["observed_head"]
+        or requested_revision != document["revision"]
+    ):
+        raise R1GateError("preserved interrupted checkout repository identity differs")
+    lock = document["lock"]
+    preserved_lock = quarantine / ".git" / "index.lock"
+    if (
+        preserved_lock.is_symlink()
+        or not preserved_lock.is_file()
+        or sha256_file(preserved_lock) != lock.get("sha256")
+        or preserved_lock.stat().st_size != lock.get("size_bytes")
+        or datetime.fromtimestamp(preserved_lock.stat().st_mtime, UTC).isoformat()
+        != lock.get("last_write_time_utc")
+    ):
+        raise R1GateError("preserved interrupted checkout lock identity differs")
+    for row in document["interrupted_checkout_state"].get("materialized_files", []):
+        if not isinstance(row, dict):
+            raise R1GateError("preserved interrupted checkout inventory is invalid")
+        errors = verify_file_identity(
+            quarantine / str(row.get("path")),
+            str(row.get("sha256")),
+            row.get("size_bytes"),
+        )
+        if errors:
+            raise R1GateError("; ".join(errors))
+
+
+def _existing_checkout_quarantines(
+    target: Path,
+    cache_root: Path,
+    current_execution_id: str,
+    repository: str,
+    revision: str,
+) -> list[dict[str, Any]]:
+    try:
+        relative_target = target.resolve().relative_to(cache_root.resolve()).as_posix()
+    except ValueError as exc:
+        raise R1GateError("checkout target is outside the external cache") from exc
+    records: list[dict[str, Any]] = []
+    root = cache_root / "control" / "quarantine_receipts"
+    for path in sorted(root.glob("*.json")):
+        document = _load_checkout_quarantine_receipt(path, cache_root)
+        if document["original_target_relative_path"] != relative_target:
+            continue
+        if document["repository"].rstrip("/") != repository.rstrip("/"):
+            raise R1GateError("checkout quarantine repository identity differs")
+        if document["revision"] != revision:
+            raise R1GateError("checkout quarantine revision identity differs")
+        authorizer = document["recovery_authorized_execution_id"]
+        if authorizer != current_execution_id:
+            _aborted_model_usage(cache_root / "control" / "usage" / f"{authorizer}.json")
+        quarantine = cache_root / document["quarantine_target_relative_path"]
+        if quarantine.exists():
+            _validate_preserved_checkout(cache_root, document)
+            records.append(_checkout_quarantine_reference(path, cache_root, document))
+        elif not target.exists():
+            raise R1GateError("checkout quarantine source and target are both missing")
+    return records
+
+
+def _quarantine_interrupted_checkout(
+    target: Path,
+    cache_root: Path,
+    repository: str,
+    revision: str,
+    current_execution_id: str,
+) -> list[dict[str, Any]]:
+    if (
+        len(current_execution_id) != 32
+        or any(character not in "0123456789abcdef" for character in current_execution_id)
+    ):
+        raise R1GateError("current R1 execution identity is invalid for checkout quarantine")
+    if (cache_root / "manifests" / "r1_model_acquisition.json").exists():
+        raise R1GateError("checkout quarantine is forbidden after model acquisition completion")
+    active = _active_git_processes()
+    if active:
+        raise R1GateError(f"checkout quarantine found active Git processes: {active}")
+    state = _interrupted_checkout_state(target, revision)
+    if state is None:
+        raise R1GateError("Git acquisition target is not an exact interrupted checkout")
+    actual_revision = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=target, text=True
+    ).strip()
+    requested_revision = subprocess.check_output(
+        ["git", "rev-parse", revision], cwd=target, text=True
+    ).strip()
+    if requested_revision != revision:
+        raise R1GateError("interrupted checkout lacks the requested Git revision")
+    origin = subprocess.check_output(
+        ["git", "remote", "get-url", "origin"], cwd=target, text=True
+    ).strip()
+    if origin.rstrip("/") != repository.rstrip("/"):
+        raise R1GateError("interrupted checkout uses another Git origin")
+    lock = target / ".git" / "index.lock"
+    if lock.is_symlink() or not lock.is_file() or lock.stat().st_size != 0:
+        raise R1GateError("interrupted checkout lacks its expected zero-byte Git lock")
+    lock_stat = lock.stat()
+    lock_mtime = datetime.fromtimestamp(lock_stat.st_mtime, UTC)
+    source = _aborted_usage_for_git_lock(cache_root, lock_mtime)
+    source_path = source["path"]
+    source_document = source["document"]
+    relative_target = target.resolve().relative_to(cache_root.resolve()).as_posix()
+    receipt_path, quarantine = _checkout_quarantine_paths(
+        cache_root, relative_target, source_document["execution_id"]
+    )
+    lock_identity = {
+        "relative_path": f"{relative_target}/.git/index.lock",
+        "sha256": sha256_file(lock),
+        "size_bytes": lock_stat.st_size,
+        "last_write_time_utc": lock_mtime.isoformat(),
+    }
+    source_identity = {
+        "relative_path": source_path.resolve().relative_to(cache_root.resolve()).as_posix(),
+        "sha256": sha256_file(source_path),
+        "self_sha256": source_document["self_sha256"],
+        "execution_id": source_document["execution_id"],
+    }
+    document = {
+        "schema_version": 1,
+        "artifact_role": "r1_git_checkout_quarantine_authorization",
+        "created_at_utc": datetime.now(UTC).isoformat(),
+        "recovery_authorized_execution_id": current_execution_id,
+        "expected_action_receipt_relative_path": "manifests/r1_model_acquisition.json",
+        "original_target_relative_path": relative_target,
+        "quarantine_target_relative_path": quarantine.resolve()
+        .relative_to(cache_root.resolve())
+        .as_posix(),
+        "repository": repository,
+        "revision": revision,
+        "observed_head": actual_revision,
+        "lock": lock_identity,
+        "source_usage": source_identity,
+        "interrupted_checkout_state": state,
+    }
+    if receipt_path.exists():
+        existing = _load_checkout_quarantine_receipt(receipt_path, cache_root)
+        comparable = dict(existing)
+        comparable.pop("self_sha256", None)
+        comparable.pop("created_at_utc", None)
+        comparable.pop("recovery_authorized_execution_id", None)
+        candidate = dict(document)
+        candidate.pop("created_at_utc", None)
+        candidate.pop("recovery_authorized_execution_id", None)
+        if comparable != candidate:
+            raise R1GateError("existing checkout quarantine receipt identity differs")
+    else:
+        _write_json(receipt_path, document)
+    authorized = _load_checkout_quarantine_receipt(receipt_path, cache_root)
+    if quarantine.exists():
+        raise R1GateError("checkout quarantine target already exists while source remains")
+    if _interrupted_checkout_state(target, revision) != state:
+        raise R1GateError("interrupted checkout changed during quarantine authorization")
+    if (
+        sha256_file(lock) != lock_identity["sha256"]
+        or lock.stat().st_size != lock_identity["size_bytes"]
+        or datetime.fromtimestamp(lock.stat().st_mtime, UTC).isoformat()
+        != lock_identity["last_write_time_utc"]
+    ):
+        raise R1GateError("interrupted checkout lock changed during quarantine authorization")
+    quarantine.parent.mkdir(parents=True, exist_ok=True)
+    target.rename(quarantine)
+    _validate_preserved_checkout(cache_root, authorized)
+    return _existing_checkout_quarantines(
+        target,
+        cache_root,
+        current_execution_id,
+        repository,
+        revision,
+    )
+
+
 def _git_checkout(
     repository: str,
     revision: str,
@@ -565,6 +986,22 @@ def _git_checkout(
     current_execution_id: str,
     lfs_file: str | None = None,
 ) -> list[dict[str, Any]]:
+    recoveries = _existing_checkout_quarantines(
+        target,
+        cache_root,
+        current_execution_id,
+        repository,
+        revision,
+    )
+    if target.exists() and (target / ".git" / "index.lock").exists():
+        if not _is_exact_empty_no_checkout(target):
+            recoveries = _quarantine_interrupted_checkout(
+                target,
+                cache_root,
+                repository,
+                revision,
+                current_execution_id,
+            )
     if not target.exists():
         target.parent.mkdir(parents=True, exist_ok=True)
         environment = os.environ.copy()
@@ -580,7 +1017,9 @@ def _git_checkout(
     ).strip()
     if origin.rstrip("/") != repository.rstrip("/"):
         raise R1GateError(f"Git acquisition target has another origin: {target}")
-    recoveries = _recover_stale_git_index_lock(target, cache_root, current_execution_id)
+    recoveries.extend(
+        _recover_stale_git_index_lock(target, cache_root, current_execution_id)
+    )
     status = subprocess.check_output(["git", "status", "--porcelain"], cwd=target, text=True)
     if status.strip() and not _is_exact_empty_no_checkout(target):
         raise R1GateError(f"Git acquisition target is dirty before checkout: {target}")
@@ -632,7 +1071,7 @@ def _acquire_eres(
         "source_revision": model["source_revision"],
         "source_root": str(source_root.resolve()),
         "source_files": source_files,
-        "stale_git_lock_recoveries": checkpoint_lock_recoveries + source_lock_recoveries,
+        "git_recovery_receipts": checkpoint_lock_recoveries + source_lock_recoveries,
     }
 
 

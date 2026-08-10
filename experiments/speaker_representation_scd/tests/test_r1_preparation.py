@@ -374,9 +374,14 @@ def test_git_checkout_rejects_unexpected_content_in_no_checkout_target(
 
 
 def _aborted_model_usage_for_lock(
-    cache_root: Path, lock: Path, execution_id: str = "3" * 32
+    cache_root: Path,
+    lock: Path,
+    execution_id: str = "3" * 32,
+    time_shift_seconds: float = 0.0,
 ) -> dict:
-    lock_time = datetime.fromtimestamp(lock.stat().st_mtime, UTC)
+    lock_time = datetime.fromtimestamp(lock.stat().st_mtime, UTC) + timedelta(
+        seconds=time_shift_seconds
+    )
     usage = with_self_sha256(
         {
             "schema_version": 1,
@@ -569,6 +574,235 @@ def test_git_checkout_reuses_crash_safe_recovery_receipt(
     assert second == first
     assert len(second) == 1
     assert second[0]["recovery_authorized_execution_id"] == "2" * 32
+
+
+def test_git_checkout_quarantines_an_exact_interrupted_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, revision = _local_git_repository(tmp_path / "source")
+    target = tmp_path / "models" / "target"
+    target.parent.mkdir()
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    (target / "artifact.txt").write_text("partial checkout\n", encoding="utf-8")
+    lock = target / ".git" / "index.lock"
+    lock.write_bytes(b"")
+    _aborted_model_usage_for_lock(tmp_path, lock, "3" * 32)
+    monkeypatch.setattr(acquire_r1, "_active_git_processes", lambda: ())
+    recoveries = _git_checkout(
+        repository,
+        revision,
+        target,
+        cache_root=tmp_path,
+        current_execution_id="2" * 32,
+    )
+    assert (target / "artifact.txt").read_text(encoding="utf-8") == "reviewed artifact\n"
+    assert len(recoveries) == 1
+    assert recoveries[0]["kind"] == "interrupted_checkout_quarantine"
+    receipt = load_json(tmp_path / recoveries[0]["relative_path"])
+    assert self_sha256_valid(receipt)
+    quarantine = tmp_path / receipt["quarantine_target_relative_path"]
+    assert (quarantine / ".git" / "index.lock").is_file()
+    assert (quarantine / "artifact.txt").read_text(encoding="utf-8") == "partial checkout\n"
+
+
+def test_git_checkout_does_not_quarantine_an_unknown_untracked_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, revision = _local_git_repository(tmp_path / "source")
+    target = tmp_path / "models" / "target"
+    target.parent.mkdir()
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    unexpected = target / "user-file.txt"
+    unexpected.write_text("preserve me\n", encoding="utf-8")
+    lock = target / ".git" / "index.lock"
+    lock.write_bytes(b"")
+    _aborted_model_usage_for_lock(tmp_path, lock, "3" * 32)
+    monkeypatch.setattr(acquire_r1, "_active_git_processes", lambda: ())
+    with pytest.raises(R1GateError, match="not an exact interrupted checkout"):
+        _git_checkout(
+            repository,
+            revision,
+            target,
+            cache_root=tmp_path,
+            current_execution_id="2" * 32,
+        )
+    assert unexpected.read_text(encoding="utf-8") == "preserve me\n"
+    assert lock.exists()
+    assert not (tmp_path / "control" / "quarantine_receipts").exists()
+
+
+def test_git_checkout_does_not_quarantine_an_ignored_unknown_nested_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source"
+    repository, _ = _local_git_repository(source)
+    (source / "images").mkdir()
+    (source / "images" / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+    subprocess.run(["git", "add", "images/tracked.txt"], cwd=source, check=True)
+    subprocess.run(["git", "commit", "--quiet", "-m", "images"], cwd=source, check=True)
+    revision = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=source, text=True
+    ).strip()
+    target = tmp_path / "models" / "target"
+    target.parent.mkdir()
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    (target / "images").mkdir()
+    (target / "images" / "tracked.txt").write_text("partial\n", encoding="utf-8")
+    ignored = target / "images" / "user.tmp"
+    ignored.write_text("preserve me\n", encoding="utf-8")
+    (target / ".git" / "info" / "exclude").write_text("images/*.tmp\n", encoding="utf-8")
+    lock = target / ".git" / "index.lock"
+    lock.write_bytes(b"")
+    _aborted_model_usage_for_lock(tmp_path, lock, "3" * 32)
+    monkeypatch.setattr(acquire_r1, "_active_git_processes", lambda: ())
+    with pytest.raises(R1GateError, match="not an exact interrupted checkout"):
+        _git_checkout(
+            repository,
+            revision,
+            target,
+            cache_root=tmp_path,
+            current_execution_id="2" * 32,
+        )
+    assert ignored.read_text(encoding="utf-8") == "preserve me\n"
+    assert lock.exists()
+    assert not (tmp_path / "control" / "quarantine_receipts").exists()
+
+
+def test_git_checkout_reuses_a_preserved_checkout_quarantine(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, revision = _local_git_repository(tmp_path / "source")
+    target = tmp_path / "models" / "target"
+    target.parent.mkdir()
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    (target / "artifact.txt").write_text("partial checkout\n", encoding="utf-8")
+    lock = target / ".git" / "index.lock"
+    lock.write_bytes(b"")
+    _aborted_model_usage_for_lock(tmp_path, lock, "3" * 32)
+    monkeypatch.setattr(acquire_r1, "_active_git_processes", lambda: ())
+    first = _git_checkout(
+        repository,
+        revision,
+        target,
+        cache_root=tmp_path,
+        current_execution_id="2" * 32,
+    )
+    clock = tmp_path / "quarantine-attempt.clock"
+    clock.write_bytes(b"")
+    _aborted_model_usage_for_lock(tmp_path, clock, "2" * 32)
+    second = _git_checkout(
+        repository,
+        revision,
+        target,
+        cache_root=tmp_path,
+        current_execution_id="5" * 32,
+    )
+    assert second == first
+    assert len(second) == 1
+    assert second[0]["recovery_authorized_execution_id"] == "2" * 32
+
+
+def test_git_checkout_quarantines_partial_materialization_from_requested_revision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source"
+    repository, requested_revision = _local_git_repository(source)
+    (source / "artifact.txt").unlink()
+    (source / "current.txt").write_text("current head\n", encoding="utf-8")
+    subprocess.run(["git", "add", "--all"], cwd=source, check=True)
+    subprocess.run(["git", "commit", "--quiet", "-m", "advance"], cwd=source, check=True)
+    observed_head = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=source, text=True
+    ).strip()
+    target = tmp_path / "models" / "target"
+    target.parent.mkdir()
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    assert subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=target, text=True
+    ).strip() == observed_head
+    (target / "artifact.txt").write_text("partial requested revision\n", encoding="utf-8")
+    lock = target / ".git" / "index.lock"
+    lock.write_bytes(b"")
+    _aborted_model_usage_for_lock(tmp_path, lock, "3" * 32)
+    monkeypatch.setattr(acquire_r1, "_active_git_processes", lambda: ())
+    recoveries = _git_checkout(
+        repository,
+        requested_revision,
+        target,
+        cache_root=tmp_path,
+        current_execution_id="2" * 32,
+    )
+    assert (target / "artifact.txt").read_text(encoding="utf-8") == "reviewed artifact\n"
+    assert not (target / "current.txt").exists()
+    receipt = load_json(tmp_path / recoveries[0]["relative_path"])
+    assert receipt["observed_head"] == observed_head
+    assert receipt["revision"] == requested_revision
+    assert receipt["interrupted_checkout_state"]["requested_revision"] == requested_revision
+
+
+def test_git_checkout_completes_a_pre_rename_quarantine_authorization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, revision = _local_git_repository(tmp_path / "source")
+    target = tmp_path / "models" / "target"
+    target.parent.mkdir()
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", repository, str(target)],
+        check=True,
+    )
+    (target / "artifact.txt").write_text("partial checkout\n", encoding="utf-8")
+    lock = target / ".git" / "index.lock"
+    lock.write_bytes(b"")
+    _aborted_model_usage_for_lock(tmp_path, lock, "3" * 32)
+    monkeypatch.setattr(acquire_r1, "_active_git_processes", lambda: ())
+    with monkeypatch.context() as crash:
+        crash.setattr(
+            acquire_r1.Path,
+            "rename",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("interrupted")),
+        )
+        with pytest.raises(RuntimeError, match="interrupted"):
+            _git_checkout(
+                repository,
+                revision,
+                target,
+                cache_root=tmp_path,
+                current_execution_id="2" * 32,
+            )
+    receipts = list((tmp_path / "control" / "quarantine_receipts").glob("*.json"))
+    assert len(receipts) == 1
+    assert target.exists()
+    _aborted_model_usage_for_lock(
+        tmp_path,
+        lock,
+        "2" * 32,
+        time_shift_seconds=10.0,
+    )
+    recoveries = _git_checkout(
+        repository,
+        revision,
+        target,
+        cache_root=tmp_path,
+        current_execution_id="5" * 32,
+    )
+    assert len(recoveries) == 1
+    assert recoveries[0]["recovery_authorized_execution_id"] == "2" * 32
+    assert (target / "artifact.txt").read_text(encoding="utf-8") == "reviewed artifact\n"
 
 
 def _authoritative_predecessor_environment_receipt(
