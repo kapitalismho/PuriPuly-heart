@@ -699,9 +699,13 @@ def _extract_context(
     import soundfile as sf
 
     total_windows = sum(
-        len(rows)
+        len(
+            {
+                (int(row["window_start_sample"]), int(row["window_end_sample"]))
+                for row in waveform_rows.get(str(context_ms)) or []
+            }
+        )
         for waveform_rows in by_waveform.values()
-        for rows in [waveform_rows.get(str(context_ms)) or []]
     )
     pooled: np.ndarray | None = None
     pooled_rows = 0

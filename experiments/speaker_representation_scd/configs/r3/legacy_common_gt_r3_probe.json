@@ -136,7 +136,7 @@
       },
       {
         "path": "r3_probe.py",
-        "sha256": "77829e1da50708eab91ed71216365c86869f9e29d7fe42a960c1e8e7d3d228b0"
+        "sha256": "494ebdcfd1b56ac6653f9cc07afb2b8649ccffe17fd5d711b3146dfbc946377c"
       },
       {
         "path": "run_provenance.py",
@@ -151,7 +151,7 @@
         "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
       }
     ],
-    "manifest_sha256": "2a788265c5b2d2ba3d73ab30f42a4dd7ba37b461e546274fb36f201f056aa598"
+    "manifest_sha256": "97c60d558737937e1e16883c60a5e22b4921687bbd15d45b80441a60990a3c51"
   },
   "experiment_id": "speaker_representation_scd_v1",
   "protocol_version": "r3-legacy-common-gt-1",
@@ -216,7 +216,7 @@
     }
   },
   "schema_version": 1,
-  "self_sha256": "b77abeb3900c9ac49823622bdf5c1a429e7a22c9d3563ff8d51cd7772a2a0854",
+  "self_sha256": "4712db8ad335405fb22b9499eccad907d419f9af54bec7cfebca616964c04aad",
   "storage": {
     "cache_root_env": "SRSCD_CACHE_ROOT",
     "max_derived_cache_gib": 20,
