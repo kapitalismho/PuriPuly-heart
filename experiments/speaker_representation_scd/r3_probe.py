@@ -63,6 +63,16 @@ class R3ProbeError(RuntimeError):
     pass
 
 
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, float):
+        return None if not np.isfinite(value) else value
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    return value
+
+
 def _average_ranks(values: np.ndarray) -> np.ndarray:
     order = np.argsort(values, kind="mergesort")
     ranks = np.empty(len(values), dtype=np.float64)
@@ -968,7 +978,7 @@ def run_probe(model_id: str, cache_root: Path, requested_argv: tuple[str, ...]) 
         },
         "provenance": _probe_provenance(model_id, requested_argv),
     }
-    document = with_self_sha256(result)
+    document = with_self_sha256(_json_safe(result))
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text(
         json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -1050,6 +1060,7 @@ def run_promote(cache_root: Path, requested_argv: tuple[str, ...]) -> Path:
             },
         }
     )
+    document = with_self_sha256(_json_safe(document))
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text(
         json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
