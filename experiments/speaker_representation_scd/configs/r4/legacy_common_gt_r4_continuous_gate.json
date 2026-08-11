@@ -1,0 +1,236 @@
+{
+  "accepted_predecessors": {
+    "promotion_ledger": {
+      "relative_to_cache_root": "manifests/r3/legacy_common_gt/promotion_ledger.json",
+      "self_sha256": "cc6e33023e639110b3f802f50ceef3ba89e715fff8da7833c67968dbe10c0d7f",
+      "sha256": "987e5f2a66db7170cdbfaaf2c0be624de4ffda3ca7d41fc9205d091393de9fd1"
+    },
+    "r3_gate": {
+      "path": "configs/r3/legacy_common_gt_r3_probe.json",
+      "self_sha256": "93a6b541bdea5d817964b00951f42e0a0478fe8bd69ca6aa10e0c1f3b3f39988",
+      "sha256": "1c40475860e6d2714b8a2c4e1d43abd6ab0994aef33e19d233a4226e166c6152"
+    }
+  },
+  "artifact_role": "r4_legacy_common_gt_gate",
+  "authority": {
+    "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
+    "sha256": "bf1727a62dcd9c8c28cc095c46ebeaaab8e3f723a0c1c6440ed19a9968d590be"
+  },
+  "authorization": {
+    "cache_calibration": false,
+    "confirmatory_access": false,
+    "full_extraction": false,
+    "r4_continuous": true,
+    "r4_report": true,
+    "r4_sensitivity": true,
+    "training": false
+  },
+  "dependencies": {
+    "cache": {
+      "coordinate_ledger": {
+        "relative_to_cache_root": "manifests/r2/legacy_common_gt/coordinate_ledger.json",
+        "self_sha256": "362eaf17bd538e1badd49bbfe6500cf88b7ddbce22bc8e38df4700302573b2c5",
+        "sha256": "390e77f52e3cd2b1cc3c545036e23f1ffcdaa543d748a58cba0eb86aef90d528"
+      },
+      "environment_sync_receipt": {
+        "relative_to_cache_root": "manifests/r1_environment_sync.json",
+        "self_sha256": "ac02743e2871f833aaf0a6a7f48dbd7464f7d5b8f4088f077c3f56d9c4952ee4",
+        "sha256": "ba32f3c8ebb7adb7f66d0b3f9ff13b5b41abf82ba220927b293be38cedc97e09"
+      },
+      "model_acquisition_receipt": {
+        "relative_to_cache_root": "manifests/r1_model_acquisition.json",
+        "self_sha256": "55085db57c02f2aaacb57497ae135697846a9df7646d87b3fb1d6f262217865e",
+        "sha256": "7b20c28aaa528717fab399ad471cada6393896c15046a2ed1a1fda9db7a37c1f"
+      },
+      "reduced_forecast": {
+        "relative_to_cache_root": "manifests/r2/legacy_common_gt/reduced_r3_r4_forecast.json",
+        "self_sha256": "2ae41d38e6c6f4834c683ca6fd5d187c049171ad558f4caed7de7a66fe22b498",
+        "sha256": "ec59ed137ed20a88c30405a499a3d89c7ef5e51e6013e831024c5c2c1c95e987"
+      },
+      "validation_receipt": {
+        "relative_to_cache_root": "manifests/r2/legacy_common_gt/validation_receipt.json",
+        "self_sha256": "7c5e149f82cfbc2e729eef6316b807895b28c100ce030f14b4a7d2f43b40b945",
+        "sha256": "cd9c1fd6f60a73c52aba913d8304d573dc84b3d6e0fb85e7127cd9e066d9d693"
+      }
+    },
+    "environment": {
+      "backend": "cpu",
+      "lock": {
+        "path": "environment/uv.lock",
+        "sha256": "2865f5c05352ba1dc99d2899cc583a3844a2ab1a590388aeee3a0eb0644b9af1"
+      },
+      "project_root": "environment",
+      "pyproject": {
+        "path": "environment/pyproject.toml",
+        "sha256": "4f82330869d8e4dede12ebc6346422a518ebff2245b8875b3a092e5b666bb3c6"
+      },
+      "python": "3.12.10",
+      "runtime_packages": {
+        "huggingface-hub": "0.31.4",
+        "matplotlib": "3.10.3",
+        "numpy": "1.26.4",
+        "pandas": "2.2.3",
+        "psutil": "7.0.0",
+        "pyarrow": "20.0.0",
+        "pyyaml": "6.0.2",
+        "safetensors": "0.5.3",
+        "scikit-learn": "1.6.1",
+        "soundfile": "0.13.1",
+        "torch": "2.7.1+cpu",
+        "torchaudio": "2.7.1+cpu",
+        "transformers": "4.52.3"
+      },
+      "uv": "0.9.17 (2b5d65e61 2025-12-09)"
+    },
+    "forecast_contract": {
+      "path": "configs/r1/full_job_forecast_contract.json",
+      "self_sha256": "3115382954018f54cefa2b691cc56a84fdf5b8998a23d153a2ea3b40e55773e8",
+      "sha256": "6a258094a9a75deb09a4d6685b90dd83f2f9170194b3644bb855d40cf1da4980"
+    },
+    "protocol_screen": {
+      "path": "configs/protocol/reduced_pretraining_screen.json",
+      "self_sha256": "78719c6b10392b8d051f8d90884b73d4ceea845275966cbe8bfa7ae0d2710338",
+      "sha256": "587e9afd3c50f46da7aa022679c5222e8f0437458dd601de6b0a0fe8ca4855b7"
+    },
+    "source_registry": {
+      "path": "models/source_registry.json",
+      "self_sha256": "cc09d72b7f05e0375972f9f427c2dc3b6c6cf6a45399a3d91b18c44d6c1716bf",
+      "sha256": "0cc07fa30294a2ae9a4d30ef4bcb7201f6b03d700ce815139975678704d182bb"
+    },
+    "technical_validity": {
+      "path": "results/r1/technical_validity.json",
+      "self_sha256": "9a276d1ced9fb17cdd2f5e0efddf6d8691fcf043b6798ea8081c7ce0b08c7109",
+      "sha256": "fe8195e6b7b64784d35b0a9279bbc13b0c16ece7319d493a894f05376b35d838"
+    }
+  },
+  "execution_code": {
+    "files": [
+      {
+        "path": "execution_guard.py",
+        "sha256": "24b72f4c08688173a48ce31889045b565f6bd4cf1cb37a1f72c154d263299210"
+      },
+      {
+        "path": "provenance.py",
+        "sha256": "1c19652a1f66bcc428edf5ff4f66cd44263a8f43ee718c77babbb32551ab0615"
+      },
+      {
+        "path": "r1_forecast.py",
+        "sha256": "9813bdbaba4a09155712a679d456470749177cc9f1a470f607e57d26945785d8"
+      },
+      {
+        "path": "r1_gate.py",
+        "sha256": "0588af099eaaf948ed7ae357e1f589023f4384e54de0d4d624fddd50a7a1f160"
+      },
+      {
+        "path": "r2l_gate.py",
+        "sha256": "372cbe49157f11c5aff6c5ca871199d35cfe6e1fa81764b832b51ec91a81a711"
+      },
+      {
+        "path": "r3_execute.py",
+        "sha256": "2be17eabb531abc918b979fd98e48b2832c4f197177a39e0652ff04bf81dc27d"
+      },
+      {
+        "path": "r3_gate.py",
+        "sha256": "fcfacf84c6d3e42df9f8456c691e96e3e193a43828f7f9ece65957a772d0eb5c"
+      },
+      {
+        "path": "r3_probe.py",
+        "sha256": "c9b8dfc878942ea9ea4bf4f858b396a35904a270fc74f4465d83cd11622034fd"
+      },
+      {
+        "path": "r4_continuous.py",
+        "sha256": "e71bf1a2786dbef287abf790d4498488cd96790bdfcb5bbc538bf0d46b794926"
+      },
+      {
+        "path": "r4_execute.py",
+        "sha256": "3aec20cd3faf536418745350cbd5ef6a598e6f47f56c7c15d0690cf7d4265d27"
+      },
+      {
+        "path": "r4_gate.py",
+        "sha256": "e00a4c035253081e9cc2d71efea5eab47fb12fa19cb0237153f47828b80aa7a5"
+      },
+      {
+        "path": "run_provenance.py",
+        "sha256": "7a086c012a8de99dbeb73914d99df58ab13adda859eff52e593f635a1959c766"
+      },
+      {
+        "path": "validate_r4_gate.py",
+        "sha256": "dc9abd19fc399cf59780ee0f19b0827bf1bc2195763e1cf7caeaefd0d04bdf11"
+      },
+      {
+        "path": "windows_job.py",
+        "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
+      }
+    ],
+    "manifest_sha256": "cfb509cc8fa0b1f96476a4e19b2442cc4b40e98ddcfb0b2826d318f0a0c3558e"
+  },
+  "experiment_id": "speaker_representation_scd_v1",
+  "protocol_version": "r4-legacy-common-gt-1",
+  "r4": {
+    "bounded_panel": {
+      "maximum_source_count": 80,
+      "maximum_source_hours": 6.0
+    },
+    "false_event_budget_per_hour": 1.0,
+    "families": [
+      "one_hop",
+      "two_hop",
+      "three_hop",
+      "hysteresis"
+    ],
+    "hop_samples": 1600,
+    "match_tolerance_ms": 500,
+    "minimum_event_separation_hops": 2,
+    "primary_context_ms": 300,
+    "primary_hop_ms": 100,
+    "prototype_k": 3,
+    "score_types": [
+      "adjacent",
+      "prototype"
+    ],
+    "sensitivity": {
+      "event_stratum_only": true,
+      "top_encoder_count": 2
+    },
+    "sensitivity_hop_ms": 50,
+    "sensitivity_hop_samples": 800,
+    "stability_gate": 0.25,
+    "thresholds": [
+      0.1,
+      0.15,
+      0.2,
+      0.25,
+      0.3,
+      0.35,
+      0.4
+    ]
+  },
+  "schema_version": 1,
+  "self_sha256": "cbc9c27ea5a1e1247bbe644efcb8c254e02c2388d560e4f27bd8c9b50b08599a",
+  "storage": {
+    "cache_root_env": "SRSCD_CACHE_ROOT",
+    "max_derived_cache_gib": 20,
+    "max_external_storage_gib": 50,
+    "max_source_download_gib": 25,
+    "min_free_gib_before_download": 55,
+    "must_be_outside_repository": true,
+    "required_volume": "C:"
+  },
+  "supervision": {
+    "action_receipt_authority": "unique_completed_usage_attestation",
+    "direct_worker_execution_allowed": false,
+    "entrypoint": "python -m experiments.speaker_representation_scd.r4_execute",
+    "hard_memory_boundary": "windows_job_object_job_memory",
+    "legacy_process_scan": "continuous_fail_closed_excluding_phase5_modules",
+    "max_action_wall_hours": 24,
+    "max_cpu_threads": 8,
+    "max_cumulative_wall_hours": 96,
+    "max_parallel_actions": 1,
+    "max_process_tree_resident_ram_gib": 24,
+    "max_worker_processes": 1,
+    "orphan_receipt_policy": "quarantine_and_retry",
+    "process_inspection_failure": "abort",
+    "shared_execution_lease": "control/r1_execution.lock",
+    "worker_environment": "environment_venv"
+  }
+}
