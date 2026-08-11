@@ -438,6 +438,18 @@ def _anchor_coordinates(cache_root: Path) -> dict[str, list[dict[str, Any]]]:
     return dict(result)
 
 
+def _session_waveform_map(cache_root: Path) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for path in sorted((cache_root / "data/r2/legacy_common_gt/coordinates").glob("*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line:
+                continue
+            row = json.loads(line)
+            if row.get("coordinate_role") == "r4_continuous":
+                result.setdefault(str(row["session_id"]), str(row["waveform_id"]))
+    return result
+
+
 def _extract_continuous_vectors(
     extractor,
     model_id: str,
@@ -449,13 +461,16 @@ def _extract_continuous_vectors(
     pooled_path: Path | None,
     index_path: Path | None,
     layer_kwarg: str,
+    session_waveform: dict[str, str],
 ) -> dict[str, dict[str, Any]]:
     import soundfile as sf
 
     per_source: dict[str, dict[str, Any]] = {}
     for source in sources:
         session_id = str(source["session_id"])
-        waveform_id = str(source["waveform_id"])
+        waveform_id = session_waveform.get(session_id)
+        if waveform_id is None:
+            raise R4Error(f"waveform mapping missing for session: {session_id}")
         path = waveform_paths.get(waveform_id)
         if path is None or not path.is_file():
             raise R4Error(f"waveform path missing: {waveform_id}")
@@ -566,6 +581,7 @@ def _run_continuous(
             row for row in sources if row.get("synthetic_manifest") is not None
         ]
     waveform_paths = _waveform_paths(cache_root)
+    session_waveform = _session_waveform_map(cache_root)
     ground_truth = _anchor_coordinates(cache_root)
     extractor = _make_extractor(model_id, cache_root)
     pooled_dir = cache_root / POOLED_RELATIVE_DIR / model_id
@@ -585,6 +601,7 @@ def _run_continuous(
         pooled_path,
         index_path,
         "tap_ids" if model_id == ERES_MODEL_ID else "layer_ids",
+        session_waveform,
     )
     config_rows: list[dict[str, Any]] = []
     for score_type in SCORE_TYPES:
