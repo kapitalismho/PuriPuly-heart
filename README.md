@@ -525,6 +525,10 @@ Broker documentation is maintained in [`broker/README.md`](broker/README.md).
 
 Native VR overlay documentation is maintained in [`native/overlay/README.md`](native/overlay/README.md).
 
+Custom HTTP API extension documentation is maintained in [`docs/http-extensions.md`](docs/http-extensions.md). For the JSON Schema required for connection, see [`docs/http-extension.schema.json`](docs/http-extension.schema.json).
+
+VRChat OSC controls are documented in [`docs/vrchat-osc.md`](docs/vrchat-osc.md).
+
 ---
 
 ## Developer

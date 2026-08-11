@@ -524,6 +524,10 @@ python -m pytest tests/path/to/test_file.py
 
 Документация нативного VR-оверлея ведётся в [`native/overlay/README.md`](native/overlay/README.md).
 
+Документация пользовательского HTTP API-расширения ведётся в [`docs/http-extensions.md`](docs/http-extensions.md). Необходимую для подключения JSON Schema см. в [`docs/http-extension.schema.json`](docs/http-extension.schema.json).
+
+Управление VRChat через OSC см. в [`docs/vrchat-osc.md`](docs/vrchat-osc.md).
+
 ---
 
 ## Разработчик

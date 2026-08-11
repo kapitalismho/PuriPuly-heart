@@ -521,6 +521,10 @@ Broker 文档维护于 [`broker/README.md`](broker/README.md)。
 
 原生 VR 浮层文档维护于 [`native/overlay/README.md`](native/overlay/README.md)。
 
+自定义 HTTP API 扩展文档维护于 [`docs/http-extensions.md`](docs/http-extensions.md)。连接所需的 JSON Schema 请参阅 [`docs/http-extension.schema.json`](docs/http-extension.schema.json)。
+
+VRChat OSC 控制请参阅 [`docs/vrchat-osc.md`](docs/vrchat-osc.md)。
+
 ---
 
 ## 开发者
