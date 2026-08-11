@@ -139,7 +139,7 @@
       },
       {
         "path": "r4_continuous.py",
-        "sha256": "c7557fbd16c45b4612a4eb83783ccf23ddc65581c29150f0430d76b6ff2b1994"
+        "sha256": "991db9ae53f094f27c6f8027c59abb37f54cfbdb1bb70b637047fd7677720cb0"
       },
       {
         "path": "r4_execute.py",
@@ -162,7 +162,7 @@
         "sha256": "507db5e00a849951f4421bbee36733398e29b772eac68611d78e19ff5409c996"
       }
     ],
-    "manifest_sha256": "1c076d1c51c291ed7c0c7b8ae2d3ab30374b9803a7cdf784a38a5a9e4630e172"
+    "manifest_sha256": "6b9a872570587a4f1e57109b47fea872409f030cf003bf555d3b9d43994b13aa"
   },
   "experiment_id": "speaker_representation_scd_v1",
   "protocol_version": "r4-legacy-common-gt-1",
@@ -206,7 +206,7 @@
     ]
   },
   "schema_version": 1,
-  "self_sha256": "62e5f35ae0b86f3d5aec3859970f894a0177010e9113319714a710877db15be1",
+  "self_sha256": "2794d61d3e6d24be3d5d59fce37eb527f2353056509e607f1bfa30f2488d3cfd",
   "storage": {
     "cache_root_env": "SRSCD_CACHE_ROOT",
     "max_derived_cache_gib": 20,

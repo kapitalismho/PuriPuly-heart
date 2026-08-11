@@ -12,6 +12,7 @@ from experiments.speaker_representation_scd.provenance import with_self_sha256
 from experiments.speaker_representation_scd.r1_gate import EXPERIMENT_ROOT
 from experiments.speaker_representation_scd.r4_continuous import (
     _event_metrics,
+    _prototype_event_detector,
     _rank_encoders,
     _select_operating_point,
     adjacent_scores,
@@ -82,6 +83,31 @@ def test_prototype_scores_tracks_stable_mean() -> None:
     assert scores[1] == pytest.approx(0.0, abs=1e-6)
     assert scores[3] == pytest.approx(1.0)
     assert scores[4] == pytest.approx(1.0)
+
+
+def test_prototype_event_detector_resets_after_emit() -> None:
+    vectors = np.array(
+        [
+            [1.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 0.0],
+            [0.0, 1.0],
+            [0.0, 1.0],
+            [0.0, 1.0],
+            [0.0, 1.0],
+            [0.0, 1.0],
+            [1.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 0.0],
+        ],
+        dtype=np.float32,
+    )
+    events = _prototype_event_detector(vectors, "one_hop", 0.4)
+    assert [row["emit_hop"] for row in events] == [3, 8]
+    events_two = _prototype_event_detector(vectors, "two_hop", 0.4)
+    assert [row["emit_hop"] for row in events_two] == [4, 9]
+    stable = np.tile(np.array([1.0, 0.0], dtype=np.float32), (30, 1))
+    assert _prototype_event_detector(stable, "one_hop", 0.4) == []
 
 
 def test_detect_events_families() -> None:

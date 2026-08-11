@@ -124,6 +124,82 @@ def prototype_scores(vectors: np.ndarray, stability_gate: float = STABILITY_GATE
     return distances
 
 
+def _prototype_event_detector(
+    vectors: np.ndarray,
+    family: str,
+    threshold: float,
+    *,
+    stability_gate: float = STABILITY_GATE,
+    prototype_k: int = PROTOTYPE_K,
+    hop_samples: int = PRIMARY_HOP_SAMPLES,
+) -> list[dict[str, int]]:
+    if family not in FAMILIES:
+        raise R4Error(f"unknown detector family: {family}")
+    confirmation = {"one_hop": 0, "two_hop": 1, "three_hop": 2, "hysteresis": 1}[family]
+    time_steps = vectors.shape[0]
+    events: list[dict[str, int]] = []
+    prototype: np.ndarray | None = None
+    stable: list[np.ndarray] = []
+    index = 0
+    while index < time_steps:
+        vector = vectors[index]
+        norm = float(np.linalg.norm(vector))
+        if not np.isfinite(norm) or norm <= 0:
+            index += 1
+            continue
+        if prototype is None:
+            prototype = vector
+            stable = [vector]
+            index += 1
+            continue
+        distance = cosine_distance(prototype, vector)
+        emit: int | None = None
+        if distance > threshold:
+            probe = index + 1
+            confirmed = 0
+            while probe < time_steps and confirmed < confirmation:
+                probe_vector = vectors[probe]
+                probe_norm = float(np.linalg.norm(probe_vector))
+                if not np.isfinite(probe_norm) or probe_norm <= 0:
+                    break
+                probe_distance = cosine_distance(prototype, probe_vector)
+                required = 0.5 * threshold if family == "hysteresis" else threshold
+                if probe_distance <= required:
+                    break
+                confirmed += 1
+                probe += 1
+            if confirmed == confirmation:
+                emit = probe - 1 if confirmation else index
+        if emit is not None:
+            if not events or emit - events[-1]["emit_hop"] >= MIN_EVENT_SEPARATION_HOPS:
+                events.append(
+                    {
+                        "onset_hop": int(index),
+                        "onset_sample": int(index * hop_samples)
+                        + int(PRIMARY_CONTEXT_MS * 16),
+                        "emit_hop": int(emit),
+                        "emit_sample": int(emit * hop_samples)
+                        + int(PRIMARY_CONTEXT_MS * 16),
+                        "availability_hop": int(emit),
+                    }
+                )
+                prototype = vectors[emit]
+                stable = [vectors[emit]]
+                index = emit + 1
+                continue
+        if distance <= stability_gate:
+            stable.append(vector)
+            if len(stable) > prototype_k:
+                stable.pop(0)
+            if len(stable) >= 2:
+                mean = np.mean(np.stack(stable), axis=0)
+                mean_norm = np.linalg.norm(mean)
+                if np.isfinite(mean_norm) and mean_norm > 0:
+                    prototype = (mean / mean_norm).astype(np.float32)
+        index += 1
+    return events
+
+
 def detect_events(
     distances: np.ndarray,
     family: str,
@@ -729,9 +805,9 @@ def _evaluate_config(
         vectors = row["vectors"]
         if score_type == "adjacent":
             distances = adjacent_scores(vectors)
+            events = detect_events(distances, family, threshold, hop_samples=hop_samples)
         else:
-            distances = prototype_scores(vectors)
-        events = detect_events(distances, family, threshold, hop_samples=hop_samples)
+            events = _prototype_event_detector(vectors, family, threshold, hop_samples=hop_samples)
         gt_samples = [int(gt["coordinate"]) for gt in ground_truth.get(session_id, [])]
         total_events += len(events)
         ground_truth_count += len(gt_samples)
