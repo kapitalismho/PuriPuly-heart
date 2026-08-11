@@ -417,11 +417,11 @@ def _rank_encoders(
             {
                 "model_id": model_id,
                 "config_id": point["config_id"],
-                "recall_within_500ms": float(metrics["recall_within_500ms"]),
-                "false_events_per_hour": float(metrics["false_events_per_hour"]),
-                "f1_at_250ms": float(metrics["f1_at_250ms"]),
+                "recall_within_500ms": float(metrics["recall_within_500ms"] or 0.0),
+                "false_events_per_hour": float(metrics["false_events_per_hour"] or 0.0),
+                "f1_at_250ms": float(metrics["f1_at_250ms"] or 0.0),
                 "median_availability_latency_ms": metrics["availability_latency_ms"]["median_ms"],
-                "r3_macro_roc_auc": float(r3_macro_auc.get(model_id, float("nan"))),
+                "r3_macro_roc_auc": float(r3_macro_auc.get(model_id, float("nan")) or 0.0),
             }
         )
     ranked.sort(
@@ -908,7 +908,7 @@ def run_report(cache_root: Path, requested_argv: tuple[str, ...]) -> Path:
                 "efficient_backbone_candidate": min(
                     MODEL_IDS,
                     key=lambda model_id: (
-                        operating_points[model_id]["metrics"]["f1_at_250ms"],
+                        float(operating_points[model_id]["metrics"]["f1_at_250ms"] or 0.0),
                         operating_points[model_id]["metrics"]["availability_latency_ms"][
                             "median_ms"
                         ]
