@@ -1,6 +1,6 @@
 [package]
 name = "puripuly-heart-overlay"
-version = "2.3.3"
+version = "2.4.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 
