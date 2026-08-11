@@ -263,6 +263,35 @@ async def test_disabled_enabled_and_release_are_owned() -> None:
     assert sources[0].close_calls == 1
 
 
+async def test_prepared_local_provider_is_reused_when_capture_starts() -> None:
+    owner, admission, resolver, provider, sources, _sink = make_owner()
+    config = make_config(provider_id="local_qwen")
+
+    prepared = await owner.prepare_provider(config)
+
+    assert prepared.state is PeerCaptureSessionState.STOPPED
+    assert prepared.provider_status is PeerCaptureProviderStatus.READY
+    assert prepared.effective_active is False
+    assert admission.calls == []
+    assert resolver.calls == []
+    assert sources == []
+    assert provider.requests == [("local_qwen", True)]
+
+    started = await owner.apply_intent(config, enabled=True)
+
+    assert started.state is PeerCaptureSessionState.RUNNING
+    assert provider.requests == [("local_qwen", True)]
+    assert provider.start_calls == 1
+    assert admission.calls == [config]
+    assert resolver.calls == [config.capture_target]
+    assert len(sources) == 1
+
+    await owner.close()
+    assert provider.start_calls == 1
+    assert provider.releases == [("abort", None)]
+    assert sources[0].close_calls == 1
+
+
 @pytest.mark.parametrize(
     ("status", "expected_state", "desired_active"),
     [

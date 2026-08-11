@@ -9,12 +9,14 @@ from puripuly_heart.app.services.peer_application import (
 )
 from puripuly_heart.app.wiring import build_peer_capture_session_config
 from puripuly_heart.config.settings import AppSettings, STTProviderName
+from puripuly_heart.core.peer_capture import PeerCaptureProviderStatus
 from puripuly_heart.ui.overlay_peer_contract import build_overlay_peer_consumer_contract
 
 
 @dataclass(frozen=True)
 class RuntimeSnapshot:
     effective_active: bool
+    provider_status: PeerCaptureProviderStatus = PeerCaptureProviderStatus.READY
 
 
 @dataclass
@@ -30,10 +32,26 @@ class Runtime:
     close_entered: asyncio.Event | None = None
     close_release: asyncio.Event | None = None
     effective_active: bool = True
+    prepare_calls: list[object] = field(default_factory=list)
+    prepare_entered: asyncio.Event | None = None
+    prepare_release: asyncio.Event | None = None
+    provider_status: PeerCaptureProviderStatus = PeerCaptureProviderStatus.READY
 
     @property
     def snapshot(self) -> RuntimeSnapshot:
-        return RuntimeSnapshot(effective_active=self.effective_active)
+        return RuntimeSnapshot(
+            effective_active=self.effective_active,
+            provider_status=self.provider_status,
+        )
+
+    async def prepare_provider(self, config: object) -> RuntimeSnapshot:
+        self.prepare_calls.append(config)
+        if self.prepare_entered is not None:
+            self.prepare_entered.set()
+        if self.prepare_release is not None:
+            await self.prepare_release.wait()
+        self.current_signature = getattr(config, "runtime_signature", None)
+        return self.snapshot
 
     async def apply_policy(
         self,
@@ -392,6 +410,55 @@ async def test_peer_activation_starting_survives_overlay_connect_until_capture_e
     ]
     owner.sync_effective_flags()
     assert len(harness.lifecycle_traces) == 1
+
+
+@pytest.mark.asyncio
+async def test_local_provider_prepares_while_overlay_start_is_in_progress() -> None:
+    harness = Harness(overlay_state="off", provider_available=False)
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+    runtime = Runtime(
+        effective_active=False,
+        prepare_entered=asyncio.Event(),
+        prepare_release=asyncio.Event(),
+    )
+    owner.bind_runtime(runtime)
+
+    enabling = asyncio.create_task(owner.set_enabled(True))
+    await runtime.prepare_entered.wait()
+
+    assert "overlay_start" in harness.events
+    assert owner.snapshot().model_loading is True
+    harness.overlay_state = "connected"
+    await owner.refresh_runtime()
+    assert runtime.policy_calls == []
+
+    runtime.prepare_release.set()
+    await enabling
+
+    assert len(runtime.prepare_calls) == 1
+    assert len(runtime.policy_calls) == 1
+    assert runtime.policy_calls[0][1] is True
+    assert owner.snapshot().model_loading is False
+
+
+@pytest.mark.asyncio
+async def test_failed_local_provider_preparation_is_not_retried_by_activation() -> None:
+    harness = Harness(overlay_state="connected", provider_available=False)
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+    runtime = Runtime(
+        effective_active=False,
+        provider_status=PeerCaptureProviderStatus.FAILED,
+    )
+    owner.bind_runtime(runtime)
+
+    await owner.set_enabled(True)
+
+    assert len(runtime.prepare_calls) == 1
+    assert runtime.policy_calls == []
+    assert owner.snapshot().activation_starting is False
+    assert owner.snapshot().model_loading is False
 
 
 @pytest.mark.asyncio

@@ -391,6 +391,101 @@ class PeerCaptureSessionOwner:
             stop_mode=stop_mode,
         )
 
+    async def prepare_provider(
+        self,
+        config: PeerCaptureSessionConfig,
+    ) -> PeerCaptureSessionSnapshot:
+        async with self._lock:
+            if self._closed:
+                raise RuntimeError("PeerCaptureSessionOwner is closed")
+            if (
+                self._desired_active
+                or self._audio_source is not None
+                or self._loop_task is not None
+            ):
+                return self.snapshot
+            self._generation += 1
+            generation = self._generation
+            self._config = config
+            self._state = PeerCaptureSessionState.PROVIDER_PENDING
+            self._provider_status = PeerCaptureProviderStatus.PENDING
+            self._last_failure = None
+            self._admission_reason = None
+            self._notify_state_changed()
+        async with self._activation_lock:
+            if generation != self._generation or self._closed:
+                return self.snapshot
+            reusable = (
+                self._provider.is_ready(config) and self._provider_attachment_token is not None
+            )
+            attachment_token = self._provider_attachment_token
+            if reusable:
+                result_status = PeerCaptureProviderMutationStatus.APPLIED
+                failure_reason = None
+                pending_failure = None
+            else:
+                attachment_token = object()
+                self._pending_provider_failures[attachment_token] = None
+                try:
+                    result = await self._provider.replace(
+                        self._provider_request_factory(config, config.local_provider),
+                        start=False,
+                        on_terminal_failure=lambda exc: self._on_terminal_stt_failure(
+                            exc,
+                            attachment_token=attachment_token,
+                        ),
+                    )
+                except asyncio.CancelledError:
+                    self._pending_provider_failures.pop(attachment_token, None)
+                    raise
+                except Exception as exc:
+                    self._pending_provider_failures.pop(attachment_token, None)
+                    result_status = PeerCaptureProviderMutationStatus.FAILED
+                    failure_reason = type(exc).__name__
+                    pending_failure = None
+                else:
+                    result_status = result.status
+                    failure_reason = result.reason
+                    pending_failure = self._pending_provider_failures.pop(
+                        attachment_token,
+                        None,
+                    )
+            if generation != self._generation or self._closed:
+                if not reusable and result_status is PeerCaptureProviderMutationStatus.APPLIED:
+                    await self._provider.release(mode="abort")
+                return self.snapshot
+            if pending_failure is not None:
+                await self._fault_current_generation_locked(
+                    generation,
+                    config=config,
+                    reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                )
+                return self.snapshot
+            if result_status is PeerCaptureProviderMutationStatus.APPLIED:
+                self._provider_signature = config.provider_signature
+                self._signature = config.runtime_signature
+                if not reusable:
+                    self._commit_provider_attachment(attachment_token)
+                self._provider_status = PeerCaptureProviderStatus.READY
+                self._state = PeerCaptureSessionState.STOPPED
+                self._emit_event(PeerCaptureDiagnosticEvent.PROVIDER_CHANGED)
+            elif result_status is PeerCaptureProviderMutationStatus.PENDING:
+                self._provider_status = PeerCaptureProviderStatus.PENDING
+                self._state = PeerCaptureSessionState.PROVIDER_PENDING
+                self._admission_reason = failure_reason
+            elif result_status is PeerCaptureProviderMutationStatus.SUPERSEDED:
+                self._provider_status = PeerCaptureProviderStatus.DETACHED
+                self._state = PeerCaptureSessionState.STOPPED
+            else:
+                await self._fault_current_generation_locked(
+                    generation,
+                    config=config,
+                    reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                )
+                return self.snapshot
+            self._notify_state_changed()
+            return self.snapshot
+
     async def retry_process_capture(
         self,
         *,

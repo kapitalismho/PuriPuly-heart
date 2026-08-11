@@ -9,6 +9,7 @@ from puripuly_heart.app.services.local_asr_selection import LOCAL_CPU_PROVIDERS
 from puripuly_heart.core.peer_capture import (
     PeerCaptureDiagnostic,
     PeerCaptureFailureReason,
+    PeerCaptureProviderStatus,
     PeerCaptureSessionConfig,
     PeerCaptureSessionSnapshot,
 )
@@ -105,6 +106,7 @@ class PeerApplicationOwner:
     _activation_generation: int = field(init=False, default=0, repr=False)
     _activation_starting: bool = field(init=False, default=False, repr=False)
     _model_loading: bool = field(init=False, default=False, repr=False)
+    _model_loading_generation: int | None = field(init=False, default=None, repr=False)
     _process_warning_reason: str | None = field(init=False, default=None, repr=False)
     _effective_trace_generation: int | None = field(init=False, default=None, repr=False)
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
@@ -173,6 +175,7 @@ class PeerApplicationOwner:
     @model_loading.setter
     def model_loading(self, value: bool) -> None:
         self._model_loading = bool(value)
+        self._model_loading_generation = self._activation_generation if value else None
 
     @property
     def process_warning_reason(self) -> str | None:
@@ -343,6 +346,7 @@ class PeerApplicationOwner:
         )
         self._activation_starting = enabled
         self.presentation_changed()
+        ready = False
         if enabled:
             ready = await self.ensure_local_ready(generation)
             if generation != self._activation_generation:
@@ -356,10 +360,51 @@ class PeerApplicationOwner:
         self.sync_local_notice()
         self.presentation_changed()
         current = self.state_provider()
-        if enabled and current.overlay_state not in {"starting", "connected"}:
-            await self.begin_overlay_start()
-        else:
-            await self.refresh_dependencies(stop_mode="release" if not enabled else "retain")
+        prepared = False
+        runtime = self._runtime
+        prepare_local = bool(
+            enabled
+            and ready
+            and current.peer_provider_id in LOCAL_CPU_PROVIDERS
+            and runtime is not None
+        )
+        config = self.config_factory() if prepare_local else None
+        if prepare_local:
+            self._model_loading = True
+            self._model_loading_generation = generation
+            self.sync_local_notice()
+            self.presentation_changed()
+        try:
+            if enabled and current.overlay_state not in {"starting", "connected"}:
+                await self.begin_overlay_start()
+                if generation != self._activation_generation or (
+                    prepare_local and self._runtime is not runtime
+                ):
+                    return
+            if prepare_local and runtime is not None and config is not None:
+                prepared_snapshot = await runtime.prepare_provider(config)
+        finally:
+            if self._model_loading_generation == generation:
+                self._model_loading = False
+                self._model_loading_generation = None
+                self.sync_local_notice()
+                self.presentation_changed()
+        if prepare_local and config is not None:
+            if generation != self._activation_generation or self._runtime is not runtime:
+                return
+            prepared = prepared_snapshot.provider_status is PeerCaptureProviderStatus.READY
+            if prepared:
+                self._last_provider_signature = config.provider_signature
+                self._last_runtime_signature = config.runtime_signature
+            else:
+                self._activation_starting = False
+        current = self.state_provider()
+        if not enabled:
+            await self.refresh_dependencies(stop_mode="release")
+        elif current.overlay_state == "connected" and (not prepare_local or prepared):
+            await self.refresh_dependencies()
+        elif current.overlay_state == "starting" and not prepare_local:
+            await self.refresh_dependencies()
         if generation != self._activation_generation:
             return
         self.sync_effective_flags()
@@ -401,6 +446,12 @@ class PeerApplicationOwner:
         state = self.state_provider()
         runtime = self._runtime
         if not state.settings_available or not state.runtime_available or runtime is None:
+            return
+        if (
+            self._model_loading
+            and self._model_loading_generation == self._activation_generation
+            and self.local_stt_requested(state)
+        ):
             return
         config = self.config_factory()
         desired_active = self.desired_active(state)
