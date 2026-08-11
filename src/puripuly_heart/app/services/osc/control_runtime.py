@@ -8,6 +8,8 @@ from collections.abc import Callable, Mapping
 from puripuly_heart.app.ports.osc_control import (
     OSC_PARAMETER_DEFINITIONS,
     OscConnectionMode,
+    OscControlCodecError,
+    decode_control_message,
 )
 from puripuly_heart.app.ports.oscquery import OscQueryServicePort
 from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
@@ -37,7 +39,7 @@ class OscControlIntegrationOwner:
         translation_model_normalizer: Callable[[object], object],
         query_service: OscQueryServicePort | None = None,
         error_sink: Callable[[str], None] | None = None,
-        command_suppression_seconds: float = 1.5,
+        resync_timeout_seconds: float = 1.5,
     ) -> None:
         self._receiver_owner = receiver_owner
         self._settings_provider = settings_provider
@@ -52,8 +54,11 @@ class OscControlIntegrationOwner:
         self._configured_connection: tuple[str, OscConnectionMode, int, int] | None = None
         self._accepting_ingress = True
         self._closed = False
-        self._command_suppression_seconds = float(command_suppression_seconds)
-        self._command_suppression_until = 0.0
+        self._resync_timeout_seconds = float(resync_timeout_seconds)
+        self._resync_generation = 0
+        self._resync_deadline = 0.0
+        self._resync_unsettled: set[str] = set()
+        self._resync_ready_generation: int | None = None
         self._publisher: OscStatePublisher | None = None
         self._avatar_parameter_diagnostics: dict[str, object] = {}
         self._avatar_sequence = 0
@@ -89,6 +94,7 @@ class OscControlIntegrationOwner:
             receiver_effective_port=lambda: self._receiver_owner.effective_port,
             sender_destination_changed=self._set_sender_destination,
             snapshot_publisher=self._publish_snapshot,
+            resync_starter=self._begin_query_resync,
             avatar_inspector=self._inspect_avatar_tree,
         )
 
@@ -198,12 +204,13 @@ class OscControlIntegrationOwner:
             return
 
         await self.router.suspend_ingress()
+        await self.query_runtime.stop()
         self._send_port = int(send_port)
         self._receive_port = int(receive_port)
         self._host = host
         self._mode = mode
         self._configured_connection = (host, mode, self._send_port, self._receive_port)
-        await self.query_runtime.stop()
+        resync_generation = self._begin_resync() if mode != "off" else None
         receiver_port = 0 if mode == "automatic" else self._receive_port
         await self._receiver_owner.configure_control(
             active=mode != "off",
@@ -219,19 +226,20 @@ class OscControlIntegrationOwner:
         self._ensure_publisher()
         if mode == "manual":
             await self._set_sender_destination(host, self._send_port)
-            self._publish_start()
-            self._begin_command_suppression()
+            self._publish_start(resync_generation)
             self.router.set_ingress_enabled(True)
             return
 
         try:
-            await self.query_runtime.start("automatic")
+            await self.query_runtime.start(
+                "automatic",
+                snapshot_generation=resync_generation,
+            )
         except Exception as exc:
             self._report_error(f"OSCQuery automatic discovery unavailable: {type(exc).__name__}")
             await self._receiver_owner.ensure_receiver()
             await self._set_sender_destination(host, VRCHAT_OSC_DEFAULT_INPUT_PORT)
-            self._publish_start()
-        self._begin_command_suppression()
+            self._publish_start(resync_generation)
         self.router.set_ingress_enabled(True)
 
     async def close(self) -> None:
@@ -316,20 +324,38 @@ class OscControlIntegrationOwner:
             )
         )
 
-    def _begin_command_suppression(self) -> None:
-        self._command_suppression_until = time.monotonic() + self._command_suppression_seconds
+    def _begin_resync(self) -> int:
+        self._resync_generation += 1
+        self._resync_deadline = time.monotonic() + self._resync_timeout_seconds
+        self._resync_unsettled = set(OSC_PARAMETER_DEFINITIONS)
+        self._resync_ready_generation = None
+        return self._resync_generation
 
-    def _suppressing_commands(self) -> bool:
-        return time.monotonic() < self._command_suppression_until
+    def _begin_query_resync(self, _reason: str) -> int | None:
+        if not self._accepting_ingress or self._mode != "automatic":
+            return None
+        return self._begin_resync()
 
-    def _publish_start(self) -> None:
+    def _expire_resync_if_needed(self) -> None:
+        if self._resync_unsettled and time.monotonic() >= self._resync_deadline:
+            self._resync_unsettled.clear()
+
+    def _mark_resync_ready(self, generation: int | None = None) -> None:
+        expected_generation = self._resync_generation if generation is None else generation
+        if expected_generation == self._resync_generation:
+            self._resync_ready_generation = expected_generation
+
+    def _publish_start(self, generation: int | None = None) -> None:
         if self._mode == "off":
             return
         publisher = self._ensure_publisher()
         if publisher is None:
             return
-        with contextlib.suppress(Exception):
+        try:
             publisher.start(self._state_provider())
+        except Exception:
+            return
+        self._mark_resync_ready(generation)
 
     def _publish_delta(self) -> None:
         if self._mode == "off":
@@ -349,14 +375,20 @@ class OscControlIntegrationOwner:
         publisher = self._ensure_publisher()
         if publisher is None:
             return
-        with contextlib.suppress(Exception):
+        try:
             publisher.publish_full(self._state_provider())
-
-    async def _publish_snapshot(self, reason: str) -> None:
-        if self._mode == "off":
+        except Exception:
             return
-        if reason in {"avatar_change", "discovery"}:
-            self._begin_command_suppression()
+
+    async def _publish_snapshot(
+        self,
+        reason: str,
+        generation: int | None = None,
+    ) -> None:
+        if not self._accepting_ingress or self._mode == "off":
+            return
+        if generation is not None and generation != self._resync_generation:
+            return
         publisher = self._ensure_publisher()
         if publisher is None:
             return
@@ -370,6 +402,8 @@ class OscControlIntegrationOwner:
                 publisher.start(state)
         except Exception as exc:
             self._report_error(f"OSC state publication failed: {type(exc).__name__}")
+            return
+        self._mark_resync_ready(generation)
 
     async def _inspect_avatar_tree(self, tree: object) -> None:
         parameters = _extract_avatar_parameters(tree)
@@ -390,19 +424,35 @@ class OscControlIntegrationOwner:
     def _handle_control_packet(self, address: str, values: tuple[object, ...]) -> bool:
         if self._mode == "off":
             return False
-        if self._suppressing_commands():
+        self._expire_resync_if_needed()
+        try:
+            message = decode_control_message(address, *values)
+        except OscControlCodecError:
+            return self.router.handle_packet(address, *values)
+        if message.name not in self._resync_unsettled:
+            return self.router.handle_packet(address, *values)
+        if self._resync_ready_generation != self._resync_generation:
             return False
-        return self.router.handle_packet(address, *values)
+        try:
+            canonical = OscStatePublisher.value_for_state(
+                self._state_provider(),
+                message.name,
+            )
+        except Exception:
+            return False
+        if OscStatePublisher.values_equal(message.name, message.value, canonical):
+            self._resync_unsettled.discard(message.name)
+        return False
 
     def _handle_avatar_change(self, _values: tuple[object, ...]) -> None:
         if not self._accepting_ingress or self._mode == "off":
             return
-        self._begin_command_suppression()
+        generation = self._begin_resync()
         try:
             self._avatar_sequence += 1
             start_lifecycle_task(
                 self._scope,
-                self.query_runtime.on_avatar_change(),
+                self.query_runtime.on_avatar_change(snapshot_generation=generation),
                 name=f"avatar-change-{self._avatar_sequence}",
             )
         except RuntimeError:

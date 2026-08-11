@@ -11,7 +11,9 @@ from puripuly_heart.app.ports.osc_control import (
     LANGUAGE_ID_BY_CODE,
     OSC_PARAMETER_ADDRESS_PREFIX,
     TRANSLATION_MODEL_ID_BY_VALUE,
+    OscControlCodecError,
     OscSenderPort,
+    validate_control_value,
 )
 
 
@@ -61,7 +63,30 @@ class OscStatePublisher:
         return dict(self._last_published)
 
     def is_echo(self, parameter: str, value: bool | int) -> bool:
-        return self._last_published.get(parameter) == value
+        published = self._last_published.get(parameter)
+        return published is not None and self.values_equal(parameter, value, published)
+
+    @classmethod
+    def value_for_state(
+        cls,
+        state: OscCanonicalState,
+        parameter: str,
+    ) -> bool | int:
+        return cls._values_for_state(state)[parameter]
+
+    @staticmethod
+    def values_equal(
+        parameter: str,
+        first: object,
+        second: object,
+    ) -> bool:
+        try:
+            return validate_control_value(parameter, first) == validate_control_value(
+                parameter,
+                second,
+            )
+        except OscControlCodecError:
+            return False
 
     def start(self, state: OscCanonicalState | None = None) -> tuple[OscPublishedValue, ...]:
         self._started = True

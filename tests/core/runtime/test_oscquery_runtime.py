@@ -94,7 +94,7 @@ async def test_oscquery_runtime_uses_dynamic_receive_port_and_discovered_send_po
         receiver_stop=stop_receiver,
         receiver_effective_port=lambda: 49152,
         sender_destination_changed=lambda host, port: events.append((host, port)),
-        snapshot_publisher=lambda reason: events.append(("snapshot", reason)),
+        snapshot_publisher=lambda reason, _generation: events.append(("snapshot", reason)),
     )
 
     await runtime.start("automatic")
@@ -157,7 +157,7 @@ async def test_oscquery_monitor_detects_disappearance_and_rediscovery_without_ca
         receiver_stop=lambda: _noop(),
         receiver_effective_port=lambda: 49152,
         sender_destination_changed=lambda host, port: events.append((host, port)),
-        snapshot_publisher=lambda reason: events.append(("snapshot", reason)),
+        snapshot_publisher=lambda reason, _generation: events.append(("snapshot", reason)),
         discovery_poll_interval_seconds=0.01,
     )
     await runtime.start("automatic", manual_send_port=9123)

@@ -6,10 +6,12 @@ from dataclasses import dataclass
 
 import pytest
 
+from puripuly_heart.app.ports.osc_control import OSC_PARAMETER_DEFINITIONS
 from puripuly_heart.app.ports.oscquery import (
     OscQueryAdvertisement,
     OscQueryServiceInfo,
 )
+from puripuly_heart.app.services.osc import control_runtime as control_runtime_module
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
 from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState
 from puripuly_heart.config.settings import AppSettings, materialize_translation_settings
@@ -77,8 +79,39 @@ class FakeReceiverOwner:
         self.closed = True
 
 
+class PacketInjectingReceiverOwner(FakeReceiverOwner):
+    def __init__(self, *packets: tuple[str, tuple[object, ...]]) -> None:
+        super().__init__()
+        self.packets = packets
+        self.results: list[object] = []
+
+    async def configure_control(
+        self,
+        *,
+        active: bool,
+        host: str,
+        port: int,
+        force_restart: bool = False,
+    ) -> None:
+        await super().configure_control(
+            active=active,
+            host=host,
+            port=port,
+            force_restart=force_restart,
+        )
+        if active:
+            handler = self.packet_handlers["control_packet_handler"]
+            assert callable(handler)
+            for address, values in self.packets:
+                self.results.append(handler(address, values))
+
+
 class DashboardApplication:
+    def __init__(self) -> None:
+        self.stt_values: list[bool] = []
+
     async def set_stt_enabled(self, _enabled: bool) -> None:
+        self.stt_values.append(_enabled)
         return None
 
 
@@ -141,6 +174,20 @@ class FakeService:
         }
 
 
+class DelayedAvatarService(FakeService):
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.block_avatar_queries = False
+        self.query_started = asyncio.Event()
+        self.query_gate = asyncio.Event()
+
+    async def query_avatar(self, service: OscQueryServiceInfo) -> dict[str, object]:
+        if self.block_avatar_queries:
+            self.query_started.set()
+            await self.query_gate.wait()
+        return await super().query_avatar(service)
+
+
 def _integration(
     settings: AppSettings,
     receiver_owner: FakeReceiverOwner,
@@ -150,7 +197,7 @@ def _integration(
     application: object | None = None,
     osc_state: OscCanonicalState | None = None,
     state_provider: Callable[[], OscCanonicalState] | None = None,
-    command_suppression_seconds: float = 1.5,
+    resync_timeout_seconds: float = 1.5,
 ) -> OscControlIntegrationOwner:
     return OscControlIntegrationOwner(
         receiver_owner=receiver_owner,
@@ -162,7 +209,7 @@ def _integration(
         language_state_provider=lambda: ("ko", "en", "en", "ko"),
         translation_model_normalizer=materialize_translation_settings,
         query_service=service,
-        command_suppression_seconds=command_suppression_seconds,
+        resync_timeout_seconds=resync_timeout_seconds,
     )
 
 
@@ -341,7 +388,7 @@ async def test_two_integrations_keep_distinct_receivers_and_cleanup_independentl
 
 
 @pytest.mark.asyncio
-async def test_connection_start_suppresses_initial_parameter_dump() -> None:
+async def test_connection_start_fences_parameters_until_each_canonical_value_arrives() -> None:
     settings = AppSettings()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
@@ -350,7 +397,7 @@ async def test_connection_start_suppresses_initial_parameter_dump() -> None:
         receiver_owner,
         sender,
         FakeService(None),
-        command_suppression_seconds=60,
+        resync_timeout_seconds=60,
     )
 
     await integration.configure_connection(
@@ -361,21 +408,165 @@ async def test_connection_start_suppresses_initial_parameter_dump() -> None:
     control_handler = receiver_owner.packet_handlers["control_packet_handler"]
 
     assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (11,)) is False
+    assert "PuriPuly_SelfDstLang" in integration._resync_unsettled
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (7,)) is False
+    assert "PuriPuly_SelfDstLang" not in integration._resync_unsettled
+    assert "PuriPuly_SelfSrcLang" in integration._resync_unsettled
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (11,)) is True
 
     await integration.close()
 
 
 @pytest.mark.asyncio
-async def test_avatar_change_suppresses_parameter_dump_until_window_expires() -> None:
+async def test_manual_connection_packet_before_snapshot_cannot_settle_parameter() -> None:
+    settings = AppSettings()
+    receiver_owner = PacketInjectingReceiverOwner(
+        ("/avatar/parameters/PuriPuly_SelfDstLang", (7,)),
+    )
+    sender = FakeSender()
+    integration = _integration(settings, receiver_owner, sender, FakeService(None))
+
+    await integration.configure_connection(
+        mode="manual",
+        send_port=9020,
+        receive_port=9021,
+    )
+
+    assert receiver_owner.results == [False]
+    assert integration._resync_ready_generation == integration._resync_generation
+    assert "PuriPuly_SelfDstLang" in integration._resync_unsettled
+
+    control_handler = receiver_owner.packet_handlers["control_packet_handler"]
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (7,)) is False
+    assert "PuriPuly_SelfDstLang" not in integration._resync_unsettled
+
+    await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_invalid_prepublication_packet_cannot_make_generation_ready() -> None:
+    settings = AppSettings()
+    receiver_owner = PacketInjectingReceiverOwner(
+        ("/avatar/parameters/PuriPuly_SelfASR", (99,)),
+        ("/avatar/parameters/PuriPuly_SelfDstLang", (7,)),
+    )
+    sender = FakeSender()
+    integration = _integration(settings, receiver_owner, sender, FakeService(None))
+
+    await integration.configure_connection(
+        mode="manual",
+        send_port=9020,
+        receive_port=9021,
+    )
+
+    assert receiver_owner.results == [False, False]
+    assert integration._resync_ready_generation == integration._resync_generation
+    assert "PuriPuly_SelfDstLang" in integration._resync_unsettled
+
+    control_handler = receiver_owner.packet_handlers["control_packet_handler"]
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (7,)) is False
+    assert "PuriPuly_SelfDstLang" not in integration._resync_unsettled
+
+    await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_automatic_connection_packet_before_delayed_snapshot_cannot_settle() -> None:
     settings = AppSettings()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
+    service = DelayedAvatarService(
+        OscQueryServiceInfo(
+            service_id="VRChat",
+            host="127.0.0.1",
+            osc_send_port=9010,
+            is_vrchat=True,
+        )
+    )
+    service.block_avatar_queries = True
+    integration = _integration(settings, receiver_owner, sender, service)
+
+    configure_task = asyncio.create_task(
+        integration.configure_connection(
+            mode="automatic",
+            send_port=9020,
+            receive_port=9021,
+        )
+    )
+    await service.query_started.wait()
+    control_handler = receiver_owner.packet_handlers["control_packet_handler"]
+
+    assert integration._resync_ready_generation is None
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (7,)) is False
+    assert "PuriPuly_SelfDstLang" in integration._resync_unsettled
+
+    service.query_gate.set()
+    await configure_task
+
+    assert integration._resync_ready_generation == integration._resync_generation
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (7,)) is False
+    assert "PuriPuly_SelfDstLang" not in integration._resync_unsettled
+
+    await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_avatar_packet_before_delayed_snapshot_cannot_settle_parameter() -> None:
+    settings = AppSettings()
+    receiver_owner = FakeReceiverOwner()
+    sender = FakeSender()
+    service = DelayedAvatarService(
+        OscQueryServiceInfo(
+            service_id="VRChat",
+            host="127.0.0.1",
+            osc_send_port=9010,
+            is_vrchat=True,
+        )
+    )
+    integration = _integration(settings, receiver_owner, sender, service)
+
+    await integration.configure_connection(
+        mode="automatic",
+        send_port=9020,
+        receive_port=9021,
+    )
+    service.block_avatar_queries = True
+    service.query_started.clear()
+    integration._handle_avatar_change(())
+    await service.query_started.wait()
+    generation = integration._resync_generation
+    control_handler = receiver_owner.packet_handlers["control_packet_handler"]
+
+    assert integration._resync_ready_generation is None
+    assert control_handler("/avatar/parameters/PuriPuly_Talk", (False,)) is False
+    assert "PuriPuly_Talk" in integration._resync_unsettled
+
+    service.query_gate.set()
+    for _ in range(10):
+        await asyncio.sleep(0)
+        if integration._resync_ready_generation == generation:
+            break
+
+    assert integration._resync_ready_generation == generation
+    assert control_handler("/avatar/parameters/PuriPuly_Talk", (False,)) is False
+    assert "PuriPuly_Talk" not in integration._resync_unsettled
+
+    await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_resync_settlement_uses_live_canonical_state() -> None:
+    settings = AppSettings()
+    receiver_owner = FakeReceiverOwner()
+    sender = FakeSender()
+    state = [OscCanonicalState(self_target_language="en")]
     integration = _integration(
         settings,
         receiver_owner,
         sender,
         FakeService(None),
-        command_suppression_seconds=60,
+        state_provider=lambda: state[0],
+        resync_timeout_seconds=60,
     )
 
     await integration.configure_connection(
@@ -385,13 +576,185 @@ async def test_avatar_change_suppresses_parameter_dump_until_window_expires() ->
     )
     control_handler = receiver_owner.packet_handlers["control_packet_handler"]
 
-    integration._handle_avatar_change(())
+    state[0] = OscCanonicalState(self_target_language="fr")
+    integration.publish_delta()
 
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (7,)) is False
+    assert "PuriPuly_SelfDstLang" in integration._resync_unsettled
     assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (11,)) is False
+    assert "PuriPuly_SelfDstLang" not in integration._resync_unsettled
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (7,)) is True
 
-    integration._command_suppression_until = 0.0
+    await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_resync_deadline_fails_open_for_all_remaining_parameters() -> None:
+    settings = AppSettings()
+    receiver_owner = FakeReceiverOwner()
+    sender = FakeSender()
+    integration = _integration(
+        settings,
+        receiver_owner,
+        sender,
+        FakeService(None),
+        resync_timeout_seconds=0.0,
+    )
+
+    await integration.configure_connection(
+        mode="manual",
+        send_port=9020,
+        receive_port=9021,
+    )
+    control_handler = receiver_owner.packet_handlers["control_packet_handler"]
 
     assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (11,)) is True
+    assert integration._resync_unsettled == set()
+
+    await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_avatar_snapshot_completion_does_not_rearm_event_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = [100.0]
+    monkeypatch.setattr(control_runtime_module.time, "monotonic", lambda: now[0])
+    settings = AppSettings()
+    receiver_owner = FakeReceiverOwner()
+    sender = FakeSender()
+    integration = _integration(settings, receiver_owner, sender, FakeService(None))
+
+    await integration.configure_connection(
+        mode="manual",
+        send_port=9020,
+        receive_port=9021,
+    )
+    now[0] = 200.0
+    integration._handle_avatar_change(())
+    generation = integration._resync_generation
+    deadline = integration._resync_deadline
+    now[0] = 300.0
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert integration._resync_generation == generation
+    assert integration._resync_deadline == deadline == 201.5
+
+    await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_rapid_avatar_changes_ignore_stale_snapshot_completion() -> None:
+    settings = AppSettings()
+    receiver_owner = FakeReceiverOwner()
+    sender = FakeSender()
+    integration = _integration(settings, receiver_owner, sender, FakeService(None))
+
+    await integration.configure_connection(
+        mode="manual",
+        send_port=9020,
+        receive_port=9021,
+    )
+    initial_generation = integration._resync_generation
+    sender.messages.clear()
+
+    integration._handle_avatar_change(())
+    integration._handle_avatar_change(())
+    for _ in range(10):
+        await asyncio.sleep(0)
+        if len(sender.messages) == len(OSC_PARAMETER_DEFINITIONS):
+            break
+
+    assert integration._resync_generation == initial_generation + 2
+    assert integration._resync_unsettled == set(OSC_PARAMETER_DEFINITIONS)
+    assert len(sender.messages) == len(OSC_PARAMETER_DEFINITIONS)
+
+    await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_discovery_epoch_is_anchored_before_avatar_query_completion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = [100.0]
+    monkeypatch.setattr(control_runtime_module.time, "monotonic", lambda: now[0])
+    settings = AppSettings()
+    receiver_owner = FakeReceiverOwner()
+    sender = FakeSender()
+    service = DelayedAvatarService(
+        OscQueryServiceInfo(
+            service_id="VRChat",
+            host="127.0.0.1",
+            osc_send_port=9010,
+            is_vrchat=True,
+        )
+    )
+    integration = _integration(settings, receiver_owner, sender, service)
+
+    await integration.configure_connection(
+        mode="automatic",
+        send_port=9020,
+        receive_port=9021,
+    )
+    initial_generation = integration._resync_generation
+    service.info = OscQueryServiceInfo(
+        service_id="VRChat-restarted",
+        host="127.0.0.1",
+        osc_send_port=9030,
+        is_vrchat=True,
+    )
+    service.block_avatar_queries = True
+    now[0] = 200.0
+    refresh_task = asyncio.create_task(integration.query_runtime.refresh())
+    await service.query_started.wait()
+
+    assert integration._resync_generation == initial_generation + 1
+    assert integration._resync_deadline == 201.5
+
+    now[0] = 300.0
+    service.query_gate.set()
+    await refresh_task
+
+    assert integration._resync_generation == initial_generation + 1
+    assert integration._resync_deadline == 201.5
+
+    await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_runtime_boolean_command_reaches_existing_path_after_settlement() -> None:
+    settings = AppSettings()
+    receiver_owner = FakeReceiverOwner()
+    sender = FakeSender()
+    application = DashboardApplication()
+    integration = _integration(
+        settings,
+        receiver_owner,
+        sender,
+        FakeService(None),
+        application=application,
+        osc_state=OscCanonicalState(self_capture=False),
+        resync_timeout_seconds=60,
+    )
+
+    await integration.configure_connection(
+        mode="manual",
+        send_port=9020,
+        receive_port=9021,
+    )
+    control_handler = receiver_owner.packet_handlers["control_packet_handler"]
+
+    assert control_handler("/avatar/parameters/PuriPuly_Talk", (True,)) is False
+    assert application.stt_values == []
+    assert control_handler("/avatar/parameters/PuriPuly_Talk", (False,)) is False
+    assert control_handler("/avatar/parameters/PuriPuly_Talk", (True,)) is True
+    for _ in range(10):
+        await asyncio.sleep(0)
+        if application.stt_values:
+            break
+
+    assert application.stt_values == [True]
 
     await integration.close()
 
@@ -424,7 +787,7 @@ async def test_invalid_control_republishes_full_canonical_state() -> None:
         receiver_owner,
         sender,
         FakeService(None),
-        command_suppression_seconds=0.0,
+        resync_timeout_seconds=0.0,
     )
 
     await integration.configure_connection(

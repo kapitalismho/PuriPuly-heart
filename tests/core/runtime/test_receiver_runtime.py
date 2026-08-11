@@ -186,31 +186,56 @@ async def test_vrc_mic_receiver_runtime_drops_late_packets_after_stop_and_genera
     None
 ):
     state = VrcMicState()
-    callbacks: list[Callable[[bool], bool]] = []
+    callbacks: list[dict[str, Callable[..., object]]] = []
+    control_packets: list[tuple[str, tuple[object, ...]]] = []
+    avatar_packets: list[tuple[object, ...]] = []
+    packets: list[tuple[str, tuple[object, ...]]] = []
 
     def receiver_factory(**kwargs):  # noqa: ANN003, ANN202
-        callbacks.append(kwargs["mute_packet_handler"])
+        callbacks.append(
+            {
+                "mute": kwargs["mute_packet_handler"],
+                "control": kwargs["control_packet_handler"],
+                "avatar": kwargs["avatar_change_handler"],
+                "packet": kwargs["packet_handler"],
+            }
+        )
         return FakeOscReceiver()
 
     runtime = VrcMicReceiverRuntime(
         state=state,
         receiver_factory=receiver_factory,
         mute_delay_s=0.0,
+        control_packet_handler=lambda address, values: control_packets.append((address, values)),
+        avatar_change_handler=lambda values: avatar_packets.append(values),
+        packet_handler=lambda address, values: packets.append((address, values)),
     )
     await runtime.start()
     stale_callback = callbacks[0]
     stale_generation = runtime.generation
     await runtime.stop()
 
-    assert stale_callback(False) is False
+    assert stale_callback["mute"](False) is False
+    assert stale_callback["control"]("/avatar/parameters/PuriPuly_Talk", (True,)) is False
+    assert stale_callback["avatar"](("avatar-id",)) is False
+    assert stale_callback["packet"]("/test", (1,)) is False
     assert runtime.handle_mute_packet(False, generation=stale_generation) is False
     await _flush_loop()
     assert state.muted is None
+    assert control_packets == []
+    assert avatar_packets == []
+    assert packets == []
 
     await runtime.start()
-    assert callbacks[1](False) is True
+    assert callbacks[1]["mute"](False) is True
+    callbacks[1]["control"]("/avatar/parameters/PuriPuly_Talk", (True,))
+    callbacks[1]["avatar"](("avatar-id",))
+    callbacks[1]["packet"]("/test", (1,))
     await _flush_loop()
     assert state.muted is False
+    assert control_packets == [("/avatar/parameters/PuriPuly_Talk", (True,))]
+    assert avatar_packets == [("avatar-id",)]
+    assert packets == [("/test", (1,))]
 
 
 @pytest.mark.asyncio

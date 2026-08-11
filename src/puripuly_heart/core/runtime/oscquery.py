@@ -18,7 +18,8 @@ OscReceiverStarter = Callable[[], Awaitable[object]]
 OscReceiverStopper = Callable[[], Awaitable[object]]
 OscEffectivePort = Callable[[], int]
 OscDestinationChanged = Callable[[str, int], Awaitable[None] | None]
-OscSnapshotPublisher = Callable[[str], Awaitable[None] | None]
+OscSnapshotPublisher = Callable[[str, int | None], Awaitable[None] | None]
+OscResyncStarter = Callable[[str], int | None]
 OscAvatarInspector = Callable[[Mapping[str, object]], Awaitable[None] | None]
 VRCHAT_OSC_DEFAULT_INPUT_PORT: Final = 9000
 
@@ -31,6 +32,7 @@ class OscQueryRuntime:
     receiver_effective_port: OscEffectivePort
     sender_destination_changed: OscDestinationChanged | None = None
     snapshot_publisher: OscSnapshotPublisher | None = None
+    resync_starter: OscResyncStarter | None = None
     avatar_inspector: OscAvatarInspector | None = None
     receiver_host: str = "127.0.0.1"
     discovery_poll_interval_seconds: float = 2.0
@@ -61,6 +63,7 @@ class OscQueryRuntime:
         mode: OscConnectionMode,
         *,
         manual_send_port: int = 9000,
+        snapshot_generation: int | None = None,
     ) -> None:
         async with self._lock:
             await self._stop_locked()
@@ -77,7 +80,7 @@ class OscQueryRuntime:
                         self.sender_destination_changed(self.receiver_host, manual_send_port)
                     )
                 if self.snapshot_publisher is not None:
-                    await _maybe_await(self.snapshot_publisher("start"))
+                    await _maybe_await(self.snapshot_publisher("start", snapshot_generation))
                 return
 
             self._fallback_send_port = VRCHAT_OSC_DEFAULT_INPUT_PORT
@@ -104,7 +107,7 @@ class OscQueryRuntime:
                     self._refresh_requested = False
                     await self._refresh_locked(publish_snapshot=False)
                 if self.snapshot_publisher is not None:
-                    await _maybe_await(self.snapshot_publisher("start"))
+                    await _maybe_await(self.snapshot_publisher("start", snapshot_generation))
                 self._start_discovery_monitor()
             except BaseException:
                 await self._stop_locked()
@@ -126,6 +129,14 @@ class OscQueryRuntime:
         changed = service_info != self.service_info
         if not changed and not force_requery:
             return
+        snapshot_generation = None
+        if (
+            publish_snapshot
+            and service_info is not None
+            and self.snapshot_publisher is not None
+            and self.resync_starter is not None
+        ):
+            snapshot_generation = self.resync_starter("discovery")
         self.service_info = service_info
         await self._apply_service_info(
             self.service_info,
@@ -135,17 +146,18 @@ class OscQueryRuntime:
             publish_snapshot
             and self.service_info is not None
             and self.snapshot_publisher is not None
+            and (self.resync_starter is None or snapshot_generation is not None)
         ):
-            await _maybe_await(self.snapshot_publisher("discovery"))
+            await _maybe_await(self.snapshot_publisher("discovery", snapshot_generation))
 
-    async def on_avatar_change(self) -> None:
+    async def on_avatar_change(self, *, snapshot_generation: int | None = None) -> None:
         async with self._lock:
             await self._refresh_locked(
                 publish_snapshot=False,
                 force_requery=True,
             )
         if self.snapshot_publisher is not None:
-            await _maybe_await(self.snapshot_publisher("avatar_change"))
+            await _maybe_await(self.snapshot_publisher("avatar_change", snapshot_generation))
 
     async def stop(self) -> None:
         async with self._lock:

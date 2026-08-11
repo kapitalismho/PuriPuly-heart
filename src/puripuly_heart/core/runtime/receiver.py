@@ -169,7 +169,7 @@ class VrcMicReceiverRuntime:
     resource_fields = ("receiver", "_mute_task", "_mute_tasks", "_generation")
     stop_ingress = "stop receiver before runtime shutdown"
     shutdown_policy = "close socket, cancel/gather receiver task"
-    late_callback_rule = "late mute packets dropped after stop"
+    late_callback_rule = "late packets dropped after stop"
 
     def __init__(
         self,
@@ -311,12 +311,8 @@ class VrcMicReceiverRuntime:
             self._notify_state_changed()
 
     def handle_mute_packet(self, is_muted: bool, *, generation: int | None = None) -> bool:
-        expected_generation = self._active_generation if generation is None else generation
-        if expected_generation is None or not self.is_current_generation(expected_generation):
-            self._emit(
-                "vrc_mic_receiver_late_packet_dropped",
-                {"host": self._host, "port": self._port},
-            )
+        expected_generation = self._packet_generation(generation)
+        if expected_generation is None:
             return False
 
         previous_task = self._mute_task
@@ -339,6 +335,51 @@ class VrcMicReceiverRuntime:
         self._notify_state_changed()
         return True
 
+    def handle_control_packet(
+        self,
+        address: str,
+        values: tuple[Any, ...],
+        *,
+        generation: int | None = None,
+    ) -> object:
+        if self._packet_generation(generation) is None:
+            return False
+        handler = self._control_packet_handler
+        return handler(address, values) if handler is not None else False
+
+    def handle_avatar_change_packet(
+        self,
+        values: tuple[Any, ...],
+        *,
+        generation: int | None = None,
+    ) -> object:
+        if self._packet_generation(generation) is None:
+            return False
+        handler = self._avatar_change_handler
+        return handler(values) if handler is not None else False
+
+    def handle_packet(
+        self,
+        address: str,
+        values: tuple[Any, ...],
+        *,
+        generation: int | None = None,
+    ) -> object:
+        if self._packet_generation(generation) is None:
+            return False
+        handler = self._packet_handler
+        return handler(address, values) if handler is not None else False
+
+    def _packet_generation(self, generation: int | None) -> int | None:
+        expected_generation = self._active_generation if generation is None else generation
+        if expected_generation is not None and self.is_current_generation(expected_generation):
+            return expected_generation
+        self._emit(
+            "vrc_mic_receiver_late_packet_dropped",
+            {"host": self._host, "port": self._port},
+        )
+        return None
+
     def is_current_generation(self, generation: int) -> bool:
         return (
             not self._closing
@@ -357,9 +398,38 @@ class VrcMicReceiverRuntime:
                 is_muted,
                 generation=_generation,
             ),
-            control_packet_handler=self._control_packet_handler,
-            avatar_change_handler=self._avatar_change_handler,
-            packet_handler=self._packet_handler,
+            control_packet_handler=(
+                (
+                    lambda address, values, *, _generation=generation: self.handle_control_packet(
+                        address,
+                        values,
+                        generation=_generation,
+                    )
+                )
+                if self._control_packet_handler is not None
+                else None
+            ),
+            avatar_change_handler=(
+                (
+                    lambda values, *, _generation=generation: self.handle_avatar_change_packet(
+                        values,
+                        generation=_generation,
+                    )
+                )
+                if self._avatar_change_handler is not None
+                else None
+            ),
+            packet_handler=(
+                (
+                    lambda address, values, *, _generation=generation: self.handle_packet(
+                        address,
+                        values,
+                        generation=_generation,
+                    )
+                )
+                if self._packet_handler is not None
+                else None
+            ),
         )
 
     def _build_receiver_for_osc_runtime(self) -> OscReceiverProtocol:
