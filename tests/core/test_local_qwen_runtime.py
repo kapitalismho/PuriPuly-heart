@@ -94,9 +94,14 @@ def test_ensure_local_qwen_windows_runtime_registers_directory_only_once_and_pre
         (runtime_dir / dll_name).write_bytes(b"")
 
     calls: list[str] = []
+    loaded_libraries: list[str] = []
 
     def fake_add_dll_directory(path: str) -> object:
         calls.append(path)
+        return object()
+
+    def fake_win_dll(path: str) -> object:
+        loaded_libraries.append(path)
         return object()
 
     monkeypatch.setattr(runtime_module.sys, "platform", "win32")
@@ -107,6 +112,7 @@ def test_ensure_local_qwen_windows_runtime_registers_directory_only_once_and_pre
         fake_add_dll_directory,
         raising=False,
     )
+    monkeypatch.setattr(runtime_module.ctypes, "WinDLL", fake_win_dll, raising=False)
     monkeypatch.setenv("PATH", r"C:\\Windows\\System32")
 
     first = runtime_module.ensure_local_qwen_windows_runtime()
@@ -115,7 +121,35 @@ def test_ensure_local_qwen_windows_runtime_registers_directory_only_once_and_pre
     assert first == runtime_dir
     assert second == runtime_dir
     assert calls == [str(runtime_dir)]
+    assert loaded_libraries == [str(runtime_dir / "onnxruntime.dll")]
 
     path_entries = os.environ["PATH"].split(os.pathsep)
     assert path_entries[0] == str(runtime_dir)
     assert path_entries.count(str(runtime_dir)) == 1
+
+
+def test_ensure_local_qwen_windows_runtime_rejects_unloadable_runtime_dll(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime_module = _load_runtime_module()
+    runtime_dir = tmp_path / "runtime"
+    runtime_dir.mkdir()
+    for dll_name in runtime_module.REQUIRED_LOCAL_QWEN_RUNTIME_DLLS:
+        (runtime_dir / dll_name).write_bytes(b"")
+
+    monkeypatch.setattr(runtime_module.sys, "platform", "win32")
+    monkeypatch.setattr(runtime_module, "resolve_local_qwen_runtime_dir", lambda: runtime_dir)
+    monkeypatch.setattr(runtime_module.os, "add_dll_directory", lambda _path: object())
+    monkeypatch.setattr(
+        runtime_module.ctypes,
+        "WinDLL",
+        lambda _path: (_ for _ in ()).throw(OSError("load failed")),
+        raising=False,
+    )
+
+    with pytest.raises(
+        runtime_module.LocalQwenRuntimeBootstrapError,
+        match="failed to load local qwen runtime DLL",
+    ):
+        runtime_module.ensure_local_qwen_windows_runtime()

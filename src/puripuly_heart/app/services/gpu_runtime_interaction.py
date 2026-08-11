@@ -189,6 +189,7 @@ class GpuRuntimeInteractionOwner:
         state_by_phase = {
             "unsupported": "unsupported",
             "not_installed": "not_installed",
+            "installing": "installing",
             "invalid": "invalid",
             "failed": (
                 "unavailable_device"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import logging
 import os
 import sys
@@ -20,6 +21,7 @@ class LocalQwenRuntimeBootstrapError(RuntimeError):
 
 _REGISTERED_LOCAL_QWEN_RUNTIME_DIR: Path | None = None
 _REGISTERED_LOCAL_QWEN_RUNTIME_HANDLE: object | None = None
+_REGISTERED_LOCAL_QWEN_RUNTIME_LIBRARY: object | None = None
 
 
 def resolve_local_qwen_runtime_dir() -> Path:
@@ -71,6 +73,7 @@ def _path_contains_entry(path_value: str, entry: str) -> bool:
 def ensure_local_qwen_windows_runtime() -> Path:
     global _REGISTERED_LOCAL_QWEN_RUNTIME_DIR
     global _REGISTERED_LOCAL_QWEN_RUNTIME_HANDLE
+    global _REGISTERED_LOCAL_QWEN_RUNTIME_LIBRARY
 
     if sys.platform != "win32":
         return Path()
@@ -83,6 +86,17 @@ def ensure_local_qwen_windows_runtime() -> Path:
         if add_dll_directory is None:
             raise LocalQwenRuntimeBootstrapError("os.add_dll_directory is unavailable")
         _REGISTERED_LOCAL_QWEN_RUNTIME_HANDLE = add_dll_directory(str(runtime_dir))
+        win_dll = getattr(ctypes, "WinDLL", None)
+        if win_dll is None:
+            _REGISTERED_LOCAL_QWEN_RUNTIME_HANDLE = None
+            raise LocalQwenRuntimeBootstrapError("ctypes.WinDLL is unavailable")
+        try:
+            _REGISTERED_LOCAL_QWEN_RUNTIME_LIBRARY = win_dll(str(runtime_dir / "onnxruntime.dll"))
+        except OSError as exc:
+            _REGISTERED_LOCAL_QWEN_RUNTIME_HANDLE = None
+            raise LocalQwenRuntimeBootstrapError(
+                f"failed to load local qwen runtime DLL: {runtime_dir / 'onnxruntime.dll'}"
+            ) from exc
         _REGISTERED_LOCAL_QWEN_RUNTIME_DIR = runtime_dir
 
     current_path = os.environ.get("PATH", "")

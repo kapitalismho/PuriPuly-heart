@@ -7,6 +7,16 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from puripuly_heart.core.local_asr_provider_runtime import (
+    ProviderRuntimeBuildRequest,
+    ProviderRuntimeGpuRecoveryRequest,
+    ProviderRuntimeRecoveryChannel,
+)
+from puripuly_heart.core.local_asr_provisioning import (
+    LocalASRModelProvisioningState,
+    LocalASRProvisioningSnapshot,
+)
+from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
 
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_NONE,
@@ -18,16 +28,6 @@ from puripuly_heart.core.gpu_worker import (
     GpuWorkerDevice,
     GpuWorkerTranscription,
 )
-from puripuly_heart.core.local_asr_provider_runtime import (
-    ProviderRuntimeBuildRequest,
-    ProviderRuntimeGpuRecoveryRequest,
-    ProviderRuntimeRecoveryChannel,
-)
-from puripuly_heart.core.local_asr_provisioning import (
-    LocalASRModelProvisioningState,
-    LocalASRProvisioningSnapshot,
-)
-from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
 from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnostic
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
@@ -82,8 +82,9 @@ def _resolved_config(
 
 
 class FakeProvisioningPort:
-    def __init__(self, integrity: str = "ready") -> None:
+    def __init__(self, integrity: str = "ready", operation: str = "idle") -> None:
         self.integrity = integrity
+        self.operation = operation
         self.inspect_gpu_calls: list[tuple[bool, bool]] = []
         self.closed = False
 
@@ -95,6 +96,7 @@ class FakeProvisioningPort:
                     model_id=LOCAL_QWEN_GPU_MODEL_ID,
                     backend="gpu",
                     integrity=self.integrity,
+                    operation=self.operation,
                 ),
             ),
             required_cpu_model_ids=(),
@@ -504,6 +506,23 @@ async def test_gpu_readiness_uses_only_provisioning_port_and_low_vram_is_advisor
 
     assert result.status == "applied"
     assert provider_factory.providers[-1].gpu_runtime is gpu_factory.instances[0]
+    assert gpu_factory.instances[0].activation_calls == []
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_gpu_readiness_preserves_active_model_download_state() -> None:
+    provisioning = FakeProvisioningPort(integrity="missing", operation="downloading")
+    owner, _provisioning, gpu_factory, _provider_factory = _owner(provisioning=provisioning)
+
+    snapshot = await owner.inspect_gpu_readiness(
+        explicit_intent=True,
+        device_id=GPU_DEVICE.device_id,
+    )
+
+    assert snapshot.gpu.phase == "installing"
+    assert snapshot.gpu.failure_code == "downloading"
     assert gpu_factory.instances[0].activation_calls == []
 
     await owner.close()

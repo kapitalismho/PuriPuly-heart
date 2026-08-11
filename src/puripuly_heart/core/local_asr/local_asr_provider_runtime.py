@@ -32,6 +32,7 @@ ProviderRuntimeGpuPhase = Literal[
     "discovery_pending",
     "unsupported",
     "not_installed",
+    "installing",
     "invalid",
     "available",
     "validating",

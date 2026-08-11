@@ -5412,6 +5412,24 @@ async def test_desktop_overlay_lifecycle_errors_keep_stderr_fallback(
 
 
 @pytest.mark.asyncio
+async def test_desktop_overlay_lifecycle_sink_ignores_closed_parent_stream(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class ClosedStream:
+        def write(self, _value: str) -> int:
+            raise OSError(22, "Invalid argument")
+
+        def flush(self) -> None:
+            raise OSError(22, "Invalid argument")
+
+    monkeypatch.setattr(desktop_overlay.sys, "stderr", ClosedStream())
+
+    await desktop_overlay.StdoutLifecycleSink().emit(
+        {"type": "runtime_error", "failure_reason": "runtime_disconnected"}
+    )
+
+
+@pytest.mark.asyncio
 async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dispatch() -> None:
     token = "runtime-control-token"
     bridge = OverlayBridge(

@@ -323,6 +323,9 @@ class LocalASRProviderRuntimeOwner:
             elif status in {"missing", "not_requested"}:
                 self._gpu_phase = "not_installed"
                 self._gpu_failure_code = status
+            elif status == "downloading":
+                self._gpu_phase = "installing"
+                self._gpu_failure_code = status
             else:
                 self._gpu_phase = "invalid"
                 self._gpu_failure_code = status

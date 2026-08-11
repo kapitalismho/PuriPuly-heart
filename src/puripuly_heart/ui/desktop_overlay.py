@@ -717,7 +717,8 @@ class StdoutLifecycleSink:
             if safe_event.get("type") in {"startup_error", "runtime_error"}
             else sys.stdout
         )
-        print(json.dumps(safe_event, sort_keys=True), file=stream, flush=True)
+        with contextlib.suppress(OSError):
+            print(json.dumps(safe_event, sort_keys=True), file=stream, flush=True)
 
 
 type FletAppRunner = Callable[[Callable[[Any], object]], Awaitable[None]]
