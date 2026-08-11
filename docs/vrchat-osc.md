@@ -21,14 +21,14 @@
 | `PuriPuly_PeerAuto` | Peer source auto-detection | Bool | False | Off | Off |
 | `PuriPuly_MuteSync` | VRChat mute synchronization | Bool | False | Off | Off |
 | `PuriPuly_ChatboxSource` | Include source text in Chatbox output | Bool | False | Off | Off |
-| `PuriPuly_SelfSrcLang` | Self source language | Int | 17 (`ko`) | Off | Off |
-| `PuriPuly_SelfDstLang` | Self target language | Int | 7 (`en`) | Off | Off |
-| `PuriPuly_PeerSrcLang` | Peer source language | Int | 7 (`en`) | Off | Off |
-| `PuriPuly_PeerDstLang` | Peer target language | Int | 17 (`ko`) | Off | Off |
-| `PuriPuly_SelfASR` | Self ASR provider | Int | 0 (`local_cpu_auto`) | Off | Off |
-| `PuriPuly_PeerASR` | Peer ASR provider | Int | 0 (`local_cpu_auto`) | Off | Off |
-| `PuriPuly_Translator` | Translation model | Int | 0 (`gemma4_26b_31b`) | Off | Off |
-| `PuriPuly_Fallback` | Translation fallback | Int | 0 (`none`) | Off | Off |
+| `PuriPuly_SelfSrcLang` | Self source language | Int | 17 | Off | Off |
+| `PuriPuly_SelfDstLang` | Self target language | Int | 7 | Off | Off |
+| `PuriPuly_PeerSrcLang` | Peer source language | Int | 7 | Off | Off |
+| `PuriPuly_PeerDstLang` | Peer target language | Int | 17 | Off | Off |
+| `PuriPuly_SelfASR` | Self ASR provider | Int | 0 | Off | Off |
+| `PuriPuly_PeerASR` | Peer ASR provider | Int | 0 | Off | Off |
+| `PuriPuly_Translator` | Translation model | Int | 0 | Off | Off |
+| `PuriPuly_Fallback` | Translation fallback | Int | 0 | Off | Off |
 
 - Default: PuriPuly fresh runtime value
 - Saved: Off; PuriPuly owns persistence and republishes its current state
@@ -45,56 +45,57 @@
 - Bool payload: OSC boolean
 - Int payload: fixed ABI ID
 - Int ID policy: append-only; never reuse an ID
+- Int IDs are the OSC payload; the tables below map each ID to its human-readable name
 - Bool commands: absolute and idempotent
 
 ### Language IDs
 
 | ID | Language | ID | Language | ID | Language |
 | ---: | --- | ---: | --- | ---: | --- |
-| 0 | `ar` | 12 | `hi` | 24 | `pt` |
-| 1 | `bg` | 13 | `hu` | 25 | `ro` |
-| 2 | `ca` | 14 | `id` | 26 | `ru` |
-| 3 | `cs` | 15 | `it` | 27 | `sk` |
-| 4 | `da` | 16 | `ja` | 28 | `sv` |
-| 5 | `de` | 17 | `ko` | 29 | `th` |
-| 6 | `el` | 18 | `lt` | 30 | `tr` |
-| 7 | `en` | 19 | `lv` | 31 | `uk` |
-| 8 | `es` | 20 | `ms` | 32 | `vi` |
-| 9 | `et` | 21 | `nl` | 33 | `zh-CN` |
-| 10 | `fi` | 22 | `no` | 34 | `zh-TW` |
-| 11 | `fr` | 23 | `pl` | | |
+| 0 | Arabic | 12 | Hindi | 24 | Portuguese |
+| 1 | Bulgarian | 13 | Hungarian | 25 | Romanian |
+| 2 | Catalan | 14 | Indonesian | 26 | Russian |
+| 3 | Czech | 15 | Italian | 27 | Slovak |
+| 4 | Danish | 16 | Japanese | 28 | Swedish |
+| 5 | German | 17 | Korean | 29 | Thai |
+| 6 | Greek | 18 | Lithuanian | 30 | Turkish |
+| 7 | English | 19 | Latvian | 31 | Ukrainian |
+| 8 | Spanish | 20 | Malay | 32 | Vietnamese |
+| 9 | Estonian | 21 | Dutch | 33 | Chinese (Simplified) |
+| 10 | Finnish | 22 | Norwegian | 34 | Chinese (Traditional) |
+| 11 | French | 23 | Polish | | |
 
 - Used by: `PuriPuly_SelfSrcLang`, `PuriPuly_SelfDstLang`, `PuriPuly_PeerSrcLang`, `PuriPuly_PeerDstLang`
 
 ### ASR IDs
 
-| ID | Value |
+| ID | Provider |
 | ---: | --- |
-| 0 | `local_cpu_auto` |
-| 1 | `local_parakeet_v3` |
-| 2 | `local_parakeet_ja` |
-| 3 | `local_qwen` |
-| 4 | `local_qwen_gpu` |
-| 5 | `deepgram` |
-| 6 | `qwen_asr` |
-| 7 | `soniox` |
+| 0 | Auto Select (CPU Inference) |
+| 1 | Parakeet TDT 0.6B v3 |
+| 2 | Parakeet TDT-CTC 0.6B (ja) |
+| 3 | Qwen3 ASR 0.6B |
+| 4 | Qwen3 ASR 1.7B |
+| 5 | Deepgram |
+| 6 | Qwen3 ASR Flash Realtime |
+| 7 | Soniox |
 
 - Used by: `PuriPuly_SelfASR`, `PuriPuly_PeerASR`
 
 ### Translation model IDs
 
-| ID | Value |
+| ID | Model |
 | ---: | --- |
-| 0 | `gemma4_26b_31b` |
-| 1 | `gemma4_31b` |
-| 2 | `gemma4` |
-| 3 | `deepseek_v4_flash` |
-| 4 | `deepseek_v4_pro` |
-| 5 | `gemini3_flash` |
-| 6 | `gemini31_flash_lite` |
-| 7 | `qwen35_plus` |
-| 8 | `local_llm` |
-| 9 | `custom_http` |
+| 0 | Gemma 4 26B + 31B |
+| 1 | Gemma 4 31B |
+| 2 | Gemma 4 26B A4B |
+| 3 | DeepSeek V4 Flash |
+| 4 | DeepSeek V4 Pro |
+| 5 | Gemini 3 Flash |
+| 6 | Gemini 3.1 Flash-Lite |
+| 7 | Qwen 3.5 Plus |
+| 8 | OpenAI-compatible API |
+| 9 | Custom HTTP API |
 
 - Used by: `PuriPuly_Translator`
 - Gemma 4 31B on a Cerebras connection is published as ID `1`; select the connection in PuriPuly.
@@ -102,16 +103,16 @@
 
 ### Fallback IDs
 
-| ID | Value |
+| ID | Fallback |
 | ---: | --- |
-| 0 | `none` |
-| 1 | `deepseek_v4_flash_official` |
-| 2 | `openrouter_deepseek_v4_flash` |
-| 3 | `openrouter_gemma4_26b_a4b` |
-| 4 | `openrouter_gemma4_26b_31b` |
-| 5 | `openrouter_gemma4_31b` |
-| 6 | `managed_gemma4_26b_31b` |
-| 7 | `managed_gemma4_31b` |
-| 8 | `cerebras_gemma4_31b` |
+| 0 | Off |
+| 1 | DeepSeek V4 Flash (Official API) |
+| 2 | DeepSeek V4 Flash (OpenRouter) |
+| 3 | Gemma 4 26B A4B (OpenRouter) |
+| 4 | Gemma 4 26B + 31B (OpenRouter) |
+| 5 | Gemma 4 31B (OpenRouter) |
+| 6 | Gemma 4 26B + 31B (Managed) |
+| 7 | Gemma 4 31B (Managed) |
+| 8 | Gemma 4 31B (Cerebras) |
 
 - Used by: `PuriPuly_Fallback`
