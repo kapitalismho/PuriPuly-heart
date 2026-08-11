@@ -383,24 +383,27 @@ def _select_operating_point(
         if row["metrics"]["false_events_per_hour"] is not None
         and float(row["metrics"]["false_events_per_hour"]) <= FALSE_EVENT_BUDGET_PER_HOUR
     ]
-    pool = feasible if feasible else sorted(
+    if feasible:
+        return min(
+            feasible,
+            key=lambda row: (
+                -float(row["metrics"]["recall_within_500ms"]),
+                float(row["metrics"]["false_events_per_hour"]),
+                -float(row["metrics"]["f1_at_250ms"]),
+                float(row["metrics"]["availability_latency_ms"]["median_ms"] or 1e18),
+                row["config_id"],
+            ),
+        )
+    return min(
         config_rows,
         key=lambda row: (
             float(row["metrics"]["false_events_per_hour"]),
-            row["config_id"],
-        ),
-    )
-    primary = min(
-        pool,
-        key=lambda row: (
             -float(row["metrics"]["recall_within_500ms"]),
-            float(row["metrics"]["false_events_per_hour"]),
             -float(row["metrics"]["f1_at_250ms"]),
             float(row["metrics"]["availability_latency_ms"]["median_ms"] or 1e18),
             row["config_id"],
         ),
     )
-    return primary
 
 
 def _rank_encoders(
@@ -860,6 +863,7 @@ def run_report(cache_root: Path, requested_argv: tuple[str, ...]) -> Path:
     if gate.allowed_actions.get("r4_report") is not True:
         raise R4Error("r4_report is not authorized")
     operating_points: dict[str, dict[str, Any]] = {}
+    budget_meetable: dict[str, bool] = {}
     for model_id in MODEL_IDS:
         path = cache_root / CONTINUOUS_RESULT_RELATIVE_PATH.as_posix().format(model_id=model_id)
         if not path.is_file():
@@ -870,6 +874,11 @@ def run_report(cache_root: Path, requested_argv: tuple[str, ...]) -> Path:
         if not self_sha256_valid(document):
             raise R4Error(f"R4 continuous result self identity invalid: {model_id}")
         operating_points[model_id] = document["operating_point"]
+        budget_meetable[model_id] = any(
+            row["metrics"]["false_events_per_hour"] is not None
+            and float(row["metrics"]["false_events_per_hour"]) <= FALSE_EVENT_BUDGET_PER_HOUR
+            for row in document["config_grid"]
+        )
     r3_auc = _r3_macro_auc(cache_root)
     ranked = _rank_encoders(operating_points, r3_auc)
     top_two = [row["model_id"] for row in ranked[:2]]
@@ -907,6 +916,17 @@ def run_report(cache_root: Path, requested_argv: tuple[str, ...]) -> Path:
                     ),
                 ),
                 "claim_level": "exploratory_candidate_selection",
+                "false_event_budget_note": (
+                    "the <=1.0 false-event-per-source-hour budget was unmeetable for every "
+                    "encoder on the 2.47-hour bounded panel; per plan section 17.2 the complete "
+                    "development Pareto frontier (config_grid) is promoted to primary status and "
+                    "the rule-selected operating point is reported with the lowest-false-event "
+                    "fallback"
+                    if not any(budget_meetable.values())
+                    else "the <=1.0 false-event-per-source-hour budget was met by at least one "
+                    "configuration for the encoders marked true in false_event_budget_meetable"
+                ),
+                "false_event_budget_meetable": budget_meetable,
                 "supervision_binding": {
                     "execution_id": os.environ.get("SRSCD_EXECUTION_LEASE_TOKEN"),
                     "expected_receipt_relative_path": SELECTION_LEDGER_RELATIVE_PATH.as_posix(),
