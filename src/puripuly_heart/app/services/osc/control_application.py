@@ -9,6 +9,8 @@ from puripuly_heart.app.ports.osc_control import (
     OscControlApplicationPort,
 )
 
+from .state_publisher import fallback_alias_from_settings
+
 SettingsProvider = Callable[[], object | None]
 SettingsApply = Callable[[object], Awaitable[object]]
 ApplicationCall = Callable[..., Awaitable[object]]
@@ -60,6 +62,15 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         peer_source: str,
         peer_target: str,
     ) -> object:
+        current = self.settings_provider()
+        if current is not None and _language_values_match(
+            current,
+            self_source=self_source,
+            self_target=self_target,
+            peer_source=peer_source,
+            peer_target=peer_target,
+        ):
+            return True
         return await self._apply_settings(
             lambda settings: self._set_languages(
                 settings,
@@ -71,6 +82,11 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         )
 
     async def set_peer_auto_detect(self, enabled: bool) -> object:
+        current = self.settings_provider()
+        if current is not None and current.languages.peer_source_mode == (
+            "auto" if enabled else "manual"
+        ):
+            return True
         return await self._apply_settings(
             lambda settings: setattr(
                 settings.languages, "peer_source_mode", "auto" if enabled else "manual"
@@ -78,6 +94,9 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         )
 
     async def set_self_asr(self, provider: str) -> object:
+        current = self.settings_provider()
+        if current is not None and _enum_value_for_compare(current.provider.stt) == provider:
+            return True
         return await self._apply_settings(
             lambda settings: setattr(
                 settings.provider,
@@ -87,6 +106,9 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         )
 
     async def set_peer_asr(self, provider: str) -> object:
+        current = self.settings_provider()
+        if current is not None and _enum_value_for_compare(current.provider.peer_stt) == provider:
+            return True
         return await self._apply_settings(
             lambda settings: setattr(
                 settings.provider,
@@ -106,14 +128,23 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         )
 
     async def set_fallback(self, alias: str) -> object:
+        current = self.settings_provider()
+        if current is not None and fallback_alias_from_settings(current) == alias:
+            return True
         return await self._apply_settings(lambda settings: self._set_fallback(settings, alias))
 
     async def set_mute_sync(self, enabled: bool) -> object:
+        current = self.settings_provider()
+        if current is not None and bool(current.osc.vrc_mic_intercept) is bool(enabled):
+            return True
         return await self._apply_settings(
             lambda settings: setattr(settings.osc, "vrc_mic_intercept", bool(enabled))
         )
 
     async def set_chatbox_source(self, enabled: bool) -> object:
+        current = self.settings_provider()
+        if current is not None and bool(current.osc.chatbox_include_source) is bool(enabled):
+            return True
         return await self._apply_settings(
             lambda settings: setattr(settings.osc, "chatbox_include_source", bool(enabled))
         )
@@ -225,6 +256,23 @@ def _enum_value(current: object, value: str) -> object:
         return enum_type(value)
     except (TypeError, ValueError):
         return value
+
+
+def _language_values_match(
+    settings: object,
+    *,
+    self_source: str,
+    self_target: str,
+    peer_source: str,
+    peer_target: str,
+) -> bool:
+    languages = settings.languages
+    return (
+        languages.source_language == self_source
+        and languages.target_language == self_target
+        and languages.peer_source_language == peer_source
+        and languages.peer_target_language == peer_target
+    )
 
 
 def _settings_control_values_match(actual: object | None, expected: object) -> bool:

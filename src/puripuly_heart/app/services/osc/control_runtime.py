@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import inspect
+import time
 from collections.abc import Callable, Mapping
 
 from puripuly_heart.app.ports.osc_control import (
@@ -36,6 +37,7 @@ class OscControlIntegrationOwner:
         translation_model_normalizer: Callable[[object], object],
         query_service: OscQueryServicePort | None = None,
         error_sink: Callable[[str], None] | None = None,
+        command_suppression_seconds: float = 1.5,
     ) -> None:
         self._receiver_owner = receiver_owner
         self._settings_provider = settings_provider
@@ -50,6 +52,8 @@ class OscControlIntegrationOwner:
         self._configured_connection: tuple[str, OscConnectionMode, int, int] | None = None
         self._accepting_ingress = True
         self._closed = False
+        self._command_suppression_seconds = float(command_suppression_seconds)
+        self._command_suppression_until = 0.0
         self._publisher: OscStatePublisher | None = None
         self._avatar_parameter_diagnostics: dict[str, object] = {}
         self._avatar_sequence = 0
@@ -216,6 +220,7 @@ class OscControlIntegrationOwner:
         if mode == "manual":
             await self._set_sender_destination(host, self._send_port)
             self._publish_start()
+            self._begin_command_suppression()
             self.router.set_ingress_enabled(True)
             return
 
@@ -226,6 +231,7 @@ class OscControlIntegrationOwner:
             await self._receiver_owner.ensure_receiver()
             await self._set_sender_destination(host, VRCHAT_OSC_DEFAULT_INPUT_PORT)
             self._publish_start()
+        self._begin_command_suppression()
         self.router.set_ingress_enabled(True)
 
     async def close(self) -> None:
@@ -310,6 +316,12 @@ class OscControlIntegrationOwner:
             )
         )
 
+    def _begin_command_suppression(self) -> None:
+        self._command_suppression_until = time.monotonic() + self._command_suppression_seconds
+
+    def _suppressing_commands(self) -> bool:
+        return time.monotonic() < self._command_suppression_until
+
     def _publish_start(self) -> None:
         if self._mode == "off":
             return
@@ -343,6 +355,8 @@ class OscControlIntegrationOwner:
     async def _publish_snapshot(self, reason: str) -> None:
         if self._mode == "off":
             return
+        if reason in {"avatar_change", "discovery"}:
+            self._begin_command_suppression()
         publisher = self._ensure_publisher()
         if publisher is None:
             return
@@ -376,11 +390,14 @@ class OscControlIntegrationOwner:
     def _handle_control_packet(self, address: str, values: tuple[object, ...]) -> bool:
         if self._mode == "off":
             return False
+        if self._suppressing_commands():
+            return False
         return self.router.handle_packet(address, *values)
 
     def _handle_avatar_change(self, _values: tuple[object, ...]) -> None:
         if not self._accepting_ingress or self._mode == "off":
             return
+        self._begin_command_suppression()
         try:
             self._avatar_sequence += 1
             start_lifecycle_task(

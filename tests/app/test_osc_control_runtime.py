@@ -150,6 +150,7 @@ def _integration(
     application: object | None = None,
     osc_state: OscCanonicalState | None = None,
     state_provider: Callable[[], OscCanonicalState] | None = None,
+    command_suppression_seconds: float = 1.5,
 ) -> OscControlIntegrationOwner:
     return OscControlIntegrationOwner(
         receiver_owner=receiver_owner,
@@ -161,6 +162,7 @@ def _integration(
         language_state_provider=lambda: ("ko", "en", "en", "ko"),
         translation_model_normalizer=materialize_translation_settings,
         query_service=service,
+        command_suppression_seconds=command_suppression_seconds,
     )
 
 
@@ -339,6 +341,62 @@ async def test_two_integrations_keep_distinct_receivers_and_cleanup_independentl
 
 
 @pytest.mark.asyncio
+async def test_connection_start_suppresses_initial_parameter_dump() -> None:
+    settings = AppSettings()
+    receiver_owner = FakeReceiverOwner()
+    sender = FakeSender()
+    integration = _integration(
+        settings,
+        receiver_owner,
+        sender,
+        FakeService(None),
+        command_suppression_seconds=60,
+    )
+
+    await integration.configure_connection(
+        mode="manual",
+        send_port=9020,
+        receive_port=9021,
+    )
+    control_handler = receiver_owner.packet_handlers["control_packet_handler"]
+
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (11,)) is False
+
+    await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_avatar_change_suppresses_parameter_dump_until_window_expires() -> None:
+    settings = AppSettings()
+    receiver_owner = FakeReceiverOwner()
+    sender = FakeSender()
+    integration = _integration(
+        settings,
+        receiver_owner,
+        sender,
+        FakeService(None),
+        command_suppression_seconds=60,
+    )
+
+    await integration.configure_connection(
+        mode="manual",
+        send_port=9020,
+        receive_port=9021,
+    )
+    control_handler = receiver_owner.packet_handlers["control_packet_handler"]
+
+    integration._handle_avatar_change(())
+
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (11,)) is False
+
+    integration._command_suppression_until = 0.0
+
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (11,)) is True
+
+    await integration.close()
+
+
+@pytest.mark.asyncio
 async def test_off_mode_settings_apply_does_not_publish_or_start_control_transport() -> None:
     settings = AppSettings()
     settings.osc.connection_mode = "off"
@@ -361,7 +419,13 @@ async def test_invalid_control_republishes_full_canonical_state() -> None:
     settings = AppSettings()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
-    integration = _integration(settings, receiver_owner, sender, FakeService(None))
+    integration = _integration(
+        settings,
+        receiver_owner,
+        sender,
+        FakeService(None),
+        command_suppression_seconds=0.0,
+    )
 
     await integration.configure_connection(
         mode="manual",

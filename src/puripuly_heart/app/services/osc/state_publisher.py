@@ -163,11 +163,11 @@ def state_from_settings(
         self_asr=settings.provider.stt.value,
         peer_asr=settings.provider.peer_stt.value,
         translation_model=settings.translation.model.value,
-        fallback=_fallback_alias_from_settings(settings),
+        fallback=fallback_alias_from_settings(settings),
     )
 
 
-def _fallback_alias_from_settings(settings: Any) -> str:
+def fallback_alias_from_settings(settings: Any) -> str:
     fallback = settings.translation.fallback
     if not fallback.enabled:
         return "none"
@@ -187,4 +187,10 @@ def _fallback_alias_from_settings(settings: Any) -> str:
     return aliases.get((str(model), str(connection)), "none")
 
 
-__all__ = ["OscCanonicalState", "OscPublishedValue", "OscStatePublisher", "state_from_settings"]
+__all__ = [
+    "OscCanonicalState",
+    "OscPublishedValue",
+    "OscStatePublisher",
+    "fallback_alias_from_settings",
+    "state_from_settings",
+]
