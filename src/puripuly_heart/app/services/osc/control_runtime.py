@@ -95,6 +95,7 @@ class OscControlIntegrationOwner:
             sender_destination_changed=self._set_sender_destination,
             snapshot_publisher=self._publish_snapshot,
             resync_starter=self._begin_query_resync,
+            resync_generation_provider=self._current_resync_generation,
             avatar_inspector=self._inspect_avatar_tree,
         )
 
@@ -331,8 +332,17 @@ class OscControlIntegrationOwner:
         self._resync_ready_generation = None
         return self._resync_generation
 
-    def _begin_query_resync(self, _reason: str) -> int | None:
+    def _current_resync_generation(self) -> int:
+        return self._resync_generation
+
+    def _begin_query_resync(
+        self,
+        _reason: str,
+        parent_generation: int | None,
+    ) -> int | None:
         if not self._accepting_ingress or self._mode != "automatic":
+            return None
+        if parent_generation is not None and parent_generation != self._resync_generation:
             return None
         return self._begin_resync()
 

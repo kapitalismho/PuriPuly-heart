@@ -19,7 +19,8 @@ OscReceiverStopper = Callable[[], Awaitable[object]]
 OscEffectivePort = Callable[[], int]
 OscDestinationChanged = Callable[[str, int], Awaitable[None] | None]
 OscSnapshotPublisher = Callable[[str, int | None], Awaitable[None] | None]
-OscResyncStarter = Callable[[str], int | None]
+OscResyncGenerationProvider = Callable[[], int]
+OscResyncStarter = Callable[[str, int | None], int | None]
 OscAvatarInspector = Callable[[Mapping[str, object]], Awaitable[None] | None]
 VRCHAT_OSC_DEFAULT_INPUT_PORT: Final = 9000
 
@@ -33,6 +34,7 @@ class OscQueryRuntime:
     sender_destination_changed: OscDestinationChanged | None = None
     snapshot_publisher: OscSnapshotPublisher | None = None
     resync_starter: OscResyncStarter | None = None
+    resync_generation_provider: OscResyncGenerationProvider | None = None
     avatar_inspector: OscAvatarInspector | None = None
     receiver_host: str = "127.0.0.1"
     discovery_poll_interval_seconds: float = 2.0
@@ -125,6 +127,13 @@ class OscQueryRuntime:
     ) -> None:
         if not self._started or self.mode != "automatic":
             return
+        resync_parent_generation = (
+            self.resync_generation_provider()
+            if publish_snapshot
+            and self.resync_starter is not None
+            and self.resync_generation_provider is not None
+            else None
+        )
         service_info = await self.service.discover_vrchat()
         changed = service_info != self.service_info
         if not changed and not force_requery:
@@ -136,7 +145,10 @@ class OscQueryRuntime:
             and self.snapshot_publisher is not None
             and self.resync_starter is not None
         ):
-            snapshot_generation = self.resync_starter("discovery")
+            snapshot_generation = self.resync_starter(
+                "discovery",
+                resync_parent_generation,
+            )
         self.service_info = service_info
         await self._apply_service_info(
             self.service_info,

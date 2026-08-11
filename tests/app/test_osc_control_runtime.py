@@ -188,6 +188,20 @@ class DelayedAvatarService(FakeService):
         return await super().query_avatar(service)
 
 
+class DelayedDiscoveryService(FakeService):
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.block_discovery = False
+        self.discovery_started = asyncio.Event()
+        self.discovery_gate = asyncio.Event()
+
+    async def discover_vrchat(self) -> OscQueryServiceInfo | None:
+        if self.block_discovery:
+            self.discovery_started.set()
+            await self.discovery_gate.wait()
+        return await super().discover_vrchat()
+
+
 def _integration(
     settings: AppSettings,
     receiver_owner: FakeReceiverOwner,
@@ -718,6 +732,59 @@ async def test_discovery_epoch_is_anchored_before_avatar_query_completion(
 
     assert integration._resync_generation == initial_generation + 1
     assert integration._resync_deadline == 201.5
+
+    await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_stale_discovery_cannot_supersede_newer_avatar_epoch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = [100.0]
+    monkeypatch.setattr(control_runtime_module.time, "monotonic", lambda: now[0])
+    settings = AppSettings()
+    receiver_owner = FakeReceiverOwner()
+    sender = FakeSender()
+    service = DelayedDiscoveryService(
+        OscQueryServiceInfo(
+            service_id="VRChat",
+            host="127.0.0.1",
+            osc_send_port=9010,
+            is_vrchat=True,
+        )
+    )
+    integration = _integration(settings, receiver_owner, sender, service)
+
+    await integration.configure_connection(
+        mode="automatic",
+        send_port=9020,
+        receive_port=9021,
+    )
+    service.info = OscQueryServiceInfo(
+        service_id="VRChat-restarted",
+        host="127.0.0.1",
+        osc_send_port=9030,
+        is_vrchat=True,
+    )
+    service.block_discovery = True
+    now[0] = 200.0
+    discovery_task = asyncio.create_task(integration.query_runtime.refresh())
+    await service.discovery_started.wait()
+
+    integration._handle_avatar_change(())
+    avatar_generation = integration._resync_generation
+    avatar_deadline = integration._resync_deadline
+    now[0] = 210.0
+    service.discovery_gate.set()
+    await discovery_task
+    for _ in range(10):
+        await asyncio.sleep(0)
+        if integration._resync_ready_generation == avatar_generation:
+            break
+
+    assert integration._resync_generation == avatar_generation
+    assert integration._resync_deadline == avatar_deadline == 201.5
+    assert integration._resync_ready_generation == avatar_generation
 
     await integration.close()
 
