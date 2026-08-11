@@ -705,6 +705,7 @@ def _extract_context(
     index_path: Path,
     z_primary: dict[str, dict[str, np.ndarray]],
     trajectory_by_layer: dict[str, dict[str, dict[int, tuple[str, np.ndarray]]]],
+    layer_kwarg: str = "layer_ids",
 ) -> dict[str, Any]:
     import soundfile as sf
 
@@ -745,7 +746,9 @@ def _extract_context(
                     for start, end in batch_keys
                 ]
                 observed = [end for _, end in batch_keys]
-                batch = extractor.extract(windows, observed, layer_ids=layer_ids)
+                batch = extractor.extract(
+                    windows, observed, **{layer_kwarg: layer_ids}
+                )
                 if pooled is None:
                     dimension = int(batch.layers[layer_ids[0]].shape[2])
                     pooled = np.lib.format.open_memmap(
@@ -932,6 +935,7 @@ def run_probe(model_id: str, cache_root: Path, requested_argv: tuple[str, ...]) 
             index_path,
             z_primary,
             trajectory_by_layer,
+            layer_kwarg=("tap_ids" if model_id == ERES_MODEL_ID else "layer_ids"),
         )
         layer_metrics_by_context[context_ms] = _analyze_context(
             layer_ids,
