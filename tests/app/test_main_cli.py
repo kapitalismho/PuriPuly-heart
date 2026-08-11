@@ -42,6 +42,18 @@ def test_main_version_prints_without_soxr_runtime_startup_check(monkeypatch, cap
     assert capsys.readouterr().out.strip() == __version__
 
 
+def test_main_gui_startup_check_imports_gui_runtime_without_starting_flet(monkeypatch) -> None:
+    import flet
+
+    monkeypatch.setattr(
+        flet,
+        "run",
+        lambda **_kwargs: pytest.fail("gui-startup-check should not start Flet"),
+    )
+
+    assert main_module.main(["gui-startup-check"]) == 0
+
+
 @pytest.mark.parametrize(
     "argv",
     [

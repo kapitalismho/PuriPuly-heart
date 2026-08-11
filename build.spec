@@ -22,8 +22,10 @@ import hashlib
 import json
 import os
 import sys
+from importlib import import_module
 from pathlib import Path
 
+import flet_cli.__pyinstaller.config as flet_pyinstaller_hook_config
 from PyInstaller.utils.hooks import (
     collect_data_files,
     collect_dynamic_libs,
@@ -34,6 +36,17 @@ from PyInstaller.utils.hooks import (
 # Add src to path for imports
 src_path = Path("src").resolve()
 sys.path.insert(0, str(src_path))
+from puripuly_heart._compat import moved_module_alias_targets
+
+for moved_module_alias_parent in (
+    "puripuly_heart.app",
+    "puripuly_heart.app.adapters",
+    "puripuly_heart.app.services",
+    "puripuly_heart.core",
+):
+    import_module(moved_module_alias_parent)
+
+moved_module_hiddenimports = list(moved_module_alias_targets())
 release_smoke = os.environ.get("PURIPULY_HEART_RELEASE_PROCESS_CAPTURE_SMOKE") == "1"
 entry_script = (
     Path("scripts/release/process-capture-runtime-smoke.py").resolve()
@@ -96,6 +109,7 @@ if flet_windows_runtime_sha256 != FLET_WINDOWS_RUNTIME_SHA256:
         "Pinned Flet Windows runtime checksum mismatch: expected "
         f"{FLET_WINDOWS_RUNTIME_SHA256}, found {flet_windows_runtime_sha256}"
     )
+flet_pyinstaller_hook_config.temp_bin_dir = str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH.parent)
 
 
 def get_prepared_soxr_runtime_paths() -> tuple[Path, Path]:
@@ -172,9 +186,7 @@ datas = [
     (str(NOTO_CJK_PROVENANCE_DIR / "OFL.txt"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
     (str(NOTO_CJK_PROVENANCE_DIR / "README.md"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
     (str(NOTO_CJK_PROVENANCE_DIR / "SHA256SUMS.txt"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
-] + collect_data_files("flet_desktop") + collect_data_files("huggingface_hub") + [
-    (str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH), "flet_desktop/app"),
-]
+] + collect_data_files("flet_desktop") + collect_data_files("huggingface_hub")
 
 runtime_binaries = collect_dynamic_libs(
     "onnxruntime", destdir=LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR.as_posix()
@@ -228,7 +240,7 @@ hiddenimports = [
     "puripuly_heart.core.local_asr.local_qwen_runtime",
     "puripuly_heart.config.process_capture_platform",
     "puripuly_heart.core.audio.process_source",
-] + collect_submodules("proctap") + collect_submodules("huggingface_hub")
+] + moved_module_hiddenimports + collect_submodules("proctap") + collect_submodules("huggingface_hub")
 
 required_proctap_hiddenimports = {"proctap", "proctap._native", "proctap.backends.windows"}
 if not required_proctap_hiddenimports.issubset(set(hiddenimports)):

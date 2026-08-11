@@ -6,7 +6,11 @@ import sys
 from importlib import import_module
 from types import ModuleType
 
-__all__ = ["MovedModuleAlias", "install_moved_module_aliases"]
+__all__ = [
+    "MovedModuleAlias",
+    "install_moved_module_aliases",
+    "moved_module_alias_targets",
+]
 
 
 class MovedModuleAlias(ModuleType):
@@ -42,3 +46,7 @@ def install_moved_module_aliases(parent_name: str, mapping: dict[str, str]) -> N
         alias = MovedModuleAlias(old_name)
         sys.modules[old_name] = alias
         setattr(parent, short, alias)
+
+
+def moved_module_alias_targets() -> tuple[str, ...]:
+    return tuple(sorted({new_name for new_name, _, _ in MovedModuleAlias._targets.values()}))

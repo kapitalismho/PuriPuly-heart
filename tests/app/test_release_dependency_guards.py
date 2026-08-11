@@ -288,6 +288,31 @@ def test_shared_windows_build_script_runs_packaged_smoke_test() -> None:
     assert "Get-Command choco" in script
 
 
+def test_build_spec_collects_all_registered_moved_module_alias_targets() -> None:
+    spec = (ROOT / "build.spec").read_text(encoding="utf-8")
+
+    assert "from puripuly_heart._compat import moved_module_alias_targets" in spec
+    for parent_name in (
+        "puripuly_heart.app",
+        "puripuly_heart.app.adapters",
+        "puripuly_heart.app.services",
+        "puripuly_heart.core",
+    ):
+        assert f'"{parent_name}"' in spec
+    assert "import_module(moved_module_alias_parent)" in spec
+    assert "moved_module_hiddenimports = list(moved_module_alias_targets())" in spec
+    assert "] + moved_module_hiddenimports + collect_submodules" in spec
+
+
+def test_shared_windows_build_script_smoke_tests_gui_startup_for_each_layout() -> None:
+    script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(encoding="utf-8")
+
+    assert '@("gui-startup-check")' in script
+    assert 'Invoke-GuiStartupSmokeCheck -ExePath $exePath -Label "Packaged"' in script
+    assert 'Invoke-GuiStartupSmokeCheck -ExePath $installedExePath -Label "Installed"' in script
+    assert 'Invoke-GuiStartupSmokeCheck -ExePath $installedExePath -Label "Reinstalled"' in script
+
+
 def test_shared_windows_build_script_reads_soxr_runtime_report_files_for_packaged_and_installed_smoke() -> (
     None
 ):
@@ -820,7 +845,12 @@ def test_flet_runtime_preparation_and_build_spec_pin_the_official_windows_archiv
     assert "/releases/download/v$FletVersion/flet-windows.zip" in script
     assert FLET_RUNTIME_PREPARATION_SCRIPT in spec
     assert FLET_RUNTIME_SHA256 in spec
-    assert '(str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH), "flet_desktop/app")' in spec
+    assert "import flet_cli.__pyinstaller.config as flet_pyinstaller_hook_config" in spec
+    assert (
+        "flet_pyinstaller_hook_config.temp_bin_dir = "
+        "str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH.parent)" in spec
+    )
+    assert '(str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH), "flet_desktop/app")' not in spec
 
 
 def test_windows_packaging_paths_prepare_flet_runtime_before_pyinstaller() -> None:

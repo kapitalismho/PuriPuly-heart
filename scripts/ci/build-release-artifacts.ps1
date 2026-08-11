@@ -279,6 +279,21 @@ function Invoke-SoxrRuntimeSmokeCheck {
     Assert-SoxrRuntimeReport -ReportPath $ReportPath -ExpectedExtensionPath $ExpectedExtensionPath -ExpectedSoxrDllPath $ExpectedSoxrDllPath -Label $Label
 }
 
+function Invoke-GuiStartupSmokeCheck {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ExePath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Label
+    )
+
+    $smokeTest = Start-Process -FilePath $ExePath -ArgumentList @("gui-startup-check") -Wait -PassThru
+    if ($smokeTest.ExitCode -ne 0) {
+        throw "$Label GUI startup smoke test failed with exit code $($smokeTest.ExitCode)"
+    }
+}
+
 function Invoke-ProcessCaptureRuntimeSmokeCheck {
     param(
         [Parameter(Mandatory = $true)]
@@ -679,6 +694,8 @@ if ($versionSmokeTest.ExitCode -ne 0) {
     throw "Packaged executable version smoke test failed with exit code $($versionSmokeTest.ExitCode)"
 }
 
+Invoke-GuiStartupSmokeCheck -ExePath $exePath -Label "Packaged"
+
 $localQwenRuntimeSmokeTest = Start-Process -FilePath $exePath -ArgumentList @("local-qwen-runtime-check") -Wait -PassThru
 if ($localQwenRuntimeSmokeTest.ExitCode -ne 0) {
     throw "Local Qwen runtime smoke test failed with exit code $($localQwenRuntimeSmokeTest.ExitCode)"
@@ -869,6 +886,7 @@ if (-not (Test-Path $installedSoxrSourceBundlePath)) {
 }
 
 Invoke-SoxrRuntimeSmokeCheck -ExePath $installedExePath -ReportPath $installedSoxrRuntimeReportPath -ExpectedExtensionPath $installedSoxrExtensionPath -ExpectedSoxrDllPath $installedSoxrDllPath -Label "Installed"
+Invoke-GuiStartupSmokeCheck -ExePath $installedExePath -Label "Installed"
 Invoke-ProcessCaptureRuntimeSmokeCheck -HelperExePath $installedProcessCaptureSmokeHelperPath -ArtifactRoot $installedProcessCaptureSmokeArtifactRoot -ReportPath $installedProcessCaptureRuntimeReportPath -Label "Installed"
 
 $expectedInstalledSoxrDllHash = (Get-FileHash -Path $packagedSoxrDllPath -Algorithm SHA256).Hash
@@ -974,6 +992,7 @@ if (Test-Path $legacyRootLevelSoxrDllPath) {
 }
 
 Invoke-SoxrRuntimeSmokeCheck -ExePath $installedExePath -ReportPath $reinstalledSoxrRuntimeReportPath -ExpectedExtensionPath $installedSoxrExtensionPath -ExpectedSoxrDllPath $installedSoxrDllPath -Label "Reinstalled"
+Invoke-GuiStartupSmokeCheck -ExePath $installedExePath -Label "Reinstalled"
 Invoke-ProcessCaptureRuntimeSmokeCheck -HelperExePath $installedProcessCaptureSmokeHelperPath -ArtifactRoot $installedProcessCaptureSmokeArtifactRoot -ReportPath $reinstalledProcessCaptureRuntimeReportPath -Label "Reinstalled"
 
 $installedUninstallerPath = Join-Path $InstallerSmokeDir "unins000.exe"

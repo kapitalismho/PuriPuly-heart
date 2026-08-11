@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
@@ -82,6 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
         "hf-xet-runtime-check",
         help="Verify the packaged Hugging Face/Xet runtime",
     )
+    sub.add_parser("gui-startup-check", help=argparse.SUPPRESS)
     local_cpu_real_model_check = sub.add_parser(
         "local-cpu-real-model-check",
         help="Run strict real-model checks for all direct local CPU ASR backends",
@@ -173,12 +174,7 @@ def run_local_cpu_real_model_check(
     )
 
 
-def _run_gui(
-    config_path: Path,
-    *,
-    debug_ui_preview: bool,
-    runtime_logging_sinks: RuntimeLoggingSinks,
-) -> int:
+def _load_gui_runtime() -> tuple[Any, Any, Any, Any, Any]:
     import flet as ft
 
     from puripuly_heart.app.adapters.vrchat_osc_presence import PsutilVrchatOscPresenceAdapter
@@ -186,7 +182,27 @@ def _run_gui(
     from puripuly_heart.ui.app import main_gui
     from puripuly_heart.ui.fonts import assets_dir
 
-    vrchat_osc_presence = PsutilVrchatOscPresenceAdapter()
+    return ft, PsutilVrchatOscPresenceAdapter, compose_ui_application, main_gui, assets_dir
+
+
+def run_gui_startup_check() -> int:
+    _, vrchat_osc_presence_adapter, _, _, assets_dir = _load_gui_runtime()
+    vrchat_osc_presence_adapter()
+    assets_dir()
+    return 0
+
+
+def _run_gui(
+    config_path: Path,
+    *,
+    debug_ui_preview: bool,
+    runtime_logging_sinks: RuntimeLoggingSinks,
+) -> int:
+    ft, vrchat_osc_presence_adapter, compose_ui_application, main_gui, assets_dir = (
+        _load_gui_runtime()
+    )
+
+    vrchat_osc_presence = vrchat_osc_presence_adapter()
 
     async def _target(page: ft.Page):
         try:
@@ -376,6 +392,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "hf-xet-runtime-check":
             return run_hf_xet_runtime_check()
+
+        if args.command == "gui-startup-check":
+            return run_gui_startup_check()
 
         if args.command == "local-cpu-real-model-check":
             return run_local_cpu_real_model_check(
