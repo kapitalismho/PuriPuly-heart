@@ -523,6 +523,10 @@ Broker 문서는 [`broker/README.md`](broker/README.md)에서 관리해요.
 
 네이티브 VR 오버레이 문서는 [`native/overlay/README.md`](native/overlay/README.md)에서 관리해요.
 
+커스텀 HTTP API 확장 문서는 [`docs/http-extensions.md`](docs/http-extensions.md)에서 관리해요. 연결에 필요한 JSON Schema는 [`docs/http-extension.schema.json`](docs/http-extension.schema.json)를 참조하세요.
+
+VRChat OSC 컨트롤은 [`docs/vrchat-osc.md`](docs/vrchat-osc.md)를 참조하세요.
+
 ---
 
 ## 개발자
