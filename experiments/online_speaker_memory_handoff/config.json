@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "experiment_id": "online_speaker_memory_handoff_r6_v1",
+  "sample_rate_hz": 16000,
+  "hop_ms": 100,
+  "development_sessions": [
+    "alimeeting_R8001_M8004",
+    "alimeeting_R8008_M8013",
+    "alimeeting_R8009_M8019",
+    "ami_ES2003a",
+    "ami_TS3009b"
+  ],
+  "evaluation_sessions": [
+    "alimeeting_R8007_M8010",
+    "ami_EN2001d",
+    "ami_ES2015d",
+    "ami_IS1009a",
+    "ami_TS3006a"
+  ],
+  "input_identities": {
+    "source_metadata.jsonl": "fa50470eb236e236584e6a2633c12ce5f2b45002fcd655eeb8d1c0a86d674c0e",
+    "waveform_inventory.jsonl": "3caa5bc339b2503e60190fd58239aa21ff1317709444e6ef6bb6279d2f66c27a",
+    "anchor_index.jsonl": "2ed7656a6a4036fc0b3134c18847e7ec13456a5f1ee0f915af36fbe6129cc1f8",
+    "reduced_r3_r4_forecast.json": "ec59ed137ed20a88c30405a499a3d89c7ef5e51e6013e831024c5c2c1c95e987",
+    "promotion_ledger.json": "987e5f2a66db7170cdbfaaf2c0be624de4ffda3ca7d41fc9205d091393de9fd1"
+  },
+  "representations": {
+    "m-l1": {
+      "model_id": "mhubert-147",
+      "layer_id": "L1",
+      "query_context_ms": [300],
+      "enrollment_ms": [1500, 2000],
+      "aggregation": ["mean", "medoid"]
+    },
+    "e-s3": {
+      "model_id": "eres2netv2-standard-prepool",
+      "layer_id": "S3",
+      "query_context_ms": [300],
+      "enrollment_ms": [1500, 2000],
+      "aggregation": ["mean", "medoid"]
+    },
+    "e-final": {
+      "model_id": "eres2netv2-standard-final",
+      "layer_id": "final-192",
+      "query_context_ms": [500, 750, 1000],
+      "enrollment_ms": [1500, 2000],
+      "aggregation": ["mean"]
+    }
+  },
+  "unit_policy": {
+    "minimum_speech_coverage": 0.65,
+    "maximum_horizon_ms": 30000,
+    "post_event_tail_ms": 2000,
+    "minimum_query_ms": 2000
+  },
+  "candidate_windows_ms": [100, 250, 500, 1000],
+  "causal_recall_windows_ms": [250, 500, 750, 1000, 1500],
+  "handoff_windows_ms": [250, 500, 1000, 1500],
+  "handoff_recall_windows_ms": [500, 1000, 1500, 2000],
+  "persistence_views_ms": {
+    "fast": 300,
+    "balanced": 500,
+    "stable": 1000
+  },
+  "backchannel_return_windows_ms": [500, 1000, 1500],
+  "development_false_event_targets_per_hour": [1, 5, 10, 20],
+  "output_relative_path": "results/r6/online_speaker_memory_handoff_v1"
+}
