@@ -50,6 +50,21 @@ async def test_qwen_asr_backend_requires_positive_connect_timeout() -> None:
 
 
 @pytest.mark.asyncio
+async def test_qwen_asr_backend_requires_positive_finish_timeout() -> None:
+    backend = QwenASRRealtimeSTTBackend(
+        api_key="k",
+        model="qwen3-asr-flash-realtime",
+        endpoint="wss://example",
+        language="en",
+        sample_rate_hz=16000,
+        finish_timeout_s=0.0,
+    )
+
+    with pytest.raises(ValueError):
+        await backend.open_session()
+
+
+@pytest.mark.asyncio
 async def test_qwen_asr_backend_verify_api_key_delegates(monkeypatch) -> None:
     seen: dict[str, str] = {}
 
