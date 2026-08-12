@@ -517,26 +517,12 @@ class _QwenASRSession(STTBackendSession):
         trailing_silence_ms: int | None = None,
         reason: SpeechBoundaryReason | None = None,
     ) -> None:
-        """Handle end of speech: top up trailing silence if needed, then commit."""
         if self._stopped:
             return
 
-        min_silence_ms = 100
         existing_ms = max(int(trailing_silence_ms or 0), 0)
-        missing_ms = max(min_silence_ms - existing_ms, 0)
+        missing_ms = 0
         wait_ms = boundary_wait_ms(reason, observed_tail_ms=existing_ms)
-
-        if missing_ms > 0:
-            import numpy as np
-
-            silence_samples = int(self.sample_rate_hz * (missing_ms / 1000.0))
-            if silence_samples > 0:
-                silence = np.zeros(silence_samples, dtype=np.float32)
-                pcm16 = (silence * 32767).astype(np.int16).tobytes()
-                self._audio_q.put_nowait(pcm16)
-                logger.info(
-                    "[STT] Trailing silence sent (%sms, %s samples)", missing_ms, silence_samples
-                )
 
         logger.info(
             "[STT][Tail] provider=qwen boundary_reason=%s observed_tail_ms=%s "

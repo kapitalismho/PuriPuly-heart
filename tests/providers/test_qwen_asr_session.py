@@ -45,15 +45,24 @@ async def test_qwen_asr_session_on_speech_end_enqueues_commit(caplog) -> None:
     caplog.clear()
     with caplog.at_level(logging.INFO):
         await session.on_speech_end(trailing_silence_ms=0, reason="max_duration")
-    silence = session._audio_q.get_nowait()
     commit = session._audio_q.get_nowait()
 
-    assert isinstance(silence, bytes)
-    assert len(silence) == 3200
     assert commit is _COMMIT
-    assert "observed_tail_ms=0 injected_padding_ms=100" in caplog.text
+    assert session._audio_q.empty()
+    assert "observed_tail_ms=0 injected_padding_ms=0" in caplog.text
     assert "boundary_reason=max_duration" in caplog.text
     assert "declared_trim_ms=0 boundary_wait_ms=0" in caplog.text
+
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        await session.on_speech_end(trailing_silence_ms=160, reason="soft_pause")
+    commit = session._audio_q.get_nowait()
+
+    assert commit is _COMMIT
+    assert session._audio_q.empty()
+    assert "observed_tail_ms=160 injected_padding_ms=0" in caplog.text
+    assert "boundary_reason=soft_pause" in caplog.text
+    assert "boundary_wait_ms=160" in caplog.text
 
 
 @pytest.mark.asyncio
