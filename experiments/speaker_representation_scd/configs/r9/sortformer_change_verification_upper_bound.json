@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "experiment_id": "sortformer_change_verification_upper_bound_r9_v1",
+  "evidence_mode": "fast_internal_development_known",
+  "output_relative_path": "results/r9/sortformer_change_verification_upper_bound_v1",
+  "r8_output_relative_path": "results/r8/streaming_sortformer_feasibility_v1",
+  "r7b_output_relative_path": "results/r7b/fixed_lag_local_segmentation_v1",
+  "frame_ms": 80,
+  "samples_per_frame": 1280,
+  "sample_rate_hz": 16000,
+  "folds": [
+    ["alimeeting_R8001_M8004", "ami_IS1009a"],
+    ["alimeeting_R8008_M8013", "ami_EN2001d"],
+    ["alimeeting_R8009_M8019", "ami_TS3006a"],
+    ["ami_ES2003a", "alimeeting_R8007_M8010"],
+    ["ami_TS3009b", "ami_ES2015d"]
+  ],
+  "candidate": {
+    "segment_threshold": 0.5,
+    "positive_tolerance_ms": 250,
+    "ambiguous_tolerance_ms": 500
+  },
+  "confirmation": {
+    "base_frames": 3,
+    "diagnostic_frames": 6
+  },
+  "feature_windows": {
+    "argmax_pre_frames": 10,
+    "pre_depth_frames": 10,
+    "resume_window_frames": 250,
+    "gap_cap_frames": 1250,
+    "return_window_frames": 3
+  },
+  "feature_names": [
+    "argmax_switch",
+    "gap_ms",
+    "pre_depth_min",
+    "pre_depth_mean",
+    "rise_slope",
+    "cross_probability",
+    "peak_probability",
+    "persistence_ms",
+    "same_slot_resume",
+    "co_activity_max",
+    "return_flag"
+  ],
+  "feature_definitions": {
+    "argmax_switch": "1 if the dominant (mean-probability) slot over argmax_pre_frames before the candidate differs from the dominant slot over the confirmation window starting at the candidate frame; 0 otherwise; 0 with missing-imputed input when the pre-window does not exist",
+    "gap_ms": "length in milliseconds of the contiguous all-slots-inactive run immediately preceding the candidate crossing, capped at gap_cap_frames; 0 when another slot is active at the crossing (overlap signature)",
+    "pre_depth_min": "minimum probability of the previous dominant slot over the pre_depth_frames window ending at the gap start (or at the candidate frame when there is no gap); imputed 0.5 when the window does not exist",
+    "pre_depth_mean": "mean probability of the previous dominant slot over the same window; imputed 0.5 when the window does not exist",
+    "rise_slope": "candidate-slot probability at the last confirmation frame minus its probability at the candidate frame",
+    "cross_probability": "candidate-slot probability at the candidate frame",
+    "peak_probability": "maximum candidate-slot probability over the candidate frame through the confirmation window",
+    "persistence_ms": "candidate-slot active-run length in milliseconds measured from the candidate frame, capped at the confirmation window (base: 240, diagnostic: 480)",
+    "same_slot_resume": "1 if the candidate slot was active at any frame in the resume_window_frames window before the candidate frame; 0 otherwise",
+    "co_activity_max": "maximum probability of any other slot over the candidate frame through the confirmation window",
+    "return_flag": "1 if a slot other than the candidate slot that was active in the pre-window re-activates within the return_window_frames window after the candidate frame; 0 otherwise"
+  },
+  "verifier": {
+    "class_balance": "reweight_0.5",
+    "label_set": "positive_vs_negative_excluding_ambiguous",
+    "linear": {
+      "c": 1.0,
+      "max_iter": 500,
+      "random_state": 1701
+    },
+    "mlp": {
+      "hidden_width": 32,
+      "dropout": 0.0,
+      "learning_rate": 0.001,
+      "weight_decay": 0.0001,
+      "batch_size": 256,
+      "maximum_epochs": 80,
+      "patience": 8,
+      "seeds": [1701, 1702, 1703],
+      "fallback_auroc_trigger": 0.55,
+      "inner_validation_fold_offset": 1
+    },
+    "standardization": "fit on the eight training meetings per fold; scale values below 1e-6 are set to 1.0"
+  },
+  "a0": {
+    "dev_false_event_budget_per_hour": 100.0,
+    "peak_probability_grid": [0.5, 0.6, 0.7, 0.8, 0.9],
+    "persistence_ms_grid": [0, 80, 160, 240],
+    "exclude_same_slot_resume": true,
+    "selection_rule": "per fold, select the grid combination maximizing development recall_250 subject to development false events per hour <= dev_false_event_budget_per_hour; tie-break by lower false events per hour, then lower peak threshold, then lower persistence threshold; if no combination satisfies the budget, select the minimum false events per hour combination",
+    "grouping_score": "peak_probability"
+  },
+  "duplicate_suppression_ms": 200,
+  "curve_search": {
+    "dense_min": 0.005,
+    "dense_max": 0.995,
+    "dense_step": 0.005,
+    "refinement_points": 64,
+    "refinement_rounds": 4,
+    "maximum_exact_values_per_target": 512
+  },
+  "targets": {
+    "false_events_per_hour": [1, 5, 10, 20, 50, 100]
+  },
+  "ceiling": {
+    "candidate_recall_fractions": [0.5, 0.8]
+  },
+  "outcome_a_pareto": {
+    "comparison_points_feh": [10, 20, 50],
+    "minimum_ratio": 2.0,
+    "minimum_points": 2
+  },
+  "reference_gate": {
+    "recall_at_10_false_events_per_hour": 0.3,
+    "recall_at_20_false_events_per_hour": 0.5,
+    "maximum_single_meeting_true_positive_share": 0.5,
+    "maximum_transfer_false_event_multiplier": 2.0
+  },
+  "verification_commit_policy": {
+    "no_new_inference": true,
+    "probability_source": "results/r8/streaming_sortformer_feasibility_v1/probabilities/cpu/*.npz, hash-verified at prepare",
+    "r8_curve_reference": "results/r8/streaming_sortformer_feasibility_v1/accuracy_metrics.json, hash-verified at prepare"
+  }
+}
