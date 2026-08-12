@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import bisect
 import gzip
 import hashlib
 import json
@@ -193,16 +194,23 @@ def contamination_samples(
 ) -> dict[str, int]:
     threshold = owner_threshold_ms * SAMPLES_PER_MS
     contaminated = 0
-    denominator = sum(int(item[1]) - int(item[0]) for item in singleton_intervals)
+    ordered_intervals = sorted(
+        (int(item[0]), int(item[1]), str(item[2])) for item in singleton_intervals
+    )
+    starts = [item[0] for item in ordered_intervals]
+    ends = [item[1] for item in ordered_intervals]
+    denominator = sum(item[1] - item[0] for item in ordered_intervals)
     for span in spans:
         left = int(span["start"])
         right = int(span["end"])
         qualifying: list[tuple[int, int, str]] = []
-        for raw_start, raw_end, raw_speaker in singleton_intervals:
-            overlap_start = max(left, int(raw_start))
-            overlap_end = min(right, int(raw_end))
+        first = bisect.bisect_right(ends, left)
+        last = bisect.bisect_left(starts, right)
+        for raw_start, raw_end, raw_speaker in ordered_intervals[first:last]:
+            overlap_start = max(left, raw_start)
+            overlap_end = min(right, raw_end)
             if overlap_end - overlap_start >= threshold:
-                qualifying.append((overlap_start, overlap_end, str(raw_speaker)))
+                qualifying.append((overlap_start, overlap_end, raw_speaker))
         qualifying.sort(key=lambda item: (item[0], item[1], item[2]))
         if not qualifying:
             continue

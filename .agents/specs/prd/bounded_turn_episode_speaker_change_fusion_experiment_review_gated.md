@@ -2,21 +2,52 @@
 
 ## 0. Status, authority, and purpose
 
-Status: normative experiment plan; implementation has not started.
+Status: reviewed normative experiment plan. Phases 0-4 are accepted and closed. Phase 5 is
+paused before compact design regeneration and execution; no corrected product-level
+detector/fusion selection has been made.
+
+### Owner override for Phase 5 execution (2026-08-11)
+
+On 2026-08-11 the owner explicitly approved the locally verified revision-8 repairs as a
+sufficient owner override for Phase 5 execution and, for this Phase 5 only, replaced the
+Section 29 accepted pre-execution review requirement with that override. No re-review was
+requested or performed. The override covers exactly the two revision-8 repairs:
+
+1. observable empty word timing (`word_intervals=[]`) remains an observable lexical
+   negative and only missing timing (`word_intervals=None`) increments
+   `lexical_not_observable`;
+2. the typed historical aggregate explicitly includes B0 and B1, all 408 baseline case
+   identities, the complete contamination/harm metric field set, ordered
+   identity/action/score digests, and the exhaustive B0/B1 equivalence receipt; the
+   redundant unprojected historical-correction output is removed.
+
+This document's authority SHA-256 is re-pinned below to the hash of this amended
+document. The re-pinned hash supersedes `bad637985e6ea2b82b0ac0e233b99ca7364d324dd2c5a38ec446b95a8604fbc4`
+for all Phase 5 gate checks. The revision-7 verdict `repair_required` remains recorded
+for revision 7; the override does not claim an independent accepted verdict for
+revision 8.
+
+Current compact-Phase-5 amendment source:
+`.agents/specs/prd/drafts/bounded_turn_episode_speaker_change_fusion_experiment_review_gated.source.r1.md`.
+Document review verdict for this amendment: ready.
 
 Authority order:
 
 1. Explicit user decisions in the experiment thread.
-2. `.agents/specs/prd/speaker_change_turn_boundary_experiment_handoff_en(1).md`.
-3. This normative experiment plan.
-4. GitHub issue #51 as product/history context where it does not conflict with the items above.
-5. Verified raw artifacts from committed Phases 0-2 and the uncommitted Phase 3 development sweep.
-6. Older reports and analyses as historical evidence only.
+2. The approved compact Phase 5 source snapshot named above.
+3. `.agents/specs/prd/speaker_change_turn_boundary_experiment_handoff_en(1).md`.
+4. This normative experiment plan.
+5. GitHub issue #51 as product/history context where it does not conflict with the items above.
+6. Verified raw artifacts from accepted Phases 0-4.
+7. Older reports and analyses as historical evidence only.
 
 If a lower-authority artifact conflicts with the action, scoring, sampling, or selection
 contract in this plan, the lower-authority artifact is not normative for the new run.
 Historical artifacts may be reused only as evidence or cached model output after their
 identity and causal semantics are verified.
+The compact Phase 5 source and corresponding explicit owner decisions supersede every
+conflicting exhaustive-sweep, W24-replay, full-verifier, and runtime instruction in the
+older handoff or historical artifacts.
 
 The experiment answers a product question:
 
@@ -48,6 +79,18 @@ The following decisions are frozen before implementation.
 14. The previously touched Phase 3 held-out manifests are historical validation inputs, not the sole confirmatory held-out set for this experiment.
 15. Target-enriched episode pools are used for comparative efficacy and failure analysis, not to infer natural five-minute/session rates. Natural-rate estimates come only from the unbiased natural-exposure pool defined in Section 16.
 16. Newly recorded private or product-domain conversational audio is not required by this experiment. Its absence is an external-validity limitation, not an automatic experiment failure.
+17. Independent verification proves complete artifact identity, completeness, aggregate
+    arithmetic, and outcome-critical invariants without replaying the entire Phase 5
+    computation a second time. Raw/derived trace reconstruction uses a frozen
+    deterministic stratified audit sample plus all mandatory sentinels and failure
+    examples. Broad harness regression and duplicate full-grid recomputation are not
+    experiment acceptance gates.
+18. Compact Phase 5 is planned as a 2-3 hour execution on the declared Phase 4 CPU
+    environment. Including exact design regeneration, mandatory pre-execution review,
+    execution, sampled independent audit, and the owner report, the expected elapsed
+    time after explicit Goal resume is 3-5 hours. This is a planning envelope rather
+    than accepted scientific evidence; a regenerated pre-execution forecast materially
+    above three execution hours must be reported before execution.
 
 ## 2. Non-goals
 
@@ -940,11 +983,28 @@ For each family, use session-block bootstrap on the paired AUC difference:
 - `signal_limited`: the point estimate is greater than zero but the interval includes zero, or the comparison has fewer than eight independent blocks;
 - `signal_stop`: every hard-target score has a 95% upper bound at or below zero.
 
-`signal_go` receives the full predeclared policy grid. `signal_limited` receives the
-same-proposal policy ladder and one sentinel profile per policy family, but no expanded
-combinatorial sweep. `signal_stop` receives only B0/B1, the raw diagnostic report, and
-the no-neural-policy control. This gate controls compute; it is not itself a product
-selection claim.
+`signal_go` normally receives the predeclared policy grid. Phase 4 retains the completed
+Standard/W24 comparison, but the owner-directed compact Phase 5 excludes W24 from all
+new inference and policy replay. It evaluates only the three E-standard extractor IDs
+already frozen as `eligible_go` by the accepted Phase 4 disposition:
+
+- `eres_adjacent_change.v1:E-standard:W8000:H500`;
+- `eres_prototype_change.v1:E-standard:prototype_memory_4:W8000:S1600:H500`;
+- `eres_prototype_change.v1:E-standard:prototype_memory_4:W8000:S4000:H500`.
+
+The adjacent extractor ID is a reference-aligned scalar test and does not encode a
+regular proposal step. It maps deterministically to the already declared 100 and 250 ms
+steps (`S1600` and `S4000`), so the three eligible Standard signal configurations produce
+four executable Phase 5 proposal profiles. No W24, stable-anchor, other window, step,
+threshold, confirmation, or state variant is admitted. Each of those four retains the
+full clustering, actionization, VAD-fusion, same-proposal ladder, and frequency-control
+comparison. The 936 legacy compatibility profiles remain
+immutable historical evidence and are not replayed as a new combinatorial sweep; only
+B0/B1 and the four compact Standard profiles receive corrected historical-case rescoring.
+`signal_limited` receives the same-proposal policy ladder and one sentinel profile per
+policy family, but no expanded combinatorial sweep. `signal_stop` receives only B0/B1,
+the raw diagnostic report, and the no-neural-policy control. This gate controls compute;
+it is not itself a product selection claim.
 
 ## 19. Required ablations and falsification tests
 
@@ -1051,7 +1111,7 @@ dominating the conclusion.
 ### 20.1 Search order
 
 1. verify raw model/cache parity;
-2. generate raw proposals for every existing detector profile;
+2. generate raw proposals for every compact Phase 5 `eligible_go` profile;
 3. compute signal diagnostics;
 4. replay clustering grid;
 5. replay hard/soft actionization;
@@ -1598,6 +1658,9 @@ Gate: only signal-positive or diagnostic-limited families enter the full policy 
 **Mandatory pre-execution review timing:** before launching the clustering/refractory/VAD-
 fusion grid or corrected large development replay.
 
+Phase 5 design regeneration, review, and execution require an explicit owner resume from
+the current paused Goal. This document amendment and its review do not resume the Goal.
+
 The Phase 5 reviewer must examine at minimum:
 
 - proposal schema and confidence semantics;
@@ -1610,6 +1673,25 @@ The Phase 5 reviewer must examine at minimum:
 - orthogonal benefit attribution versus harm flags;
 - expected row count, cache reuse, runtime forecast, and completeness checks.
 
+The approved compact planning basis is:
+
+- exactly four E-standard proposal profiles over the currently pinned 878 turn episodes
+  and the same four profiles over 204 corrected historical cases;
+- 427,566 unique 500 ms E-standard windows, comprising 219,802 verified reusable
+  windows and 207,764 windows requiring inference;
+- approximately 1.35 hours of benchmark-derived core calculation;
+- 2-3 hours of expected Phase 5 execution, including output materialization and the
+  frozen 2,048-unit independent audit;
+- 3-5 hours of expected elapsed time from explicit Goal resume through design
+  regeneration, mandatory pre-execution review, execution, audit, and owner report.
+
+These counts are a pre-review planning baseline, not permission to execute. The Phase 5
+design ledger must recompute them from the then-current pinned manifests, cache receipts,
+code identities, and declared Phase 4 CPU configuration. Any identity/count mismatch or
+an exact execution forecast materially above three hours stops before execution and is
+reported to the owner. The superseded 201.6796-hour, 1,024-profile forecast cannot
+authorize work.
+
 Deliverables:
 
 - complete causal proposal evidence;
@@ -1617,15 +1699,42 @@ Deliverables:
 - VAD fusion actions;
 - policy-ladder ablations;
 - corrected rescoring of historical development caches;
+- actual-versus-forecast runtime and cache-reuse receipt for the compact four-profile
+  execution;
 - approved Phase 5 pre-execution review artifact.
 
-Gate: independent recomputation agrees on actions, contamination, harm, and timing.
+Gate: file/self hashes, expected identities, split completeness, per-session aggregates,
+and summary arithmetic are checked exhaustively. B0/B1 equivalence, audio conservation,
+and generation-time causal/schema checks remain exhaustive. Independent raw/derived
+trace reconstruction for actions, contamination, harm, and timing uses the frozen audit
+sample below rather than a second full-grid replay:
+
+- include every mandatory scientific sentinel and every deterministically selected
+  failure example;
+- include at least one row for every observed checkpoint, proposal-policy class, pool,
+  corpus, ladder stage, fusion mode, and control kind;
+- fill the remainder to 2,048 distinct physical trace/episode or historical-case units
+  by ascending SHA-256 of
+  `"turn-episode-v1-phase5-audit-v1" || canonical_unit_id`;
+- recompute sampled units from accepted cache/audio/annotation inputs, never from trusted
+  derived outputs;
+- fail the phase if any sampled reconstruction or exhaustive aggregate check disagrees.
+
+The independent verifier does not expand or replay every logical alias and does not
+repeat all neural inference, clustering, control placement, or per-policy scoring.
+
+After the independently verified Phase 5 per-policy results and exit review are accepted,
+stop and report them to the owner. No Phase 6 preparation, review, frontier construction,
+panel construction, or freeze may begin without a separate explicit owner resume.
 
 ### Phase 6: development frontier and freeze
 
 **Mandatory pre-execution review timing:** after Phase 5 evidence is accepted but before
 constructing the final selection panel, locking profile IDs, or creating the self-hashed
 contract that will authorize confirmatory held-out access.
+
+The post-Phase-5 owner report and separate explicit owner resume are additional entry
+conditions for Phase 6; accepted Phase 5 evidence alone does not authorize preparation.
 
 The Phase 6 reviewer must examine at minimum:
 
@@ -1724,7 +1833,8 @@ most favorable observed result.
 The Phase 9 reviewer must examine at minimum:
 
 - completeness of every required phase and review artifact;
-- exact coordinator recomputation procedure from per-session evidence;
+- exact coordinator recomputation procedure from per-session aggregate evidence, plus
+  the frozen sampled raw/derived trace audit rather than duplicate full-grid replay;
 - provenance/cache/split/timing audit plan;
 - deterministic failure-example selection rule;
 - decision-framework mapping to signal-positive, policy-positive, provider-feasible, and product-candidate outcomes;
@@ -1739,7 +1849,8 @@ new rule and presented as if it were confirmatory.
 
 Deliverables:
 
-- coordinator recomputation from per-session evidence;
+- coordinator recomputation from per-session aggregate evidence and frozen sampled trace
+  audit;
 - provenance/cache/split/timing audit;
 - failure-example audit selected by frozen rule;
 - explicit model-signal, policy, provider, and product conclusions;
@@ -1844,25 +1955,31 @@ Goal executor:
 - does not retry or restart a failed full run without a new coordinator instruction;
 - reports completion or escalation at the phase boundary.
 
-Reviewer or executor reports are not scientific evidence by themselves. The coordinator independently verifies:
+Reviewer or executor reports are not scientific evidence by themselves. The coordinator
+independently verifies file/self hashes, expected identities, split completeness,
+per-session/pool/block aggregates, summary arithmetic, provider audio conservation, and
+review-gate provenance exhaustively. For high-cardinality raw or derived rows, it uses
+the phase's frozen deterministic stratified sample unless that phase explicitly requires
+an exhaustive sentinel. Accordingly, the coordinator verifies:
 
 - file and self hashes;
 - expected session/profile counts;
 - split completeness;
 - cache identities and sampled payload recomputation;
-- causal timing;
-- cluster membership;
-- final action taxonomy;
-- contamination sample accounting;
-- harmful-split classifications;
-- session-block bootstrap inputs;
+- sampled causal timing;
+- sampled cluster membership;
+- sampled final action taxonomy;
+- sampled contamination accounting;
+- sampled harmful-split classifications;
+- sampled session-block bootstrap inputs;
 - aggregate recomputation;
 - provider audio conservation;
 - presence and approval status of the required pre-execution review artifact for every completed phase;
 - proof that no phase produced accepted experimental evidence before its review approval.
 
-Experiment-scientific tests are strict. Code style, docstrings, and unrelated polishing
-are not acceptance gates.
+Experiment-scientific tests are strict for outcome-critical invariants and frozen
+sentinels. Broad harness regression, duplicate end-to-end replay, code style, docstrings,
+and unrelated polishing are not acceptance gates.
 
 ## 33. Architecture boundary
 
@@ -1891,19 +2008,21 @@ phase, obtain that phase's explicit pre-execution approval first.**
 9. Implement and pass the provider-neutral PCM oracle grid; verify the Phase 3 exit gate.
 10. Prepare and obtain Phase 4 pre-execution approval before any new large neural inference or full diagnostic sweep.
 11. Run accepted raw signal diagnostics and verify the Phase 4 signal gate.
-12. Prepare and obtain Phase 5 pre-execution approval before the full clustering/refractory/VAD-fusion development sweep.
+12. After explicit owner resume, prepare and obtain Phase 5 pre-execution approval before the compact four-profile clustering/refractory/VAD-fusion development sweep.
 13. Implement causal cluster/refractory replay, VAD fusion, complete action evidence, cache reuse verification, and corrected development rescoring; verify the Phase 5 exit gate.
 14. Decide any data additions only from the accepted inventory findings and under the Phase 1/2 reviewed sampling contract.
-15. Prepare and obtain Phase 6 pre-execution approval before constructing the final frontier/panel or self-hashed freeze.
-16. Build the full development frontier and frozen panel; verify the Phase 6 freeze gate.
-17. Prepare and obtain the Phase 7 **pre-held-out-access** approval. Do not resolve or open confirmatory held-out paths before this approval.
-18. Run confirmatory held-out exactly under the frozen contract and verify complete-session evidence.
-19. Prepare and obtain Phase 8 pre-execution approval before provider-specific replay, credentials, or paid/live provider calls.
-20. Run provider-specific frozen-trace replay and verify transcript/runtime evidence.
-21. Prepare and obtain Phase 9 pre-conclusion approval before writing the final recommendation or implementation handoff.
-22. Perform independent final recomputation/audit and issue the conclusion only after the Phase 9 gate passes.
+15. Stop after accepted Phase 5 per-policy results, report them to the owner, and wait for a separate explicit owner resume before any Phase 6 preparation.
+16. Prepare and obtain Phase 6 pre-execution approval before constructing the final frontier/panel or self-hashed freeze.
+17. Build the full development frontier and frozen panel; verify the Phase 6 freeze gate.
+18. Prepare and obtain the Phase 7 **pre-held-out-access** approval. Do not resolve or open confirmatory held-out paths before this approval.
+19. Run confirmatory held-out exactly under the frozen contract and verify complete-session evidence.
+20. Prepare and obtain Phase 8 pre-execution approval before provider-specific replay, credentials, or paid/live provider calls.
+21. Run provider-specific frozen-trace replay and verify transcript/runtime evidence.
+22. Prepare and obtain Phase 9 pre-conclusion approval before writing the final recommendation or implementation handoff.
+23. Perform independent final recomputation/audit and issue the conclusion only after the Phase 9 gate passes.
 
 Until the corrected development evidence and its required review gates through Phase 5 are complete, the accepted experiment conclusion is:
 
-> Useful raw speaker-change signal exists in both families, but no corrected
+> ERes2NetV2 has accepted `signal_go` raw speaker-change evidence. LS-EEND has accepted
+> `signal_stop` evidence and does not enter Phase 5 neural replay. No corrected
 > product-level detector/fusion selection has been made.

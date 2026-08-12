@@ -14,6 +14,7 @@ end-to-end baseline smoke over the 20 opened sessions (baseline only).
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -142,6 +143,7 @@ def benefit_attribution(
     reference: ReferenceAction,
     delay_ms: int,
     all_actions: list[Action],
+    baseline_action: Action | None = None,
 ) -> str:
     """Section 12.3 benefit attribution for one matched reference.
 
@@ -160,19 +162,13 @@ def benefit_attribution(
         return "retained_b0_success"
     if delay_ms > 1500:
         return "late_target_action"
-    b0_actions = [
-        a
-        for a in all_actions
-        if a.owner == "b0"
-        and a.action_id != action.action_id
-        and in_eligibility_window(a.boundary_source_sample, reference)
-        and a.observed_source_sample_at_emit - reference.evidence_onset_sample
-        <= MATCH_DEADLINE_MS * SAMPLES_PER_MS
-    ]
-    if b0_actions and action.observed_source_sample_at_emit < min(
-        a.observed_source_sample_at_emit for a in b0_actions
+    if (
+        baseline_action is not None
+        and action.observed_source_sample_at_emit < baseline_action.observed_source_sample_at_emit
     ):
         return "accelerated_b0_success"
+    if baseline_action is not None:
+        return "none"
     return "recovered_b0_hard_miss"
 
 
@@ -206,6 +202,9 @@ def match_episode(
     references: list[ReferenceAction],
     scored_start: int,
     processed_scored_end: int,
+    *,
+    fixed_pairs: dict[str, str] | None = None,
+    baseline_actions_by_reference: dict[str, Action] | None = None,
 ) -> tuple[list[Match], list[str], dict[str, int]]:
     """Deterministic ordered maximum-weight one-to-one matching.
 
@@ -214,8 +213,8 @@ def match_episode(
     delay, (4) lower interval localization distance, (5) deterministic lexical ids.
     References are matched in evidence-onset order and actions in source order, so
     the resulting matching never crosses source order (Section 12.1.6: ordered
-    one-to-one matching is preserved). Implemented as an exact dynamic program
-    over the reference x action grid.
+    one-to-one matching is preserved). Implemented as an exact sparse dynamic
+    program over eligible reference/action edges.
     """
     refs = [
         r
@@ -231,6 +230,18 @@ def match_episode(
         ),
     )
     n, m = len(refs), len(ordered_actions)
+    fixed = dict(fixed_pairs or {})
+    if len(set(fixed.values())) != len(fixed):
+        raise ScoringError("fixed match references are not one-to-one")
+    if not set(fixed).issubset({action.action_id for action in ordered_actions}):
+        raise ScoringError("fixed match action is absent")
+    if not set(fixed.values()).issubset({reference.reference_id for reference in refs}):
+        raise ScoringError("fixed match reference is absent")
+
+    reference_index = {reference.reference_id: index for index, reference in enumerate(refs)}
+    action_index = {action.action_id: index for index, action in enumerate(ordered_actions)}
+    if len(reference_index) != n or len(action_index) != m:
+        raise ScoringError("matching IDs are not unique")
 
     def better(
         left: tuple[tuple[int, int, int, int], tuple[tuple[str, str], ...]] | None,
@@ -244,38 +255,121 @@ def match_episode(
             return left if left[0] > right[0] else right
         return left if left[1] < right[1] else right
 
-    empty: tuple[tuple[int, int, int, int], tuple[tuple[str, str], ...]] = ((0, 0, 0, 0), ())
-    dp: list[list[tuple[tuple[int, int, int, int], tuple[tuple[str, str], ...]] | None]] = [
-        [None] * (m + 1) for _ in range(n + 1)
-    ]
-    for j in range(m + 1):
-        dp[0][j] = empty
-    for i in range(1, n + 1):
-        for j in range(1, m + 1):
-            # Standard ordered DP: skip the reference (dp[i-1][j]), skip the
-            # action (dp[i][j-1]), or match ref[i-1] to action[j-1] on top of
-            # dp[i-1][j-1].
-            best = better(dp[i - 1][j], dp[i][j - 1])
-            prev = dp[i - 1][j - 1]
-            if prev is not None:
-                ref = refs[i - 1]
-                act = ordered_actions[j - 1]
-                if action_eligible(act, ref, scored_start, processed_scored_end):
-                    weight = _match_weight(ref, act)
-                    obj = tuple(prev[0][k] + weight[k] for k in range(4))
-                    ids = tuple(sorted(prev[1] + ((ref.reference_id, act.action_id),)))
-                    best = better(best, (obj, ids))
-            dp[i][j] = best
+    state_type = tuple[tuple[int, int, int, int], tuple[tuple[str, str], ...]]
+    empty: state_type = ((0, 0, 0, 0), ())
 
-    best_state = dp[n][m]
-    if best_state is None or not best_state[1]:
+    def combine(left: state_type, right: state_type) -> state_type:
+        return (
+            tuple(left[0][index] + right[0][index] for index in range(4)),
+            tuple(sorted(left[1] + right[1])),
+        )
+
+    def solve_segment(
+        segment_refs: list[ReferenceAction], segment_actions: list[Action]
+    ) -> state_type:
+        if not segment_refs or not segment_actions:
+            return empty
+        boundaries = [action.boundary_source_sample for action in segment_actions]
+        tree: list[state_type | None] = [None] * (len(segment_actions) + 1)
+
+        def query(count: int) -> state_type:
+            best: state_type | None = empty
+            index = count
+            while index > 0:
+                best = better(best, tree[index])
+                index -= index & -index
+            return best or empty
+
+        def update(position: int, state: state_type) -> None:
+            index = position + 1
+            while index < len(tree):
+                tree[index] = better(tree[index], state)
+                index += index & -index
+
+        for ref in segment_refs:
+            if is_gap_reference(ref):
+                eligibility_start, eligibility_end = gap_eligibility(ref)
+            else:
+                eligibility_start, eligibility_end = ref.acceptable_interval
+            start = bisect.bisect_left(boundaries, eligibility_start)
+            end = bisect.bisect_right(boundaries, eligibility_end)
+            candidates: list[tuple[int, state_type]] = []
+            for position in range(start, end):
+                act = segment_actions[position]
+                if not action_eligible(act, ref, scored_start, processed_scored_end):
+                    continue
+                prev = query(position)
+                weight = _match_weight(ref, act)
+                candidates.append(
+                    (
+                        position,
+                        (
+                            tuple(prev[0][index] + weight[index] for index in range(4)),
+                            tuple(sorted(prev[1] + ((ref.reference_id, act.action_id),))),
+                        ),
+                    )
+                )
+            for position, state in candidates:
+                update(position, state)
+        return query(len(segment_actions))
+
+    fixed_positions = sorted(
+        (
+            reference_index[reference_id],
+            action_index[action_id],
+            reference_id,
+            action_id,
+        )
+        for action_id, reference_id in fixed.items()
+    )
+    if any(left[1] >= right[1] for left, right in zip(fixed_positions, fixed_positions[1:])):
+        raise ScoringError("fixed B0 matches do not preserve source order")
+    for ref_position, act_position, _, _ in fixed_positions:
+        if not action_eligible(
+            ordered_actions[act_position],
+            refs[ref_position],
+            scored_start,
+            processed_scored_end,
+        ):
+            raise ScoringError("fixed B0 match is ineligible")
+
+    best_state = empty
+    prior_ref = -1
+    prior_action = -1
+    for ref_position, act_position, reference_id, action_id in fixed_positions:
+        best_state = combine(
+            best_state,
+            solve_segment(
+                refs[prior_ref + 1 : ref_position],
+                ordered_actions[prior_action + 1 : act_position],
+            ),
+        )
+        best_state = combine(
+            best_state,
+            (
+                _match_weight(refs[ref_position], ordered_actions[act_position]),
+                ((reference_id, action_id),),
+            ),
+        )
+        prior_ref = ref_position
+        prior_action = act_position
+    best_state = combine(
+        best_state,
+        solve_segment(refs[prior_ref + 1 :], ordered_actions[prior_action + 1 :]),
+    )
+    matched_id_pairs = set(best_state[1])
+    expected_fixed = {(reference_id, action_id) for action_id, reference_id in fixed.items()}
+    if not expected_fixed.issubset(matched_id_pairs):
+        raise ScoringError("fixed B0 match cannot be preserved in ordered candidate matching")
+    if not best_state[1]:
         matches: list[Match] = []
     else:
-        matched_pairs: list[tuple[ReferenceAction, Action]] = []
-        for reference_id, action_id in best_state[1]:
-            ref = next(r for r in refs if r.reference_id == reference_id)
-            act = next(a for a in ordered_actions if a.action_id == action_id)
-            matched_pairs.append((ref, act))
+        reference_by_id = {reference.reference_id: reference for reference in refs}
+        action_by_id = {action.action_id: action for action in ordered_actions}
+        matched_pairs = [
+            (reference_by_id[reference_id], action_by_id[action_id])
+            for reference_id, action_id in best_state[1]
+        ]
         matches = []
         for ref, action in matched_pairs:
             raw_delay = action.observed_source_sample_at_emit - ref.evidence_onset_sample
@@ -292,7 +386,13 @@ def match_episode(
                 Match(
                     reference_id=ref.reference_id,
                     action_id=action.action_id,
-                    benefit_attribution=benefit_attribution(action, ref, delay_ms, actions),
+                    benefit_attribution=benefit_attribution(
+                        action,
+                        ref,
+                        delay_ms,
+                        actions,
+                        (baseline_actions_by_reference or {}).get(ref.reference_id),
+                    ),
                     availability_delay_ms=delay_ms,
                     localization_error_ms=localization_error_ms(action.boundary_source_sample, ref),
                     pre_existing=pre_existing,
