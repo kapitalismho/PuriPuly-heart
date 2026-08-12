@@ -27,7 +27,7 @@ _STOP = object()
 
 @dataclass(frozen=True, slots=True)
 class _FinalizeRequest:
-    trailing_silence_ms: int | None = None
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,8 +207,6 @@ class _SonioxSession(STTBackendSession):
                     return
                 if isinstance(data, _FinalizeRequest):
                     payload = {"type": "finalize"}
-                    if data.trailing_silence_ms is not None:
-                        payload["trailing_silence_ms"] = data.trailing_silence_ms
                     await self._ws.send(json.dumps(payload))
                     self._last_send_at = time.monotonic()
                     continue
@@ -424,45 +422,16 @@ class _SonioxSession(STTBackendSession):
             return
 
         self._pending_finalize_requests += 1
-        configured_trim_ms = max(int(self.trailing_silence_ms), 0)
         observed_tail_ms = max(int(trailing_silence_ms or 0), 0)
-        injected_padding_ms = 0
-        if trailing_silence_ms is None and configured_trim_ms > 0:
-            injected_padding_ms = configured_trim_ms
-            silence_samples = int(self.sample_rate_hz * (injected_padding_ms / 1000.0))
-            if silence_samples > 0:
-                import numpy as np
-
-                silence = np.zeros(silence_samples, dtype=np.float32)
-                pcm16 = (silence * 32767).astype(np.int16).tobytes()
-                await self._audio_q.put(pcm16)
-                logger.info(
-                    "[STT] Trailing silence sent (%sms, %s samples, %s bytes)",
-                    injected_padding_ms,
-                    silence_samples,
-                    len(pcm16),
-                )
-
-        declared_trim_ms = min(
-            configured_trim_ms,
-            observed_tail_ms + injected_padding_ms,
-        )
         wait_ms = boundary_wait_ms(reason, observed_tail_ms=observed_tail_ms)
         logger.info(
             "[STT][Tail] provider=soniox boundary_reason=%s observed_tail_ms=%s "
-            "injected_padding_ms=%s "
-            "declared_trim_ms=%s boundary_wait_ms=%s",
+            "boundary_wait_ms=%s",
             reason,
             observed_tail_ms,
-            injected_padding_ms,
-            declared_trim_ms,
             wait_ms,
         )
-        await self._audio_q.put(
-            _FinalizeRequest(
-                trailing_silence_ms=declared_trim_ms if declared_trim_ms > 0 else None
-            )
-        )
+        await self._audio_q.put(_FinalizeRequest())
 
     async def stop(self) -> None:
         if self._stopped:

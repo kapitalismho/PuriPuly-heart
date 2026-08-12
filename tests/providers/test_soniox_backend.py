@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import sys
 from types import SimpleNamespace
 
@@ -427,46 +428,28 @@ async def test_soniox_session_preserves_equal_and_regressing_timestamp_tokens() 
 
 
 @pytest.mark.asyncio
-async def test_soniox_session_on_speech_end_enqueues_finalize() -> None:
+async def test_soniox_session_on_speech_end_enqueues_finalize(caplog) -> None:
     session = _make_session()
 
-    await session.on_speech_end(trailing_silence_ms=240)
+    with caplog.at_level(logging.INFO):
+        await session.on_speech_end(trailing_silence_ms=240, reason="soft_pause")
 
     finalize = await session._audio_q.get()
-
     assert isinstance(finalize, _FinalizeRequest)
-    assert finalize.trailing_silence_ms == session.trailing_silence_ms
+    assert session._audio_q.empty()
+    assert "boundary_reason=soft_pause" in caplog.text
+    assert "observed_tail_ms=240" in caplog.text
+    assert "boundary_wait_ms=240" in caplog.text
 
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        await session.on_speech_end()
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("observed_tail_ms", "expected_trim_ms"),
-    [(0, None), (40, 40), (100, 100), (500, 100)],
-)
-async def test_soniox_session_limits_declared_trim_to_observed_tail(
-    observed_tail_ms: int,
-    expected_trim_ms: int | None,
-) -> None:
-    session = _make_session()
-
-    finalize = await _request_finalize(session, observed_tail_ms=observed_tail_ms)
-
-    assert finalize.trailing_silence_ms == expected_trim_ms
-
-
-@pytest.mark.asyncio
-async def test_soniox_session_on_speech_end_none_injects_configured_trailing_silence() -> None:
-    session = _make_session()
-
-    await session.on_speech_end(trailing_silence_ms=None)
-
-    silence = await session._audio_q.get()
     finalize = await session._audio_q.get()
-
-    assert isinstance(silence, bytes)
-    assert len(silence) > 0
     assert isinstance(finalize, _FinalizeRequest)
-    assert finalize.trailing_silence_ms == session.trailing_silence_ms
+    assert session._audio_q.empty()
+    assert "boundary_reason=None" in caplog.text
+    assert "boundary_wait_ms=None" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -637,12 +620,12 @@ async def test_soniox_send_loop_preserves_finalize_before_stream_end() -> None:
     session._ws = websocket
 
     await session.send_audio(b"abc")
-    await session.on_speech_end(trailing_silence_ms=0)
+    await session.on_speech_end(trailing_silence_ms=240)
     await session.stop()
     await session._send_loop()
 
     assert websocket.sent[0] == b"abc"
-    assert json.loads(websocket.sent[1])["type"] == "finalize"
+    assert json.loads(websocket.sent[1]) == {"type": "finalize"}
     assert websocket.sent[2] == ""
 
 
