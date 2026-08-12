@@ -5,6 +5,7 @@
   "output_relative_path": "results/r9/sortformer_change_verification_upper_bound_v1",
   "r8_output_relative_path": "results/r8/streaming_sortformer_feasibility_v1",
   "r7b_output_relative_path": "results/r7b/fixed_lag_local_segmentation_v1",
+  "model_q8_filename": "diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
   "frame_ms": 80,
   "samples_per_frame": 1280,
   "sample_rate_hz": 16000,

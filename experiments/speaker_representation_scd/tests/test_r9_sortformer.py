@@ -126,6 +126,43 @@ def test_recording_start_gap_is_imputed_to_cap() -> None:
     assert features["same_slot_resume"] == 0.0
 
 
+def test_co_onset_after_silence_has_zero_gap() -> None:
+    cfg = config()
+    probabilities = np.asarray(
+        [
+            [0.9, 0.1, 0.1, 0.1],
+            [0.1, 0.1, 0.1, 0.1],
+            [0.9, 0.9, 0.1, 0.1],
+        ],
+        dtype=np.float32,
+    )
+    features = _features_for_candidate(
+        probabilities, 2, 1, int(cfg["confirmation"]["base_frames"]), cfg["feature_windows"], 80
+    )
+    assert features["gap_ms"] == 0.0
+
+
+def test_confirmation_window_never_reads_beyond_three_frames() -> None:
+    cfg = config()
+    probabilities = np.asarray(
+        [
+            [0.9, 0.1, 0.1, 0.1],
+            [0.9, 0.1, 0.1, 0.1],
+            [0.1, 0.6, 0.1, 0.1],
+            [0.1, 0.7, 0.1, 0.1],
+            [0.1, 0.8, 0.1, 0.1],
+            [0.1, 0.99, 0.1, 0.1],
+        ],
+        dtype=np.float32,
+    )
+    features = _features_for_candidate(
+        probabilities, 2, 1, int(cfg["confirmation"]["base_frames"]), cfg["feature_windows"], 80
+    )
+    assert math.isclose(features["peak_probability"], 0.8, rel_tol=1e-6)
+    assert math.isclose(features["rise_slope"], 0.2, rel_tol=1e-6)
+    assert features["persistence_ms"] == 240.0
+
+
 def test_grouping_keeps_highest_score_within_radius() -> None:
     rows = [
         {"sample": 100, "score": 0.4},

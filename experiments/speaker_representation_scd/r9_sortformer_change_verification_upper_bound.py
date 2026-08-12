@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -12,13 +13,6 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 import numpy as np
-
-from experiments.online_speaker_memory_handoff.protocol import (
-    read_jsonl,
-    sha256_file,
-    write_json,
-    write_jsonl,
-)
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = (
@@ -33,6 +27,37 @@ R7B_RELATIVE = "results/r7b/fixed_lag_local_segmentation_v1"
 
 class R9Error(RuntimeError):
     pass
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines()
+        if line.strip()
+    ]
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 @dataclass(slots=True)
@@ -126,6 +151,8 @@ def _sessions(root: Path) -> dict[str, Session]:
         waveform_path = Path(row["waveform_path"])
         if not waveform_path.is_file():
             raise R9Error(f"waveform is missing: {waveform_path}")
+        if float(row["scored_hours"]) <= 0.0:
+            raise R9Error(f"non-positive scored hours for {row['session_id']}")
         result[str(row["session_id"])] = Session(
             session_id=str(row["session_id"]),
             fold=int(row["fold"]),
@@ -140,12 +167,44 @@ def _sessions(root: Path) -> dict[str, Session]:
 
 
 def _load_probabilities(root: Path, session_id: str) -> np.ndarray:
-    path = r8_output_root(root) / "probabilities" / "cpu" / f"{session_id}.npz"
+    cfg = config()
+    directory = output_root(root)
+    reuse_path = directory / "r8_reuse_inventory.json"
+    if not reuse_path.is_file():
+        raise R9Error("prepare must run before loading R8 probabilities")
+    reuse = load_json(reuse_path)["reused"]
+    key = f"probabilities_cpu_{session_id}"
+    if key not in reuse:
+        raise R9Error(f"reuse inventory lacks {key}")
+    path = Path(reuse[key]["path"])
     if not path.is_file():
         raise R9Error(f"R8 probabilities are missing: {path}")
-    values = np.load(path)["probabilities"].astype(np.float32)
+    if sha256_file(path) != str(reuse[key]["sha256"]):
+        raise R9Error(f"R8 probabilities hash drift since prepare: {path}")
+    archive = np.load(path)
+    values = archive["probabilities"].astype(np.float32)
     if values.ndim != 2 or values.shape[1] != 4 or not np.isfinite(values).all():
         raise R9Error(f"invalid probabilities: {path}")
+    if int(archive["frame_ms"]) != int(cfg["frame_ms"]):
+        raise R9Error(f"probability frame identity drift: {path}")
+    if str(archive["backend"]) != "cpu":
+        raise R9Error(f"probability backend identity drift: {path}")
+    model_key = "r8_model_receipt"
+    if model_key not in reuse:
+        raise R9Error("reuse inventory lacks the R8 model receipt")
+    model_receipt = load_json(Path(reuse[model_key]["path"]))
+    expected_model_sha = next(
+        (
+            str(file_row["sha256"])
+            for file_row in model_receipt["files"]
+            if str(file_row["filename"]) == str(cfg["model_q8_filename"])
+        ),
+        None,
+    )
+    if expected_model_sha is None:
+        raise R9Error("R8 model receipt lacks the Q8_0 file hash")
+    if str(archive["model_sha256"]) != expected_model_sha:
+        raise R9Error(f"probability model identity drift: {path}")
     return values
 
 
@@ -293,13 +352,18 @@ def _features_for_candidate(
     active_any = (probabilities > 0.5).any(axis=1)
     inactive = ~active_any
 
-    gap_frames = 0
-    index = frame - 1
-    while index >= 0 and bool(inactive[index]) and gap_frames < int(windows["gap_cap_frames"]):
-        gap_frames += 1
-        index -= 1
-    if frame == 0:
-        gap_frames = int(windows["gap_cap_frames"])
+    other_mask = np.ones(probabilities.shape[1], dtype=np.bool_)
+    other_mask[slot] = False
+    if bool((probabilities[frame, other_mask] > 0.5).any()):
+        gap_frames = 0
+    else:
+        gap_frames = 0
+        index = frame - 1
+        while index >= 0 and bool(inactive[index]) and gap_frames < int(windows["gap_cap_frames"]):
+            gap_frames += 1
+            index -= 1
+        if frame == 0:
+            gap_frames = int(windows["gap_cap_frames"])
     gap_ms = float(gap_frames * frame_ms)
 
     pre_depth_frames = int(windows["pre_depth_frames"])
@@ -318,7 +382,7 @@ def _features_for_candidate(
     pre_dominant = (
         _dominant_slot(probabilities, argmax_pre_lo, frame) if argmax_pre_lo < frame else None
     )
-    post_hi = min(total, frame + confirmation_frames + 1)
+    post_hi = min(total, frame + confirmation_frames)
     post_dominant = _dominant_slot(probabilities, frame, post_hi)
     argmax_switch = (
         1.0
@@ -328,7 +392,7 @@ def _features_for_candidate(
         else 0.0
     )
 
-    last = min(total - 1, frame + confirmation_frames)
+    last = min(total - 1, frame + confirmation_frames - 1)
     cross_probability = float(probabilities[frame, slot])
     peak_probability = float(probabilities[frame : last + 1, slot].max())
     rise_slope = float(probabilities[last, slot] - probabilities[frame, slot])
@@ -352,8 +416,6 @@ def _features_for_candidate(
         else 0.0
     )
 
-    other_mask = np.ones(probabilities.shape[1], dtype=np.bool_)
-    other_mask[slot] = False
     co_activity_max = (
         float(probabilities[frame : last + 1, other_mask].max()) if last >= frame else 0.0
     )
@@ -366,9 +428,9 @@ def _features_for_candidate(
         and bool((probabilities[pre_lo:frame, other] > 0.5).any())
         and pre_lo < frame
     }
-    return_hi = min(total, frame + int(windows["return_window_frames"]) + 1)
+    return_hi = min(total, frame + int(windows["return_window_frames"]))
     return_flag = 0.0
-    if pre_active_slots and frame + 1 < total:
+    if pre_active_slots and frame + 1 < return_hi:
         for other in pre_active_slots:
             if bool((probabilities[frame + 1 : return_hi, other] > 0.5).any()):
                 return_flag = 1.0
@@ -465,6 +527,19 @@ def _ratio(numerator: int, denominator: int) -> float | None:
     return numerator / denominator if denominator else None
 
 
+def _percentiles(values: Sequence[float]) -> dict[str, float | None]:
+    if not values:
+        return {"p50": None, "p90": None, "p95": None, "p99": None, "maximum": None}
+    array = np.asarray(values, dtype=np.float64)
+    return {
+        "p50": float(np.percentile(array, 50)),
+        "p90": float(np.percentile(array, 90)),
+        "p95": float(np.percentile(array, 95)),
+        "p99": float(np.percentile(array, 99)),
+        "maximum": float(np.max(array)),
+    }
+
+
 def _metrics(
     sessions: dict[str, Session],
     predictions: dict[str, list[int]],
@@ -472,6 +547,8 @@ def _metrics(
 ) -> dict[str, Any]:
     session_ids = sorted(selected_ids if selected_ids is not None else sessions)
     exposure_hours = sum(sessions[session_id].scored_hours for session_id in session_ids)
+    if exposure_hours <= 0.0:
+        raise R9Error("scored exposure must be positive")
     reference_count = sum(len(sessions[session_id].events) for session_id in session_ids)
     scored_predictions = {
         session_id: [
@@ -1018,7 +1095,6 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
     radius_samples = int(cfg["duplicate_suppression_ms"]) * 16
 
     linear_scores = np.full(len(rows), np.nan, dtype=np.float64)
-    mlp_scores: np.ndarray | None = None
     fold_auroc: dict[str, Any] = {}
     for fold, held_out in enumerate(cfg["folds"]):
         held_out_ids = [str(value) for value in held_out]
@@ -1037,42 +1113,11 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
         fold_scores = _linear_predict(standardized, coef, intercept)
         linear_scores[held_mask] = fold_scores[held_mask]
         fold_auroc[str(fold)] = _auroc(fold_scores[held_mask], labels[held_mask])
-        inner_val_ids = [
-            str(value)
-            for value in cfg["folds"][
-                (fold + int(cfg["verifier"]["mlp"]["inner_validation_fold_offset"]))
-                % len(cfg["folds"])
-            ]
-        ]
-        inner_val_mask = (
-            np.asarray([session_id in inner_val_ids for session_id in row_session], dtype=np.bool_)
-            & train_mask
-            & usable
-        )
-        inner_train_mask = train_mask & usable & ~inner_val_mask
-        validation = (
-            standardized[inner_val_mask],
-            labels[inner_val_mask],
-            _balance_weights(labels[inner_val_mask]),
-        )
-        if mlp_scores is None:
-            mlp_scores = np.full(len(rows), np.nan, dtype=np.float64)
-        seed_scores: list[np.ndarray] = []
-        for seed in cfg["verifier"]["mlp"]["seeds"]:
-            state, _ = _fit_mlp(
-                standardized[inner_train_mask],
-                labels[inner_train_mask],
-                _balance_weights(labels[inner_train_mask]),
-                cfg["verifier"],
-                int(seed),
-                validation,
-            )
-            seed_scores.append(_mlp_predict(standardized[held_mask], state, cfg["verifier"]))
-        mlp_scores[held_mask] = np.mean(seed_scores, axis=0)
 
-    mean_auroc = float(
-        np.nanmean([value for value in fold_auroc.values() if not math.isnan(value)])
-    )
+    finite_aurocs = [value for value in fold_auroc.values() if not math.isnan(value)]
+    if not finite_aurocs:
+        raise R9Error("no fold produced a finite out-of-fold AUROC")
+    mean_auroc = float(np.mean(finite_aurocs))
     trigger = float(cfg["verifier"]["mlp"]["fallback_auroc_trigger"])
     if diagnostic:
         a1_path = directory / "a1_metrics.json"
@@ -1081,6 +1126,50 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
         mlp_triggered = bool(load_json(a1_path).get("mlp_triggered", False))
     else:
         mlp_triggered = mean_auroc < trigger
+    mlp_scores: np.ndarray | None = None
+    if mlp_triggered:
+        mlp_scores = np.full(len(rows), np.nan, dtype=np.float64)
+        for fold, held_out in enumerate(cfg["folds"]):
+            held_out_ids = [str(value) for value in held_out]
+            train_mask = np.asarray(
+                [session_id not in held_out_ids for session_id in row_session], dtype=np.bool_
+            )
+            held_mask = ~train_mask
+            mean, scale = _standardize_fit(matrix[train_mask])
+            standardized = _standardize(matrix, mean, scale)
+            usable = labels != -1
+            inner_val_ids = [
+                str(value)
+                for value in cfg["folds"][
+                    (fold + int(cfg["verifier"]["mlp"]["inner_validation_fold_offset"]))
+                    % len(cfg["folds"])
+                ]
+            ]
+            inner_val_mask = (
+                np.asarray(
+                    [session_id in inner_val_ids for session_id in row_session], dtype=np.bool_
+                )
+                & train_mask
+                & usable
+            )
+            inner_train_mask = train_mask & usable & ~inner_val_mask
+            validation = (
+                standardized[inner_val_mask],
+                labels[inner_val_mask],
+                _balance_weights(labels[inner_val_mask]),
+            )
+            seed_scores: list[np.ndarray] = []
+            for seed in cfg["verifier"]["mlp"]["seeds"]:
+                state, _ = _fit_mlp(
+                    standardized[inner_train_mask],
+                    labels[inner_train_mask],
+                    _balance_weights(labels[inner_train_mask]),
+                    cfg["verifier"],
+                    int(seed),
+                    validation,
+                )
+                seed_scores.append(_mlp_predict(standardized[held_mask], state, cfg["verifier"]))
+            mlp_scores[held_mask] = np.mean(seed_scores, axis=0)
     scores = mlp_scores if mlp_triggered else linear_scores
     if not np.isfinite(scores).all():
         raise R9Error("verifier scores contain non-finite values")
@@ -1150,6 +1239,13 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
                 }
             )
     gate_cfg = cfg["reference_gate"]
+    transfer_check_ok = all(
+        float(row["held_out_false_events_per_hour"])
+        <= float(row["target_false_events_per_hour"])
+        * float(gate_cfg["maximum_transfer_false_event_multiplier"])
+        for row in transfer
+        if int(row["target_false_events_per_hour"]) in {10, 20}
+    )
     reference_gate: dict[str, Any] = {"targets": {}}
     for target in (10, 20):
         point = selected_points[str(target)]["metrics"]
@@ -1181,7 +1277,21 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
             reference_gate["targets"]["20"]["maximum_meeting_true_positive_share"]
         )
         <= float(gate_cfg["maximum_single_meeting_true_positive_share"]),
+        "threshold_transfer": transfer_check_ok,
     }
+    confirmation_ms = int(
+        cfg["confirmation"]["diagnostic_frames" if diagnostic else "base_frames"]
+    ) * int(cfg["frame_ms"])
+    availability_latency: dict[str, Any] = {"confirmation_ms": confirmation_ms, "per_target": {}}
+    for target, point in selected_points.items():
+        deltas = [
+            (int(prediction) - int(reference)) // 16
+            for _, prediction, reference in point["metrics"]["matched_pairs"]
+        ]
+        availability_latency["per_target"][str(target)] = {
+            "boundary_lag_ms": _percentiles([float(value) for value in deltas]),
+            "availability_ms": _percentiles([float(value) + confirmation_ms for value in deltas]),
+        }
     document = {
         "schema_version": 1,
         "diagnostic": diagnostic,
@@ -1195,12 +1305,19 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
         "threshold_transfer": transfer,
         "per_meeting_curves": per_meeting_curves,
         "reference_gate": reference_gate,
+        "availability_latency": availability_latency,
         "score_count": len(rows),
         "code_sha256": sha256_file(CODE_PATH),
         "config_sha256": sha256_file(CONFIG_PATH),
     }
     path = directory / f"{output_name}.json"
     write_json(path, document)
+    transfer_path = (
+        directory / "threshold_transfer_metrics.json"
+        if not diagnostic
+        else directory / "threshold_transfer_diagnostic_metrics.json"
+    )
+    write_json(transfer_path, transfer)
     write_jsonl(
         directory / f"scores_{'a1_diagnostic' if diagnostic else 'a1'}.jsonl",
         [
@@ -1237,6 +1354,7 @@ def prepare(root: Path) -> Path:
         "r8_input_inventory": r8 / "input_inventory.json",
         "r8_threshold_transfer_metrics": r8 / "threshold_transfer_metrics.json",
         "r8_artifact_inventory": r8 / "artifact_inventory.json",
+        "r8_model_receipt": r8 / "model_receipt.json",
         "r7b_inventory": r7b_inventory_path(root),
     }
     for session_id in sessions:
@@ -1246,10 +1364,40 @@ def prepare(root: Path) -> Path:
         reused_paths[f"speaker_segments_cpu_{session_id}"] = (
             r8 / "speaker_segments" / "cpu" / f"{session_id}.json"
         )
+    for name, path in reused_paths.items():
+        if not path.is_file():
+            raise R9Error(f"reused R8/R7-B input is missing: {path}")
     reuse = {
         name: {"path": str(path), "sha256": sha256_file(path)}
         for name, path in reused_paths.items()
     }
+    r8_artifact_inventory = load_json(reused_paths["r8_artifact_inventory"])
+    expected_by_relative: dict[str, str] = {
+        str(row["relative_path"]): str(row["sha256"]) for row in r8_artifact_inventory["artifacts"]
+    }
+    mismatches: list[str] = []
+    for name, path in reused_paths.items():
+        if name == "r7b_inventory":
+            continue
+        relative = str(path.relative_to(r8)).replace("\\", "/")
+        expected = expected_by_relative.get(relative)
+        if expected is not None and reuse[name]["sha256"] != expected:
+            mismatches.append(f"{name}: expected {expected}, got {reuse[name]['sha256']}")
+    r8_input_inventory = load_json(reused_paths["r8_input_inventory"])
+    if reuse["r7b_inventory"]["sha256"] != str(r8_input_inventory.get("r7b_inventory_sha256")):
+        mismatches.append("r7b_inventory: hash differs from the R8 input inventory")
+    r8_waveform_hashes = {
+        str(row["session_id"]): str(row["waveform_sha256"])
+        for row in r8_input_inventory["sessions"]
+    }
+    for session in sessions.values():
+        expected = r8_waveform_hashes.get(session.session_id)
+        if expected is not None and session.waveform_sha256 != expected:
+            mismatches.append(
+                f"waveform {session.session_id}: computed {session.waveform_sha256}, R8 recorded {expected}"
+            )
+    if mismatches:
+        raise R9Error(f"frozen R8/R7-B input verification failed: {mismatches}")
     document = {
         "schema_version": 1,
         "experiment_id": cfg["experiment_id"],
@@ -1387,7 +1535,55 @@ def ceiling_summary(root: Path) -> Path:
     path = directory / "ceiling_summary.json"
     write_json(path, document)
     _plot_ceiling(root, arms, r8_accuracy, baseline)
+    _plot_timelines(root)
     return path
+
+
+def _plot_timelines(root: Path) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    cfg = config()
+    directory = output_root(root)
+    a1_path = directory / "a1_metrics.json"
+    if not a1_path.is_file():
+        return
+    a1 = load_json(a1_path)
+    sessions = _sessions(root)
+    timeline_dir = directory / "representative_timelines"
+    timeline_dir.mkdir(parents=True, exist_ok=True)
+    point = a1["selected_operating_points"]["20"]
+    metrics = point["metrics"]
+    selected = list(metrics["matched_pairs"][:2]) + [
+        [session_id, sample, sample] for session_id, sample in metrics["false_event_samples"][:2]
+    ]
+    frame_ms = int(cfg["frame_ms"])
+    for index, (session_id, prediction, reference) in enumerate(selected):
+        values = _load_probabilities(root, str(session_id))
+        center_frame = int(round(int(prediction) / (frame_ms * 16)))
+        start = max(0, center_frame - 50)
+        end = min(len(values), center_frame + 51)
+        x_seconds = np.arange(start, end) * (frame_ms / 1000.0)
+        figure, axis = plt.subplots(figsize=(9, 4))
+        for speaker in range(4):
+            axis.plot(x_seconds, values[start:end, speaker], label=f"slot {speaker + 1}")
+        axis.axhline(0.5, color="black", linestyle=":", label="0.5 candidate threshold")
+        axis.axvline(int(prediction) / 16000.0, color="tab:red", linestyle="--", label="prediction")
+        for event in sessions[str(session_id)].events:
+            sample = int(event["sample"])
+            if start * 1280 <= sample < end * 1280:
+                axis.axvline(sample / 16000.0, color="tab:green", alpha=0.35)
+        is_match = [session_id, prediction, reference] in metrics["matched_pairs"]
+        axis.set_title(f"{session_id}: {'match' if is_match else 'false event'}")
+        axis.set_xlabel("Source time (seconds)")
+        axis.set_ylabel("Speaker activity probability")
+        axis.set_ylim(0, 1)
+        axis.legend(ncol=3, fontsize=8)
+        figure.tight_layout()
+        figure.savefig(timeline_dir / f"timeline_{index:02d}_{session_id}.png", dpi=150)
+        plt.close(figure)
 
 
 def _plot_ceiling(
@@ -1435,13 +1631,17 @@ def _plot_ceiling(
             marker="s",
             label="R9-A0 rule stack",
         )
-    axis.scatter(
-        [float(baseline["model_policy"]["false_events_per_hour"])],
-        [float(baseline["model_policy"]["recall_250"] or 0.0)],
-        color="tab:purple",
-        marker="*",
-        s=110,
-        label="model 0.5 policy (unfiltered)",
+    model_policy = baseline["model_policy"]
+    axis.annotate(
+        f"model 0.5 policy (unfiltered):\n"
+        f"recall {float(model_policy['recall_250'] or 0.0):.2f} @ "
+        f"{float(model_policy['false_events_per_hour']):.0f} FE/h (off-scale)",
+        xy=(0.02, 0.98),
+        xycoords="axes fraction",
+        ha="left",
+        va="top",
+        fontsize=8,
+        bbox={"boxstyle": "round,pad=0.3", "facecolor": "lavender", "alpha": 0.9},
     )
     axis.scatter(
         [0.0],
@@ -1460,7 +1660,7 @@ def _plot_ceiling(
     axis.grid(alpha=0.25)
     axis.legend(fontsize=8)
     figure.tight_layout()
-    figure.savefig(directory / "recall_false_event_curve.png", dpi=160)
+    figure.savefig(directory / "recall_false_event_curves.png", dpi=160)
     plt.close(figure)
 
 
@@ -1605,6 +1805,46 @@ def report(root: Path) -> Path:
     lines.extend(
         [
             "",
+            "## Availability latency (R9-A1)",
+            "",
+            f"Confirmation window: {int(a1['availability_latency']['confirmation_ms'])} ms. "
+            "Boundary timestamps stay at the 0.5 candidate crossing; availability adds the fixed "
+            "confirmation window.",
+            "",
+            "| Target FE/h | Boundary lag p50 ms | Boundary lag p90 ms | Availability p50 ms | Availability p90 ms |",
+            "| ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for target in config()["targets"]["false_events_per_hour"]:
+        point = a1["availability_latency"]["per_target"][str(target)]
+        lines.append(
+            f"| {target} | {_latency_cell(point['boundary_lag_ms'], 'p50')} | "
+            f"{_latency_cell(point['boundary_lag_ms'], 'p90')} | "
+            f"{_latency_cell(point['availability_ms'], 'p50')} | "
+            f"{_latency_cell(point['availability_ms'], 'p90')} |"
+        )
+    transfer = a1.get("threshold_transfer", [])
+    if transfer:
+        lines.extend(
+            [
+                "",
+                "## Threshold transfer (R9-A1)",
+                "",
+                "| Fold | Target FE/h | Dev FE/h | Dev recall | Held-out FE/h | Held-out recall |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for row in transfer:
+            lines.append(
+                f"| {int(row['fold'])} | {int(row['target_false_events_per_hour'])} | "
+                f"{float(row['development_false_events_per_hour']):.1f} | "
+                f"{float(row['development_recall_250'] or 0.0):.3f} | "
+                f"{float(row['held_out_false_events_per_hour']):.1f} | "
+                f"{float(row['held_out_recall_250'] or 0.0):.3f} |"
+            )
+    lines.extend(
+        [
+            "",
             "## Outcome",
             "",
             "R9 measured the probability-only verification ceiling. The B arms (speaker-cache",
@@ -1617,6 +1857,11 @@ def report(root: Path) -> Path:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     artifact_inventory(root)
     return path
+
+
+def _latency_cell(values: dict[str, Any], key: str) -> str:
+    value = values.get(key)
+    return "—" if value is None else f"{float(value):.0f}"
 
 
 def artifact_inventory(root: Path) -> Path:
