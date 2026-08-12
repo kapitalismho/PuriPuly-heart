@@ -1255,7 +1255,7 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
         if int(row["target_false_events_per_hour"]) in {10, 20}
     )
     reference_gate: dict[str, Any] = {"targets": {}}
-    for target in (10, 20):
+    for target in (10.0, 20.0):
         point = selected_points[str(target)]["metrics"]
         primary = point["tolerances"]["250"]
         reference_gate["targets"][str(target)] = {
@@ -1266,23 +1266,23 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
         }
     reference_gate["checks"] = {
         "recall_at_10_false_events_per_hour": float(
-            reference_gate["targets"]["10"]["recall_250"] or 0.0
+            reference_gate["targets"]["10.0"]["recall_250"] or 0.0
         )
         >= float(gate_cfg["recall_at_10_false_events_per_hour"]),
         "recall_at_20_false_events_per_hour": float(
-            reference_gate["targets"]["20"]["recall_250"] or 0.0
+            reference_gate["targets"]["20.0"]["recall_250"] or 0.0
         )
         >= float(gate_cfg["recall_at_20_false_events_per_hour"]),
         "overlap_onset_nonzero": float(
-            reference_gate["targets"]["20"]["stratum_recall"].get("overlap_onset") or 0.0
+            reference_gate["targets"]["20.0"]["stratum_recall"].get("overlap_onset") or 0.0
         )
         > 0.0,
         "silence_gap_change_nonzero": float(
-            reference_gate["targets"]["20"]["stratum_recall"].get("silence_gap_change") or 0.0
+            reference_gate["targets"]["20.0"]["stratum_recall"].get("silence_gap_change") or 0.0
         )
         > 0.0,
         "meeting_concentration": float(
-            reference_gate["targets"]["20"]["maximum_meeting_true_positive_share"]
+            reference_gate["targets"]["20.0"]["maximum_meeting_true_positive_share"]
         )
         <= float(gate_cfg["maximum_single_meeting_true_positive_share"]),
         "threshold_transfer": transfer_check_ok,
@@ -1480,7 +1480,7 @@ def ceiling_summary(root: Path) -> Path:
                 recall = float(document["aggregate_recall_250"] or 0.0)
                 feh = float(document["aggregate_false_events_per_hour"])
                 at_targets = {
-                    str(target): (
+                    str(float(target)): (
                         {"recall_250": recall, "false_events_per_hour": feh, "threshold": None}
                         if feh <= float(target)
                         else None
@@ -1511,7 +1511,7 @@ def ceiling_summary(root: Path) -> Path:
         at_targets: dict[str, Any] = {}
         for target in cfg["targets"]["false_events_per_hour"]:
             selected = _select_row(curve, float(target))
-            at_targets[str(target)] = {
+            at_targets[str(float(target))] = {
                 "threshold": selected["threshold"],
                 "recall_250": selected["recall_250"],
                 "false_events_per_hour": selected["false_events_per_hour"],
@@ -1541,13 +1541,13 @@ def ceiling_summary(root: Path) -> Path:
         counts = 0
         for target in cfg["outcome_a_pareto"]["comparison_points_feh"]:
             r8_best = _select_row(r8_curve, float(target))
-            a1_best = arms["a1"]["at_targets"][str(target)]
+            a1_best = arms["a1"]["at_targets"][str(float(target))]
             r8_recall = float(r8_best["recall_250"] or 0.0)
             a1_recall = float(a1_best["recall_250"] or 0.0)
             ratio = (
                 a1_recall / r8_recall if r8_recall > 0.0 else (math.inf if a1_recall > 0.0 else 0.0)
             )
-            pareto["points"][str(target)] = {
+            pareto["points"][str(float(target))] = {
                 "r8_recall_250": r8_recall,
                 "a1_recall_250": a1_recall,
                 "ratio": ratio,
@@ -1599,7 +1599,7 @@ def _plot_timelines(root: Path) -> None:
     sessions = _sessions(root)
     timeline_dir = directory / "representative_timelines"
     timeline_dir.mkdir(parents=True, exist_ok=True)
-    point = a1["selected_operating_points"]["20"]
+    point = a1["selected_operating_points"]["20.0"]
     metrics = point["metrics"]
     selected = list(metrics["matched_pairs"][:2]) + [
         [session_id, sample, sample] for session_id, sample in metrics["false_event_samples"][:2]
@@ -1676,10 +1676,10 @@ def _plot_ceiling(
             marker="s",
             label="R9-A0 rule stack",
         )
-    model_policy = baseline["model_policy"]
+    model_policy = baseline["model_policy"]["tolerances"]["250"]
     axis.annotate(
         f"model 0.5 policy (unfiltered):\n"
-        f"recall {float(model_policy['recall_250'] or 0.0):.2f} @ "
+        f"recall {float(model_policy['recall'] or 0.0):.2f} @ "
         f"{float(model_policy['false_events_per_hour']):.0f} FE/h (off-scale)",
         xy=(0.02, 0.98),
         xycoords="axes fraction",
@@ -1690,7 +1690,7 @@ def _plot_ceiling(
     )
     axis.scatter(
         [0.0],
-        [float(baseline["oracle"]["recall_250"] or 0.0)],
+        [float(baseline["oracle"]["tolerances"]["250"]["recall"] or 0.0)],
         color="tab:red",
         marker="x",
         s=90,
@@ -1768,8 +1768,8 @@ def report(root: Path) -> Path:
                 continue
             arm = ceiling["arms"]["a0"]
             lines.append(
-                f"| R9-A0 rule stack (single point) | {cell(arm, 1)} | {cell(arm, 5)} | {cell(arm, 10)} | "
-                f"{cell(arm, 20)} | {cell(arm, 50)} | {cell(arm, 100)} | {fraction_cell(arm, 0.5)} | {fraction_cell(arm, 0.8)} |"
+                f"| R9-A0 rule stack (single point) | {cell(arm, 1.0)} | {cell(arm, 5.0)} | {cell(arm, 10.0)} | "
+                f"{cell(arm, 20.0)} | {cell(arm, 50.0)} | {cell(arm, 100.0)} | {fraction_cell(arm, 0.5)} | {fraction_cell(arm, 0.8)} |"
             )
             lines.append(
                 f"|  (operating point: {float(arm['recall_250'] or 0.0):.3f} recall at "
@@ -1781,8 +1781,8 @@ def report(root: Path) -> Path:
             continue
         label = "R9-A1 logistic verifier" if name == "a1" else "R9-A1 diagnostic (non-causal)"
         lines.append(
-            f"| {label} | {cell(arm, 1)} | {cell(arm, 5)} | {cell(arm, 10)} | {cell(arm, 20)} | "
-            f"{cell(arm, 50)} | {cell(arm, 100)} | {fraction_cell(arm, 0.5)} | {fraction_cell(arm, 0.8)} |"
+            f"| {label} | {cell(arm, 1.0)} | {cell(arm, 5.0)} | {cell(arm, 10.0)} | {cell(arm, 20.0)} | "
+            f"{cell(arm, 50.0)} | {cell(arm, 100.0)} | {fraction_cell(arm, 0.5)} | {fraction_cell(arm, 0.8)} |"
         )
     lines.extend(
         [
@@ -1818,15 +1818,15 @@ def report(root: Path) -> Path:
             "## Inherited-gate reference lines (context only, not continuation criteria)",
             "",
             f"R9-A1 at the 10 FE/h reference point: Recall@250 "
-            f"{float(a1['reference_gate']['targets']['10']['recall_250'] or 0.0):.3f} (reference gate: >= 0.3).",
+            f"{float(a1['reference_gate']['targets']['10.0']['recall_250'] or 0.0):.3f} (reference gate: >= 0.3).",
             f"R9-A1 at the 20 FE/h reference point: Recall@250 "
-            f"{float(a1['reference_gate']['targets']['20']['recall_250'] or 0.0):.3f} (reference gate: >= 0.5).",
+            f"{float(a1['reference_gate']['targets']['20.0']['recall_250'] or 0.0):.3f} (reference gate: >= 0.5).",
             f"20 FE/h stratum recall — overlap onset "
-            f"{float(a1['reference_gate']['targets']['20']['stratum_recall'].get('overlap_onset') or 0.0):.3f}, "
+            f"{float(a1['reference_gate']['targets']['20.0']['stratum_recall'].get('overlap_onset') or 0.0):.3f}, "
             f"silence-gap change "
-            f"{float(a1['reference_gate']['targets']['20']['stratum_recall'].get('silence_gap_change') or 0.0):.3f}, "
+            f"{float(a1['reference_gate']['targets']['20.0']['stratum_recall'].get('silence_gap_change') or 0.0):.3f}, "
             f"maximum single-meeting TP share "
-            f"{float(a1['reference_gate']['targets']['20']['maximum_meeting_true_positive_share']):.3f}.",
+            f"{float(a1['reference_gate']['targets']['20.0']['maximum_meeting_true_positive_share']):.3f}.",
         ]
     )
     if "a1" in ceiling["arms"] and ceiling["outcome_a_pareto"]["meaningful"] is not None:
@@ -1879,7 +1879,7 @@ def report(root: Path) -> Path:
         ]
     )
     for target in config()["targets"]["false_events_per_hour"]:
-        point = a1["availability_latency"]["per_target"][str(target)]
+        point = a1["availability_latency"]["per_target"][str(float(target))]
         lines.append(
             f"| {target} | {_latency_cell(point['boundary_lag_ms'], 'p50')} | "
             f"{_latency_cell(point['boundary_lag_ms'], 'p90')} | "
