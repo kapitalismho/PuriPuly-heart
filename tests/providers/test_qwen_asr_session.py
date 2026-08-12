@@ -14,6 +14,7 @@ from puripuly_heart.providers.stt.qwen_asr import (
     _COMMIT,
     _END_SESSION,
     _STOP,
+    QwenASRRealtimeSTTBackend,
     _QwenASRSession,
 )
 from tests.helpers.fakes import TargetThread
@@ -28,6 +29,43 @@ def _make_session() -> _QwenASRSession:
         sample_rate_hz=16000,
         connect_timeout_s=5.0,
     )
+
+
+@pytest.mark.asyncio
+async def test_qwen_backend_open_cancellation_closes_started_session(monkeypatch) -> None:
+    started = asyncio.Event()
+    aborted = asyncio.Event()
+    closed = asyncio.Event()
+    sessions = []
+
+    class PartialSession:
+        def __init__(self, **_kwargs) -> None:
+            self.worker_alive = True
+            sessions.append(self)
+
+        async def start(self) -> None:
+            started.set()
+            await asyncio.Event().wait()
+
+        async def abort_for_toggle_off(self) -> None:
+            aborted.set()
+
+        async def close(self) -> None:
+            self.worker_alive = False
+            closed.set()
+
+    monkeypatch.setattr(qwen_asr_module, "_QwenASRSession", PartialSession)
+    backend = QwenASRRealtimeSTTBackend(api_key="k", language="en")
+    open_task = asyncio.create_task(backend.open_session())
+    await started.wait()
+
+    open_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await open_task
+
+    assert aborted.is_set()
+    assert closed.is_set()
+    assert sessions and sessions[0].worker_alive is False
 
 
 @pytest.mark.asyncio
@@ -199,6 +237,35 @@ async def test_qwen_asr_session_buffers_out_of_order_items_and_ignores_duplicate
     assert (await session._events.get()).text == "first"
     assert (await session._events.get()).text == "second"
     assert session._events.empty()
+
+
+@pytest.mark.asyncio
+async def test_qwen_asr_session_itemless_duplicate_event_does_not_consume_next_commit() -> None:
+    session = _make_session()
+    session._loop = asyncio.get_running_loop()
+    assert session._register_commit() is not None
+    assert session._register_commit() is not None
+
+    first_terminal = {
+        "type": "conversation.item.input_audio_transcription.completed",
+        "event_id": "terminal-1",
+        "transcript": "first",
+    }
+    session._handle_provider_event(first_terminal)
+    session._handle_provider_event(first_terminal)
+    session._handle_provider_event(
+        {
+            "type": "conversation.item.input_audio_transcription.completed",
+            "event_id": "terminal-2",
+            "transcript": "second",
+        }
+    )
+    await asyncio.sleep(0)
+
+    assert (await session._events.get()).text == "first"
+    assert (await session._events.get()).text == "second"
+    assert session._events.empty()
+    assert not session._pending_commits
 
 
 @pytest.mark.asyncio

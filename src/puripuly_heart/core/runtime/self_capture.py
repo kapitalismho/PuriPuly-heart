@@ -1079,7 +1079,7 @@ class SelfCaptureSessionOwner:
         force_immediate: bool,
         explicit_toggle_off: bool,
     ) -> tuple[Literal["drain", "abort"], float | None]:
-        if force_immediate or config.local_gpu or (explicit_toggle_off and config.local_cpu):
+        if force_immediate or config.local_gpu or explicit_toggle_off:
             return "abort", None
         return "drain", config.release_backend_after if config.local_cpu else None
 

@@ -9,6 +9,7 @@ import pytest
 from websockets.asyncio.server import serve
 
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
+from puripuly_heart.providers.stt import soniox as soniox_module
 from puripuly_heart.providers.stt.soniox import (
     _STOP,
     SonioxRealtimeSTTBackend,
@@ -34,6 +35,38 @@ def _make_session(
         connect_timeout_s=5.0,
         enable_language_identification=enable_language_identification,
     )
+
+
+@pytest.mark.asyncio
+async def test_soniox_backend_open_cancellation_closes_started_session(monkeypatch) -> None:
+    started = asyncio.Event()
+    closed = asyncio.Event()
+    sessions = []
+
+    class PartialSession:
+        def __init__(self, **_kwargs) -> None:
+            self.websocket_open = True
+            sessions.append(self)
+
+        async def start(self) -> None:
+            started.set()
+            await asyncio.Event().wait()
+
+        async def close(self) -> None:
+            self.websocket_open = False
+            closed.set()
+
+    monkeypatch.setattr(soniox_module, "_SonioxSession", PartialSession)
+    backend = SonioxRealtimeSTTBackend(api_key="k", language_hints=["en"])
+    open_task = asyncio.create_task(backend.open_session())
+    await started.wait()
+
+    open_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await open_task
+
+    assert closed.is_set()
+    assert sessions and sessions[0].websocket_open is False
 
 
 async def _request_finalize(
@@ -588,6 +621,29 @@ async def test_soniox_session_send_audio_and_stop() -> None:
     await session.stop()
     assert session._stopped is True
     assert await session._audio_q.get() is _STOP
+
+
+@pytest.mark.asyncio
+async def test_soniox_send_loop_preserves_finalize_before_stream_end() -> None:
+    class RecordingWebSocket:
+        def __init__(self) -> None:
+            self.sent: list[object] = []
+
+        async def send(self, payload: object) -> None:
+            self.sent.append(payload)
+
+    session = _make_session()
+    websocket = RecordingWebSocket()
+    session._ws = websocket
+
+    await session.send_audio(b"abc")
+    await session.on_speech_end(trailing_silence_ms=0)
+    await session.stop()
+    await session._send_loop()
+
+    assert websocket.sent[0] == b"abc"
+    assert json.loads(websocket.sent[1])["type"] == "finalize"
+    assert websocket.sent[2] == ""
 
 
 @pytest.mark.asyncio

@@ -9,7 +9,12 @@ import pytest
 
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.providers.stt import deepgram as deepgram_module
-from puripuly_heart.providers.stt.deepgram import _FINALIZE, _STOP, _DeepgramSDKSession
+from puripuly_heart.providers.stt.deepgram import (
+    _FINALIZE,
+    _STOP,
+    DeepgramRealtimeSTTBackend,
+    _DeepgramSDKSession,
+)
 from tests.helpers.fakes import NoopThread, TargetThread
 
 
@@ -55,6 +60,43 @@ async def _wait_until(predicate, *, timeout_s: float = 1.0) -> None:
     async with asyncio.timeout(timeout_s):
         while not predicate():
             await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_deepgram_backend_open_cancellation_closes_started_session(monkeypatch) -> None:
+    started = asyncio.Event()
+    aborted = asyncio.Event()
+    closed = asyncio.Event()
+    sessions = []
+
+    class PartialSession:
+        def __init__(self, **_kwargs) -> None:
+            self.worker_alive = True
+            sessions.append(self)
+
+        async def start(self) -> None:
+            started.set()
+            await asyncio.Event().wait()
+
+        async def abort_for_toggle_off(self) -> None:
+            aborted.set()
+
+        async def close(self) -> None:
+            self.worker_alive = False
+            closed.set()
+
+    monkeypatch.setattr(deepgram_module, "_DeepgramSDKSession", PartialSession)
+    backend = DeepgramRealtimeSTTBackend(api_key="k", language="en")
+    open_task = asyncio.create_task(backend.open_session())
+    await started.wait()
+
+    open_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await open_task
+
+    assert aborted.is_set()
+    assert closed.is_set()
+    assert sessions and sessions[0].worker_alive is False
 
 
 @pytest.mark.asyncio

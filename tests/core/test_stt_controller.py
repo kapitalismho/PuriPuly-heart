@@ -253,6 +253,34 @@ class StopFinalizingBackend:
         return session
 
 
+class ControlledStopSession(Float32Session):
+    __slots__ = ("stop_started", "release_stop")
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.stop_started = asyncio.Event()
+        self.release_stop = asyncio.Event()
+
+    async def stop(self) -> None:
+        self.calls.append("stop")
+        self.stop_started.set()
+        await self.release_stop.wait()
+        await self._queue.put(None)
+
+
+@dataclass(slots=True)
+class ControlledFirstStopBackend:
+    sessions: list[Float32Session]
+
+    def __init__(self) -> None:
+        self.sessions = []
+
+    async def open_session(self) -> Float32Session:
+        session = ControlledStopSession() if not self.sessions else Float32Session()
+        self.sessions.append(session)
+        return session
+
+
 @dataclass(slots=True)
 class EventOnlySession:
     items: list[object]
@@ -362,6 +390,31 @@ class ControlledOpenBackend:
         self.release = asyncio.Event()
 
 
+class TimeoutBridgeBackend:
+    def __init__(self) -> None:
+        self.sessions: list[Float32Session] = []
+        self.second_open_started = asyncio.Event()
+        self.second_open_cancelled = asyncio.Event()
+        self.release_second_open = asyncio.Event()
+        self.partial_open_closed = asyncio.Event()
+
+    async def open_session(self) -> Float32Session:
+        if not self.sessions:
+            session = Float32Session()
+            self.sessions.append(session)
+            return session
+        self.second_open_started.set()
+        try:
+            await self.release_second_open.wait()
+        except asyncio.CancelledError:
+            self.second_open_cancelled.set()
+            self.partial_open_closed.set()
+            raise
+        session = Float32Session()
+        self.sessions.append(session)
+        return session
+
+
 @dataclass(slots=True)
 class TerminalFailureSession:
     closed: bool = False
@@ -436,6 +489,28 @@ async def _next_typed_event(stream, event_type, *, max_events: int = 10):
     raise AssertionError(f"Expected event of type {event_type.__name__}")
 
 
+def _event_context_with_pending(
+    provider: ManagedSTTProvider,
+    session: EventOnlySession | TerminalFailureSession,
+    *utterance_ids,
+):
+    context = stt_controller_module._SessionContext(
+        token=provider._next_session_token,
+        session=session,
+        publication_generation=provider._publication_generation,
+        draining=True,
+    )
+    provider._next_session_token += 1
+    provider._session_contexts[context.token] = context
+    for utterance_id in utterance_ids:
+        provider._register_pending_boundary(
+            context,
+            utterance_id=utterance_id,
+            ended_at=provider.clock.now(),
+        )
+    return context
+
+
 async def test_stt_controller_connects_on_speech_start():
     clock = FakeClock()
     backend = FakeBackend()
@@ -476,6 +551,77 @@ async def test_stt_provider_close_backend_closes_session_and_backend_once() -> N
     assert backend.sessions[0].calls[-1] == "close"
     assert backend.close_calls == 1
     assert stt.state == STTSessionState.DISCONNECTED
+
+
+async def test_managed_stt_provider_normal_close_finalizes_active_boundary_without_sleep() -> None:
+    backend = StopFinalizingBackend(first_stop_final_text="closed final")
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        reset_deadline_s=90.0,
+        drain_timeout_s=0.1,
+    )
+    utterance_id = uuid4()
+    stream = stt.events()
+
+    await stt.handle_vad_event(
+        SpeechStart(
+            utterance_id,
+            pre_roll=np.zeros(0, dtype=np.float32),
+            chunk=samples(1.0),
+        )
+    )
+    await _next_state(stream, STTSessionState.STREAMING)
+
+    await stt.close()
+    event = await _next_typed_event(stream, STTFinalEvent)
+
+    assert event.utterance_id == utterance_id
+    assert event.transcript.text == "closed final"
+    assert backend.sessions[0].calls.index("on_speech_end") < backend.sessions[0].calls.index(
+        "stop"
+    )
+    assert not stt._accepted_boundaries
+    assert stt._session_contexts == {}
+
+
+@pytest.mark.parametrize("abort_delay_s", [0.0, 0.1, 0.3, 1.0])
+async def test_managed_stt_provider_abort_rejects_late_terminal_at_each_delay(
+    abort_delay_s: float,
+) -> None:
+    backend = Float32Backend()
+    clock = FakeClock(10.0)
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        clock=clock,
+        reset_deadline_s=90.0,
+    )
+    utterance_id = uuid4()
+    stream = stt.events()
+
+    await stt.handle_vad_event(
+        SpeechStart(
+            utterance_id,
+            pre_roll=np.zeros(0, dtype=np.float32),
+            chunk=samples(1.0),
+        )
+    )
+    await _next_state(stream, STTSessionState.STREAMING)
+    await stt.handle_vad_event(SpeechEnd(utterance_id))
+    clock.advance(abort_delay_s)
+
+    old_session = backend.sessions[0]
+    await stt.abort_for_toggle_off()
+    await old_session._queue.put(
+        STTBackendTranscriptEvent(text="late final", is_final=True)
+    )
+    await asyncio.sleep(0)
+
+    assert stt.state == STTSessionState.DISCONNECTED
+    assert stt._events.empty()
+    assert not stt._accepted_boundaries
+    assert stt._session_contexts == {}
 
 
 async def test_stt_controller_prefers_float32_session_audio_path() -> None:
@@ -1365,6 +1511,39 @@ async def test_managed_stt_provider_multiple_pending_finals_resolve_fifo() -> No
         await stt.close()
 
 
+async def test_managed_stt_provider_duplicate_terminal_publishes_once() -> None:
+    backend = Float32Backend()
+    stt = ManagedSTTProvider(backend=backend, sample_rate_hz=16000, reset_deadline_s=90.0)
+    utterance_id = uuid4()
+    stream = stt.events()
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(utterance_id))
+        await backend.sessions[0]._queue.put(
+            STTBackendTranscriptEvent(text="final", is_final=True)
+        )
+        await backend.sessions[0]._queue.put(
+            STTBackendTranscriptEvent(text="duplicate", is_final=True)
+        )
+
+        event = await _next_typed_event(stream, STTFinalEvent)
+        await asyncio.sleep(0)
+
+        assert event.utterance_id == utterance_id
+        assert event.transcript.text == "final"
+        assert stt._events.empty()
+    finally:
+        await stt.close()
+
+
 async def test_managed_stt_provider_emits_delayed_finalization_lag_diagnostic() -> None:
     backend = Float32Backend()
     clock = FakeClock(10.0)
@@ -1785,8 +1964,8 @@ async def test_local_qwen_provider_close_bounds_decode_and_reopen_maps_new_final
     assert cancelled.is_set()
     assert stt.state == STTSessionState.DISCONNECTED
     assert stt._active_utterance_id is None
-    assert list(stt._pending_final_utterance_ids) == []
-    assert stt._pending_final_utterance_times == {}
+    assert not stt._accepted_boundaries
+    assert stt._session_contexts == {}
 
     try:
         await stt.handle_vad_event(
@@ -1873,8 +2052,8 @@ async def test_local_qwen_cancelled_close_is_retryable_and_reopens_cleanly(
     assert stt._active_session is None
     assert stt._consumer_task is None
     assert stt._active_utterance_id is None
-    assert list(stt._pending_final_utterance_ids) == []
-    assert stt._pending_final_utterance_times == {}
+    assert not stt._accepted_boundaries
+    assert stt._session_contexts == {}
     assert stt._closing is False
     assert session._decode_coordinator._worker_task is not None
     assert session._decode_coordinator._worker_task.done()
@@ -1920,11 +2099,11 @@ async def test_managed_stt_repeated_close_cancellation_completes_owned_cleanup()
         backend=FakeBackend(),
         sample_rate_hz=16000,
         reset_deadline_s=90.0,
+        drain_timeout_s=0.02,
     )
     stale_utterance_id = uuid4()
     stt._active_utterance_id = stale_utterance_id
-    stt._pending_final_utterance_ids.append(stale_utterance_id)
-    stt._pending_final_utterance_times[stale_utterance_id] = 1.0
+    _event_context_with_pending(stt, EventOnlySession([]), stale_utterance_id)
     draining_task = asyncio.create_task(slow_draining_cleanup())
     stt._draining.add(draining_task)
 
@@ -1944,8 +2123,8 @@ async def test_managed_stt_repeated_close_cancellation_completes_owned_cleanup()
     assert stt._active_session is None
     assert stt._consumer_task is None
     assert stt._active_utterance_id is None
-    assert list(stt._pending_final_utterance_ids) == []
-    assert stt._pending_final_utterance_times == {}
+    assert not stt._accepted_boundaries
+    assert stt._session_contexts == {}
     assert stt._closing is False
 
 
@@ -2003,9 +2182,9 @@ async def test_managed_stt_propagates_caller_cancellation_during_session_close()
         reset_deadline_s=90.0,
     )
     session = BlockingCloseSession()
-    consumer_task = asyncio.create_task(stt._consume_session_events(session))
-    stt._active_session = session
-    stt._consumer_task = consumer_task
+    context = stt._install_active_session(session)
+    consumer_task = context.consumer_task
+    assert consumer_task is not None
 
     close_task = asyncio.create_task(stt.close())
     await asyncio.wait_for(session.close_started.wait(), timeout=0.1)
@@ -2094,53 +2273,120 @@ async def test_local_qwen_provider_close_cancels_handoff_waiting_successor(
     assert old_session._decode_coordinator._worker_task.done()
 
 
-async def test_managed_stt_provider_drops_stale_pending_final_before_later_final() -> None:
+async def test_managed_stt_provider_terminal_timeout_fences_session_before_reopen() -> None:
     backend = Float32Backend()
-    clock = FakeClock(10.0)
     stt = ManagedSTTProvider(
         backend=backend,
         sample_rate_hz=16000,
-        clock=clock,
-        reconnect_window_s=20.0,
+        reconnect_window_s=0.02,
         reset_deadline_s=90.0,
+        drain_timeout_s=0.02,
     )
 
-    stale_utterance_id = uuid4()
-    current_utterance_id = uuid4()
+    first_utterance_id = uuid4()
+    second_utterance_id = uuid4()
+    reopened_utterance_id = uuid4()
     stream = stt.events()
 
     try:
         await stt.handle_vad_event(
             SpeechStart(
-                stale_utterance_id,
+                first_utterance_id,
                 pre_roll=np.zeros(0, dtype=np.float32),
                 chunk=samples(1.0),
             )
         )
         await _next_state(stream, STTSessionState.STREAMING)
-        await stt.handle_vad_event(SpeechEnd(stale_utterance_id))
-
-        clock.advance(25.0)
-
+        await stt.handle_vad_event(SpeechEnd(first_utterance_id))
         await stt.handle_vad_event(
             SpeechStart(
-                current_utterance_id,
+                second_utterance_id,
                 pre_roll=np.zeros(0, dtype=np.float32),
                 chunk=samples(0.5),
             )
         )
-        await stt.handle_vad_event(SpeechEnd(current_utterance_id))
+        await stt.handle_vad_event(SpeechEnd(second_utterance_id))
 
-        await backend.sessions[0]._queue.put(
-            STTBackendTranscriptEvent(text="current final", is_final=True)
+        old_session = backend.sessions[0]
+        await _next_state(stream, STTSessionState.DISCONNECTED, max_events=10)
+        assert not stt._accepted_boundaries
+        assert stt._session_contexts == {}
+
+        await old_session._queue.put(
+            STTBackendTranscriptEvent(text="late old final", is_final=True)
+        )
+        await stt.handle_vad_event(
+            SpeechStart(
+                reopened_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.25),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(reopened_utterance_id))
+        await backend.sessions[1]._queue.put(
+            STTBackendTranscriptEvent(text="reopened final", is_final=True)
         )
 
         event = await _next_typed_event(stream, STTFinalEvent)
 
-        assert event.utterance_id == current_utterance_id
-        assert event.transcript.utterance_id == current_utterance_id
-        assert event.transcript.text == "current final"
+        assert event.utterance_id == reopened_utterance_id
+        assert event.transcript.utterance_id == reopened_utterance_id
+        assert event.transcript.text == "reopened final"
     finally:
+        await stt.close()
+
+
+@pytest.mark.parametrize("terminal_action", ["abort", "close"])
+async def test_managed_stt_provider_abort_or_close_cancels_timeout_bridge_open(
+    terminal_action: str,
+) -> None:
+    backend = TimeoutBridgeBackend()
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        reconnect_window_s=0.01,
+        reset_deadline_s=90.0,
+        drain_timeout_s=0.02,
+    )
+    first_utterance_id = uuid4()
+    active_utterance_id = uuid4()
+    stream = stt.events()
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                first_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(first_utterance_id))
+        await stt.handle_vad_event(
+            SpeechStart(
+                active_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        await asyncio.wait_for(backend.second_open_started.wait(), timeout=0.2)
+
+        if terminal_action == "abort":
+            await asyncio.wait_for(stt.abort_for_toggle_off(), timeout=0.2)
+        else:
+            await asyncio.wait_for(stt.close(), timeout=0.2)
+        await asyncio.sleep(0)
+
+        assert backend.second_open_cancelled.is_set()
+        assert backend.partial_open_closed.is_set()
+        assert len(backend.sessions) == 1
+        assert not stt._boundary_timeout_tasks
+        assert not stt._accepted_boundaries
+        assert stt._session_contexts == {}
+        assert stt.state == STTSessionState.DISCONNECTED
+    finally:
+        backend.release_second_open.set()
         await stt.close()
 
 
@@ -2254,7 +2500,7 @@ async def test_managed_stt_provider_partials_do_not_consume_pending_finals() -> 
         await stt.close()
 
 
-async def test_managed_stt_provider_final_without_pending_uses_active_fallback() -> None:
+async def test_managed_stt_provider_final_without_pending_is_ignored() -> None:
     backend = Float32Backend()
     stt = ManagedSTTProvider(backend=backend, sample_rate_hz=16000, reset_deadline_s=90.0)
 
@@ -2271,14 +2517,21 @@ async def test_managed_stt_provider_final_without_pending_uses_active_fallback()
         )
         await _next_state(stream, STTSessionState.STREAMING)
         await backend.sessions[0]._queue.put(
-            STTBackendTranscriptEvent(text="active final", is_final=True)
+            STTBackendTranscriptEvent(text="unsolicited final", is_final=True)
+        )
+        await asyncio.sleep(0)
+        assert stt._events.empty()
+
+        await stt.handle_vad_event(SpeechEnd(active_utterance_id))
+        await backend.sessions[0]._queue.put(
+            STTBackendTranscriptEvent(text="accepted final", is_final=True)
         )
 
         event = await _next_typed_event(stream, STTFinalEvent)
 
         assert event.utterance_id == active_utterance_id
         assert event.transcript.utterance_id == active_utterance_id
-        assert event.transcript.text == "active final"
+        assert event.transcript.text == "accepted final"
     finally:
         await stt.close()
 
@@ -2327,6 +2580,116 @@ async def test_managed_stt_provider_bridging_reset_preserves_pending_final() -> 
         await stt.close()
 
 
+async def test_managed_stt_provider_reversed_cross_session_finals_publish_in_acceptance_order() -> (
+    None
+):
+    backend = ControlledFirstStopBackend()
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        reset_deadline_s=90.0,
+        drain_timeout_s=0.2,
+    )
+    first_utterance_id = uuid4()
+    second_utterance_id = uuid4()
+    stream = stt.events()
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                first_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(first_utterance_id))
+        await stt._reset_with_reconnect()
+
+        old_session = backend.sessions[0]
+        new_session = backend.sessions[1]
+        assert isinstance(old_session, ControlledStopSession)
+        await asyncio.wait_for(old_session.stop_started.wait(), timeout=0.1)
+
+        await stt.handle_vad_event(
+            SpeechStart(
+                second_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        await stt.handle_vad_event(SpeechEnd(second_utterance_id))
+        await new_session._queue.put(
+            STTBackendTranscriptEvent(text="second final", is_final=True)
+        )
+        await asyncio.sleep(0)
+        assert not any(isinstance(item, STTFinalEvent) for item in stt._events._queue)
+
+        await old_session._queue.put(
+            STTBackendTranscriptEvent(text="first final", is_final=True)
+        )
+        first_event = await _next_typed_event(stream, STTFinalEvent)
+        second_event = await _next_typed_event(stream, STTFinalEvent)
+
+        assert [first_event.utterance_id, second_event.utterance_id] == [
+            first_utterance_id,
+            second_utterance_id,
+        ]
+        assert [first_event.transcript.text, second_event.transcript.text] == [
+            "first final",
+            "second final",
+        ]
+        old_session.release_stop.set()
+    finally:
+        if backend.sessions and isinstance(backend.sessions[0], ControlledStopSession):
+            backend.sessions[0].release_stop.set()
+        await stt.close()
+
+
+async def test_managed_stt_provider_normal_close_waits_for_replaced_session_drain() -> None:
+    backend = ControlledFirstStopBackend()
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        reset_deadline_s=90.0,
+        drain_timeout_s=0.1,
+    )
+    utterance_id = uuid4()
+    stream = stt.events()
+
+    await stt.handle_vad_event(
+        SpeechStart(
+            utterance_id,
+            pre_roll=np.zeros(0, dtype=np.float32),
+            chunk=samples(1.0),
+        )
+    )
+    await _next_state(stream, STTSessionState.STREAMING)
+    await stt.handle_vad_event(SpeechEnd(utterance_id))
+    await stt._reset_with_reconnect()
+
+    old_session = backend.sessions[0]
+    assert isinstance(old_session, ControlledStopSession)
+    await asyncio.wait_for(old_session.stop_started.wait(), timeout=0.1)
+
+    async def release_old_final() -> None:
+        await asyncio.sleep(0.01)
+        await old_session._queue.put(
+            STTBackendTranscriptEvent(text="replaced final", is_final=True)
+        )
+        old_session.release_stop.set()
+
+    release_task = asyncio.create_task(release_old_final())
+    await stt.close()
+    await release_task
+    event = await _next_typed_event(stream, STTFinalEvent)
+
+    assert event.utterance_id == utterance_id
+    assert event.transcript.text == "replaced final"
+    assert not stt._accepted_boundaries
+    assert stt._session_contexts == {}
+
+
 async def test_managed_stt_provider_peer_channel_produces_final_event():
     provider = ManagedSTTProvider(
         backend=FakeBackend(),
@@ -2334,18 +2697,12 @@ async def test_managed_stt_provider_peer_channel_produces_final_event():
         channel="peer",
     )
     utterance_id = uuid4()
-    provider._pending_final_utterance_ids.append(utterance_id)
-
-    await provider._consume_session_events(
-        EventOnlySession(
-            items=[
-                STTBackendTranscriptEvent(
-                    text="peer line",
-                    is_final=True,
-                )
-            ]
-        ),
+    session = EventOnlySession(
+        items=[STTBackendTranscriptEvent(text="peer line", is_final=True)]
     )
+    context = _event_context_with_pending(provider, session, utterance_id)
+
+    await provider._consume_session_events(context)
 
     event = await _next_event(provider.events())
     assert isinstance(event, STTFinalEvent)
@@ -2360,23 +2717,22 @@ async def test_managed_stt_provider_preserves_provider_neutral_final_language_ru
         channel="peer",
     )
     utterance_id = uuid4()
-    provider._pending_final_utterance_ids.append(utterance_id)
     runs = (
         FinalLanguageRun(text="日本語", language="ja"),
         FinalLanguageRun(text="中文", language="zh"),
     )
-
-    await provider._consume_session_events(
-        EventOnlySession(
-            items=[
-                STTBackendTranscriptEvent(
-                    text="日本語中文",
-                    is_final=True,
-                    final_language_runs=runs,
-                )
-            ]
-        )
+    session = EventOnlySession(
+        items=[
+            STTBackendTranscriptEvent(
+                text="日本語中文",
+                is_final=True,
+                final_language_runs=runs,
+            )
+        ]
     )
+    context = _event_context_with_pending(provider, session, utterance_id)
+
+    await provider._consume_session_events(context)
 
     event = await _next_event(provider.events())
     assert isinstance(event, STTFinalEvent)
@@ -2402,16 +2758,14 @@ async def test_managed_stt_provider_suppresses_known_local_qwen_final_and_notifi
         on_final_transcript_suppressed=notifications.append,
     )
     utterance_id = uuid4()
-    provider._pending_final_utterance_ids.append(utterance_id)
-    provider._pending_final_utterance_times[utterance_id] = 10.0
+    session = EventOnlySession([STTBackendTranscriptEvent(text=text, is_final=True)])
+    context = _event_context_with_pending(provider, session, utterance_id)
 
-    await provider._consume_session_events(
-        EventOnlySession([STTBackendTranscriptEvent(text=text, is_final=True)])
-    )
+    await provider._consume_session_events(context)
 
     assert provider._events.empty()
-    assert list(provider._pending_final_utterance_ids) == []
-    assert provider._pending_final_utterance_times == {}
+    assert not provider._accepted_boundaries
+    assert not context.pending
     assert len(notifications) == 1
     notification = notifications[0]
     assert getattr(notification, "utterance_id") == utterance_id
@@ -2442,11 +2796,10 @@ async def test_managed_stt_provider_suppression_log_marks_missing_notification_c
         runtime_logging=runtime_logging,
     )
     utterance_id = uuid4()
-    provider._pending_final_utterance_ids.append(utterance_id)
+    session = EventOnlySession([STTBackendTranscriptEvent(text="leşme", is_final=True)])
+    context = _event_context_with_pending(provider, session, utterance_id)
 
-    await provider._consume_session_events(
-        EventOnlySession([STTBackendTranscriptEvent(text="leşme", is_final=True)])
-    )
+    await provider._consume_session_events(context)
 
     messages = _runtime_log_messages(log_stream)
     assert provider._events.empty()
@@ -2476,11 +2829,10 @@ async def test_managed_stt_provider_suppression_log_marks_notification_failure_w
         on_final_transcript_suppressed=fail_notification,
     )
     utterance_id = uuid4()
-    provider._pending_final_utterance_ids.append(utterance_id)
+    session = EventOnlySession([STTBackendTranscriptEvent(text="acia", is_final=True)])
+    context = _event_context_with_pending(provider, session, utterance_id)
 
-    await provider._consume_session_events(
-        EventOnlySession([STTBackendTranscriptEvent(text="acia", is_final=True)])
-    )
+    await provider._consume_session_events(context)
 
     messages = _runtime_log_messages(log_stream)
     assert provider._events.empty()
@@ -2509,18 +2861,18 @@ async def test_managed_stt_provider_allows_known_text_from_non_local_provider_in
         on_final_transcript_suppressed=notifications.append,
     )
     utterance_id = uuid4()
-    provider._pending_final_utterance_ids.append(utterance_id)
+    session = EventOnlySession([STTBackendTranscriptEvent(text="leşme", is_final=True)])
+    context = _event_context_with_pending(provider, session, utterance_id)
 
-    await provider._consume_session_events(
-        EventOnlySession([STTBackendTranscriptEvent(text="leşme", is_final=True)])
-    )
+    await provider._consume_session_events(context)
 
     event = await _next_event(provider.events())
     assert isinstance(event, STTFinalEvent)
     assert event.utterance_id == utterance_id
     assert event.transcript.text == "leşme"
     assert notifications == []
-    assert list(provider._pending_final_utterance_ids) == []
+    assert not provider._accepted_boundaries
+    assert not context.pending
 
 
 @pytest.mark.parametrize(
@@ -2536,11 +2888,10 @@ async def test_managed_stt_provider_allows_non_matching_local_qwen_finals(text: 
         on_final_transcript_suppressed=notifications.append,
     )
     utterance_id = uuid4()
-    provider._pending_final_utterance_ids.append(utterance_id)
+    session = EventOnlySession([STTBackendTranscriptEvent(text=text, is_final=True)])
+    context = _event_context_with_pending(provider, session, utterance_id)
 
-    await provider._consume_session_events(
-        EventOnlySession([STTBackendTranscriptEvent(text=text, is_final=True)])
-    )
+    await provider._consume_session_events(context)
 
     event = await _next_event(provider.events())
     assert isinstance(event, STTFinalEvent)
@@ -2557,7 +2908,10 @@ async def test_managed_stt_provider_suppression_decision_uses_producer_instance_
         on_final_transcript_suppressed=local_notifications.append,
     )
     local_id = uuid4()
-    local_provider._pending_final_utterance_ids.append(local_id)
+    local_session = EventOnlySession(
+        [STTBackendTranscriptEvent(text="leşme", is_final=True)]
+    )
+    local_context = _event_context_with_pending(local_provider, local_session, local_id)
 
     non_local_notifications: list[object] = []
     non_local_provider = ManagedSTTProvider(
@@ -2567,14 +2921,17 @@ async def test_managed_stt_provider_suppression_decision_uses_producer_instance_
         on_final_transcript_suppressed=non_local_notifications.append,
     )
     non_local_id = uuid4()
-    non_local_provider._pending_final_utterance_ids.append(non_local_id)
+    non_local_session = EventOnlySession(
+        [STTBackendTranscriptEvent(text="leşme", is_final=True)]
+    )
+    non_local_context = _event_context_with_pending(
+        non_local_provider,
+        non_local_session,
+        non_local_id,
+    )
 
-    await local_provider._consume_session_events(
-        EventOnlySession([STTBackendTranscriptEvent(text="leşme", is_final=True)])
-    )
-    await non_local_provider._consume_session_events(
-        EventOnlySession([STTBackendTranscriptEvent(text="leşme", is_final=True)])
-    )
+    await local_provider._consume_session_events(local_context)
+    await non_local_provider._consume_session_events(non_local_context)
 
     assert local_provider._events.empty()
     assert getattr(local_notifications[0], "stt_provider_name") == STTProviderName.LOCAL_QWEN
@@ -2666,6 +3023,27 @@ async def test_managed_stt_provider_reopens_on_next_speech_after_terminal_failur
     await stt.close()
 
 
+async def test_managed_stt_provider_unexpected_normal_stream_end_disconnects_session() -> None:
+    session = EventOnlySession([])
+    stt = ManagedSTTProvider(
+        backend=EventOnlyBackend(session=session),
+        sample_rate_hz=16000,
+        channel="peer",
+        connect_attempts=1,
+    )
+    stream = stt.events()
+
+    await stt.handle_vad_event(
+        SpeechStart(uuid4(), pre_roll=samples(0.0), chunk=samples(1.0))
+    )
+    await _next_state(stream, STTSessionState.STREAMING)
+    await _next_state(stream, STTSessionState.DISCONNECTED, max_events=10)
+
+    assert stt._active_context is None
+    assert stt._active_session is None
+    assert stt._consumer_task is None
+
+
 async def test_stt_suppresses_error_event_during_close() -> None:
     stt = ManagedSTTProvider(
         backend=TerminalFailureBackend(),
@@ -2675,8 +3053,9 @@ async def test_stt_suppresses_error_event_during_close() -> None:
     )
     session = TerminalFailureSession()
     stt._closing = True
+    context = _event_context_with_pending(stt, session)
 
-    await stt._handle_terminal_session_failure(session, RuntimeError("backend closed"))
+    await stt._handle_terminal_session_failure(context, RuntimeError("backend closed"))
 
     assert stt._events.empty()
 
@@ -2689,8 +3068,9 @@ async def test_stt_emits_error_event_when_not_closing() -> None:
         connect_attempts=1,
     )
     session = TerminalFailureSession()
+    context = _event_context_with_pending(stt, session)
 
-    await stt._handle_terminal_session_failure(session, RuntimeError("backend closed"))
+    await stt._handle_terminal_session_failure(context, RuntimeError("backend closed"))
 
     events: list[object] = []
     while not stt._events.empty():

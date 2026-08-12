@@ -8,6 +8,7 @@ to prevent the 10-second timeout (NET-0001 error).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import queue
 import threading
@@ -60,7 +61,14 @@ class DeepgramRealtimeSTTBackend(STTBackend):
             stream_label=self.stream_label,
             finalize_timeout_s=self.finalize_timeout_s,
         )
-        await session.start()
+        try:
+            await session.start()
+        except BaseException:
+            with contextlib.suppress(BaseException):
+                await session.abort_for_toggle_off()
+            with contextlib.suppress(BaseException):
+                await session.close()
+            raise
         return session
 
     @staticmethod

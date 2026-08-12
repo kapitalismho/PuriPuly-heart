@@ -27,6 +27,7 @@ from puripuly_heart.core.stt.backend import (
     STTBackend,
     STTBackendFloat32Session,
     STTBackendSession,
+    STTBackendTranscriptEvent,
 )
 from puripuly_heart.core.stt.local_qwen_hallucination import (
     is_known_local_qwen_hallucination,
@@ -55,6 +56,30 @@ class _EventIngressBarrier:
 
 
 @dataclass(slots=True)
+class _PendingBoundary:
+    sequence: int
+    utterance_id: UUID
+    ended_at: float
+    publication_generation: int
+    status: str = "pending"
+    terminal: STTBackendTranscriptEvent | None = None
+    timeout_task: asyncio.Task[None] | None = None
+
+
+@dataclass(slots=True)
+class _SessionContext:
+    token: int
+    session: STTBackendSession
+    publication_generation: int
+    active_utterance_id: UUID | None = None
+    pending: deque[_PendingBoundary] = field(default_factory=deque)
+    consumer_task: asyncio.Task[None] | None = None
+    accept_events: bool = True
+    accept_partials: bool = True
+    draining: bool = False
+
+
+@dataclass(slots=True)
 class ManagedSTTProvider:
     backend: STTBackend
     sample_rate_hz: int
@@ -78,6 +103,7 @@ class ManagedSTTProvider:
 
     _state: STTSessionState = STTSessionState.DISCONNECTED
     _active_session: STTBackendSession | None = None
+    _active_context: _SessionContext | None = None
     _session_started_at: float | None = None
     _consumer_task: asyncio.Task[None] | None = None
     _draining: set[asyncio.Task[None]] = field(default_factory=set)
@@ -85,8 +111,11 @@ class ManagedSTTProvider:
     _session_open_lock: asyncio.Lock = field(init=False, repr=False)
 
     _active_utterance_id: UUID | None = None
-    _pending_final_utterance_ids: deque[UUID] = field(default_factory=deque)
-    _pending_final_utterance_times: dict[UUID, float] = field(default_factory=dict)
+    _accepted_boundaries: deque[_PendingBoundary] = field(default_factory=deque)
+    _session_contexts: dict[int, _SessionContext] = field(default_factory=dict)
+    _next_session_token: int = 1
+    _next_boundary_sequence: int = 1
+    _boundary_timeout_tasks: set[asyncio.Task[None]] = field(default_factory=set)
     _audio_ring: RingBufferF32 | None = None
     _reset_timer: asyncio.Task[None] | None = None
     _last_speech_end_time: float | None = None
@@ -131,6 +160,47 @@ class ManagedSTTProvider:
         self._session_open_lock = asyncio.Lock()
         capacity_samples = int(self.sample_rate_hz * (self.bridging_ms / 1000.0))
         self._audio_ring = RingBufferF32(capacity_samples=capacity_samples)
+
+    def _install_active_session(self, session: STTBackendSession) -> _SessionContext:
+        context = _SessionContext(
+            token=self._next_session_token,
+            session=session,
+            publication_generation=self._publication_generation,
+            active_utterance_id=self._active_utterance_id,
+        )
+        self._next_session_token += 1
+        self._session_contexts[context.token] = context
+        context.consumer_task = asyncio.create_task(self._consume_session_events(context))
+        self._active_context = context
+        self._active_session = session
+        self._consumer_task = context.consumer_task
+        return context
+
+    def _pending_boundary_count(self) -> int:
+        return sum(
+            boundary.status == "pending"
+            for context in self._session_contexts.values()
+            for boundary in context.pending
+        )
+
+    def _cancel_boundary_timeout(self, boundary: _PendingBoundary) -> None:
+        task = boundary.timeout_task
+        boundary.timeout_task = None
+        if task is not None and task is not asyncio.current_task() and not task.done():
+            task.cancel()
+
+    async def _cancel_all_boundary_timeouts(self) -> None:
+        current_task = asyncio.current_task()
+        tasks = tuple(
+            task
+            for task in self._boundary_timeout_tasks
+            if task is not current_task and not task.done()
+        )
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._boundary_timeout_tasks.difference_update(tasks)
 
     def _provider_label(self) -> str:
         if self.stt_provider_name is None:
@@ -196,6 +266,7 @@ class ManagedSTTProvider:
     async def close(self) -> None:
         self._closing = True
         try:
+            await self._cancel_all_boundary_timeouts()
             await self._set_state(
                 STTSessionState.DRAINING if self._active_session else STTSessionState.DISCONNECTED
             )
@@ -203,10 +274,8 @@ class ManagedSTTProvider:
             if self._reset_timer:
                 self._reset_timer.cancel()
 
-            if self._active_session and self._consumer_task:
-                await self._drain_and_close(
-                    self._active_session, self._consumer_task, allow_finalize=True
-                )
+            if self._active_context and self._active_context.consumer_task:
+                await self._drain_and_close(self._active_context, allow_finalize=True)
             elif self._consumer_task:
                 self._consumer_task.cancel()
                 try:
@@ -237,7 +306,7 @@ class ManagedSTTProvider:
             self.channel,
             self._provider_label(),
             discarded_audio_samples,
-            len(self._pending_final_utterance_ids),
+            self._pending_boundary_count(),
             active_decode,
             fallback_level=logging.INFO,
         )
@@ -249,12 +318,21 @@ class ManagedSTTProvider:
 
         session = self._active_session
         consumer_task = self._consumer_task
+        await self._cancel_all_boundary_timeouts()
+        for context in self._session_contexts.values():
+            context.accept_events = False
+            context.accept_partials = False
+            for boundary in context.pending:
+                if boundary.status == "pending":
+                    boundary.status = "canceled"
+            context.pending.clear()
+        self._accepted_boundaries.clear()
+        self._session_contexts.clear()
+        self._active_context = None
         self._active_session = None
         self._consumer_task = None
         self._session_started_at = None
         self._active_utterance_id = None
-        self._pending_final_utterance_ids.clear()
-        self._pending_final_utterance_times.clear()
         self._last_speech_end_time = None
         if self._audio_ring is not None:
             self._audio_ring.clear()
@@ -350,20 +428,27 @@ class ManagedSTTProvider:
             except Exception:
                 pass
         self._consumer_task = None
+        self._active_context = None
         self._active_session = None
 
         if self._draining:
             draining = tuple(self._draining)
-            for task in draining:
+            _done, pending = await asyncio.wait(
+                draining,
+                timeout=self.drain_timeout_s * 2,
+            )
+            for task in pending:
                 if not task.done():
                     task.cancel()
-            await asyncio.gather(*draining, return_exceptions=True)
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
             self._draining.difference_update(draining)
 
         self._session_started_at = None
         self._active_utterance_id = None
-        self._pending_final_utterance_ids.clear()
-        self._pending_final_utterance_times.clear()
+        await self._cancel_all_boundary_timeouts()
+        self._accepted_boundaries.clear()
+        self._session_contexts.clear()
         self._last_speech_end_time = None
         if self._audio_ring is not None:
             self._audio_ring.clear()
@@ -399,6 +484,8 @@ class ManagedSTTProvider:
                 return
 
     async def handle_vad_event(self, event: VadEvent) -> None:
+        if self._closing:
+            return
         if isinstance(event, SpeechStart):
             await self._on_speech_start(event)
         elif isinstance(event, SpeechChunk):
@@ -445,6 +532,8 @@ class ManagedSTTProvider:
 
         if not await self._ensure_session():
             return
+        if self._active_context is not None:
+            self._active_context.active_utterance_id = event.utterance_id
 
         await self._send_audio(event.pre_roll)
         await self._send_audio(event.chunk)
@@ -462,22 +551,30 @@ class ManagedSTTProvider:
         self._active_utterance_id = event.utterance_id
         if not await self._ensure_session():
             return
+        if self._active_context is not None:
+            self._active_context.active_utterance_id = event.utterance_id
         await self._send_audio(event.chunk)
 
     async def _on_speech_end(self, event: SpeechEnd) -> None:
+        context = self._active_context
         if self._active_utterance_id == event.utterance_id:
             self._active_utterance_id = None
+        if context is not None and context.active_utterance_id == event.utterance_id:
+            context.active_utterance_id = None
         self._last_speech_end_time = self.clock.now()
 
         # Delegate end-of-speech handling to the backend (silence + finalize etc.)
-        if self._active_session is not None:
+        if context is not None and context is self._active_context:
             ended_at = self.clock.now()
-            self._pending_final_utterance_ids.append(event.utterance_id)
-            self._pending_final_utterance_times[event.utterance_id] = ended_at
-            if len(self._pending_final_utterance_ids) > PENDING_FINAL_QUEUE_WARN_SIZE:
+            self._register_pending_boundary(
+                context,
+                utterance_id=event.utterance_id,
+                ended_at=ended_at,
+            )
+            if len(context.pending) > PENDING_FINAL_QUEUE_WARN_SIZE:
                 self._emit_basic(
                     "[STT] Pending final queue size is unexpectedly high: %s",
-                    len(self._pending_final_utterance_ids),
+                    len(context.pending),
                     level=logging.WARNING,
                     fallback_level=logging.WARNING,
                 )
@@ -490,10 +587,151 @@ class ManagedSTTProvider:
                 fallback_level=logging.INFO,
             )
             self._emit_stt_input_diagnostics(event.utterance_id, finalize=True)
-            await self._active_session.on_speech_end(
-                trailing_silence_ms=event.trailing_silence_ms,
-                reason=event.reason,
+            try:
+                await context.session.on_speech_end(
+                    trailing_silence_ms=event.trailing_silence_ms,
+                    reason=event.reason,
+                )
+            except Exception:
+                await self._fence_session_context(
+                    context,
+                    oldest_status="finalize_failed",
+                    remaining_status="correlation_lost",
+                )
+                raise
+
+    def _register_pending_boundary(
+        self,
+        context: _SessionContext,
+        *,
+        utterance_id: UUID,
+        ended_at: float,
+    ) -> _PendingBoundary:
+        boundary = _PendingBoundary(
+            sequence=self._next_boundary_sequence,
+            utterance_id=utterance_id,
+            ended_at=ended_at,
+            publication_generation=context.publication_generation,
+        )
+        self._next_boundary_sequence += 1
+        context.pending.append(boundary)
+        self._accepted_boundaries.append(boundary)
+        boundary.timeout_task = asyncio.create_task(
+            self._expire_pending_boundary(context, boundary)
+        )
+        self._boundary_timeout_tasks.add(boundary.timeout_task)
+        boundary.timeout_task.add_done_callback(self._boundary_timeout_tasks.discard)
+        return boundary
+
+    def _finalization_timeout_s(self) -> float:
+        return max(float(self.drain_timeout_s), float(self.reconnect_window_s))
+
+    async def _expire_pending_boundary(
+        self,
+        context: _SessionContext,
+        boundary: _PendingBoundary,
+    ) -> None:
+        try:
+            await asyncio.sleep(self._finalization_timeout_s())
+        except asyncio.CancelledError:
+            return
+        if boundary.status != "pending" or not context.accept_events:
+            return
+        age_s = max(0.0, self.clock.now() - boundary.ended_at)
+        self._emit_finalization_lag_diagnostic(
+            utterance_id=boundary.utterance_id,
+            pending_duration_s=age_s,
+            threshold_s=self._finalization_timeout_s(),
+            outcome="terminal_timeout",
+        )
+        was_active = context is self._active_context
+        await self._fence_session_context(
+            context,
+            oldest_status="terminal_timeout",
+            remaining_status="correlation_lost",
+        )
+        if not was_active or self._closing:
+            return
+        if context.active_utterance_id is not None:
+            try:
+                await self._reset_with_bridging(expected_context=context)
+                return
+            except Exception as exc:
+                self._emit_detailed(
+                    "[STT] Finalization timeout bridge failed: %s",
+                    exc,
+                    level=logging.WARNING,
+                    fallback_level=logging.WARNING,
+                )
+        self._detach_active_context(context)
+        if self._reset_timer is not None:
+            self._reset_timer.cancel()
+            self._reset_timer = None
+        await self._drain_and_close(context, allow_finalize=False)
+        await self._set_state(STTSessionState.DISCONNECTED)
+
+    async def _fence_session_context(
+        self,
+        context: _SessionContext,
+        *,
+        oldest_status: str,
+        remaining_status: str,
+    ) -> None:
+        context.accept_events = False
+        context.accept_partials = False
+        first = True
+        while context.pending:
+            boundary = context.pending.popleft()
+            if boundary.status != "pending":
+                continue
+            boundary.status = oldest_status if first else remaining_status
+            first = False
+            self._cancel_boundary_timeout(boundary)
+            self._emit_detailed(
+                "[STT] Boundary resolved without transcript id=%s outcome=%s session=%s",
+                str(boundary.utterance_id)[:8],
+                boundary.status,
+                context.token,
+                level=logging.WARNING,
+                fallback_level=logging.WARNING,
             )
+        await self._flush_resolved_boundaries()
+
+    async def _flush_resolved_boundaries(self) -> None:
+        while self._accepted_boundaries:
+            boundary = self._accepted_boundaries[0]
+            if boundary.status == "pending":
+                return
+            self._accepted_boundaries.popleft()
+            self._cancel_boundary_timeout(boundary)
+            terminal = boundary.terminal
+            if (
+                boundary.status != "completed_text"
+                or terminal is None
+                or boundary.publication_generation != self._publication_generation
+            ):
+                continue
+            if self._should_suppress_final_transcript(terminal.text):
+                await self._handle_suppressed_final_transcript(
+                    utterance_id=boundary.utterance_id,
+                )
+                continue
+            transcript = self._build_transcript(
+                utterance_id=boundary.utterance_id,
+                text=terminal.text,
+                is_final=True,
+                created_at=self.clock.now(),
+                final_language_runs=terminal.final_language_runs,
+            )
+            await self._events.put(STTFinalEvent(boundary.utterance_id, transcript))
+
+    def _detach_active_context(self, context: _SessionContext) -> None:
+        if context is not self._active_context:
+            return
+        self._active_context = None
+        self._active_session = None
+        self._consumer_task = None
+        self._session_started_at = None
 
     async def _send_audio(self, samples_f32: np.ndarray) -> None:
         samples_f32 = np.asarray(samples_f32, dtype=np.float32).reshape(-1)
@@ -648,14 +886,8 @@ class ManagedSTTProvider:
                             continue
                         break
                     else:
-                        self._active_session = session
+                        self._install_active_session(session)
                         self._session_started_at = self.clock.now()
-                        self._consumer_task = asyncio.create_task(
-                            self._consume_session_events(
-                                session,
-                                publication_generation=self._publication_generation,
-                            )
-                        )
                         self._schedule_reset_timer()
                         await self._set_state(STTSessionState.STREAMING)
                         self._log_session_connected(attempts=attempt)
@@ -695,9 +927,16 @@ class ManagedSTTProvider:
             )
             return False
 
-    async def _reset_with_bridging(self) -> None:
-        old_session = self._active_session
-        old_consumer = self._consumer_task
+    async def _reset_with_bridging(
+        self,
+        *,
+        expected_context: _SessionContext | None = None,
+    ) -> None:
+        old_context = self._active_context
+        if old_context is None or (
+            expected_context is not None and old_context is not expected_context
+        ):
+            return
 
         bridging_audio = self._audio_ring.get_last_samples(self._audio_ring.capacity_samples)  # type: ignore[union-attr]
         bridging_ms = len(bridging_audio) / self.sample_rate_hz * 1000
@@ -707,15 +946,19 @@ class ManagedSTTProvider:
             bridging_ms,
             fallback_level=logging.INFO,
         )
+        publication_generation = self._publication_generation
         new_session = await self.backend.open_session()
-        self._active_session = new_session
+        if (
+            self._closing
+            or self._publication_generation != publication_generation
+            or self._active_context is not old_context
+        ):
+            await self._close_session_for_cleanup(new_session)
+            return
+        old_context.accept_partials = False
+        old_context.active_utterance_id = None
+        self._install_active_session(new_session)
         self._session_started_at = self.clock.now()
-        self._consumer_task = asyncio.create_task(
-            self._consume_session_events(
-                new_session,
-                publication_generation=self._publication_generation,
-            )
-        )
         self._schedule_reset_timer()
 
         await self._set_state(STTSessionState.STREAMING)
@@ -723,16 +966,13 @@ class ManagedSTTProvider:
         await self._send_audio_to_session(new_session, bridging_audio)
         self._emit_basic("[STT] Session reset while speaking; bridged to a new session")
 
-        if old_session and old_consumer:
-            self._emit_detailed(
-                "[STT] Draining replaced session in background",
-                fallback_level=logging.INFO,
-            )
-            self._track_draining_task(
-                asyncio.create_task(
-                    self._drain_and_close(old_session, old_consumer, allow_finalize=False)
-                )
-            )
+        self._emit_detailed(
+            "[STT] Draining replaced session in background",
+            fallback_level=logging.INFO,
+        )
+        self._track_draining_task(
+            asyncio.create_task(self._drain_and_close(old_context, allow_finalize=False))
+        )
 
     async def _reset_with_reconnect(self) -> None:
         """Close current session and immediately open a new one.
@@ -750,10 +990,11 @@ class ManagedSTTProvider:
             fallback_level=logging.INFO,
         )
 
-        old_session = self._active_session
-        old_consumer = self._consumer_task
+        old_context = self._active_context
+        if old_context is None:
+            return
 
-        # Open new session
+        publication_generation = self._publication_generation
         try:
             new_session = await self.backend.open_session()
         except Exception as e:
@@ -772,14 +1013,16 @@ class ManagedSTTProvider:
             await self._reset_on_silence()
             return
 
-        self._active_session = new_session
+        if (
+            self._closing
+            or self._publication_generation != publication_generation
+            or self._active_context is not old_context
+        ):
+            await self._close_session_for_cleanup(new_session)
+            return
+        old_context.accept_partials = False
+        self._install_active_session(new_session)
         self._session_started_at = self.clock.now()
-        self._consumer_task = asyncio.create_task(
-            self._consume_session_events(
-                new_session,
-                publication_generation=self._publication_generation,
-            )
-        )
         self._schedule_reset_timer()
 
         await self._set_state(STTSessionState.STREAMING)
@@ -787,9 +1030,7 @@ class ManagedSTTProvider:
 
         # Drain old session with finalize (unlike bridging)
         self._track_draining_task(
-            asyncio.create_task(
-                self._drain_and_close(old_session, old_consumer, allow_finalize=True)
-            )
+            asyncio.create_task(self._drain_and_close(old_context, allow_finalize=True))
         )
 
     def _track_draining_task(self, task: asyncio.Task[None]) -> None:
@@ -807,32 +1048,39 @@ class ManagedSTTProvider:
         if self._active_session is None or self._consumer_task is None:
             return
 
-        old_session = self._active_session
-        old_consumer = self._consumer_task
-        self._active_session = None
-        self._consumer_task = None
-        self._session_started_at = None
+        old_context = self._active_context
+        if old_context is None:
+            return
+        old_context.accept_partials = False
+        self._detach_active_context(old_context)
 
         await self._set_state(STTSessionState.DRAINING)
-        await self._drain_and_close(old_session, old_consumer, allow_finalize=True)
+        await self._drain_and_close(old_context, allow_finalize=True)
         await self._set_state(STTSessionState.DISCONNECTED)
         self._emit_basic("[STT] Session closed after silence")
 
     async def _drain_and_close(
         self,
-        session: STTBackendSession,
-        consumer_task: asyncio.Task[None],
+        context: _SessionContext,
         *,
         allow_finalize: bool,
     ) -> None:
+        session = context.session
+        consumer_task = context.consumer_task
+        if consumer_task is None:
+            await self._close_session_for_cleanup(session)
+            self._session_contexts.pop(context.token, None)
+            return
+        context.accept_partials = False
+        context.draining = True
         self._emit_detailed(
             f"[STT] DRAIN: Starting drain (timeout={self.drain_timeout_s}s)...",
             fallback_level=logging.DEBUG,
         )
         stop_timed_out = False
         try:
-            if allow_finalize and self._should_finalize_before_stop():
-                await self._finalize_before_stop(session)
+            if allow_finalize and self._should_finalize_before_stop(context):
+                await self._finalize_before_stop(context)
             try:
                 await asyncio.wait_for(session.stop(), timeout=self.drain_timeout_s)
             except asyncio.TimeoutError:
@@ -850,6 +1098,11 @@ class ManagedSTTProvider:
                 pass
 
             if stop_timed_out:
+                await self._fence_session_context(
+                    context,
+                    oldest_status="stop_timeout",
+                    remaining_status="correlation_lost",
+                )
                 await self._close_session_for_cleanup(session)
 
             if not consumer_task.done():
@@ -864,6 +1117,11 @@ class ManagedSTTProvider:
                         f"[STT] DRAIN: Timeout after {self.drain_timeout_s}s, cancelling consumer task",
                         level=logging.WARNING,
                         fallback_level=logging.WARNING,
+                    )
+                    await self._fence_session_context(
+                        context,
+                        oldest_status="drain_timeout",
+                        remaining_status="correlation_lost",
                     )
                     consumer_task.cancel()
                     with contextlib.suppress(asyncio.CancelledError, Exception):
@@ -884,18 +1142,39 @@ class ManagedSTTProvider:
                 consumer_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await consumer_task
+            if context.pending:
+                await self._fence_session_context(
+                    context,
+                    oldest_status="stream_closed",
+                    remaining_status="correlation_lost",
+                )
+            self._session_contexts.pop(context.token, None)
+            self._detach_active_context(context)
         self._emit_detailed("[STT] DRAIN: Session closed", fallback_level=logging.DEBUG)
 
-    def _should_finalize_before_stop(self) -> bool:
-        return self._active_utterance_id is not None or bool(self._pending_final_utterance_ids)
+    def _should_finalize_before_stop(self, context: _SessionContext) -> bool:
+        return context.active_utterance_id is not None or bool(context.pending)
 
-    async def _finalize_before_stop(self, session: STTBackendSession) -> None:
-        if self._active_utterance_id is not None:
-            with contextlib.suppress(Exception):
-                await session.on_speech_end()
-        if self.finalize_grace_s <= 0:
+    async def _finalize_before_stop(self, context: _SessionContext) -> None:
+        utterance_id = context.active_utterance_id
+        if utterance_id is None:
             return
-        await asyncio.sleep(self.finalize_grace_s)
+        context.active_utterance_id = None
+        if self._active_utterance_id == utterance_id:
+            self._active_utterance_id = None
+        self._register_pending_boundary(
+            context,
+            utterance_id=utterance_id,
+            ended_at=self.clock.now(),
+        )
+        try:
+            await context.session.on_speech_end()
+        except Exception:
+            await self._fence_session_context(
+                context,
+                oldest_status="finalize_failed",
+                remaining_status="correlation_lost",
+            )
 
     def _build_transcript(
         self,
@@ -914,39 +1193,6 @@ class ManagedSTTProvider:
             channel=self.channel,
             final_language_runs=final_language_runs,
         )
-
-    def _drop_stale_pending_final_utterance_ids(self) -> None:
-        stale_after_s = max(0.0, float(self.reconnect_window_s))
-        now = self.clock.now()
-
-        while self._pending_final_utterance_ids:
-            if len(self._pending_final_utterance_ids) <= 1 and self._active_utterance_id is None:
-                return
-
-            utterance_id = self._pending_final_utterance_ids[0]
-            ended_at = self._pending_final_utterance_times.get(utterance_id)
-            if ended_at is None:
-                return
-
-            age_s = now - ended_at
-            if age_s <= stale_after_s:
-                return
-
-            self._pending_final_utterance_ids.popleft()
-            self._pending_final_utterance_times.pop(utterance_id, None)
-            self._emit_finalization_lag_diagnostic(
-                utterance_id=utterance_id,
-                pending_duration_s=age_s,
-                threshold_s=stale_after_s,
-                outcome="stale_drop",
-            )
-            self._emit_detailed(
-                "[STT] Dropped stale pending final id=%s age_s=%.1f",
-                str(utterance_id)[:8],
-                age_s,
-                level=logging.WARNING,
-                fallback_level=logging.WARNING,
-            )
 
     def _emit_finalization_lag_diagnostic(
         self,
@@ -1025,77 +1271,85 @@ class ManagedSTTProvider:
 
     async def _consume_session_events(
         self,
-        session: STTBackendSession,
-        *,
-        publication_generation: int | None = None,
+        context: _SessionContext,
     ) -> None:
-        if publication_generation is None:
-            publication_generation = self._publication_generation
+        session = context.session
         try:
             async for ev in session.events():
-                if publication_generation != self._publication_generation:
+                if (
+                    not context.accept_events
+                    or context.publication_generation != self._publication_generation
+                ):
                     continue
                 if ev.is_final:
-                    self._drop_stale_pending_final_utterance_ids()
-                    utterance_id = (
-                        self._pending_final_utterance_ids.popleft()
-                        if self._pending_final_utterance_ids
-                        else self._active_utterance_id
+                    if not context.pending:
+                        self._emit_detailed(
+                            "[STT] Ignored terminal without pending boundary session=%s",
+                            context.token,
+                            level=logging.WARNING,
+                            fallback_level=logging.WARNING,
+                        )
+                        continue
+                    boundary = context.pending.popleft()
+                    self._cancel_boundary_timeout(boundary)
+                    boundary.terminal = ev
+                    boundary.status = (
+                        "completed_text" if ev.text.strip() else "completed_empty"
                     )
-                    if utterance_id is not None:
-                        ended_at = self._pending_final_utterance_times.pop(utterance_id, None)
-                        if ended_at is not None:
-                            self._emit_finalization_lag_diagnostic(
-                                utterance_id=utterance_id,
-                                pending_duration_s=self.clock.now() - ended_at,
-                                threshold_s=max(0.0, float(self.reconnect_window_s)),
-                                outcome="final_received",
-                            )
-                else:
-                    utterance_id = self._active_utterance_id or (
-                        self._pending_final_utterance_ids[0]
-                        if self._pending_final_utterance_ids
-                        else None
+                    self._emit_finalization_lag_diagnostic(
+                        utterance_id=boundary.utterance_id,
+                        pending_duration_s=self.clock.now() - boundary.ended_at,
+                        threshold_s=max(0.0, float(self.reconnect_window_s)),
+                        outcome="final_received",
                     )
+                    await self._flush_resolved_boundaries()
+                    continue
+                if context is not self._active_context or not context.accept_partials:
+                    continue
+                utterance_id = context.active_utterance_id
                 if utterance_id is None:
                     continue
-                if ev.is_final and not ev.text.strip():
-                    continue
-                if ev.is_final and self._should_suppress_final_transcript(ev.text):
-                    await self._handle_suppressed_final_transcript(
-                        utterance_id=utterance_id,
-                    )
-                    continue
-                created_at = self.clock.now()
                 transcript = self._build_transcript(
                     utterance_id=utterance_id,
                     text=ev.text,
-                    is_final=ev.is_final,
-                    created_at=created_at,
+                    is_final=False,
+                    created_at=self.clock.now(),
                     final_language_runs=ev.final_language_runs,
                 )
-                if ev.is_final:
-                    await self._events.put(STTFinalEvent(utterance_id, transcript))
-                else:
-                    await self._events.put(STTPartialEvent(utterance_id, transcript))
+                await self._events.put(STTPartialEvent(utterance_id, transcript))
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            await self._handle_terminal_session_failure(session, exc)
+            await self._handle_terminal_session_failure(context, exc)
+        else:
+            unexpected_close = not context.draining and context.accept_events
+            if context.pending:
+                await self._fence_session_context(
+                    context,
+                    oldest_status="stream_closed",
+                    remaining_status="correlation_lost",
+                )
+            if unexpected_close:
+                await self._handle_terminal_session_failure(
+                    context,
+                    RuntimeError("STT backend event stream closed"),
+                )
 
     async def _handle_terminal_session_failure(
         self,
-        session: STTBackendSession,
+        context: _SessionContext,
         exc: Exception,
     ) -> None:
-        is_active_session = session is self._active_session
+        session = context.session
+        await self._fence_session_context(
+            context,
+            oldest_status="session_failed",
+            remaining_status="correlation_lost",
+        )
+        is_active_session = context is self._active_context
         if is_active_session:
-            self._active_session = None
-            self._consumer_task = None
-            self._session_started_at = None
+            self._detach_active_context(context)
             self._active_utterance_id = None
-            self._pending_final_utterance_ids.clear()
-            self._pending_final_utterance_times.clear()
             self._last_speech_end_time = None
             if self._reset_timer is not None:
                 self._reset_timer.cancel()
@@ -1105,6 +1359,10 @@ class ManagedSTTProvider:
                 maybe_awaitable = self.on_terminal_failure(exc)
                 if inspect.isawaitable(maybe_awaitable):
                     await maybe_awaitable
+
+        context.accept_events = False
+        context.accept_partials = False
+        self._session_contexts.pop(context.token, None)
 
         with contextlib.suppress(Exception):
             await session.stop()

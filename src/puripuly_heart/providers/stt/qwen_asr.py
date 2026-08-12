@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import logging
 import queue
 import threading
@@ -57,7 +58,14 @@ class QwenASRRealtimeSTTBackend(STTBackend):
             connect_timeout_s=self.connect_timeout_s,
             finish_timeout_s=self.finish_timeout_s,
         )
-        await session.start()
+        try:
+            await session.start()
+        except BaseException:
+            with contextlib.suppress(BaseException):
+                await session.abort_for_toggle_off()
+            with contextlib.suppress(BaseException):
+                await session.close()
+            raise
         return session
 
     @staticmethod
@@ -111,6 +119,7 @@ class _QwenASRSession(STTBackendSession):
     _commit_lock: threading.Lock = field(init=False, repr=False)
     _pending_commits: deque[_PendingCommit] = field(init=False, repr=False)
     _terminal_item_ids: set[str] = field(init=False, repr=False)
+    _terminal_event_ids: set[str] = field(init=False, repr=False)
     _next_commit_sequence: int = field(init=False, default=1, repr=False)
     _accept_terminals: bool = field(init=False, default=True, repr=False)
 
@@ -121,6 +130,7 @@ class _QwenASRSession(STTBackendSession):
         self._commit_lock = threading.Lock()
         self._pending_commits = deque()
         self._terminal_item_ids = set()
+        self._terminal_event_ids = set()
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
@@ -370,9 +380,13 @@ class _QwenASRSession(STTBackendSession):
         text: str,
     ) -> None:
         item_id = self._response_item_id(response)
+        event_id = str(response.get("event_id") or "").strip() or None
         ready: list[STTBackendTranscriptEvent] = []
         with self._commit_lock:
             if not self._accept_terminals:
+                return
+            if event_id is not None and event_id in self._terminal_event_ids:
+                logger.debug("[STT] Qwen ASR duplicate terminal ignored event_id=%s", event_id)
                 return
             if item_id is not None and item_id in self._terminal_item_ids:
                 logger.debug("[STT] Qwen ASR duplicate terminal ignored item_id=%s", item_id)
@@ -401,6 +415,8 @@ class _QwenASRSession(STTBackendSession):
                     status,
                 )
                 return
+            if event_id is not None:
+                self._terminal_event_ids.add(event_id)
             pending.terminal_status = status
             pending.event = STTBackendTranscriptEvent(text=text, is_final=True)
             ready = self._drain_ready_terminals_locked()
