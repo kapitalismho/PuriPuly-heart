@@ -16,6 +16,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Sequence
 
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
     STTBackend,
     STTBackendSession,
@@ -555,7 +556,12 @@ class _DeepgramSDKSession(STTBackendSession):
             return
         self._audio_q.put_nowait(pcm16le)
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
         """Handle end of speech and finalize."""
         if self._stopped:
             return
@@ -566,12 +572,16 @@ class _DeepgramSDKSession(STTBackendSession):
 
         existing_ms = max(int(trailing_silence_ms or 0), 0)
         missing_ms = 0
+        wait_ms = boundary_wait_ms(reason, observed_tail_ms=existing_ms)
 
         logger.info(
-            "[STT][Tail] provider=deepgram observed_tail_ms=%s injected_padding_ms=%s "
-            "declared_trim_ms=0 boundary_wait_ms=unknown",
+            "[STT][Tail] provider=deepgram boundary_reason=%s observed_tail_ms=%s "
+            "injected_padding_ms=%s "
+            "declared_trim_ms=0 boundary_wait_ms=%s",
+            reason,
             existing_ms,
             missing_ms,
+            wait_ms,
         )
         self._audio_q.put_nowait(_FINALIZE)
 

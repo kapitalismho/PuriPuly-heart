@@ -160,6 +160,7 @@ def _controlled_final_runs(
         }
         for index, (language, end_ms) in enumerate(zip(languages, final_token_end_ms, strict=True))
     ]
+    session._pending_finalize_requests = 1
     batch_start = 0
     for batch_index, batch_size in enumerate(token_batch_sizes):
         batch_end = batch_start + batch_size

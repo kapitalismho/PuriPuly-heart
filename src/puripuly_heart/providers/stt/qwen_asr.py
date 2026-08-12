@@ -16,6 +16,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
 
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
     STTBackend,
     STTBackendSession,
@@ -510,7 +511,12 @@ class _QwenASRSession(STTBackendSession):
             return
         self._audio_q.put_nowait(pcm16le)
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
         """Handle end of speech: top up trailing silence if needed, then commit."""
         if self._stopped:
             return
@@ -518,6 +524,7 @@ class _QwenASRSession(STTBackendSession):
         min_silence_ms = 100
         existing_ms = max(int(trailing_silence_ms or 0), 0)
         missing_ms = max(min_silence_ms - existing_ms, 0)
+        wait_ms = boundary_wait_ms(reason, observed_tail_ms=existing_ms)
 
         if missing_ms > 0:
             import numpy as np
@@ -532,10 +539,13 @@ class _QwenASRSession(STTBackendSession):
                 )
 
         logger.info(
-            "[STT][Tail] provider=qwen observed_tail_ms=%s injected_padding_ms=%s "
-            "declared_trim_ms=0 boundary_wait_ms=unknown",
+            "[STT][Tail] provider=qwen boundary_reason=%s observed_tail_ms=%s "
+            "injected_padding_ms=%s "
+            "declared_trim_ms=0 boundary_wait_ms=%s",
+            reason,
             existing_ms,
             missing_ms,
+            wait_ms,
         )
         self._audio_q.put_nowait(_COMMIT)
 

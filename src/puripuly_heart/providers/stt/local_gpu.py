@@ -15,6 +15,7 @@ from puripuly_heart.core.runtime.gpu_asr import (
     SharedGpuASRRuntime,
 )
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import STTBackend, STTBackendSession, STTBackendTranscriptEvent
 from puripuly_heart.domain.models import FinalLanguageRun
 
@@ -90,8 +91,13 @@ class _LocalGpuSTTSession(STTBackendSession):
         if samples.size:
             self._buffer.append(samples.copy())
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        _ = trailing_silence_ms
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        _ = (trailing_silence_ms, reason)
         if self._closed or self._stopping:
             return
         samples = np.concatenate(self._buffer) if self._buffer else np.empty((0,), dtype=np.float32)

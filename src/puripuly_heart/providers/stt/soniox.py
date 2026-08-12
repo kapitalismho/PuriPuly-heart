@@ -12,6 +12,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Sequence
 
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
     STTBackend,
     STTBackendSession,
@@ -406,7 +407,12 @@ class _SonioxSession(STTBackendSession):
             return
         await self._audio_q.put(pcm16le)
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
         if self._stopped:
             return
 
@@ -434,13 +440,16 @@ class _SonioxSession(STTBackendSession):
             configured_trim_ms,
             observed_tail_ms + injected_padding_ms,
         )
+        wait_ms = boundary_wait_ms(reason, observed_tail_ms=observed_tail_ms)
         logger.info(
-            "[STT][Tail] provider=soniox observed_tail_ms=%s injected_padding_ms=%s "
+            "[STT][Tail] provider=soniox boundary_reason=%s observed_tail_ms=%s "
+            "injected_padding_ms=%s "
             "declared_trim_ms=%s boundary_wait_ms=%s",
+            reason,
             observed_tail_ms,
             injected_padding_ms,
             declared_trim_ms,
-            observed_tail_ms,
+            wait_ms,
         )
         await self._audio_q.put(
             _FinalizeRequest(
