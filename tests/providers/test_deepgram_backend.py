@@ -48,6 +48,20 @@ async def test_deepgram_backend_requires_positive_connect_timeout() -> None:
 
 
 @pytest.mark.asyncio
+async def test_deepgram_backend_requires_positive_finalize_timeout() -> None:
+    backend = DeepgramRealtimeSTTBackend(
+        api_key="k",
+        language="en",
+        model="nova-3",
+        sample_rate_hz=16000,
+        finalize_timeout_s=0.0,
+    )
+
+    with pytest.raises(ValueError):
+        await backend.open_session()
+
+
+@pytest.mark.asyncio
 async def test_deepgram_backend_verify_api_key_handles_empty_and_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
