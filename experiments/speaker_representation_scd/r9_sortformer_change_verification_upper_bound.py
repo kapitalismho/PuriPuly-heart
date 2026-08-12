@@ -1265,11 +1265,28 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
     )
     targets = [float(value) for value in cfg["targets"]["false_events_per_hour"]]
     curve = _curve_for_scores(selection_cache, score_values, targets, cfg["curve_search"])
+    evaluation_curve: list[dict[str, Any]] = []
+    for row in curve:
+        threshold = float(row["threshold"])
+        metrics = all_cache.metrics(threshold)
+        primary = metrics["tolerances"]["250"]
+        evaluation_curve.append(
+            {
+                "threshold": threshold,
+                "prediction_count": metrics["prediction_count"],
+                "true_positive_count": primary["true_positive_count"],
+                "false_event_count": primary["false_event_count"],
+                "false_events_per_hour": primary["false_events_per_hour"],
+                "recall_250": primary["recall"],
+            }
+        )
     selected_points: dict[str, Any] = {}
     for target in targets:
         selected = _select_row(curve, target)
         selected_points[str(target)] = {
             "threshold": selected["threshold"],
+            "selection_false_events_per_hour": selected["false_events_per_hour"],
+            "selection_recall_250": selected["recall_250"],
             "metrics": all_cache.metrics(float(selected["threshold"])),
         }
     transfer: list[dict[str, Any]] = []
@@ -1389,6 +1406,9 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
         "fold_auroc": fold_auroc,
         "threshold_selection_excluded_ambiguous": True,
         "curve": curve,
+        "curve_kind": "selection_excluding_ambiguous",
+        "evaluation_curve": evaluation_curve,
+        "evaluation_curve_kind": "event_level_including_ambiguous",
         "selected_operating_points": selected_points,
         "threshold_transfer": transfer,
         "per_meeting_curves": per_meeting_curves,
@@ -1574,7 +1594,8 @@ def ceiling_summary(root: Path) -> Path:
         if not path.is_file():
             continue
         document = load_json(path)
-        curve = document["curve"]
+        curve = document["evaluation_curve"]
+        selection_curve = document.get("curve", curve)
         at_targets: dict[str, Any] = {}
         for target in cfg["targets"]["false_events_per_hour"]:
             selected = _select_row(curve, float(target))
@@ -1601,6 +1622,7 @@ def ceiling_summary(root: Path) -> Path:
             "at_targets": at_targets,
             "candidate_ceiling_fractions": fractions,
             "curve": curve,
+            "selection_curve": selection_curve,
         }
     pareto: dict[str, Any] = {"points": {}, "meaningful": None}
     if "a1" in arms:
@@ -1617,6 +1639,7 @@ def ceiling_summary(root: Path) -> Path:
             pareto["points"][str(float(target))] = {
                 "r8_recall_250": r8_recall,
                 "a1_recall_250": a1_recall,
+                "a1_evaluated_false_events_per_hour": a1_best["false_events_per_hour"],
                 "ratio": ratio,
             }
             if ratio >= float(cfg["outcome_a_pareto"]["minimum_ratio"]):
@@ -1817,6 +1840,11 @@ def report(root: Path) -> Path:
         "",
         "## Ceiling summary",
         "",
+        "Target columns select the best event-level (evaluation) curve point with evaluated false",
+        "events/hour at or below the target. Thresholds originate from the non-ambiguous selection",
+        "curve (plan section 6); event-level evaluation includes ambiguous candidates. Selection and",
+        "evaluation curves are both stored in the metrics artifacts.",
+        "",
         "| Arm | 1 FE/h | 5 FE/h | 10 FE/h | 20 FE/h | 50 FE/h | 100 FE/h | FE/h at 50% of ceiling | FE/h at 80% of ceiling |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
@@ -1886,10 +1914,14 @@ def report(root: Path) -> Path:
             "",
             "## Inherited-gate reference lines (context only, not continuation criteria)",
             "",
-            f"R9-A1 at the 10 FE/h reference point: Recall@250 "
-            f"{float(a1['reference_gate']['targets']['10.0']['recall_250'] or 0.0):.3f} (reference gate: >= 0.3).",
-            f"R9-A1 at the 20 FE/h reference point: Recall@250 "
-            f"{float(a1['reference_gate']['targets']['20.0']['recall_250'] or 0.0):.3f} (reference gate: >= 0.5).",
+            f"R9-A1 at the <=10 FE/h selection point (threshold chosen on non-ambiguous candidates; "
+            f"evaluated {float(a1['reference_gate']['targets']['10.0']['false_events_per_hour']):.2f} FE/h): "
+            f"Recall@250 {float(a1['reference_gate']['targets']['10.0']['recall_250'] or 0.0):.3f} "
+            f"(reference gate: >= 0.3).",
+            f"R9-A1 at the <=20 FE/h selection point (threshold chosen on non-ambiguous candidates; "
+            f"evaluated {float(a1['reference_gate']['targets']['20.0']['false_events_per_hour']):.2f} FE/h): "
+            f"Recall@250 {float(a1['reference_gate']['targets']['20.0']['recall_250'] or 0.0):.3f} "
+            f"(reference gate: >= 0.5).",
             f"20 FE/h stratum recall — overlap onset "
             f"{float(a1['reference_gate']['targets']['20.0']['stratum_recall'].get('overlap_onset') or 0.0):.3f}, "
             f"silence-gap change "
@@ -1920,7 +1952,8 @@ def report(root: Path) -> Path:
         for target, point in pareto["points"].items():
             lines.append(
                 f"- {target} FE/h: R8 {float(point['r8_recall_250']):.4f} vs R9-A1 "
-                f"{float(point['a1_recall_250']):.4f} (ratio {float(point['ratio']):.2f})"
+                f"{float(point['a1_recall_250']):.4f} (evaluated "
+                f"{float(point['a1_evaluated_false_events_per_hour']):.1f} FE/h, ratio {float(point['ratio']):.2f})"
             )
     if a1_diagnostic is not None:
         lines.extend(
