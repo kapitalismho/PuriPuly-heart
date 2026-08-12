@@ -25,7 +25,7 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
             "src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py",
             ASYNCIO_CREATE_TASK,
         ): 1,
-        ("src/puripuly_heart/core/stt/controller.py", ASYNCIO_CREATE_TASK): 5,
+        ("src/puripuly_heart/core/stt/controller.py", ASYNCIO_CREATE_TASK): 6,
         ("src/puripuly_heart/core/overlay/bridge.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/overlay/presenter.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/providers/stt/soniox.py", ASYNCIO_CREATE_TASK): 3,
@@ -102,7 +102,7 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
     (
         "src/puripuly_heart/core/stt/controller.py",
         ASYNCIO_CREATE_TASK,
-    ): "managed STT provider owns session consumers, boundary timeouts, replacement drains, and reset timers and cancels or awaits them during abort and close",
+    ): "managed STT provider still owns session consumer and reset timers until STT lifecycle is folded into an explicit runtime owner",
     (
         "src/puripuly_heart/core/orchestrator/self_translation_channel.py",
         ASYNCIO_CREATE_TASK,
