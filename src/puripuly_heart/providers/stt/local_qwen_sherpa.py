@@ -14,10 +14,6 @@ import numpy as np
 
 from puripuly_heart.core.audio.diagnostics import compute_audio_frame_metrics
 from puripuly_heart.core.audio.format import AudioFrameF32, pcm16le_bytes_to_float32
-from puripuly_heart.core.local_asr.trailing_silence import (
-    LocalASRTrailingSilenceTrim,
-    trim_local_asr_trailing_silence,
-)
 from puripuly_heart.core.local_qwen_runtime import (
     LocalQwenRuntimeBootstrapError,
     ensure_local_qwen_windows_runtime,
@@ -383,6 +379,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
         self._buffer_f32.append(samples.copy())
 
     async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
+        _ = trailing_silence_ms
         if self._closed or self._stopping or not self._decode_coordinator.accepting:
             return
 
@@ -392,14 +389,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
             else np.empty((0,), dtype=np.float32)
         )
         self._buffer_f32.clear()
-        trim = trim_local_asr_trailing_silence(
-            samples_f32,
-            sample_rate_hz=self.backend.sample_rate_hz,
-            trailing_silence_ms=trailing_silence_ms,
-        )
-        if self._diagnostics_enabled():
-            self._log_trim_diagnostic(trim)
-        self._decode_coordinator.enqueue(trim.samples_f32)
+        self._decode_coordinator.enqueue(samples_f32)
 
     async def _decode_samples(self, samples_f32: np.ndarray) -> str:
         if self._diagnostics_enabled():
@@ -552,23 +542,6 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 metrics.peak_db,
                 metrics.zero_ratio,
                 self.backend.language_hint,
-            )
-
-    def _log_trim_diagnostic(self, trim: LocalASRTrailingSilenceTrim) -> None:
-        with contextlib.suppress(Exception):
-            reported_seconds = (
-                "none"
-                if trim.reported_trailing_silence_ms is None
-                else f"{max(trim.reported_trailing_silence_ms, 0) / 1000.0:.3f}"
-            )
-            logger.info(
-                "[LocalASR][Trim] channel=%s model=%s backend=CPU audio_before_seconds=%.3f reported_trailing_silence_seconds=%s actual_trimmed_seconds=%.3f submitted_audio_seconds=%.3f",
-                self.backend.stream_label or "unknown",
-                self.backend.model_id,
-                trim.audio_ms_before / 1000.0,
-                reported_seconds,
-                trim.actual_trimmed_ms / 1000.0,
-                trim.submitted_audio_ms / 1000.0,
             )
 
     def _log_decode_done_diagnostics(

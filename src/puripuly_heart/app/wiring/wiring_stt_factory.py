@@ -674,7 +674,6 @@ def create_stt_backend_from_resolved_config(
             device_id=gpu_device_id,
             sample_rate_hz=config.sample_rate_hz,
             source_mode=config.source_mode,
-            diagnostics_enabled=diagnostics_enabled,
             language_hint=(
                 None
                 if config.source_mode == "auto"

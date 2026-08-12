@@ -1654,9 +1654,6 @@ def test_create_stt_backend_from_resolved_gpu_provider_fails_without_cpu_fallbac
 def test_peer_qwen_gpu_auto_omits_hint_while_manual_uses_qwen_code(tmp_path: Path) -> None:
     runtime = object()
 
-    def diagnostics_enabled() -> bool:
-        return True
-
     automatic = _resolved_stt_config(
         channel="peer",
         provider="local_qwen_gpu",
@@ -1672,7 +1669,6 @@ def test_peer_qwen_gpu_auto_omits_hint_while_manual_uses_qwen_code(tmp_path: Pat
         secrets=InMemorySecretStore(),
         gpu_runtime=runtime,
         gpu_model_path=tmp_path / "model.gguf",
-        diagnostics_enabled=diagnostics_enabled,
     )
     manual_backend = wiring_module.create_stt_backend_from_resolved_config(
         manual,
@@ -1683,7 +1679,6 @@ def test_peer_qwen_gpu_auto_omits_hint_while_manual_uses_qwen_code(tmp_path: Pat
 
     assert automatic_backend.source_mode == "auto"
     assert automatic_backend.language_hint is None
-    assert automatic_backend.diagnostics_enabled is diagnostics_enabled
     assert manual_backend.source_mode == "manual"
     assert manual_backend.language_hint == "ja"
 

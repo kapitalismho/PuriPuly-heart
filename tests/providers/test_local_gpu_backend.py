@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from pathlib import Path
 
 import numpy as np
@@ -157,7 +156,7 @@ async def test_session_submits_float_audio_at_speech_end_without_blocking() -> N
     await backend.close()
 
 
-async def test_gpu_qwen_submits_audio_with_fixed_trailing_silence_tail() -> None:
+async def test_gpu_qwen_preserves_full_audio_on_speech_end() -> None:
     runtime = FakeSharedGpuRuntime()
     backend = LocalGpuSTTBackend(
         runtime=runtime,
@@ -175,48 +174,7 @@ async def test_gpu_qwen_submits_audio_with_fixed_trailing_silence_tail() -> None
 
     assert event == STTBackendTranscriptEvent(text="hello", is_final=True)
     assert len(runtime.submissions) == 1
-    assert np.array_equal(runtime.submissions[0][1], samples[:11_648])
-    await session.close()
-    await backend.close()
-
-
-async def test_gpu_trim_diagnostic_uses_detailed_logging_toggle(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    detailed = False
-    runtime = FakeSharedGpuRuntime()
-    backend = LocalGpuSTTBackend(
-        runtime=runtime,
-        channel="peer",
-        model_path=Path("model.gguf"),
-        model_id="qwen3-asr-1.7b",
-        device_id="auto",
-        diagnostics_enabled=lambda: detailed,
-    )
-    session = await backend.open_session()
-
-    with caplog.at_level(
-        logging.INFO,
-        logger="puripuly_heart.providers.stt.local_gpu",
-    ):
-        await session.send_audio_f32(np.ones(16_000, dtype=np.float32))
-        await session.on_speech_end(trailing_silence_ms=400)
-        await asyncio.wait_for(anext(session.events()), timeout=0.5)
-        assert not any("[LocalASR][Trim]" in message for message in caplog.messages)
-
-        detailed = True
-        await session.send_audio_f32(np.ones(16_000, dtype=np.float32))
-        await session.on_speech_end(trailing_silence_ms=400)
-        await asyncio.wait_for(anext(session.events()), timeout=0.5)
-
-    diagnostic = next(message for message in caplog.messages if "[LocalASR][Trim]" in message)
-    assert "channel=peer" in diagnostic
-    assert "model=qwen3-asr-1.7b" in diagnostic
-    assert "backend=Vulkan" in diagnostic
-    assert "audio_before_seconds=1.000" in diagnostic
-    assert "reported_trailing_silence_seconds=0.400" in diagnostic
-    assert "actual_trimmed_seconds=0.272" in diagnostic
-    assert "submitted_audio_seconds=0.728" in diagnostic
+    assert np.array_equal(runtime.submissions[0][1], samples)
     await session.close()
     await backend.close()
 

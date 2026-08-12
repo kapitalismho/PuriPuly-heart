@@ -178,7 +178,7 @@ def test_direct_local_cpu_factory_targets_only_selected_model(
         LocalParakeetJapaneseSherpaSTTBackend,
     ],
 )
-async def test_direct_local_cpu_models_submit_equivalently_trimmed_audio(
+async def test_direct_local_cpu_models_preserve_full_audio_on_speech_end(
     monkeypatch: pytest.MonkeyPatch,
     backend_type: type[LocalQwenSherpaSTTBackend],
 ) -> None:
@@ -206,7 +206,7 @@ async def test_direct_local_cpu_models_submit_equivalently_trimmed_audio(
 
     assert event == STTBackendTranscriptEvent(text="transcript", is_final=True)
     assert len(decoded) == 1
-    assert np.array_equal(decoded[0], samples[:11_648])
+    assert np.array_equal(decoded[0], samples)
     await session.close()
     await backend.close()
 
@@ -357,7 +357,7 @@ async def test_cpu_auto_strict_gate_resolves_once_and_awaits_delegate_close(
         ("zh-CN", LOCAL_STT_MODEL_ID),
     ],
 )
-async def test_cpu_auto_each_delegate_submits_common_trimmed_audio(
+async def test_cpu_auto_each_delegate_preserves_full_audio_on_speech_end(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     source_language: str,
@@ -397,7 +397,7 @@ async def test_cpu_auto_each_delegate_submits_common_trimmed_audio(
     assert backend.resolved_model_id == expected_model_id
     assert len(decoded) == 1
     assert decoded[0][0] == expected_model_id
-    assert np.array_equal(decoded[0][1], samples[:11_648])
+    assert np.array_equal(decoded[0][1], samples)
     await session.close()
     await backend.close()
 
@@ -604,47 +604,6 @@ async def test_local_cpu_attempt_diagnostic_separates_queue_wait_and_decode_rtf(
     assert "queue_wait_seconds=0.250" in attempt
     assert "private transcript" not in attempt
     await session.close()
-
-
-@pytest.mark.asyncio
-async def test_local_cpu_trim_diagnostic_reports_required_durations(
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    backend = LocalQwenSherpaSTTBackend(
-        model_dir=Path("C:/models/qwen"),
-        stream_label="self",
-        diagnostics_enabled=lambda: True,
-    )
-
-    async def ensure_recognizer() -> object:
-        return object()
-
-    async def decode(_samples: np.ndarray) -> str:
-        return "transcript"
-
-    monkeypatch.setattr(backend, "_ensure_recognizer", ensure_recognizer)
-    monkeypatch.setattr(backend, "decode_f32", decode)
-    session = await backend.open_session()
-    await session.send_audio_f32(np.ones(16_000, dtype=np.float32))
-
-    with caplog.at_level(
-        logging.INFO,
-        logger="puripuly_heart.providers.stt.local_qwen_sherpa",
-    ):
-        await session.on_speech_end(trailing_silence_ms=400)
-        await anext(session.events())
-
-    diagnostic = next(message for message in caplog.messages if "[LocalASR][Trim]" in message)
-    assert "channel=self" in diagnostic
-    assert f"model={LOCAL_STT_MODEL_ID}" in diagnostic
-    assert "backend=CPU" in diagnostic
-    assert "audio_before_seconds=1.000" in diagnostic
-    assert "reported_trailing_silence_seconds=0.400" in diagnostic
-    assert "actual_trimmed_seconds=0.272" in diagnostic
-    assert "submitted_audio_seconds=0.728" in diagnostic
-    await session.close()
-    await backend.close()
 
 
 @pytest.mark.asyncio
