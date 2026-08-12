@@ -4,16 +4,14 @@
   "experiment_id": "speaker_representation_scd_v1",
   "authority": {
     "path": "experiments/speaker_representation_scd/EXPERIMENT_PLAN.en.md",
-    "sha256": "32cfea1779be54b7db2b7094bc35da928b74514d47d2fdd96581ef18d7f84aec"
+    "sha256": "bf1727a62dcd9c8c28cc095c46ebeaaab8e3f723a0c1c6440ed19a9968d590be"
   },
-  "authorized_sequence": ["R2", "R3", "R4", "candidate_selection"],
+  "authorized_sequence": ["R2-L", "R3", "R4", "candidate_selection"],
   "data_scope": {
     "payload_tier": "development_known_only",
-    "required_source_ids": [
-      "legacy-common-gt-v1",
-      "zeroth-korean-development",
-      "jvs-development"
-    ],
+    "required_source_ids": ["legacy-common-gt-v1"],
+    "excluded_source_ids": ["zeroth-korean-development", "jvs-development", "D5"],
+    "new_corpus_acquisition": false,
     "future_test_payload_access": false,
     "legacy_eres_final_rerun": false,
     "legacy_lseend_rerun": false
@@ -24,9 +22,9 @@
     "hop_samples": 1600
   },
   "r3": {
-    "maximum_shared_anchor_count": 4000,
-    "maximum_positive_anchor_count": 2000,
-    "maximum_negative_or_nuisance_anchor_count": 2000,
+    "maximum_shared_anchor_count": 810,
+    "maximum_positive_anchor_count": 450,
+    "maximum_negative_or_nuisance_anchor_count": 360,
     "contexts_ms": [100, 300, 500],
     "all_valid_representative_layers_or_taps": true,
     "shared_rows_across_encoders": true,
@@ -86,7 +84,9 @@
     "claim_level": "exploratory_candidate_selection",
     "bootstrap_replicates": 1000,
     "confirmatory_significance_claims": false,
-    "future_test_remains_sealed": true
+    "future_test_selected_or_accessed": false,
+    "claim_languages": ["English", "Mandarin"],
+    "absent_language_claims_forbidden": ["Korean", "Japanese", "broad_multilingual"]
   },
   "resource_ceiling": {
     "max_total_wall_hours": 24,
@@ -101,5 +101,5 @@
     "handoff_training",
     "distillation"
   ],
-  "self_sha256": "cdf0ec32017ed1636e31642a4c36b81830db5394dc35c92fe21478044382022d"
+  "self_sha256": "78719c6b10392b8d051f8d90884b73d4ceea845275966cbe8bfa7ae0d2710338"
 }

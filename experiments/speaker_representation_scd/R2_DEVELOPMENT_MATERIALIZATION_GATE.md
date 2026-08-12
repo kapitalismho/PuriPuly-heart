@@ -1,158 +1,99 @@
-# R2 Development-Only Acquisition and Materialization Gate
+# R2-L Legacy Common-GT Validation and Coordinate Gate
 
 ## Status
 
-- Scope: development-known data only
-- Execution state: Zeroth archive acquired; JVS acquisition pending after official Google Drive quota failure
-- Upstream checkpoint: accepted R1 commit `ac35b473e4ff932a3ab358a011ad9b21cbf63ca6`
-- Confirmatory state: sealed
-- Training state: forbidden
+- Scope: exact existing legacy common-GT data only
+- Upstream checkpoint: accepted R1 model acquisition, four-encoder smoke, and extractor parity
+- Current action: adapt and run legacy-only data validation and coordinate materialization
+- New corpus download or archive extraction: forbidden
+- Neural inference: forbidden until a separate owner approval
+- Training: forbidden
 
-This checkpoint opens only the path required to construct the R2 development waveform inventory
-and deterministic continuous-window coordinate ledger. It does not authorize pooled-feature
-extraction, cache calibration, confirmatory access, or training. The archive and materialization
-commands must not be run until this exact gate candidate receives independent acceptance and is
-preserved in a local commit.
+This document supersedes the former Zeroth/JVS acquisition-oriented R2 procedure. The old
+`r2_execute archives` path and any public-corpus materialization path are historical implementation
+artifacts and must not be run for the current study.
 
-## Development population
+## Input Population
 
-| Source | Materialized development population | Relationship to the existing experiment |
-| --- | --- | --- |
-| Legacy common-GT | The 695 `diagnostic_dev` episodes in the exact 804-row manifest, resolving to 616 source identities and 600 unique WAV bytes | Exact audio/GT bridge used by the ERes/LS-EEND Phase-4 comparison; development-known only |
-| Zeroth-Korean | The first 20 `train_data_01` speaker IDs sorted by `(SHA-256(ID), ID)`, after proving train/test speaker disjointness | Adds controlled Korean development evidence; official test remains confirmatory |
-| JVS | The 20 fixed development speakers in the R0 split contract, across normal, non-parallel, whisper, and falsetto audio | Adds controlled Japanese and same-speaker nuisance evidence; the reserved 20 speakers remain confirmatory |
+| Item | Frozen identity |
+| --- | --- |
+| Manifest | `experiments/speaker_turn_boundary/results/turn_episode_v1/episode_manifest_dev.json` |
+| Manifest byte SHA-256 | `a5df5e56c2917ba174fca7892fbaa092f2b57705cad7a77bf9a347ba94cddfee` |
+| Canonical content SHA-256 | `deb1713cd581c93cc13c47103643041c7551993985379869cfa0ca9a407dff68` |
+| Total episodes | 804 |
+| Diagnostic episodes | 695 |
+| Source identities | 616 |
+| Unique WAV bytes | 600 |
+| Candidate inventory | 450 positive and 360 negative rows |
+| Existing matched pairs | 313 |
 
-The legacy panel is not resplit and is not promoted to confirmatory evidence. Its existing
-thresholds, detector states, feature caches, and shortlist conclusions are not imported.
+These are the same audio and GT identities used by the existing ERes/LS-EEND comparison. The panel
+is not resplit and is not promoted to confirmatory evidence. Legacy result files are read-only.
 
-## Official public-source identity
+## Required R2-L Work
 
-Zeroth-Korean is acquired from the official OpenSLR-listed ELDA mirror because the SLR40 external
-GCS URL returns HTTP 403. The gate records the returned archive byte count, SHA-256, final URL, and
-selected HTTP identity headers before any member is materialized.
+1. Revalidate the exact manifest byte/content hashes.
+2. Resolve every referenced legacy WAV and annotation and verify its recorded identity.
+3. Import or derive the minimum independent inventory needed by R3/R4: active-speaker sets, event
+   classes, positive/negative rows, pair blocks, source/session blocks, and missingness.
+4. Freeze at most the eligible existing 810 candidate rows for R3 while preserving shared rows
+   across all four encoders. Do not manufacture replacement rows for absent conditions.
+5. Freeze an R4 source subset of at most six source hours before any new encoder score is observed.
+6. Generate trailing-window coordinates for 100, 300, and 500 ms contexts at a 1,600-sample
+   (100 ms) hop.
+7. Use the accepted R1 smoke measurements plus the completed coordinate ledger to forecast actual
+   R3/R4 wall time, peak memory, and derived-cache storage.
+8. Report exact R3/R4 inputs, model/layer/context grids, commands, and forecast to the owner, then
+   stop for explicit approval.
 
-JVS is acquired from the 3.5 GB Google Drive file linked by the official JVS project page. The
-fixed Drive file ID is `19oAw8wWn3Y7z6CKChRdAyGOB9yupL_Xt`. JVS audio remains restricted to
-the published academic/non-commercial research terms and is not product evidence. Acquisition
-uses `Range: bytes=0-` and accepts HTTP 206 only when `Content-Range` proves that the response
-covers the complete file from byte zero through `total - 1`. Google Drive currently returns its
-quota HTML page to both plain and complete-file range requests, so execution remains paused until
-the provider again serves a full response. Bounded partial ranges are not assembled to circumvent
-that quota.
+R2-L may reference the existing WAVs in place when stable identity and read-only access can be
+proven. Canonical copies in the external experiment cache are allowed only when required for stable
+addressing; copying existing bytes is not corpus acquisition.
 
-Neither release publishes a checksum used by this repository. The first supervised acquisition
-therefore freezes the exact downloaded archive bytes in the archive receipt. The failed
-`ceedae35b2b76d0bafd12af426efe85e` attempt completed Zeroth before JVS returned Google's quota
-page, so the retry may reuse only that exact 10,339,720,618-byte Zeroth artifact with SHA-256
-`6e109897f4d866eb1a3d31cbb2220c0b5e3dc74704208189ecc3bec787740e5f` and its self-hash-valid
-aborted usage receipt. Every other pre-existing final archive or partial file remains rejected.
+## Coordinate Contract
 
-## Combined-archive isolation
+For each eligible waveform or bounded source region, the observation uses a causal trailing window
+ending at frontier `t`. Context is one of 1,600, 4,800, or 8,000 samples. Frontiers advance by
+exactly 1,600 samples. Padding is not observed audio, and coordinates that cannot supply the full
+required context are excluded with a recorded reason.
 
-The Zeroth and JVS public archives contain both development-eligible and reserved material. The
-archive itself may be downloaded and its member names may be enumerated because deterministic
-speaker selection requires release metadata. Payload reads are stricter:
-
-- Zeroth payload reads are permitted only for selected `train_data_01` FLAC members.
-- No `test_data_01` member payload may be opened.
-- JVS payload reads are permitted only for the fixed 20 development speakers and the four frozen
-  condition directories.
-- No reserved JVS speaker member payload may be opened.
-- Absolute paths, parent traversal, Windows drive paths, backslashes, links, devices, duplicate
-  names, and case-colliding names fail closed before materialization.
-
-Before any selected payload is opened, archive metadata must establish the official Zeroth
-population of 105 train and 10 test speakers and the complete JVS population of 100 speakers.
-Every JVS speaker must expose exactly 100 `parallel100`, 30 `nonpara30`, 10 `whisper10`, and 10
-`falsetto10` WAV members. These release inventories and the fixed development/reserved selections
-are preserved in the archive and materialization receipts.
-
-The combined archives remain opaque source artifacts. Their mere storage does not make their
-reserved members development data and does not authorize later confirmatory use.
-
-## Canonical waveform contract
-
-Every materialized waveform is a complete mono, signed 16-bit PCM WAV at 16 kHz. Zeroth FLAC is
-decoded without a sample-rate change. JVS 24 kHz PCM is converted with the frozen
-`torchaudio.functional.resample` Kaiser-sinc parameters in the machine-readable gate.
-
-The legacy source copies must match the exact SHA-256 already present in the episode manifest.
-Each canonical waveform is represented exactly once in
-`data/r2/development/waveform_inventory.jsonl`, with the full PCM range from sample zero through
-`num_samples` marked eligible. Speaker, condition, source-member, and legacy-session mappings are
-kept separately in `source_metadata.jsonl` so the forecast inventory schema remains stable.
-
-## Coordinate contract
-
-For every canonical waveform, one JSONL shard is generated for the reduced set of trailing
-windows at 100, 300, and 500 ms. The first frontier is
-`eligible_start + context`; subsequent frontiers advance by exactly 1600 samples (100 ms) through
-the eligible end. The existing R1 forecast code independently regenerates every expected row and
-rejects omissions, additions, reordering, altered frontiers, and waveform-binding changes.
-
-No encoder is loaded and no neural inference occurs in R2 materialization.
-
-## Execution and resource boundary
-
-The only public entrypoint is:
-
-```text
-python -m experiments.speaker_representation_scd.r2_execute archives
-python -m experiments.speaker_representation_scd.r2_execute materialize
-```
-
-Both actions reuse the accepted experiment-wide Windows Job Object and exclusive execution lease.
-They run sequentially with one worker, eight CPU threads, a 24 GiB hard job-memory ceiling, a
-24-hour per-action ceiling, a 24-hour cumulative reduced-screen ceiling, and continuous fail-closed detection of
-the legacy experiment. Every authoritative action receipt requires one matching completed usage
-attestation.
-
-The storage gates remain 25 GiB for source downloads, 20 GiB for derived cache, 50 GiB for the
-external root, and at least 55 GiB free before an action. The external cache remains outside the
-repository on `C:`. Before materialization, selected member metadata is used to project canonical
-PCM bytes and all coordinate rows. Each output is reserved against both ceilings before writing,
-and final filesystem usage is checked again before the action can complete.
+The ledger must bind each coordinate to its source identity, WAV SHA-256, source sample interval,
+context, frontier, event/negative label, and block identity. The same coordinate rows are consumed
+by every encoder.
 
 ## Outputs
 
-Archive acquisition produces:
+The implementation may retain the existing R2 external-cache namespace, but current receipts must
+identify the source scope as `legacy-common-gt-v1` only. At minimum it produces:
 
 ```text
-manifests/r2/development/development_archive_receipt.json
-sources/r2/development/zeroth-korean-development/zeroth_korean.tar.gz
-sources/r2/development/jvs-development/jvs_ver1.zip
+manifests/r2/legacy_common_gt/validation_receipt.json
+manifests/r2/legacy_common_gt/coordinate_ledger.json
+data/r2/legacy_common_gt/waveform_inventory.jsonl
+data/r2/legacy_common_gt/source_metadata.jsonl
+data/r2/legacy_common_gt/coordinates/*.jsonl
+manifests/r2/legacy_common_gt/reduced_r3_r4_forecast.json
 ```
 
-Development materialization produces:
+Exact names may be adjusted minimally to fit the current harness, but the source scope and receipt
+semantics must remain unambiguous.
+
+## Explicitly Disabled
 
 ```text
-manifests/r2/development/development_acquisition_receipt.json
-manifests/r2/development/development_coordinate_ledger.json
-manifests/r2/development/development_materialization_receipt.json
-data/r2/development/waveform_inventory.jsonl
-data/r2/development/source_metadata.jsonl
-data/r2/development/coordinates/<source>/<waveform>.jsonl
-sources/r2/development/<source>/waveforms/*.wav
+Zeroth/JVS archive download or extraction     no
+any new public-corpus acquisition             no
+D5 selection or access                       no
+ERes-final inference rerun                    no
+LS-EEND inference rerun                       no
+pooled neural feature extraction              no, until owner approves R3/R4
+full hidden-state persistence                 no
+training or learned probes                    no
+production changes                            no
 ```
 
-The materialization receipt binds the archive receipt, acquisition receipt, coordinate ledger,
-gate identity, execution-code manifest, run provenance, and completed supervision identity.
+## Exit and Approval Boundary
 
-## Explicitly disabled
-
-```text
-confirmatory audio or annotation payload access  no
-VoxConverse or AISHELL-4 acquisition              no
-Zeroth official-test payload extraction           no
-reserved JVS speaker payload extraction            no
-cache calibration                                  no
-pooled feature extraction                          no
-full hidden-state extraction                       no
-neural inference                                   no
-training                                           no
-production changes                                 no
-```
-
-The next checkpoint after accepted and successful R2 materialization is a separate, minimal cache
-calibration gate. Full extraction remains blocked until the resulting measured forecast is
-independently reviewed and accepted.
+R2-L is complete only when the legacy identities and reduced coordinate ledger validate, the cost
+forecast is available, and the owner has received the exact proposed R3/R4 invocation. The worker
+must stop at that point. Only an explicit owner approval may start neural R3/R4 measurement.

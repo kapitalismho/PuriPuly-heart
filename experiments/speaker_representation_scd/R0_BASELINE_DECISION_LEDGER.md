@@ -1,23 +1,34 @@
 # R0 Baseline and Decision Ledger
 
+## Owner Amendment — 2026-08-11
+
+The executable dataset scope is now the exact existing legacy common-GT panel only. Any sections
+below that describe Zeroth-Korean, JVS, D4 acquisition, or D5 reservation are retained solely as
+historical design context and do not authorize an action. The current continuation is
+`R2-L -> reduced R3 -> reduced R4 -> candidate selection`.
+
+Existing ERes2NetV2 final-embedding and LS-EEND measurements are reused, not rerun. The four new
+representation encoders are measured on the shared legacy audio/GT rows after R2-L validation and
+explicit owner approval of the reported neural commands and cost.
+
 ## Status
 
 - Experiment: `speaker_representation_scd_v1`
 - Goal: `GOAL-EXPERIMENT-PLAN-EN`
 - Authority: `EXPERIMENT_PLAN.en.md`
-- Authority SHA-256: `32cfea1779be54b7db2b7094bc35da928b74514d47d2fdd96581ef18d7f84aec`
+- Authority SHA-256: `bf1727a62dcd9c8c28cc095c46ebeaaab8e3f723a0c1c6440ed19a9968d590be`
 - Audit date: `2026-08-10`
-- Ledger status: working R0 input, not an accepted evidence boundary
-- Current checkpoint: R0 protocol candidate repair
+- Ledger status: historical audit plus current owner amendment
+- Current checkpoint: R2-L legacy common-GT validation
 
 ## Owner Amendment — Reduced Pre-Training Screen
 
-The current execution now ends at `R2 → bounded R3 → reduced R4 → candidate selection`. Historical
-R6-Z and D5 planning below is retained only as provenance for a future learned-head test reserve;
-it no longer authorizes zero-shot confirmatory acquisition or evaluation. The reduced primary grid
-uses 100/300/500 ms R3 contexts, at most 4,000 shared anchors, one promoted layer/tap per encoder,
-a 300 ms matched R4 context, a 100 ms primary hop, and at most six source hours. Existing ERes-final
-and LS-EEND results may be normalized on the shared development GT but shall not be rerun.
+The current execution ends at `R2-L -> bounded R3 -> reduced R4 -> candidate selection` and uses
+only the legacy common-GT panel. Historical R6-Z, D4, and D5 planning below is provenance only. The
+reduced primary grid uses 100/300/500 ms R3 contexts, at most the 810 existing candidate rows, one
+promoted layer/tap per encoder, a 300 ms matched R4 context, a 100 ms primary hop, and at most six
+source hours. Existing ERes-final and LS-EEND results may be normalized on the shared development GT
+but shall not be rerun.
 
 This ledger maps reusable local assets, forbidden inheritance, environment constraints, model
 metadata, and the owner decisions required before an R0 contract can be frozen. It does not
@@ -164,12 +175,11 @@ outputs or contend for its compute resources.
 - A new speaker/session identity ledger is required before any development/confirmatory split can
   be frozen.
 
-### 4.3 Public-only D4/D5 decision matrix
+### 4.3 Superseded public-only D4/D5 design — historical only
 
-The detailed decision is recorded in `R0_DATASET_DECISION.md`, SHA-256
-`a326ea469cd5907b3374b7004aca3e5c7ba3a3b7763dd122e4170013c812f0e2`.
-It does not authorize download, waveform inspection, or confirmatory-label access. Exact release
-file hashes are added to the R0 source ledger when acquisition is separately authorized.
+The table below records the superseded design considered before the 2026-08-11 owner amendment.
+It is not the current `R0_DATASET_DECISION.md` and authorizes no download, extraction, waveform
+inspection, split reservation, or confirmatory access.
 
 | Candidate | Proposed role | Useful evidence | Limitation / required guard |
 | --- | --- | --- | --- |
@@ -181,11 +191,9 @@ file hashes are added to the R0 source ledger when acquisition is separately aut
 | JVS hash-reserved speakers | D4 development or D5 controlled Japanese/nuisance candidate | 100 speakers with normal, whisper, and falsetto recordings | Audio permits non-commercial research but is not generally product-cleared; read/studio speech cannot support natural-handoff claims |
 | Unused AliMeeting official sessions | D5 same-domain Mandarin sensitivity | Natural public meeting domain matching the existing Mandarin panel | Same-corpus generalization is weaker than AISHELL-4; must exclude all eight legacy session IDs and connected speakers |
 
-Current decision: use the legacy common-GT panel and public development speakers only for the
-bounded R3/R4 screen. Preserve the complete VoxConverse v0.3 official test partition, eight
-hash-selected AISHELL-4 official test sessions, all Zeroth-Korean official test speakers, and 20
-fixed JVS speakers as a future learned-head test-reserve design; do not acquire or score those
-reserved payloads in the current execution.
+Current decision: use only the legacy common-GT panel for the bounded R3/R4 screen. Do not acquire,
+extract, reserve, or score any new public-corpus payload. Future test-data selection is deferred
+until a learned-head study is separately approved.
 
 Metadata sources:
 
@@ -290,11 +298,11 @@ decisions are now frozen in authority Section 30 and the machine contracts.
 
 | ID | Open decision | Current evidence | Recommendation | Status |
 | --- | --- | --- | --- | --- |
-| D30-1 | D4 recruitment scale and language combinations | The owner cannot collect private data | Replace recruitment with approved public multilingual development data and limit claims to observed public-language/scenario coverage | Resolved by owner |
-| D30-2 | New untouched confirmatory data | AMI is GT-exposed in tracked coverage artifacts; only public data are available | Use the complete VoxConverse v0.3 test partition plus fixed AISHELL-4/Zeroth-Korean/JVS rules in `R0_DATASET_DECISION.md` | Resolved; AMI permanently development-known |
+| D30-1 | Current data scope | The owner cannot collect private data and removed new corpus acquisition | Use only the exact legacy common-GT panel and limit claims to observed source/language/scenario coverage | Resolved by owner amendment |
+| D30-2 | New untouched confirmatory data | The current work stops before training | Defer dataset selection and acquisition until a learned-head study is separately approved | Deferred outside current scope |
 | D30-3 | Primary false-event budget | Existing development sessions are too small for precise rate claims | Use integer false-event Pareto frontier as primary during development; retain `1/hour` as a labeled reference and freeze a rate operating point only if preflight proves estimability | Resolved by owner resume |
 | D30-4 | Primary R5 head | The owner limited the current execution to pre-training zero-shot work | Defer all learned probes/heads and their architecture decision to separate approval after R4 candidate selection | Resolved as not applicable to current execution |
-| D30-5 | Hardware and ceilings | Local host has no visible CUDA and a legacy CPU experiment is active | Sequential CPU only after legacy release; one model/worker, 8 threads, 24 GiB RAM, 25 GiB source, 20 GiB cache, 50 GiB external storage, 24 total and 8 per-model wall hours for the reduced screen; measured forecast required | Resolved by owner amendment |
+| D30-5 | Hardware and ceilings | Local host has no visible CUDA and a legacy CPU experiment may be active | Sequential CPU only after legacy release; one model/worker, 8 threads, 24 GiB RAM, no new source download, 20 GiB cache, 50 GiB external storage, 24 total and 8 per-model wall hours; measured legacy-only forecast and owner approval required | Resolved by owner amendment |
 | D30-6 | Restricted-license teachers | mHuBERT is non-commercial; Microsoft model product status is unresolved | Include restricted/unresolved models as research-only candidates; exclude product claims until a separate legal gate records product_allowed | Resolved by owner resume |
 | D30-7 | LS-EEND contextual table | The owner authorized reuse of the exact ERes/LS-EEND measurement data | Use manifest byte SHA-256 `a5df5e56c2917ba174fca7892fbaa092f2b57705cad7a77bf9a347ba94cddfee` for development context; no new LS-EEND or ERes-final inference is authorized | Resolved by owner amendment |
 

@@ -1,20 +1,20 @@
 # Speaker Representation SCD
 
-This directory contains an experiment-only, public-data study of frozen speaker-change
+This directory contains an experiment-only study of frozen speaker-change
 representations. It is independent from the production runtime and from the legacy
 `speaker_turn_boundary` result namespace.
 
-The current authorized sequence is R0, R1, R2, reduced R3, reduced R4, and candidate selection.
-R3 uses at most 4,000 shared anchors at 100/300/500 ms. R4 uses one promoted layer/tap per encoder,
+The current authorized sequence is completed R0/R1, R2-L, reduced R3, reduced R4, and candidate
+selection. R2-L uses only the already available legacy common-GT panel. R3 uses at most its 810
+eligible positive/negative candidate rows at 100/300/500 ms. R4 uses one promoted layer/tap per encoder,
 a common 300 ms primary context, a 100 ms primary hop, and at most six source hours; only the top
 two encoders may receive a 50 ms sensitivity. It does not authorize model training, a learned probe
 or head, confirmatory/test evaluation, fine-tuning, product wiring, or deployment.
 
-The legacy ERes/LS-EEND common-GT manifest is reused only as `development_known`. Public future-test
-partitions remain sealed and are not opened, materialized, or scored in the current scope; dedicated
-future-test releases are not downloaded. An inseparable Zeroth/JVS combined archive may be stored
-opaquely for development extraction, but reserved members remain unopened. Future-test evaluation
-is deferred until a separately approved learned-head study. LS-EEND is eligible only through
+The legacy ERes/LS-EEND common-GT manifest is the sole `development_known` experimental dataset.
+Zeroth-Korean, JVS, D5, and all other new corpus acquisition are excluded. Preserved external
+download attempts are historical only and must not be used or deleted. Future-test selection is
+deferred until a separately approved learned-head study. LS-EEND is eligible only through
 its existing event-level results and is never rerun or used for representation AUC/EER or layer ranking.
 
 Validate the R0 contracts from the repository root:
@@ -23,17 +23,18 @@ Validate the R0 contracts from the repository root:
 uv run python -m experiments.speaker_representation_scd.validate_r0
 ```
 
-A valid R0 bundle may still report neural execution and future-test access as blocked. That is
-intentional: weight/corpus acquisition, legacy-run release, a measured smoke forecast, extractor
-parity, and a reduced-scope R3/R4 approval are later gates.
+A valid R0 bundle may still report neural execution as blocked. R1 model acquisition, four-encoder
+smoke, and parity are already complete; R2-L legacy validation and a measured reduced R3/R4
+forecast are the next gate.
 
 Primary documents:
 
 - `EXPERIMENT_PLAN.en.md`: authority and full scientific plan
 - `R0_BASELINE_DECISION_LEDGER.md`: existing-work audit and inheritance boundary
-- `R0_DATASET_DECISION.md`: public-only dataset and split decision
+- `R0_DATASET_DECISION.md`: legacy-common-GT-only dataset decision
 - `configs/protocol/`: machine-readable protocol and safety ceilings
-- `configs/protocol/reduced_pretraining_screen.json`: owner-amended immediate R2/R3/R4 scope
+- `configs/protocol/reduced_pretraining_screen.json`: owner-amended immediate R2-L/R3/R4 scope
+- `NEXT_AGENT_HANDOFF.md`: exact continuation point, approval boundary, and worker instructions
 - `data/`: source, split, and confirmatory-access contracts
 - `models/registry.json`: immutable model identities and unresolved extraction blockers
 

@@ -1,0 +1,63 @@
+{
+  "artifact_role": "r5_frozen_causal_head_config",
+  "context_ms": 300,
+  "development_false_event_budget_per_hour": 5.0,
+  "hop_samples": 1600,
+  "linear": {
+    "batch_size": 64,
+    "learning_rate": 0.001,
+    "max_epochs": 30,
+    "patience": 5
+  },
+  "models": {
+    "eres2netv2-standard-prepool": "S3",
+    "mhubert-147": "L1",
+    "unispeech-sat-base-plus": "L1",
+    "wavlm-base-plus": "L3"
+  },
+  "schema_version": 1,
+  "seeds": [0, 1, 2],
+  "sequence": {
+    "confirmation_hops": [1, 2, 3],
+    "end_offset_ms": 1500,
+    "positive_offsets_ms": [100, 200, 300],
+    "start_offset_ms": -1500,
+    "step_ms": 100,
+    "thresholds": [
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.25,
+      0.3,
+      0.35,
+      0.4,
+      0.45,
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8,
+      0.85,
+      0.9,
+      0.95
+    ]
+  },
+  "split": {
+    "dev_fraction": 0.2,
+    "search_trials": 4096,
+    "seed": 20260811
+  },
+  "tcn": {
+    "batch_size": 16,
+    "dilations": [1, 2, 4],
+    "dropout": 0.1,
+    "hidden_dimension": 256,
+    "kernel_size": 3,
+    "learning_rate": 0.001,
+    "max_epochs": 30,
+    "patience": 5
+  }
+}

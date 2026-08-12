@@ -1,0 +1,42 @@
+{
+  "batch_size": 256,
+  "development_false_event_targets_per_hour": [1, 5, 10, 20],
+  "duplicate_suppression_ms": 200,
+  "early_stopping_patience": 4,
+  "epochs": 30,
+  "evidence_mode": "fast_internal_development_known",
+  "experiment_id": "fixed_lag_local_segmentation_r7b_v1",
+  "folds": [
+    ["alimeeting_R8001_M8004", "ami_IS1009a"],
+    ["alimeeting_R8008_M8013", "ami_EN2001d"],
+    ["alimeeting_R8009_M8019", "ami_TS3006a"],
+    ["ami_ES2003a", "alimeeting_R8007_M8010"],
+    ["ami_TS3009b", "ami_ES2015d"]
+  ],
+  "gate": {
+    "maximum_single_meeting_true_positive_share": 0.5,
+    "minimum_improved_folds": 4,
+    "recall_at_10_false_events_per_hour": 0.3,
+    "recall_at_20_false_events_per_hour": 0.5
+  },
+  "hidden_dimension": 64,
+  "hop_ms": 100,
+  "learning_rate": 0.001,
+  "maximum_gap_ms": 500,
+  "output_relative_path": "results/r7b/fixed_lag_local_segmentation_v1",
+  "pair_dimension": 48,
+  "pcm": {
+    "fft_size": 512,
+    "frame_hop_ms": 10,
+    "frame_ms": 25,
+    "mel_bands": 40,
+    "speech_rms_threshold": 0.0001
+  },
+  "sample_rate_hz": 16000,
+  "seeds": [2701, 2702],
+  "sequence_frontier_offsets_ms": [-500, -400, -300, -200, -100, 0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000],
+  "state_loss_weight": 0.5,
+  "training_background_hop_ms": 500,
+  "training_event_radius_ms": 500,
+  "weight_decay": 0.0001
+}

@@ -1,0 +1,55 @@
+{
+  "algorithmic_lookahead_ms": 1040,
+  "chunk_audio_ms": 480,
+  "cpu_threads": 8,
+  "development_false_event_targets_per_hour": [1, 5, 10, 20],
+  "duplicate_suppression_ms": 200,
+  "evidence_mode": "fast_internal_development_known",
+  "execution_amendment": {
+    "authorized_at_local_date": "2026-08-12",
+    "full_panel_backends": ["cpu"],
+    "vulkan_scope": "smoke_only_by_owner_decision"
+  },
+  "experiment_id": "streaming_sortformer_feasibility_r8_v1",
+  "folds": [
+    ["alimeeting_R8001_M8004", "ami_IS1009a"],
+    ["alimeeting_R8008_M8013", "ami_EN2001d"],
+    ["alimeeting_R8009_M8019", "ami_TS3006a"],
+    ["ami_ES2003a", "alimeeting_R8007_M8010"],
+    ["ami_TS3009b", "ami_ES2015d"]
+  ],
+  "frame_ms": 80,
+  "gate": {
+    "maximum_single_meeting_true_positive_share": 0.5,
+    "maximum_transfer_false_event_multiplier": 2.0,
+    "recall_at_10_false_events_per_hour": 0.3,
+    "recall_at_20_false_events_per_hour": 0.5
+  },
+  "maximum_gap_ms": 500,
+  "memory_ceiling_gib": 24,
+  "model": {
+    "f16_filename": "diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "q8_filename": "diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+    "repository": "handy-computer/diar_streaming_sortformer_4spk-v2.1-gguf",
+    "repository_revision": "7ef0c15dc8f9d717e9d24fac29a6e6551e9c6ddf"
+  },
+  "output_relative_path": "results/r8/streaming_sortformer_feasibility_v1",
+  "preset": "low_latency",
+  "primary_backend": "cpu",
+  "sample_rate_hz": 16000,
+  "smoke_clip_count": 20,
+  "smoke_clip_seconds": 30,
+  "source": {
+    "commit_prefix": "d42c3bb",
+    "repository": "https://github.com/handy-computer/transcribe.cpp.git"
+  },
+  "threshold_search": {
+    "dense_max": 0.995,
+    "dense_min": 0.005,
+    "dense_step": 0.005,
+    "maximum_exact_values_per_target": 512,
+    "refinement_points": 64,
+    "refinement_rounds": 4
+  },
+  "worker_forecast_stop_hours": 24
+}

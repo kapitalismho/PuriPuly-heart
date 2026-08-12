@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "experiment_id": "eres_candidate_relation_verifier_r7a_v1",
+  "sample_rate_hz": 16000,
+  "hop_ms": 100,
+  "embedding_window_ms": 500,
+  "past_context_ms": 1000,
+  "lookahead_ms": [500, 750, 1000],
+  "candidate_change_threshold": 0.5,
+  "positive_radius_ms": 250,
+  "negative_radius_ms": 500,
+  "duplicate_suppression_ms": 200,
+  "development_false_event_targets_per_hour": [1, 5, 10, 20],
+  "development_sessions": [
+    "alimeeting_R8001_M8004",
+    "alimeeting_R8008_M8013",
+    "alimeeting_R8009_M8019",
+    "ami_ES2003a",
+    "ami_TS3009b"
+  ],
+  "evaluation_sessions": [
+    "alimeeting_R8007_M8010",
+    "ami_EN2001d",
+    "ami_ES2015d",
+    "ami_IS1009a",
+    "ami_TS3006a"
+  ],
+  "input_identities": {
+    "source_metadata.jsonl": "fa50470eb236e236584e6a2633c12ce5f2b45002fcd655eeb8d1c0a86d674c0e",
+    "waveform_inventory.jsonl": "3caa5bc339b2503e60190fd58239aa21ff1317709444e6ef6bb6279d2f66c27a",
+    "anchor_index.jsonl": "2ed7656a6a4036fc0b3134c18847e7ec13456a5f1ee0f915af36fbe6129cc1f8",
+    "reduced_r3_r4_forecast.json": "ec59ed137ed20a88c30405a499a3d89c7ef5e51e6013e831024c5c2c1c95e987",
+    "promotion_ledger.json": "987e5f2a66db7170cdbfaaf2c0be624de4ffda3ca7d41fc9205d091393de9fd1"
+  },
+  "linear": {
+    "c": 1.0,
+    "max_iter": 500
+  },
+  "mlp": {
+    "hidden_width": 96,
+    "dropout": 0.15,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 512,
+    "maximum_epochs": 80,
+    "patience": 8,
+    "seeds": [1701, 1702, 1703]
+  },
+  "output_relative_path": "results/r7/eres_candidate_relation_verifier_v1"
+}
