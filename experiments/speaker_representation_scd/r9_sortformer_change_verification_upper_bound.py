@@ -1004,35 +1004,54 @@ def run_a0(root: Path) -> Path:
                 "peak_probability": float(features["peak_probability"]),
                 "persistence_ms": float(features["persistence_ms"]),
                 "same_slot_resume": float(features["same_slot_resume"]),
+                "gap_ms": float(features["gap_ms"]),
+                "co_activity_max": float(features["co_activity_max"]),
             }
         )
     for rows in per_session.values():
         rows.sort(key=lambda row: int(row["sample"]))
 
-    def passes(row: dict[str, Any], peak: float, persistence: float, exclude_resume: bool) -> bool:
+    def passes(
+        row: dict[str, Any],
+        peak: float,
+        persistence: float,
+        gap_max: float,
+        co_activity_min: float,
+        exclude_resume: bool,
+    ) -> bool:
         if exclude_resume and float(row["same_slot_resume"]) == 1.0:
             return False
         if float(row["peak_probability"]) < peak:
             return False
         if float(row["persistence_ms"]) < persistence:
             return False
+        if float(row["gap_ms"]) > gap_max:
+            return False
+        if float(row["co_activity_max"]) < co_activity_min:
+            return False
         return True
 
     def predictions_for(
-        session_ids: Sequence[str], peak: float, persistence: float
+        session_ids: Sequence[str],
+        peak: float,
+        persistence: float,
+        gap_max: float,
+        co_activity_min: float,
     ) -> dict[str, list[int]]:
         result: dict[str, list[int]] = {}
         for session_id in session_ids:
             passing = [
                 {**row, "score": float(row["peak_probability"])}
                 for row in per_session[session_id]
-                if passes(row, peak, persistence, exclude_resume)
+                if passes(row, peak, persistence, gap_max, co_activity_min, exclude_resume)
             ]
             result[session_id] = [sample for sample, _ in _grouped_events(passing, radius_samples)]
         return result
 
     peak_grid = [float(value) for value in cfg["a0"]["peak_probability_grid"]]
     persistence_grid = [float(value) for value in cfg["a0"]["persistence_ms_grid"]]
+    gap_grid = [float(value) for value in cfg["a0"]["gap_ms_max_grid"]]
+    co_activity_grid = [float(value) for value in cfg["a0"]["co_activity_min_grid"]]
     budget = float(cfg["a0"]["dev_false_event_budget_per_hour"])
     exclude_resume = bool(cfg["a0"]["exclude_same_slot_resume"])
     folded: dict[str, list[int]] = defaultdict(list)
@@ -1044,24 +1063,58 @@ def run_a0(root: Path) -> Path:
         best_metrics: dict[str, Any] | None = None
         best_peak = peak_grid[0]
         best_persistence = persistence_grid[0]
+        best_gap = gap_grid[0]
+        best_co_activity = co_activity_grid[0]
         for peak in peak_grid:
             for persistence in persistence_grid:
-                metrics = _metrics(
-                    sessions, predictions_for(development_ids, peak, persistence), development_ids
-                )
-                primary = metrics["tolerances"]["250"]
-                feh = float(primary["false_events_per_hour"])
-                recall = float(primary["recall"] or 0.0)
-                if feh <= budget:
-                    candidate_key = (recall, -feh, -peak, -persistence)
-                else:
-                    candidate_key = (-1.0, -feh, -peak, -persistence)
-                if best is None or candidate_key > best:
-                    best = candidate_key
-                    best_metrics = metrics
-                    best_peak = peak
-                    best_persistence = persistence
-        held_predictions = predictions_for(held_out_ids, float(best_peak), float(best_persistence))
+                for gap_max in gap_grid:
+                    for co_activity_min in co_activity_grid:
+                        metrics = _metrics(
+                            sessions,
+                            predictions_for(
+                                development_ids,
+                                peak,
+                                persistence,
+                                gap_max,
+                                co_activity_min,
+                            ),
+                            development_ids,
+                        )
+                        primary = metrics["tolerances"]["250"]
+                        feh = float(primary["false_events_per_hour"])
+                        recall = float(primary["recall"] or 0.0)
+                        if feh <= budget:
+                            candidate_key = (
+                                recall,
+                                -feh,
+                                -peak,
+                                -persistence,
+                                gap_max,
+                                -co_activity_min,
+                            )
+                        else:
+                            candidate_key = (
+                                -1.0,
+                                -feh,
+                                -peak,
+                                -persistence,
+                                gap_max,
+                                -co_activity_min,
+                            )
+                        if best is None or candidate_key > best:
+                            best = candidate_key
+                            best_metrics = metrics
+                            best_peak = peak
+                            best_persistence = persistence
+                            best_gap = gap_max
+                            best_co_activity = co_activity_min
+        held_predictions = predictions_for(
+            held_out_ids,
+            float(best_peak),
+            float(best_persistence),
+            float(best_gap),
+            float(best_co_activity),
+        )
         for session_id in held_out_ids:
             folded[session_id] = held_predictions[session_id]
         held_metrics = _metrics(sessions, held_predictions, held_out_ids)
@@ -1069,6 +1122,8 @@ def run_a0(root: Path) -> Path:
             "held_out_sessions": held_out_ids,
             "selected_peak_probability_threshold": float(best_peak),
             "selected_persistence_ms_threshold": float(best_persistence),
+            "selected_gap_ms_max": float(best_gap),
+            "selected_co_activity_min": float(best_co_activity),
             "development_metrics": best_metrics,
             "held_out_metrics": held_metrics,
         }
@@ -1183,39 +1238,50 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
         raise R9Error("verifier scores contain non-finite values")
 
     grouped: dict[str, list[tuple[int, float]]] = {}
+    grouped_selection: dict[str, list[tuple[int, float]]] = {}
     for index, row in enumerate(rows):
         session_id = str(row["session_id"])
-        grouped.setdefault(session_id, []).append((int(row["sample"]), float(scores[index])))
+        pair = (int(row["sample"]), float(scores[index]))
+        grouped.setdefault(session_id, []).append(pair)
+        if str(row["label"]) != "ambiguous":
+            grouped_selection.setdefault(session_id, []).append(pair)
     for session_id in sessions:
         grouped.setdefault(session_id, [])
+        grouped_selection.setdefault(session_id, [])
     for session_id in grouped:
         grouped[session_id] = _grouped_events(
             [{"sample": sample, "score": score} for sample, score in grouped[session_id]],
             radius_samples,
         )
-    cache = ScoreEvaluationCache(sessions, grouped)
+        grouped_selection[session_id] = _grouped_events(
+            [{"sample": sample, "score": score} for sample, score in grouped_selection[session_id]],
+            radius_samples,
+        )
+    selection_cache = ScoreEvaluationCache(sessions, grouped_selection)
+    all_cache = ScoreEvaluationCache(sessions, grouped)
     score_values = np.asarray(
-        [score for pairs in grouped.values() for _, score in pairs], dtype=np.float32
+        [score for pairs in grouped_selection.values() for _, score in pairs],
+        dtype=np.float32,
     )
     targets = [float(value) for value in cfg["targets"]["false_events_per_hour"]]
-    curve = _curve_for_scores(cache, score_values, targets, cfg["curve_search"])
+    curve = _curve_for_scores(selection_cache, score_values, targets, cfg["curve_search"])
     selected_points: dict[str, Any] = {}
     for target in targets:
         selected = _select_row(curve, target)
         selected_points[str(target)] = {
             "threshold": selected["threshold"],
-            "metrics": cache.metrics(float(selected["threshold"])),
+            "metrics": all_cache.metrics(float(selected["threshold"])),
         }
     transfer: list[dict[str, Any]] = []
     for fold, held_out in enumerate(cfg["folds"]):
         held_out_ids = [str(value) for value in held_out]
         development_ids = [session_id for session_id in sessions if session_id not in held_out_ids]
         development_rows = [
-            _curve_row(cache, float(row["threshold"]), development_ids) for row in curve
+            _curve_row(selection_cache, float(row["threshold"]), development_ids) for row in curve
         ]
         for target in targets:
             selected = _select_row(development_rows, target)
-            held_metrics = cache.metrics(float(selected["threshold"]), held_out_ids)
+            held_metrics = all_cache.metrics(float(selected["threshold"]), held_out_ids)
             primary = held_metrics["tolerances"]["250"]
             transfer.append(
                 {
@@ -1234,7 +1300,7 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
     }
     for row in curve:
         threshold = float(row["threshold"])
-        metrics = cache.metrics(threshold)
+        metrics = all_cache.metrics(threshold)
         for session_id, meeting in metrics["per_meeting"].items():
             per_meeting_curves[session_id].append(
                 {
@@ -1321,6 +1387,7 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
         "mlp_triggered": mlp_triggered,
         "mean_out_of_fold_auroc": mean_auroc,
         "fold_auroc": fold_auroc,
+        "threshold_selection_excluded_ambiguous": True,
         "curve": curve,
         "selected_operating_points": selected_points,
         "threshold_transfer": transfer,
@@ -1810,6 +1877,8 @@ def report(root: Path) -> Path:
             lines.append(
                 f"- fold {fold}: peak >= {float(selection['selected_peak_probability_threshold']):.2f}, "
                 f"persistence >= {int(selection['selected_persistence_ms_threshold'])} ms, "
+                f"gap <= {float(selection['selected_gap_ms_max']):.0f} ms, "
+                f"co-activity >= {float(selection['selected_co_activity_min']):.2f}, "
                 f"same-slot resume excluded"
             )
     lines.extend(
@@ -1827,6 +1896,8 @@ def report(root: Path) -> Path:
             f"{float(a1['reference_gate']['targets']['20.0']['stratum_recall'].get('silence_gap_change') or 0.0):.3f}, "
             f"maximum single-meeting TP share "
             f"{float(a1['reference_gate']['targets']['20.0']['maximum_meeting_true_positive_share']):.3f}.",
+            f"20 FE/h short-return recall "
+            f"{float(a1['selected_operating_points']['20.0']['metrics']['short_return_recall'] or 0.0):.3f}.",
         ]
     )
     if "a1" in ceiling["arms"] and ceiling["outcome_a_pareto"]["meaningful"] is not None:

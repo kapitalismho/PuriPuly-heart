@@ -84,8 +84,10 @@
     "dev_false_event_budget_per_hour": 100.0,
     "peak_probability_grid": [0.5, 0.6, 0.7, 0.8, 0.9],
     "persistence_ms_grid": [0, 80, 160, 240],
+    "gap_ms_max_grid": [400, 1000, 4000, 100000],
+    "co_activity_min_grid": [0.0, 0.3, 0.5],
     "exclude_same_slot_resume": true,
-    "selection_rule": "per fold, select the grid combination maximizing development recall_250 subject to development false events per hour <= dev_false_event_budget_per_hour; tie-break by lower false events per hour, then lower peak threshold, then lower persistence threshold; if no combination satisfies the budget, select the minimum false events per hour combination",
+    "selection_rule": "per fold, select the grid combination maximizing development recall_250 subject to development false events per hour <= dev_false_event_budget_per_hour; tie-break by lower false events per hour, then lower peak threshold, then lower persistence threshold, then higher gap maximum, then lower co-activity minimum; if no combination satisfies the budget, select the minimum false events per hour combination",
     "grouping_score": "peak_probability"
   },
   "duplicate_suppression_ms": 200,
