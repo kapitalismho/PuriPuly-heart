@@ -112,7 +112,8 @@
     "recall_at_10_false_events_per_hour": 0.3,
     "recall_at_20_false_events_per_hour": 0.5,
     "maximum_single_meeting_true_positive_share": 0.5,
-    "maximum_transfer_false_event_multiplier": 2.0
+    "maximum_transfer_false_event_multiplier": 2.0,
+    "latency_defect_median_ms": 400
   },
   "verification_commit_policy": {
     "no_new_inference": true,

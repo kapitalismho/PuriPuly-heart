@@ -6,6 +6,7 @@ import json
 import math
 import os
 import subprocess
+import time
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -1063,11 +1064,13 @@ def run_a0(root: Path) -> Path:
         held_predictions = predictions_for(held_out_ids, float(best_peak), float(best_persistence))
         for session_id in held_out_ids:
             folded[session_id] = held_predictions[session_id]
+        held_metrics = _metrics(sessions, held_predictions, held_out_ids)
         fold_selection[str(fold)] = {
             "held_out_sessions": held_out_ids,
             "selected_peak_probability_threshold": float(best_peak),
             "selected_persistence_ms_threshold": float(best_persistence),
             "development_metrics": best_metrics,
+            "held_out_metrics": held_metrics,
         }
     aggregate = _metrics(sessions, dict(folded))
     document = {
@@ -1096,6 +1099,7 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
 
     linear_scores = np.full(len(rows), np.nan, dtype=np.float64)
     fold_auroc: dict[str, Any] = {}
+    predict_seconds = 0.0
     for fold, held_out in enumerate(cfg["folds"]):
         held_out_ids = [str(value) for value in held_out]
         train_mask = np.asarray(
@@ -1110,7 +1114,9 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
         coef, intercept = _fit_linear(
             standardized[train_usable], labels[train_usable], weights, cfg["verifier"]
         )
+        started = time.perf_counter()
         fold_scores = _linear_predict(standardized, coef, intercept)
+        predict_seconds += time.perf_counter() - started
         linear_scores[held_mask] = fold_scores[held_mask]
         fold_auroc[str(fold)] = _auroc(fold_scores[held_mask], labels[held_mask])
 
@@ -1168,7 +1174,9 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
                     int(seed),
                     validation,
                 )
+                started = time.perf_counter()
                 seed_scores.append(_mlp_predict(standardized[held_mask], state, cfg["verifier"]))
+                predict_seconds += time.perf_counter() - started
             mlp_scores[held_mask] = np.mean(seed_scores, axis=0)
     scores = mlp_scores if mlp_triggered else linear_scores
     if not np.isfinite(scores).all():
@@ -1282,15 +1290,28 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
     confirmation_ms = int(
         cfg["confirmation"]["diagnostic_frames" if diagnostic else "base_frames"]
     ) * int(cfg["frame_ms"])
-    availability_latency: dict[str, Any] = {"confirmation_ms": confirmation_ms, "per_target": {}}
+    defect_threshold_ms = float(cfg["reference_gate"]["latency_defect_median_ms"])
+    verification_compute_ms = max(predict_seconds / len(rows) * 1000.0, 0.0)
+    availability_latency: dict[str, Any] = {
+        "confirmation_ms": confirmation_ms,
+        "verification_compute_ms_per_event": verification_compute_ms,
+        "latency_defect_median_ms": defect_threshold_ms,
+        "per_target": {},
+    }
     for target, point in selected_points.items():
         deltas = [
             (int(prediction) - int(reference)) // 16
             for _, prediction, reference in point["metrics"]["matched_pairs"]
         ]
+        availability_values = [
+            float(value) + confirmation_ms + verification_compute_ms for value in deltas
+        ]
+        availability_percentiles = _percentiles(availability_values)
         availability_latency["per_target"][str(target)] = {
             "boundary_lag_ms": _percentiles([float(value) for value in deltas]),
-            "availability_ms": _percentiles([float(value) + confirmation_ms for value in deltas]),
+            "availability_ms": availability_percentiles,
+            "latency_defect": availability_percentiles["p50"] is not None
+            and float(availability_percentiles["p50"]) >= defect_threshold_ms,
         }
     document = {
         "schema_version": 1,
@@ -1377,11 +1398,13 @@ def prepare(root: Path) -> Path:
     }
     mismatches: list[str] = []
     for name, path in reused_paths.items():
-        if name == "r7b_inventory":
+        if name in {"r7b_inventory", "r8_artifact_inventory"}:
             continue
         relative = str(path.relative_to(r8)).replace("\\", "/")
         expected = expected_by_relative.get(relative)
-        if expected is not None and reuse[name]["sha256"] != expected:
+        if expected is None:
+            mismatches.append(f"{name}: absent from the R8 artifact inventory")
+        elif reuse[name]["sha256"] != expected:
             mismatches.append(f"{name}: expected {expected}, got {reuse[name]['sha256']}")
     r8_input_inventory = load_json(reused_paths["r8_input_inventory"])
     if reuse["r7b_inventory"]["sha256"] != str(r8_input_inventory.get("r7b_inventory_sha256")):
@@ -1392,7 +1415,9 @@ def prepare(root: Path) -> Path:
     }
     for session in sessions.values():
         expected = r8_waveform_hashes.get(session.session_id)
-        if expected is not None and session.waveform_sha256 != expected:
+        if expected is None:
+            mismatches.append(f"waveform {session.session_id}: absent from the R8 input inventory")
+        elif session.waveform_sha256 != expected:
             mismatches.append(
                 f"waveform {session.session_id}: computed {session.waveform_sha256}, R8 recorded {expected}"
             )
@@ -1452,11 +1477,31 @@ def ceiling_summary(root: Path) -> Path:
         if name == "a0":
             if path.is_file():
                 document = load_json(path)
+                recall = float(document["aggregate_recall_250"] or 0.0)
+                feh = float(document["aggregate_false_events_per_hour"])
+                at_targets = {
+                    str(target): (
+                        {"recall_250": recall, "false_events_per_hour": feh, "threshold": None}
+                        if feh <= float(target)
+                        else None
+                    )
+                    for target in cfg["targets"]["false_events_per_hour"]
+                }
+                fractions: dict[str, Any] = {}
+                for fraction in cfg["ceiling"]["candidate_recall_fractions"]:
+                    fractions[str(fraction)] = (
+                        {"recall_250": recall, "false_events_per_hour": feh}
+                        if recall >= float(fraction) * oracle_recall
+                        else None
+                    )
                 arms["a0"] = {
                     "kind": "point",
-                    "recall_250": document["aggregate_recall_250"],
-                    "false_events_per_hour": document["aggregate_false_events_per_hour"],
+                    "recall_250": recall,
+                    "false_events_per_hour": feh,
                     "metrics": document["aggregate_metrics"],
+                    "at_targets": at_targets,
+                    "candidate_ceiling_fractions": fractions,
+                    "fold_selection": document["fold_selection"],
                 }
             continue
         if not path.is_file():
@@ -1653,6 +1698,17 @@ def _plot_ceiling(
     )
     for target in (1, 5, 10, 20):
         axis.axvline(float(target), color="tab:gray", alpha=0.35, linewidth=0.6)
+    axis.axhline(0.3, color="tab:red", linestyle=":", linewidth=1.0)
+    axis.axhline(0.5, color="tab:red", linestyle=":", linewidth=1.0)
+    axis.annotate(
+        "inherited gate reference lines (context only):\n"
+        "recall >= 0.3 @ 10 FE/h, recall >= 0.5 @ 20 FE/h",
+        xy=(0.62, 0.13),
+        xycoords="axes fraction",
+        fontsize=7.5,
+        color="tab:red",
+        bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "alpha": 0.85},
+    )
     axis.set_xlabel("False events per source hour")
     axis.set_ylabel("Recall@250 ms")
     axis.set_xlim(0, 120)
@@ -1710,10 +1766,14 @@ def report(root: Path) -> Path:
         if name == "a0":
             if "a0" not in ceiling["arms"]:
                 continue
-            lines.append("| R9-A0 rule stack | — | — | — | — | — | — | — | — |")
+            arm = ceiling["arms"]["a0"]
             lines.append(
-                f"|  (single point: {float(ceiling['arms']['a0']['recall_250'] or 0.0):.3f} recall at "
-                f"{float(ceiling['arms']['a0']['false_events_per_hour']):.1f} FE/h) | | | | | | | | |"
+                f"| R9-A0 rule stack (single point) | {cell(arm, 1)} | {cell(arm, 5)} | {cell(arm, 10)} | "
+                f"{cell(arm, 20)} | {cell(arm, 50)} | {cell(arm, 100)} | {fraction_cell(arm, 0.5)} | {fraction_cell(arm, 0.8)} |"
+            )
+            lines.append(
+                f"|  (operating point: {float(arm['recall_250'] or 0.0):.3f} recall at "
+                f"{float(arm['false_events_per_hour']):.1f} FE/h) | | | | | | | | |"
             )
             continue
         arm = ceiling["arms"].get(name)
@@ -1807,12 +1867,15 @@ def report(root: Path) -> Path:
             "",
             "## Availability latency (R9-A1)",
             "",
-            f"Confirmation window: {int(a1['availability_latency']['confirmation_ms'])} ms. "
+            f"Confirmation window: {int(a1['availability_latency']['confirmation_ms'])} ms; "
+            f"verification compute: {float(a1['availability_latency']['verification_compute_ms_per_event']):.3f} ms per event. "
             "Boundary timestamps stay at the 0.5 candidate crossing; availability adds the fixed "
-            "confirmation window.",
+            "confirmation window plus verifier compute. "
+            f"Latency defect threshold (R8 0.99-confirmation signature): median >= "
+            f"{int(a1['availability_latency']['latency_defect_median_ms'])} ms.",
             "",
-            "| Target FE/h | Boundary lag p50 ms | Boundary lag p90 ms | Availability p50 ms | Availability p90 ms |",
-            "| ---: | ---: | ---: | ---: | ---: |",
+            "| Target FE/h | Boundary lag p50 ms | Boundary lag p90 ms | Availability p50 ms | Availability p90 ms | Defect |",
+            "| ---: | ---: | ---: | ---: | ---: | ---: |",
         ]
     )
     for target in config()["targets"]["false_events_per_hour"]:
@@ -1821,7 +1884,8 @@ def report(root: Path) -> Path:
             f"| {target} | {_latency_cell(point['boundary_lag_ms'], 'p50')} | "
             f"{_latency_cell(point['boundary_lag_ms'], 'p90')} | "
             f"{_latency_cell(point['availability_ms'], 'p50')} | "
-            f"{_latency_cell(point['availability_ms'], 'p90')} |"
+            f"{_latency_cell(point['availability_ms'], 'p90')} | "
+            f"{'yes' if point.get('latency_defect') else 'no'} |"
         )
     transfer = a1.get("threshold_transfer", [])
     if transfer:
