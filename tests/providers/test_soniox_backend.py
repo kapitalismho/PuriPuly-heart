@@ -36,6 +36,17 @@ def _make_session(
     )
 
 
+async def _request_finalize(
+    session: _SonioxSession,
+    *,
+    observed_tail_ms: int = 500,
+) -> _FinalizeRequest:
+    await session.on_speech_end(trailing_silence_ms=observed_tail_ms)
+    finalize = await session._audio_q.get()
+    assert isinstance(finalize, _FinalizeRequest)
+    return finalize
+
+
 @pytest.mark.asyncio
 async def test_soniox_backend_validates_params() -> None:
     backend = SonioxRealtimeSTTBackend(api_key="", language_hints=["en"])
@@ -84,6 +95,7 @@ async def test_soniox_session_handles_message_errors() -> None:
 @pytest.mark.asyncio
 async def test_soniox_session_collects_final_tokens() -> None:
     session = _make_session()
+    await _request_finalize(session)
 
     message = {
         "tokens": [
@@ -104,6 +116,7 @@ async def test_soniox_session_collects_final_tokens() -> None:
 @pytest.mark.asyncio
 async def test_soniox_session_emits_ordered_adjacent_final_language_runs() -> None:
     session = _make_session(enable_language_identification=True)
+    await _request_finalize(session)
 
     session._handle_message(
         json.dumps(
@@ -134,6 +147,7 @@ async def test_soniox_session_emits_ordered_adjacent_final_language_runs() -> No
 @pytest.mark.asyncio
 async def test_soniox_terminal_cleanup_keeps_final_runs_equal_to_emitted_text() -> None:
     session = _make_session(enable_language_identification=True)
+    await _request_finalize(session)
 
     session._handle_message(
         json.dumps(
@@ -149,13 +163,14 @@ async def test_soniox_terminal_cleanup_keeps_final_runs_equal_to_emitted_text() 
     )
 
     event = session._events.get_nowait()
-    assert event.text == "あ你"
+    assert event.text == ". あ你"
     assert [(token.text, token.language) for token in session._final_tokens] == [
+        (". ", "ja"),
         ("あ", "ja"),
         ("你", "zh"),
     ]
     assert [(run.text, run.language) for run in event.final_language_runs] == [
-        ("あ", "ja"),
+        (". あ", "ja"),
         ("你", "zh"),
     ]
     assert "".join(run.text for run in event.final_language_runs) == event.text
@@ -204,6 +219,7 @@ async def test_soniox_controlled_final_token_fixtures_preserve_each_token_and_ad
     ]
     fixture_tokens.append({"text": "<fin>", "is_final": True})
 
+    await _request_finalize(session)
     session._handle_message(json.dumps({"tokens": fixture_tokens}))
 
     event = session._events.get_nowait()
@@ -214,10 +230,11 @@ async def test_soniox_controlled_final_token_fixtures_preserve_each_token_and_ad
 
 
 @pytest.mark.asyncio
-async def test_soniox_controlled_final_batches_merge_and_replace_without_token_loss_or_duplicates() -> (
+async def test_soniox_controlled_finalize_boundaries_remain_independent_and_append_only() -> (
     None
 ):
     merged = _make_session(enable_language_identification=True)
+    await _request_finalize(merged)
     merged._handle_message(
         json.dumps(
             {
@@ -228,7 +245,8 @@ async def test_soniox_controlled_final_batches_merge_and_replace_without_token_l
             }
         )
     )
-    merged._events.get_nowait()
+    first_event = merged._events.get_nowait()
+    await _request_finalize(merged)
     merged._handle_message(
         json.dumps(
             {
@@ -241,16 +259,16 @@ async def test_soniox_controlled_final_batches_merge_and_replace_without_token_l
     )
     merged_event = merged._events.get_nowait()
 
+    assert first_event.text == "あ"
     assert [(token.text, token.language, token.end_ms) for token in merged._final_tokens] == [
-        ("あ", "ja", 100),
         ("你", "zh", 200),
     ]
     assert [(run.text, run.language) for run in merged_event.final_language_runs] == [
-        ("あ", "ja"),
         ("你", "zh"),
     ]
 
     replaced = _make_session(enable_language_identification=True)
+    await _request_finalize(replaced)
     replaced._handle_message(
         json.dumps(
             {
@@ -263,7 +281,8 @@ async def test_soniox_controlled_final_batches_merge_and_replace_without_token_l
             }
         )
     )
-    replaced._events.get_nowait()
+    original_event = replaced._events.get_nowait()
+    await _request_finalize(replaced)
     replaced._handle_message(
         json.dumps(
             {
@@ -277,14 +296,13 @@ async def test_soniox_controlled_final_batches_merge_and_replace_without_token_l
     )
     replaced_event = replaced._events.get_nowait()
 
+    assert original_event.text == "你旧旧"
     assert [(token.text, token.language, token.end_ms) for token in replaced._final_tokens] == [
-        ("你", "zh", 100),
         ("あ", "ja", 200),
         ("가", "ko", 300),
     ]
-    assert replaced_event.text == "你あ가"
+    assert replaced_event.text == "あ가"
     assert [(run.text, run.language) for run in replaced_event.final_language_runs] == [
-        ("你", "zh"),
         ("あ", "ja"),
         ("가", "ko"),
     ]
@@ -293,6 +311,7 @@ async def test_soniox_controlled_final_batches_merge_and_replace_without_token_l
 @pytest.mark.asyncio
 async def test_soniox_session_retains_unknown_detected_language_for_safe_fallback() -> None:
     session = _make_session(enable_language_identification=True)
+    await _request_finalize(session)
 
     session._handle_message(
         json.dumps(
@@ -310,8 +329,9 @@ async def test_soniox_session_retains_unknown_detected_language_for_safe_fallbac
 
 
 @pytest.mark.asyncio
-async def test_soniox_session_merges_final_batches_by_end_ms() -> None:
+async def test_soniox_session_appends_final_tokens_across_messages_in_receive_order() -> None:
     session = _make_session()
+    await _request_finalize(session)
 
     session._handle_message(
         json.dumps(
@@ -319,14 +339,11 @@ async def test_soniox_session_merges_final_batches_by_end_ms() -> None:
                 "tokens": [
                     {"text": "Hello", "is_final": True, "end_ms": 100},
                     {"text": " world", "is_final": True, "end_ms": 200},
-                    {"text": "<fin>", "is_final": True},
                 ]
             }
         )
     )
-    event = session._events.get_nowait()
-    assert isinstance(event, STTBackendTranscriptEvent)
-    assert event.text == "Hello world"
+    assert session._events.empty()
 
     session._handle_message(
         json.dumps(
@@ -342,21 +359,29 @@ async def test_soniox_session_merges_final_batches_by_end_ms() -> None:
     )
     event = session._events.get_nowait()
     assert isinstance(event, STTBackendTranscriptEvent)
-    assert event.text == "Hello. world!"
+    assert event.text == "Hello world. world!"
 
 
 @pytest.mark.asyncio
-async def test_soniox_session_skips_out_of_order_tokens() -> None:
+async def test_soniox_session_preserves_equal_and_regressing_timestamp_tokens() -> None:
     session = _make_session()
+    await _request_finalize(session)
 
     session._handle_message(
-        json.dumps({"tokens": [{"text": "A", "is_final": True, "end_ms": 100}]})
+        json.dumps(
+            {
+                "tokens": [
+                    {"text": "A", "is_final": True, "end_ms": 100},
+                    {"text": "B", "is_final": True, "end_ms": 100},
+                ]
+            }
+        )
     )
     session._handle_message(
         json.dumps(
             {
                 "tokens": [
-                    {"text": "B", "is_final": True, "end_ms": 90},
+                    {"text": "C", "is_final": True, "end_ms": 90},
                     {"text": "<fin>", "is_final": True},
                 ]
             }
@@ -365,7 +390,7 @@ async def test_soniox_session_skips_out_of_order_tokens() -> None:
     event = session._events.get_nowait()
 
     assert isinstance(event, STTBackendTranscriptEvent)
-    assert event.text == "A"
+    assert event.text == "ABC"
 
 
 @pytest.mark.asyncio
@@ -378,6 +403,22 @@ async def test_soniox_session_on_speech_end_enqueues_finalize() -> None:
 
     assert isinstance(finalize, _FinalizeRequest)
     assert finalize.trailing_silence_ms == session.trailing_silence_ms
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("observed_tail_ms", "expected_trim_ms"),
+    [(0, None), (40, 40), (100, 100), (500, 100)],
+)
+async def test_soniox_session_limits_declared_trim_to_observed_tail(
+    observed_tail_ms: int,
+    expected_trim_ms: int | None,
+) -> None:
+    session = _make_session()
+
+    finalize = await _request_finalize(session, observed_tail_ms=observed_tail_ms)
+
+    assert finalize.trailing_silence_ms == expected_trim_ms
 
 
 @pytest.mark.asyncio
@@ -444,6 +485,28 @@ async def test_soniox_session_repeated_finalize_boundaries_clear_each_final_segm
 
     events = [session._events.get_nowait() for _ in range(3)]
     assert [event.text for event in events] == ["First", "Second", "Third"]
+
+
+@pytest.mark.asyncio
+async def test_soniox_session_duplicate_finalize_marker_emits_one_terminal() -> None:
+    session = _make_session()
+    await _request_finalize(session)
+
+    session._handle_message(
+        json.dumps(
+            {
+                "tokens": [
+                    {"text": "Only", "is_final": True, "end_ms": 100},
+                    {"text": "<fin>", "is_final": True},
+                    {"text": "<fin>", "is_final": True},
+                ]
+            }
+        )
+    )
+
+    event = session._events.get_nowait()
+    assert event.text == "Only"
+    assert session._events.empty()
 
 
 @pytest.mark.asyncio

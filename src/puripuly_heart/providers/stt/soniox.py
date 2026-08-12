@@ -8,7 +8,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Sequence
@@ -295,11 +294,10 @@ class _SonioxSession(STTBackendSession):
                 end_ms = int(end_ms)
                 if self._pending_last_end_ms is not None and end_ms <= self._pending_last_end_ms:
                     logger.debug(
-                        "[STT] Soniox token skipped end_ms=%s last_end_ms=%s",
+                        "[STT] Soniox token timestamp non-increasing end_ms=%s last_end_ms=%s",
                         end_ms,
                         self._pending_last_end_ms,
                     )
-                    continue
                 self._pending_last_end_ms = end_ms
             logger.debug(
                 "[STT] Soniox token final text_len=%s end_ms=%s pending_tokens=%s",
@@ -315,76 +313,24 @@ class _SonioxSession(STTBackendSession):
             self._pending_tokens.append(_FinalToken(text=text, end_ms=end_ms, language=language))
 
     def _flush_final(self) -> None:
-        if not self._pending_tokens:
-            if self._consume_pending_finalize_request():
-                self._final_tokens.clear()
-                self._emit_empty_final_ack()
+        if not self._consume_pending_finalize_request():
+            logger.debug(
+                "[STT] Soniox finalize marker ignored without pending request tokens=%s",
+                len(self._pending_tokens),
+            )
+            self._pending_tokens.clear()
+            self._pending_last_end_ms = None
             return
-        updated = self._merge_pending_tokens()
+        self._final_tokens = list(self._pending_tokens)
         self._pending_tokens.clear()
         self._pending_last_end_ms = None
-        if not updated:
-            if self._consume_pending_finalize_request():
-                if not self._emit_final_text():
-                    self._emit_empty_final_ack()
-                self._final_tokens.clear()
-            return
-        emitted = self._emit_final_text()
-        if self._consume_pending_finalize_request():
-            self._final_tokens.clear()
-            if not emitted:
-                self._emit_empty_final_ack()
+        if not self._emit_final_text():
+            self._emit_empty_final_ack()
 
     def _consume_pending_finalize_request(self) -> bool:
         if self._pending_finalize_requests <= 0:
             return False
         self._pending_finalize_requests -= 1
-        return True
-
-    def _merge_pending_tokens(self) -> bool:
-        new_tokens = self._pending_tokens
-        if not new_tokens:
-            return False
-        if not self._final_tokens:
-            self._final_tokens = list(new_tokens)
-            return True
-
-        new_max = self._max_end_ms(new_tokens)
-        existing_max = self._max_end_ms(self._final_tokens)
-        if new_max is not None and existing_max is not None and new_max < existing_max:
-            logger.debug(
-                "[STT] Soniox final batch out-of-order max_end_ms=%s existing_max_end_ms=%s",
-                new_max,
-                existing_max,
-            )
-            return False
-
-        new_first = self._min_end_ms(new_tokens)
-        if new_first is None:
-            self._final_tokens.extend(new_tokens)
-            return True
-
-        cut_idx = None
-        for idx, token in enumerate(self._final_tokens):
-            if token.end_ms is None:
-                continue
-            if token.end_ms >= new_first:
-                cut_idx = idx
-                break
-
-        logger.debug(
-            "[STT] Soniox final merge cut_idx=%s new_first_end_ms=%s new_max_end_ms=%s existing_max_end_ms=%s",
-            cut_idx,
-            new_first,
-            new_max,
-            existing_max,
-        )
-        if cut_idx is None:
-            self._final_tokens.extend(new_tokens)
-        elif cut_idx == 0:
-            self._final_tokens = list(new_tokens)
-        else:
-            self._final_tokens = self._final_tokens[:cut_idx] + list(new_tokens)
         return True
 
     def _emit_final_text(self) -> bool:
@@ -413,10 +359,6 @@ class _SonioxSession(STTBackendSession):
         source = "".join(token.text for token in self._final_tokens)
         start = len(source) - len(source.lstrip())
         end = len(source.rstrip())
-        terminal_text = source[start:end]
-        leading_punctuation = re.match(r"^[.,:;!?。，；：！？]+\s+", terminal_text)
-        if leading_punctuation is not None:
-            start += leading_punctuation.end()
         if start >= end:
             return []
 
@@ -456,18 +398,6 @@ class _SonioxSession(STTBackendSession):
         logger.debug("[STT] Soniox empty finalize ack")
         self._put_event(STTBackendTranscriptEvent(text="", is_final=True))
 
-    def _min_end_ms(self, tokens: Sequence[_FinalToken]) -> int | None:
-        values = [token.end_ms for token in tokens if token.end_ms is not None]
-        if not values:
-            return None
-        return min(values)
-
-    def _max_end_ms(self, tokens: Sequence[_FinalToken]) -> int | None:
-        values = [token.end_ms for token in tokens if token.end_ms is not None]
-        if not values:
-            return None
-        return max(values)
-
     def _put_event(self, event: STTBackendTranscriptEvent | BaseException | None) -> None:
         self._events.put_nowait(event)
 
@@ -481,9 +411,12 @@ class _SonioxSession(STTBackendSession):
             return
 
         self._pending_finalize_requests += 1
-        silence_ms = max(int(self.trailing_silence_ms), 0)
-        if trailing_silence_ms is None and silence_ms > 0:
-            silence_samples = int(self.sample_rate_hz * (silence_ms / 1000.0))
+        configured_trim_ms = max(int(self.trailing_silence_ms), 0)
+        observed_tail_ms = max(int(trailing_silence_ms or 0), 0)
+        injected_padding_ms = 0
+        if trailing_silence_ms is None and configured_trim_ms > 0:
+            injected_padding_ms = configured_trim_ms
+            silence_samples = int(self.sample_rate_hz * (injected_padding_ms / 1000.0))
             if silence_samples > 0:
                 import numpy as np
 
@@ -492,13 +425,27 @@ class _SonioxSession(STTBackendSession):
                 await self._audio_q.put(pcm16)
                 logger.info(
                     "[STT] Trailing silence sent (%sms, %s samples, %s bytes)",
-                    silence_ms,
+                    injected_padding_ms,
                     silence_samples,
                     len(pcm16),
                 )
 
+        declared_trim_ms = min(
+            configured_trim_ms,
+            observed_tail_ms + injected_padding_ms,
+        )
+        logger.info(
+            "[STT][Tail] provider=soniox observed_tail_ms=%s injected_padding_ms=%s "
+            "declared_trim_ms=%s boundary_wait_ms=%s",
+            observed_tail_ms,
+            injected_padding_ms,
+            declared_trim_ms,
+            observed_tail_ms,
+        )
         await self._audio_q.put(
-            _FinalizeRequest(trailing_silence_ms=silence_ms if silence_ms > 0 else None)
+            _FinalizeRequest(
+                trailing_silence_ms=declared_trim_ms if declared_trim_ms > 0 else None
+            )
         )
 
     async def stop(self) -> None:
