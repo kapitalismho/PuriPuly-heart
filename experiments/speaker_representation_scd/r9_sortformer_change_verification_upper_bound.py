@@ -2438,7 +2438,7 @@ def extract_embedding_features(root: Path) -> Path:
         "dependencies": {
             "features_a.jsonl": sha256_file(features_a),
             "candidates.jsonl": sha256_file(candidates),
-            "replay_manifest.json": sha256_file(
+            "r9b_runs/vulkan/replay_manifest.json": sha256_file(
                 directory / "r9b_runs" / "vulkan" / "replay_manifest.json"
             ),
             "embedding_dumps": {
@@ -2702,8 +2702,6 @@ def run_b2(root: Path) -> Path:
         )
         return path
 
-    if bool(b1_document.get("mlp_triggered", False)):
-        return stopped_receipt("b1_mlp_fallback")
     if b1_document.get("code_sha256") != sha256_file(CODE_PATH) or b1_document.get(
         "config_sha256"
     ) != sha256_file(CONFIG_PATH):
@@ -2716,6 +2714,8 @@ def run_b2(root: Path) -> Path:
     _validate_receipt_dependencies(root, directory, b1_receipt)
     features_b_receipt = _require_receipt(directory, "features_b_receipt.json")
     _validate_receipt_dependencies(root, directory, features_b_receipt)
+    if bool(b1_document.get("mlp_triggered", False)):
+        return stopped_receipt("b1_mlp_fallback")
     scores_b1_path = directory / "scores_b1.jsonl"
     features_b_path = directory / "features_b.jsonl"
     if not scores_b1_path.is_file() or sha256_file(scores_b1_path) != str(
