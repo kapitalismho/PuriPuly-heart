@@ -2525,10 +2525,17 @@ def run_b2(root: Path) -> Path:
         raise R9Error("b1_metrics.json hashes do not match the current harness/config; rerun b1")
     if b1_document.get("arm") != "b1" or "evaluation_curve" not in b1_document:
         raise R9Error("b1_metrics.json is missing required B1 schema fields")
-    evaluation_curve = b1_document.get("evaluation_curve", [])
-    b1_recall_100 = 0.0
-    if evaluation_curve:
-        b1_recall_100 = float(_select_row(evaluation_curve, 100.0).get("recall_250") or 0.0)
+    evaluation_curve = b1_document.get("evaluation_curve")
+    if not isinstance(evaluation_curve, list) or not evaluation_curve:
+        raise R9Error("b1 evaluation curve is empty; rerun b1 before b2")
+    for row in evaluation_curve:
+        if (
+            not isinstance(row, dict)
+            or not math.isfinite(float(row.get("recall_250", float("nan"))))
+            or not math.isfinite(float(row.get("false_events_per_hour", float("nan"))))
+        ):
+            raise R9Error("b1 evaluation curve contains an invalid row; rerun b1")
+    b1_recall_100 = float(_select_row(evaluation_curve, 100.0).get("recall_250") or 0.0)
     ceiling_doc_path = directory / "ceiling_summary.json"
     if not ceiling_doc_path.is_file():
         raise R9Error("ceiling_summary.json is missing; rerun the ceiling action before b2")
@@ -2540,8 +2547,14 @@ def run_b2(root: Path) -> Path:
             "ceiling summary hashes do not match the current harness/config; rerun ceiling"
         )
     oracle_value = ceiling_doc.get("oracle_recall_250")
-    if not isinstance(oracle_value, (int, float)) or not math.isfinite(float(oracle_value)):
-        raise R9Error("ceiling summary is missing a finite oracle recall; rerun ceiling")
+    if (
+        not isinstance(oracle_value, (int, float))
+        or not math.isfinite(float(oracle_value))
+        or not 0.0 <= float(oracle_value) <= 1.0
+    ):
+        raise R9Error(
+            "ceiling summary has an invalid oracle recall (expected a finite value in [0, 1]); rerun ceiling"
+        )
     candidate_ceiling_recall = float(oracle_value)
     entry = bool(b1_recall_100 >= 0.6 or candidate_ceiling_recall < 0.9)
     if not entry:
@@ -2769,25 +2782,34 @@ def run_b2(root: Path) -> Path:
                 }
             )
     availability_frame_horizon_ms = int(embedding["features"]["after_frames"]) * frame_ms
-    verification_compute_ms_per_event = (
+    verification_compute_ms_per_event_b2 = (
         max(b2_scoring_seconds / len(b2_rows) * 1000.0, 0.0) if b2_rows else 0.0
     )
+    verification_compute_ms_per_event_b1 = float(
+        b1_document.get("availability_latency", {}).get("verification_compute_ms_per_event", 0.0)
+        or 0.0
+    )
+    b2_samples = {int(row["sample"]) for row in b2_rows}
     defect_threshold_ms = float(cfg["reference_gate"]["latency_defect_median_ms"])
     availability: dict[str, Any] = {
         "availability_frame_horizon_ms": availability_frame_horizon_ms,
-        "verification_compute_ms_per_event": verification_compute_ms_per_event,
+        "verification_compute_ms_per_event_b1": verification_compute_ms_per_event_b1,
+        "verification_compute_ms_per_event_b2": verification_compute_ms_per_event_b2,
         "latency_defect_median_ms": defect_threshold_ms,
         "per_target": {},
     }
     for target, point in selected_points.items():
-        deltas = [
-            (int(prediction) - int(reference)) // 16
-            for _, prediction, reference in point["metrics"]["matched_pairs"]
-        ]
-        availability_values = [
-            float(value) + availability_frame_horizon_ms + verification_compute_ms_per_event
-            for value in deltas
-        ]
+        deltas = []
+        availability_values = []
+        for _, prediction, reference in point["metrics"]["matched_pairs"]:
+            lag = (int(prediction) - int(reference)) // 16
+            compute_ms = (
+                verification_compute_ms_per_event_b2
+                if int(prediction) in b2_samples
+                else verification_compute_ms_per_event_b1
+            )
+            deltas.append(lag)
+            availability_values.append(float(lag) + availability_frame_horizon_ms + compute_ms)
         availability_percentiles = _percentiles(availability_values)
         availability["per_target"][str(target)] = {
             "boundary_lag_ms": _percentiles([float(value) for value in deltas]),
@@ -2985,8 +3007,7 @@ def ceiling_summary(root: Path) -> Path:
             if not path.is_file():
                 continue
             b2_document = load_json(path)
-            if not bool(b2_document.get("stopped", True)):
-                require_current_identity(b2_document, "b2")
+            require_current_identity(b2_document, "b2")
             if bool(b2_document.get("stopped", True)):
                 arms["b2"] = {
                     "kind": "stopped",
@@ -3597,8 +3618,11 @@ def report(root: Path) -> Path:
                     "",
                     f"Embedding after-window horizon: "
                     f"{int(b2_doc['availability']['availability_frame_horizon_ms'])} ms; "
-                    f"verification compute: "
-                    f"{float(b2_doc['availability'].get('verification_compute_ms_per_event') or 0.0):.3f} ms per event.",
+                    f"verification compute per event — B1 "
+                    f"{float(b2_doc['availability'].get('verification_compute_ms_per_event_b1') or 0.0):.3f} ms, "
+                    f"B2 "
+                    f"{float(b2_doc['availability'].get('verification_compute_ms_per_event_b2') or 0.0):.3f} ms "
+                    f"(applied to the corresponding emitted events).",
                     "",
                     "| Target FE/h | Boundary lag p50 ms | Boundary lag p90 ms | Availability p50 ms | Availability p90 ms | Defect |",
                     "| ---: | ---: | ---: | ---: | ---: | ---: |",
