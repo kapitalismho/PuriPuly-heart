@@ -1160,6 +1160,7 @@ def _verifier_arm(
     mlp_trigger_source: str | None = None,
     fold_matrix_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] | None = None,
     availability_frames: int | None = None,
+    dependencies: dict[str, str] | None = None,
 ) -> Path:
     cfg = config()
     sessions = _sessions(root)
@@ -1464,8 +1465,9 @@ def _verifier_arm(
     write_json(path, document)
     transfer_path = directory / transfer_name
     write_json(transfer_path, transfer)
+    scores_path = directory / f"scores_{scores_name}.jsonl"
     write_jsonl(
-        directory / f"scores_{scores_name}.jsonl",
+        scores_path,
         [
             {
                 "row": int(row["row"]),
@@ -1477,12 +1479,25 @@ def _verifier_arm(
             for row in rows
         ],
     )
+    receipt = {
+        "schema_version": 1,
+        "arm": arm,
+        "feature_file": feature_file,
+        "feature_file_sha256": sha256_file(directory / f"{feature_file}.jsonl"),
+        "scores_file": scores_path.name,
+        "scores_sha256": sha256_file(scores_path),
+        "dependencies": dependencies or {},
+        "code_sha256": sha256_file(CODE_PATH),
+        "config_sha256": sha256_file(CONFIG_PATH),
+    }
+    write_json(directory / f"{output_name}_receipt.json", receipt)
     return path
 
 
 def run_a1(root: Path, diagnostic: bool) -> Path:
     cfg = config()
     feature_names = list(cfg["feature_names"])
+    directory = output_root(root)
     if diagnostic:
         return _verifier_arm(
             root,
@@ -1493,6 +1508,11 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
             output_name="a1_diagnostic_metrics",
             scores_name="a1_diagnostic",
             transfer_name="threshold_transfer_diagnostic_metrics.json",
+            dependencies={
+                "features_a_diagnostic.jsonl": sha256_file(
+                    directory / "features_a_diagnostic.jsonl"
+                )
+            },
         )
     return _verifier_arm(
         root,
@@ -1503,6 +1523,10 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
         output_name="a1_metrics",
         scores_name="a1",
         transfer_name="threshold_transfer_metrics.json",
+        dependencies={
+            "candidates.jsonl": sha256_file(directory / "candidates.jsonl"),
+            "features_a.jsonl": sha256_file(directory / "features_a.jsonl"),
+        },
     )
 
 
@@ -1780,9 +1804,16 @@ def _run_bench(
                 process.terminate()
                 process.wait(timeout=30)
         return_code = int(process.returncode)
+        if memory_ceiling_bytes is not None:
+            final_sample = _peak_private_bytes(process._handle)
+            if final_sample > 0:
+                peak_private = max(peak_private, final_sample)
+                memory_sampled = True
     wall_seconds = time.perf_counter() - started
     if return_code != 0:
         raise R9Error(f"transcribe-bench failed ({return_code}); see {log_path}")
+    if memory_ceiling_bytes is not None and not memory_sampled:
+        raise R9Error("memory sampling failed; the 24 GiB ceiling cannot be certified")
     return {
         "wall_seconds": wall_seconds,
         "peak_private_bytes": peak_private,
@@ -1832,10 +1863,18 @@ def r9b_fixture(root: Path) -> Path:
     if not prepared.is_file():
         raise R9Error("r9b-prepare must run first")
     prepare_doc = load_json(prepared)
+    if prepare_doc.get("code_sha256") != sha256_file(CODE_PATH) or prepare_doc.get(
+        "config_sha256"
+    ) != sha256_file(CONFIG_PATH):
+        raise R9Error("r9b_prepare.json is stale; rerun r9b-prepare")
     patched_cpu = Path(prepare_doc["binaries"]["patched_cpu"]["path"])
     clean_cpu = Path(prepare_doc["binaries"]["clean_cpu"]["path"])
     model = Path(prepare_doc["model"]["path"])
     fixture_root = directory / "embedding_validation"
+    fixture_root.mkdir(parents=True, exist_ok=True)
+    validation_target = fixture_root / "embedding_validation.json"
+    if validation_target.exists():
+        validation_target.unlink()
     smoke_root = r8_output_root(root) / "smoke_audio"
     cadence = int(embedding["dump"]["cadence_chunks"])
     horizon = int(embedding["dump"]["horizon_frames"])
@@ -1952,6 +1991,11 @@ def r9b_fixture(root: Path) -> Path:
         "schema_version": 1,
         "passed": checks["passed"],
         "fixtures": fixtures,
+        "preparation": {
+            "patch_sha256": prepare_doc["patch_sha256"],
+            "model_sha256": prepare_doc["model"]["sha256"],
+            "binaries": {name: value["sha256"] for name, value in prepare_doc["binaries"].items()},
+        },
         "code_sha256": sha256_file(CODE_PATH),
         "config_sha256": sha256_file(CONFIG_PATH),
     }
@@ -1992,6 +2036,10 @@ def r9b_replay(root: Path) -> Path:
     if not prepared.is_file():
         raise R9Error("r9b-prepare must run first")
     prepare_doc = load_json(prepared)
+    if prepare_doc.get("code_sha256") != sha256_file(CODE_PATH) or prepare_doc.get(
+        "config_sha256"
+    ) != sha256_file(CONFIG_PATH):
+        raise R9Error("r9b_prepare.json is stale; rerun r9b-prepare")
     bench = Path(prepare_doc["binaries"]["patched_vulkan"]["path"])
     model = Path(prepare_doc["model"]["path"])
     sessions = _sessions(root)
@@ -2009,6 +2057,16 @@ def r9b_replay(root: Path) -> Path:
         raise R9Error(
             "fixture validation hashes do not match the current harness/config; rerun r9b-fixture"
         )
+    preparation_binding = validation.get("preparation", {})
+    if preparation_binding.get("patch_sha256") != prepare_doc.get("patch_sha256"):
+        raise R9Error("fixture validation does not bind to the current patch; rerun r9b-fixture")
+    if preparation_binding.get("model_sha256") != prepare_doc.get("model", {}).get("sha256"):
+        raise R9Error("fixture validation does not bind to the current model; rerun r9b-fixture")
+    current_binary_hashes = {
+        name: value.get("sha256") for name, value in prepare_doc.get("binaries", {}).items()
+    }
+    if preparation_binding.get("binaries") != current_binary_hashes:
+        raise R9Error("fixture validation does not bind to the current binaries; rerun r9b-fixture")
     memory_ceiling_bytes = 24 * 1024 * 1024 * 1024
     wall_budget_seconds = 24 * 3600.0
     storage_floor_bytes = 40 * 1024 * 1024 * 1024
@@ -2134,7 +2192,7 @@ def r9b_replay(root: Path) -> Path:
                     "cpu_probability_shape": list(cpu_probabilities.shape),
                 }
             )
-        except Exception as error:  # receipt integrity on any limit/cleanup failure
+        except BaseException as error:  # receipt integrity on any limit/cleanup/cancel failure
             invalid_receipt(session_id, f"{type(error).__name__}: {error}")
             raise
     manifest = {
@@ -2298,11 +2356,7 @@ def extract_embedding_features(root: Path) -> Path:
             records_by_session[session_id] = _parse_dump_records(dump_paths[session_id])
         records = records_by_session[session_id]
         target = int(candidate["frame"]) + int(embedding["features"]["after_frames"])
-        chosen = next((record for record in records if record["total_n"] > target), None)
-        if chosen is None:
-            raise R9Error(
-                f"no dump record covers candidate row {row['row']} (session {session_id})"
-            )
+        chosen = next((record for record in records if record["total_n"] > target), records[-1])
         previous = records[records.index(chosen) - 1] if records.index(chosen) > 0 else None
         values, excluded = _embedding_features_for_candidate(
             chosen,
@@ -2341,6 +2395,25 @@ def extract_embedding_features(root: Path) -> Path:
             "config_sha256": sha256_file(CONFIG_PATH),
         },
     )
+    receipt = {
+        "schema_version": 1,
+        "feature_file": "features_b.jsonl",
+        "features_b_sha256": sha256_file(path),
+        "dependencies": {
+            "features_a.jsonl": sha256_file(features_a),
+            "candidates.jsonl": sha256_file(candidates),
+            "replay_manifest.json": sha256_file(
+                directory / "r9b_runs" / "vulkan" / "replay_manifest.json"
+            ),
+            "embedding_dumps": {
+                session_id: sha256_file(dump_path)
+                for session_id, dump_path in sorted(dump_paths.items())
+            },
+        },
+        "code_sha256": sha256_file(CODE_PATH),
+        "config_sha256": sha256_file(CONFIG_PATH),
+    }
+    write_json(directory / "features_b_receipt.json", receipt)
     return path
 
 
@@ -2361,9 +2434,44 @@ def _b1_fold_transform(matrix: np.ndarray, train_mask: np.ndarray) -> np.ndarray
     return transformed
 
 
+def _require_receipt(
+    directory: Path, receipt_name: str, expected_arm: str | None = None
+) -> dict[str, Any]:
+    path = directory / receipt_name
+    if not path.is_file():
+        raise R9Error(f"{receipt_name} is missing; rerun the producing action")
+    receipt = load_json(path)
+    if receipt.get("code_sha256") != sha256_file(CODE_PATH) or receipt.get(
+        "config_sha256"
+    ) != sha256_file(CONFIG_PATH):
+        raise R9Error(
+            f"{receipt_name} hashes do not match the current harness/config; rerun the producing action"
+        )
+    if expected_arm is not None and receipt.get("arm") != expected_arm:
+        raise R9Error(f"{receipt_name} arm mismatch; rerun the producing action")
+    return receipt
+
+
 def run_b1(root: Path) -> Path:
     cfg = config()
     embedding = _embedding_config(cfg)
+    directory = output_root(root)
+    a1_path = directory / "a1_metrics.json"
+    if not a1_path.is_file():
+        raise R9Error("a1 must run before b1 (no parallel-run authorization)")
+    a1_document = load_json(a1_path)
+    if (
+        a1_document.get("arm") != "a1"
+        or a1_document.get("code_sha256") != sha256_file(CODE_PATH)
+        or a1_document.get("config_sha256") != sha256_file(CONFIG_PATH)
+    ):
+        raise R9Error("a1_metrics.json is stale or invalid; rerun a1 with the current harness")
+    features_b_receipt = _require_receipt(directory, "features_b_receipt.json")
+    features_b_path = directory / "features_b.jsonl"
+    if not features_b_path.is_file() or sha256_file(features_b_path) != str(
+        features_b_receipt.get("features_b_sha256")
+    ):
+        raise R9Error("features_b.jsonl is missing or modified; rerun r9b-extract")
     feature_names = list(cfg["feature_names"]) + list(embedding["features"]["feature_names"])
     return _verifier_arm(
         root,
@@ -2377,6 +2485,7 @@ def run_b1(root: Path) -> Path:
         mlp_trigger_source=None,
         fold_matrix_transform=_b1_fold_transform,
         availability_frames=int(embedding["features"]["after_frames"]),
+        dependencies={"features_b.jsonl": sha256_file(features_b_path)},
     )
 
 
@@ -2537,6 +2646,17 @@ def run_b2(root: Path) -> Path:
         raise R9Error("b1_metrics.json hashes do not match the current harness/config; rerun b1")
     if b1_document.get("arm") != "b1" or "evaluation_curve" not in b1_document:
         raise R9Error("b1_metrics.json is missing required B1 schema fields")
+    b1_receipt = _require_receipt(directory, "b1_metrics_receipt.json", expected_arm="b1")
+    scores_b1_path = directory / "scores_b1.jsonl"
+    features_b_path = directory / "features_b.jsonl"
+    if not scores_b1_path.is_file() or sha256_file(scores_b1_path) != str(
+        b1_receipt.get("scores_sha256")
+    ):
+        raise R9Error("scores_b1.jsonl is missing or modified; rerun b1")
+    if not features_b_path.is_file() or sha256_file(features_b_path) != str(
+        b1_receipt.get("feature_file_sha256")
+    ):
+        raise R9Error("features_b.jsonl is missing or modified; rerun r9b-extract and b1")
     evaluation_curve = b1_document.get("evaluation_curve")
     if not isinstance(evaluation_curve, list) or not evaluation_curve:
         raise R9Error("b1 evaluation curve is empty; rerun b1 before b2")
@@ -2657,11 +2777,7 @@ def run_b2(root: Path) -> Path:
                 records_by_session[session_id] = _parse_dump_records(dump_paths[session_id])
             records = records_by_session[session_id]
             target = int(candidate["frame"]) + int(embedding["features"]["after_frames"])
-            chosen = next((record for record in records if record["total_n"] > target), None)
-            if chosen is None:
-                raise R9Error(
-                    f"no dump record covers B2 candidate {candidate} (session {session_id})"
-                )
+            chosen = next((record for record in records if record["total_n"] > target), records[-1])
             previous = records[records.index(chosen) - 1] if records.index(chosen) > 0 else None
             values, excluded = _embedding_features_for_candidate(
                 chosen,
