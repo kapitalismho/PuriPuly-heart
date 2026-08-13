@@ -1979,6 +1979,13 @@ def r9b_replay(root: Path) -> Path:
     cfg = config()
     embedding = _embedding_config(cfg)
     directory = output_root(root)
+    embeddings_dir = directory / "embeddings" / "vulkan"
+    embeddings_dir.mkdir(parents=True, exist_ok=True)
+    runs_dir = directory / "r9b_runs" / "vulkan"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    stale_manifest = runs_dir / "replay_manifest.json"
+    if stale_manifest.exists():
+        stale_manifest.unlink()
     prepared = directory / "r9b_prepare.json"
     if not prepared.is_file():
         raise R9Error("r9b-prepare must run first")
@@ -2003,17 +2010,10 @@ def r9b_replay(root: Path) -> Path:
     memory_ceiling_bytes = 24 * 1024 * 1024 * 1024
     wall_budget_seconds = 24 * 3600.0
     storage_floor_bytes = 40 * 1024 * 1024 * 1024
-    embeddings_dir = directory / "embeddings" / "vulkan"
-    embeddings_dir.mkdir(parents=True, exist_ok=True)
-    runs_dir = directory / "r9b_runs" / "vulkan"
-    runs_dir.mkdir(parents=True, exist_ok=True)
     probabilities_dir = directory / "probabilities" / "vulkan"
     probabilities_dir.mkdir(parents=True, exist_ok=True)
     segments_dir = directory / "speaker_segments" / "vulkan"
     segments_dir.mkdir(parents=True, exist_ok=True)
-    stale_manifest = runs_dir / "replay_manifest.json"
-    if stale_manifest.exists():
-        stale_manifest.unlink()
     cpu_probabilities_dir = r8_output_root(root) / "probabilities" / "cpu"
     rows: list[dict[str, Any]] = []
     total_wall = 0.0
@@ -2039,12 +2039,12 @@ def r9b_replay(root: Path) -> Path:
             invalid_receipt(session_id, f"storage floor breached: {free} free bytes")
             raise R9Error(f"storage floor breached: {free} free bytes")
         dump_bin = embeddings_dir / f"{session_id}.bin"
-        if dump_bin.exists():
-            dump_bin.unlink()
         base = runs_dir / session_id
         dump_dir = base / "dumps"
         bench_json = base / "bench.json"
         try:
+            if dump_bin.exists():
+                dump_bin.unlink()
             run_metrics = _run_bench(
                 bench,
                 model,
@@ -2232,21 +2232,12 @@ def _embedding_features_for_candidate(
     }, excluded
 
 
-def extract_embedding_features(root: Path) -> Path:
-    cfg = config()
-    embedding = _embedding_config(cfg)
-    directory = output_root(root)
-    features_a = directory / "features_a.jsonl"
-    candidates = directory / "candidates.jsonl"
-    for required in (features_a, candidates):
-        if not required.is_file():
-            raise R9Error(f"{required.name} must exist before r9b-extract")
-    feature_rows = read_jsonl(features_a)
-    candidates_rows = read_jsonl(candidates)
-    by_row = {int(row["row"]): row for row in candidates_rows}
+def _replay_manifest_and_dumps(
+    root: Path, directory: Path
+) -> tuple[dict[str, Any], dict[str, Path]]:
     manifest = directory / "r9b_runs" / "vulkan" / "replay_manifest.json"
     if not manifest.is_file():
-        raise R9Error("r9b-replay must run before r9b-extract")
+        raise R9Error("r9b-replay must run before this step")
     manifest_doc = load_json(manifest)
     if manifest_doc.get("code_sha256") != sha256_file(CODE_PATH) or manifest_doc.get(
         "config_sha256"
@@ -2266,6 +2257,22 @@ def extract_embedding_features(root: Path) -> Path:
         if sha256_file(dump_path) != str(item.get("embedding_dump_sha256")):
             raise R9Error(f"embedding dump hash mismatch for {item['session_id']}")
         dump_paths[str(item["session_id"])] = dump_path
+    return manifest_doc, dump_paths
+
+
+def extract_embedding_features(root: Path) -> Path:
+    cfg = config()
+    embedding = _embedding_config(cfg)
+    directory = output_root(root)
+    features_a = directory / "features_a.jsonl"
+    candidates = directory / "candidates.jsonl"
+    for required in (features_a, candidates):
+        if not required.is_file():
+            raise R9Error(f"{required.name} must exist before r9b-extract")
+    feature_rows = read_jsonl(features_a)
+    candidates_rows = read_jsonl(candidates)
+    by_row = {int(row["row"]): row for row in candidates_rows}
+    _, dump_paths = _replay_manifest_and_dumps(root, directory)
     records_by_session: dict[str, list[dict[str, Any]]] = {}
     similarity_names = ("same_slot_similarity", "best_other_similarity", "embedding_jump")
     excluded_count = 0
@@ -2516,10 +2523,17 @@ def run_b2(root: Path) -> Path:
     b1_recall_100 = 0.0
     if evaluation_curve:
         b1_recall_100 = float(_select_row(evaluation_curve, 100.0).get("recall_250") or 0.0)
-    ceiling_doc = directory / "ceiling_summary.json"
-    candidate_ceiling_recall = 0.0
-    if ceiling_doc.is_file():
-        candidate_ceiling_recall = float(load_json(ceiling_doc).get("oracle_recall_250") or 0.0)
+    ceiling_doc_path = directory / "ceiling_summary.json"
+    if not ceiling_doc_path.is_file():
+        raise R9Error("ceiling_summary.json is missing; rerun the ceiling action before b2")
+    ceiling_doc = load_json(ceiling_doc_path)
+    if ceiling_doc.get("code_sha256") != sha256_file(CODE_PATH) or ceiling_doc.get(
+        "config_sha256"
+    ) != sha256_file(CONFIG_PATH):
+        raise R9Error(
+            "ceiling summary hashes do not match the current harness/config; rerun ceiling"
+        )
+    candidate_ceiling_recall = float(ceiling_doc.get("oracle_recall_250") or 0.0)
     entry = bool(b1_recall_100 >= 0.6 or candidate_ceiling_recall < 0.9)
     if not entry:
         return stopped_receipt(
@@ -2527,13 +2541,7 @@ def run_b2(root: Path) -> Path:
             b1_recall_100_feh=b1_recall_100,
             candidate_ceiling_recall=candidate_ceiling_recall,
         )
-    manifest = directory / "r9b_runs" / "vulkan" / "replay_manifest.json"
-    if not manifest.is_file():
-        raise R9Error("r9b-replay must run before b2")
-    dump_paths = {
-        str(item["session_id"]): Path(item["embedding_dump_path"])
-        for item in load_json(manifest)["items"]
-    }
+    _, dump_paths = _replay_manifest_and_dumps(root, directory)
     windows = cfg["feature_windows"]
     frame_ms = int(cfg["frame_ms"])
     confirmation_frames = int(cfg["confirmation"]["base_frames"])
@@ -2749,8 +2757,10 @@ def run_b2(root: Path) -> Path:
                 }
             )
     availability_frame_horizon_ms = int(embedding["features"]["after_frames"]) * frame_ms
+    defect_threshold_ms = float(cfg["reference_gate"]["latency_defect_median_ms"])
     availability: dict[str, Any] = {
         "availability_frame_horizon_ms": availability_frame_horizon_ms,
+        "latency_defect_median_ms": defect_threshold_ms,
         "per_target": {},
     }
     for target, point in selected_points.items():
@@ -2758,10 +2768,13 @@ def run_b2(root: Path) -> Path:
             (int(prediction) - int(reference)) // 16
             for _, prediction, reference in point["metrics"]["matched_pairs"]
         ]
+        availability_values = [float(value) + availability_frame_horizon_ms for value in deltas]
+        availability_percentiles = _percentiles(availability_values)
         availability["per_target"][str(target)] = {
-            "availability_ms": _percentiles(
-                [float(value) + availability_frame_horizon_ms for value in deltas]
-            )
+            "boundary_lag_ms": _percentiles([float(value) for value in deltas]),
+            "availability_ms": availability_percentiles,
+            "latency_defect": availability_percentiles["p50"] is not None
+            and float(availability_percentiles["p50"]) >= defect_threshold_ms,
         }
     path = directory / "b2_metrics.json"
     write_json(
@@ -3082,6 +3095,8 @@ def ceiling_summary(root: Path) -> Path:
         "arms": arms,
         "outcome_a_pareto": pareto,
         "embedding_contribution": embedding_contribution,
+        "code_sha256": sha256_file(CODE_PATH),
+        "config_sha256": sha256_file(CONFIG_PATH),
     }
     path = directory / "ceiling_summary.json"
     write_json(path, document)
@@ -3501,8 +3516,44 @@ def report(root: Path) -> Path:
                 f"{int(b1_doc['availability_latency']['availability_frame_horizon_ms'])} ms; "
                 f"verification compute: "
                 f"{float(b1_doc['availability_latency']['verification_compute_ms_per_event']):.3f} ms per event.",
+                "",
+                "| Target FE/h | Boundary lag p50 ms | Boundary lag p90 ms | Availability p50 ms | Availability p90 ms | Defect |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
+        for target in config()["targets"]["false_events_per_hour"]:
+            point = b1_doc["availability_latency"]["per_target"][str(float(target))]
+            lines.append(
+                f"| {target} | {_latency_cell(point['boundary_lag_ms'], 'p50')} | "
+                f"{_latency_cell(point['boundary_lag_ms'], 'p90')} | "
+                f"{_latency_cell(point['availability_ms'], 'p50')} | "
+                f"{_latency_cell(point['availability_ms'], 'p90')} | "
+                f"{'yes' if point.get('latency_defect') else 'no'} |"
+            )
+        b1_gate = b1_doc.get("reference_gate", {}).get("targets", {})
+        if "20.0" in b1_gate:
+            point_20 = b1_gate["20.0"]
+            lines.extend(
+                [
+                    "",
+                    "## R9-B1 at the <=20 FE/h selection point",
+                    "",
+                    f"Evaluated {float(point_20['false_events_per_hour']):.2f} FE/h; "
+                    f"Recall@250 {float(point_20['recall_250'] or 0.0):.3f}; "
+                    f"stratum recall — overlap onset "
+                    f"{float(point_20['stratum_recall'].get('overlap_onset') or 0.0):.3f}, "
+                    f"silence-gap change "
+                    f"{float(point_20['stratum_recall'].get('silence_gap_change') or 0.0):.3f}; "
+                    f"maximum single-meeting TP share "
+                    f"{float(point_20['maximum_meeting_true_positive_share']):.3f}.",
+                ]
+            )
+        b1_selected = b1_doc.get("selected_operating_points", {}).get("20.0")
+        if b1_selected:
+            lines.append(
+                f"20 FE/h short-return recall "
+                f"{float(b1_selected['metrics'].get('short_return_recall') or 0.0):.3f}."
+            )
     b2_metrics_path = directory / "b2_metrics.json"
     if b2_metrics_path.is_file():
         b2_doc = load_json(b2_metrics_path)
@@ -3514,8 +3565,20 @@ def report(root: Path) -> Path:
                     "",
                     f"Embedding after-window horizon: "
                     f"{int(b2_doc['availability']['availability_frame_horizon_ms'])} ms.",
+                    "",
+                    "| Target FE/h | Boundary lag p50 ms | Boundary lag p90 ms | Availability p50 ms | Availability p90 ms | Defect |",
+                    "| ---: | ---: | ---: | ---: | ---: | ---: |",
                 ]
             )
+            for target in config()["targets"]["false_events_per_hour"]:
+                point = b2_doc["availability"]["per_target"][str(float(target))]
+                lines.append(
+                    f"| {target} | {_latency_cell(point['boundary_lag_ms'], 'p50')} | "
+                    f"{_latency_cell(point['boundary_lag_ms'], 'p90')} | "
+                    f"{_latency_cell(point['availability_ms'], 'p50')} | "
+                    f"{_latency_cell(point['availability_ms'], 'p90')} | "
+                    f"{'yes' if point.get('latency_defect') else 'no'} |"
+                )
     transfer = a1.get("threshold_transfer", [])
     if transfer:
         lines.extend(
@@ -3594,6 +3657,36 @@ def report(root: Path) -> Path:
                         f"{float(point_20['metrics']['maximum_meeting_true_positive_share']):.3f}.",
                     ]
                 )
+            b2_per_meeting = b2_doc.get("per_meeting_curves", {})
+            if b2_per_meeting:
+                selected_threshold = float(
+                    b2_doc.get("selected_operating_points", {})
+                    .get("20.0", {})
+                    .get("threshold", 0.0)
+                )
+                lines.extend(
+                    [
+                        "",
+                        "## R9-B2 union per-meeting at the <=20 FE/h threshold",
+                        "",
+                        "| Meeting | Predictions | FE/h | Recall@250 |",
+                        "| --- | ---: | ---: | ---: |",
+                    ]
+                )
+                for session_id in sorted(b2_per_meeting):
+                    rows = [
+                        row
+                        for row in b2_per_meeting[session_id]
+                        if abs(float(row["threshold"]) - selected_threshold) < 1e-6
+                    ]
+                    if not rows:
+                        continue
+                    row = rows[0]
+                    lines.append(
+                        f"| {session_id} | {int(row['prediction_count'])} | "
+                        f"{float(row['false_events_per_hour']):.1f} | "
+                        f"{float(row['recall_250'] or 0.0):.3f} |"
+                    )
     outcome_lines = ["", "## Outcome", ""]
     if (directory / "b1_metrics.json").is_file():
         b1_doc = load_json(directory / "b1_metrics.json")
