@@ -300,6 +300,64 @@ def test_final_dev_v30_ui_equivalent_save_preserves_migrated_and_changed_values(
     )
 
 
+def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    translation = canonical["intent"]["translation"]
+    translation["model"] = "gemini3_flash"
+    translation["connection"] = "official_byok"
+    translation["gemini"] = {"llm_model": "gemini-3-flash-preview"}
+    translation["openrouter_model"] = "google/gemini-3-flash-preview"
+    translation["openrouter_selection_alias"] = "gemini3_flash_byok"
+    translation["fallback"] = {
+        "enabled": True,
+        "model": "gemini3_flash",
+        "connection": "openrouter",
+        "selection_alias": "none",
+    }
+
+    migrated = migration.from_dict(canonical)
+    result = serialization.to_dict(migrated)["intent"]["translation"]
+
+    assert result["model"] == "gemini37_flash"
+    assert result["gemini"]["llm_model"] == "gemini-3.7-flash"
+    assert result["openrouter_model"] == "google/gemini-3.7-flash"
+    assert result["openrouter_selection_alias"] == "gemini37_flash_byok"
+    assert result["fallback"] == {
+        "enabled": True,
+        "model": "gemma4_26b_31b",
+        "connection": "openrouter",
+        "selection_alias": "openrouter_gemma4_26b_31b",
+    }
+
+
+def test_vnext_dict_migrates_disabled_gemini_3_flash_fallback_to_none() -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    translation = canonical["intent"]["translation"]
+    translation["model"] = "gemini3_flash"
+    translation["connection"] = "official_byok"
+    translation["fallback"] = {
+        "enabled": False,
+        "model": "gemini3_flash",
+        "connection": "openrouter",
+        "selection_alias": "none",
+    }
+
+    migrated = migration.from_dict(canonical)
+    result = serialization.to_dict(migrated)["intent"]["translation"]
+
+    assert result["model"] == "gemini37_flash"
+    assert result["fallback"] == {
+        "enabled": False,
+        "model": "deepseek_v4_flash",
+        "connection": "official_byok",
+        "selection_alias": "none",
+    }
+
+
 def test_v24_boolean_api_key_verification_migrates_every_provider_to_verified() -> None:
     migration = _migration()
     serialization = _serialization()

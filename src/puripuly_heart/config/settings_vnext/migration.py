@@ -365,13 +365,31 @@ def _migrate_gemini_3_flash_translation(translation: dict[str, Any]) -> None:
         translation["model"] = "gemini37_flash"
     if translation.get("previous_llm_model") == "gemini3_flash":
         translation["previous_llm_model"] = "gemini37_flash"
+    gemini = translation.get("gemini")
+    if isinstance(gemini, dict) and gemini.get("llm_model") in {
+        "gemini-3-flash",
+        "gemini-3-flash-preview",
+    }:
+        gemini["llm_model"] = "gemini-3.7-flash"
+    if translation.get("openrouter_model") == "google/gemini-3-flash-preview":
+        translation["openrouter_model"] = "google/gemini-3.7-flash"
+    if translation.get("openrouter_selection_alias") == "gemini3_flash_byok":
+        translation["openrouter_selection_alias"] = "gemini37_flash_byok"
     history = translation.get("connection_history")
     if isinstance(history, dict) and "gemini3_flash" in history:
         history["gemini37_flash"] = history["gemini3_flash"]
         history.pop("gemini3_flash", None)
     fallback = translation.get("fallback")
     if isinstance(fallback, dict) and fallback.get("model") == "gemini3_flash":
-        fallback["model"] = "gemini37_flash"
+        if bool(fallback.get("enabled", False)):
+            fallback["enabled"] = True
+            fallback["model"] = "gemma4_26b_31b"
+            fallback["connection"] = "openrouter"
+            fallback["selection_alias"] = DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
+        else:
+            fallback["model"] = "deepseek_v4_flash"
+            fallback["connection"] = "official_byok"
+            fallback["selection_alias"] = "none"
 
 
 def _migrate_deepseek_v4_pro_translation(translation: dict[str, Any]) -> None:
