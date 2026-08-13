@@ -82,7 +82,7 @@
   "settings.translation_model.gemma4.description": "",
   "settings.translation_model.gemma4_26b_31b.description": "ほとんどの場面で優秀です",
   "settings.translation_model.deepseek_v4_flash.description": "Gemma 4の速度が不安定な場合にお試しください",
-  "settings.translation_model.gemini37_flash.description": "翻訳が速いです",
+  "settings.translation_model.gemini37_flash.description": "",
   "settings.translation_model.gemini31_flash_lite.description": "",
   "settings.translation_model.qwen35_plus.description": "DeepSeekの良い代替手段です",
   "settings.translation_model.local_llm.description": "ローカルLLMも使用できます",

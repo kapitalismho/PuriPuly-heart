@@ -82,7 +82,7 @@
   "settings.translation_model.gemma4.description": "",
   "settings.translation_model.gemma4_26b_31b.description": "Good for most situations",
   "settings.translation_model.deepseek_v4_flash.description": "Try this if Gemma 4's speed is unstable",
-  "settings.translation_model.gemini37_flash.description": "Fast translation",
+  "settings.translation_model.gemini37_flash.description": "",
   "settings.translation_model.gemini31_flash_lite.description": "",
   "settings.translation_model.qwen35_plus.description": "A strong alternative to DeepSeek",
   "settings.translation_model.local_llm.description": "You can also use a local LLM",

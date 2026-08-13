@@ -82,7 +82,7 @@
   "settings.translation_model.gemma4.description": "",
   "settings.translation_model.gemma4_26b_31b.description": "适合大多数情况",
   "settings.translation_model.deepseek_v4_flash.description": "当 Gemma 4 速度不稳定时可以试试",
-  "settings.translation_model.gemini37_flash.description": "翻译速度快",
+  "settings.translation_model.gemini37_flash.description": "",
   "settings.translation_model.gemini31_flash_lite.description": "",
   "settings.translation_model.qwen35_plus.description": "DeepSeek 的不错替代选择",
   "settings.translation_model.local_llm.description": "也可以使用本地 LLM",

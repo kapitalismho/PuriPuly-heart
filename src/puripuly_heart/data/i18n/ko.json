@@ -82,7 +82,7 @@
   "settings.translation_model.gemma4.description": "",
   "settings.translation_model.gemma4_26b_31b.description": "대부분의 상황에서 좋아요",
   "settings.translation_model.deepseek_v4_flash.description": "Gemma 4의 속도가 불안정할 경우 사용해보세요",
-  "settings.translation_model.gemini37_flash.description": "번역이 빨라요",
+  "settings.translation_model.gemini37_flash.description": "",
   "settings.translation_model.gemini31_flash_lite.description": "",
   "settings.translation_model.qwen35_plus.description": "딥시크의 좋은 대안이에요",
   "settings.translation_model.local_llm.description": "로컬 LLM도 사용할 수 있어요",
