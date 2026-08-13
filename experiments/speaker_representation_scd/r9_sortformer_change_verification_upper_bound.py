@@ -2785,11 +2785,15 @@ def run_b2(root: Path) -> Path:
     verification_compute_ms_per_event_b2 = (
         max(b2_scoring_seconds / len(b2_rows) * 1000.0, 0.0) if b2_rows else 0.0
     )
-    verification_compute_ms_per_event_b1 = float(
-        b1_document.get("availability_latency", {}).get("verification_compute_ms_per_event", 0.0)
-        or 0.0
+    b1_compute_value = b1_document.get("availability_latency", {}).get(
+        "verification_compute_ms_per_event"
     )
-    b2_samples = {int(row["sample"]) for row in b2_rows}
+    if not isinstance(b1_compute_value, (int, float)) or not math.isfinite(float(b1_compute_value)):
+        raise R9Error("b1_metrics.json lacks a finite verifier compute value; rerun b1")
+    verification_compute_ms_per_event_b1 = float(b1_compute_value)
+    b2_samples: dict[str, set[int]] = defaultdict(set)
+    for row in b2_rows:
+        b2_samples[str(row["session_id"])].add(int(row["sample"]))
     defect_threshold_ms = float(cfg["reference_gate"]["latency_defect_median_ms"])
     availability: dict[str, Any] = {
         "availability_frame_horizon_ms": availability_frame_horizon_ms,
@@ -2801,11 +2805,11 @@ def run_b2(root: Path) -> Path:
     for target, point in selected_points.items():
         deltas = []
         availability_values = []
-        for _, prediction, reference in point["metrics"]["matched_pairs"]:
+        for session_id, prediction, reference in point["metrics"]["matched_pairs"]:
             lag = (int(prediction) - int(reference)) // 16
             compute_ms = (
                 verification_compute_ms_per_event_b2
-                if int(prediction) in b2_samples
+                if int(prediction) in b2_samples.get(str(session_id), set())
                 else verification_compute_ms_per_event_b1
             )
             deltas.append(lag)
@@ -3607,6 +3611,34 @@ def report(root: Path) -> Path:
                 f"20 FE/h short-return recall "
                 f"{float(b1_selected['metrics'].get('short_return_recall') or 0.0):.3f}."
             )
+        b1_per_meeting = b1_doc.get("per_meeting_curves", {})
+        if b1_per_meeting:
+            selected_threshold = float(
+                b1_doc.get("selected_operating_points", {}).get("20.0", {}).get("threshold", 0.0)
+            )
+            lines.extend(
+                [
+                    "",
+                    "## R9-B1 per-meeting at the <=20 FE/h threshold",
+                    "",
+                    "| Meeting | Predictions | FE/h | Recall@250 |",
+                    "| --- | ---: | ---: | ---: |",
+                ]
+            )
+            for session_id in sorted(b1_per_meeting):
+                rows = [
+                    row
+                    for row in b1_per_meeting[session_id]
+                    if abs(float(row["threshold"]) - selected_threshold) < 1e-6
+                ]
+                if not rows:
+                    continue
+                row = rows[0]
+                lines.append(
+                    f"| {session_id} | {int(row['prediction_count'])} | "
+                    f"{float(row['false_events_per_hour']):.1f} | "
+                    f"{float(row['recall_250'] or 0.0):.3f} |"
+                )
     b2_metrics_path = directory / "b2_metrics.json"
     if b2_metrics_path.is_file():
         b2_doc = load_json(b2_metrics_path)
