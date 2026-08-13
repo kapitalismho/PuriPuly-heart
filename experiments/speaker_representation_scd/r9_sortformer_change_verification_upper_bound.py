@@ -2791,9 +2791,29 @@ def run_b2(root: Path) -> Path:
     if not isinstance(b1_compute_value, (int, float)) or not math.isfinite(float(b1_compute_value)):
         raise R9Error("b1_metrics.json lacks a finite verifier compute value; rerun b1")
     verification_compute_ms_per_event_b1 = float(b1_compute_value)
-    b2_samples: dict[str, set[int]] = defaultdict(set)
+    b1_score_by_key: dict[tuple[str, int], float] = {}
+    for row in read_jsonl(directory / "scores_b1.jsonl"):
+        key = (str(row["session_id"]), int(row["sample"]))
+        score = float(row["score"])
+        if key not in b1_score_by_key or score > b1_score_by_key[key]:
+            b1_score_by_key[key] = score
+    b2_score_by_key: dict[tuple[str, int], float] = {}
     for row in b2_rows:
-        b2_samples[str(row["session_id"])].add(int(row["sample"]))
+        key = (str(row["session_id"]), int(row["sample"]))
+        score = float(row["score"])
+        if key not in b2_score_by_key or score > b2_score_by_key[key]:
+            b2_score_by_key[key] = score
+
+    def selected_arm(session_id: str, sample: int) -> str:
+        key = (session_id, sample)
+        b1_score = b1_score_by_key.get(key, float("-inf"))
+        b2_score = b2_score_by_key.get(key, float("-inf"))
+        # The union grouping emits the max-score candidate at each sample;
+        # ties resolve to B2 (the more expensive compute, conservative).
+        if key in b2_score_by_key and b2_score >= b1_score:
+            return "b2"
+        return "b1"
+
     defect_threshold_ms = float(cfg["reference_gate"]["latency_defect_median_ms"])
     availability: dict[str, Any] = {
         "availability_frame_horizon_ms": availability_frame_horizon_ms,
@@ -2809,7 +2829,7 @@ def run_b2(root: Path) -> Path:
             lag = (int(prediction) - int(reference)) // 16
             compute_ms = (
                 verification_compute_ms_per_event_b2
-                if int(prediction) in b2_samples.get(str(session_id), set())
+                if selected_arm(str(session_id), int(prediction)) == "b2"
                 else verification_compute_ms_per_event_b1
             )
             deltas.append(lag)
