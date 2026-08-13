@@ -162,7 +162,6 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.GEMMA4_31B: "provider.gemma4_31b",
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
     TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
-    TranslationModel.DEEPSEEK_V4_PRO: "provider.deepseek_v4_pro",
     TranslationModel.GEMINI_3_FLASH: "provider.gemini3_flash",
     TranslationModel.GEMINI_31_FLASH_LITE: "provider.gemini31_flash_lite",
     TranslationModel.QWEN_35_PLUS: "provider.qwen35_plus",
@@ -187,7 +186,6 @@ _TRANSLATION_MODELS = (
     TranslationModel.GEMMA4_31B,
     TranslationModel.GEMMA4,
     TranslationModel.DEEPSEEK_V4_FLASH,
-    TranslationModel.DEEPSEEK_V4_PRO,
     TranslationModel.LOCAL_LLM,
     TranslationModel.CUSTOM_HTTP,
     TranslationModel.GEMINI_3_FLASH,
@@ -197,7 +195,6 @@ _TRANSLATION_MODELS = (
 _TRANSLATION_MODEL_SECTION_ORDER = (
     "settings.translation_model.section.recommended",
     "settings.translation_model.section.gemma",
-    "settings.translation_model.section.deepseek",
     "settings.translation_model.section.user_settings",
     "settings.translation_model.section.others",
 )
@@ -206,7 +203,6 @@ _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended",
     TranslationModel.GEMMA4_31B: "settings.translation_model.section.gemma",
     TranslationModel.GEMMA4: "settings.translation_model.section.gemma",
-    TranslationModel.DEEPSEEK_V4_PRO: "settings.translation_model.section.deepseek",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
     TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
     TranslationModel.GEMINI_3_FLASH: "settings.translation_model.section.others",
@@ -3716,8 +3712,7 @@ class SettingsView(ft.Column):
                 llm == LLMProviderName.DEEPSEEK
                 or (
                     fallback.enabled
-                    and fallback.model
-                    in (TranslationModel.DEEPSEEK_V4_FLASH, TranslationModel.DEEPSEEK_V4_PRO)
+                    and fallback.model == TranslationModel.DEEPSEEK_V4_FLASH
                     and fallback.connection == TranslationConnection.OFFICIAL_BYOK
                 )
             )

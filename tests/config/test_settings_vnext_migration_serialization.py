@@ -235,9 +235,7 @@ def test_final_dev_v30_fixture_migrates_with_semantic_and_verification_continuit
     }
     assert canonical["intent"]["translation"]["qwen"]["region"] == "singapore"
     assert canonical["intent"]["translation"]["gemini"]["llm_model"] == (raw["gemini"]["llm_model"])
-    assert canonical["intent"]["translation"]["deepseek"]["llm_model"] == (
-        raw["deepseek"]["llm_model"]
-    )
+    assert canonical["intent"]["translation"]["deepseek"]["llm_model"] == "deepseek-v4-flash"
     assert canonical["intent"]["stt"]["custom_terms"] == raw["stt"]["custom_terms"]
     assert (
         canonical["intent"]["languages"]["recent_source_languages"]
@@ -257,7 +255,7 @@ def test_final_dev_v30_fixture_migrates_with_semantic_and_verification_continuit
     projected = migration.to_legacy_dict(first.settings)
     assert projected["api_key_verified"] == raw["api_key_verified"]
     assert projected["gemini"] == raw["gemini"]
-    assert projected["deepseek"] == raw["deepseek"]
+    assert projected["deepseek"] == {"llm_model": "deepseek-v4-flash"}
     assert projected["telemetry_state"] == {
         "anonymous_id": raw["telemetry"]["identifier"],
         "sent_translation_success_dates_utc": raw["telemetry"]["sent_utc_dates"],
@@ -293,7 +291,7 @@ def test_final_dev_v30_ui_equivalent_save_preserves_migrated_and_changed_values(
     assert reloaded.audio.ring_buffer_ms == 875
     assert reloaded.translation.model.value == "local_llm"
     assert reloaded.gemini.llm_model.value == "gemini-3-flash-preview"
-    assert reloaded.deepseek.llm_model.value == "deepseek-v4-pro"
+    assert reloaded.deepseek.llm_model.value == "deepseek-v4-flash"
     assert reloaded.languages.recent_source_languages == ["fr", "de", "it", "ko", "en", "zh-CN"]
     assert reloaded.managed_identity.pending_delivery_ack_delivery_id == "fixture-delivery-id"
     assert all(
@@ -675,6 +673,50 @@ def test_pre_v35_active_cerebras_model_migrates_without_losing_explicit_disabled
     assert translated.connection == "cerebras"
     assert translated.connection_history == {"gemma4_31b": "cerebras"}
     assert translated.fallback == TranslationFallbackIntent()
+
+
+@pytest.mark.parametrize("source_version", [34, 35])
+def test_pre_v36_deepseek_v4_pro_migrates_to_deepseek_v4_flash(
+    source_version: int,
+) -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = source_version
+    raw["intent"]["translation"].update(
+        {
+            "model": "deepseek_v4_pro",
+            "connection": "official_byok",
+            "connection_history": {
+                "gemma4_26b_31b": "managed",
+                "deepseek_v4_pro": "official_byok",
+            },
+            "fallback": {
+                "enabled": True,
+                "model": "deepseek_v4_pro",
+                "connection": "official_byok",
+                "selection_alias": "none",
+            },
+        }
+    )
+
+    loaded = migration.from_dict(raw)
+    translated = loaded.intent.translation
+
+    assert loaded.settings_version == VNEXT_SETTINGS_SCHEMA_VERSION
+    assert translated.model == "deepseek_v4_flash"
+    assert translated.connection == "official_byok"
+    assert translated.connection_history == {
+        "gemma4_26b_31b": "managed",
+        "deepseek_v4_flash": "official_byok",
+    }
+    assert translated.fallback == TranslationFallbackIntent(
+        enabled=True,
+        model="deepseek_v4_flash",
+        connection="official_byok",
+        selection_alias="none",
+    )
+    assert "deepseek_v4_pro" not in json.dumps(serialization.to_dict(loaded))
 
 
 def test_current_vnext_missing_fallback_alias_still_infers_compatibility_fields() -> None:

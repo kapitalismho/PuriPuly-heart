@@ -451,17 +451,6 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             None,
         ),
         (
-            "deepseek_v4_pro",
-            "official_byok",
-            "byok",
-            "deepseek",
-            "deepseek-v4-pro",
-            "secret_store",
-            "deepseek:byok",
-            None,
-            None,
-        ),
-        (
             "gemini3_flash",
             "openrouter",
             "byok",
@@ -1087,7 +1076,6 @@ def test_old_openrouter_credential_source_keys_normalize_through_settings_to_res
         openrouter_provider_routing=openrouter_intent.provider_routing,
         gemini_model=settings.gemini.llm_model.value,
         qwen_model=settings.qwen.llm_model.value,
-        deepseek_model=settings.deepseek.llm_model.value,
         concurrency_limit=settings.llm.concurrency_limit,
     )
     config = runtime_resolution.resolve_llm_config(
@@ -1307,7 +1295,6 @@ def test_missing_translation_openrouter_compatibility_values_derive_exact_runtim
         openrouter_provider_routing=openrouter_intent.provider_routing,
         gemini_model=raw_settings["gemini"]["llm_model"],
         qwen_model=raw_settings["qwen"]["llm_model"],
-        deepseek_model=raw_settings["deepseek"]["llm_model"],
         concurrency_limit=raw_settings["llm"]["concurrency_limit"],
     )
 
@@ -1462,7 +1449,6 @@ def test_missing_openrouter_source_defaults_to_byok_for_openrouter_provider() ->
         openrouter_provider_routing=openrouter_intent.provider_routing,
         gemini_model=raw_settings["gemini"]["llm_model"],
         qwen_model=raw_settings["qwen"]["llm_model"],
-        deepseek_model=raw_settings["deepseek"]["llm_model"],
         concurrency_limit=raw_settings["llm"]["concurrency_limit"],
     )
 
@@ -1533,7 +1519,7 @@ def test_missing_translation_direct_provider_compatibility_values_derive_exact_c
         },
         "gemini": {"llm_model": "gemini-3.1-flash-lite"},
         "qwen": {"llm_model": "qwen3.5-plus", "region": "singapore"},
-        "deepseek": {"llm_model": "deepseek-v4-pro"},
+        "deepseek": {"llm_model": "deepseek-v4-flash"},
         "llm": {"concurrency_limit": 6},
     }
     raw_openrouter = raw_settings["openrouter"]
@@ -1553,7 +1539,6 @@ def test_missing_translation_direct_provider_compatibility_values_derive_exact_c
         openrouter_provider_routing=openrouter_intent.provider_routing,
         gemini_model=raw_settings["gemini"]["llm_model"],
         qwen_model=raw_settings["qwen"]["llm_model"],
-        deepseek_model=raw_settings["deepseek"]["llm_model"],
         concurrency_limit=raw_settings["llm"]["concurrency_limit"],
     )
 
@@ -1562,16 +1547,16 @@ def test_missing_translation_direct_provider_compatibility_values_derive_exact_c
             translation=translation_intent,
             openrouter=openrouter_intent,
             direct=runtime_resolution.DirectProviderRuntimeIntent(
-                deepseek_v4_pro_model=raw_settings["deepseek"]["llm_model"],
+                deepseek_v4_flash_model=raw_settings["deepseek"]["llm_model"],
                 qwen_region=raw_settings["qwen"]["region"],
             ),
         )
     )
 
-    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_PRO
+    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH
     assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_OFFICIAL_BYOK
     assert config.provider == "deepseek"
-    assert config.model == "deepseek-v4-pro"
+    assert config.model == "deepseek-v4-flash"
     assert config.credential == resolved.ResolvedCredentialRequirement(
         source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
         required=True,

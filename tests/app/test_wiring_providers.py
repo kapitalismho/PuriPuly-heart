@@ -374,15 +374,11 @@ def test_create_llm_provider_deepseek_uses_secret_and_model() -> None:
     assert provider.semaphore._value == 4  # type: ignore[attr-defined]
 
 
-def test_create_llm_provider_deepseek_uses_v4_pro_model() -> None:
-    deepseek_model = getattr(DeepSeekLLMModel, "DEEPSEEK_V4_PRO", None)
-
-    assert deepseek_model is not None
-
+def test_create_llm_provider_deepseek_uses_v4_flash_model() -> None:
     settings = AppSettings(
         provider=ProviderSettings(llm=LLMProviderName.DEEPSEEK),
     )
-    settings.deepseek.llm_model = deepseek_model
+    settings.deepseek.llm_model = DeepSeekLLMModel.DEEPSEEK_V4_FLASH
     secrets = InMemorySecretStore()
     secrets.set("deepseek_api_key", "ds-key")
 
@@ -390,7 +386,7 @@ def test_create_llm_provider_deepseek_uses_v4_pro_model() -> None:
 
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, DeepSeekLLMProvider)
-    assert provider.inner.model == "deepseek-v4-pro"
+    assert provider.inner.model == "deepseek-v4-flash"
 
 
 def test_create_llm_provider_deepseek_passes_runtime_logging() -> None:
@@ -833,7 +829,7 @@ def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_skips_fallba
 def test_create_llm_provider_deepseek_flash_official_fallback_uses_flash_model() -> None:
     settings = AppSettings(
         provider=ProviderSettings(llm=LLMProviderName.DEEPSEEK),
-        deepseek=DeepSeekSettings(llm_model=DeepSeekLLMModel.DEEPSEEK_V4_PRO),
+        deepseek=DeepSeekSettings(llm_model=DeepSeekLLMModel.DEEPSEEK_V4_FLASH),
         translation=_translation_with_fallback(
             model=TranslationModel.DEEPSEEK_V4_FLASH,
             connection=TranslationConnection.OFFICIAL_BYOK,
@@ -847,7 +843,7 @@ def test_create_llm_provider_deepseek_flash_official_fallback_uses_flash_model()
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, FallbackRacingLLMProvider)
     assert isinstance(provider.inner.primary, DeepSeekLLMProvider)
-    assert provider.inner.primary.model == DeepSeekLLMModel.DEEPSEEK_V4_PRO.value
+    assert provider.inner.primary.model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
     assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
 
     fallback_delegate = provider.inner.fallback.factory()

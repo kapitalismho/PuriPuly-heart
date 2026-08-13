@@ -131,7 +131,7 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("PuriPuly_PeerDstLang", 17),
         ("PuriPuly_SelfASR", 7),
         ("PuriPuly_PeerASR", 1),
-        ("PuriPuly_Translator", 4),
+        ("PuriPuly_Translator", 5),
         ("PuriPuly_Fallback", 0),
     ]
 
@@ -163,7 +163,7 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("languages", ("ja", "en", "en", "ko")),
         ("self_asr", "soniox"),
         ("peer_asr", "local_parakeet_v3"),
-        ("model", "deepseek_v4_pro"),
+        ("model", "gemini3_flash"),
         ("fallback", "none"),
     ]
     await router.close()

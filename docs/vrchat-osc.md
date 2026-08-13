@@ -90,7 +90,6 @@
 | 1 | Gemma 4 31B |
 | 2 | Gemma 4 26B A4B |
 | 3 | DeepSeek V4 Flash |
-| 4 | DeepSeek V4 Pro |
 | 5 | Gemini 3 Flash |
 | 6 | Gemini 3.1 Flash-Lite |
 | 7 | Qwen 3.5 Plus |

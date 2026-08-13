@@ -321,7 +321,6 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
         connection_history={
             TranslationModel.GEMMA4.value: TranslationConnection.OPENROUTER,
             TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA,
-            TranslationModel.DEEPSEEK_V4_PRO.value: TranslationConnection.OFFICIAL_BYOK,
             TranslationModel.GEMINI_3_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
             TranslationModel.GEMINI_31_FLASH_LITE.value: TranslationConnection.OFFICIAL_BYOK,
             TranslationModel.QWEN_35_PLUS.value: TranslationConnection.OFFICIAL_BYOK,
@@ -388,7 +387,7 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     settings.openrouter.broker_base_url = "https://broker.fixture.test"
     settings.qwen.region = QwenRegion.SINGAPORE
     settings.qwen.llm_model = QwenLLMModel.QWEN_35_FLASH
-    settings.deepseek.llm_model = DeepSeekLLMModel.DEEPSEEK_V4_PRO
+    settings.deepseek.llm_model = DeepSeekLLMModel.DEEPSEEK_V4_FLASH
     settings.cerebras.llm_model = CerebrasLLMModel.GEMMA_4_31B
     settings.local_llm.base_url = "http://127.0.0.1:12345/v1"
     settings.local_llm.model = "fixture-local-model"

@@ -347,7 +347,6 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         TranslationModel.DEEPSEEK_V4_FLASH.value,
         TranslationModel.GEMMA4_31B.value,
         TranslationModel.GEMMA4.value,
-        TranslationModel.DEEPSEEK_V4_PRO.value,
         TranslationModel.LOCAL_LLM.value,
         TranslationModel.CUSTOM_HTTP.value,
         TranslationModel.GEMINI_3_FLASH.value,
@@ -366,7 +365,6 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
     assert sections == [
         t("settings.translation_model.section.recommended"),
         t("settings.translation_model.section.gemma"),
-        t("settings.translation_model.section.deepseek"),
         t("settings.translation_model.section.user_settings"),
         t("settings.translation_model.section.others"),
     ]

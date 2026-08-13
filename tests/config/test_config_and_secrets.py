@@ -473,7 +473,6 @@ def test_translation_model_public_member_names_and_values_match_plan() -> None:
         ("GEMMA4_31B", "gemma4_31b"),
         ("GEMMA4", "gemma4"),
         ("DEEPSEEK_V4_FLASH", "deepseek_v4_flash"),
-        ("DEEPSEEK_V4_PRO", "deepseek_v4_pro"),
         ("GEMINI_3_FLASH", "gemini3_flash"),
         ("GEMINI_31_FLASH_LITE", "gemini31_flash_lite"),
         ("QWEN_35_PLUS", "qwen35_plus"),
@@ -852,88 +851,31 @@ def test_materialize_translation_settings_returns_mutated_settings() -> None:
     assert settings.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH
 
 
-def test_deepseek_v4_pro_translation_supports_official_byok_only() -> None:
-    deepseek_v4_pro = getattr(TranslationModel, "DEEPSEEK_V4_PRO", None)
-
-    assert deepseek_v4_pro is not None
-    assert supported_translation_connections(deepseek_v4_pro) == (
+def test_legacy_deepseek_v4_pro_translation_migrates_to_v4_flash() -> None:
+    assert supported_translation_connections(TranslationModel.DEEPSEEK_V4_FLASH) == (
+        TranslationConnection.MANAGED,
+        TranslationConnection.MANAGED_CHINA,
+        TranslationConnection.OPENROUTER,
         TranslationConnection.OFFICIAL_BYOK,
     )
 
-
-def test_materialize_translation_settings_maps_deepseek_v4_pro_official_byok() -> None:
-    deepseek_v4_pro = getattr(TranslationModel, "DEEPSEEK_V4_PRO", None)
-    deepseek_model = getattr(DeepSeekLLMModel, "DEEPSEEK_V4_PRO", None)
-
-    assert deepseek_v4_pro is not None
-    assert deepseek_model is not None
-
-    settings = AppSettings()
-    settings.translation = TranslationSettings(
-        model=deepseek_v4_pro,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-    )
-
-    returned = materialize_translation_settings(settings)
-
-    assert returned is settings
-    assert settings.provider.llm == LLMProviderName.DEEPSEEK
-    assert settings.deepseek.llm_model == deepseek_model
-
-
-def test_materialize_translation_settings_normalizes_deepseek_v4_pro_openrouter_to_official_byok() -> (
-    None
-):
-    deepseek_v4_pro = getattr(TranslationModel, "DEEPSEEK_V4_PRO", None)
-    deepseek_model = getattr(DeepSeekLLMModel, "DEEPSEEK_V4_PRO", None)
-
-    assert deepseek_v4_pro is not None
-    assert deepseek_model is not None
-
-    settings = AppSettings()
-    settings.translation = TranslationSettings(
-        model=deepseek_v4_pro,
-        connection=TranslationConnection.OPENROUTER,
-        connection_history={deepseek_v4_pro.value: TranslationConnection.OPENROUTER},
-    )
-
-    returned = materialize_translation_settings(settings)
-
-    assert returned is settings
-    assert settings.translation.connection == TranslationConnection.OFFICIAL_BYOK
-    assert settings.provider.llm == LLMProviderName.DEEPSEEK
-    assert settings.deepseek.llm_model == deepseek_model
-    assert settings.openrouter.provider_routing == OpenRouterProviderRouting.DEFAULT
-
-
-def test_from_dict_roundtrips_deepseek_v4_pro_official_byok() -> None:
-    deepseek_v4_pro = getattr(TranslationModel, "DEEPSEEK_V4_PRO", None)
-    deepseek_model = getattr(DeepSeekLLMModel, "DEEPSEEK_V4_PRO", None)
-
-    assert deepseek_v4_pro is not None
-    assert deepseek_model is not None
-
     data = to_dict(AppSettings())
     data["translation"] = {
-        "model": deepseek_v4_pro.value,
+        "model": "deepseek_v4_pro",
         "connection": TranslationConnection.OFFICIAL_BYOK.value,
         "connection_history": {
-            deepseek_v4_pro.value: TranslationConnection.OFFICIAL_BYOK.value,
+            "deepseek_v4_pro": TranslationConnection.OFFICIAL_BYOK.value,
         },
     }
     data["provider"]["llm"] = LLMProviderName.DEEPSEEK.value
-    data["deepseek"] = {"llm_model": deepseek_model.value}
+    data["deepseek"] = {"llm_model": "deepseek-v4-pro"}
 
     loaded = from_dict(data)
-    persisted = to_dict(loaded)
 
-    assert loaded.translation.model == deepseek_v4_pro
+    assert loaded.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
     assert loaded.translation.connection == TranslationConnection.OFFICIAL_BYOK
     assert loaded.provider.llm == LLMProviderName.DEEPSEEK
-    assert loaded.deepseek.llm_model == deepseek_model
-    assert persisted["translation"]["model"] == deepseek_v4_pro.value
-    assert persisted["provider"]["llm"] == LLMProviderName.DEEPSEEK.value
-    assert persisted["deepseek"]["llm_model"] == deepseek_model.value
+    assert loaded.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH
 
 
 def test_openrouter_alias_for_fields_does_not_expose_deepseek_v4_pro() -> None:

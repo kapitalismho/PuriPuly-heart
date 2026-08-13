@@ -202,7 +202,6 @@ def _runtime_resolution_input_from_compatibility_settings(
         openrouter_provider_routing=openrouter_intent.provider_routing,
         gemini_model=settings.gemini.llm_model,
         qwen_model=settings.qwen.llm_model,
-        deepseek_model=settings.deepseek.llm_model,
         concurrency_limit=settings.llm.concurrency_limit,
     )
     if settings.translation.model == TranslationModel.CUSTOM_HTTP:
