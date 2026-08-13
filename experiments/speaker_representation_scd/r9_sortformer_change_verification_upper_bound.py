@@ -1482,6 +1482,7 @@ def _verifier_arm(
     receipt = {
         "schema_version": 1,
         "arm": arm,
+        "metrics_sha256": sha256_file(path),
         "feature_file": feature_file,
         "feature_file_sha256": sha256_file(directory / f"{feature_file}.jsonl"),
         "scores_file": scores_path.name,
@@ -1533,6 +1534,7 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
 EMBEDDING_DUMP_HEADER = struct.Struct("<qqiiii")
 EMBEDDING_DIM = 512
 EMBEDDING_SPEAKERS = 4
+EMBEDDING_PINNED_MODEL_SHA256 = "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9"
 EMBEDDING_ROW_BYTES = 4 + EMBEDDING_DIM * 4 + EMBEDDING_SPEAKERS * 4
 EMBEDDING_EXTERNAL_REPOSITORY = "https://github.com/handy-computer/transcribe.cpp.git"
 EMBEDDING_EXTERNAL_COMMIT = "d42c3bbdfa2f63c37e5891e27de47a612d62f221"
@@ -1668,6 +1670,8 @@ def r9b_prepare(root: Path) -> Path:
     model_path = root / "models" / "r8" / str(cfg["model_q8_filename"])
     if not model_path.is_file():
         raise R9Error(f"model missing: {model_path}")
+    if sha256_file(model_path) != EMBEDDING_PINNED_MODEL_SHA256:
+        raise R9Error(f"model hash differs from the plan-pinned R8 model: {model_path}")
     document = {
         "schema_version": 1,
         "external_repository": EMBEDDING_EXTERNAL_REPOSITORY,
@@ -1690,6 +1694,21 @@ def r9b_prepare(root: Path) -> Path:
     path = directory / "r9b_prepare.json"
     write_json(path, document)
     return path
+
+
+def _verify_preparation_artifacts(prepare_doc: dict[str, Any]) -> None:
+    patch_path = Path(str(prepare_doc["patch_path"]))
+    if not patch_path.is_file() or sha256_file(patch_path) != str(prepare_doc["patch_sha256"]):
+        raise R9Error("embedding_patch.diff is missing or modified; rerun r9b-prepare")
+    model_path = Path(str(prepare_doc["model"]["path"]))
+    if not model_path.is_file() or sha256_file(model_path) != str(prepare_doc["model"]["sha256"]):
+        raise R9Error("model file is missing or modified; rerun r9b-prepare")
+    if sha256_file(model_path) != EMBEDDING_PINNED_MODEL_SHA256:
+        raise R9Error("model hash differs from the plan-pinned R8 model")
+    for name, entry in prepare_doc.get("binaries", {}).items():
+        binary_path = Path(str(entry["path"]))
+        if not binary_path.is_file() or sha256_file(binary_path) != str(entry["sha256"]):
+            raise R9Error(f"binary {name} is missing or modified; rebuild and rerun r9b-prepare")
 
 
 def _peak_private_bytes(process_handle: Any) -> int:
@@ -1809,6 +1828,11 @@ def _run_bench(
             if final_sample > 0:
                 peak_private = max(peak_private, final_sample)
                 memory_sampled = True
+                if peak_private > memory_ceiling_bytes:
+                    raise R9Error(
+                        f"transcribe-bench exceeded the memory ceiling "
+                        f"({peak_private} > {memory_ceiling_bytes} bytes); see {log_path}"
+                    )
     wall_seconds = time.perf_counter() - started
     if return_code != 0:
         raise R9Error(f"transcribe-bench failed ({return_code}); see {log_path}")
@@ -1867,6 +1891,7 @@ def r9b_fixture(root: Path) -> Path:
         "config_sha256"
     ) != sha256_file(CONFIG_PATH):
         raise R9Error("r9b_prepare.json is stale; rerun r9b-prepare")
+    _verify_preparation_artifacts(prepare_doc)
     patched_cpu = Path(prepare_doc["binaries"]["patched_cpu"]["path"])
     clean_cpu = Path(prepare_doc["binaries"]["clean_cpu"]["path"])
     model = Path(prepare_doc["model"]["path"])
@@ -2040,6 +2065,7 @@ def r9b_replay(root: Path) -> Path:
         "config_sha256"
     ) != sha256_file(CONFIG_PATH):
         raise R9Error("r9b_prepare.json is stale; rerun r9b-prepare")
+    _verify_preparation_artifacts(prepare_doc)
     bench = Path(prepare_doc["binaries"]["patched_vulkan"]["path"])
     model = Path(prepare_doc["model"]["path"])
     sessions = _sessions(root)
@@ -2195,6 +2221,16 @@ def r9b_replay(root: Path) -> Path:
         except BaseException as error:  # receipt integrity on any limit/cleanup/cancel failure
             invalid_receipt(session_id, f"{type(error).__name__}: {error}")
             raise
+    unverified = [
+        row["session_id"]
+        for row in rows
+        if bool(row.get("memory_sampled")) is not True
+        or bool(row.get("memory_within_ceiling")) is not True
+    ]
+    if unverified:
+        raise R9Error(
+            f"replay rows not certified within the memory ceiling: {unverified}; rerun r9b-replay"
+        )
     manifest = {
         "schema_version": 1,
         "backend": "vulkan",
@@ -2452,6 +2488,23 @@ def _require_receipt(
     return receipt
 
 
+def _validate_receipt_dependencies(root: Path, directory: Path, receipt: dict[str, Any]) -> None:
+    dependencies = receipt.get("dependencies") or {}
+    for name, expected in dependencies.items():
+        if name == "embedding_dumps":
+            _, dump_paths, _ = _replay_manifest_and_dumps(root, directory)
+            for session_id, expected_hash in (expected or {}).items():
+                dump_path = dump_paths.get(session_id)
+                if dump_path is None or sha256_file(dump_path) != str(expected_hash):
+                    raise R9Error(
+                        f"embedding dump dependency mismatch for {session_id}; rerun r9b-replay and r9b-extract"
+                    )
+            continue
+        path = directory / str(name)
+        if not path.is_file() or sha256_file(path) != str(expected):
+            raise R9Error(f"dependency mismatch for {name}; rerun the producing action")
+
+
 def run_b1(root: Path) -> Path:
     cfg = config()
     embedding = _embedding_config(cfg)
@@ -2459,14 +2512,25 @@ def run_b1(root: Path) -> Path:
     a1_path = directory / "a1_metrics.json"
     if not a1_path.is_file():
         raise R9Error("a1 must run before b1 (no parallel-run authorization)")
+    a1_receipt = _require_receipt(directory, "a1_metrics_receipt.json", expected_arm="a1")
     a1_document = load_json(a1_path)
     if (
         a1_document.get("arm") != "a1"
         or a1_document.get("code_sha256") != sha256_file(CODE_PATH)
         or a1_document.get("config_sha256") != sha256_file(CONFIG_PATH)
+        or sha256_file(a1_path) != str(a1_receipt.get("metrics_sha256"))
     ):
         raise R9Error("a1_metrics.json is stale or invalid; rerun a1 with the current harness")
+    a1_curve = list(a1_document.get("evaluation_curve") or [])
+    if not a1_curve or not all(
+        np.isfinite(float(point.get("recall_250", np.nan)))
+        and np.isfinite(float(point.get("false_events_per_hour", np.nan)))
+        for point in a1_curve
+    ):
+        raise R9Error("a1_metrics.json has no valid finite evaluation curve; rerun a1")
+    _validate_receipt_dependencies(root, directory, a1_receipt)
     features_b_receipt = _require_receipt(directory, "features_b_receipt.json")
+    _validate_receipt_dependencies(root, directory, features_b_receipt)
     features_b_path = directory / "features_b.jsonl"
     if not features_b_path.is_file() or sha256_file(features_b_path) != str(
         features_b_receipt.get("features_b_sha256")
@@ -2647,6 +2711,11 @@ def run_b2(root: Path) -> Path:
     if b1_document.get("arm") != "b1" or "evaluation_curve" not in b1_document:
         raise R9Error("b1_metrics.json is missing required B1 schema fields")
     b1_receipt = _require_receipt(directory, "b1_metrics_receipt.json", expected_arm="b1")
+    if sha256_file(b1_metrics_path) != str(b1_receipt.get("metrics_sha256")):
+        raise R9Error("b1_metrics.json is missing or modified; rerun b1")
+    _validate_receipt_dependencies(root, directory, b1_receipt)
+    features_b_receipt = _require_receipt(directory, "features_b_receipt.json")
+    _validate_receipt_dependencies(root, directory, features_b_receipt)
     scores_b1_path = directory / "scores_b1.jsonl"
     features_b_path = directory / "features_b.jsonl"
     if not scores_b1_path.is_file() or sha256_file(scores_b1_path) != str(
