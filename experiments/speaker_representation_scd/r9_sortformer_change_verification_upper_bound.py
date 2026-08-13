@@ -2593,16 +2593,22 @@ def _b1_linear_models(root: Path) -> list[dict[str, Any]]:
     return models
 
 
-def _dense_embedding_frames(dump_path: Path, total_frames: int) -> tuple[np.ndarray, np.ndarray]:
-    embeddings = np.zeros((total_frames, EMBEDDING_DIM), dtype=np.float32)
-    preds = np.zeros((total_frames, EMBEDDING_SPEAKERS), dtype=np.float32)
-    filled = np.zeros(total_frames, dtype=np.bool_)
-    for record in _parse_dump_records(dump_path):
+def _dense_embedding_frames(
+    dump_path: Path, total_frames: int
+) -> tuple[np.ndarray, np.ndarray, int]:
+    records = _parse_dump_records(dump_path)
+    effective_frames = int(min(total_frames, max(record["total_n"] for record in records)))
+    if effective_frames <= 0:
+        raise R9Error(f"no processed frames in {dump_path.name}")
+    embeddings = np.zeros((effective_frames, EMBEDDING_DIM), dtype=np.float32)
+    preds = np.zeros((effective_frames, EMBEDDING_SPEAKERS), dtype=np.float32)
+    filled = np.zeros(effective_frames, dtype=np.bool_)
+    for record in records:
         frame_idx = record["frame_idx"]
         fresh = (
             (frame_idx >= 0)
-            & (frame_idx < total_frames)
-            & ~filled[frame_idx.clip(0, total_frames - 1)]
+            & (frame_idx < effective_frames)
+            & ~filled[frame_idx.clip(0, effective_frames - 1)]
         )
         if bool(fresh.any()):
             targets = frame_idx[fresh]
@@ -2612,7 +2618,7 @@ def _dense_embedding_frames(dump_path: Path, total_frames: int) -> tuple[np.ndar
     missing = int((~filled).sum())
     if missing:
         raise R9Error(f"{missing} frames have no dumped embedding in {dump_path.name}")
-    return embeddings, preds
+    return embeddings, preds, effective_frames
 
 
 def _b2_detect(
@@ -2775,10 +2781,10 @@ def run_b2(root: Path) -> Path:
             if session.fold not in folds:
                 continue
             probabilities = np.load(probability_paths[session.session_id])["probabilities"]
-            total_frames = int(probabilities.shape[0])
-            dense_emb, dense_preds = _dense_embedding_frames(
-                dump_paths[session.session_id], total_frames
+            dense_emb, dense_preds, effective_frames = _dense_embedding_frames(
+                dump_paths[session.session_id], int(probabilities.shape[0])
             )
+            probabilities = probabilities[:effective_frames]
             detected = _b2_detect(probabilities, dense_emb, dense_preds, b2_cfg)
             for frame, slot in detected:
                 sample = frame * int(cfg["samples_per_frame"])

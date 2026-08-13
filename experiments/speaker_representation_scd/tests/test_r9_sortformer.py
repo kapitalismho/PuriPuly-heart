@@ -416,7 +416,7 @@ def test_b1_fold_transform_imputes_nan_with_train_median() -> None:
 
 def test_dense_embedding_frames_fills_from_records(tmp_path) -> None:
     rows_a = [_row(0, 0, 5.0), _row(1, 0, 6.0)]
-    rows_b = [_row(2, 0, 7.0)]
+    rows_b = [_row(2, 0, 7.0), _row(3, 0, 8.0)]
     path = _write_dump(
         tmp_path,
         [
@@ -424,12 +424,34 @@ def test_dense_embedding_frames_fills_from_records(tmp_path) -> None:
             {"chunk": 2, "total_n": 4, "fifo": rows_b, "compression": 0},
         ],
     )
-    dense, dense_preds = _dense_embedding_frames(path, 3)
-    assert dense.shape == (3, EMBEDDING_DIM)
-    assert dense_preds.shape == (3, EMBEDDING_SPEAKERS)
+    dense, dense_preds, effective = _dense_embedding_frames(path, 4)
+    assert effective == 4
+    assert dense.shape == (4, EMBEDDING_DIM)
+    assert dense_preds.shape == (4, EMBEDDING_SPEAKERS)
     assert math.isclose(float(dense[0, 0]), 5.0)
     assert math.isclose(float(dense[2, 0]), 7.0)
     assert int(dense_preds[1].argmax()) == 0
+
+
+def test_dense_embedding_frames_slices_padded_tail(tmp_path) -> None:
+    rows = [
+        _row(0, 0, 1.0),
+        _row(1, 0, 2.0),
+        _row(2, 0, 3.0),
+        _row(3, 0, 4.0),
+        _row(4, 0, 5.0),
+        _row(5, 0, 6.0),
+    ]
+    path = _write_dump(
+        tmp_path,
+        [{"chunk": 0, "total_n": 6, "fifo": rows, "compression": 0}],
+    )
+    dense, dense_preds, effective = _dense_embedding_frames(path, 10)
+    assert effective == 6
+    assert dense.shape == (6, EMBEDDING_DIM)
+    assert dense_preds.shape == (6, EMBEDDING_SPEAKERS)
+    assert math.isclose(float(dense[3, 0]), 4.0)
+    assert math.isclose(float(dense[5, 0]), 6.0)
 
 
 def test_b2_detect_flags_intra_slot_drop_and_deduplicates() -> None:
