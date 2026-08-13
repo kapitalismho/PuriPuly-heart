@@ -22,6 +22,7 @@ from experiments.speaker_representation_scd.r9_sortformer_change_verification_up
     _one_to_one,
     _parse_dump_records,
     _segment_start_candidates,
+    _select_predeclared_outcome,
     _select_row,
     _standardize,
     _standardize_fit,
@@ -479,3 +480,32 @@ def test_b2_detect_flags_intra_slot_drop_and_deduplicates() -> None:
         {"window_frames": 15, "stride_frames": 1, "similarity_threshold": 0.75},
     )
     assert [frame for frame, _ in dense_stride] == [23, 26, 29, 32, 35]
+
+
+def test_predeclared_outcome_selection() -> None:
+    def ceiling(**overrides):
+        document = {
+            "outcome_a_pareto": {"meaningful": False},
+            "embedding_contribution": {"raises_ceiling": False},
+            "arms": {},
+        }
+        document.update(overrides)
+        return document
+
+    assert _select_predeclared_outcome(ceiling(outcome_a_pareto={"meaningful": True})) == "A"
+    assert (
+        _select_predeclared_outcome(ceiling(embedding_contribution={"raises_ceiling": True})) == "B"
+    )
+    assert (
+        _select_predeclared_outcome(
+            ceiling(
+                arms={
+                    "a0": {"metrics": {}},
+                    "a1": {"curve": [{"recall_250": 0.1}]},
+                }
+            )
+        )
+        == "C"
+    )
+    assert _select_predeclared_outcome(ceiling(arms={"a0": {"metrics": {}}})) == "D"
+    assert _select_predeclared_outcome(ceiling()) == "D"

@@ -3526,11 +3526,29 @@ def _plot_ceiling(
     plt.close(figure)
 
 
+def _select_predeclared_outcome(ceiling: dict[str, Any]) -> str:
+    pareto = ceiling.get("outcome_a_pareto") or {}
+    contribution = ceiling.get("embedding_contribution", {})
+    if bool(pareto.get("meaningful")):
+        return "A"
+    if bool(contribution.get("raises_ceiling", False)):
+        return "B"
+    arms = ceiling.get("arms", {})
+    verifier_arms = ("a1", "a1_diagnostic", "b1", "b2")
+    has_verifier_curve = any(
+        name in verifier_arms and bool(arm.get("curve"))
+        for name, arm in arms.items()
+        if isinstance(arm, dict)
+    )
+    return "C" if has_verifier_curve else "D"
+
+
 def report(root: Path) -> Path:
     directory = output_root(root)
     ceiling = load_json(directory / "ceiling_summary.json")
     candidate_summary = load_json(directory / "candidate_summary.json")
-    a1 = load_json(directory / "a1_metrics.json")
+    a1_path = directory / "a1_metrics.json"
+    a1 = load_json(a1_path) if a1_path.is_file() else None
     embedding_feature_names = list(
         config().get("embedding", {}).get("features", {}).get("feature_names", [])
     )
@@ -3619,15 +3637,20 @@ def report(root: Path) -> Path:
             f"Perfect-filter oracle: Recall@250 {float(ceiling['oracle_recall_250']):.3f} at "
             f"{float(ceiling['baseline']['oracle']['false_events_per_hour']):.2f} false events/hour "
             f"({int(ceiling['baseline']['oracle']['prediction_count'])} predictions).",
-            "",
-            "## Verifier detail",
-            "",
-            f"Verifier form: **{a1['verifier_form']}** (MLP fallback triggered: {a1['mlp_triggered']}); "
-            f"mean out-of-fold AUROC {float(a1['mean_out_of_fold_auroc']):.4f}.",
         ]
     )
-    for fold, value in sorted(a1["fold_auroc"].items()):
-        lines.append(f"- fold {fold} held-out AUROC: {float(value):.4f}")
+    if a1 is not None:
+        lines.extend(
+            [
+                "",
+                "## Verifier detail",
+                "",
+                f"Verifier form: **{a1['verifier_form']}** (MLP fallback triggered: {a1['mlp_triggered']}); "
+                f"mean out-of-fold AUROC {float(a1['mean_out_of_fold_auroc']):.4f}.",
+            ]
+        )
+        for fold, value in sorted(a1["fold_auroc"].items()):
+            lines.append(f"- fold {fold} held-out AUROC: {float(value):.4f}")
     if a0 is not None:
         lines.extend(["", "R9-A0 rule stack selections per fold:", ""])
         for fold, selection in sorted(a0["fold_selection"].items(), key=lambda pair: int(pair[0])):
@@ -3638,29 +3661,30 @@ def report(root: Path) -> Path:
                 f"co-activity >= {float(selection['selected_co_activity_min']):.2f}, "
                 f"same-slot resume excluded"
             )
-    lines.extend(
-        [
-            "",
-            "## Inherited-gate reference lines (context only, not continuation criteria)",
-            "",
-            f"R9-A1 at the <=10 FE/h selection point (threshold chosen on non-ambiguous candidates; "
-            f"evaluated {float(a1['reference_gate']['targets']['10.0']['false_events_per_hour']):.2f} FE/h): "
-            f"Recall@250 {float(a1['reference_gate']['targets']['10.0']['recall_250'] or 0.0):.3f} "
-            f"(reference gate: >= 0.3).",
-            f"R9-A1 at the <=20 FE/h selection point (threshold chosen on non-ambiguous candidates; "
-            f"evaluated {float(a1['reference_gate']['targets']['20.0']['false_events_per_hour']):.2f} FE/h): "
-            f"Recall@250 {float(a1['reference_gate']['targets']['20.0']['recall_250'] or 0.0):.3f} "
-            f"(reference gate: >= 0.5).",
-            f"20 FE/h stratum recall — overlap onset "
-            f"{float(a1['reference_gate']['targets']['20.0']['stratum_recall'].get('overlap_onset') or 0.0):.3f}, "
-            f"silence-gap change "
-            f"{float(a1['reference_gate']['targets']['20.0']['stratum_recall'].get('silence_gap_change') or 0.0):.3f}, "
-            f"maximum single-meeting TP share "
-            f"{float(a1['reference_gate']['targets']['20.0']['maximum_meeting_true_positive_share']):.3f}.",
-            f"20 FE/h short-return recall "
-            f"{float(a1['selected_operating_points']['20.0']['metrics']['short_return_recall'] or 0.0):.3f}.",
-        ]
-    )
+    if a1 is not None:
+        lines.extend(
+            [
+                "",
+                "## Inherited-gate reference lines (context only, not continuation criteria)",
+                "",
+                f"R9-A1 at the <=10 FE/h selection point (threshold chosen on non-ambiguous candidates; "
+                f"evaluated {float(a1['reference_gate']['targets']['10.0']['false_events_per_hour']):.2f} FE/h): "
+                f"Recall@250 {float(a1['reference_gate']['targets']['10.0']['recall_250'] or 0.0):.3f} "
+                f"(reference gate: >= 0.3).",
+                f"R9-A1 at the <=20 FE/h selection point (threshold chosen on non-ambiguous candidates; "
+                f"evaluated {float(a1['reference_gate']['targets']['20.0']['false_events_per_hour']):.2f} FE/h): "
+                f"Recall@250 {float(a1['reference_gate']['targets']['20.0']['recall_250'] or 0.0):.3f} "
+                f"(reference gate: >= 0.5).",
+                f"20 FE/h stratum recall — overlap onset "
+                f"{float(a1['reference_gate']['targets']['20.0']['stratum_recall'].get('overlap_onset') or 0.0):.3f}, "
+                f"silence-gap change "
+                f"{float(a1['reference_gate']['targets']['20.0']['stratum_recall'].get('silence_gap_change') or 0.0):.3f}, "
+                f"maximum single-meeting TP share "
+                f"{float(a1['reference_gate']['targets']['20.0']['maximum_meeting_true_positive_share']):.3f}.",
+                f"20 FE/h short-return recall "
+                f"{float(a1['selected_operating_points']['20.0']['metrics']['short_return_recall'] or 0.0):.3f}.",
+            ]
+        )
     if "a1" in ceiling["arms"] and ceiling["outcome_a_pareto"]["meaningful"] is not None:
         pareto = ceiling["outcome_a_pareto"]
         verdict = (
@@ -3755,31 +3779,32 @@ def report(root: Path) -> Path:
                 "ceiling depends on waiting.",
             ]
         )
-    lines.extend(
-        [
-            "",
-            "## Availability latency (R9-A1)",
-            "",
-            f"Confirmation window: {int(a1['availability_latency']['confirmation_ms'])} ms; "
-            f"verification compute: {float(a1['availability_latency']['verification_compute_ms_per_event']):.3f} ms per event. "
-            "Boundary timestamps stay at the 0.5 candidate crossing; availability adds the fixed "
-            "confirmation window plus verifier compute. "
-            f"Latency defect threshold (R8 0.99-confirmation signature): median >= "
-            f"{int(a1['availability_latency']['latency_defect_median_ms'])} ms.",
-            "",
-            "| Target FE/h | Boundary lag p50 ms | Boundary lag p90 ms | Availability p50 ms | Availability p90 ms | Defect |",
-            "| ---: | ---: | ---: | ---: | ---: | ---: |",
-        ]
-    )
-    for target in config()["targets"]["false_events_per_hour"]:
-        point = a1["availability_latency"]["per_target"][str(float(target))]
-        lines.append(
-            f"| {target} | {_latency_cell(point['boundary_lag_ms'], 'p50')} | "
-            f"{_latency_cell(point['boundary_lag_ms'], 'p90')} | "
-            f"{_latency_cell(point['availability_ms'], 'p50')} | "
-            f"{_latency_cell(point['availability_ms'], 'p90')} | "
-            f"{'yes' if point.get('latency_defect') else 'no'} |"
+    if a1 is not None:
+        lines.extend(
+            [
+                "",
+                "## Availability latency (R9-A1)",
+                "",
+                f"Confirmation window: {int(a1['availability_latency']['confirmation_ms'])} ms; "
+                f"verification compute: {float(a1['availability_latency']['verification_compute_ms_per_event']):.3f} ms per event. "
+                "Boundary timestamps stay at the 0.5 candidate crossing; availability adds the fixed "
+                "confirmation window plus verifier compute. "
+                f"Latency defect threshold (R8 0.99-confirmation signature): median >= "
+                f"{int(a1['availability_latency']['latency_defect_median_ms'])} ms.",
+                "",
+                "| Target FE/h | Boundary lag p50 ms | Boundary lag p90 ms | Availability p50 ms | Availability p90 ms | Defect |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
         )
+        for target in config()["targets"]["false_events_per_hour"]:
+            point = a1["availability_latency"]["per_target"][str(float(target))]
+            lines.append(
+                f"| {target} | {_latency_cell(point['boundary_lag_ms'], 'p50')} | "
+                f"{_latency_cell(point['boundary_lag_ms'], 'p90')} | "
+                f"{_latency_cell(point['availability_ms'], 'p50')} | "
+                f"{_latency_cell(point['availability_ms'], 'p90')} | "
+                f"{'yes' if point.get('latency_defect') else 'no'} |"
+            )
     b1_metrics_path = directory / "b1_metrics.json"
     if b1_metrics_path.is_file():
         b1_doc = load_json(b1_metrics_path)
@@ -3888,7 +3913,7 @@ def report(root: Path) -> Path:
                     f"{_latency_cell(point['availability_ms'], 'p90')} | "
                     f"{'yes' if point.get('latency_defect') else 'no'} |"
                 )
-    transfer = a1.get("threshold_transfer", [])
+    transfer = a1.get("threshold_transfer", []) if a1 is not None else []
     if transfer:
         lines.extend(
             [
@@ -3997,10 +4022,9 @@ def report(root: Path) -> Path:
                         f"{float(row['recall_250'] or 0.0):.3f} |"
                     )
     outcome_lines = ["", "## Outcome", ""]
-    pareto = ceiling.get("outcome_a_pareto") or {}
     contribution = ceiling.get("embedding_contribution", {})
-    if bool(pareto.get("meaningful")):
-        outcome = "A"
+    outcome = _select_predeclared_outcome(ceiling)
+    if outcome == "A":
         outcome_lines.extend(
             [
                 "**Selected predeclared outcome: Outcome A — probability-only verification raises",
@@ -4008,44 +4032,55 @@ def report(root: Path) -> Path:
                 "the low-false-event region per the frozen configuration.",
             ]
         )
-    elif bool(contribution.get("raises_ceiling", False)):
-        outcome = "B"
+    elif outcome == "B":
         outcome_lines.extend(
             [
                 "**Selected predeclared outcome: Outcome B — embeddings carry the ceiling.**",
                 "A1 does not dominate meaningfully, but the embedding-augmented B1 verifier does.",
             ]
         )
-    elif any(
-        bool(arm.get("curve")) or "metrics" in arm
-        for arm in ceiling.get("arms", {}).values()
-        if isinstance(arm, dict)
-    ):
-        outcome = "C"
+    elif outcome == "C":
         outcome_lines.extend(
             [
                 "**Selected predeclared outcome: Outcome C — neither arm moves the curve.**",
                 "Sortformer's own candidate stream is not separable at low false-event rates with",
-                "these features; the measured ceiling is the honest product.",
+                "these features; the measured ceiling is the honest product: the maximum recall each",
+                "arm achieves at each false-event rate is in the ceiling table above.",
             ]
         )
+        if a1 is not None:
+            gates = a1.get("reference_gate", {}).get("targets", {}).get("20.0", {})
+            stratum = gates.get("stratum_recall") or {}
+            outcome_lines.append(
+                "Dominant residual false-candidate classes at the <=20 FE/h point: overlap onset "
+                f"stratum recall {float(stratum.get('overlap_onset') or 0.0):.3f}, silence-gap "
+                f"change {float(stratum.get('silence_gap_change') or 0.0):.3f}."
+            )
+        else:
+            outcome_lines.append(
+                "Residual false-candidate classes are unavailable because no A1 metrics completed."
+            )
     else:
-        outcome = "D"
         outcome_lines.extend(
             [
                 "**Selected predeclared outcome: Outcome D — invalid or inconclusive.**",
-                "No valid curve completed under the execution ceilings.",
+                "No valid verifier curve completed under the execution ceilings.",
             ]
         )
     if (directory / "b1_metrics.json").is_file():
         b1_doc = load_json(directory / "b1_metrics.json")
+        a1_auroc_line = (
+            f"B1 mean out-of-fold AUROC {float(b1_doc.get('mean_out_of_fold_auroc', float('nan'))):.4f} "
+            f"(A1: {float(a1.get('mean_out_of_fold_auroc', float('nan'))):.4f})."
+            if a1 is not None
+            else f"B1 mean out-of-fold AUROC {float(b1_doc.get('mean_out_of_fold_auroc', float('nan'))):.4f}."
+        )
         outcome_lines.extend(
             [
                 "The A1-vs-B1 comparison answers whether the speaker-cache embeddings raise the",
                 "ceiling over probability-only features "
                 f"(raises_ceiling: {bool(contribution.get('raises_ceiling', False))}).",
-                f"B1 mean out-of-fold AUROC {float(b1_doc.get('mean_out_of_fold_auroc', float('nan'))):.4f} "
-                f"(A1: {float(a1.get('mean_out_of_fold_auroc', float('nan'))):.4f}).",
+                a1_auroc_line,
             ]
         )
         b2_path = directory / "b2_metrics.json"
