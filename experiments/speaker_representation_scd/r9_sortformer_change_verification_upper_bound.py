@@ -1672,7 +1672,7 @@ def _peak_private_bytes(process_handle: Any) -> int:
     import ctypes
     from ctypes import wintypes
 
-    class _COUNTERS(ctypes.Structure):
+    class _COUNTERS_EX(ctypes.Structure):
         _fields_ = [
             ("cb", wintypes.DWORD),
             ("PageFaultCount", wintypes.DWORD),
@@ -1684,14 +1684,20 @@ def _peak_private_bytes(process_handle: Any) -> int:
             ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
             ("PagefileUsage", ctypes.c_size_t),
             ("PeakPagefileUsage", ctypes.c_size_t),
+            ("PrivateUsage", ctypes.c_size_t),
         ]
 
-    counters = _COUNTERS()
+    counters = _COUNTERS_EX()
     counters.cb = ctypes.sizeof(counters)
-    if ctypes.windll.psapi.GetProcessMemoryInfo(
-        process_handle, ctypes.byref(counters), ctypes.sizeof(counters)
-    ):
-        return int(counters.PeakPagefileUsage)
+    psapi = ctypes.WinDLL("psapi")
+    psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+    psapi.GetProcessMemoryInfo.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+    ]
+    if psapi.GetProcessMemoryInfo(process_handle, ctypes.byref(counters), ctypes.sizeof(counters)):
+        return int(counters.PrivateUsage)
     return 0
 
 
@@ -1743,23 +1749,34 @@ def _run_bench(
         )
     started = time.perf_counter()
     peak_private = 0
+    memory_sampled = False
     with log_path.open("wb") as log:
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=env)
-        while process.poll() is None:
-            if timeout_seconds is not None and time.perf_counter() - started > timeout_seconds:
-                process.terminate()
-                process.wait(timeout=30)
-                raise R9Error(f"transcribe-bench timeout after {timeout_seconds}s; see {log_path}")
-            if memory_ceiling_bytes is not None:
-                peak_private = _peak_private_bytes(process._handle)
-                if peak_private > memory_ceiling_bytes:
+        try:
+            while process.poll() is None:
+                if timeout_seconds is not None and time.perf_counter() - started > timeout_seconds:
                     process.terminate()
                     process.wait(timeout=30)
                     raise R9Error(
-                        f"transcribe-bench exceeded the memory ceiling "
-                        f"({peak_private} > {memory_ceiling_bytes} bytes); see {log_path}"
+                        f"transcribe-bench timeout after {timeout_seconds}s; see {log_path}"
                     )
-            time.sleep(5.0)
+                if memory_ceiling_bytes is not None:
+                    sampled = _peak_private_bytes(process._handle)
+                    if sampled > 0:
+                        peak_private = max(peak_private, sampled)
+                        memory_sampled = True
+                        if peak_private > memory_ceiling_bytes:
+                            process.terminate()
+                            process.wait(timeout=30)
+                            raise R9Error(
+                                f"transcribe-bench exceeded the memory ceiling "
+                                f"({peak_private} > {memory_ceiling_bytes} bytes); see {log_path}"
+                            )
+                time.sleep(5.0)
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=30)
         return_code = int(process.returncode)
     wall_seconds = time.perf_counter() - started
     if return_code != 0:
@@ -1767,6 +1784,7 @@ def _run_bench(
     return {
         "wall_seconds": wall_seconds,
         "peak_private_bytes": peak_private,
+        "memory_sampled": memory_sampled,
         "command": command,
     }
 
@@ -1777,6 +1795,8 @@ def _validate_dump_records(
     expected_chunk = 0
     last_total = -1
     violations: list[str] = []
+    if not records:
+        violations.append("no dump records")
     for record in records:
         if record["chunk"] != expected_chunk:
             violations.append(f"chunk {record['chunk']} != expected {expected_chunk}")
@@ -1784,6 +1804,12 @@ def _validate_dump_records(
         if record["total_n"] <= last_total:
             violations.append(f"total_n not increasing at chunk {record['chunk']}")
         last_total = record["total_n"]
+        if record["n_cache"] < 0 or record["n_fifo"] < 0:
+            violations.append(f"negative row counts at chunk {record['chunk']}")
+        if not np.isfinite(record["emb"]).all() or not np.isfinite(record["preds"]).all():
+            violations.append(f"non-finite dump values at chunk {record['chunk']}")
+        if len(record["frame_idx"]) != int(record["n_cache"]) + int(record["n_fifo"]):
+            violations.append(f"row count mismatch at chunk {record['chunk']}")
         lower = max(0, record["total_n"] - horizon)
         frame_idx = record["frame_idx"]
         if len(frame_idx) and (
@@ -1853,6 +1879,17 @@ def r9b_fixture(root: Path) -> Path:
         patched_segments = _fixed_segments_vulkan(_load_raw_probs_dump(patched_dumps))
         records = _parse_dump_records(patched_dump_bin)
         structure = _validate_dump_records(records, cadence, horizon)
+        expected_records = len(
+            [
+                chunk
+                for chunk in range(int(_load_raw_probs_dump(patched_dumps).shape[0]) // 6 + 1)
+                if chunk % cadence == 0
+            ]
+        )
+        if len(records) != expected_records:
+            raise R9Error(
+                f"fixture {clip_id}: dump record count {len(records)} != expected {expected_records}"
+            )
         r8_telemetry_path = (
             r8_output_root(root)
             / "runs"
@@ -1862,12 +1899,17 @@ def r9b_fixture(root: Path) -> Path:
             / "telemetry"
             / f"{clip_id}.jsonl"
         )
+        if not r8_telemetry_path.is_file():
+            raise R9Error(f"R8 smoke telemetry missing for {clip_id}")
         telemetry_flags: dict[int, bool] = {}
-        if r8_telemetry_path.is_file():
-            for row in read_jsonl(r8_telemetry_path):
-                telemetry_flags[int(row["chunk_index"])] = bool(
-                    row.get("compression_called", False)
-                )
+        for row in read_jsonl(r8_telemetry_path):
+            telemetry_flags[int(row["chunk_index"])] = bool(row.get("compression_called", False))
+        expected_telemetry_chunks = int(_load_raw_probs_dump(patched_dumps).shape[0]) // 6 + 1
+        if len(telemetry_flags) != expected_telemetry_chunks:
+            raise R9Error(
+                f"R8 smoke telemetry incomplete for {clip_id}: "
+                f"{len(telemetry_flags)} != {expected_telemetry_chunks}"
+            )
         compression_mismatches = [
             (record["chunk"], int(record["compression"]), telemetry_flags.get(record["chunk"]))
             for record in records
@@ -1887,7 +1929,8 @@ def r9b_fixture(root: Path) -> Path:
                 == sha256_file(patched_probs),
                 "speaker_segments_equal": unpatched_segments == patched_segments,
                 "dump_records": len(records),
-                "dump_schema_complete": True,
+                "dump_schema_complete": bool(structure["valid"]),
+                "r8_telemetry_present": True,
                 "dump_structure": structure,
                 "compression_mismatches_vs_r8_telemetry": compression_mismatches,
             }
@@ -1896,6 +1939,7 @@ def r9b_fixture(root: Path) -> Path:
         fixture["probability_bytes_equal"]
         and fixture["speaker_segments_equal"]
         and fixture["dump_schema_complete"]
+        and fixture["r8_telemetry_present"]
         and fixture["dump_structure"]["valid"]
         and not fixture["compression_mismatches_vs_r8_telemetry"]
         for fixture in fixtures
@@ -1967,6 +2011,9 @@ def r9b_replay(root: Path) -> Path:
     probabilities_dir.mkdir(parents=True, exist_ok=True)
     segments_dir = directory / "speaker_segments" / "vulkan"
     segments_dir.mkdir(parents=True, exist_ok=True)
+    stale_manifest = runs_dir / "replay_manifest.json"
+    if stale_manifest.exists():
+        stale_manifest.unlink()
     cpu_probabilities_dir = r8_output_root(root) / "probabilities" / "cpu"
     rows: list[dict[str, Any]] = []
     total_wall = 0.0
@@ -2073,13 +2120,17 @@ def r9b_replay(root: Path) -> Path:
                     "probability_shape": list(probabilities.shape),
                     "wall_seconds": run_metrics["wall_seconds"],
                     "peak_private_bytes": run_metrics["peak_private_bytes"],
-                    "memory_within_ceiling": run_metrics["peak_private_bytes"]
-                    <= memory_ceiling_bytes,
+                    "memory_sampled": run_metrics["memory_sampled"],
+                    "memory_within_ceiling": (
+                        run_metrics["peak_private_bytes"] <= memory_ceiling_bytes
+                        if run_metrics["memory_sampled"]
+                        else None
+                    ),
                     "cpu_probability_shape": list(cpu_probabilities.shape),
                 }
             )
-        except R9Error as error:
-            invalid_receipt(session_id, str(error))
+        except Exception as error:  # receipt integrity on any limit/cleanup failure
+            invalid_receipt(session_id, f"{type(error).__name__}: {error}")
             raise
     manifest = {
         "schema_version": 1,
@@ -2197,9 +2248,24 @@ def extract_embedding_features(root: Path) -> Path:
     if not manifest.is_file():
         raise R9Error("r9b-replay must run before r9b-extract")
     manifest_doc = load_json(manifest)
-    dump_paths = {
-        str(item["session_id"]): Path(item["embedding_dump_path"]) for item in manifest_doc["items"]
-    }
+    if manifest_doc.get("code_sha256") != sha256_file(CODE_PATH) or manifest_doc.get(
+        "config_sha256"
+    ) != sha256_file(CONFIG_PATH):
+        raise R9Error(
+            "replay manifest hashes do not match the current harness/config; rerun r9b-replay"
+        )
+    expected_session_ids = {str(session_id) for session_id in _sessions(root)}
+    manifest_items = list(manifest_doc.get("items", []))
+    if {str(item["session_id"]) for item in manifest_items} != expected_session_ids:
+        raise R9Error("replay manifest does not cover all ten sessions")
+    dump_paths: dict[str, Path] = {}
+    for item in manifest_items:
+        dump_path = Path(item["embedding_dump_path"])
+        if not dump_path.is_file():
+            raise R9Error(f"embedding dump missing for {item['session_id']}")
+        if sha256_file(dump_path) != str(item.get("embedding_dump_sha256")):
+            raise R9Error(f"embedding dump hash mismatch for {item['session_id']}")
+        dump_paths[str(item["session_id"])] = dump_path
     records_by_session: dict[str, list[dict[str, Any]]] = {}
     similarity_names = ("same_slot_similarity", "best_other_similarity", "embedding_jump")
     excluded_count = 0
@@ -2212,7 +2278,7 @@ def extract_embedding_features(root: Path) -> Path:
         if session_id not in records_by_session:
             records_by_session[session_id] = _parse_dump_records(dump_paths[session_id])
         records = records_by_session[session_id]
-        target = int(candidate["start_frame"]) + int(embedding["features"]["after_frames"])
+        target = int(candidate["frame"]) + int(embedding["features"]["after_frames"])
         chosen = next((record for record in records if record["total_n"] > target), None)
         if chosen is None:
             raise R9Error(
@@ -2221,7 +2287,7 @@ def extract_embedding_features(root: Path) -> Path:
         previous = records[records.index(chosen) - 1] if records.index(chosen) > 0 else None
         values, excluded = _embedding_features_for_candidate(
             chosen,
-            int(candidate["start_frame"]),
+            int(candidate["frame"]),
             int(candidate["speaker_slot"]),
             embedding["features"],
         )
@@ -2384,10 +2450,14 @@ def _b2_detect(
         end = frame
         offset = run_start
         while offset + 2 * window <= end:
-            before_slot_mask = dense_preds[offset : offset + window].argmax(axis=1) == run_slot
+            before_active = dense_preds[offset : offset + window].max(axis=1) >= 0.5
+            after_active = dense_preds[offset + window : offset + 2 * window].max(axis=1) >= 0.5
+            before_slot_mask = (
+                dense_preds[offset : offset + window].argmax(axis=1) == run_slot
+            ) & before_active
             after_slot_mask = (
                 dense_preds[offset + window : offset + 2 * window].argmax(axis=1) == run_slot
-            )
+            ) & after_active
             if bool(before_slot_mask.any()) and bool(after_slot_mask.any()):
                 before_mean = dense_emb[offset : offset + window][before_slot_mask].mean(axis=0)
                 after_mean = dense_emb[offset + window : offset + 2 * window][after_slot_mask].mean(
@@ -3419,6 +3489,33 @@ def report(root: Path) -> Path:
             f"{_latency_cell(point['availability_ms'], 'p90')} | "
             f"{'yes' if point.get('latency_defect') else 'no'} |"
         )
+    b1_metrics_path = directory / "b1_metrics.json"
+    if b1_metrics_path.is_file():
+        b1_doc = load_json(b1_metrics_path)
+        lines.extend(
+            [
+                "",
+                "## Availability latency (R9-B1)",
+                "",
+                f"Embedding after-window horizon: "
+                f"{int(b1_doc['availability_latency']['availability_frame_horizon_ms'])} ms; "
+                f"verification compute: "
+                f"{float(b1_doc['availability_latency']['verification_compute_ms_per_event']):.3f} ms per event.",
+            ]
+        )
+    b2_metrics_path = directory / "b2_metrics.json"
+    if b2_metrics_path.is_file():
+        b2_doc = load_json(b2_metrics_path)
+        if not bool(b2_doc.get("stopped", True)):
+            lines.extend(
+                [
+                    "",
+                    "## Availability latency (R9-B2 union)",
+                    "",
+                    f"Embedding after-window horizon: "
+                    f"{int(b2_doc['availability']['availability_frame_horizon_ms'])} ms.",
+                ]
+            )
     transfer = a1.get("threshold_transfer", [])
     if transfer:
         lines.extend(
@@ -3438,6 +3535,65 @@ def report(root: Path) -> Path:
                 f"{float(row['held_out_false_events_per_hour']):.1f} | "
                 f"{float(row['held_out_recall_250'] or 0.0):.3f} |"
             )
+    if b1_metrics_path.is_file():
+        b1_transfer = load_json(b1_metrics_path).get("threshold_transfer", [])
+        if b1_transfer:
+            lines.extend(
+                [
+                    "",
+                    "## Threshold transfer (R9-B1)",
+                    "",
+                    "| Fold | Target FE/h | Dev FE/h | Dev recall | Held-out FE/h | Held-out recall |",
+                    "| ---: | ---: | ---: | ---: | ---: | ---: |",
+                ]
+            )
+            for row in b1_transfer:
+                lines.append(
+                    f"| {int(row['fold'])} | {int(row['target_false_events_per_hour'])} | "
+                    f"{float(row['development_false_events_per_hour']):.1f} | "
+                    f"{float(row['development_recall_250'] or 0.0):.3f} | "
+                    f"{float(row['held_out_false_events_per_hour']):.1f} | "
+                    f"{float(row['held_out_recall_250'] or 0.0):.3f} |"
+                )
+    if b2_metrics_path.is_file():
+        b2_doc = load_json(b2_metrics_path)
+        if not bool(b2_doc.get("stopped", True)):
+            b2_transfer = b2_doc.get("threshold_transfer", [])
+            if b2_transfer:
+                lines.extend(
+                    [
+                        "",
+                        "## Threshold transfer (R9-B2 union)",
+                        "",
+                        "| Fold | Target FE/h | Dev FE/h | Dev recall | Held-out FE/h | Held-out recall |",
+                        "| ---: | ---: | ---: | ---: | ---: | ---: |",
+                    ]
+                )
+                for row in b2_transfer:
+                    lines.append(
+                        f"| {int(row['fold'])} | {int(row['target_false_events_per_hour'])} | "
+                        f"{float(row['development_false_events_per_hour']):.1f} | "
+                        f"{float(row['development_recall_250'] or 0.0):.3f} | "
+                        f"{float(row['held_out_false_events_per_hour']):.1f} | "
+                        f"{float(row['held_out_recall_250'] or 0.0):.3f} |"
+                    )
+            point_20 = b2_doc.get("selected_operating_points", {}).get("20.0")
+            if point_20:
+                stratum = point_20["metrics"]["stratum_recall"]
+                lines.extend(
+                    [
+                        "",
+                        "## R9-B2 union at the <=20 FE/h selection point",
+                        "",
+                        f"Evaluated {float(point_20['metrics']['tolerances']['250']['false_events_per_hour']):.2f} FE/h; "
+                        f"Recall@250 {float(point_20['metrics']['tolerances']['250']['recall'] or 0.0):.3f}; "
+                        f"stratum recall — overlap onset {float(stratum.get('overlap_onset') or 0.0):.3f}, "
+                        f"silence-gap change {float(stratum.get('silence_gap_change') or 0.0):.3f}, "
+                        f"short-return {float(stratum.get('short_backchannel_or_return') or 0.0):.3f}; "
+                        f"maximum single-meeting TP share "
+                        f"{float(point_20['metrics']['maximum_meeting_true_positive_share']):.3f}.",
+                    ]
+                )
     outcome_lines = ["", "## Outcome", ""]
     if (directory / "b1_metrics.json").is_file():
         b1_doc = load_json(directory / "b1_metrics.json")
