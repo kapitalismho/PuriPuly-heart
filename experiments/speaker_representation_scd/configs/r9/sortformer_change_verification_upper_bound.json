@@ -117,6 +117,52 @@
     "maximum_transfer_false_event_multiplier": 2.0,
     "latency_defect_median_ms": 400
   },
+  "embedding": {
+    "enabled": true,
+    "replay_backend": "vulkan",
+    "replay_backend_note": "Owner decision 2026-08-13: the B-arm full replay runs on Vulkan (GPU) to save wall-clock time; plan section 10's CPU example is overridden. Candidate stream, references, and probability features stay frozen from the R8 CPU dumps; embedding features come from the Vulkan replay. The CPU-vs-Vulkan numeric difference is a documented confound (R8 smoke parity: max abs diff 0.0907, mean 0.00067).",
+    "dump": {
+      "format": "binary_records_little_endian",
+      "header_layout": "int64 chunk_index; int64 total_n; int32 dumped_cache_rows; int32 dumped_fifo_rows; int32 compression_this_or_prev; int32 compress_count",
+      "row_layout": "int32 frame_idx; float32 emb[512]; float32 preds[4]",
+      "cadence_chunks": 2,
+      "cadence_note": "Dump after streaming_update_sync of every chunk whose chunk_index % 2 == 0; halves storage to ~13.8 GiB against the 24 GiB experiment ceiling.",
+      "horizon_frames": 188,
+      "horizon_note": "Only rows with frame_idx >= total_n - horizon_frames are dumped; any row older than 188 frames is never inside a feature window.",
+      "env_var": "TRANSCRIBE_SORTFORMER_EMBEDDING_DUMP_PATH",
+      "cadence_env_var": "TRANSCRIBE_SORTFORMER_EMBEDDING_DUMP_CADENCE",
+      "horizon_env_var": "TRANSCRIBE_SORTFORMER_EMBEDDING_DUMP_HORIZON"
+    },
+    "features": {
+      "before_frames": 15,
+      "after_frames": 15,
+      "after_lo_frames": 0,
+      "row_activation_rule": "A row belongs to a slot only when max(preds) >= 0.5; its slot is argmax(preds). Rows below 0.5 are inactive and never used in similarity means.",
+      "before_window": "rows with frame_idx in [candidate_frame - before_frames, candidate_frame - 1]",
+      "after_window": "rows with frame_idx in [candidate_frame + after_lo_frames, candidate_frame + after_frames]",
+      "same_slot_similarity": "cosine of (mean embedding of after-window rows assigned to the candidate slot, mean embedding of before-window rows assigned to the candidate slot)",
+      "best_other_similarity": "maximum over slots != candidate slot of cosine(mean embedding of after-window rows assigned to that slot, mean embedding of after-window rows assigned to the candidate slot)",
+      "embedding_jump": "euclidean distance between the two candidate-slot mean embeddings used for same_slot_similarity",
+      "compression_boundary": "1 if compression_this_or_prev == 1 in the dump record chosen for the candidate or in the immediately preceding dump record; 0 otherwise. compression_this_or_prev folds the previous chunk's compression flag so compressions landing between dumped chunks stay visible; compression events come from the same replay run (owner-override Vulkan), not from the R8 CPU per-chunk telemetry.",
+      "missing_rule": "A similarity feature is NaN when the needed row set is empty. NaN embedding features (including all three similarities of a compression-boundary candidate, per plan section 7.2 default) are imputed with the per-fold training median computed on the eight training meetings only. Candidates whose after and before row sets are both empty are flagged excluded_embedding=1, kept in event-level evaluation, and reported as a count.",
+      "candidate_slot_source": "frozen R8 CPU candidate stream (candidate slot at the crossing frame); Vulkan row argmax used for row assignment only",
+      "feature_names": ["same_slot_similarity", "best_other_similarity", "embedding_jump", "compression_boundary"]
+    },
+    "b1": {
+      "model_form": "identical discipline to R9-A1: per-fold L2-regularized logistic regression over normalized A1 features plus the four embedding features; MLP fallback with the verifier.mlp trigger; threshold selection on development folds out-of-fold scores",
+      "comparison": "A1 vs B1 curve comparison isolates the ceiling contribution of the speaker-cache embeddings"
+    },
+    "b2": {
+      "entry_condition": "B1 is valid (not Outcome D) AND candidate coverage is the binding constraint: evaluated after B1 as (B1 evaluation-curve recall at 100 false events/hour >= 0.6) OR (candidate ceiling recall < 0.9); candidate ceiling recall is 0.816 as frozen in R9-A",
+      "candidate_definition": "points inside continuously active single-slot runs where the cosine similarity between the slot's mean embedding over two adjacent fixed windows drops below the fixed threshold",
+      "window_frames": 15,
+      "stride_frames": 3,
+      "similarity_threshold": 0.75,
+      "deduplication": "200 ms duplicate suppression inherited from the main candidate stream",
+      "fail_fast": "if the first fold produces no B2 candidates beyond noise (candidate count below 10), B2 stops and the R9-B ceiling is reported without it",
+      "verification": "same B1 machinery and feature definitions, evaluated with the same event construction and scoring protocol"
+    }
+  },
   "verification_commit_policy": {
     "no_new_inference": true,
     "probability_source": "results/r8/streaming_sortformer_feasibility_v1/probabilities/cpu/*.npz, hash-verified at prepare",

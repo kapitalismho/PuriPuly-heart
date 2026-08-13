@@ -5,13 +5,14 @@ import hashlib
 import json
 import math
 import os
+import struct
 import subprocess
 import time
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Callable, Iterable, Sequence
 
 import numpy as np
 
@@ -939,9 +940,12 @@ def _mlp_predict(
     return np.concatenate(values).astype(np.float64)
 
 
-def _feature_matrix(rows: Sequence[dict[str, Any]]) -> np.ndarray:
-    cfg = config()
-    names = list(cfg["feature_names"])
+def _feature_matrix(
+    rows: Sequence[dict[str, Any]], names: Sequence[str] | None = None
+) -> np.ndarray:
+    if names is None:
+        names = list(config()["feature_names"])
+    names = list(names)
     return np.asarray(
         [[float(row["features"][name]) for name in names] for row in rows],
         dtype=np.float32,
@@ -1140,14 +1144,24 @@ def run_a0(root: Path) -> Path:
     return path
 
 
-def run_a1(root: Path, diagnostic: bool) -> Path:
+def _verifier_arm(
+    root: Path,
+    *,
+    arm: str,
+    diagnostic: bool,
+    feature_file: str,
+    feature_names: Sequence[str],
+    output_name: str,
+    scores_name: str,
+    transfer_name: str,
+    mlp_trigger_source: str | None = None,
+    fold_matrix_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] | None = None,
+) -> Path:
     cfg = config()
     sessions = _sessions(root)
     directory = output_root(root)
-    feature_name = "features_a_diagnostic" if diagnostic else "features_a"
-    output_name = "a1_diagnostic_metrics" if diagnostic else "a1_metrics"
-    rows = read_jsonl(directory / f"{feature_name}.jsonl")
-    matrix = _feature_matrix(rows)
+    rows = read_jsonl(directory / f"{feature_file}.jsonl")
+    matrix = _feature_matrix(rows, feature_names)
     labels = _label_vector(rows)
     row_session = [str(row["session_id"]) for row in rows]
     radius_samples = int(cfg["duplicate_suppression_ms"]) * 16
@@ -1161,8 +1175,13 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
             [session_id not in held_out_ids for session_id in row_session], dtype=np.bool_
         )
         held_mask = ~train_mask
-        mean, scale = _standardize_fit(matrix[train_mask])
-        standardized = _standardize(matrix, mean, scale)
+        fold_matrix = (
+            fold_matrix_transform(matrix, train_mask)
+            if fold_matrix_transform is not None
+            else matrix
+        )
+        mean, scale = _standardize_fit(fold_matrix[train_mask])
+        standardized = _standardize(fold_matrix, mean, scale)
         usable = labels != -1
         train_usable = train_mask & usable
         weights = _balance_weights(labels[train_usable])
@@ -1180,7 +1199,12 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
         raise R9Error("no fold produced a finite out-of-fold AUROC")
     mean_auroc = float(np.mean(finite_aurocs))
     trigger = float(cfg["verifier"]["mlp"]["fallback_auroc_trigger"])
-    if diagnostic:
+    if mlp_trigger_source is not None:
+        source_path = directory / mlp_trigger_source
+        if not source_path.is_file():
+            raise R9Error(f"{mlp_trigger_source} must exist before {arm}")
+        mlp_triggered = bool(load_json(source_path).get("mlp_triggered", False))
+    elif diagnostic:
         a1_path = directory / "a1_metrics.json"
         if not a1_path.is_file():
             raise R9Error("a1 must run before a1-diagnostic")
@@ -1196,8 +1220,13 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
                 [session_id not in held_out_ids for session_id in row_session], dtype=np.bool_
             )
             held_mask = ~train_mask
-            mean, scale = _standardize_fit(matrix[train_mask])
-            standardized = _standardize(matrix, mean, scale)
+            fold_matrix = (
+                fold_matrix_transform(matrix, train_mask)
+                if fold_matrix_transform is not None
+                else matrix
+            )
+            mean, scale = _standardize_fit(fold_matrix[train_mask])
+            standardized = _standardize(fold_matrix, mean, scale)
             usable = labels != -1
             inner_val_ids = [
                 str(value)
@@ -1398,8 +1427,10 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
         }
     document = {
         "schema_version": 1,
+        "arm": arm,
         "diagnostic": diagnostic,
-        "feature_name": feature_name,
+        "feature_name": feature_file,
+        "feature_names": list(feature_names),
         "verifier_form": "mlp" if mlp_triggered else "logistic",
         "mlp_triggered": mlp_triggered,
         "mean_out_of_fold_auroc": mean_auroc,
@@ -1420,14 +1451,10 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
     }
     path = directory / f"{output_name}.json"
     write_json(path, document)
-    transfer_path = (
-        directory / "threshold_transfer_metrics.json"
-        if not diagnostic
-        else directory / "threshold_transfer_diagnostic_metrics.json"
-    )
+    transfer_path = directory / transfer_name
     write_json(transfer_path, transfer)
     write_jsonl(
-        directory / f"scores_{'a1_diagnostic' if diagnostic else 'a1'}.jsonl",
+        directory / f"scores_{scores_name}.jsonl",
         [
             {
                 "row": int(row["row"]),
@@ -1438,6 +1465,1023 @@ def run_a1(root: Path, diagnostic: bool) -> Path:
             }
             for row in rows
         ],
+    )
+    return path
+
+
+def run_a1(root: Path, diagnostic: bool) -> Path:
+    cfg = config()
+    feature_names = list(cfg["feature_names"])
+    if diagnostic:
+        return _verifier_arm(
+            root,
+            arm="a1-diagnostic",
+            diagnostic=True,
+            feature_file="features_a_diagnostic",
+            feature_names=feature_names,
+            output_name="a1_diagnostic_metrics",
+            scores_name="a1_diagnostic",
+            transfer_name="threshold_transfer_diagnostic_metrics.json",
+        )
+    return _verifier_arm(
+        root,
+        arm="a1",
+        diagnostic=False,
+        feature_file="features_a",
+        feature_names=feature_names,
+        output_name="a1_metrics",
+        scores_name="a1",
+        transfer_name="threshold_transfer_metrics.json",
+    )
+
+
+EMBEDDING_DUMP_HEADER = struct.Struct("<qqiiii")
+EMBEDDING_DIM = 512
+EMBEDDING_SPEAKERS = 4
+EMBEDDING_ROW_BYTES = 4 + EMBEDDING_DIM * 4 + EMBEDDING_SPEAKERS * 4
+EMBEDDING_EXTERNAL_REPOSITORY = "https://github.com/handy-computer/transcribe.cpp.git"
+EMBEDDING_EXTERNAL_COMMIT = "d42c3bbdfa2f63c37e5891e27de47a612d62f221"
+
+
+def _embedding_config(cfg: dict[str, Any]) -> dict[str, Any]:
+    embedding = cfg.get("embedding")
+    if not embedding or not embedding.get("enabled"):
+        raise R9Error("embedding section is not enabled in the R9 config")
+    return embedding
+
+
+def _parse_dump_records(
+    path: Path,
+) -> list[dict[str, Any]]:
+    rows_out: list[dict[str, Any]] = []
+    with path.open("rb") as handle:
+        while True:
+            header_bytes = handle.read(EMBEDDING_DUMP_HEADER.size)
+            if not header_bytes:
+                break
+            if len(header_bytes) < EMBEDDING_DUMP_HEADER.size:
+                raise R9Error(f"truncated embedding dump header: {path}")
+            chunk, total_n, n_cache, n_fifo, compression, compress_count = (
+                EMBEDDING_DUMP_HEADER.unpack(header_bytes)
+            )
+            row_count = int(n_cache) + int(n_fifo)
+            row_bytes = handle.read(row_count * EMBEDDING_ROW_BYTES)
+            if len(row_bytes) != row_count * EMBEDDING_ROW_BYTES:
+                raise R9Error(f"truncated embedding dump rows: {path}")
+            values = np.frombuffer(row_bytes, dtype="<f4").reshape(
+                row_count, 1 + EMBEDDING_DIM + EMBEDDING_SPEAKERS
+            )
+            rows_out.append(
+                {
+                    "chunk": int(chunk),
+                    "total_n": int(total_n),
+                    "n_cache": int(n_cache),
+                    "n_fifo": int(n_fifo),
+                    "compression": int(compression),
+                    "compress_count": int(compress_count),
+                    "frame_idx": values[:, 0].view("<i4").astype(np.int32),
+                    "emb": values[:, 1 : 1 + EMBEDDING_DIM],
+                    "preds": values[:, 1 + EMBEDDING_DIM :],
+                }
+            )
+    return rows_out
+
+
+def _r9_external_root(root: Path) -> Path:
+    return root / "external" / "r9" / "transcribe.cpp"
+
+
+def _clean_external_root(root: Path) -> Path:
+    return root / "external" / "r9" / "transcribe-clean"
+
+
+def r9b_prepare(root: Path) -> Path:
+    cfg = config()
+    embedding = _embedding_config(cfg)
+    if str(embedding["replay_backend"]) != "vulkan":
+        raise R9Error("replay_backend must be vulkan (owner decision)")
+    directory = output_root(root)
+    external = _r9_external_root(root)
+    clean = _clean_external_root(root)
+    if not (external / "src" / "arch" / "sortformer" / "model.cpp").is_file():
+        raise R9Error(f"external r9 checkout missing: {external}")
+    if not (clean / "src" / "arch" / "sortformer" / "model.cpp").is_file():
+        raise R9Error(f"external clean checkout missing: {clean}")
+
+    def git(command: Sequence[str]) -> list[str]:
+        process = subprocess.run(
+            ["git", "-C", str(external), *command],
+            capture_output=True,
+            text=True,
+            errors="replace",
+        )
+        if process.returncode != 0:
+            raise R9Error(f"git {command} failed: {process.stderr.strip()}")
+        return process.stdout.splitlines()
+
+    commit = git(["rev-parse", "HEAD"])[0]
+    if commit != EMBEDDING_EXTERNAL_COMMIT:
+        raise R9Error(f"external checkout at {commit}, expected {EMBEDDING_EXTERNAL_COMMIT}")
+    clean_commit_process = subprocess.run(
+        ["git", "-C", str(clean), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        errors="replace",
+    )
+    if clean_commit_process.stdout.strip() != EMBEDDING_EXTERNAL_COMMIT:
+        raise R9Error("clean checkout is not at the pinned commit")
+    clean_status = subprocess.run(
+        ["git", "-C", str(clean), "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+        errors="replace",
+    ).stdout.strip()
+    if clean_status:
+        raise R9Error(f"clean checkout is dirty: {clean_status}")
+    dirty = git(["status", "--porcelain"])
+    allowed_dirty = {
+        "M src/arch/sortformer/model.cpp",
+        "M src/arch/sortformer/sortformer.h",
+        "M src/arch/sortformer/stream.cpp",
+    }
+    if {line.strip() for line in dirty} != allowed_dirty:
+        raise R9Error(f"external checkout dirty paths differ from the R9-B patch: {dirty}")
+    patch = subprocess.run(
+        ["git", "-C", str(external), "diff", "--", "src/arch/sortformer"],
+        capture_output=True,
+        text=True,
+        errors="replace",
+    )
+    if patch.returncode != 0:
+        raise R9Error("failed to capture the embedding patch diff")
+    patch_path = directory / "embedding_patch.diff"
+    patch_path.parent.mkdir(parents=True, exist_ok=True)
+    patch_path.write_text(patch.stdout, encoding="utf-8")
+    bins = {
+        "patched_cpu": external / "build-r9-cpu" / "bin" / "Release" / "transcribe-bench.exe",
+        "patched_vulkan": root
+        / "builds"
+        / "r9-vulkan"
+        / "bin"
+        / "Release"
+        / "transcribe-bench.exe",
+        "clean_cpu": clean / "build-r9-clean-cpu" / "bin" / "Release" / "transcribe-bench.exe",
+    }
+    missing = [name for name, path in bins.items() if not path.is_file()]
+    if missing:
+        raise R9Error(f"missing R9-B binaries: {missing}")
+    model_path = root / "models" / "r8" / str(cfg["model_q8_filename"])
+    if not model_path.is_file():
+        raise R9Error(f"model missing: {model_path}")
+    document = {
+        "schema_version": 1,
+        "external_repository": EMBEDDING_EXTERNAL_REPOSITORY,
+        "external_commit": EMBEDDING_EXTERNAL_COMMIT,
+        "external_checkout": str(external),
+        "clean_checkout": str(clean),
+        "dirty_paths": sorted(dirty),
+        "patch_path": str(patch_path),
+        "patch_sha256": sha256_file(patch_path),
+        "binaries": {
+            name: {"path": str(path), "sha256": sha256_file(path)} for name, path in bins.items()
+        },
+        "model": {"path": str(model_path), "sha256": sha256_file(model_path)},
+        "replay_backend": embedding["replay_backend"],
+        "dump": embedding["dump"],
+        "features": embedding["features"],
+        "code_sha256": sha256_file(CODE_PATH),
+        "config_sha256": sha256_file(CONFIG_PATH),
+    }
+    path = directory / "r9b_prepare.json"
+    write_json(path, document)
+    return path
+
+
+def _run_bench(
+    bench: Path,
+    model: Path,
+    audio: Path,
+    backend: str,
+    dump_dir: Path | None,
+    embedding_dump: Path | None,
+    bench_json: Path,
+    log_path: Path,
+) -> dict[str, Any]:
+    dump_dir.mkdir(parents=True, exist_ok=True) if dump_dir is not None else None
+    bench_json.parent.mkdir(parents=True, exist_ok=True)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    embedding = _embedding_config(config())
+    command = [
+        str(bench),
+        "--model",
+        str(model),
+        "--sample",
+        str(audio),
+        "--backend",
+        backend,
+        "--threads",
+        "8",
+        "--warmup",
+        "0",
+        "--iters",
+        "1",
+        "--json-out",
+        str(bench_json),
+    ]
+    env = os.environ.copy()
+    env["TRANSCRIBE_SORTFORMER_STREAM_PRESET"] = "low_latency"
+    if dump_dir is not None:
+        env["TRANSCRIBE_DUMP_DIR"] = str(dump_dir)
+    if embedding_dump is not None:
+        env["TRANSCRIBE_SORTFORMER_EMBEDDING_DUMP_PATH"] = str(embedding_dump)
+        env["TRANSCRIBE_SORTFORMER_EMBEDDING_DUMP_CADENCE"] = str(
+            int(embedding["dump"]["cadence_chunks"])
+        )
+        env["TRANSCRIBE_SORTFORMER_EMBEDDING_DUMP_HORIZON"] = str(
+            int(embedding["dump"]["horizon_frames"])
+        )
+    started = time.perf_counter()
+    with log_path.open("wb") as log:
+        process = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, env=env)
+    wall_seconds = time.perf_counter() - started
+    if process.returncode != 0:
+        raise R9Error(f"transcribe-bench failed ({process.returncode}); see {log_path}")
+    return {"wall_seconds": wall_seconds, "command": command}
+
+
+def _validate_dump_records(
+    records: Sequence[dict[str, Any]], cadence: int, horizon: int
+) -> dict[str, Any]:
+    expected_chunk = 0
+    last_total = -1
+    violations: list[str] = []
+    for record in records:
+        if record["chunk"] != expected_chunk:
+            violations.append(f"chunk {record['chunk']} != expected {expected_chunk}")
+        expected_chunk = record["chunk"] + cadence
+        if record["total_n"] <= last_total:
+            violations.append(f"total_n not increasing at chunk {record['chunk']}")
+        last_total = record["total_n"]
+        lower = max(0, record["total_n"] - horizon)
+        frame_idx = record["frame_idx"]
+        if len(frame_idx) and (
+            int(frame_idx.min()) < lower or int(frame_idx.max()) >= record["total_n"]
+        ):
+            violations.append(
+                f"frame index out of horizon at chunk {record['chunk']}: "
+                f"min={int(frame_idx.min())} max={int(frame_idx.max())} total_n={record['total_n']}"
+            )
+    return {"valid": not violations, "violations": violations}
+
+
+def r9b_fixture(root: Path) -> Path:
+    cfg = config()
+    embedding = _embedding_config(cfg)
+    directory = output_root(root)
+    prepared = directory / "r9b_prepare.json"
+    if not prepared.is_file():
+        raise R9Error("r9b-prepare must run first")
+    prepare_doc = load_json(prepared)
+    patched_cpu = Path(prepare_doc["binaries"]["patched_cpu"]["path"])
+    clean_cpu = Path(prepare_doc["binaries"]["clean_cpu"]["path"])
+    model = Path(prepare_doc["model"]["path"])
+    fixture_root = directory / "embedding_validation"
+    smoke_root = r8_output_root(root) / "smoke_audio"
+    cadence = int(embedding["dump"]["cadence_chunks"])
+    horizon = int(embedding["dump"]["horizon_frames"])
+    checks: dict[str, Any] = {}
+    fixtures: list[dict[str, Any]] = []
+    for clip_id in ("r8_smoke_00", "r8_smoke_03"):
+        audio = smoke_root / f"{clip_id}.wav"
+        if not audio.is_file():
+            raise R9Error(f"fixture audio missing: {audio}")
+        base = fixture_root / clip_id
+        unpatched_dumps = base / "unpatched" / "dumps"
+        patched_dumps = base / "patched" / "dumps"
+        patched_dump_bin = base / "patched" / "embedding_dump.bin"
+        patched_dump_bin.parent.mkdir(parents=True, exist_ok=True)
+        if patched_dump_bin.exists():
+            patched_dump_bin.unlink()
+        _run_bench(
+            clean_cpu,
+            model,
+            audio,
+            "cpu",
+            unpatched_dumps,
+            None,
+            base / "unpatched" / "bench.json",
+            base / "unpatched" / "run.log",
+        )
+        _run_bench(
+            patched_cpu,
+            model,
+            audio,
+            "cpu",
+            patched_dumps,
+            patched_dump_bin,
+            base / "patched" / "bench.json",
+            base / "patched" / "run.log",
+        )
+        unpatched_probs = unpatched_dumps / "diar.probs.f32"
+        patched_probs = patched_dumps / "diar.probs.f32"
+        for path in (unpatched_probs, patched_probs):
+            if not path.is_file():
+                raise R9Error(f"diar.probs missing for {clip_id}: {path}")
+        records = _parse_dump_records(patched_dump_bin)
+        structure = _validate_dump_records(records, cadence, horizon)
+        r8_telemetry_path = (
+            r8_output_root(root)
+            / "runs"
+            / "smoke"
+            / "cpu"
+            / "diar_streaming_sortformer_4spk-v2.1-Q8_0"
+            / "telemetry"
+            / f"{clip_id}.jsonl"
+        )
+        telemetry_flags: dict[int, bool] = {}
+        if r8_telemetry_path.is_file():
+            for row in read_jsonl(r8_telemetry_path):
+                telemetry_flags[int(row["chunk_index"])] = bool(
+                    row.get("compression_called", False)
+                )
+        compression_mismatches = [
+            (record["chunk"], int(record["compression"]), telemetry_flags.get(record["chunk"]))
+            for record in records
+            if bool(record["compression"])
+            != bool(
+                telemetry_flags.get(record["chunk"], False)
+                or telemetry_flags.get(record["chunk"] - 1, False)
+            )
+        ]
+        fixtures.append(
+            {
+                "clip_id": clip_id,
+                "audio_sha256": sha256_file(audio),
+                "unpatched_probability_sha256": sha256_file(unpatched_probs),
+                "patched_probability_sha256": sha256_file(patched_probs),
+                "probability_bytes_equal": sha256_file(unpatched_probs)
+                == sha256_file(patched_probs),
+                "dump_records": len(records),
+                "dump_structure": structure,
+                "compression_mismatches_vs_r8_telemetry": compression_mismatches,
+            }
+        )
+    valid = all(
+        fixture["probability_bytes_equal"]
+        and fixture["dump_structure"]["valid"]
+        and not fixture["compression_mismatches_vs_r8_telemetry"]
+        for fixture in fixtures
+    )
+    checks["passed"] = bool(valid)
+    checks["fixtures"] = fixtures
+    document = {
+        "schema_version": 1,
+        "passed": checks["passed"],
+        "fixtures": fixtures,
+        "code_sha256": sha256_file(CODE_PATH),
+        "config_sha256": sha256_file(CONFIG_PATH),
+    }
+    path = fixture_root / "embedding_validation.json"
+    write_json(path, document)
+    return path
+
+
+def _load_raw_probs_dump(dump_dir: Path) -> np.ndarray:
+    metadata_path = dump_dir / "diar.probs.json"
+    data_path = dump_dir / "diar.probs.f32"
+    if not metadata_path.is_file() or not data_path.is_file():
+        raise R9Error(f"diar.probs dump is missing: {dump_dir}")
+    shape = tuple(int(value) for value in load_json(metadata_path)["shape"])
+    probabilities = np.fromfile(data_path, dtype="<f4")
+    if probabilities.size != int(np.prod(shape)):
+        raise R9Error(f"invalid probability dump size: {probabilities.size} != {shape}")
+    probabilities = probabilities.reshape(shape).astype(np.float32)
+    if probabilities.ndim != 2 or probabilities.shape[1] != EMBEDDING_SPEAKERS:
+        raise R9Error(f"unexpected Sortformer probability shape: {probabilities.shape}")
+    if not np.isfinite(probabilities).all():
+        raise R9Error("non-finite Sortformer probabilities")
+    return probabilities
+
+
+def r9b_replay(root: Path) -> Path:
+    cfg = config()
+    embedding = _embedding_config(cfg)
+    directory = output_root(root)
+    prepared = directory / "r9b_prepare.json"
+    if not prepared.is_file():
+        raise R9Error("r9b-prepare must run first")
+    prepare_doc = load_json(prepared)
+    bench = Path(prepare_doc["binaries"]["patched_vulkan"]["path"])
+    model = Path(prepare_doc["model"]["path"])
+    sessions = _sessions(root)
+    cadence = int(embedding["dump"]["cadence_chunks"])
+    horizon = int(embedding["dump"]["horizon_frames"])
+    embeddings_dir = directory / "embeddings" / "vulkan"
+    embeddings_dir.mkdir(parents=True, exist_ok=True)
+    runs_dir = directory / "r9b_runs" / "vulkan"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    probabilities_dir = directory / "probabilities" / "vulkan"
+    probabilities_dir.mkdir(parents=True, exist_ok=True)
+    segments_dir = directory / "speaker_segments" / "vulkan"
+    segments_dir.mkdir(parents=True, exist_ok=True)
+    rows: list[dict[str, Any]] = []
+    for session in sorted(sessions.values(), key=lambda value: (value.fold, value.session_id)):
+        dump_bin = embeddings_dir / f"{session.session_id}.bin"
+        if dump_bin.exists():
+            dump_bin.unlink()
+        base = runs_dir / session.session_id
+        dump_dir = base / "dumps"
+        bench_json = base / "bench.json"
+        run_metrics = _run_bench(
+            bench,
+            model,
+            session.waveform_path,
+            "vulkan",
+            dump_dir,
+            dump_bin,
+            bench_json,
+            base / "run.log",
+        )
+        bench_result = load_json(bench_json)
+        resolved_backend = str(bench_result.get("backend", "unknown")).lower()
+        if "vulkan" not in resolved_backend:
+            raise R9Error(
+                f"backend fallback for {session.session_id}: requested vulkan, resolved {resolved_backend}"
+            )
+        records = _parse_dump_records(dump_bin)
+        structure = _validate_dump_records(records, cadence, horizon)
+        if not structure["valid"]:
+            raise R9Error(
+                f"dump structure invalid for {session.session_id}: {structure['violations'][:5]}"
+            )
+        probabilities = _load_raw_probs_dump(dump_dir)
+        np.savez_compressed(
+            probabilities_dir / f"{session.session_id}.npz",
+            probabilities=probabilities,
+            frame_ms=np.int32(cfg["frame_ms"]),
+            backend=np.asarray("vulkan"),
+            model_sha256=np.asarray(sha256_file(model)),
+        )
+        write_json(
+            segments_dir / f"{session.session_id}.json",
+            _fixed_segments_vulkan(probabilities),
+        )
+        expected_records = len(
+            [chunk for chunk in range(int(probabilities.shape[0]) // 6 + 1) if chunk % cadence == 0]
+        )
+        if len(records) != expected_records:
+            raise R9Error(
+                f"dump record count mismatch for {session.session_id}: "
+                f"{len(records)} != {expected_records}"
+            )
+        rows.append(
+            {
+                "session_id": session.session_id,
+                "fold": session.fold,
+                "backend_requested": "vulkan",
+                "backend_resolved": resolved_backend,
+                "bench_path": str(bench),
+                "bench_sha256": sha256_file(bench),
+                "model_path": str(model),
+                "model_sha256": sha256_file(model),
+                "embedding_dump_path": str(dump_bin),
+                "embedding_dump_sha256": sha256_file(dump_bin),
+                "embedding_dump_records": len(records),
+                "embedding_dump_bytes": dump_bin.stat().st_size,
+                "probability_path": str(probabilities_dir / f"{session.session_id}.npz"),
+                "probability_shape": list(probabilities.shape),
+                "wall_seconds": run_metrics["wall_seconds"],
+            }
+        )
+    manifest = {
+        "schema_version": 1,
+        "backend": "vulkan",
+        "items": rows,
+        "code_sha256": sha256_file(CODE_PATH),
+        "config_sha256": sha256_file(CONFIG_PATH),
+    }
+    path = runs_dir / "replay_manifest.json"
+    write_json(path, manifest)
+    return path
+
+
+def _fixed_segments_vulkan(probabilities: np.ndarray) -> list[dict[str, Any]]:
+    frame_ms = int(config()["frame_ms"])
+    result: list[dict[str, Any]] = []
+    for speaker in range(probabilities.shape[1]):
+        active = probabilities[:, speaker] > 0.5
+        start: int | None = None
+        for frame in range(len(active) + 1):
+            value = frame < len(active) and bool(active[frame])
+            if value and start is None:
+                start = frame
+            elif not value and start is not None:
+                result.append(
+                    {
+                        "speaker_slot": speaker + 1,
+                        "start_ms": start * frame_ms,
+                        "end_ms": frame * frame_ms,
+                    }
+                )
+                start = None
+    return sorted(result, key=lambda row: (int(row["start_ms"]), int(row["speaker_slot"])))
+
+
+def _cosine(left: np.ndarray, right: np.ndarray) -> float:
+    denominator = float(np.linalg.norm(left)) * float(np.linalg.norm(right))
+    if denominator <= 0.0:
+        return float("nan")
+    return float(np.clip(np.dot(left, right) / denominator, -1.0, 1.0))
+
+
+def _embedding_features_for_candidate(
+    record: dict[str, Any],
+    candidate_frame: int,
+    candidate_slot: int,
+    features: dict[str, Any],
+) -> tuple[dict[str, float], bool]:
+    before_frames = int(features["before_frames"])
+    after_frames = int(features["after_frames"])
+    after_lo = int(features["after_lo_frames"])
+    frame_idx = record["frame_idx"]
+    emb = record["emb"]
+    preds = record["preds"]
+    active = preds.max(axis=1) >= 0.5
+    slots = preds.argmax(axis=1)
+    slot = candidate_slot - 1
+    after_mask = (frame_idx >= candidate_frame + after_lo) & (
+        frame_idx <= candidate_frame + after_frames
+    )
+    before_mask = (frame_idx >= candidate_frame - before_frames) & (
+        frame_idx <= candidate_frame - 1
+    )
+    after_slot = after_mask & active & (slots == slot)
+    before_slot = before_mask & active & (slots == slot)
+    mean_after = emb[after_slot].mean(axis=0) if bool(after_slot.any()) else None
+    mean_before = emb[before_slot].mean(axis=0) if bool(before_slot.any()) else None
+    excluded = mean_after is None and mean_before is None
+    if mean_after is not None and mean_before is not None:
+        same_slot = _cosine(
+            np.asarray(mean_after, dtype=np.float32), np.asarray(mean_before, dtype=np.float32)
+        )
+        jump = float(np.linalg.norm(mean_after - mean_before))
+    else:
+        same_slot = float("nan")
+        jump = float("nan")
+    best_other = float("nan")
+    if mean_after is not None:
+        best = -2.0
+        for other in range(EMBEDDING_SPEAKERS):
+            if other == slot:
+                continue
+            other_mask = after_mask & active & (slots == other)
+            if bool(other_mask.any()):
+                cosine = _cosine(
+                    np.asarray(mean_after, dtype=np.float32),
+                    np.asarray(emb[other_mask].mean(axis=0), dtype=np.float32),
+                )
+                best = max(best, cosine)
+        if best > -1.5:
+            best_other = best
+    return {
+        "same_slot_similarity": same_slot,
+        "best_other_similarity": best_other,
+        "embedding_jump": jump,
+    }, excluded
+
+
+def extract_embedding_features(root: Path) -> Path:
+    cfg = config()
+    embedding = _embedding_config(cfg)
+    directory = output_root(root)
+    features_a = directory / "features_a.jsonl"
+    candidates = directory / "candidates.jsonl"
+    for required in (features_a, candidates):
+        if not required.is_file():
+            raise R9Error(f"{required.name} must exist before r9b-extract")
+    feature_rows = read_jsonl(features_a)
+    candidates_rows = read_jsonl(candidates)
+    by_row = {int(row["row"]): row for row in candidates_rows}
+    manifest = directory / "r9b_runs" / "vulkan" / "replay_manifest.json"
+    if not manifest.is_file():
+        raise R9Error("r9b-replay must run before r9b-extract")
+    manifest_doc = load_json(manifest)
+    dump_paths = {
+        str(item["session_id"]): Path(item["embedding_dump_path"]) for item in manifest_doc["items"]
+    }
+    excluded_count = 0
+    missing_count = 0
+    for row in feature_rows:
+        session_id = str(row["session_id"])
+        candidate = by_row[int(row["row"])]
+        if session_id not in dump_paths:
+            raise R9Error(f"no embedding dump for {session_id}")
+        records = _parse_dump_records(dump_paths[session_id])
+        target = int(candidate["start_frame"]) + int(embedding["features"]["after_frames"])
+        chosen = next((record for record in records if record["total_n"] >= target), None)
+        if chosen is None:
+            raise R9Error(
+                f"no dump record covers candidate row {row['row']} (session {session_id})"
+            )
+        previous = records[records.index(chosen) - 1] if records.index(chosen) > 0 else None
+        values, excluded = _embedding_features_for_candidate(
+            chosen,
+            int(candidate["start_frame"]),
+            int(candidate["speaker_slot"]),
+            embedding["features"],
+        )
+        compression_boundary = (
+            1.0
+            if chosen["compression"] or (previous is not None and previous["compression"])
+            else 0.0
+        )
+        if any(
+            math.isnan(float(values[name]))
+            for name in ("same_slot_similarity", "best_other_similarity", "embedding_jump")
+        ):
+            missing_count += 1
+        row["features"] = {
+            **row["features"],
+            **values,
+            "compression_boundary": compression_boundary,
+        }
+        row["excluded_embedding"] = int(bool(excluded))
+        excluded_count += int(bool(excluded))
+    path = directory / "features_b.jsonl"
+    write_jsonl(path, feature_rows)
+    summary_path = directory / "embedding_feature_summary.json"
+    write_json(
+        summary_path,
+        {
+            "schema_version": 1,
+            "row_count": len(feature_rows),
+            "excluded_embedding_count": excluded_count,
+            "nan_feature_count": missing_count,
+            "code_sha256": sha256_file(CODE_PATH),
+            "config_sha256": sha256_file(CONFIG_PATH),
+        },
+    )
+    return path
+
+
+def _b1_fold_transform(matrix: np.ndarray, train_mask: np.ndarray) -> np.ndarray:
+    transformed = matrix.copy()
+    embedding_names = list(config()["embedding"]["features"]["feature_names"])
+    continuous = [name for name in embedding_names if name != "compression_boundary"]
+    base_count = len(list(config()["feature_names"]))
+    for name in continuous:
+        index = base_count + embedding_names.index(name)
+        train_values = matrix[train_mask, index]
+        finite = train_values[np.isfinite(train_values)]
+        if len(finite) == 0:
+            raise R9Error(f"no finite training values for embedding feature {name}")
+        median = float(np.median(finite))
+        nan_mask = ~np.isfinite(transformed[:, index])
+        transformed[nan_mask, index] = median
+    return transformed
+
+
+def run_b1(root: Path) -> Path:
+    cfg = config()
+    embedding = _embedding_config(cfg)
+    feature_names = list(cfg["feature_names"]) + list(embedding["features"]["feature_names"])
+    return _verifier_arm(
+        root,
+        arm="b1",
+        diagnostic=False,
+        feature_file="features_b",
+        feature_names=feature_names,
+        output_name="b1_metrics",
+        scores_name="b1",
+        transfer_name="threshold_transfer_b1_metrics.json",
+        mlp_trigger_source=None,
+        fold_matrix_transform=_b1_fold_transform,
+    )
+
+
+def _b1_linear_models(root: Path) -> list[dict[str, Any]]:
+    cfg = config()
+    embedding = _embedding_config(cfg)
+    directory = output_root(root)
+    b1_metrics_path = directory / "b1_metrics.json"
+    if not b1_metrics_path.is_file():
+        raise R9Error("b1 must run before b2")
+    if bool(load_json(b1_metrics_path).get("mlp_triggered", False)):
+        raise R9Error("b2 requires the linear B1 verifier; the MLP fallback was triggered")
+    names = list(cfg["feature_names"]) + list(embedding["features"]["feature_names"])
+    rows = read_jsonl(directory / "features_b.jsonl")
+    matrix = _feature_matrix(rows, names)
+    labels = _label_vector(rows)
+    row_session = [str(row["session_id"]) for row in rows]
+    models: list[dict[str, Any]] = []
+    for fold, held_out in enumerate(cfg["folds"]):
+        train_mask = np.asarray(
+            [session_id not in held_out for session_id in row_session], dtype=np.bool_
+        )
+        fold_matrix = _b1_fold_transform(matrix, train_mask)
+        mean, scale = _standardize_fit(fold_matrix[train_mask])
+        standardized = _standardize(fold_matrix, mean, scale)
+        usable = labels != -1
+        train_usable = train_mask & usable
+        weights = _balance_weights(labels[train_usable])
+        coef, intercept = _fit_linear(
+            standardized[train_usable], labels[train_usable], weights, cfg["verifier"]
+        )
+        models.append(
+            {
+                "fold": fold,
+                "mean": [float(value) for value in mean],
+                "scale": [float(value) for value in scale],
+                "coef": [float(value) for value in coef],
+                "intercept": float(intercept),
+            }
+        )
+    return models
+
+
+def _dense_embedding_frames(dump_path: Path, total_frames: int) -> np.ndarray:
+    embeddings = np.zeros((total_frames, EMBEDDING_DIM), dtype=np.float32)
+    filled = np.zeros(total_frames, dtype=np.bool_)
+    for record in _parse_dump_records(dump_path):
+        frame_idx = record["frame_idx"]
+        fresh = (
+            (frame_idx >= 0)
+            & (frame_idx < total_frames)
+            & ~filled[frame_idx.clip(0, total_frames - 1)]
+        )
+        if bool(fresh.any()):
+            targets = frame_idx[fresh]
+            embeddings[targets] = record["emb"][fresh]
+            filled[targets] = True
+    missing = int((~filled).sum())
+    if missing:
+        raise R9Error(f"{missing} frames have no dumped embedding in {dump_path.name}")
+    return embeddings
+
+
+def _b2_detect(
+    probabilities: np.ndarray, dense_emb: np.ndarray, b2_cfg: dict[str, Any]
+) -> list[tuple[int, int]]:
+    window = int(b2_cfg["window_frames"])
+    stride = int(b2_cfg["stride_frames"])
+    threshold = float(b2_cfg["similarity_threshold"])
+    active_value = probabilities.max(axis=1)
+    active_slot = probabilities.argmax(axis=1)
+    raw: list[tuple[int, int]] = []
+    run_slot: int | None = None
+    run_start = -1
+    for frame in range(len(probabilities) + 1):
+        active = frame < len(probabilities) and float(active_value[frame]) >= 0.5
+        slot_now = int(active_slot[frame]) if frame < len(probabilities) else -1
+        if run_slot is None:
+            if active:
+                run_slot = slot_now
+                run_start = frame
+            continue
+        if active and slot_now == run_slot:
+            continue
+        end = frame
+        offset = run_start
+        while offset + 2 * window <= end:
+            before_mean = dense_emb[offset : offset + window].mean(axis=0)
+            after_mean = dense_emb[offset + window : offset + 2 * window].mean(axis=0)
+            if _cosine(before_mean, after_mean) < threshold:
+                raw.append((offset + window, run_slot))
+            offset += stride
+        run_slot = None
+        run_start = -1
+        if active:
+            run_slot = slot_now
+            run_start = frame
+    dedup_radius_frames = max(
+        1, int(int(config()["duplicate_suppression_ms"]) // int(config()["frame_ms"]))
+    )
+    raw.sort()
+    deduplicated: list[tuple[int, int]] = []
+    for frame, slot in raw:
+        if not deduplicated or frame - deduplicated[-1][0] >= dedup_radius_frames:
+            deduplicated.append((frame, slot))
+    return deduplicated
+
+
+def run_b2(root: Path) -> Path:
+    cfg = config()
+    embedding = _embedding_config(cfg)
+    b2_cfg = embedding["b2"]
+    directory = output_root(root)
+    sessions = _sessions(root)
+    fold_map = _fold_map(cfg)
+    b1_metrics_path = directory / "b1_metrics.json"
+    if not b1_metrics_path.is_file():
+        raise R9Error("b1 must run before b2")
+    b1_document = load_json(b1_metrics_path)
+    evaluation_curve = b1_document.get("evaluation_curve", [])
+    b1_recall_100 = 0.0
+    for row in evaluation_curve:
+        if abs(float(row.get("false_events_per_hour", 1e9)) - 100.0) < 1e-6:
+            b1_recall_100 = float(row.get("recall_250") or 0.0)
+    ceiling_doc = directory / "ceiling_summary.json"
+    candidate_ceiling_recall = 0.0
+    if ceiling_doc.is_file():
+        candidate_ceiling_recall = float(
+            load_json(ceiling_doc).get("candidate_ceiling", {}).get("recall_250") or 0.0
+        )
+    entry = bool(b1_recall_100 >= 0.6 or candidate_ceiling_recall < 0.9)
+    if not entry:
+        path = directory / "b2_metrics.json"
+        write_json(
+            path,
+            {
+                "schema_version": 1,
+                "stopped": True,
+                "stop_reason": "entry_condition_not_met",
+                "b1_recall_100_feh": b1_recall_100,
+                "candidate_ceiling_recall": candidate_ceiling_recall,
+                "code_sha256": sha256_file(CODE_PATH),
+                "config_sha256": sha256_file(CONFIG_PATH),
+            },
+        )
+        return path
+    manifest = directory / "r9b_runs" / "vulkan" / "replay_manifest.json"
+    if not manifest.is_file():
+        raise R9Error("r9b-replay must run before b2")
+    dump_paths = {
+        str(item["session_id"]): Path(item["embedding_dump_path"])
+        for item in load_json(manifest)["items"]
+    }
+    vulkan_probabilities = {
+        session_id: np.load(directory / "probabilities" / "vulkan" / f"{session_id}.npz")[
+            "probabilities"
+        ]
+        for session_id in sessions
+    }
+    cpu_probabilities = {
+        session_id: _load_probabilities(root, session_id) for session_id in sessions
+    }
+    windows = cfg["feature_windows"]
+    frame_ms = int(cfg["frame_ms"])
+    confirmation_frames = int(cfg["confirmation"]["base_frames"])
+    fold_candidates: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for session in sorted(sessions.values(), key=lambda value: (value.fold, value.session_id)):
+        total_frames = int(vulkan_probabilities[session.session_id].shape[0])
+        dense_emb = _dense_embedding_frames(dump_paths[session.session_id], total_frames)
+        detected = _b2_detect(vulkan_probabilities[session.session_id], dense_emb, b2_cfg)
+        for frame, slot in detected:
+            sample = frame * int(cfg["samples_per_frame"])
+            fold_candidates[fold_map[session.session_id]].append(
+                {
+                    "session_id": session.session_id,
+                    "frame": frame,
+                    "sample": sample,
+                    "speaker_slot": slot + 1,
+                    "candidate_kind": "intra_slot",
+                }
+            )
+    first_fold_count = len(fold_candidates.get(0, []))
+    if first_fold_count < 10:
+        path = directory / "b2_metrics.json"
+        write_json(
+            path,
+            {
+                "schema_version": 1,
+                "stopped": True,
+                "stop_reason": "fail_fast_noise_floor",
+                "first_fold_candidate_count": first_fold_count,
+                "code_sha256": sha256_file(CODE_PATH),
+                "config_sha256": sha256_file(CONFIG_PATH),
+            },
+        )
+        return path
+    models = _b1_linear_models(root)
+    feature_names = list(cfg["feature_names"]) + list(embedding["features"]["feature_names"])
+    b2_rows: list[dict[str, Any]] = []
+    sessions_by_id = {str(key): value for key, value in sessions.items()}
+    records_by_session: dict[str, list[dict[str, Any]]] = {}
+    features_b_rows = read_jsonl(directory / "features_b.jsonl")
+    features_b_matrix = _feature_matrix(features_b_rows, feature_names)
+    row_session_main = [str(row["session_id"]) for row in features_b_rows]
+    continuous_embedding_names = [
+        name for name in embedding["features"]["feature_names"] if name != "compression_boundary"
+    ]
+    base_count = len(list(cfg["feature_names"]))
+    for fold, candidates in sorted(fold_candidates.items()):
+        model = models[fold]
+        mean = np.asarray(model["mean"], dtype=np.float64)
+        scale = np.asarray(model["scale"], dtype=np.float64)
+        coef = np.asarray(model["coef"], dtype=np.float64)
+        train_mask = np.asarray(
+            [session_id not in cfg["folds"][fold] for session_id in row_session_main],
+            dtype=np.bool_,
+        )
+        imputation_medians: dict[int, float] = {}
+        for name in continuous_embedding_names:
+            index = base_count + list(embedding["features"]["feature_names"]).index(name)
+            train_values = features_b_matrix[train_mask, index]
+            finite = train_values[np.isfinite(train_values)]
+            imputation_medians[index] = float(np.median(finite))
+        for candidate in candidates:
+            session_id = str(candidate["session_id"])
+            session = sessions_by_id[session_id]
+            a_features = _features_for_candidate(
+                cpu_probabilities[session_id],
+                int(candidate["frame"]),
+                int(candidate["speaker_slot"]) - 1,
+                confirmation_frames,
+                windows,
+                frame_ms,
+            )
+            label = _label_candidate(int(candidate["sample"]), session.events)
+            if session_id not in records_by_session:
+                records_by_session[session_id] = _parse_dump_records(dump_paths[session_id])
+            records = records_by_session[session_id]
+            target = int(candidate["frame"]) + int(embedding["features"]["after_frames"])
+            chosen = next(record for record in records if record["total_n"] >= target)
+            previous = records[records.index(chosen) - 1] if records.index(chosen) > 0 else None
+            values, excluded = _embedding_features_for_candidate(
+                chosen,
+                int(candidate["frame"]),
+                int(candidate["speaker_slot"]),
+                embedding["features"],
+            )
+            compression_boundary = (
+                1.0
+                if chosen["compression"] or (previous is not None and previous["compression"])
+                else 0.0
+            )
+            features = {**a_features, **values, "compression_boundary": compression_boundary}
+            feature_vector = np.asarray(
+                [float(features[name]) for name in feature_names], dtype=np.float64
+            )
+            for index in np.nonzero(~np.isfinite(feature_vector))[0]:
+                feature_vector[int(index)] = imputation_medians[int(index)]
+            standardized = _standardize(feature_vector[None, :], mean, scale)
+            score = float(_linear_predict(standardized, coef, float(model["intercept"]))[0])
+            b2_rows.append(
+                {
+                    "session_id": session_id,
+                    "sample": int(candidate["sample"]),
+                    "frame": int(candidate["frame"]),
+                    "speaker_slot": int(candidate["speaker_slot"]),
+                    "label": str(label["label"]),
+                    "excluded_embedding": int(bool(excluded)),
+                    "score": score,
+                }
+            )
+    scores_path = directory / "scores_b2.jsonl"
+    write_jsonl(scores_path, b2_rows)
+    union_rows = list(read_jsonl(directory / "scores_b1.jsonl")) + b2_rows
+    grouped: dict[str, list[tuple[int, float]]] = {}
+    for row in union_rows:
+        grouped.setdefault(str(row["session_id"]), []).append(
+            (int(row["sample"]), float(row["score"]))
+        )
+    for session_id in sessions:
+        grouped.setdefault(session_id, [])
+    radius_samples = int(cfg["duplicate_suppression_ms"]) * 16
+    for session_id in grouped:
+        grouped[session_id] = _grouped_events(
+            [{"sample": sample, "score": score} for sample, score in grouped[session_id]],
+            radius_samples,
+        )
+    cache = ScoreEvaluationCache(sessions, grouped)
+    score_values = np.asarray(
+        [score for pairs in grouped.values() for _, score in pairs], dtype=np.float32
+    )
+    targets = [float(value) for value in cfg["targets"]["false_events_per_hour"]]
+    curve = _curve_for_scores(cache, score_values, targets, cfg["curve_search"])
+    evaluation_curve_rows: list[dict[str, Any]] = []
+    for row in curve:
+        metrics = cache.metrics(float(row["threshold"]))
+        primary = metrics["tolerances"]["250"]
+        evaluation_curve_rows.append(
+            {
+                "threshold": row["threshold"],
+                "prediction_count": metrics["prediction_count"],
+                "true_positive_count": primary["true_positive_count"],
+                "false_event_count": primary["false_event_count"],
+                "false_events_per_hour": primary["false_events_per_hour"],
+                "recall_250": primary["recall"],
+            }
+        )
+    path = directory / "b2_metrics.json"
+    write_json(
+        path,
+        {
+            "schema_version": 1,
+            "stopped": False,
+            "entry_condition_met": bool(entry),
+            "b1_recall_100_feh": b1_recall_100,
+            "candidate_ceiling_recall": candidate_ceiling_recall,
+            "b2_candidate_count": len(b2_rows),
+            "first_fold_candidate_count": first_fold_count,
+            "b2_candidates_path": str(directory / "scores_b2.jsonl"),
+            "curve": curve,
+            "curve_kind": "selection_union_main_and_b2",
+            "evaluation_curve": evaluation_curve_rows,
+            "evaluation_curve_kind": "event_level_union_including_ambiguous",
+            "code_sha256": sha256_file(CODE_PATH),
+            "config_sha256": sha256_file(CONFIG_PATH),
+        },
     )
     return path
 
@@ -1559,7 +2603,7 @@ def ceiling_summary(root: Path) -> Path:
     oracle_recall = float(baseline["oracle"]["tolerances"]["250"]["recall"] or 0.0)
     r8_accuracy = load_json(r8_output_root(root) / "accuracy_metrics.json")
     arms: dict[str, Any] = {}
-    for name in ("a0", "a1", "a1_diagnostic"):
+    for name in ("a0", "a1", "a1_diagnostic", "b1", "b2"):
         path = directory / f"{name}_metrics.json"
         if name == "a0":
             if path.is_file():
@@ -1590,6 +2634,50 @@ def ceiling_summary(root: Path) -> Path:
                     "candidate_ceiling_fractions": fractions,
                     "fold_selection": document["fold_selection"],
                 }
+            continue
+        if name == "b2":
+            if not path.is_file():
+                continue
+            b2_document = load_json(path)
+            if bool(b2_document.get("stopped", True)):
+                arms["b2"] = {
+                    "kind": "stopped",
+                    "stop_reason": b2_document.get("stop_reason"),
+                    "candidate_count": b2_document.get("b2_candidate_count"),
+                    "first_fold_candidate_count": b2_document.get("first_fold_candidate_count"),
+                }
+                continue
+            curve = b2_document["evaluation_curve"]
+            at_targets = {}
+            for target in cfg["targets"]["false_events_per_hour"]:
+                selected = _select_row(curve, float(target))
+                at_targets[str(float(target))] = {
+                    "threshold": selected["threshold"],
+                    "recall_250": selected["recall_250"],
+                    "false_events_per_hour": selected["false_events_per_hour"],
+                }
+            fractions = {}
+            for fraction in cfg["ceiling"]["candidate_recall_fractions"]:
+                threshold = float(fraction) * oracle_recall
+                hit = None
+                for row in sorted(curve, key=lambda value: float(value["false_events_per_hour"])):
+                    if float(row["recall_250"] or 0.0) >= threshold:
+                        hit = {
+                            "false_events_per_hour": row["false_events_per_hour"],
+                            "recall_250": row["recall_250"],
+                            "threshold": row["threshold"],
+                        }
+                        break
+                fractions[str(fraction)] = hit
+            arms["b2"] = {
+                "kind": "curve",
+                "union_main_and_b2": True,
+                "candidate_count": b2_document.get("b2_candidate_count"),
+                "at_targets": at_targets,
+                "candidate_ceiling_fractions": fractions,
+                "curve": curve,
+                "selection_curve": b2_document.get("curve", curve),
+            }
             continue
         if not path.is_file():
             continue
@@ -1645,6 +2733,29 @@ def ceiling_summary(root: Path) -> Path:
             if ratio >= float(cfg["outcome_a_pareto"]["minimum_ratio"]):
                 counts += 1
         pareto["meaningful"] = counts >= int(cfg["outcome_a_pareto"]["minimum_points"])
+    embedding_contribution: dict[str, Any] = {"points": {}}
+    if "a1" in arms and "b1" in arms:
+        for target in cfg["outcome_a_pareto"]["comparison_points_feh"]:
+            a1_best = arms["a1"]["at_targets"][str(float(target))]
+            b1_best = arms["b1"]["at_targets"][str(float(target))]
+            a1_recall = float(a1_best["recall_250"] or 0.0)
+            b1_recall = float(b1_best["recall_250"] or 0.0)
+            embedding_contribution["points"][str(float(target))] = {
+                "a1_recall_250": a1_recall,
+                "b1_recall_250": b1_recall,
+                "b1_evaluated_false_events_per_hour": b1_best["false_events_per_hour"],
+                "ratio": (
+                    b1_recall / a1_recall
+                    if a1_recall > 0.0
+                    else (math.inf if b1_recall > 0.0 else 0.0)
+                ),
+            }
+    embedding_contribution["raises_ceiling"] = bool(
+        embedding_contribution["points"]
+        and any(
+            float(point["ratio"]) >= 1.05 for point in embedding_contribution["points"].values()
+        )
+    )
     document = {
         "schema_version": 1,
         "oracle_recall_250": oracle_recall,
@@ -1666,6 +2777,7 @@ def ceiling_summary(root: Path) -> Path:
         },
         "arms": arms,
         "outcome_a_pareto": pareto,
+        "embedding_contribution": embedding_contribution,
     }
     path = directory / "ceiling_summary.json"
     write_json(path, document)
@@ -1742,20 +2854,29 @@ def _plot_ceiling(
         linewidth=1.0,
         label="R8 raw-probability curve (incumbent)",
     )
-    colors = {"a1": "tab:blue", "a1_diagnostic": "tab:orange"}
-    labels = {
-        "a1": "R9-A1 logistic verifier (causal)",
-        "a1_diagnostic": "R9-A1 diagnostic (+480 ms window)",
+    colors = {
+        "a1": "tab:blue",
+        "a1_diagnostic": "tab:orange",
+        "b1": "tab:green",
+        "b2": "tab:purple",
     }
-    for name in ("a1", "a1_diagnostic"):
+    labels = {
+        "a1": "R9-A1 logistic verifier (probability-only)",
+        "a1_diagnostic": "R9-A1 diagnostic (+480 ms window)",
+        "b1": "R9-B1 logistic verifier (embedding-augmented)",
+        "b2": "R9-B2 union stream (intra-slot extension, if run)",
+    }
+    for name in ("a1", "a1_diagnostic", "b1", "b2"):
         if name not in arms:
+            continue
+        if name == "b2" and arms[name].get("kind") != "curve":
             continue
         curve = [row for row in arms[name]["curve"] if float(row["false_events_per_hour"]) <= 120.0]
         axis.plot(
             [float(row["false_events_per_hour"]) for row in curve],
             [float(row["recall_250"] or 0.0) for row in curve],
             color=colors[name],
-            linestyle="--" if name == "a1_diagnostic" else "-",
+            linestyle="--" if name in ("a1_diagnostic", "b2") else "-",
             label=labels[name],
         )
     if "a0" in arms:
@@ -1815,6 +2936,9 @@ def report(root: Path) -> Path:
     ceiling = load_json(directory / "ceiling_summary.json")
     candidate_summary = load_json(directory / "candidate_summary.json")
     a1 = load_json(directory / "a1_metrics.json")
+    embedding_feature_names = list(
+        config().get("embedding", {}).get("features", {}).get("feature_names", [])
+    )
     a1_diagnostic_path = directory / "a1_diagnostic_metrics.json"
     a1_diagnostic = load_json(a1_diagnostic_path) if a1_diagnostic_path.is_file() else None
     a0 = (
@@ -1857,7 +2981,7 @@ def report(root: Path) -> Path:
         point = arm["candidate_ceiling_fractions"].get(str(fraction))
         return f"{float(point['false_events_per_hour']):.1f}" if point else "—"
 
-    for name in ("a0", "a1", "a1_diagnostic"):
+    for name in ("a0", "a1", "a1_diagnostic", "b1", "b2"):
         if name == "a0":
             if "a0" not in ceiling["arms"]:
                 continue
@@ -1874,9 +2998,19 @@ def report(root: Path) -> Path:
         arm = ceiling["arms"].get(name)
         if arm is None:
             continue
-        label = "R9-A1 logistic verifier" if name == "a1" else "R9-A1 diagnostic (non-causal)"
+        if name == "b2" and arm.get("kind") == "stopped":
+            lines.append(
+                f"| R9-B2 intra-slot extension | stopped: {arm.get('stop_reason')} | | | | | | | | |"
+            )
+            continue
+        labels = {
+            "a1": "R9-A1 logistic verifier (probability-only)",
+            "a1_diagnostic": "R9-A1 diagnostic (non-causal)",
+            "b1": "R9-B1 logistic verifier (embedding-augmented)",
+            "b2": "R9-B2 union stream (main + intra-slot)",
+        }
         lines.append(
-            f"| {label} | {cell(arm, 1.0)} | {cell(arm, 5.0)} | {cell(arm, 10.0)} | {cell(arm, 20.0)} | "
+            f"| {labels[name]} | {cell(arm, 1.0)} | {cell(arm, 5.0)} | {cell(arm, 10.0)} | {cell(arm, 20.0)} | "
             f"{cell(arm, 50.0)} | {cell(arm, 100.0)} | {fraction_cell(arm, 0.5)} | {fraction_cell(arm, 0.8)} |"
         )
     lines.extend(
@@ -1954,6 +3088,66 @@ def report(root: Path) -> Path:
                 f"- {target} FE/h: R8 {float(point['r8_recall_250']):.4f} vs R9-A1 "
                 f"{float(point['a1_recall_250']):.4f} (evaluated "
                 f"{float(point['a1_evaluated_false_events_per_hour']):.1f} FE/h, ratio {float(point['ratio']):.2f})"
+            )
+    if "b1" in ceiling["arms"]:
+        b1_doc = load_json(directory / "b1_metrics.json")
+        lines.extend(
+            [
+                "",
+                "## R9-B1 (embedding-augmented verifier)",
+                "",
+                f"Verifier form: **{b1_doc['verifier_form']}** (MLP fallback triggered: {b1_doc['mlp_triggered']}); "
+                f"mean out-of-fold AUROC {float(b1_doc['mean_out_of_fold_auroc']):.4f}. "
+                "B1 adds the four speaker-cache embedding features "
+                f"({', '.join(embedding_feature_names)}) to the A1 features.",
+            ]
+        )
+        for fold, value in sorted(b1_doc["fold_auroc"].items()):
+            lines.append(f"- fold {fold} held-out AUROC: {float(value):.4f}")
+    if ceiling["embedding_contribution"]["points"]:
+        contribution = ceiling["embedding_contribution"]
+        lines.extend(
+            [
+                "",
+                "## Embedding contribution (A1 vs B1)",
+                "",
+                "The comparison isolates how much the speaker-cache embeddings raise the ceiling over",
+                "probability-only features.",
+            ]
+        )
+        for target, point in contribution["points"].items():
+            lines.append(
+                f"- {target} FE/h: A1 {float(point['a1_recall_250']):.4f} vs B1 "
+                f"{float(point['b1_recall_250']):.4f} (evaluated "
+                f"{float(point['b1_evaluated_false_events_per_hour']):.1f} FE/h, ratio {float(point['ratio']):.2f})"
+            )
+        lines.append(
+            f"- Embeddings raise the ceiling: **{bool(contribution['raises_ceiling'])}** "
+            f"(frozen threshold: B1/A1 ratio >= 1.05 at any comparison point)."
+        )
+    b2_doc_path = directory / "b2_metrics.json"
+    if b2_doc_path.is_file():
+        b2_doc = load_json(b2_doc_path)
+        if bool(b2_doc.get("stopped", True)):
+            lines.extend(
+                [
+                    "",
+                    "## R9-B2 (intra-slot candidate extension)",
+                    "",
+                    f"Stopped: **{b2_doc.get('stop_reason')}** "
+                    f"(first-fold candidate count {b2_doc.get('first_fold_candidate_count')}).",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "",
+                    "## R9-B2 (intra-slot candidate extension)",
+                    "",
+                    f"Ran with {int(b2_doc.get('b2_candidate_count', 0))} intra-slot candidates; the B2 row in the "
+                    "ceiling table scores the union stream (main candidates + intra-slot candidates) with the "
+                    "B1 verifier.",
+                ]
             )
     if a1_diagnostic is not None:
         lines.extend(
@@ -2142,6 +3336,12 @@ def main(argv: list[str] | None = None) -> int:
             "a1-diagnostic",
             "ceiling",
             "report",
+            "r9b-prepare",
+            "r9b-fixture",
+            "r9b-replay",
+            "r9b-extract",
+            "b1",
+            "b2",
         ),
     )
     args = parser.parse_args(argv)
@@ -2166,6 +3366,18 @@ def main(argv: list[str] | None = None) -> int:
         print(ceiling_summary(root))
     elif args.action == "report":
         print(report(root))
+    elif args.action == "r9b-prepare":
+        print(r9b_prepare(root))
+    elif args.action == "r9b-fixture":
+        print(r9b_fixture(root))
+    elif args.action == "r9b-replay":
+        print(r9b_replay(root))
+    elif args.action == "r9b-extract":
+        print(extract_embedding_features(root))
+    elif args.action == "b1":
+        print(run_b1(root))
+    elif args.action == "b2":
+        print(run_b2(root))
     return 0
 
 

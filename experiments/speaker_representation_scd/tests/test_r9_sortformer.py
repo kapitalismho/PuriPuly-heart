@@ -1,22 +1,31 @@
 from __future__ import annotations
 
 import math
+import struct
 
 import numpy as np
 
 from experiments.speaker_representation_scd.r9_sortformer_change_verification_upper_bound import (
+    EMBEDDING_DIM,
+    EMBEDDING_SPEAKERS,
+    _b1_fold_transform,
+    _b2_detect,
     _balance_weights,
     _curve_row,
+    _dense_embedding_frames,
+    _embedding_features_for_candidate,
     _features_for_candidate,
     _fit_linear,
     _grouped_events,
     _label_candidate,
     _linear_predict,
     _one_to_one,
+    _parse_dump_records,
     _segment_start_candidates,
     _select_row,
     _standardize,
     _standardize_fit,
+    _validate_dump_records,
     config,
     smoke,
 )
@@ -260,3 +269,186 @@ def test_curve_row_uses_score_cache() -> None:
     row_high = _curve_row(cache, 0.85)
     assert row_high["prediction_count"] == 1
     assert row_high["recall_250"] == 1.0
+
+
+def _row(frame_idx: int, slot: int, emb_seed: float) -> tuple[int, list[float], list[float]]:
+    emb = np.full(EMBEDDING_DIM, float(emb_seed), dtype=np.float32)
+    preds = np.zeros(EMBEDDING_SPEAKERS, dtype=np.float32)
+    preds[slot] = 0.9
+    return frame_idx, [float(value) for value in emb], [float(value) for value in preds]
+
+
+def _write_dump(tmp_path, records: list[dict]) -> object:
+    blob = bytearray()
+    for record in records:
+        cache_rows = record.get("cache", [])
+        fifo_rows = record.get("fifo", [])
+        blob += struct.pack(
+            "<qqiiii",
+            int(record["chunk"]),
+            int(record["total_n"]),
+            len(cache_rows),
+            len(fifo_rows),
+            int(record.get("compression", 0)),
+            int(record.get("compress_count", 0)),
+        )
+        for frame_idx, emb, preds in cache_rows + fifo_rows:
+            blob += struct.pack("<i", int(frame_idx))
+            blob += np.asarray(emb, dtype="<f4").tobytes()
+            blob += np.asarray(preds, dtype="<f4").tobytes()
+    path = tmp_path / "dump.bin"
+    path.write_bytes(bytes(blob))
+    return path
+
+
+def test_parse_dump_records_round_trip(tmp_path) -> None:
+    rows_a = [_row(4, 0, 1.0), _row(5, 0, 2.0)]
+    rows_b = [_row(6, 1, 3.0)]
+    path = _write_dump(
+        tmp_path,
+        [
+            {"chunk": 0, "total_n": 6, "fifo": rows_a, "compression": 0, "compress_count": 0},
+            {"chunk": 2, "total_n": 12, "cache": rows_b, "compression": 1, "compress_count": 1},
+        ],
+    )
+    records = _parse_dump_records(path)
+    assert len(records) == 2
+    assert [int(value) for value in records[0]["frame_idx"]] == [4, 5]
+    assert records[0]["emb"].shape == (2, EMBEDDING_DIM)
+    assert records[0]["preds"].shape == (2, EMBEDDING_SPEAKERS)
+    assert int(records[1]["compression"]) == 1
+    assert int(records[1]["compress_count"]) == 1
+
+
+def test_validate_dump_records_catches_violations(tmp_path) -> None:
+    path = _write_dump(
+        tmp_path,
+        [
+            {"chunk": 0, "total_n": 6, "fifo": [_row(0, 0, 0.0)], "compression": 0},
+            {"chunk": 3, "total_n": 12, "fifo": [_row(11, 0, 0.0)], "compression": 0},
+        ],
+    )
+    records = _parse_dump_records(path)
+    result = _validate_dump_records(records, cadence=2, horizon=188)
+    assert not result["valid"]
+    assert any("chunk" in violation for violation in result["violations"])
+    valid_path = _write_dump(
+        tmp_path,
+        [{"chunk": 0, "total_n": 6, "fifo": [_row(0, 0, 0.0)], "compression": 0}],
+    )
+    valid = _validate_dump_records(_parse_dump_records(valid_path), cadence=2, horizon=188)
+    assert valid["valid"]
+    horizon_path = _write_dump(
+        tmp_path,
+        [{"chunk": 0, "total_n": 100, "fifo": [_row(0, 0, 0.0)], "compression": 0}],
+    )
+    horizon_result = _validate_dump_records(
+        _parse_dump_records(horizon_path), cadence=2, horizon=10
+    )
+    assert not horizon_result["valid"]
+
+
+def test_embedding_features_for_candidate_values() -> None:
+    record = {
+        "chunk": 0,
+        "total_n": 40,
+        "frame_idx": np.asarray([18, 19, 20, 21, 22], dtype=np.int32),
+        "emb": np.asarray(
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+            ],
+            dtype=np.float32,
+        ),
+        "preds": np.asarray(
+            [
+                [0.9, 0.1, 0.1, 0.1],
+                [0.9, 0.1, 0.1, 0.1],
+                [0.9, 0.1, 0.1, 0.1],
+                [0.1, 0.9, 0.1, 0.1],
+                [0.1, 0.9, 0.1, 0.1],
+            ],
+            dtype=np.float32,
+        ),
+        "compression": 0,
+        "compress_count": 0,
+        "n_cache": 5,
+        "n_fifo": 0,
+    }
+    features = config()["embedding"]["features"]
+    values, excluded = _embedding_features_for_candidate(record, 20, 1, features)
+    assert excluded is False
+    assert math.isclose(values["same_slot_similarity"], 1.0, abs_tol=1e-6)
+    assert math.isclose(values["embedding_jump"], 0.0, abs_tol=1e-6)
+    assert math.isclose(values["best_other_similarity"], 1.0, abs_tol=1e-6)
+    empty_record = {
+        **record,
+        "frame_idx": np.asarray([40, 41], dtype=np.int32),
+        "emb": np.asarray([[1.0, 0.0, 0.0, 0.0]] * 2, dtype=np.float32),
+        "preds": np.asarray([[0.9, 0.1, 0.1, 0.1]] * 2, dtype=np.float32),
+        "n_cache": 2,
+        "n_fifo": 0,
+    }
+    empty_values, excluded = _embedding_features_for_candidate(empty_record, 20, 1, features)
+    assert excluded is True
+    assert math.isnan(empty_values["same_slot_similarity"])
+    assert math.isnan(empty_values["best_other_similarity"])
+    assert math.isnan(empty_values["embedding_jump"])
+
+
+def test_b1_fold_transform_imputes_nan_with_train_median() -> None:
+    cfg = config()
+    embedding_names = list(cfg["embedding"]["features"]["feature_names"])
+    assert embedding_names.index("compression_boundary") == 3
+    base_count = len(list(cfg["feature_names"]))
+    matrix = np.zeros((4, base_count + 4), dtype=np.float32)
+    matrix[:, base_count] = [1.0, 2.0, np.nan, 3.0]
+    matrix[:, base_count + 1] = [10.0, np.nan, 20.0, 30.0]
+    train_mask = np.asarray([True, True, False, False])
+    transformed = _b1_fold_transform(matrix, train_mask)
+    assert math.isclose(transformed[2, base_count], 1.5)
+    assert math.isclose(transformed[1, base_count + 1], 10.0)
+    assert math.isclose(transformed[0, base_count], 1.0)
+
+
+def test_dense_embedding_frames_fills_from_records(tmp_path) -> None:
+    rows_a = [_row(0, 0, 5.0), _row(1, 0, 6.0)]
+    rows_b = [_row(2, 0, 7.0)]
+    path = _write_dump(
+        tmp_path,
+        [
+            {"chunk": 0, "total_n": 2, "fifo": rows_a, "compression": 0},
+            {"chunk": 2, "total_n": 4, "fifo": rows_b, "compression": 0},
+        ],
+    )
+    dense = _dense_embedding_frames(path, 3)
+    assert dense.shape == (3, EMBEDDING_DIM)
+    assert math.isclose(float(dense[0, 0]), 5.0)
+    assert math.isclose(float(dense[2, 0]), 7.0)
+
+
+def test_b2_detect_flags_intra_slot_drop_and_deduplicates() -> None:
+    frames = 61
+    probabilities = np.zeros((frames, 4), dtype=np.float32)
+    probabilities[:, 0] = 0.9
+    dense = np.zeros((frames, EMBEDDING_DIM), dtype=np.float32)
+    dense[:30, 0] = 1.0
+    dense[30:, 1] = 1.0
+    detected = _b2_detect(
+        probabilities,
+        dense,
+        {"window_frames": 15, "stride_frames": 3, "similarity_threshold": 0.75},
+    )
+    assert detected[0][0] == 24
+    assert all(slot == 0 for _, slot in detected)
+    assert all(later[0] - earlier[0] >= 2 for earlier, later in zip(detected, detected[1:]))
+    dense_stride = _b2_detect(
+        probabilities,
+        dense,
+        {"window_frames": 15, "stride_frames": 1, "similarity_threshold": 0.75},
+    )
+    assert len(dense_stride) == 8
+    assert [frame for frame, _ in dense_stride] == [23, 25, 27, 29, 31, 33, 35, 37]
