@@ -1139,6 +1139,8 @@ def run_a0(root: Path) -> Path:
         "aggregate_metrics": aggregate,
         "aggregate_recall_250": aggregate["tolerances"]["250"]["recall"],
         "aggregate_false_events_per_hour": aggregate["tolerances"]["250"]["false_events_per_hour"],
+        "code_sha256": sha256_file(CODE_PATH),
+        "config_sha256": sha256_file(CONFIG_PATH),
     }
     path = directory / "a0_metrics.json"
     write_json(path, document)
@@ -2031,18 +2033,16 @@ def r9b_replay(root: Path) -> Path:
 
     for session in sorted(sessions.values(), key=lambda value: (value.fold, value.session_id)):
         session_id = session.session_id
-        if total_wall > wall_budget_seconds:
-            invalid_receipt(session_id, "24-hour per-backend wall budget exhausted")
-            raise R9Error("24-hour per-backend wall budget exhausted")
-        free, _, _ = shutil.disk_usage(str(embeddings_dir))
-        if free < storage_floor_bytes:
-            invalid_receipt(session_id, f"storage floor breached: {free} free bytes")
-            raise R9Error(f"storage floor breached: {free} free bytes")
         dump_bin = embeddings_dir / f"{session_id}.bin"
         base = runs_dir / session_id
         dump_dir = base / "dumps"
         bench_json = base / "bench.json"
         try:
+            if total_wall > wall_budget_seconds:
+                raise R9Error("24-hour per-backend wall budget exhausted")
+            free, _, _ = shutil.disk_usage(str(embeddings_dir))
+            if free < storage_floor_bytes:
+                raise R9Error(f"storage floor breached: {free} free bytes")
             if dump_bin.exists():
                 dump_bin.unlink()
             run_metrics = _run_bench(
@@ -2519,6 +2519,12 @@ def run_b2(root: Path) -> Path:
 
     if bool(b1_document.get("mlp_triggered", False)):
         return stopped_receipt("b1_mlp_fallback")
+    if b1_document.get("code_sha256") != sha256_file(CODE_PATH) or b1_document.get(
+        "config_sha256"
+    ) != sha256_file(CONFIG_PATH):
+        raise R9Error("b1_metrics.json hashes do not match the current harness/config; rerun b1")
+    if b1_document.get("arm") != "b1" or "evaluation_curve" not in b1_document:
+        raise R9Error("b1_metrics.json is missing required B1 schema fields")
     evaluation_curve = b1_document.get("evaluation_curve", [])
     b1_recall_100 = 0.0
     if evaluation_curve:
@@ -2533,7 +2539,10 @@ def run_b2(root: Path) -> Path:
         raise R9Error(
             "ceiling summary hashes do not match the current harness/config; rerun ceiling"
         )
-    candidate_ceiling_recall = float(ceiling_doc.get("oracle_recall_250") or 0.0)
+    oracle_value = ceiling_doc.get("oracle_recall_250")
+    if not isinstance(oracle_value, (int, float)) or not math.isfinite(float(oracle_value)):
+        raise R9Error("ceiling summary is missing a finite oracle recall; rerun ceiling")
+    candidate_ceiling_recall = float(oracle_value)
     entry = bool(b1_recall_100 >= 0.6 or candidate_ceiling_recall < 0.9)
     if not entry:
         return stopped_receipt(
@@ -2590,6 +2599,7 @@ def run_b2(root: Path) -> Path:
         name for name in embedding["features"]["feature_names"] if name != "compression_boundary"
     ]
     base_count = len(list(cfg["feature_names"]))
+    b2_scoring_seconds = 0.0
     for fold, candidates in sorted(fold_candidates.items()):
         model = models[fold]
         mean = np.asarray(model["mean"], dtype=np.float64)
@@ -2606,6 +2616,7 @@ def run_b2(root: Path) -> Path:
             finite = train_values[np.isfinite(train_values)]
             imputation_medians[index] = float(np.median(finite))
         for candidate in candidates:
+            started = time.perf_counter()
             session_id = str(candidate["session_id"])
             session = sessions_by_id[session_id]
             if session_id not in cpu_probabilities:
@@ -2651,6 +2662,7 @@ def run_b2(root: Path) -> Path:
                 feature_vector[int(index)] = imputation_medians[int(index)]
             standardized = _standardize(feature_vector[None, :], mean, scale)
             score = float(_linear_predict(standardized, coef, float(model["intercept"]))[0])
+            b2_scoring_seconds += time.perf_counter() - started
             b2_rows.append(
                 {
                     "session_id": session_id,
@@ -2757,9 +2769,13 @@ def run_b2(root: Path) -> Path:
                 }
             )
     availability_frame_horizon_ms = int(embedding["features"]["after_frames"]) * frame_ms
+    verification_compute_ms_per_event = (
+        max(b2_scoring_seconds / len(b2_rows) * 1000.0, 0.0) if b2_rows else 0.0
+    )
     defect_threshold_ms = float(cfg["reference_gate"]["latency_defect_median_ms"])
     availability: dict[str, Any] = {
         "availability_frame_horizon_ms": availability_frame_horizon_ms,
+        "verification_compute_ms_per_event": verification_compute_ms_per_event,
         "latency_defect_median_ms": defect_threshold_ms,
         "per_target": {},
     }
@@ -2768,7 +2784,10 @@ def run_b2(root: Path) -> Path:
             (int(prediction) - int(reference)) // 16
             for _, prediction, reference in point["metrics"]["matched_pairs"]
         ]
-        availability_values = [float(value) + availability_frame_horizon_ms for value in deltas]
+        availability_values = [
+            float(value) + availability_frame_horizon_ms + verification_compute_ms_per_event
+            for value in deltas
+        ]
         availability_percentiles = _percentiles(availability_values)
         availability["per_target"][str(target)] = {
             "boundary_lag_ms": _percentiles([float(value) for value in deltas]),
@@ -2920,11 +2939,21 @@ def ceiling_summary(root: Path) -> Path:
     oracle_recall = float(baseline["oracle"]["tolerances"]["250"]["recall"] or 0.0)
     r8_accuracy = load_json(r8_output_root(root) / "accuracy_metrics.json")
     arms: dict[str, Any] = {}
+
+    def require_current_identity(document: dict[str, Any], name: str) -> None:
+        if document.get("code_sha256") != sha256_file(CODE_PATH) or document.get(
+            "config_sha256"
+        ) != sha256_file(CONFIG_PATH):
+            raise R9Error(
+                f"{name} was produced by a different harness/config; rerun the {name} action"
+            )
+
     for name in ("a0", "a1", "a1_diagnostic", "b1", "b2"):
         path = directory / f"{name}_metrics.json"
         if name == "a0":
             if path.is_file():
                 document = load_json(path)
+                require_current_identity(document, "a0")
                 recall = float(document["aggregate_recall_250"] or 0.0)
                 feh = float(document["aggregate_false_events_per_hour"])
                 at_targets = {
@@ -2956,6 +2985,8 @@ def ceiling_summary(root: Path) -> Path:
             if not path.is_file():
                 continue
             b2_document = load_json(path)
+            if not bool(b2_document.get("stopped", True)):
+                require_current_identity(b2_document, "b2")
             if bool(b2_document.get("stopped", True)):
                 arms["b2"] = {
                     "kind": "stopped",
@@ -2999,6 +3030,7 @@ def ceiling_summary(root: Path) -> Path:
         if not path.is_file():
             continue
         document = load_json(path)
+        require_current_identity(document, name)
         curve = document["evaluation_curve"]
         selection_curve = document.get("curve", curve)
         at_targets: dict[str, Any] = {}
@@ -3564,7 +3596,9 @@ def report(root: Path) -> Path:
                     "## Availability latency (R9-B2 union)",
                     "",
                     f"Embedding after-window horizon: "
-                    f"{int(b2_doc['availability']['availability_frame_horizon_ms'])} ms.",
+                    f"{int(b2_doc['availability']['availability_frame_horizon_ms'])} ms; "
+                    f"verification compute: "
+                    f"{float(b2_doc['availability'].get('verification_compute_ms_per_event') or 0.0):.3f} ms per event.",
                     "",
                     "| Target FE/h | Boundary lag p50 ms | Boundary lag p90 ms | Availability p50 ms | Availability p90 ms | Defect |",
                     "| ---: | ---: | ---: | ---: | ---: | ---: |",
