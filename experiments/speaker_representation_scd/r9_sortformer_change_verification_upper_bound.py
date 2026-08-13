@@ -2045,6 +2045,10 @@ def r9b_replay(root: Path) -> Path:
                 raise R9Error(f"storage floor breached: {free} free bytes")
             if dump_bin.exists():
                 dump_bin.unlink()
+            for stale in dump_dir.glob("diar.probs.*"):
+                stale.unlink()
+            if bench_json.exists():
+                bench_json.unlink()
             run_metrics = _run_bench(
                 bench,
                 model,
@@ -2117,6 +2121,7 @@ def r9b_replay(root: Path) -> Path:
                     "embedding_dump_records": len(records),
                     "embedding_dump_bytes": dump_bin.stat().st_size,
                     "probability_path": str(probabilities_dir / f"{session_id}.npz"),
+                    "probability_sha256": sha256_file(probabilities_dir / f"{session_id}.npz"),
                     "probability_shape": list(probabilities.shape),
                     "wall_seconds": run_metrics["wall_seconds"],
                     "peak_private_bytes": run_metrics["peak_private_bytes"],
@@ -2234,7 +2239,7 @@ def _embedding_features_for_candidate(
 
 def _replay_manifest_and_dumps(
     root: Path, directory: Path
-) -> tuple[dict[str, Any], dict[str, Path]]:
+) -> tuple[dict[str, Any], dict[str, Path], dict[str, Path]]:
     manifest = directory / "r9b_runs" / "vulkan" / "replay_manifest.json"
     if not manifest.is_file():
         raise R9Error("r9b-replay must run before this step")
@@ -2250,14 +2255,21 @@ def _replay_manifest_and_dumps(
     if {str(item["session_id"]) for item in manifest_items} != expected_session_ids:
         raise R9Error("replay manifest does not cover all ten sessions")
     dump_paths: dict[str, Path] = {}
+    probability_paths: dict[str, Path] = {}
     for item in manifest_items:
         dump_path = Path(item["embedding_dump_path"])
         if not dump_path.is_file():
             raise R9Error(f"embedding dump missing for {item['session_id']}")
         if sha256_file(dump_path) != str(item.get("embedding_dump_sha256")):
             raise R9Error(f"embedding dump hash mismatch for {item['session_id']}")
+        probability_path = Path(item["probability_path"])
+        if not probability_path.is_file():
+            raise R9Error(f"probability dump missing for {item['session_id']}")
+        if sha256_file(probability_path) != str(item.get("probability_sha256")):
+            raise R9Error(f"probability dump hash mismatch for {item['session_id']}")
         dump_paths[str(item["session_id"])] = dump_path
-    return manifest_doc, dump_paths
+        probability_paths[str(item["session_id"])] = probability_path
+    return manifest_doc, dump_paths, probability_paths
 
 
 def extract_embedding_features(root: Path) -> Path:
@@ -2272,7 +2284,7 @@ def extract_embedding_features(root: Path) -> Path:
     feature_rows = read_jsonl(features_a)
     candidates_rows = read_jsonl(candidates)
     by_row = {int(row["row"]): row for row in candidates_rows}
-    _, dump_paths = _replay_manifest_and_dumps(root, directory)
+    _, dump_paths, _ = _replay_manifest_and_dumps(root, directory)
     records_by_session: dict[str, list[dict[str, Any]]] = {}
     similarity_names = ("same_slot_similarity", "best_other_similarity", "embedding_jump")
     excluded_count = 0
@@ -2563,7 +2575,7 @@ def run_b2(root: Path) -> Path:
             b1_recall_100_feh=b1_recall_100,
             candidate_ceiling_recall=candidate_ceiling_recall,
         )
-    _, dump_paths = _replay_manifest_and_dumps(root, directory)
+    _, dump_paths, probability_paths = _replay_manifest_and_dumps(root, directory)
     windows = cfg["feature_windows"]
     frame_ms = int(cfg["frame_ms"])
     confirmation_frames = int(cfg["confirmation"]["base_frames"])
@@ -2573,9 +2585,7 @@ def run_b2(root: Path) -> Path:
         for session in sorted(sessions.values(), key=lambda value: (value.fold, value.session_id)):
             if session.fold not in folds:
                 continue
-            probabilities = np.load(
-                directory / "probabilities" / "vulkan" / f"{session.session_id}.npz"
-            )["probabilities"]
+            probabilities = np.load(probability_paths[session.session_id])["probabilities"]
             total_frames = int(probabilities.shape[0])
             dense_emb, dense_preds = _dense_embedding_frames(
                 dump_paths[session.session_id], total_frames
