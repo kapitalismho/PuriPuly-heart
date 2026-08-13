@@ -163,7 +163,7 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("languages", ("ja", "en", "en", "ko")),
         ("self_asr", "soniox"),
         ("peer_asr", "local_parakeet_v3"),
-        ("model", "gemini3_flash"),
+        ("model", "gemini37_flash"),
         ("fallback", "none"),
     ]
     await router.close()

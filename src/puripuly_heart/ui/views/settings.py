@@ -162,7 +162,7 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.GEMMA4_31B: "provider.gemma4_31b",
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
     TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
-    TranslationModel.GEMINI_3_FLASH: "provider.gemini3_flash",
+    TranslationModel.GEMINI_37_FLASH: "provider.gemini37_flash",
     TranslationModel.GEMINI_31_FLASH_LITE: "provider.gemini31_flash_lite",
     TranslationModel.QWEN_35_PLUS: "provider.qwen35_plus",
     TranslationModel.LOCAL_LLM: "provider.local_llms",
@@ -188,7 +188,7 @@ _TRANSLATION_MODELS = (
     TranslationModel.DEEPSEEK_V4_FLASH,
     TranslationModel.LOCAL_LLM,
     TranslationModel.CUSTOM_HTTP,
-    TranslationModel.GEMINI_3_FLASH,
+    TranslationModel.GEMINI_37_FLASH,
     TranslationModel.GEMINI_31_FLASH_LITE,
     TranslationModel.QWEN_35_PLUS,
 )
@@ -205,7 +205,7 @@ _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.GEMMA4: "settings.translation_model.section.gemma",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
     TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
-    TranslationModel.GEMINI_3_FLASH: "settings.translation_model.section.others",
+    TranslationModel.GEMINI_37_FLASH: "settings.translation_model.section.others",
     TranslationModel.GEMINI_31_FLASH_LITE: "settings.translation_model.section.others",
     TranslationModel.QWEN_35_PLUS: "settings.translation_model.section.others",
 }
@@ -1075,7 +1075,7 @@ class SettingsView(ft.Column):
         )
 
         self._llm_text = self._build_clickable_text(
-            t("provider.gemini3_flash"),
+            t("provider.gemini37_flash"),
             self._on_llm_click,
         )
         self._trans_title = ft.Text(

@@ -321,14 +321,14 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
         connection_history={
             TranslationModel.GEMMA4.value: TranslationConnection.OPENROUTER,
             TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA,
-            TranslationModel.GEMINI_3_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
+            TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
             TranslationModel.GEMINI_31_FLASH_LITE.value: TranslationConnection.OFFICIAL_BYOK,
             TranslationModel.QWEN_35_PLUS.value: TranslationConnection.OFFICIAL_BYOK,
             TranslationModel.LOCAL_LLM.value: TranslationConnection.OLLAMA,
         },
         fallback=TranslationFallbackSettings(
             enabled=True,
-            model=TranslationModel.GEMINI_3_FLASH,
+            model=TranslationModel.GEMINI_37_FLASH,
             connection=TranslationConnection.OPENROUTER,
         ),
     )
@@ -377,7 +377,7 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     settings.soniox_stt.endpoint = "wss://soniox.fixture.test/transcribe"
     settings.soniox_stt.keepalive_interval_s = 12.5
     settings.soniox_stt.trailing_silence_ms = 250
-    settings.gemini.llm_model = GeminiLLMModel.GEMINI_3_FLASH
+    settings.gemini.llm_model = GeminiLLMModel.GEMINI_37_FLASH
     settings.openrouter.llm_model = OpenRouterLLMModel.QWEN_35_FLASH_02_23
     settings.openrouter.routing_mode = OpenRouterRoutingMode.LATENCY
     settings.openrouter.provider_routing = OpenRouterProviderRouting.DEEPSEEK_ONLY

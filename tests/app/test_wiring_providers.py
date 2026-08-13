@@ -539,7 +539,7 @@ def test_create_llm_provider_legacy_facade_uses_runtime_resolution(
 ) -> None:
     settings = AppSettings(
         provider=ProviderSettings(llm=LLMProviderName.GEMINI),
-        gemini=GeminiSettings(llm_model=GeminiLLMModel.GEMINI_3_FLASH),
+        gemini=GeminiSettings(llm_model=GeminiLLMModel.GEMINI_37_FLASH),
         llm=LLMSettings(concurrency_limit=2),
     )
     settings.local_llm.base_url = "http://legacy.local/v1"

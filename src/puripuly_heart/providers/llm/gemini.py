@@ -225,12 +225,17 @@ class GoogleGenaiGeminiClient:
         )
 
         client = self._get_client()
+        thinking_level = (
+            types.ThinkingLevel.MINIMAL
+            if _normalized_model_id(self.model) == GEMINI_31_FLASH_LITE_GA_MODEL
+            else types.ThinkingLevel.LOW
+        )
         response = await client.aio.models.generate_content(
             model=self.model,
             contents=user_message,
             config=types.GenerateContentConfig(
                 system_instruction=formatted_system_prompt,
-                thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),
+                thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             ),
         )

@@ -234,7 +234,7 @@ def test_final_dev_v30_fixture_migrates_with_semantic_and_verification_continuit
         "selection_alias": "openrouter_deepseek_v4_flash",
     }
     assert canonical["intent"]["translation"]["qwen"]["region"] == "singapore"
-    assert canonical["intent"]["translation"]["gemini"]["llm_model"] == (raw["gemini"]["llm_model"])
+    assert canonical["intent"]["translation"]["gemini"]["llm_model"] == "gemini-3.7-flash"
     assert canonical["intent"]["translation"]["deepseek"]["llm_model"] == "deepseek-v4-flash"
     assert canonical["intent"]["stt"]["custom_terms"] == raw["stt"]["custom_terms"]
     assert (
@@ -254,7 +254,7 @@ def test_final_dev_v30_fixture_migrates_with_semantic_and_verification_continuit
     )
     projected = migration.to_legacy_dict(first.settings)
     assert projected["api_key_verified"] == raw["api_key_verified"]
-    assert projected["gemini"] == raw["gemini"]
+    assert projected["gemini"] == {"llm_model": "gemini-3.7-flash"}
     assert projected["deepseek"] == {"llm_model": "deepseek-v4-flash"}
     assert projected["telemetry_state"] == {
         "anonymous_id": raw["telemetry"]["identifier"],
@@ -290,7 +290,7 @@ def test_final_dev_v30_ui_equivalent_save_preserves_migrated_and_changed_values(
     assert reloaded.ui.locale == "ko"
     assert reloaded.audio.ring_buffer_ms == 875
     assert reloaded.translation.model.value == "local_llm"
-    assert reloaded.gemini.llm_model.value == "gemini-3-flash-preview"
+    assert reloaded.gemini.llm_model.value == "gemini-3.7-flash"
     assert reloaded.deepseek.llm_model.value == "deepseek-v4-flash"
     assert reloaded.languages.recent_source_languages == ["fr", "de", "it", "ko", "en", "zh-CN"]
     assert reloaded.managed_identity.pending_delivery_ack_delivery_id == "fixture-delivery-id"

@@ -686,7 +686,7 @@
       "gemma4_managed",
       "qwen35_flash_managed",
       "deepseek_v4_flash_managed",
-      "gemini3_flash_byok",
+      "gemini37_flash_byok",
       "gemini31_flash_lite_byok",
       "gemma4_byok",
       "qwen35_flash_byok",

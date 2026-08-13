@@ -11,7 +11,7 @@ from puripuly_heart.config.llm_profiles import (
     OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
     OPENROUTER_CREDENTIAL_SOURCE_NONE,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
-    OPENROUTER_MODEL_GEMINI_3_FLASH,
+    OPENROUTER_MODEL_GEMINI_37_FLASH,
     OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
     OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
     OPENROUTER_MODEL_GEMMA_4_31B_IT,
@@ -41,7 +41,7 @@ TRANSLATION_MODEL_GEMMA4: Final = "gemma4"
 TRANSLATION_MODEL_GEMMA4_26B_31B: Final = "gemma4_26b_31b"
 TRANSLATION_MODEL_GEMMA4_31B: Final = "gemma4_31b"
 TRANSLATION_MODEL_DEEPSEEK_V4_FLASH: Final = "deepseek_v4_flash"
-TRANSLATION_MODEL_GEMINI_3_FLASH: Final = "gemini3_flash"
+TRANSLATION_MODEL_GEMINI_37_FLASH: Final = "gemini37_flash"
 TRANSLATION_MODEL_GEMINI_31_FLASH_LITE: Final = "gemini31_flash_lite"
 TRANSLATION_MODEL_QWEN_35_PLUS: Final = "qwen35_plus"
 TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH: Final = "openrouter_qwen35_flash"
@@ -57,7 +57,7 @@ TranslationModelName: TypeAlias = Literal[
     "gemma4_31b",
     "gemma4",
     "deepseek_v4_flash",
-    "gemini3_flash",
+    "gemini37_flash",
     "gemini31_flash_lite",
     "qwen35_plus",
     "openrouter_qwen35_flash",
@@ -69,7 +69,7 @@ TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
     TRANSLATION_MODEL_GEMMA4_31B,
     TRANSLATION_MODEL_GEMMA4,
     TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
-    TRANSLATION_MODEL_GEMINI_3_FLASH,
+    TRANSLATION_MODEL_GEMINI_37_FLASH,
     TRANSLATION_MODEL_GEMINI_31_FLASH_LITE,
     TRANSLATION_MODEL_QWEN_35_PLUS,
     TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH,
@@ -126,7 +126,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
             TRANSLATION_CONNECTION_OPENROUTER,
             TRANSLATION_CONNECTION_OFFICIAL_BYOK,
         ),
-        TRANSLATION_MODEL_GEMINI_3_FLASH: (
+        TRANSLATION_MODEL_GEMINI_37_FLASH: (
             TRANSLATION_CONNECTION_OFFICIAL_BYOK,
             TRANSLATION_CONNECTION_OPENROUTER,
         ),
@@ -182,7 +182,7 @@ LLM_PROVIDERS: Final[tuple[str, ...]] = (
     PROVIDER_CEREBRAS,
 )
 
-GEMINI_MODEL_3_FLASH: Final = "gemini-3-flash-preview"
+GEMINI_MODEL_37_FLASH: Final = "gemini-3.7-flash"
 GEMINI_MODEL_31_FLASH_LITE: Final = "gemini-3.1-flash-lite"
 DEEPSEEK_MODEL_V4_FLASH: Final = "deepseek-v4-flash"
 QWEN_MODEL_35_FLASH: Final = "qwen3.5-flash"
@@ -254,7 +254,7 @@ _OPENROUTER_MODELS: Final[tuple[str, ...]] = (
     OPENROUTER_MODEL_GEMMA_4_31B_IT,
     OPENROUTER_MODEL_QWEN_35_FLASH_02_23,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
-    OPENROUTER_MODEL_GEMINI_3_FLASH,
+    OPENROUTER_MODEL_GEMINI_37_FLASH,
     OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
 )
 _OPENROUTER_ROUTING_MODES: Final[tuple[str, ...]] = ("latency",)
@@ -339,6 +339,8 @@ def _default_translation_connection(model: TranslationModelName) -> TranslationC
 
 
 def _normalize_translation_model(value: object) -> TranslationModelName:
+    if isinstance(value, str) and value.strip() == "gemini3_flash":
+        value = TRANSLATION_MODEL_GEMINI_37_FLASH
     return cast(
         TranslationModelName,
         _normalize_allowed(
@@ -405,15 +407,24 @@ def _explicit_openrouter_source(value: object) -> OpenRouterSource | None:
 
 
 def _normalize_openrouter_model(value: object) -> str:
-    if (
-        isinstance(value, str)
-        and value.strip() == LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
-    ):
+    if isinstance(value, str) and value.strip() == LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH:
         value = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+    if isinstance(value, str) and value.strip() == "google/gemini-3-flash-preview":
+        value = OPENROUTER_MODEL_GEMINI_37_FLASH
     return _normalize_allowed(
         value,
         allowed=_OPENROUTER_MODELS,
         default=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+    )
+
+
+def _normalize_gemini_model(value: object) -> str:
+    if isinstance(value, str) and value.strip() in {"gemini-3-flash", "gemini-3-flash-preview"}:
+        return GEMINI_MODEL_37_FLASH
+    return _normalize_allowed(
+        value,
+        allowed=(GEMINI_MODEL_37_FLASH, GEMINI_MODEL_31_FLASH_LITE),
+        default=GEMINI_MODEL_31_FLASH_LITE,
     )
 
 
@@ -608,7 +619,7 @@ class OpenRouterRuntimeIntent:
 
 @dataclass(frozen=True, slots=True)
 class DirectProviderRuntimeIntent:
-    gemini_3_flash_model: str = GEMINI_MODEL_3_FLASH
+    gemini_37_flash_model: str = GEMINI_MODEL_37_FLASH
     gemini_31_flash_lite_model: str = GEMINI_MODEL_31_FLASH_LITE
     deepseek_v4_flash_model: str = DEEPSEEK_MODEL_V4_FLASH
     qwen_35_plus_model: str = QWEN_MODEL_35_PLUS
@@ -978,12 +989,12 @@ def derive_translation_runtime_intent_from_compatibility(
                 ),
                 concurrency_limit=concurrency,
             )
-        if openrouter_model_value == OPENROUTER_MODEL_GEMINI_3_FLASH:
+        if openrouter_model_value == OPENROUTER_MODEL_GEMINI_37_FLASH:
             return TranslationRuntimeIntent(
-                model=TRANSLATION_MODEL_GEMINI_3_FLASH,
+                model=TRANSLATION_MODEL_GEMINI_37_FLASH,
                 connection=_translation_connection_from_openrouter_source(
                     openrouter_source,
-                    model=TRANSLATION_MODEL_GEMINI_3_FLASH,
+                    model=TRANSLATION_MODEL_GEMINI_37_FLASH,
                     provider_routing=provider_routing,
                 ),
                 concurrency_limit=concurrency,
@@ -1046,15 +1057,10 @@ def derive_translation_runtime_intent_from_compatibility(
         )
 
     if (
-        _normalize_allowed(
-            gemini_model,
-            allowed=(GEMINI_MODEL_3_FLASH, GEMINI_MODEL_31_FLASH_LITE),
-            default=GEMINI_MODEL_31_FLASH_LITE,
-        )
-        == GEMINI_MODEL_3_FLASH
+        _normalize_gemini_model(gemini_model) == GEMINI_MODEL_37_FLASH
     ):
         return TranslationRuntimeIntent(
-            model=TRANSLATION_MODEL_GEMINI_3_FLASH,
+            model=TRANSLATION_MODEL_GEMINI_37_FLASH,
             connection=TRANSLATION_CONNECTION_OFFICIAL_BYOK,
             concurrency_limit=concurrency,
         )
@@ -1308,10 +1314,10 @@ def _resolve_translation_target(
             ),
         )
 
-    if translation.model == TRANSLATION_MODEL_GEMINI_3_FLASH:
+    if translation.model == TRANSLATION_MODEL_GEMINI_37_FLASH:
         if translation.connection == TRANSLATION_CONNECTION_OPENROUTER:
             return _resolved_openrouter_target(
-                model=OPENROUTER_MODEL_GEMINI_3_FLASH,
+                model=OPENROUTER_MODEL_GEMINI_37_FLASH,
                 source=_openrouter_source_for_translation(translation.connection, openrouter),
                 openrouter=openrouter,
                 provider_routing="google_gemini_latency",
@@ -1322,7 +1328,7 @@ def _resolve_translation_target(
             )
         return _resolved_direct_provider_target(
             provider=PROVIDER_GEMINI,
-            model=direct.gemini_3_flash_model,
+            model=direct.gemini_37_flash_model,
             credential=_required_credential(
                 CREDENTIAL_SOURCE_SECRET_STORE,
                 CREDENTIAL_REF_GEMINI_BYOK,
@@ -1569,7 +1575,7 @@ __all__ = [
     "TRANSLATION_CONNECTIONS",
     "TRANSLATION_CONNECTIONS_BY_MODEL",
     "TRANSLATION_MODEL_DEEPSEEK_V4_FLASH",
-    "TRANSLATION_MODEL_GEMINI_3_FLASH",
+    "TRANSLATION_MODEL_GEMINI_37_FLASH",
     "TRANSLATION_MODEL_GEMINI_31_FLASH_LITE",
     "TRANSLATION_MODEL_GEMMA4",
     "TRANSLATION_MODEL_GEMMA4_26B_31B",

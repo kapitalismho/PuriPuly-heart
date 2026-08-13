@@ -1383,7 +1383,7 @@ def test_deepseek_connection_selection_controls_api_key_visibility(
     monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -1417,7 +1417,7 @@ def test_on_llm_selected_updates_to_local_llms_with_ollama_connection(
 ) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -2240,7 +2240,7 @@ def test_settings_view_omits_legacy_overlay_peer_toggle_api(
 def test_on_llm_selected_updates_model_and_prompt_state(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -2271,7 +2271,7 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
 ) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -2311,7 +2311,7 @@ def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
 ) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -2386,7 +2386,7 @@ def test_on_llm_selected_invalid_value_is_noop(
 ) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -2403,7 +2403,7 @@ def test_on_llm_selected_invalid_value_is_noop(
 
     assert pending is settings
     assert view._provider_settings_draft is None
-    assert pending.translation.model == TranslationModel.GEMINI_3_FLASH
+    assert pending.translation.model == TranslationModel.GEMINI_37_FLASH
     assert pending.translation.connection == TranslationConnection.OFFICIAL_BYOK
     assert pending.provider.llm == LLMProviderName.GEMINI
     assert view._llm_text.content.value == "Gemini 3 Flash"
@@ -2443,7 +2443,7 @@ def test_on_llm_selected_stages_byok_with_default_openrouter_prompt_when_unsaved
     )
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -2471,7 +2471,7 @@ def test_on_llm_selected_updates_managed_openrouter_label_and_source(
 ) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -2505,7 +2505,7 @@ def test_on_llm_selected_openrouter_provider_value_defaults_to_gemma_managed(
 ) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -2527,7 +2527,7 @@ def test_on_llm_selected_sets_deepseek_managed_connection_and_label(
 ) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -2562,7 +2562,7 @@ def test_on_llm_selected_updates_prompt_helper_copy_live_when_mounted(
 ) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -2792,7 +2792,7 @@ def test_on_openrouter_fallback_selected_updates_draft_and_helper_copy(
 ) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -3184,11 +3184,11 @@ def test_hidden_legacy_deepseek_china_fallback_displays_safe_current_value(
 def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
-    settings.gemini.llm_model = GeminiLLMModel.GEMINI_3_FLASH
+    settings.gemini.llm_model = GeminiLLMModel.GEMINI_37_FLASH
     settings.system_prompts = {"gemini": "G", "qwen": "Q"}
     settings.system_prompt = "G"
 
@@ -3199,7 +3199,7 @@ def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -
     pending = view.build_provider_apply_settings()
 
     assert settings.provider.llm == LLMProviderName.GEMINI
-    assert settings.gemini.llm_model == GeminiLLMModel.GEMINI_3_FLASH
+    assert settings.gemini.llm_model == GeminiLLMModel.GEMINI_37_FLASH
     assert pending is not None
     assert pending.translation.model == TranslationModel.GEMINI_31_FLASH_LITE
     assert pending.translation.connection == TranslationConnection.OFFICIAL_BYOK

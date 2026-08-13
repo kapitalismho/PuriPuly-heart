@@ -142,7 +142,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         1: "gemma4_31b",
         2: "gemma4",
         3: "deepseek_v4_flash",
-        5: "gemini3_flash",
+        5: "gemini37_flash",
         6: "gemini31_flash_lite",
         7: "qwen35_plus",
         8: "local_llm",

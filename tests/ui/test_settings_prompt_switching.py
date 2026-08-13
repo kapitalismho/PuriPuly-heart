@@ -89,7 +89,7 @@ def test_settings_view_switches_prompt_on_llm_change(monkeypatch) -> None:
     assert pending is not None
     assert pending.provider.llm == LLMProviderName.LOCAL_LLM
 
-    view._on_llm_selected(TranslationModel.GEMINI_3_FLASH.value)
+    view._on_llm_selected(TranslationModel.GEMINI_37_FLASH.value)
     pending = view.build_provider_apply_settings()
 
     assert view._prompt_editor.value == load_prompt_for_provider("gemini")
@@ -117,7 +117,7 @@ def test_settings_view_switches_prompt_on_llm_change(monkeypatch) -> None:
 def test_deepseek_managed_and_fallback_keep_single_prompt(monkeypatch) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
@@ -234,7 +234,7 @@ def test_settings_view_uses_single_prompt_across_provider_switches(monkeypatch) 
     assert pending.system_prompt == "QWEN EDITED"
     assert pending.system_prompts == {}
 
-    view._on_llm_selected(TranslationModel.GEMINI_3_FLASH.value)
+    view._on_llm_selected(TranslationModel.GEMINI_37_FLASH.value)
     pending = view.build_provider_apply_settings()
     assert view._prompt_editor.value == "QWEN EDITED"
     assert settings.system_prompt == "GEMINI CUSTOM"
@@ -263,7 +263,7 @@ def test_prompt_draft_survives_provider_round_trip_until_commit(monkeypatch) -> 
 
     view._on_prompt_change("GEMINI DRAFT")
     view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
-    view._on_llm_selected(TranslationModel.GEMINI_3_FLASH.value)
+    view._on_llm_selected(TranslationModel.GEMINI_37_FLASH.value)
 
     assert view._prompt_editor.value == "GEMINI DRAFT"
     assert settings.system_prompt == "GEMINI CUSTOM"
@@ -349,7 +349,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         TranslationModel.GEMMA4.value,
         TranslationModel.LOCAL_LLM.value,
         TranslationModel.CUSTOM_HTTP.value,
-        TranslationModel.GEMINI_3_FLASH.value,
+        TranslationModel.GEMINI_37_FLASH.value,
         TranslationModel.GEMINI_31_FLASH_LITE.value,
         TranslationModel.QWEN_35_PLUS.value,
     ]
@@ -430,7 +430,7 @@ def test_gemma31_cerebras_connection_materializes_provider_and_key_visibility(mo
 def test_settings_view_updates_gemini_model_without_provider_switch(monkeypatch) -> None:
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.GEMINI
-    settings.gemini.llm_model = GeminiLLMModel.GEMINI_3_FLASH
+    settings.gemini.llm_model = GeminiLLMModel.GEMINI_37_FLASH
     settings.system_prompts = {
         "gemini": "GEMINI CUSTOM",
         "qwen": "QWEN CUSTOM",
@@ -444,7 +444,7 @@ def test_settings_view_updates_gemini_model_without_provider_switch(monkeypatch)
     pending = view.build_provider_apply_settings()
 
     assert settings.provider.llm == LLMProviderName.GEMINI
-    assert settings.gemini.llm_model == GeminiLLMModel.GEMINI_3_FLASH
+    assert settings.gemini.llm_model == GeminiLLMModel.GEMINI_37_FLASH
     assert pending is not None
     assert pending.gemini.llm_model == GeminiLLMModel.GEMINI_31_FLASH_LITE
     assert settings.system_prompt == "GEMINI CUSTOM"
