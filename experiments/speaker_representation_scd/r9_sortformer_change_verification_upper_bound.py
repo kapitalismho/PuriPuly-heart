@@ -4046,20 +4046,11 @@ def report(root: Path) -> Path:
                 "Sortformer's own candidate stream is not separable at low false-event rates with",
                 "these features; the measured ceiling is the honest product: the maximum recall each",
                 "arm achieves at each false-event rate is in the ceiling table above.",
+                "Dominant residual false-candidate classes: **unavailable** — no residual-class",
+                "breakdown is produced by this harness; a dedicated false-candidate analysis would",
+                "be required to identify them.",
             ]
         )
-        if a1 is not None:
-            gates = a1.get("reference_gate", {}).get("targets", {}).get("20.0", {})
-            stratum = gates.get("stratum_recall") or {}
-            outcome_lines.append(
-                "Dominant residual false-candidate classes at the <=20 FE/h point: overlap onset "
-                f"stratum recall {float(stratum.get('overlap_onset') or 0.0):.3f}, silence-gap "
-                f"change {float(stratum.get('silence_gap_change') or 0.0):.3f}."
-            )
-        else:
-            outcome_lines.append(
-                "Residual false-candidate classes are unavailable because no A1 metrics completed."
-            )
     else:
         outcome_lines.extend(
             [
