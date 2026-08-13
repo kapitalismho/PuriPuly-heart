@@ -424,10 +424,12 @@ def test_dense_embedding_frames_fills_from_records(tmp_path) -> None:
             {"chunk": 2, "total_n": 4, "fifo": rows_b, "compression": 0},
         ],
     )
-    dense = _dense_embedding_frames(path, 3)
+    dense, dense_preds = _dense_embedding_frames(path, 3)
     assert dense.shape == (3, EMBEDDING_DIM)
+    assert dense_preds.shape == (3, EMBEDDING_SPEAKERS)
     assert math.isclose(float(dense[0, 0]), 5.0)
     assert math.isclose(float(dense[2, 0]), 7.0)
+    assert int(dense_preds[1].argmax()) == 0
 
 
 def test_b2_detect_flags_intra_slot_drop_and_deduplicates() -> None:
@@ -437,18 +439,21 @@ def test_b2_detect_flags_intra_slot_drop_and_deduplicates() -> None:
     dense = np.zeros((frames, EMBEDDING_DIM), dtype=np.float32)
     dense[:30, 0] = 1.0
     dense[30:, 1] = 1.0
+    dense_preds = np.zeros((frames, 4), dtype=np.float32)
+    dense_preds[:, 0] = 0.9
     detected = _b2_detect(
         probabilities,
         dense,
+        dense_preds,
         {"window_frames": 15, "stride_frames": 3, "similarity_threshold": 0.75},
     )
     assert detected[0][0] == 24
     assert all(slot == 0 for _, slot in detected)
-    assert all(later[0] - earlier[0] >= 2 for earlier, later in zip(detected, detected[1:]))
+    assert all(later[0] - earlier[0] >= 3 for earlier, later in zip(detected, detected[1:]))
     dense_stride = _b2_detect(
         probabilities,
         dense,
+        dense_preds,
         {"window_frames": 15, "stride_frames": 1, "similarity_threshold": 0.75},
     )
-    assert len(dense_stride) == 8
-    assert [frame for frame, _ in dense_stride] == [23, 25, 27, 29, 31, 33, 35, 37]
+    assert [frame for frame, _ in dense_stride] == [23, 26, 29, 32, 35]

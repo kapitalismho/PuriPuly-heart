@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 import os
+import shutil
 import struct
 import subprocess
 import time
@@ -1156,6 +1157,7 @@ def _verifier_arm(
     transfer_name: str,
     mlp_trigger_source: str | None = None,
     fold_matrix_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] | None = None,
+    availability_frames: int | None = None,
 ) -> Path:
     cfg = config()
     sessions = _sessions(root)
@@ -1399,13 +1401,19 @@ def _verifier_arm(
         <= float(gate_cfg["maximum_single_meeting_true_positive_share"]),
         "threshold_transfer": transfer_check_ok,
     }
-    confirmation_ms = int(
+    confirmation_frames = int(
         cfg["confirmation"]["diagnostic_frames" if diagnostic else "base_frames"]
-    ) * int(cfg["frame_ms"])
+    )
+    availability_frames = (
+        confirmation_frames if availability_frames is None else int(availability_frames)
+    )
+    confirmation_ms = confirmation_frames * int(cfg["frame_ms"])
+    availability_frame_horizon_ms = availability_frames * int(cfg["frame_ms"])
     defect_threshold_ms = float(cfg["reference_gate"]["latency_defect_median_ms"])
     verification_compute_ms = max(predict_seconds / len(rows) * 1000.0, 0.0)
     availability_latency: dict[str, Any] = {
         "confirmation_ms": confirmation_ms,
+        "availability_frame_horizon_ms": availability_frame_horizon_ms,
         "verification_compute_ms_per_event": verification_compute_ms,
         "latency_defect_median_ms": defect_threshold_ms,
         "per_target": {},
@@ -1416,7 +1424,8 @@ def _verifier_arm(
             for _, prediction, reference in point["metrics"]["matched_pairs"]
         ]
         availability_values = [
-            float(value) + confirmation_ms + verification_compute_ms for value in deltas
+            float(value) + availability_frame_horizon_ms + verification_compute_ms
+            for value in deltas
         ]
         availability_percentiles = _percentiles(availability_values)
         availability_latency["per_target"][str(target)] = {
@@ -1657,6 +1666,35 @@ def r9b_prepare(root: Path) -> Path:
     return path
 
 
+def _peak_private_bytes(process_handle: Any) -> int:
+    if os.name != "nt":
+        return 0
+    import ctypes
+    from ctypes import wintypes
+
+    class _COUNTERS(ctypes.Structure):
+        _fields_ = [
+            ("cb", wintypes.DWORD),
+            ("PageFaultCount", wintypes.DWORD),
+            ("PeakWorkingSetSize", ctypes.c_size_t),
+            ("WorkingSetSize", ctypes.c_size_t),
+            ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+            ("PagefileUsage", ctypes.c_size_t),
+            ("PeakPagefileUsage", ctypes.c_size_t),
+        ]
+
+    counters = _COUNTERS()
+    counters.cb = ctypes.sizeof(counters)
+    if ctypes.windll.psapi.GetProcessMemoryInfo(
+        process_handle, ctypes.byref(counters), ctypes.sizeof(counters)
+    ):
+        return int(counters.PeakPagefileUsage)
+    return 0
+
+
 def _run_bench(
     bench: Path,
     model: Path,
@@ -1666,6 +1704,9 @@ def _run_bench(
     embedding_dump: Path | None,
     bench_json: Path,
     log_path: Path,
+    *,
+    timeout_seconds: int | None = None,
+    memory_ceiling_bytes: int | None = None,
 ) -> dict[str, Any]:
     dump_dir.mkdir(parents=True, exist_ok=True) if dump_dir is not None else None
     bench_json.parent.mkdir(parents=True, exist_ok=True)
@@ -1701,12 +1742,33 @@ def _run_bench(
             int(embedding["dump"]["horizon_frames"])
         )
     started = time.perf_counter()
+    peak_private = 0
     with log_path.open("wb") as log:
-        process = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, env=env)
+        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=env)
+        while process.poll() is None:
+            if timeout_seconds is not None and time.perf_counter() - started > timeout_seconds:
+                process.terminate()
+                process.wait(timeout=30)
+                raise R9Error(f"transcribe-bench timeout after {timeout_seconds}s; see {log_path}")
+            if memory_ceiling_bytes is not None:
+                peak_private = _peak_private_bytes(process._handle)
+                if peak_private > memory_ceiling_bytes:
+                    process.terminate()
+                    process.wait(timeout=30)
+                    raise R9Error(
+                        f"transcribe-bench exceeded the memory ceiling "
+                        f"({peak_private} > {memory_ceiling_bytes} bytes); see {log_path}"
+                    )
+            time.sleep(5.0)
+        return_code = int(process.returncode)
     wall_seconds = time.perf_counter() - started
-    if process.returncode != 0:
-        raise R9Error(f"transcribe-bench failed ({process.returncode}); see {log_path}")
-    return {"wall_seconds": wall_seconds, "command": command}
+    if return_code != 0:
+        raise R9Error(f"transcribe-bench failed ({return_code}); see {log_path}")
+    return {
+        "wall_seconds": wall_seconds,
+        "peak_private_bytes": peak_private,
+        "command": command,
+    }
 
 
 def _validate_dump_records(
@@ -1787,6 +1849,8 @@ def r9b_fixture(root: Path) -> Path:
         for path in (unpatched_probs, patched_probs):
             if not path.is_file():
                 raise R9Error(f"diar.probs missing for {clip_id}: {path}")
+        unpatched_segments = _fixed_segments_vulkan(_load_raw_probs_dump(unpatched_dumps))
+        patched_segments = _fixed_segments_vulkan(_load_raw_probs_dump(patched_dumps))
         records = _parse_dump_records(patched_dump_bin)
         structure = _validate_dump_records(records, cadence, horizon)
         r8_telemetry_path = (
@@ -1821,13 +1885,17 @@ def r9b_fixture(root: Path) -> Path:
                 "patched_probability_sha256": sha256_file(patched_probs),
                 "probability_bytes_equal": sha256_file(unpatched_probs)
                 == sha256_file(patched_probs),
+                "speaker_segments_equal": unpatched_segments == patched_segments,
                 "dump_records": len(records),
+                "dump_schema_complete": True,
                 "dump_structure": structure,
                 "compression_mismatches_vs_r8_telemetry": compression_mismatches,
             }
         )
     valid = all(
         fixture["probability_bytes_equal"]
+        and fixture["speaker_segments_equal"]
+        and fixture["dump_schema_complete"]
         and fixture["dump_structure"]["valid"]
         and not fixture["compression_mismatches_vs_r8_telemetry"]
         for fixture in fixtures
@@ -1876,6 +1944,21 @@ def r9b_replay(root: Path) -> Path:
     sessions = _sessions(root)
     cadence = int(embedding["dump"]["cadence_chunks"])
     horizon = int(embedding["dump"]["horizon_frames"])
+    validation_path = directory / "embedding_validation" / "embedding_validation.json"
+    if not validation_path.is_file():
+        raise R9Error("r9b-fixture must run and pass before the replay")
+    validation = load_json(validation_path)
+    if not bool(validation.get("passed")):
+        raise R9Error("fixture validation did not pass; replay refused")
+    if validation.get("code_sha256") != sha256_file(CODE_PATH) or validation.get(
+        "config_sha256"
+    ) != sha256_file(CONFIG_PATH):
+        raise R9Error(
+            "fixture validation hashes do not match the current harness/config; rerun r9b-fixture"
+        )
+    memory_ceiling_bytes = 24 * 1024 * 1024 * 1024
+    wall_budget_seconds = 24 * 3600.0
+    storage_floor_bytes = 40 * 1024 * 1024 * 1024
     embeddings_dir = directory / "embeddings" / "vulkan"
     embeddings_dir.mkdir(parents=True, exist_ok=True)
     runs_dir = directory / "r9b_runs" / "vulkan"
@@ -1884,78 +1967,126 @@ def r9b_replay(root: Path) -> Path:
     probabilities_dir.mkdir(parents=True, exist_ok=True)
     segments_dir = directory / "speaker_segments" / "vulkan"
     segments_dir.mkdir(parents=True, exist_ok=True)
+    cpu_probabilities_dir = r8_output_root(root) / "probabilities" / "cpu"
     rows: list[dict[str, Any]] = []
+    total_wall = 0.0
+
+    def invalid_receipt(session_id: str, reason: str) -> None:
+        write_json(
+            runs_dir / f"{session_id}.receipt.invalid.json",
+            {
+                "schema_version": 1,
+                "session_id": session_id,
+                "invalid_reason": reason,
+                "created_at_utc": datetime.now(UTC).isoformat(),
+            },
+        )
+
     for session in sorted(sessions.values(), key=lambda value: (value.fold, value.session_id)):
-        dump_bin = embeddings_dir / f"{session.session_id}.bin"
+        session_id = session.session_id
+        if total_wall > wall_budget_seconds:
+            invalid_receipt(session_id, "24-hour per-backend wall budget exhausted")
+            raise R9Error("24-hour per-backend wall budget exhausted")
+        free, _, _ = shutil.disk_usage(str(embeddings_dir))
+        if free < storage_floor_bytes:
+            invalid_receipt(session_id, f"storage floor breached: {free} free bytes")
+            raise R9Error(f"storage floor breached: {free} free bytes")
+        dump_bin = embeddings_dir / f"{session_id}.bin"
         if dump_bin.exists():
             dump_bin.unlink()
-        base = runs_dir / session.session_id
+        base = runs_dir / session_id
         dump_dir = base / "dumps"
         bench_json = base / "bench.json"
-        run_metrics = _run_bench(
-            bench,
-            model,
-            session.waveform_path,
-            "vulkan",
-            dump_dir,
-            dump_bin,
-            bench_json,
-            base / "run.log",
-        )
-        bench_result = load_json(bench_json)
-        resolved_backend = str(bench_result.get("backend", "unknown")).lower()
-        if "vulkan" not in resolved_backend:
-            raise R9Error(
-                f"backend fallback for {session.session_id}: requested vulkan, resolved {resolved_backend}"
+        try:
+            run_metrics = _run_bench(
+                bench,
+                model,
+                session.waveform_path,
+                "vulkan",
+                dump_dir,
+                dump_bin,
+                bench_json,
+                base / "run.log",
+                timeout_seconds=int(wall_budget_seconds - total_wall),
+                memory_ceiling_bytes=memory_ceiling_bytes,
             )
-        records = _parse_dump_records(dump_bin)
-        structure = _validate_dump_records(records, cadence, horizon)
-        if not structure["valid"]:
-            raise R9Error(
-                f"dump structure invalid for {session.session_id}: {structure['violations'][:5]}"
+            total_wall += float(run_metrics["wall_seconds"])
+            bench_result = load_json(bench_json)
+            resolved_backend = str(bench_result.get("backend", "unknown")).lower()
+            if "vulkan" not in resolved_backend:
+                raise R9Error(
+                    f"backend fallback for {session_id}: requested vulkan, resolved {resolved_backend}"
+                )
+            records = _parse_dump_records(dump_bin)
+            structure = _validate_dump_records(records, cadence, horizon)
+            if not structure["valid"]:
+                raise R9Error(
+                    f"dump structure invalid for {session_id}: {structure['violations'][:5]}"
+                )
+            probabilities = _load_raw_probs_dump(dump_dir)
+            cpu_probabilities = np.load(cpu_probabilities_dir / f"{session_id}.npz")[
+                "probabilities"
+            ]
+            if probabilities.shape != cpu_probabilities.shape:
+                raise R9Error(
+                    f"Vulkan probability geometry differs from the frozen CPU dump for "
+                    f"{session_id}: {probabilities.shape} != {cpu_probabilities.shape}"
+                )
+            np.savez_compressed(
+                probabilities_dir / f"{session_id}.npz",
+                probabilities=probabilities,
+                frame_ms=np.int32(cfg["frame_ms"]),
+                backend=np.asarray("vulkan"),
+                model_sha256=np.asarray(sha256_file(model)),
             )
-        probabilities = _load_raw_probs_dump(dump_dir)
-        np.savez_compressed(
-            probabilities_dir / f"{session.session_id}.npz",
-            probabilities=probabilities,
-            frame_ms=np.int32(cfg["frame_ms"]),
-            backend=np.asarray("vulkan"),
-            model_sha256=np.asarray(sha256_file(model)),
-        )
-        write_json(
-            segments_dir / f"{session.session_id}.json",
-            _fixed_segments_vulkan(probabilities),
-        )
-        expected_records = len(
-            [chunk for chunk in range(int(probabilities.shape[0]) // 6 + 1) if chunk % cadence == 0]
-        )
-        if len(records) != expected_records:
-            raise R9Error(
-                f"dump record count mismatch for {session.session_id}: "
-                f"{len(records)} != {expected_records}"
+            write_json(
+                segments_dir / f"{session_id}.json",
+                _fixed_segments_vulkan(probabilities),
             )
-        rows.append(
-            {
-                "session_id": session.session_id,
-                "fold": session.fold,
-                "backend_requested": "vulkan",
-                "backend_resolved": resolved_backend,
-                "bench_path": str(bench),
-                "bench_sha256": sha256_file(bench),
-                "model_path": str(model),
-                "model_sha256": sha256_file(model),
-                "embedding_dump_path": str(dump_bin),
-                "embedding_dump_sha256": sha256_file(dump_bin),
-                "embedding_dump_records": len(records),
-                "embedding_dump_bytes": dump_bin.stat().st_size,
-                "probability_path": str(probabilities_dir / f"{session.session_id}.npz"),
-                "probability_shape": list(probabilities.shape),
-                "wall_seconds": run_metrics["wall_seconds"],
-            }
-        )
+            expected_records = len(
+                [
+                    chunk
+                    for chunk in range(int(probabilities.shape[0]) // 6 + 1)
+                    if chunk % cadence == 0
+                ]
+            )
+            if len(records) != expected_records:
+                raise R9Error(
+                    f"dump record count mismatch for {session_id}: "
+                    f"{len(records)} != {expected_records}"
+                )
+            rows.append(
+                {
+                    "session_id": session_id,
+                    "fold": session.fold,
+                    "backend_requested": "vulkan",
+                    "backend_resolved": resolved_backend,
+                    "bench_path": str(bench),
+                    "bench_sha256": sha256_file(bench),
+                    "model_path": str(model),
+                    "model_sha256": sha256_file(model),
+                    "embedding_dump_path": str(dump_bin),
+                    "embedding_dump_sha256": sha256_file(dump_bin),
+                    "embedding_dump_records": len(records),
+                    "embedding_dump_bytes": dump_bin.stat().st_size,
+                    "probability_path": str(probabilities_dir / f"{session_id}.npz"),
+                    "probability_shape": list(probabilities.shape),
+                    "wall_seconds": run_metrics["wall_seconds"],
+                    "peak_private_bytes": run_metrics["peak_private_bytes"],
+                    "memory_within_ceiling": run_metrics["peak_private_bytes"]
+                    <= memory_ceiling_bytes,
+                    "cpu_probability_shape": list(cpu_probabilities.shape),
+                }
+            )
+        except R9Error as error:
+            invalid_receipt(session_id, str(error))
+            raise
     manifest = {
         "schema_version": 1,
         "backend": "vulkan",
+        "memory_ceiling_bytes": memory_ceiling_bytes,
+        "wall_budget_seconds": wall_budget_seconds,
+        "total_wall_seconds": total_wall,
         "items": rows,
         "code_sha256": sha256_file(CODE_PATH),
         "config_sha256": sha256_file(CONFIG_PATH),
@@ -2069,6 +2200,8 @@ def extract_embedding_features(root: Path) -> Path:
     dump_paths = {
         str(item["session_id"]): Path(item["embedding_dump_path"]) for item in manifest_doc["items"]
     }
+    records_by_session: dict[str, list[dict[str, Any]]] = {}
+    similarity_names = ("same_slot_similarity", "best_other_similarity", "embedding_jump")
     excluded_count = 0
     missing_count = 0
     for row in feature_rows:
@@ -2076,9 +2209,11 @@ def extract_embedding_features(root: Path) -> Path:
         candidate = by_row[int(row["row"])]
         if session_id not in dump_paths:
             raise R9Error(f"no embedding dump for {session_id}")
-        records = _parse_dump_records(dump_paths[session_id])
+        if session_id not in records_by_session:
+            records_by_session[session_id] = _parse_dump_records(dump_paths[session_id])
+        records = records_by_session[session_id]
         target = int(candidate["start_frame"]) + int(embedding["features"]["after_frames"])
-        chosen = next((record for record in records if record["total_n"] >= target), None)
+        chosen = next((record for record in records if record["total_n"] > target), None)
         if chosen is None:
             raise R9Error(
                 f"no dump record covers candidate row {row['row']} (session {session_id})"
@@ -2095,10 +2230,10 @@ def extract_embedding_features(root: Path) -> Path:
             if chosen["compression"] or (previous is not None and previous["compression"])
             else 0.0
         )
-        if any(
-            math.isnan(float(values[name]))
-            for name in ("same_slot_similarity", "best_other_similarity", "embedding_jump")
-        ):
+        if compression_boundary == 1.0:
+            for name in similarity_names:
+                values[name] = float("nan")
+        if any(math.isnan(float(values[name])) for name in similarity_names):
             missing_count += 1
         row["features"] = {
             **row["features"],
@@ -2156,6 +2291,7 @@ def run_b1(root: Path) -> Path:
         transfer_name="threshold_transfer_b1_metrics.json",
         mlp_trigger_source=None,
         fold_matrix_transform=_b1_fold_transform,
+        availability_frames=int(embedding["features"]["after_frames"]),
     )
 
 
@@ -2199,8 +2335,9 @@ def _b1_linear_models(root: Path) -> list[dict[str, Any]]:
     return models
 
 
-def _dense_embedding_frames(dump_path: Path, total_frames: int) -> np.ndarray:
+def _dense_embedding_frames(dump_path: Path, total_frames: int) -> tuple[np.ndarray, np.ndarray]:
     embeddings = np.zeros((total_frames, EMBEDDING_DIM), dtype=np.float32)
+    preds = np.zeros((total_frames, EMBEDDING_SPEAKERS), dtype=np.float32)
     filled = np.zeros(total_frames, dtype=np.bool_)
     for record in _parse_dump_records(dump_path):
         frame_idx = record["frame_idx"]
@@ -2212,15 +2349,19 @@ def _dense_embedding_frames(dump_path: Path, total_frames: int) -> np.ndarray:
         if bool(fresh.any()):
             targets = frame_idx[fresh]
             embeddings[targets] = record["emb"][fresh]
+            preds[targets] = record["preds"][fresh]
             filled[targets] = True
     missing = int((~filled).sum())
     if missing:
         raise R9Error(f"{missing} frames have no dumped embedding in {dump_path.name}")
-    return embeddings
+    return embeddings, preds
 
 
 def _b2_detect(
-    probabilities: np.ndarray, dense_emb: np.ndarray, b2_cfg: dict[str, Any]
+    probabilities: np.ndarray,
+    dense_emb: np.ndarray,
+    dense_preds: np.ndarray,
+    b2_cfg: dict[str, Any],
 ) -> list[tuple[int, int]]:
     window = int(b2_cfg["window_frames"])
     stride = int(b2_cfg["stride_frames"])
@@ -2243,10 +2384,17 @@ def _b2_detect(
         end = frame
         offset = run_start
         while offset + 2 * window <= end:
-            before_mean = dense_emb[offset : offset + window].mean(axis=0)
-            after_mean = dense_emb[offset + window : offset + 2 * window].mean(axis=0)
-            if _cosine(before_mean, after_mean) < threshold:
-                raw.append((offset + window, run_slot))
+            before_slot_mask = dense_preds[offset : offset + window].argmax(axis=1) == run_slot
+            after_slot_mask = (
+                dense_preds[offset + window : offset + 2 * window].argmax(axis=1) == run_slot
+            )
+            if bool(before_slot_mask.any()) and bool(after_slot_mask.any()):
+                before_mean = dense_emb[offset : offset + window][before_slot_mask].mean(axis=0)
+                after_mean = dense_emb[offset + window : offset + 2 * window][after_slot_mask].mean(
+                    axis=0
+                )
+                if _cosine(before_mean, after_mean) < threshold:
+                    raw.append((offset + window, run_slot))
             offset += stride
         run_slot = None
         run_start = -1
@@ -2254,7 +2402,8 @@ def _b2_detect(
             run_slot = slot_now
             run_start = frame
     dedup_radius_frames = max(
-        1, int(int(config()["duplicate_suppression_ms"]) // int(config()["frame_ms"]))
+        1,
+        int(math.ceil(int(config()["duplicate_suppression_ms"]) / int(config()["frame_ms"]))),
     )
     raw.sort()
     deduplicated: list[tuple[int, int]] = []
@@ -2275,33 +2424,39 @@ def run_b2(root: Path) -> Path:
     if not b1_metrics_path.is_file():
         raise R9Error("b1 must run before b2")
     b1_document = load_json(b1_metrics_path)
-    evaluation_curve = b1_document.get("evaluation_curve", [])
-    b1_recall_100 = 0.0
-    for row in evaluation_curve:
-        if abs(float(row.get("false_events_per_hour", 1e9)) - 100.0) < 1e-6:
-            b1_recall_100 = float(row.get("recall_250") or 0.0)
-    ceiling_doc = directory / "ceiling_summary.json"
-    candidate_ceiling_recall = 0.0
-    if ceiling_doc.is_file():
-        candidate_ceiling_recall = float(
-            load_json(ceiling_doc).get("candidate_ceiling", {}).get("recall_250") or 0.0
-        )
-    entry = bool(b1_recall_100 >= 0.6 or candidate_ceiling_recall < 0.9)
-    if not entry:
+
+    def stopped_receipt(stop_reason: str, **extra: Any) -> Path:
         path = directory / "b2_metrics.json"
         write_json(
             path,
             {
                 "schema_version": 1,
                 "stopped": True,
-                "stop_reason": "entry_condition_not_met",
-                "b1_recall_100_feh": b1_recall_100,
-                "candidate_ceiling_recall": candidate_ceiling_recall,
+                "stop_reason": stop_reason,
+                **extra,
                 "code_sha256": sha256_file(CODE_PATH),
                 "config_sha256": sha256_file(CONFIG_PATH),
             },
         )
         return path
+
+    if bool(b1_document.get("mlp_triggered", False)):
+        return stopped_receipt("b1_mlp_fallback")
+    evaluation_curve = b1_document.get("evaluation_curve", [])
+    b1_recall_100 = 0.0
+    if evaluation_curve:
+        b1_recall_100 = float(_select_row(evaluation_curve, 100.0).get("recall_250") or 0.0)
+    ceiling_doc = directory / "ceiling_summary.json"
+    candidate_ceiling_recall = 0.0
+    if ceiling_doc.is_file():
+        candidate_ceiling_recall = float(load_json(ceiling_doc).get("oracle_recall_250") or 0.0)
+    entry = bool(b1_recall_100 >= 0.6 or candidate_ceiling_recall < 0.9)
+    if not entry:
+        return stopped_receipt(
+            "entry_condition_not_met",
+            b1_recall_100_feh=b1_recall_100,
+            candidate_ceiling_recall=candidate_ceiling_recall,
+        )
     manifest = directory / "r9b_runs" / "vulkan" / "replay_manifest.json"
     if not manifest.is_file():
         raise R9Error("r9b-replay must run before b2")
@@ -2309,57 +2464,50 @@ def run_b2(root: Path) -> Path:
         str(item["session_id"]): Path(item["embedding_dump_path"])
         for item in load_json(manifest)["items"]
     }
-    vulkan_probabilities = {
-        session_id: np.load(directory / "probabilities" / "vulkan" / f"{session_id}.npz")[
-            "probabilities"
-        ]
-        for session_id in sessions
-    }
-    cpu_probabilities = {
-        session_id: _load_probabilities(root, session_id) for session_id in sessions
-    }
     windows = cfg["feature_windows"]
     frame_ms = int(cfg["frame_ms"])
     confirmation_frames = int(cfg["confirmation"]["base_frames"])
     fold_candidates: dict[int, list[dict[str, Any]]] = defaultdict(list)
-    for session in sorted(sessions.values(), key=lambda value: (value.fold, value.session_id)):
-        total_frames = int(vulkan_probabilities[session.session_id].shape[0])
-        dense_emb = _dense_embedding_frames(dump_paths[session.session_id], total_frames)
-        detected = _b2_detect(vulkan_probabilities[session.session_id], dense_emb, b2_cfg)
-        for frame, slot in detected:
-            sample = frame * int(cfg["samples_per_frame"])
-            fold_candidates[fold_map[session.session_id]].append(
-                {
-                    "session_id": session.session_id,
-                    "frame": frame,
-                    "sample": sample,
-                    "speaker_slot": slot + 1,
-                    "candidate_kind": "intra_slot",
-                }
+
+    def detect_fold_sessions(folds: Sequence[int]) -> None:
+        for session in sorted(sessions.values(), key=lambda value: (value.fold, value.session_id)):
+            if session.fold not in folds:
+                continue
+            probabilities = np.load(
+                directory / "probabilities" / "vulkan" / f"{session.session_id}.npz"
+            )["probabilities"]
+            total_frames = int(probabilities.shape[0])
+            dense_emb, dense_preds = _dense_embedding_frames(
+                dump_paths[session.session_id], total_frames
             )
+            detected = _b2_detect(probabilities, dense_emb, dense_preds, b2_cfg)
+            for frame, slot in detected:
+                sample = frame * int(cfg["samples_per_frame"])
+                fold_candidates[fold_map[session.session_id]].append(
+                    {
+                        "session_id": session.session_id,
+                        "frame": frame,
+                        "sample": sample,
+                        "speaker_slot": slot + 1,
+                        "candidate_kind": "intra_slot",
+                    }
+                )
+
+    detect_fold_sessions([0])
     first_fold_count = len(fold_candidates.get(0, []))
     if first_fold_count < 10:
-        path = directory / "b2_metrics.json"
-        write_json(
-            path,
-            {
-                "schema_version": 1,
-                "stopped": True,
-                "stop_reason": "fail_fast_noise_floor",
-                "first_fold_candidate_count": first_fold_count,
-                "code_sha256": sha256_file(CODE_PATH),
-                "config_sha256": sha256_file(CONFIG_PATH),
-            },
-        )
-        return path
+        return stopped_receipt("fail_fast_noise_floor", first_fold_candidate_count=first_fold_count)
+    detect_fold_sessions([1, 2, 3, 4])
     models = _b1_linear_models(root)
     feature_names = list(cfg["feature_names"]) + list(embedding["features"]["feature_names"])
     b2_rows: list[dict[str, Any]] = []
     sessions_by_id = {str(key): value for key, value in sessions.items()}
     records_by_session: dict[str, list[dict[str, Any]]] = {}
+    cpu_probabilities: dict[str, np.ndarray] = {}
     features_b_rows = read_jsonl(directory / "features_b.jsonl")
     features_b_matrix = _feature_matrix(features_b_rows, feature_names)
     row_session_main = [str(row["session_id"]) for row in features_b_rows]
+    similarity_names = ("same_slot_similarity", "best_other_similarity", "embedding_jump")
     continuous_embedding_names = [
         name for name in embedding["features"]["feature_names"] if name != "compression_boundary"
     ]
@@ -2382,6 +2530,8 @@ def run_b2(root: Path) -> Path:
         for candidate in candidates:
             session_id = str(candidate["session_id"])
             session = sessions_by_id[session_id]
+            if session_id not in cpu_probabilities:
+                cpu_probabilities[session_id] = _load_probabilities(root, session_id)
             a_features = _features_for_candidate(
                 cpu_probabilities[session_id],
                 int(candidate["frame"]),
@@ -2395,7 +2545,11 @@ def run_b2(root: Path) -> Path:
                 records_by_session[session_id] = _parse_dump_records(dump_paths[session_id])
             records = records_by_session[session_id]
             target = int(candidate["frame"]) + int(embedding["features"]["after_frames"])
-            chosen = next(record for record in records if record["total_n"] >= target)
+            chosen = next((record for record in records if record["total_n"] > target), None)
+            if chosen is None:
+                raise R9Error(
+                    f"no dump record covers B2 candidate {candidate} (session {session_id})"
+                )
             previous = records[records.index(chosen) - 1] if records.index(chosen) > 0 else None
             values, excluded = _embedding_features_for_candidate(
                 chosen,
@@ -2408,6 +2562,9 @@ def run_b2(root: Path) -> Path:
                 if chosen["compression"] or (previous is not None and previous["compression"])
                 else 0.0
             )
+            if compression_boundary == 1.0:
+                for name in similarity_names:
+                    values[name] = float("nan")
             features = {**a_features, **values, "compression_boundary": compression_boundary}
             feature_vector = np.asarray(
                 [float(features[name]) for name in feature_names], dtype=np.float64
@@ -2431,27 +2588,38 @@ def run_b2(root: Path) -> Path:
     write_jsonl(scores_path, b2_rows)
     union_rows = list(read_jsonl(directory / "scores_b1.jsonl")) + b2_rows
     grouped: dict[str, list[tuple[int, float]]] = {}
+    grouped_selection: dict[str, list[tuple[int, float]]] = {}
     for row in union_rows:
-        grouped.setdefault(str(row["session_id"]), []).append(
-            (int(row["sample"]), float(row["score"]))
-        )
+        session_id = str(row["session_id"])
+        pair = (int(row["sample"]), float(row["score"]))
+        grouped.setdefault(session_id, []).append(pair)
+        if str(row["label"]) != "ambiguous":
+            grouped_selection.setdefault(session_id, []).append(pair)
     for session_id in sessions:
         grouped.setdefault(session_id, [])
+        grouped_selection.setdefault(session_id, [])
     radius_samples = int(cfg["duplicate_suppression_ms"]) * 16
     for session_id in grouped:
         grouped[session_id] = _grouped_events(
             [{"sample": sample, "score": score} for sample, score in grouped[session_id]],
             radius_samples,
         )
-    cache = ScoreEvaluationCache(sessions, grouped)
+        grouped_selection[session_id] = _grouped_events(
+            [{"sample": sample, "score": score} for sample, score in grouped_selection[session_id]],
+            radius_samples,
+        )
+    selection_cache = ScoreEvaluationCache(sessions, grouped_selection)
+    all_cache = ScoreEvaluationCache(sessions, grouped)
     score_values = np.asarray(
-        [score for pairs in grouped.values() for _, score in pairs], dtype=np.float32
+        [score for pairs in grouped_selection.values() for _, score in pairs],
+        dtype=np.float32,
     )
     targets = [float(value) for value in cfg["targets"]["false_events_per_hour"]]
-    curve = _curve_for_scores(cache, score_values, targets, cfg["curve_search"])
+    curve = _curve_for_scores(selection_cache, score_values, targets, cfg["curve_search"])
     evaluation_curve_rows: list[dict[str, Any]] = []
+    selected_points: dict[str, Any] = {}
     for row in curve:
-        metrics = cache.metrics(float(row["threshold"]))
+        metrics = all_cache.metrics(float(row["threshold"]))
         primary = metrics["tolerances"]["250"]
         evaluation_curve_rows.append(
             {
@@ -2463,6 +2631,68 @@ def run_b2(root: Path) -> Path:
                 "recall_250": primary["recall"],
             }
         )
+    for target in targets:
+        selected = _select_row(curve, float(target))
+        selected_points[str(target)] = {
+            "threshold": selected["threshold"],
+            "selection_false_events_per_hour": selected["false_events_per_hour"],
+            "selection_recall_250": selected["recall_250"],
+            "metrics": all_cache.metrics(float(selected["threshold"])),
+        }
+    transfer: list[dict[str, Any]] = []
+    for fold, held_out in enumerate(cfg["folds"]):
+        held_out_ids = [str(value) for value in held_out]
+        development_ids = [session_id for session_id in sessions if session_id not in held_out_ids]
+        development_rows = [
+            _curve_row(selection_cache, float(row["threshold"]), development_ids) for row in curve
+        ]
+        for target in targets:
+            selected = _select_row(development_rows, float(target))
+            held_metrics = all_cache.metrics(float(selected["threshold"]), held_out_ids)
+            primary = held_metrics["tolerances"]["250"]
+            transfer.append(
+                {
+                    "fold": fold,
+                    "held_out_sessions": held_out_ids,
+                    "target_false_events_per_hour": target,
+                    "selected_threshold": selected["threshold"],
+                    "development_false_events_per_hour": selected["false_events_per_hour"],
+                    "development_recall_250": selected["recall_250"],
+                    "held_out_false_events_per_hour": primary["false_events_per_hour"],
+                    "held_out_recall_250": primary["recall"],
+                }
+            )
+    per_meeting_curves: dict[str, list[dict[str, Any]]] = {
+        session_id: [] for session_id in sessions
+    }
+    for row in curve:
+        metrics = all_cache.metrics(float(row["threshold"]))
+        for session_id, meeting in metrics["per_meeting"].items():
+            per_meeting_curves[session_id].append(
+                {
+                    "threshold": row["threshold"],
+                    "prediction_count": meeting["prediction_count"],
+                    "true_positive_count": meeting["true_positive_count"],
+                    "false_event_count": meeting["false_event_count"],
+                    "false_events_per_hour": meeting["false_events_per_hour"],
+                    "recall_250": meeting["recall"],
+                }
+            )
+    availability_frame_horizon_ms = int(embedding["features"]["after_frames"]) * frame_ms
+    availability: dict[str, Any] = {
+        "availability_frame_horizon_ms": availability_frame_horizon_ms,
+        "per_target": {},
+    }
+    for target, point in selected_points.items():
+        deltas = [
+            (int(prediction) - int(reference)) // 16
+            for _, prediction, reference in point["metrics"]["matched_pairs"]
+        ]
+        availability["per_target"][str(target)] = {
+            "availability_ms": _percentiles(
+                [float(value) + availability_frame_horizon_ms for value in deltas]
+            )
+        }
     path = directory / "b2_metrics.json"
     write_json(
         path,
@@ -2476,9 +2706,13 @@ def run_b2(root: Path) -> Path:
             "first_fold_candidate_count": first_fold_count,
             "b2_candidates_path": str(directory / "scores_b2.jsonl"),
             "curve": curve,
-            "curve_kind": "selection_union_main_and_b2",
+            "curve_kind": "selection_union_excluding_ambiguous",
             "evaluation_curve": evaluation_curve_rows,
             "evaluation_curve_kind": "event_level_union_including_ambiguous",
+            "selected_operating_points": selected_points,
+            "threshold_transfer": transfer,
+            "per_meeting_curves": per_meeting_curves,
+            "availability": availability,
             "code_sha256": sha256_file(CODE_PATH),
             "config_sha256": sha256_file(CONFIG_PATH),
         },
@@ -3204,17 +3438,47 @@ def report(root: Path) -> Path:
                 f"{float(row['held_out_false_events_per_hour']):.1f} | "
                 f"{float(row['held_out_recall_250'] or 0.0):.3f} |"
             )
-    lines.extend(
-        [
-            "",
-            "## Outcome",
-            "",
-            "R9 measured the probability-only verification ceiling. The B arms (speaker-cache",
-            "embedding features) were not run: they require a separate owner decision naming them",
-            "after these A-arm results (plan section 15). No result authorizes follow-up work,",
-            "integration, or publication automatically.",
-        ]
+    outcome_lines = ["", "## Outcome", ""]
+    if (directory / "b1_metrics.json").is_file():
+        b1_doc = load_json(directory / "b1_metrics.json")
+        contribution = ceiling.get("embedding_contribution", {})
+        outcome_lines.extend(
+            [
+                "R9 measured the probability-only (A1) and embedding-augmented (B1) verification",
+                "ceilings. The A1-vs-B1 comparison answers whether the speaker-cache embeddings raise",
+                "the ceiling over probability-only features "
+                f"(raises_ceiling: {bool(contribution.get('raises_ceiling', False))}).",
+                f"B1 mean out-of-fold AUROC {float(b1_doc.get('mean_out_of_fold_auroc', float('nan'))):.4f} "
+                f"(A1: {float(a1.get('mean_out_of_fold_auroc', float('nan'))):.4f}).",
+            ]
+        )
+        b2_path = directory / "b2_metrics.json"
+        if b2_path.is_file():
+            b2_doc = load_json(b2_path)
+            if bool(b2_doc.get("stopped", True)):
+                outcome_lines.append(
+                    f"R9-B2 stopped ({b2_doc.get('stop_reason')}); the R9-B ceiling is reported without it."
+                )
+            else:
+                outcome_lines.append(
+                    "R9-B2 ran; the B2 row in the ceiling table is the union-stream ceiling with the "
+                    "B1 verifier."
+                )
+        else:
+            outcome_lines.append(
+                "R9-B2 was not executed: it runs only under its frozen entry condition."
+            )
+    else:
+        outcome_lines.extend(
+            [
+                "R9 measured the probability-only verification ceiling. The B arms (speaker-cache",
+                "embedding features) were not run in this pass.",
+            ]
+        )
+    outcome_lines.append(
+        "No result authorizes follow-up work, integration, or publication automatically."
     )
+    lines.extend(outcome_lines)
     path = directory / "REPORT.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     artifact_inventory(root)
