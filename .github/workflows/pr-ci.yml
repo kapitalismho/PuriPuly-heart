@@ -125,6 +125,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup UV environment
+        uses: ./.github/actions/setup-uv-environment
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          uv-version: ${{ env.UV_VERSION }}
+          sync-args: --extra dev
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
