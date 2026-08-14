@@ -13,7 +13,7 @@ This notice file focuses on components that are bundled, shipped, installed, or 
 
 The technical metadata review performed for the AGPL transition found no obvious license blocker to licensing PuriPuly Heart's own code under AGPL-3.0-or-later. This is a repository metadata review, not legal advice.
 
-Notable shipped/runtime license families include MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, LGPL-2.1-or-later, SIL Open Font License 1.1, and GPL-2.0-or-later WITH Bootloader-exception for PyInstaller-built binaries.
+Notable shipped/runtime license families include MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, LGPL-2.1-or-later, SIL Open Font License 1.1, CC-BY-4.0, and GPL-2.0-or-later WITH Bootloader-exception for PyInstaller-built binaries.
 
 Runtime/bundled notice-sensitive components:
 - huggingface-hub 1.26.0: Apache-2.0.
@@ -43,6 +43,7 @@ For package-managed dependencies, the authoritative license texts are distribute
 - MPL-2.0: https://www.mozilla.org/en-US/MPL/2.0/
 - LGPL-2.1-or-later: source-tree copy at src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt; installed release copy in the soxr compliance bundle.
 - SIL Open Font License 1.1: included below for bundled fonts.
+- CC-BY-4.0: https://creativecommons.org/licenses/by/4.0/legalcode.en
 - PyInstaller bootloader exception: https://github.com/pyinstaller/pyinstaller/blob/develop/COPYING.txt
 
 ----
@@ -57,13 +58,31 @@ These packages provide the optional high-speed Hugging Face/Xet download path fo
 
 ----
 
-Qwen3-ASR local model assets (optional download)
+Qwen3-ASR local model assets
 Official upstream sources: https://huggingface.co/Qwen/Qwen3-ASR-0.6B , https://github.com/QwenLM/Qwen3-ASR
 Manifest mirror sources used by the app: https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25 , https://modelscope.cn/models/zengshuishui/Qwen3-ASR-onnx
 License: Apache-2.0
 
-The local Qwen ASR model is not committed directly to this repository. The app manifest identifies pinned downloadable ONNX/tokenizer assets for local ASR setup.
+The local Qwen3-ASR-0.6B model is a default local CPU STT model. The app manifest identifies pinned downloadable ONNX/tokenizer assets for local ASR setup.
 Official upstream Qwen3-ASR assets are Apache-2.0. The mirror or converted assets referenced by the manifest may not expose complete license metadata, so pinned mirror provenance and license metadata must be verified before release.
+
+----
+
+Qwen3-ASR-1.7B GGUF model asset (optional GPU download)
+Official upstream source: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
+Manifest mirror source used by the app: https://huggingface.co/handy-computer/Qwen3-ASR-1.7B-gguf
+License: Apache-2.0
+
+The local GPU Qwen ASR GGUF model is not committed directly to this repository. The app manifest identifies the pinned downloadable GGUF asset for GPU-based local ASR setup. Official upstream Qwen3-ASR-1.7B assets are Apache-2.0.
+
+----
+
+NVIDIA Parakeet TDT model assets
+Official upstream sources: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3 , https://huggingface.co/nvidia/parakeet-tdt_ctc-0.6b-ja
+Manifest mirror sources used by the app: https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8 , https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8
+License: CC-BY-4.0
+
+The local Parakeet models are the default local CPU STT models. The app manifests identify pinned downloadable ONNX assets for local ASR setup. NVIDIA Parakeet model assets are governed by the Creative Commons Attribution 4.0 International license. The mirror or converted assets referenced by the manifests may not expose complete license metadata, so pinned mirror provenance and license metadata must be verified before release.
 
 ----
 

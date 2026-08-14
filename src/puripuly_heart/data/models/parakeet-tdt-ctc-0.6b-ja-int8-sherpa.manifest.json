@@ -3,6 +3,7 @@
   "installed_manifest_version": 1,
   "model_id": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
   "engine": "sherpa-onnx",
+  "license": "CC-BY-4.0",
   "upstream_repo": "nvidia/parakeet-tdt_ctc-0.6b-ja",
   "install_dirname": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
   "installed_manifest_filename": "installed-manifest.json",
