@@ -1769,10 +1769,9 @@ def test_desktop_overlay_preview_uses_edit_mode_for_no_caption_empty_state() -> 
 
     window._render_page()  # noqa: SLF001 - verify preview rendering contract
 
-    assert (
-        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.empty_state.action.lock")
-        in _page_text_values(app.page)
-    )
+    assert desktop_overlay.t_for_locale(
+        "en", "settings.overlay.desktop.empty_state.action.lock"
+    ) in _page_text_values(app.page)
     assert len(_text_buttons(app.page)) == 1
 
 
@@ -2046,7 +2045,10 @@ def test_desktop_overlay_preview_fixtures_use_real_overlay_window_surface_and_ed
     assert not _page_contains_control_type(app.page, ft.WindowDragArea)
 
     visible_text = _page_text_values(app.page)
-    assert desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.fixture") in visible_text
+    assert (
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.fixture")
+        in visible_text
+    )
     assert desktop_overlay.t_for_locale("en", "settings.overlay.desktop.size.title") in visible_text
     assert (
         desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_surface")
@@ -2073,10 +2075,9 @@ async def test_desktop_overlay_preview_controls_apply_size_preset_without_outlin
 
     try:
         await window.start(catalog.fixtures[0].snapshot)
-        assert (
-            desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_surface")
-            in _page_text_values(app.page)
-        )
+        assert desktop_overlay.t_for_locale(
+            "en", "settings.overlay.desktop.preview.background_surface"
+        ) in _page_text_values(app.page)
         assert "Outline width" not in _page_text_values(app.page)
 
         large_control = _find_control_with_text(app.page, "Large")
@@ -2091,7 +2092,9 @@ async def test_desktop_overlay_preview_controls_apply_size_preset_without_outlin
         assert app.page.window.height == _DESKTOP_CAPTION_SIZE_PRESETS["large"].window_height
         visible_text = _page_text_values(app.page)
         assert (
-            desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_surface")
+            desktop_overlay.t_for_locale(
+                "en", "settings.overlay.desktop.preview.background_surface"
+            )
             in visible_text
         )
         assert sink.events == []
@@ -2235,7 +2238,10 @@ def test_desktop_overlay_preview_fixtures_run_local_app_without_renderer_or_pers
     assert len(app.targets) == 1
 
     visible_text = _page_text_values(app.page)
-    assert desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.fixture") in visible_text
+    assert (
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.fixture")
+        in visible_text
+    )
     assert desktop_overlay.t_for_locale("en", "settings.overlay.desktop.size.title") in visible_text
     assert (
         desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_alpha")
@@ -2255,14 +2261,20 @@ def test_desktop_overlay_preview_fixtures_run_local_app_without_renderer_or_pers
         desktop_overlay.t_for_locale("en", "settings.overlay.desktop.size.option.xlarge"),
     } <= visible_text
     assert {
-        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_surface.bright"),
-        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_surface.dark"),
+        desktop_overlay.t_for_locale(
+            "en", "settings.overlay.desktop.preview.background_surface.bright"
+        ),
+        desktop_overlay.t_for_locale(
+            "en", "settings.overlay.desktop.preview.background_surface.dark"
+        ),
         desktop_overlay.t_for_locale(
             "en", "settings.overlay.desktop.preview.background_surface.busy"
         ),
     } <= visible_text
     assert (
-        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.fixture.korean_long_wrap")
+        desktop_overlay.t_for_locale(
+            "en", "settings.overlay.desktop.preview.fixture.korean_long_wrap"
+        )
         in visible_text
     )
     assert any("긴 문장" in text for text in visible_text)

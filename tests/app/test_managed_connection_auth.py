@@ -6,13 +6,6 @@ from dataclasses import FrozenInstanceError, dataclass, fields, is_dataclass
 from typing import Any
 
 import pytest
-
-from puripuly_heart.app.ports import (
-    broker_client,
-    managed_identity_state,
-    secret_store,
-    settings_repository,
-)
 from puripuly_heart.app.services.managed_auth_claims import (
     MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
     MANAGED_AUTH_CLAIM_SOURCE_QQ,
@@ -20,6 +13,13 @@ from puripuly_heart.app.services.managed_auth_claims import (
     OPENROUTER_MANAGED_USER_ID_SECRET,
     OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
     ManagedAuthClaimGuard,
+)
+
+from puripuly_heart.app.ports import (
+    broker_client,
+    managed_identity_state,
+    secret_store,
+    settings_repository,
 )
 from puripuly_heart.core import messages
 

@@ -18,45 +18,39 @@ def test_new_ui_error_events_do_not_publish_raw_string_payloads() -> None:
 
 
 def test_guard_fixture_catches_positional_ui_error_payload() -> None:
-    violations = _collect_violations_for_source(
-        """
+    violations = _collect_violations_for_source("""
         from puripuly_heart.domain.events import UIEvent, UIEventType
 
         def publish(exc: Exception) -> None:
             UIEvent(UIEventType.ERROR, None, str(exc))
-        """
-    )
+        """)
 
     assert len(violations) == 1
     assert "publishes raw string UIEventType.ERROR payload" in violations[0]
 
 
 def test_guard_fixture_catches_raw_stt_error_event_messages() -> None:
-    violations = _collect_violations_for_source(
-        """
+    violations = _collect_violations_for_source("""
         from puripuly_heart.domain.events import STTErrorEvent
 
         def publish(exc: Exception) -> None:
             STTErrorEvent(message="raw failure")
             STTErrorEvent(message=f"raw failure: {exc}")
             STTErrorEvent(str(exc))
-        """
-    )
+        """)
 
     assert len(violations) == 3
     assert all("publishes raw string STTErrorEvent message" in item for item in violations)
 
 
 def test_guard_fixture_catches_stt_error_event_message_assigned_from_raw_text() -> None:
-    violations = _collect_violations_for_source(
-        """
+    violations = _collect_violations_for_source("""
         from puripuly_heart.domain.events import STTErrorEvent
 
         def publish(exc: Exception) -> None:
             message = str(exc)
             STTErrorEvent(message=message)
-        """
-    )
+        """)
 
     assert len(violations) == 1
     assert "publishes raw string STTErrorEvent message" in violations[0]

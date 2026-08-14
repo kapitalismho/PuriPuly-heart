@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from puripuly_heart.app.adapters.peer_capture_vad_sink import (
     PeerCaptureVadSinkAdapter,
 )
+
 from puripuly_heart.app.wiring import create_peer_capture_vad_sink_adapter
 
 

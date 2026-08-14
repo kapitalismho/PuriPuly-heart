@@ -123,19 +123,17 @@ async def test_deepseek_provider_close_cleans_up() -> None:
     assert provider._internal_client is None
 
 
-def test_deepseek_provider_passes_v4_pro_model_to_internal_httpx_client() -> None:
+def test_deepseek_provider_passes_v4_flash_model_to_internal_httpx_client() -> None:
     from puripuly_heart.config.settings import DeepSeekLLMModel
 
-    deepseek_model = getattr(DeepSeekLLMModel, "DEEPSEEK_V4_PRO", None)
-
-    assert deepseek_model is not None
+    deepseek_model = DeepSeekLLMModel.DEEPSEEK_V4_FLASH
 
     provider = DeepSeekLLMProvider(api_key="k", model=deepseek_model.value)
 
     client = provider._get_client()
 
     assert isinstance(client, HttpxDeepSeekClient)
-    assert client.model == "deepseek-v4-pro"
+    assert client.model == "deepseek-v4-flash"
 
 
 @pytest.mark.asyncio

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import pytest
-
 from puripuly_heart.app.services.managed_auth import (
     ManagedAuthExecutionResult,
     ManagedAuthOwner,
     ManagedAuthState,
 )
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
+
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
     TransactionResult,

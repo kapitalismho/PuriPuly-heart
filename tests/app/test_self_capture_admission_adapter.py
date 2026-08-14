@@ -4,10 +4,10 @@ import asyncio
 from dataclasses import replace
 
 import pytest
-
 from puripuly_heart.app.adapters.self_capture_admission import (
     SelfCaptureAdmissionAdapter,
 )
+
 from puripuly_heart.app.ports.self_capture_admission import (
     SelfCaptureAdmissionEffect,
     SelfCaptureAdmissionEffectType,

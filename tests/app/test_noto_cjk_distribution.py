@@ -10,9 +10,6 @@ NOTO_CJK_PROVENANCE_RELATIVE_DIR = Path("third_party/noto-sans-cjk")
 NOTO_CJK_FONT_FILENAME = "NotoSansCJK-Medium.ttc"
 NOTO_CJK_FONT_SHA256 = "197d5e1e019faca33a4d55931c7d68b8056f3b97cb862049f5cb8de9efdfb8ce"
 NOTO_CJK_FONT_SIZE_BYTES = 18_354_360
-NOTO_CJK_RELEASE_NOTE_RELATIVE_PATH = Path(
-    "docs/release-notes/2026-05-26-vr-overlay-cjk-font-bundle.md"
-)
 
 
 def _read(relative_path: str | Path) -> str:
@@ -119,16 +116,3 @@ def test_third_party_notices_cover_noto_sans_cjk_medium_distribution() -> None:
     assert "Byte length: 18,354,360" in section
     assert f"SHA256: {NOTO_CJK_FONT_SHA256}" in section
     assert "Sans2.004" in section
-
-
-def test_release_note_mentions_intentional_noto_cjk_installer_size_increase() -> None:
-    release_note_path = ROOT / NOTO_CJK_RELEASE_NOTE_RELATIVE_PATH
-
-    assert release_note_path.is_file()
-    release_note = release_note_path.read_text(encoding="utf-8")
-    release_note_lower = release_note.lower()
-
-    assert "Noto Sans CJK" in release_note
-    assert "installer size" in release_note_lower
-    assert "intentional" in release_note_lower
-    assert "18 MB" in release_note

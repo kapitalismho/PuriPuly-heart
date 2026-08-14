@@ -34,24 +34,24 @@ async def test_translation_model_control_materializes_provider_and_connection() 
         translation_model_normalizer=materialize_translation_settings,
     )
 
-    result = await application.set_translation_model(TranslationModel.DEEPSEEK_V4_PRO.value)
+    result = await application.set_translation_model(TranslationModel.DEEPSEEK_V4_FLASH.value)
 
     assert result is applied[0]
     updated = applied[0]
-    assert updated.translation.model == TranslationModel.DEEPSEEK_V4_PRO
-    assert updated.translation.connection == TranslationConnection.OFFICIAL_BYOK
+    assert updated.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
+    assert updated.translation.connection == TranslationConnection.MANAGED
     assert (
-        updated.translation.connection_history[TranslationModel.DEEPSEEK_V4_PRO.value]
-        == TranslationConnection.OFFICIAL_BYOK
+        updated.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value]
+        == TranslationConnection.MANAGED
     )
-    assert updated.provider.llm == LLMProviderName.DEEPSEEK
-    assert updated.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_PRO
+    assert updated.provider.llm == LLMProviderName.OPENROUTER
+    assert updated.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH
 
 
 @pytest.mark.asyncio
 async def test_custom_http_control_preserves_the_previous_llm_selection() -> None:
     current = AppSettings()
-    current.translation.model = TranslationModel.DEEPSEEK_V4_PRO
+    current.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
     current.translation.connection = TranslationConnection.OFFICIAL_BYOK
     current.translation.http_extension_id = "demo"
 
@@ -72,7 +72,7 @@ async def test_custom_http_control_preserves_the_previous_llm_selection() -> Non
     assert current.translation.model is TranslationModel.CUSTOM_HTTP
     assert current.translation.connection is TranslationConnection.CUSTOM_HTTP
     assert current.translation.http_extension_id == "demo"
-    assert current.translation.previous_llm_model is TranslationModel.DEEPSEEK_V4_PRO
+    assert current.translation.previous_llm_model is TranslationModel.DEEPSEEK_V4_FLASH
 
 
 @pytest.mark.asyncio

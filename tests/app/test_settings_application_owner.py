@@ -6,6 +6,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
+from puripuly_heart.app.services.settings_projection import SettingsProjectionOwner
 
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
@@ -18,8 +20,6 @@ from puripuly_heart.app.services.canonical_settings_persistence import SettingsO
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
 )
-from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
-from puripuly_heart.app.services.settings_projection import SettingsProjectionOwner
 from puripuly_heart.config.settings import AppSettings, to_dict
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import (

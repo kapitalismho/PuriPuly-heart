@@ -14,11 +14,12 @@ import pytest
 
 pytest.importorskip("flet")
 
-from puripuly_heart.core import messages
 from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterReleaseDiagnostics,
     ManagedOpenRouterUserFacingError,
 )
+
+from puripuly_heart.core import messages
 from puripuly_heart.core.runtime_logging import SessionLoggingMode, SessionRuntimeLoggingService
 from puripuly_heart.domain.events import STTSessionState, UIEvent, UIEventType
 from puripuly_heart.domain.models import OSCMessage, Transcript, Translation

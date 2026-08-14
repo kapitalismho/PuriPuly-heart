@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import pytest
-
 from puripuly_heart.app.services.provider_credential_verification import (
     PROVIDER_CREDENTIAL_EMPTY,
     PROVIDER_CREDENTIAL_ERROR,

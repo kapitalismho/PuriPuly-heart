@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from puripuly_heart.app.adapters.self_capture_audio_loop import (
     SelfCaptureAudioLoopAdapter,
 )
+
 from puripuly_heart.app.wiring import create_self_capture_audio_loop_adapter
 
 

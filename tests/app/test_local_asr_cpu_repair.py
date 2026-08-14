@@ -5,7 +5,6 @@ from collections.abc import Callable
 from dataclasses import replace
 
 import pytest
-
 from puripuly_heart.app.services.local_asr_cpu_repair import (
     LocalASRCpuRepairEffect,
     LocalASRCpuRepairEffectType,

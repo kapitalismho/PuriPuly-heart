@@ -4,16 +4,16 @@ import json
 from pathlib import Path
 
 import pytest
+from puripuly_heart.app.services.capture_target_settings import (
+    CaptureTargetSettingsError,
+    persist_desktop_audio_capture_target,
+)
 
 from puripuly_heart.app.adapters import (
     settings_vnext_canonical_persistence as persistence_adapter,
 )
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
-)
-from puripuly_heart.app.services.capture_target_settings import (
-    CaptureTargetSettingsError,
-    persist_desktop_audio_capture_target,
 )
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.config.settings import to_dict as legacy_to_dict
