@@ -7,16 +7,6 @@ from pathlib import Path
 from typing import cast
 
 import pytest
-
-from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
-    SettingsVNextCanonicalPersistenceAdapter,
-)
-from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
-from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.app.services.openrouter_pkce_flow import (
-    OpenRouterPkceApplicationOwner,
-    OpenRouterPkceFlowOwner,
-)
 from puripuly_heart.app.services.provider_runtime_apply import (
     ProviderRuntimeApplyPlan,
 )
@@ -30,6 +20,17 @@ from puripuly_heart.app.services.provider_verification_binding import (
 from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
+from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
+
+from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
+    SettingsVNextCanonicalPersistenceAdapter,
+)
+from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
+from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.openrouter_pkce_flow import (
+    OpenRouterPkceApplicationOwner,
+    OpenRouterPkceFlowOwner,
+)
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -41,7 +42,6 @@ from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
 )
-from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 

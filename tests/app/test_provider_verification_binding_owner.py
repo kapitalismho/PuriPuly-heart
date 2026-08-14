@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from puripuly_heart.app.services.provider_verification_binding import (
     ProviderVerificationBindingOwner,
 )

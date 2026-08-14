@@ -95,15 +95,12 @@ class OpenRouterPKCEClient:
         code_challenge = _code_challenge(code_verifier)
         state = secrets.token_urlsafe(24)
         callback_url = f"{self.callback_origin}/callback"
-        authorization_url = (
-            f"{OPENROUTER_AUTH_URL}?"
-            f"{urllib.parse.urlencode({
+        authorization_url = f"{OPENROUTER_AUTH_URL}?" f"{urllib.parse.urlencode({
                 'callback_url': callback_url,
                 'code_challenge': code_challenge,
                 'code_challenge_method': PKCE_CHALLENGE_METHOD,
                 'state': state,
             })}"
-        )
         return OpenRouterPKCESession(
             code_verifier=code_verifier,
             code_challenge=code_challenge,

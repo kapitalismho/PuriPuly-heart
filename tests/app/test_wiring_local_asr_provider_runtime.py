@@ -4,12 +4,13 @@ from pathlib import Path
 
 import puripuly_heart.app.wiring_local_asr_provider_runtime as runtime_wiring
 from puripuly_heart.app.wiring_local_asr_provider_runtime import ManagedSTTProviderFactory
+from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
+
 from puripuly_heart.config.resolved import (
     ResolvedCredentialRequirement,
     ResolvedSTTConfig,
 )
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 
 

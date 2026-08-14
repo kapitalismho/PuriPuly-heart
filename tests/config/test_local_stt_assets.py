@@ -6,8 +6,6 @@ import json
 from pathlib import Path
 
 import pytest
-
-from puripuly_heart.core import local_stt_assets as local_stt_assets_module
 from puripuly_heart.core.local_stt_assets import (
     InstalledLocalSTTManifest,
     LocalSTTAssetFile,
@@ -23,6 +21,8 @@ from puripuly_heart.core.local_stt_assets import (
     load_local_stt_asset_manifest,
     validate_local_stt_install,
 )
+
+from puripuly_heart.core import local_stt_assets as local_stt_assets_module
 
 
 def _sha256_bytes(payload: bytes) -> str:

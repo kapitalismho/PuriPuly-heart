@@ -3,13 +3,6 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, replace
 
-from puripuly_heart.app.wiring import compose_peer_capture_session_owner
-from puripuly_heart.config.resolved import (
-    CREDENTIAL_SOURCE_SECRET_STORE,
-    ResolvedCredentialRequirement,
-    ResolvedSTTConfig,
-)
-from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeSnapshot,
     ProviderRuntimeBuildRequest,
@@ -17,6 +10,14 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     ProviderRuntimeGpuSnapshot,
     ProviderRuntimeMutationResult,
 )
+
+from puripuly_heart.app.wiring import compose_peer_capture_session_owner
+from puripuly_heart.config.resolved import (
+    CREDENTIAL_SOURCE_SECRET_STORE,
+    ResolvedCredentialRequirement,
+    ResolvedSTTConfig,
+)
+from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmission,
     PeerCaptureAdmissionStatus,

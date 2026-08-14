@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from puripuly_heart.core.local_stt_assets import (
     LOCAL_STT_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,

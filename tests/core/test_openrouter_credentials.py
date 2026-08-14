@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
-from puripuly_heart.app.wiring import ManagedIdentityStateAdapter
-from puripuly_heart.config.settings import AppSettings, OpenRouterCredentialSource
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_SECRET,
     OPENROUTER_MANAGED_API_KEY_SECRET,
@@ -20,6 +17,9 @@ from puripuly_heart.core.openrouter_credentials import (
     normalize_managed_openrouter_user_identifier,
     resolve_openrouter_credentials,
 )
+
+from puripuly_heart.app.wiring import ManagedIdentityStateAdapter
+from puripuly_heart.config.settings import AppSettings, OpenRouterCredentialSource
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 
 

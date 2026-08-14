@@ -4,8 +4,8 @@ import logging
 from dataclasses import dataclass, field
 
 import pytest
-
 from puripuly_heart.app.adapters.self_capture_source import SelfCaptureSourceAdapter
+
 from puripuly_heart.app.wiring import create_self_capture_source_adapter
 from puripuly_heart.config.audio_host_api import (
     WINDOWS_WASAPI_COMPATIBILITY_HOST_API,

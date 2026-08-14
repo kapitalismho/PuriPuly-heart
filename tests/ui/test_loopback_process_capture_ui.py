@@ -10,13 +10,13 @@ from types import SimpleNamespace
 
 import flet as ft
 import pytest
-
 from puripuly_heart.app.adapters.peer_capture_target_resolver import (
     PeerCaptureTargetResolverAdapter,
 )
 from puripuly_heart.app.services.peer_capture_target_application import (
     PeerCaptureTargetApplicationOwner,
 )
+
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.config.settings_vnext.schema import ProcessCaptureTargetIntent

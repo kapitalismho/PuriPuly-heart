@@ -119,9 +119,7 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
 
     async def set_translation_model(self, model: str) -> object:
         current = self.settings_provider()
-        if current is not None and _osc_translation_model_value(
-            current.translation.model
-        ) == model:
+        if current is not None and _osc_translation_model_value(current.translation.model) == model:
             return True
         return await self._apply_settings(
             lambda settings: self._set_translation_model(settings, model)

@@ -15,6 +15,14 @@ from cryptography.hazmat.primitives.serialization import (
     PrivateFormat,
     PublicFormat,
 )
+from puripuly_heart.core.openrouter_credentials import (
+    OPENROUTER_BYOK_API_KEY_SECRET,
+    OPENROUTER_MANAGED_API_KEY_SECRET,
+    OPENROUTER_MANAGED_USER_ID_SECRET,
+    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
+    OpenRouterCredentialRuntimeConfig,
+    load_managed_openrouter_user_identifier,
+)
 
 from puripuly_heart.app.wiring import ManagedIdentityStateAdapter
 from puripuly_heart.config.settings import (
@@ -33,14 +41,6 @@ from puripuly_heart.core.managed_identity import (
     decode_base64url,
     ensure_managed_identity_bundle,
     regenerate_managed_identity_bundle,
-)
-from puripuly_heart.core.openrouter_credentials import (
-    OPENROUTER_BYOK_API_KEY_SECRET,
-    OPENROUTER_MANAGED_API_KEY_SECRET,
-    OPENROUTER_MANAGED_USER_ID_SECRET,
-    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
-    OpenRouterCredentialRuntimeConfig,
-    load_managed_openrouter_user_identifier,
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from puripuly_heart.app.wiring_composition import create_manual_typing_owner
 
 

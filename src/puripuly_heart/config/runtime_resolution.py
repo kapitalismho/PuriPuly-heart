@@ -11,8 +11,8 @@ from puripuly_heart.config.llm_profiles import (
     OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
     OPENROUTER_CREDENTIAL_SOURCE_NONE,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
-    OPENROUTER_MODEL_GEMINI_37_FLASH,
     OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
+    OPENROUTER_MODEL_GEMINI_37_FLASH,
     OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
     OPENROUTER_MODEL_GEMMA_4_31B_IT,
     OPENROUTER_MODEL_QWEN_35_FLASH_02_23,
@@ -1056,9 +1056,7 @@ def derive_translation_runtime_intent_from_compatibility(
             concurrency_limit=concurrency,
         )
 
-    if (
-        _normalize_gemini_model(gemini_model) == GEMINI_MODEL_37_FLASH
-    ):
+    if _normalize_gemini_model(gemini_model) == GEMINI_MODEL_37_FLASH:
         return TranslationRuntimeIntent(
             model=TRANSLATION_MODEL_GEMINI_37_FLASH,
             connection=TRANSLATION_CONNECTION_OFFICIAL_BYOK,
@@ -1298,9 +1296,11 @@ def _resolve_translation_target(
             else (
                 "deepseek_v4_flash_latency"
                 if is_fallback
-                else openrouter.provider_routing
-                if translation.connection == TRANSLATION_CONNECTION_OPENROUTER
-                else "default"
+                else (
+                    openrouter.provider_routing
+                    if translation.connection == TRANSLATION_CONNECTION_OPENROUTER
+                    else "default"
+                )
             )
         )
         return _resolved_openrouter_target(
@@ -1509,7 +1509,7 @@ __all__ = [
     "DEEPGRAM_STT_MODEL_NOVA_3",
     "DirectProviderRuntimeIntent",
     "CEREBRAS_MODEL_GEMMA_4_31B",
-    "GEMINI_MODEL_3_FLASH",
+    "GEMINI_MODEL_37_FLASH",
     "GEMINI_MODEL_31_FLASH_LITE",
     "LOCAL_LLM_BACKEND_OLLAMA",
     "LOCAL_LLM_DEFAULT_BASE_URL",

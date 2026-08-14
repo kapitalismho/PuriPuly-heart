@@ -2638,9 +2638,7 @@ def test_from_dict_normalizes_legacy_openrouter_deepseek_model() -> None:
     data["translation"]["connection"] = TranslationConnection.OPENROUTER.value
     data["openrouter"]["llm_model"] = "deepseek/deepseek-v4-flash"
     data["openrouter"]["selected_source"] = OpenRouterCredentialSource.BYOK.value
-    data["openrouter"]["selection_alias"] = (
-        OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value
-    )
+    data["openrouter"]["selection_alias"] = OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value
 
     loaded = from_dict(data)
 

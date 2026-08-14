@@ -237,4 +237,3 @@ def test_release_workflow_uses_short_overlay_target_and_verifies_current_version
     assert 'Join-Path $env:TEMP "PuriPulyHeart-ReleaseBuild-$AppVersion"' in script
     assert "$overlayReleasePath --version" in script
     assert 'throw "Rust overlay version mismatch: expected $AppVersion' in script
-

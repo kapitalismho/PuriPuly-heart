@@ -5,6 +5,12 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 
 import pytest
+from puripuly_heart.core.local_asr_provider_runtime import (
+    ProviderRuntimeBuildRequest,
+    ProviderRuntimeChannel,
+    ProviderRuntimeGpuRecoveryRequest,
+    ProviderRuntimeTerminalFailureSink,
+)
 
 from puripuly_heart.app.services.gpu_provider_recovery import (
     GpuProviderRecoveryChannelPlan,
@@ -16,12 +22,6 @@ from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_NONE,
     ResolvedCredentialRequirement,
     ResolvedSTTConfig,
-)
-from puripuly_heart.core.local_asr_provider_runtime import (
-    ProviderRuntimeBuildRequest,
-    ProviderRuntimeChannel,
-    ProviderRuntimeGpuRecoveryRequest,
-    ProviderRuntimeTerminalFailureSink,
 )
 
 

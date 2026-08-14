@@ -15,7 +15,6 @@ import time
 from pathlib import Path
 
 import pytest
-
 from puripuly_heart.core.local_stt_assets import (
     InstalledLocalSTTManifest,
     LocalSTTAssetFile,

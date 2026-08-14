@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from puripuly_heart.app.services.managed_usage import (
     ManagedUsageMetadataResult,
     ManagedUsageOwner,
