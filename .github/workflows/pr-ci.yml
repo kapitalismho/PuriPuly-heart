@@ -117,3 +117,24 @@ jobs:
 
       - name: Run broker tests
         run: pnpm exec vitest run broker/tests --exclude "broker/tests/deploy-smoke/**"
+
+  native-overlay:
+    name: Native / Overlay
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/overlay
+
+      - name: Cargo check
+        run: cargo check --locked --manifest-path native/overlay/Cargo.toml
+
+      - name: Cargo test
+        run: cargo test --locked --manifest-path native/overlay/Cargo.toml
