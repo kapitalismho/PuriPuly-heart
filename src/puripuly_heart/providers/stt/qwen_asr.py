@@ -255,6 +255,8 @@ class _QwenASRSession(STTBackendSession):
                 if data is _END_SESSION:
                     try:
                         conversation.end_session(timeout=self.finish_timeout_s)
+                    except Exception as exc:
+                        logger.debug("Qwen ASR end_session failed: %s", exc)
                     finally:
                         self._resolve_all_pending_empty("session_finished_without_terminal")
                     break

@@ -524,6 +524,68 @@ async def test_soniox_session_duplicate_finalize_marker_emits_one_terminal() -> 
 
 
 @pytest.mark.asyncio
+async def test_soniox_unmatched_finalize_marker_retains_tokens_for_next_request() -> None:
+    session = _make_session()
+
+    session._handle_message(
+        json.dumps(
+            {
+                "tokens": [
+                    {"text": "Kept", "is_final": True, "end_ms": 100},
+                    {"text": "<fin>", "is_final": True},
+                ]
+            }
+        )
+    )
+    assert session._events.empty()
+    assert [token.text for token in session._pending_tokens] == ["Kept"]
+
+    await _request_finalize(session)
+    session._handle_message(
+        json.dumps(
+            {
+                "tokens": [
+                    {"text": "More", "is_final": True, "end_ms": 200},
+                    {"text": "<fin>", "is_final": True},
+                ]
+            }
+        )
+    )
+    event = session._events.get_nowait()
+    assert event.text == "KeptMore"
+    assert session._events.empty()
+
+
+@pytest.mark.asyncio
+async def test_soniox_extra_tokens_after_consumed_fin_are_retained() -> None:
+    session = _make_session()
+    await _request_finalize(session)
+
+    session._handle_message(
+        json.dumps(
+            {
+                "tokens": [
+                    {"text": "A", "is_final": True, "end_ms": 100},
+                    {"text": "<fin>", "is_final": True},
+                    {"text": "B", "is_final": True, "end_ms": 200},
+                    {"text": "<fin>", "is_final": True},
+                ]
+            }
+        )
+    )
+    first = session._events.get_nowait()
+    assert first.text == "A"
+    assert session._events.empty()
+    assert [token.text for token in session._pending_tokens] == ["B"]
+
+    await _request_finalize(session)
+    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    second = session._events.get_nowait()
+    assert second.text == "B"
+    assert session._events.empty()
+
+
+@pytest.mark.asyncio
 async def test_soniox_empty_final_boundary_clears_previous_segment_before_next_final() -> None:
     session = _make_session()
 

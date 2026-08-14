@@ -321,11 +321,9 @@ class _SonioxSession(STTBackendSession):
     def _flush_final(self) -> None:
         if not self._consume_pending_finalize_request():
             logger.debug(
-                "[STT] Soniox finalize marker ignored without pending request tokens=%s",
+                "[STT] Soniox finalize marker retained without pending request tokens=%s",
                 len(self._pending_tokens),
             )
-            self._pending_tokens.clear()
-            self._pending_last_end_ms = None
             return
         self._final_tokens = list(self._pending_tokens)
         self._pending_tokens.clear()

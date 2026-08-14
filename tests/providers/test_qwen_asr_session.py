@@ -592,3 +592,70 @@ async def test_qwen_asr_session_public_stop_after_idle_calls_end_session(
 
     assert end_session_calls == [session.finish_timeout_s]
     assert closed.is_set()
+
+
+@pytest.mark.asyncio
+async def test_qwen_asr_session_end_session_timeout_does_not_report_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _make_session()
+    session._loop = asyncio.get_running_loop()
+    closed = False
+
+    class FakeOmniRealtimeCallback:
+        pass
+
+    class FakeMultiModality:
+        TEXT = "text"
+
+    class FakeTranscriptionParams:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    class FakeConversation:
+        def __init__(self, model: str, url: str, callback):
+            _ = (model, url)
+            self.callback = callback
+
+        def connect(self):
+            self.callback.on_open()
+
+        def update_session(self, **kwargs):
+            _ = kwargs
+
+        def end_session(self, timeout):
+            _ = timeout
+            raise TimeoutError("session finish timed out")
+
+        def close(self):
+            nonlocal closed
+            closed = True
+
+    dashscope_pkg = types.ModuleType("dashscope")
+    dashscope_pkg.api_key = None
+    qwen_omni_pkg = types.ModuleType("dashscope.audio.qwen_omni")
+    qwen_omni_pkg.MultiModality = FakeMultiModality
+    qwen_omni_pkg.OmniRealtimeCallback = FakeOmniRealtimeCallback
+    qwen_omni_pkg.OmniRealtimeConversation = FakeConversation
+    omni_rt_pkg = types.ModuleType("dashscope.audio.qwen_omni.omni_realtime")
+    omni_rt_pkg.TranscriptionParams = FakeTranscriptionParams
+
+    monkeypatch.setitem(sys.modules, "dashscope", dashscope_pkg)
+    monkeypatch.setitem(sys.modules, "dashscope.audio", types.ModuleType("dashscope.audio"))
+    monkeypatch.setitem(sys.modules, "dashscope.audio.qwen_omni", qwen_omni_pkg)
+    monkeypatch.setitem(sys.modules, "dashscope.audio.qwen_omni.omni_realtime", omni_rt_pkg)
+
+    assert session._register_commit() is not None
+    session._audio_q.put_nowait(_END_SESSION)
+    session._run_sync()
+    await asyncio.sleep(0)
+
+    first = await session._events.get()
+    assert first == STTBackendTranscriptEvent(text="", is_final=True)
+    tail: list[object] = []
+    while not session._events.empty():
+        tail.append(session._events.get_nowait())
+    assert None in tail
+    assert not any(isinstance(item, BaseException) for item in tail)
+    assert session._error_reported is False
+    assert closed is True
