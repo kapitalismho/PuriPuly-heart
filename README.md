@@ -411,6 +411,10 @@ The tier transition may take a moment.
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
+## Roadmap
+
+Upcoming work is tracked publicly on the [PuriPuly project board](https://github.com/users/kapitalismho/projects/2).
+
 ---
 
 ## Development
