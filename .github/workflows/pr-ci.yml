@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   python-style:
-    name: Python / Style
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -42,7 +42,7 @@ jobs:
         run: uv run black --check .
 
   python-contracts:
-    name: Python / Contracts
+    name: Contracts
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -65,15 +65,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Python / Architecture
+          - name: Architecture
             pytest-args: tests/architecture
-          - name: Python / App Runtime
+          - name: Runtime
             pytest-args: tests/app
-          - name: Python / Providers
+          - name: Providers
             pytest-args: tests/providers
-          - name: Python / UI
+          - name: UI
             pytest-args: tests/ui
-          - name: Python / Tooling
+          - name: Tooling
             pytest-args: tests/scripts
     steps:
       - name: Checkout
@@ -92,7 +92,7 @@ jobs:
         run: uv run pytest ${{ matrix.pytest-args }}
 
   broker-ci:
-    name: Broker / CI
+    name: Broker
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -119,7 +119,7 @@ jobs:
         run: pnpm exec vitest run broker/tests --exclude "broker/tests/deploy-smoke/**"
 
   native-overlay:
-    name: Native / Overlay
+    name: Overlay
     runs-on: windows-latest
     steps:
       - name: Checkout
