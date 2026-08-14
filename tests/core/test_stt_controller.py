@@ -548,9 +548,7 @@ async def test_stt_controller_preserves_soft_boundary_reason_and_observed_tail()
                 chunk=samples(1.0),
             )
         )
-        await stt.handle_vad_event(
-            SpeechEnd(uid, trailing_silence_ms=160, reason="soft_pause")
-        )
+        await stt.handle_vad_event(SpeechEnd(uid, trailing_silence_ms=160, reason="soft_pause"))
 
         assert backend.sessions[0].speech_ends == [(160, "soft_pause")]
     finally:

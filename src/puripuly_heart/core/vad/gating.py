@@ -256,9 +256,7 @@ class VadGating:
         speech_samples_before_tail = (
             self._speech_sample_count - self._silence_run * self.chunk_samples
         )
-        speech_audio_ms_before_tail = (
-            speech_samples_before_tail * 1000.0 / self.sample_rate_hz
-        )
+        speech_audio_ms_before_tail = speech_samples_before_tail * 1000.0 / self.sample_rate_hz
         return (
             speech_audio_ms_before_tail >= self.soft_boundary_start_ms
             and trailing_silence_ms >= self.soft_pause_ms
@@ -268,9 +266,7 @@ class VadGating:
         return self.soft_boundary_start_ms is not None and self._max_segment_reached()
 
     def _trailing_silence_ms(self) -> int:
-        return int(
-            round(self._silence_run * (self.chunk_samples / self.sample_rate_hz) * 1000.0)
-        )
+        return int(round(self._silence_run * (self.chunk_samples / self.sample_rate_hz) * 1000.0))
 
     def _reset_active_segment(self) -> None:
         self._in_speech = False

@@ -482,8 +482,7 @@ class ManagedSTTProvider:
                     fallback_level=logging.WARNING,
                 )
             self._emit_detailed(
-                "[STT] Speech end handling for id=%s "
-                "(reason=%s, trailing_silence_ms=%s)",
+                "[STT] Speech end handling for id=%s " "(reason=%s, trailing_silence_ms=%s)",
                 str(event.utterance_id)[:8],
                 event.reason,
                 event.trailing_silence_ms,

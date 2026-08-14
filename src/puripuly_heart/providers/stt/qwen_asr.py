@@ -270,9 +270,7 @@ class _QwenASRSession(STTBackendSession):
                     audio_chunks_sent += 1
                     last_activity = time.monotonic()
                     if audio_chunks_sent == 1:
-                        logger.info(
-                            f"[STT] First audio chunk sent to Qwen ASR ({len(data)} bytes)"
-                        )
+                        logger.info(f"[STT] First audio chunk sent to Qwen ASR ({len(data)} bytes)")
                     elif audio_chunks_sent % 50 == 0:
                         logger.debug(f"[STT] Audio chunks sent: {audio_chunks_sent}")
 

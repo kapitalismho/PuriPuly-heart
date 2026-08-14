@@ -368,9 +368,7 @@ def test_peer_vad_gating_uses_160ms_pause_that_starts_inside_soft_window() -> No
 
     events = []
     for index in range(len(probs)):
-        events.extend(
-            gating.process_chunk(chunk_samples(float(index + 1), n=gating.chunk_samples))
-        )
+        events.extend(gating.process_chunk(chunk_samples(float(index + 1), n=gating.chunk_samples)))
 
     end = next(event for event in events if isinstance(event, SpeechEnd))
     assert end.reason == "soft_pause"
@@ -389,9 +387,7 @@ def test_peer_vad_gating_does_not_reuse_pause_that_started_before_soft_window() 
 
     events = []
     for index in range(len(probs)):
-        events.extend(
-            gating.process_chunk(chunk_samples(float(index + 1), n=gating.chunk_samples))
-        )
+        events.extend(gating.process_chunk(chunk_samples(float(index + 1), n=gating.chunk_samples)))
 
     end = next(event for event in events if isinstance(event, SpeechEnd))
     assert end.reason == "silence"
@@ -409,9 +405,7 @@ def test_peer_vad_gating_hard_cap_wins_when_soft_pause_completes_after_7000ms() 
 
     events = []
     for index in range(len(probs)):
-        events.extend(
-            gating.process_chunk(chunk_samples(float(index + 1), n=gating.chunk_samples))
-        )
+        events.extend(gating.process_chunk(chunk_samples(float(index + 1), n=gating.chunk_samples)))
 
     end = next(event for event in events if isinstance(event, SpeechEnd))
     assert end.reason == "max_duration"
@@ -462,9 +456,7 @@ def test_peer_vad_gating_soft_continuation_preserves_overlap_and_new_duration_bu
     )
     assert [float(chunk[0]) for chunk in overlap_tail] == [158.0, 159.0, 160.0, 161.0, 162.0]
     assert not any(
-        isinstance(event, SpeechEnd)
-        for events in events_by_chunk[-2:-1]
-        for event in events
+        isinstance(event, SpeechEnd) for events in events_by_chunk[-2:-1] for event in events
     )
     assert second_end.reason == "max_duration"
     assert second_end.trailing_silence_ms == 0
@@ -482,9 +474,7 @@ def test_peer_vad_gating_30s_continuous_speech_separates_unique_audio_from_overl
 
     events = []
     for index in range(chunk_count):
-        events.extend(
-            gating.process_chunk(chunk_samples(float(index + 1), n=gating.chunk_samples))
-        )
+        events.extend(gating.process_chunk(chunk_samples(float(index + 1), n=gating.chunk_samples)))
 
     starts = [event for event in events if isinstance(event, SpeechStart)]
     chunks = [event for event in events if isinstance(event, SpeechChunk)]

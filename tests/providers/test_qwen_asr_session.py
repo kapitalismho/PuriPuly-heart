@@ -470,9 +470,7 @@ async def test_qwen_asr_session_run_sync_processes_audio_commit_and_final_event(
             nonlocal commit_calls
             commit_calls += 1
             item_id = f"item-{commit_calls}"
-            self.callback.on_event(
-                {"type": "input_audio_buffer.committed", "item_id": item_id}
-            )
+            self.callback.on_event({"type": "input_audio_buffer.committed", "item_id": item_id})
             self.callback.on_event(
                 {
                     "type": "conversation.item.input_audio_transcription.completed",

@@ -264,9 +264,7 @@ async def test_soniox_controlled_final_token_fixtures_preserve_each_token_and_ad
 
 
 @pytest.mark.asyncio
-async def test_soniox_controlled_finalize_boundaries_remain_independent_and_append_only() -> (
-    None
-):
+async def test_soniox_controlled_finalize_boundaries_remain_independent_and_append_only() -> None:
     merged = _make_session(enable_language_identification=True)
     await _request_finalize(merged)
     merged._handle_message(
