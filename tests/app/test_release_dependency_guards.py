@@ -214,31 +214,9 @@ def test_release_template_uses_expected_star_request_copy() -> None:
     assert "it would mean a lot" not in template
 
 
-def test_push_ci_workflow_uses_frozen_lockfile_sync() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "push-ci.yml").read_text(encoding="utf-8")
-
-    assert SHARED_SETUP_ACTION in workflow
-    assert 'python -m pip install -e ".[dev]"' not in workflow
-
-
-def test_push_ci_omits_lint_test_and_coverage_gates() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "push-ci.yml").read_text(encoding="utf-8")
-
-    assert "quality-gate:" not in workflow
-    assert "Lint and unit tests" not in workflow
-    assert "windows-overlay-tests:" not in workflow
-    assert "Windows overlay cargo test" not in workflow
-    assert "Run native overlay tests" not in workflow
-    assert "cargo test" not in workflow
-    assert "uv run ruff check" not in workflow
-    assert "uv run black --check" not in workflow
-    assert "--cov=src/puripuly_heart" not in workflow
-    assert "--cov-fail-under" not in workflow
-
-
 def test_workflows_pin_exact_python_and_uv_versions() -> None:
     for workflow_path in (
-        ROOT / ".github" / "workflows" / "push-ci.yml",
+        ROOT / ".github" / "workflows" / "pr-ci.yml",
         ROOT / ".github" / "workflows" / "release.yml",
     ):
         workflow = workflow_path.read_text(encoding="utf-8")
@@ -247,28 +225,18 @@ def test_workflows_pin_exact_python_and_uv_versions() -> None:
         assert SHARED_SETUP_ACTION in workflow
 
 
-def test_workflows_pin_innosetup_and_build_installer_without_slow_smoke_script() -> None:
-    for workflow_path in (
-        ROOT / ".github" / "workflows" / "push-ci.yml",
-        ROOT / ".github" / "workflows" / "release.yml",
-    ):
-        workflow = workflow_path.read_text(encoding="utf-8")
-        assert PINNED_INNOSETUP_VERSION in workflow
-        assert "scripts/ci/build-release-artifacts.ps1" not in workflow
-        assert "cargo build" in workflow
-        assert "PyInstaller" in workflow
-        assert "ISCC.exe" in workflow
-        assert "DisplayVersion" in workflow
-        assert "Inno Setup version mismatch" in workflow
-        assert "--allow-downgrade" in workflow
-        assert "--force" in workflow
-
-
-def test_push_ci_has_windows_release_path_job() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "push-ci.yml").read_text(encoding="utf-8")
-
-    assert "runs-on: windows-latest" in workflow
-    assert "Build Windows release path" in workflow
+def test_release_workflow_pins_innosetup_and_build_installer_without_slow_smoke_script() -> None:
+    workflow_path = ROOT / ".github" / "workflows" / "release.yml"
+    workflow = workflow_path.read_text(encoding="utf-8")
+    assert PINNED_INNOSETUP_VERSION in workflow
+    assert "scripts/ci/build-release-artifacts.ps1" not in workflow
+    assert "cargo build" in workflow
+    assert "PyInstaller" in workflow
+    assert "ISCC.exe" in workflow
+    assert "DisplayVersion" in workflow
+    assert "Inno Setup version mismatch" in workflow
+    assert "--allow-downgrade" in workflow
+    assert "--force" in workflow
 
 
 def test_shared_windows_build_script_runs_packaged_smoke_test() -> None:
@@ -853,18 +821,13 @@ def test_flet_runtime_preparation_and_build_spec_pin_the_official_windows_archiv
     assert '(str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH), "flet_desktop/app")' not in spec
 
 
-def test_windows_packaging_paths_prepare_flet_runtime_before_pyinstaller() -> None:
-    push_workflow = (ROOT / ".github" / "workflows" / "push-ci.yml").read_text(encoding="utf-8")
+def test_release_workflow_prepares_flet_runtime_before_pyinstaller() -> None:
     release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     release_script = (ROOT / FULL_WINDOWS_RELEASE_SCRIPT).read_text(encoding="utf-8")
 
-    for workflow, job_name in (
-        (push_workflow, "windows-release-path"),
-        (release_workflow, "build-installer"),
-    ):
-        job_block = _workflow_job_block(workflow, job_name)
-        assert FLET_RUNTIME_PREPARATION_SCRIPT in job_block
-        assert job_block.index(FLET_RUNTIME_PREPARATION_SCRIPT) < job_block.index("PyInstaller")
+    job_block = _workflow_job_block(release_workflow, "build-installer")
+    assert FLET_RUNTIME_PREPARATION_SCRIPT in job_block
+    assert job_block.index(FLET_RUNTIME_PREPARATION_SCRIPT) < job_block.index("PyInstaller")
     assert "prepare-flet-runtime.ps1" in release_script
     assert release_script.index("prepare-flet-runtime.ps1") < release_script.index('"PyInstaller"')
 
@@ -878,15 +841,6 @@ def test_build_spec_deduplicates_any_root_level_auto_collected_soxr_dll() -> Non
     assert "Path(source_path).resolve() == sibling_dll_path" not in spec
     assert "normalize_soxr_runtime_binaries(a.binaries)" in spec
     assert spec.index("a = Analysis(") < spec.index("normalize_soxr_runtime_binaries(a.binaries)")
-
-
-def test_push_ci_workflow_prepares_soxr_release_inputs_before_pyinstaller_packaging() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "push-ci.yml").read_text(encoding="utf-8")
-    job_block = _workflow_job_block(workflow, "windows-release-path")
-
-    assert SOXR_RELEASE_INPUTS_SCRIPT in job_block
-    assert "scripts/ci/build-release-artifacts.ps1" not in job_block
-    assert job_block.index(SOXR_RELEASE_INPUTS_SCRIPT) < job_block.index("PyInstaller")
 
 
 def test_release_workflow_prepares_soxr_release_inputs_before_build_and_publishes_source_bundle_without_installer_sha256() -> (
