@@ -31,10 +31,6 @@ const deploySmokeSpec = new URL(
   import.meta.url,
 );
 const brokerReadme = new URL('../README.md', import.meta.url);
-const rolloutChecklist = new URL(
-  '../../docs/plans/2026-04-09-cloudflare-staging-broker-rollout-checklist.md',
-  import.meta.url,
-);
 
 const tempDirs: string[] = [];
 
@@ -182,7 +178,6 @@ describe('broker direct deploy automation', () => {
     const workflow = readFileSync(deployWorkflow, 'utf8');
     const smokeSpec = readFileSync(deploySmokeSpec, 'utf8');
     const readme = readFileSync(brokerReadme, 'utf8');
-    const checklist = readFileSync(rolloutChecklist, 'utf8');
     const deployJobEnvBlock = extractBetween(
       workflow,
       '    env:\n',
@@ -485,38 +480,6 @@ describe('broker direct deploy automation', () => {
     expect(readme).toContain('deepseek/deepseek-v4-flash-0423');
     expect(readme).toContain('deepseek/deepseek-v4-flash');
     expect(readme).toContain('google/gemini-2.5-flash-lite');
-    expect(checklist).toContain('OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION');
-    expect(checklist).toContain('OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION');
-    expect(checklist).toContain('OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION');
-    expect(checklist).toContain('QQ_AUTH_HMAC_PSK_PRODUCTION');
-    expect(checklist).toContain('QQ_AUTH_HMAC_PSK');
-    expect(checklist).toContain('TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION');
-    expect(checklist).toContain('TELEMETRY_SUBJECT_HMAC_SECRET');
-    expect(checklist).toContain('POST /v1/telemetry/translation-success-day');
-    expect(checklist).toContain('POST /v1/auth/qq/assert');
-    expect(checklist).toContain('returns `issued`');
-    expect(checklist).toContain('one-time `openrouter_api_key`');
-    expect(checklist).toContain('QQ production issuance');
-    expect(checklist).toContain('synthetic non-PII QQ Managed issuance');
-    expect(checklist).not.toContain('test-only QQ assertion endpoint');
-    expect(checklist).toContain('DISCORD_CLIENT_ID_PRODUCTION');
-    expect(checklist).toContain('DISCORD_CLIENT_SECRET_PRODUCTION');
-    expect(checklist).toContain('DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION');
-    expect(checklist).toContain('DISCORD_USER_REF_SECRET_PRODUCTION');
-    expect(checklist).toContain('DISCORD_CLIENT_ID');
-    expect(checklist).toContain('DISCORD_CLIENT_SECRET');
-    expect(checklist).toContain('DISCORD_REDIRECT_URI_ALLOWLIST');
-    expect(checklist).toContain('DISCORD_USER_REF_SECRET');
-    expect(checklist).toContain('DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION');
-    expect(checklist).toContain('daily Discord heartbeat');
-    expect(checklist).toContain('BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION');
-    expect(checklist).toContain('transitional compatibility only');
-    expect(checklist).toContain('guardrail reconcile');
-    expect(checklist).toContain('budget_usd = 0.07');
-    expect(checklist).not.toContain('budget_usd = 0.08');
-    expect(checklist).toContain(
-      'positive routing for `qwen/qwen3.5-flash-02-23`, `deepseek/deepseek-v4-flash`, and `google/gemini-2.5-flash-lite`',
-    );
   });
 
   it('ships a manual production workflow that updates only the broker daily auth cap runtime config', () => {

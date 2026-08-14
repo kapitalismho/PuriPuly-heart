@@ -6,12 +6,12 @@ import threading
 
 import httpx
 import pytest
-
 from puripuly_heart.core.openrouter_pkce import (
     OpenRouterPKCEClient,
     OpenRouterPKCEExchangeResult,
     OpenRouterPKCESession,
 )
+
 from puripuly_heart.ui.i18n import get_locale, set_locale
 
 

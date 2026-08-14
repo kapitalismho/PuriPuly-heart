@@ -9,6 +9,7 @@ from dataclasses import replace
 from typing import Protocol
 
 import flet as ft
+from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterUserFacingError
 
 from puripuly_heart.core.diagnostic_validation import (
     DIAGNOSTIC_REDACTION_MARKER,
@@ -21,7 +22,6 @@ from puripuly_heart.core.diagnostic_validation import (
     redact_user_message_ref_for_sink,
 )
 from puripuly_heart.core.error_messages import sanitize_legacy_raw_user_visible_error_text
-from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterUserFacingError
 from puripuly_heart.core.messages import UserErrorReport, UserMessageRef
 from puripuly_heart.domain.events import STTSessionState, UIEvent
 from puripuly_heart.domain.models import OSCMessage, Translation

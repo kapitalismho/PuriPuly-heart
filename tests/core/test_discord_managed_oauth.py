@@ -4,7 +4,6 @@ import threading
 from datetime import UTC, datetime
 
 import pytest
-
 from puripuly_heart.core.discord_managed_oauth import (
     _timeout_seconds,
     run_discord_oauth_callback_flow,

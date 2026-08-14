@@ -23,13 +23,13 @@ from puripuly_heart.config.llm_profiles import (
     OPENROUTER_FALLBACK_SELECTION_ALIAS_NONE,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_QWEN35_FLASH,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
-    OPENROUTER_MODEL_GEMINI_3_FLASH,
     OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
+    OPENROUTER_MODEL_GEMINI_37_FLASH,
     OPENROUTER_MODEL_GEMMA_4_31B_IT,
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK,
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED,
-    OPENROUTER_SELECTION_ALIAS_GEMINI3_FLASH_BYOK,
     OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
+    OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK,
@@ -182,7 +182,7 @@ class QwenRegion(str, Enum):
 
 
 class GeminiLLMModel(str, Enum):
-    GEMINI_3_FLASH = "gemini-3-flash-preview"
+    GEMINI_37_FLASH = "gemini-3.7-flash"
     GEMINI_31_FLASH_LITE = "gemini-3.1-flash-lite"
 
 
@@ -193,7 +193,6 @@ class QwenLLMModel(str, Enum):
 
 class DeepSeekLLMModel(str, Enum):
     DEEPSEEK_V4_FLASH = "deepseek-v4-flash"
-    DEEPSEEK_V4_PRO = "deepseek-v4-pro"
 
 
 class CerebrasLLMModel(str, Enum):
@@ -209,7 +208,7 @@ class OpenRouterLLMModel(str, Enum):
     GEMMA_4_31B_IT = OPENROUTER_MODEL_GEMMA_4_31B_IT
     QWEN_35_FLASH_02_23 = "qwen/qwen3.5-flash-02-23"
     DEEPSEEK_V4_FLASH = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
-    GEMINI_3_FLASH = OPENROUTER_MODEL_GEMINI_3_FLASH
+    GEMINI_37_FLASH = OPENROUTER_MODEL_GEMINI_37_FLASH
     GEMINI_31_FLASH_LITE = OPENROUTER_MODEL_GEMINI_31_FLASH_LITE
 
 
@@ -245,7 +244,7 @@ class OpenRouterSelectionAlias(str, Enum):
     QWEN35_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK
     DEEPSEEK_V4_FLASH_MANAGED = OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED
     DEEPSEEK_V4_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK
-    GEMINI3_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_GEMINI3_FLASH_BYOK
+    GEMINI37_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK
     GEMINI31_FLASH_LITE_BYOK = OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK
 
 
@@ -263,8 +262,7 @@ class TranslationModel(str, Enum):
     GEMMA4_31B = "gemma4_31b"
     GEMMA4 = "gemma4"
     DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
-    DEEPSEEK_V4_PRO = "deepseek_v4_pro"
-    GEMINI_3_FLASH = "gemini3_flash"
+    GEMINI_37_FLASH = "gemini37_flash"
     GEMINI_31_FLASH_LITE = "gemini31_flash_lite"
     QWEN_35_PLUS = "qwen35_plus"
     LOCAL_LLM = "local_llm"
@@ -368,8 +366,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[TranslationModel, tuple[TranslationConnec
         TranslationConnection.OPENROUTER,
         TranslationConnection.OFFICIAL_BYOK,
     ),
-    TranslationModel.DEEPSEEK_V4_PRO: (TranslationConnection.OFFICIAL_BYOK,),
-    TranslationModel.GEMINI_3_FLASH: (
+    TranslationModel.GEMINI_37_FLASH: (
         TranslationConnection.OFFICIAL_BYOK,
         TranslationConnection.OPENROUTER,
     ),
@@ -397,7 +394,7 @@ def supported_translation_connections(
 def default_translation_connection(model: TranslationModel) -> TranslationConnection:
     if model == TranslationModel.CUSTOM_HTTP:
         return TranslationConnection.CUSTOM_HTTP
-    if model in (TranslationModel.GEMINI_3_FLASH, TranslationModel.GEMINI_31_FLASH_LITE):
+    if model in (TranslationModel.GEMINI_37_FLASH, TranslationModel.GEMINI_31_FLASH_LITE):
         return TranslationConnection.OFFICIAL_BYOK
     supported_connections = supported_translation_connections(model)
     for connection in TRANSLATION_CONNECTION_PRIORITY:
@@ -427,6 +424,10 @@ def _parse_translation_model(value: object) -> TranslationModel | None:
         normalized = value.strip()
         if normalized == "gemma4_31b_cerebras":
             return TranslationModel.GEMMA4_31B
+        if normalized == "deepseek_v4_pro":
+            return TranslationModel.DEEPSEEK_V4_FLASH
+        if normalized == "gemini3_flash":
+            return TranslationModel.GEMINI_37_FLASH
         try:
             return TranslationModel(normalized)
         except ValueError:
@@ -1954,8 +1955,8 @@ def _parse_qwen_llm_model(value: object) -> QwenLLMModel:
 def _parse_gemini_llm_model(value: object) -> GeminiLLMModel:
     if isinstance(value, str):
         normalized = value.strip()
-        if normalized == "gemini-3-flash":
-            normalized = GeminiLLMModel.GEMINI_3_FLASH.value
+        if normalized in {"gemini-3-flash", "gemini-3-flash-preview"}:
+            normalized = GeminiLLMModel.GEMINI_37_FLASH.value
         elif normalized in {"gemini-3.1-flash-lite", "gemini-3.1-flash-lite-preview"}:
             normalized = GeminiLLMModel.GEMINI_31_FLASH_LITE.value
         try:
@@ -1969,6 +1970,8 @@ def _parse_deepseek_llm_model(value: object) -> DeepSeekLLMModel:
     if isinstance(value, str):
         normalized = value.strip()
         if normalized == "deepseek-chat":
+            normalized = DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
+        if normalized == "deepseek-v4-pro":
             normalized = DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
         try:
             return DeepSeekLLMModel(normalized)
@@ -1992,6 +1995,8 @@ def _parse_openrouter_llm_model(value: object) -> OpenRouterLLMModel:
         normalized = value.strip()
         if normalized == LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH:
             normalized = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+        if normalized == "google/gemini-3-flash-preview":
+            normalized = OPENROUTER_MODEL_GEMINI_37_FLASH
         try:
             return OpenRouterLLMModel(normalized)
         except ValueError:
@@ -2334,7 +2339,6 @@ def _derive_translation_settings_from_runtime_values(
     openrouter_provider_routing: OpenRouterProviderRouting,
     gemini_model: GeminiLLMModel,
     qwen_model: QwenLLMModel,
-    deepseek_model: DeepSeekLLMModel,
     cerebras_model: CerebrasLLMModel,
     history: object = None,
 ) -> TranslationSettings:
@@ -2385,12 +2389,12 @@ def _derive_translation_settings_from_runtime_values(
                 ),
                 history=normalized_history,
             )
-        if openrouter_model == OpenRouterLLMModel.GEMINI_3_FLASH:
+        if openrouter_model == OpenRouterLLMModel.GEMINI_37_FLASH:
             return _normalize_translation_settings(
-                model=TranslationModel.GEMINI_3_FLASH,
+                model=TranslationModel.GEMINI_37_FLASH,
                 connection=_translation_connection_from_openrouter_source(
                     openrouter_selected_source,
-                    model=TranslationModel.GEMINI_3_FLASH,
+                    model=TranslationModel.GEMINI_37_FLASH,
                     provider_routing=openrouter_provider_routing,
                 ),
                 history=normalized_history,
@@ -2421,12 +2425,6 @@ def _derive_translation_settings_from_runtime_values(
         )
 
     if provider_llm == LLMProviderName.DEEPSEEK:
-        if deepseek_model == DeepSeekLLMModel.DEEPSEEK_V4_PRO:
-            return _normalize_translation_settings(
-                model=TranslationModel.DEEPSEEK_V4_PRO,
-                connection=TranslationConnection.OFFICIAL_BYOK,
-                history=normalized_history,
-            )
         return _normalize_translation_settings(
             model=TranslationModel.DEEPSEEK_V4_FLASH,
             connection=TranslationConnection.OFFICIAL_BYOK,
@@ -2449,9 +2447,9 @@ def _derive_translation_settings_from_runtime_values(
             history=normalized_history,
         )
 
-    if gemini_model == GeminiLLMModel.GEMINI_3_FLASH:
+    if gemini_model == GeminiLLMModel.GEMINI_37_FLASH:
         return _normalize_translation_settings(
-            model=TranslationModel.GEMINI_3_FLASH,
+            model=TranslationModel.GEMINI_37_FLASH,
             connection=TranslationConnection.OFFICIAL_BYOK,
             history=normalized_history,
         )
@@ -2473,7 +2471,6 @@ def _derive_translation_settings_from_runtime(
         openrouter_provider_routing=settings.openrouter.provider_routing,
         gemini_model=settings.gemini.llm_model,
         qwen_model=settings.qwen.llm_model,
-        deepseek_model=settings.deepseek.llm_model,
         cerebras_model=settings.cerebras.llm_model,
         history=history,
     )
@@ -2574,16 +2571,10 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         )
         return settings
 
-    if model == TranslationModel.DEEPSEEK_V4_PRO:
-        settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
-        settings.provider.llm = LLMProviderName.DEEPSEEK
-        settings.deepseek.llm_model = DeepSeekLLMModel.DEEPSEEK_V4_PRO
-        return settings
-
-    if model == TranslationModel.GEMINI_3_FLASH:
+    if model == TranslationModel.GEMINI_37_FLASH:
         if connection == TranslationConnection.OPENROUTER:
             settings.provider.llm = LLMProviderName.OPENROUTER
-            settings.openrouter.llm_model = OpenRouterLLMModel.GEMINI_3_FLASH
+            settings.openrouter.llm_model = OpenRouterLLMModel.GEMINI_37_FLASH
             settings.openrouter.provider_routing = OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
             settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
             settings.openrouter.selection_alias = _derive_openrouter_selection_alias(
@@ -2593,7 +2584,7 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
             return settings
         settings.provider.llm = LLMProviderName.GEMINI
         settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
-        settings.gemini.llm_model = GeminiLLMModel.GEMINI_3_FLASH
+        settings.gemini.llm_model = GeminiLLMModel.GEMINI_37_FLASH
         return settings
 
     if model == TranslationModel.GEMINI_31_FLASH_LITE:
@@ -2780,31 +2771,17 @@ def _apply_materialized_translation_to_data(
         changed |= _set_mapping_value(openrouter_data, "selection_alias", selection_alias.value)
         return changed
 
-    if translation.model == TranslationModel.DEEPSEEK_V4_PRO:
-        changed |= _set_mapping_value(
-            openrouter_data,
-            "provider_routing",
-            OpenRouterProviderRouting.DEFAULT.value,
-        )
-        changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.DEEPSEEK.value)
-        changed |= _set_mapping_value(
-            deepseek_data,
-            "llm_model",
-            DeepSeekLLMModel.DEEPSEEK_V4_PRO.value,
-        )
-        return changed
-
-    if translation.model == TranslationModel.GEMINI_3_FLASH:
+    if translation.model == TranslationModel.GEMINI_37_FLASH:
         if translation.connection == TranslationConnection.OPENROUTER:
             selection_alias = _derive_openrouter_selection_alias(
-                OpenRouterLLMModel.GEMINI_3_FLASH,
+                OpenRouterLLMModel.GEMINI_37_FLASH,
                 OpenRouterCredentialSource.BYOK,
             )
             changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.OPENROUTER.value)
             changed |= _set_mapping_value(
                 openrouter_data,
                 "llm_model",
-                OpenRouterLLMModel.GEMINI_3_FLASH.value,
+                OpenRouterLLMModel.GEMINI_37_FLASH.value,
             )
             changed |= _set_mapping_value(
                 openrouter_data,
@@ -2827,7 +2804,7 @@ def _apply_materialized_translation_to_data(
         changed |= _set_mapping_value(
             gemini_data,
             "llm_model",
-            GeminiLLMModel.GEMINI_3_FLASH.value,
+            GeminiLLMModel.GEMINI_37_FLASH.value,
         )
         return changed
 
@@ -2972,7 +2949,6 @@ def _apply_china_managed_first_run_defaults(settings: AppSettings) -> None:
         openrouter_provider_routing=settings.openrouter.provider_routing,
         gemini_model=settings.gemini.llm_model,
         qwen_model=settings.qwen.llm_model,
-        deepseek_model=settings.deepseek.llm_model,
         cerebras_model=settings.cerebras.llm_model,
         history=settings.translation.connection_history,
     )
@@ -3723,7 +3699,6 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
             ),
             gemini_model=_parse_gemini_llm_model(gemini_data.get("llm_model")),
             qwen_model=_parse_qwen_llm_model(qwen_data.get("llm_model")),
-            deepseek_model=_parse_deepseek_llm_model(deepseek_data.get("llm_model")),
             cerebras_model=_parse_cerebras_llm_model(cerebras_data.get("llm_model")),
             history=translation_history,
         )

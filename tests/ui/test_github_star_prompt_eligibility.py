@@ -9,6 +9,8 @@ import pytest
 
 pytest.importorskip("flet")
 
+from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
+
 from puripuly_heart.app.services import canonical_settings_persistence as settings_module
 from puripuly_heart.app.services.canonical_settings_persistence import (
     compose_settings_owner,
@@ -16,7 +18,6 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 from puripuly_heart.app.services.github_star_prompt_settings import (
     compose_github_star_prompt_owner,
 )
-from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,

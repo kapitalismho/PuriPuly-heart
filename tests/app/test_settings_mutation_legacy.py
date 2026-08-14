@@ -18,8 +18,6 @@ from puripuly_heart.config.settings import (
     TranslationModel,
     TranslationSettings,
 )
-
-from puripuly_heart.app.services import settings_mutation
 from puripuly_heart.core import messages
 
 

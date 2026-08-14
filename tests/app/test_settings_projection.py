@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from puripuly_heart.app.services.settings_projection import SettingsProjectionOwner
+
 from puripuly_heart.config.settings import AppSettings
 
 

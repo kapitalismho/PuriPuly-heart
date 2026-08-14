@@ -6,8 +6,8 @@ import threading
 from dataclasses import dataclass
 
 import pytest
-
 from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
+
 from puripuly_heart.core.runtime import OAuthRuntime
 
 

@@ -9,13 +9,13 @@ from types import ModuleType, SimpleNamespace
 
 import numpy as np
 import pytest
-
 from puripuly_heart.core.local_qwen_runtime import LocalQwenRuntimeBootstrapError
 from puripuly_heart.core.local_stt_assets import (
     InstalledLocalSTTManifest,
     LocalSTTManifestInvalidError,
     LocalSTTModelMissingError,
 )
+
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.providers.stt import local_qwen_sherpa as local_qwen_module
 from puripuly_heart.providers.stt.local_qwen_sherpa import (

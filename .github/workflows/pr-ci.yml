@@ -1,0 +1,147 @@
+name: PR CI
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - release
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12.10"
+  UV_VERSION: "0.9.17"
+  NODE_VERSION: "22"
+
+concurrency:
+  group: pr-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  python-style:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup UV environment
+        uses: ./.github/actions/setup-uv-environment
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          uv-version: ${{ env.UV_VERSION }}
+          sync-args: --extra dev
+
+      - name: Ruff check
+        run: uv run ruff check .
+
+      - name: Black check
+        run: uv run black --check .
+
+  python-contracts:
+    name: Contracts
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup UV environment
+        uses: ./.github/actions/setup-uv-environment
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          uv-version: ${{ env.UV_VERSION }}
+          sync-args: --extra dev
+
+      - name: Run contract tests
+        run: uv run pytest tests/domain tests/config
+
+  python-suite:
+    name: ${{ matrix.name }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Architecture
+            pytest-args: tests/architecture
+          - name: Runtime
+            pytest-args: tests/app
+          - name: Providers
+            pytest-args: tests/providers
+          - name: UI
+            pytest-args: tests/ui
+          - name: Tooling
+            pytest-args: tests/scripts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup UV environment
+        uses: ./.github/actions/setup-uv-environment
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          uv-version: ${{ env.UV_VERSION }}
+          sync-args: --extra dev
+
+      - name: Run tests
+        run: uv run pytest ${{ matrix.pytest-args }}
+
+  broker-ci:
+    name: Broker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Run broker tests
+        run: pnpm exec vitest run broker/tests --exclude "broker/tests/deploy-smoke/**"
+
+  native-overlay:
+    name: Overlay
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup UV environment
+        uses: ./.github/actions/setup-uv-environment
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          uv-version: ${{ env.UV_VERSION }}
+          sync-args: --extra dev
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/overlay
+
+      - name: Cargo check
+        run: cargo check --locked --manifest-path native/overlay/Cargo.toml
+
+      - name: Cargo test
+        run: cargo test --locked --manifest-path native/overlay/Cargo.toml

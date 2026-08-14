@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from puripuly_heart.app.adapters.self_capture_vad import SelfCaptureVadAdapter
+
 from puripuly_heart.app.wiring import create_self_capture_vad_adapter
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
 

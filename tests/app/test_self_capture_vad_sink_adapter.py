@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from puripuly_heart.app.adapters.self_capture_vad_sink import (
     SelfCaptureVadSinkAdapter,
 )
+
 from puripuly_heart.app.wiring import create_self_capture_vad_sink_adapter
 
 

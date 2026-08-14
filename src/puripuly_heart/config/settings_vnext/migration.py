@@ -94,6 +94,7 @@ _LOCAL_QWEN_CPU_AUTO_MIGRATION_VERSION = 30
 _PEER_SOURCE_AUTO_MIGRATION_VERSION = 31
 _MULTI_MODEL_GEMMA_MIGRATION_VERSION = 32
 _CEREBRAS_CONNECTION_MIGRATION_VERSION = 35
+_DEEPSEEK_V4_PRO_RETIREMENT_MIGRATION_VERSION = 36
 _EXPLICIT_LEGACY_GEMMA_FALLBACK_ALIASES = frozenset({"openrouter_gemma4_26b_a4b"})
 
 _TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
@@ -184,6 +185,9 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     migrate_cerebras_connection = _requires_cerebras_connection_migration(
         data.get("settings_version")
     )
+    migrate_deepseek_v4_pro_retirement = _requires_deepseek_v4_pro_retirement_migration(
+        data.get("settings_version")
+    )
     prepared = dict(copy.deepcopy(data))
     prepared["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION
     intent = prepared.get("intent") if isinstance(prepared.get("intent"), dict) else {}
@@ -193,6 +197,9 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
             _migrate_multi_model_gemma_translation(translation)
         if migrate_cerebras_connection:
             _migrate_cerebras_connection_translation(translation)
+        if migrate_deepseek_v4_pro_retirement:
+            _migrate_deepseek_v4_pro_translation(translation)
+        _migrate_gemini_3_flash_translation(translation)
         fallback = translation.get("fallback")
         if not isinstance(fallback, Mapping):
             translation["fallback"] = _fallback_intent_to_dict(
@@ -278,6 +285,16 @@ def _requires_cerebras_connection_migration(settings_version: object) -> bool:
     return True
 
 
+def _requires_deepseek_v4_pro_retirement_migration(settings_version: object) -> bool:
+    if isinstance(settings_version, bool):
+        return True
+    if isinstance(settings_version, int):
+        return settings_version < _DEEPSEEK_V4_PRO_RETIREMENT_MIGRATION_VERSION
+    if isinstance(settings_version, str) and settings_version.strip().isdigit():
+        return int(settings_version.strip()) < _DEEPSEEK_V4_PRO_RETIREMENT_MIGRATION_VERSION
+    return True
+
+
 def _migrate_multi_model_gemma_translation(translation: dict[str, Any]) -> None:
     connection = translation.get("connection")
     if connection not in {"managed", "openrouter"}:
@@ -341,6 +358,54 @@ def _migrate_cerebras_connection_translation(translation: dict[str, Any]) -> Non
         fallback["model"] = "gemma4_31b"
         fallback["connection"] = "cerebras"
         fallback["selection_alias"] = "cerebras_gemma4_31b"
+
+
+def _migrate_gemini_3_flash_translation(translation: dict[str, Any]) -> None:
+    if translation.get("model") == "gemini3_flash":
+        translation["model"] = "gemini37_flash"
+    if translation.get("previous_llm_model") == "gemini3_flash":
+        translation["previous_llm_model"] = "gemini37_flash"
+    gemini = translation.get("gemini")
+    if isinstance(gemini, dict) and gemini.get("llm_model") in {
+        "gemini-3-flash",
+        "gemini-3-flash-preview",
+    }:
+        gemini["llm_model"] = "gemini-3.7-flash"
+    if translation.get("openrouter_model") == "google/gemini-3-flash-preview":
+        translation["openrouter_model"] = "google/gemini-3.7-flash"
+    if translation.get("openrouter_selection_alias") == "gemini3_flash_byok":
+        translation["openrouter_selection_alias"] = "gemini37_flash_byok"
+    history = translation.get("connection_history")
+    if isinstance(history, dict) and "gemini3_flash" in history:
+        history["gemini37_flash"] = history["gemini3_flash"]
+        history.pop("gemini3_flash", None)
+    fallback = translation.get("fallback")
+    if isinstance(fallback, dict) and fallback.get("model") == "gemini3_flash":
+        if bool(fallback.get("enabled", False)):
+            fallback["enabled"] = True
+            fallback["model"] = "gemma4_26b_31b"
+            fallback["connection"] = "openrouter"
+            fallback["selection_alias"] = DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
+        else:
+            fallback["model"] = "deepseek_v4_flash"
+            fallback["connection"] = "official_byok"
+            fallback["selection_alias"] = "none"
+
+
+def _migrate_deepseek_v4_pro_translation(translation: dict[str, Any]) -> None:
+    if translation.get("model") == "deepseek_v4_pro":
+        translation["model"] = "deepseek_v4_flash"
+        translation["connection"] = "official_byok"
+    if translation.get("previous_llm_model") == "deepseek_v4_pro":
+        translation["previous_llm_model"] = "deepseek_v4_flash"
+    history = translation.get("connection_history")
+    if isinstance(history, dict) and "deepseek_v4_pro" in history:
+        history["deepseek_v4_flash"] = "official_byok"
+        history.pop("deepseek_v4_pro", None)
+    fallback = translation.get("fallback")
+    if isinstance(fallback, dict) and fallback.get("model") == "deepseek_v4_pro":
+        fallback["model"] = "deepseek_v4_flash"
+        fallback["connection"] = "official_byok"
 
 
 def _migrate_peer_source_auto_mode(intent: dict[str, Any]) -> None:
@@ -1193,7 +1258,7 @@ def _legacy_provider_llm_for_translation(model: str, connection: str) -> str:
         return "local_llm"
     if model == "gemma4_31b_cerebras" or (model == "gemma4_31b" and connection == "cerebras"):
         return "cerebras"
-    if model in {"gemini3_flash", "gemini31_flash_lite"}:
+    if model in {"gemini37_flash", "gemini31_flash_lite"}:
         if connection == "openrouter":
             return "openrouter"
         return "gemini"

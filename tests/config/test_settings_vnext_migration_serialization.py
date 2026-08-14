@@ -234,10 +234,8 @@ def test_final_dev_v30_fixture_migrates_with_semantic_and_verification_continuit
         "selection_alias": "openrouter_deepseek_v4_flash",
     }
     assert canonical["intent"]["translation"]["qwen"]["region"] == "singapore"
-    assert canonical["intent"]["translation"]["gemini"]["llm_model"] == (raw["gemini"]["llm_model"])
-    assert canonical["intent"]["translation"]["deepseek"]["llm_model"] == (
-        raw["deepseek"]["llm_model"]
-    )
+    assert canonical["intent"]["translation"]["gemini"]["llm_model"] == "gemini-3.7-flash"
+    assert canonical["intent"]["translation"]["deepseek"]["llm_model"] == "deepseek-v4-flash"
     assert canonical["intent"]["stt"]["custom_terms"] == raw["stt"]["custom_terms"]
     assert (
         canonical["intent"]["languages"]["recent_source_languages"]
@@ -256,8 +254,8 @@ def test_final_dev_v30_fixture_migrates_with_semantic_and_verification_continuit
     )
     projected = migration.to_legacy_dict(first.settings)
     assert projected["api_key_verified"] == raw["api_key_verified"]
-    assert projected["gemini"] == raw["gemini"]
-    assert projected["deepseek"] == raw["deepseek"]
+    assert projected["gemini"] == {"llm_model": "gemini-3.7-flash"}
+    assert projected["deepseek"] == {"llm_model": "deepseek-v4-flash"}
     assert projected["telemetry_state"] == {
         "anonymous_id": raw["telemetry"]["identifier"],
         "sent_translation_success_dates_utc": raw["telemetry"]["sent_utc_dates"],
@@ -292,14 +290,72 @@ def test_final_dev_v30_ui_equivalent_save_preserves_migrated_and_changed_values(
     assert reloaded.ui.locale == "ko"
     assert reloaded.audio.ring_buffer_ms == 875
     assert reloaded.translation.model.value == "local_llm"
-    assert reloaded.gemini.llm_model.value == "gemini-3-flash-preview"
-    assert reloaded.deepseek.llm_model.value == "deepseek-v4-pro"
+    assert reloaded.gemini.llm_model.value == "gemini-3.7-flash"
+    assert reloaded.deepseek.llm_model.value == "deepseek-v4-flash"
     assert reloaded.languages.recent_source_languages == ["fr", "de", "it", "ko", "en", "zh-CN"]
     assert reloaded.managed_identity.pending_delivery_ack_delivery_id == "fixture-delivery-id"
     assert all(
         getattr(reloaded.api_key_verified, provider) is True
         for provider in PROVIDER_VERIFICATION_FIELDS
     )
+
+
+def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    translation = canonical["intent"]["translation"]
+    translation["model"] = "gemini3_flash"
+    translation["connection"] = "official_byok"
+    translation["gemini"] = {"llm_model": "gemini-3-flash-preview"}
+    translation["openrouter_model"] = "google/gemini-3-flash-preview"
+    translation["openrouter_selection_alias"] = "gemini3_flash_byok"
+    translation["fallback"] = {
+        "enabled": True,
+        "model": "gemini3_flash",
+        "connection": "openrouter",
+        "selection_alias": "none",
+    }
+
+    migrated = migration.from_dict(canonical)
+    result = serialization.to_dict(migrated)["intent"]["translation"]
+
+    assert result["model"] == "gemini37_flash"
+    assert result["gemini"]["llm_model"] == "gemini-3.7-flash"
+    assert result["openrouter_model"] == "google/gemini-3.7-flash"
+    assert result["openrouter_selection_alias"] == "gemini37_flash_byok"
+    assert result["fallback"] == {
+        "enabled": True,
+        "model": "gemma4_26b_31b",
+        "connection": "openrouter",
+        "selection_alias": "openrouter_gemma4_26b_31b",
+    }
+
+
+def test_vnext_dict_migrates_disabled_gemini_3_flash_fallback_to_none() -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    translation = canonical["intent"]["translation"]
+    translation["model"] = "gemini3_flash"
+    translation["connection"] = "official_byok"
+    translation["fallback"] = {
+        "enabled": False,
+        "model": "gemini3_flash",
+        "connection": "openrouter",
+        "selection_alias": "none",
+    }
+
+    migrated = migration.from_dict(canonical)
+    result = serialization.to_dict(migrated)["intent"]["translation"]
+
+    assert result["model"] == "gemini37_flash"
+    assert result["fallback"] == {
+        "enabled": False,
+        "model": "deepseek_v4_flash",
+        "connection": "official_byok",
+        "selection_alias": "none",
+    }
 
 
 def test_v24_boolean_api_key_verification_migrates_every_provider_to_verified() -> None:
@@ -474,7 +530,9 @@ def test_china_first_run_defaults_project_to_vnext_intent() -> None:
     assert serialized["intent"]["ui"]["locale"] == "zh-CN"
     assert serialized["intent"]["translation"]["model"] == "deepseek_v4_flash"
     assert serialized["intent"]["translation"]["connection"] == "managed_china"
-    assert serialized["intent"]["translation"]["openrouter_model"] == ("deepseek/deepseek-v4-flash-0731")
+    assert serialized["intent"]["translation"]["openrouter_model"] == (
+        "deepseek/deepseek-v4-flash-0731"
+    )
     assert serialized["intent"]["translation"]["openrouter_selected_source"] == "managed"
     assert serialized["intent"]["translation"]["openrouter_selection_alias"] == (
         "deepseek_v4_flash_managed"
@@ -675,6 +733,50 @@ def test_pre_v35_active_cerebras_model_migrates_without_losing_explicit_disabled
     assert translated.connection == "cerebras"
     assert translated.connection_history == {"gemma4_31b": "cerebras"}
     assert translated.fallback == TranslationFallbackIntent()
+
+
+@pytest.mark.parametrize("source_version", [34, 35])
+def test_pre_v36_deepseek_v4_pro_migrates_to_deepseek_v4_flash(
+    source_version: int,
+) -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = source_version
+    raw["intent"]["translation"].update(
+        {
+            "model": "deepseek_v4_pro",
+            "connection": "official_byok",
+            "connection_history": {
+                "gemma4_26b_31b": "managed",
+                "deepseek_v4_pro": "official_byok",
+            },
+            "fallback": {
+                "enabled": True,
+                "model": "deepseek_v4_pro",
+                "connection": "official_byok",
+                "selection_alias": "none",
+            },
+        }
+    )
+
+    loaded = migration.from_dict(raw)
+    translated = loaded.intent.translation
+
+    assert loaded.settings_version == VNEXT_SETTINGS_SCHEMA_VERSION
+    assert translated.model == "deepseek_v4_flash"
+    assert translated.connection == "official_byok"
+    assert translated.connection_history == {
+        "gemma4_26b_31b": "managed",
+        "deepseek_v4_flash": "official_byok",
+    }
+    assert translated.fallback == TranslationFallbackIntent(
+        enabled=True,
+        model="deepseek_v4_flash",
+        connection="official_byok",
+        selection_alias="none",
+    )
+    assert "deepseek_v4_pro" not in json.dumps(serialization.to_dict(loaded))
 
 
 def test_current_vnext_missing_fallback_alias_still_infers_compatibility_fields() -> None:

@@ -98,6 +98,7 @@ def _install_fake_google(monkeypatch, *, response_text: str | None) -> dict[str,
 
     class FakeThinkingLevel:
         MINIMAL = "minimal"
+        LOW = "low"
 
     types_module = ModuleType("google.genai.types")
     types_module.GenerateContentConfig = FakeGenerateContentConfig
@@ -239,8 +240,8 @@ async def test_gemini_verify_api_key_accepts_base_model_aliases(monkeypatch):
                 base_model_id="gemini-3.1-flash-lite",
             ),
             SimpleNamespace(
-                name="models/gemini-3-flash-001",
-                baseModelId="gemini-3-flash-preview",
+                name="models/gemini-3.7-flash-001",
+                baseModelId="gemini-3.7-flash",
             ),
         ],
     )
@@ -255,7 +256,7 @@ async def test_gemini_verify_api_key_accepts_base_model_aliases(monkeypatch):
     assert (
         await GeminiLLMProvider.verify_api_key(
             "secret",
-            model="gemini-3-flash-preview",
+            model="gemini-3.7-flash",
         )
         is True
     )
@@ -298,12 +299,38 @@ async def test_google_genai_client_formats_prompt_and_context(
     assert result == "OK"
     assert state["contents"] == "<context>\na -> b\n</context>\n\n<input>\nhello\n</input>"
     assert state["config"].system_instruction == "Translate ko to en."
-    assert state["config"].thinking_config.thinking_level == "minimal"
+    assert state["config"].thinking_config.thinking_level == "low"
     assert state["config"].automatic_function_calling.disable is True
     assert (
         "[Basic][LLM] Gemini request [translate][context=yes] ko -> en: 'hello'" in caplog.messages
     )
     assert "[Basic][LLM] Gemini response [translate]: 'OK'" in caplog.messages
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("model", "expected_thinking_level"),
+    [
+        ("gemini-3.1-flash-lite", "minimal"),
+        ("models/gemini-3.1-flash-lite", "minimal"),
+        ("gemini-3.7-flash", "low"),
+        ("m", "low"),
+    ],
+)
+async def test_google_genai_client_thinking_level_follows_model(
+    monkeypatch, model: str, expected_thinking_level: str
+):
+    state = _install_fake_google(monkeypatch, response_text=" OK ")
+
+    client = GoogleGenaiGeminiClient(api_key="k", model=model)
+    await client.translate(
+        text="hello",
+        system_prompt="PROMPT",
+        source_language="en",
+        target_language="ko",
+    )
+
+    assert state["config"].thinking_config.thinking_level == expected_thinking_level
 
 
 @pytest.mark.asyncio

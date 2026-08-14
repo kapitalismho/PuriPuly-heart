@@ -106,7 +106,6 @@ So I built one that can.
 | **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
 | **Gemma 4 31B (OpenRouter)** | 13,700 | 2,780 | 3,530 | 1,120 |
 | **Gemma 4 31B (Cerebras)** | 920 | 730 | 770 | 540 |
-| **DeepSeek V4 Pro** | 6,400 | 2,330 | 2,810 | 1,070 |
 | **Gemini 3 Flash** | 1,710 | 1,170 | 1,280 | 740 |
 | **Gemini 3.1 Flash-Lite** | 3,430 | 1,770 | 2,030 | 940 |
 | **Qwen 3.5 Plus** | 7,460 | 2,460 | — | — |
@@ -128,7 +127,6 @@ So I built one that can.
 | **Gemma 4 26B A4B** | ~$0.00007 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
 | **Gemma 4 31B (OpenRouter)** | ~$0.00007 | ~$0.0003 | ~$0.0003 | ~$0.0009 |
 | **Gemma 4 31B (Cerebras)** | ~$0.0011 | ~$0.0014 | ~$0.0013 | ~$0.0019 |
-| **DeepSeek V4 Pro** | ~$0.0002 | ~$0.0004 | ~$0.0004 | ~$0.0009 |
 | **Gemini 3 Flash** | ~$0.0006 | ~$0.0009 | ~$0.0008 | ~$0.0014 |
 | **Gemini 3.1 Flash-Lite** | ~$0.0003 | ~$0.0006 | ~$0.0005 | ~$0.0011 |
 | **Qwen 3.5 Plus** | ~$0.0001 | ~$0.0004 | — | — |
@@ -412,6 +410,10 @@ The tier transition may take a moment.
 ## Architecture
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+## Roadmap
+
+Upcoming work is tracked publicly on the [PuriPuly project board](https://github.com/users/kapitalismho/projects/2).
 
 ---
 

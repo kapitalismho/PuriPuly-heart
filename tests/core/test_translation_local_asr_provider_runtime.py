@@ -3,10 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from uuid import uuid4
 
-from puripuly_heart.config.resolved import (
-    ResolvedCredentialRequirement,
-    ResolvedSTTConfig,
-)
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
     LocalASRProviderRuntimeSnapshot,
@@ -14,6 +10,11 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     ProviderRuntimeChannelSnapshot,
     ProviderRuntimeGpuSnapshot,
     ProviderRuntimeMutationResult,
+)
+
+from puripuly_heart.config.resolved import (
+    ResolvedCredentialRequirement,
+    ResolvedSTTConfig,
 )
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,

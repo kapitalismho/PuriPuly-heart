@@ -67,15 +67,11 @@ def test_managed_trial_usage_bar_apply_locale_refreshes_overlay_text() -> None:
 
         set_locale("ko")
         bar.apply_locale()
-        assert bar._remaining_text.value == t(
-            "settings.managed_trial_usage.remaining", percent=71
-        )
+        assert bar._remaining_text.value == t("settings.managed_trial_usage.remaining", percent=71)
 
         bar.set_percent(None)
         bar.apply_locale()
-        assert bar._remaining_text.value == t(
-            "settings.managed_trial_usage.remaining_placeholder"
-        )
+        assert bar._remaining_text.value == t("settings.managed_trial_usage.remaining_placeholder")
     finally:
         set_locale(previous_locale)
 

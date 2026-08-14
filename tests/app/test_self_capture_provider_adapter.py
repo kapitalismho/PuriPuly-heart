@@ -4,10 +4,10 @@ from types import SimpleNamespace
 from typing import cast
 
 import pytest
-
 from puripuly_heart.app.adapters.self_capture_provider import SelfCaptureProviderAdapter
-from puripuly_heart.config.resolved import ResolvedSTTConfig
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
+
+from puripuly_heart.config.resolved import ResolvedSTTConfig
 from puripuly_heart.core.self_capture import (
     SelfCaptureProviderMutationStatus,
     SelfCaptureSessionConfig,

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from puripuly_heart.app.wiring import ManagedIdentityStateAdapter
-from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.core.openrouter_handoff import (
     MANAGED_EFFECTIVE_EXHAUSTION_USD,
     is_effectively_exhausted,
@@ -9,6 +7,9 @@ from puripuly_heart.core.openrouter_handoff import (
     should_auto_show_founder_letter,
     store_managed_entitlement_snapshot,
 )
+
+from puripuly_heart.app.wiring import ManagedIdentityStateAdapter
+from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata
 
 

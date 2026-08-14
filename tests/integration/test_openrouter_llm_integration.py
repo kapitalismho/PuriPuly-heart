@@ -4,6 +4,7 @@ import os
 from uuid import UUID
 
 import pytest
+from puripuly_heart.core.openrouter_credentials import OPENROUTER_MANAGED_API_KEY_SECRET
 
 from puripuly_heart.app.wiring import create_llm_provider
 from puripuly_heart.config.settings import (
@@ -15,7 +16,6 @@ from puripuly_heart.config.settings import (
     OpenRouterSelectionAlias,
 )
 from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider
-from puripuly_heart.core.openrouter_credentials import OPENROUTER_MANAGED_API_KEY_SECRET
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider

@@ -5,11 +5,11 @@ from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
 import pytest
+from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
 
 from puripuly_heart.app.wiring import _LazyFactoryLLMProvider
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
-from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.deepseek import (
     DeepSeekClient,

@@ -473,8 +473,7 @@ def test_translation_model_public_member_names_and_values_match_plan() -> None:
         ("GEMMA4_31B", "gemma4_31b"),
         ("GEMMA4", "gemma4"),
         ("DEEPSEEK_V4_FLASH", "deepseek_v4_flash"),
-        ("DEEPSEEK_V4_PRO", "deepseek_v4_pro"),
-        ("GEMINI_3_FLASH", "gemini3_flash"),
+        ("GEMINI_37_FLASH", "gemini37_flash"),
         ("GEMINI_31_FLASH_LITE", "gemini31_flash_lite"),
         ("QWEN_35_PLUS", "qwen35_plus"),
         ("LOCAL_LLM", "local_llm"),
@@ -574,7 +573,7 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
         TranslationConnection.OPENROUTER,
         TranslationConnection.OFFICIAL_BYOK,
     )
-    assert supported_translation_connections(TranslationModel.GEMINI_3_FLASH) == (
+    assert supported_translation_connections(TranslationModel.GEMINI_37_FLASH) == (
         TranslationConnection.OFFICIAL_BYOK,
         TranslationConnection.OPENROUTER,
     )
@@ -595,7 +594,7 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
     )
     assert default_translation_connection(TranslationModel.GEMMA4) == TranslationConnection.MANAGED
     assert (
-        default_translation_connection(TranslationModel.GEMINI_3_FLASH)
+        default_translation_connection(TranslationModel.GEMINI_37_FLASH)
         == TranslationConnection.OFFICIAL_BYOK
     )
     assert (
@@ -852,88 +851,31 @@ def test_materialize_translation_settings_returns_mutated_settings() -> None:
     assert settings.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH
 
 
-def test_deepseek_v4_pro_translation_supports_official_byok_only() -> None:
-    deepseek_v4_pro = getattr(TranslationModel, "DEEPSEEK_V4_PRO", None)
-
-    assert deepseek_v4_pro is not None
-    assert supported_translation_connections(deepseek_v4_pro) == (
+def test_legacy_deepseek_v4_pro_translation_migrates_to_v4_flash() -> None:
+    assert supported_translation_connections(TranslationModel.DEEPSEEK_V4_FLASH) == (
+        TranslationConnection.MANAGED,
+        TranslationConnection.MANAGED_CHINA,
+        TranslationConnection.OPENROUTER,
         TranslationConnection.OFFICIAL_BYOK,
     )
 
-
-def test_materialize_translation_settings_maps_deepseek_v4_pro_official_byok() -> None:
-    deepseek_v4_pro = getattr(TranslationModel, "DEEPSEEK_V4_PRO", None)
-    deepseek_model = getattr(DeepSeekLLMModel, "DEEPSEEK_V4_PRO", None)
-
-    assert deepseek_v4_pro is not None
-    assert deepseek_model is not None
-
-    settings = AppSettings()
-    settings.translation = TranslationSettings(
-        model=deepseek_v4_pro,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-    )
-
-    returned = materialize_translation_settings(settings)
-
-    assert returned is settings
-    assert settings.provider.llm == LLMProviderName.DEEPSEEK
-    assert settings.deepseek.llm_model == deepseek_model
-
-
-def test_materialize_translation_settings_normalizes_deepseek_v4_pro_openrouter_to_official_byok() -> (
-    None
-):
-    deepseek_v4_pro = getattr(TranslationModel, "DEEPSEEK_V4_PRO", None)
-    deepseek_model = getattr(DeepSeekLLMModel, "DEEPSEEK_V4_PRO", None)
-
-    assert deepseek_v4_pro is not None
-    assert deepseek_model is not None
-
-    settings = AppSettings()
-    settings.translation = TranslationSettings(
-        model=deepseek_v4_pro,
-        connection=TranslationConnection.OPENROUTER,
-        connection_history={deepseek_v4_pro.value: TranslationConnection.OPENROUTER},
-    )
-
-    returned = materialize_translation_settings(settings)
-
-    assert returned is settings
-    assert settings.translation.connection == TranslationConnection.OFFICIAL_BYOK
-    assert settings.provider.llm == LLMProviderName.DEEPSEEK
-    assert settings.deepseek.llm_model == deepseek_model
-    assert settings.openrouter.provider_routing == OpenRouterProviderRouting.DEFAULT
-
-
-def test_from_dict_roundtrips_deepseek_v4_pro_official_byok() -> None:
-    deepseek_v4_pro = getattr(TranslationModel, "DEEPSEEK_V4_PRO", None)
-    deepseek_model = getattr(DeepSeekLLMModel, "DEEPSEEK_V4_PRO", None)
-
-    assert deepseek_v4_pro is not None
-    assert deepseek_model is not None
-
     data = to_dict(AppSettings())
     data["translation"] = {
-        "model": deepseek_v4_pro.value,
+        "model": "deepseek_v4_pro",
         "connection": TranslationConnection.OFFICIAL_BYOK.value,
         "connection_history": {
-            deepseek_v4_pro.value: TranslationConnection.OFFICIAL_BYOK.value,
+            "deepseek_v4_pro": TranslationConnection.OFFICIAL_BYOK.value,
         },
     }
     data["provider"]["llm"] = LLMProviderName.DEEPSEEK.value
-    data["deepseek"] = {"llm_model": deepseek_model.value}
+    data["deepseek"] = {"llm_model": "deepseek-v4-pro"}
 
     loaded = from_dict(data)
-    persisted = to_dict(loaded)
 
-    assert loaded.translation.model == deepseek_v4_pro
+    assert loaded.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
     assert loaded.translation.connection == TranslationConnection.OFFICIAL_BYOK
     assert loaded.provider.llm == LLMProviderName.DEEPSEEK
-    assert loaded.deepseek.llm_model == deepseek_model
-    assert persisted["translation"]["model"] == deepseek_v4_pro.value
-    assert persisted["provider"]["llm"] == LLMProviderName.DEEPSEEK.value
-    assert persisted["deepseek"]["llm_model"] == deepseek_model.value
+    assert loaded.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH
 
 
 def test_openrouter_alias_for_fields_does_not_expose_deepseek_v4_pro() -> None:
@@ -1068,22 +1010,22 @@ def test_from_dict_backfills_missing_deepseek_settings_and_verification() -> Non
 def test_gemini_openrouter_alias_and_routing_roundtrip() -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OPENROUTER,
         connection_history={
-            TranslationModel.GEMINI_3_FLASH.value: TranslationConnection.OPENROUTER,
+            TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OPENROUTER,
         },
     )
 
     persisted = to_dict(settings)
     loaded = from_dict(persisted)
 
-    assert loaded.translation.model == TranslationModel.GEMINI_3_FLASH
+    assert loaded.translation.model == TranslationModel.GEMINI_37_FLASH
     assert loaded.translation.connection == TranslationConnection.OPENROUTER
     assert loaded.provider.llm == LLMProviderName.OPENROUTER
-    assert loaded.openrouter.llm_model == OpenRouterLLMModel.GEMINI_3_FLASH
+    assert loaded.openrouter.llm_model == OpenRouterLLMModel.GEMINI_37_FLASH
     assert loaded.openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMINI3_FLASH_BYOK
+    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK
     assert loaded.openrouter.provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
 
 
@@ -1708,6 +1650,29 @@ def test_load_settings_migrates_preview_gemini_flash_lite_to_ga(tmp_path):
     assert persisted["gemini"]["llm_model"] == "gemini-3.1-flash-lite"
 
 
+def test_load_settings_migrates_gemini_3_flash_preview_to_3_7_flash(tmp_path):
+    path = tmp_path / "settings.json"
+    legacy = to_dict(AppSettings())
+    legacy["gemini"]["llm_model"] = "gemini-3-flash-preview"
+    legacy["translation"]["model"] = "gemini3_flash"
+    legacy["translation"]["connection_history"] = {
+        "gemini3_flash": "official_byok",
+    }
+    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    loaded = load_settings(path)
+    assert loaded.gemini.llm_model == GeminiLLMModel.GEMINI_37_FLASH
+    assert loaded.translation.model == TranslationModel.GEMINI_37_FLASH
+    assert loaded.translation.connection_history.get("gemini37_flash") == (
+        TranslationConnection.OFFICIAL_BYOK
+    )
+
+    persisted = legacy_projected_settings_file(path)
+    assert persisted["gemini"]["llm_model"] == "gemini-3.7-flash"
+    assert persisted["translation"]["model"] == "gemini37_flash"
+    assert "gemini3_flash" not in persisted["translation"]["connection_history"]
+
+
 def test_from_dict_defaults_missing_gemini_model_to_flash_lite():
     data = to_dict(AppSettings())
     data["gemini"] = {}
@@ -2302,13 +2267,13 @@ def test_from_dict_migrates_openrouter_qwen_flash_main_preserving_routing_and_fa
             DeepSeekLLMModel.DEEPSEEK_V4_FLASH,
         ),
         (
-            TranslationModel.GEMINI_3_FLASH,
+            TranslationModel.GEMINI_37_FLASH,
             TranslationConnection.OFFICIAL_BYOK,
             LLMProviderName.GEMINI,
             None,
             None,
             None,
-            GeminiLLMModel.GEMINI_3_FLASH,
+            GeminiLLMModel.GEMINI_37_FLASH,
             None,
             None,
         ),
@@ -2433,25 +2398,25 @@ def test_migrate_v20_marks_valid_translation_schema_version_changed() -> None:
 def test_invalid_translation_connection_falls_back_to_model_default() -> None:
     data = to_dict(AppSettings())
     data["translation"] = {
-        "model": TranslationModel.GEMINI_3_FLASH.value,
+        "model": TranslationModel.GEMINI_37_FLASH.value,
         "connection": TranslationConnection.MANAGED.value,
         "connection_history": {
-            TranslationModel.GEMINI_3_FLASH.value: TranslationConnection.OPENROUTER.value,
+            TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OPENROUTER.value,
         },
     }
 
     loaded = from_dict(data)
     persisted = to_dict(loaded)
 
-    assert loaded.translation.model == TranslationModel.GEMINI_3_FLASH
+    assert loaded.translation.model == TranslationModel.GEMINI_37_FLASH
     assert loaded.translation.connection == TranslationConnection.OFFICIAL_BYOK
     assert loaded.provider.llm == LLMProviderName.GEMINI
-    assert loaded.gemini.llm_model == GeminiLLMModel.GEMINI_3_FLASH
+    assert loaded.gemini.llm_model == GeminiLLMModel.GEMINI_37_FLASH
     assert persisted["translation"] == {
-        "model": TranslationModel.GEMINI_3_FLASH.value,
+        "model": TranslationModel.GEMINI_37_FLASH.value,
         "connection": TranslationConnection.OFFICIAL_BYOK.value,
         "connection_history": {
-            TranslationModel.GEMINI_3_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
+            TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
         },
         "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
     }
@@ -2673,9 +2638,7 @@ def test_from_dict_normalizes_legacy_openrouter_deepseek_model() -> None:
     data["translation"]["connection"] = TranslationConnection.OPENROUTER.value
     data["openrouter"]["llm_model"] = "deepseek/deepseek-v4-flash"
     data["openrouter"]["selected_source"] = OpenRouterCredentialSource.BYOK.value
-    data["openrouter"]["selection_alias"] = (
-        OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value
-    )
+    data["openrouter"]["selection_alias"] = OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value
 
     loaded = from_dict(data)
 

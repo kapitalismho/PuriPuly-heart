@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
 from puripuly_heart.core.local_stt_assets import LOCAL_STT_MODEL_ID
 

@@ -64,6 +64,7 @@ build = [
 testpaths = ["tests"]
 addopts = "-q -s"
 asyncio_mode = "auto"
+pythonpath = ["."]
 
 [tool.black]
 line-length = 100

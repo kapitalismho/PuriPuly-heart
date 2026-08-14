@@ -3,14 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
-
-from puripuly_heart.app.ports import broker_client, managed_identity_state, secret_store
 from puripuly_heart.app.services.managed_auth_claims import (
     MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
     OPENROUTER_MANAGED_API_KEY_SECRET,
     ManagedAuthClaimGuard,
 )
 from puripuly_heart.app.services.managed_key_delivery_ack import ManagedKeyDeliveryAckService
+
+from puripuly_heart.app.ports import broker_client, managed_identity_state, secret_store
 from puripuly_heart.app.services.qq_managed_auth import (
     OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     QqManagedAuthRequest,
