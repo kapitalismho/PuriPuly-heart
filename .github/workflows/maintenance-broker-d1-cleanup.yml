@@ -95,7 +95,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: refs/heads/main
+          ref: refs/heads/release
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
