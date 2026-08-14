@@ -254,6 +254,22 @@ async def test_inactive_active_restart_and_explicit_toggle_off_preserve_release_
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("toggle_delay_s", [0.0, 0.1, 0.3, 1.0])
+async def test_cloud_explicit_toggle_off_routes_to_abort_at_each_delay(
+    toggle_delay_s: float,
+) -> None:
+    owner, _, provider, _, _, _ = build_owner()
+    session_config = config()
+
+    await owner.apply_intent(session_config, enabled=True)
+    await asyncio.sleep(toggle_delay_s)
+    snapshot = await owner.apply_intent(session_config, enabled=False)
+
+    assert snapshot.state is SelfCaptureSessionState.STOPPED
+    assert provider.release_calls == [("abort", None)]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("admission_result", "state", "desired"),
     [
@@ -716,7 +732,7 @@ async def test_same_signature_release_and_rebuild_rejects_retired_attachment_fai
     assert owner.snapshot.failure_reason is None
     assert sources[0].close_calls == 1
     assert sources[1].close_calls == 0
-    assert provider.release_calls == [("drain", None)]
+    assert provider.release_calls == [("abort", None)]
 
     await owner.close()
 

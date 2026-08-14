@@ -8,13 +8,16 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import logging
 import queue
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
     STTBackend,
     STTBackendSession,
@@ -34,6 +37,7 @@ class QwenASRRealtimeSTTBackend(STTBackend):
     endpoint: str = "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
     sample_rate_hz: int = 16000
     connect_timeout_s: float = 5.0
+    finish_timeout_s: float = 1.0
 
     async def open_session(self) -> STTBackendSession:
         if self.sample_rate_hz not in (8000, 16000):
@@ -42,6 +46,8 @@ class QwenASRRealtimeSTTBackend(STTBackend):
             raise ValueError("api_key must be non-empty")
         if self.connect_timeout_s <= 0:
             raise ValueError("connect_timeout_s must be > 0")
+        if self.finish_timeout_s <= 0:
+            raise ValueError("finish_timeout_s must be > 0")
 
         session = _QwenASRSession(
             api_key=self.api_key,
@@ -50,8 +56,16 @@ class QwenASRRealtimeSTTBackend(STTBackend):
             endpoint=self.endpoint,
             sample_rate_hz=self.sample_rate_hz,
             connect_timeout_s=self.connect_timeout_s,
+            finish_timeout_s=self.finish_timeout_s,
         )
-        await session.start()
+        try:
+            await session.start()
+        except BaseException:
+            with contextlib.suppress(BaseException):
+                await session.abort_for_toggle_off()
+            with contextlib.suppress(BaseException):
+                await session.close()
+            raise
         return session
 
     @staticmethod
@@ -68,6 +82,15 @@ class QwenASRRealtimeSTTBackend(STTBackend):
 
 _STOP = object()
 _COMMIT = object()
+_END_SESSION = object()
+
+
+@dataclass(slots=True)
+class _PendingCommit:
+    sequence: int
+    item_id: str | None = None
+    terminal_status: str | None = None
+    event: STTBackendTranscriptEvent | None = None
 
 
 @dataclass(slots=True)
@@ -80,6 +103,7 @@ class _QwenASRSession(STTBackendSession):
     endpoint: str
     sample_rate_hz: int
     connect_timeout_s: float
+    finish_timeout_s: float = 1.0
 
     _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
         init=False, repr=False
@@ -92,11 +116,21 @@ class _QwenASRSession(STTBackendSession):
     _connect_started_at: float | None = field(init=False, default=None, repr=False)
     _error_reported: bool = field(init=False, default=False, repr=False)
     _connect_error: BaseException | None = field(init=False, default=None, repr=False)
+    _commit_lock: threading.Lock = field(init=False, repr=False)
+    _pending_commits: deque[_PendingCommit] = field(init=False, repr=False)
+    _terminal_item_ids: set[str] = field(init=False, repr=False)
+    _terminal_event_ids: set[str] = field(init=False, repr=False)
+    _next_commit_sequence: int = field(init=False, default=1, repr=False)
+    _accept_terminals: bool = field(init=False, default=True, repr=False)
 
     def __post_init__(self) -> None:
         self._events = asyncio.Queue()
         self._audio_q = queue.Queue()
         self._connected = threading.Event()
+        self._commit_lock = threading.Lock()
+        self._pending_commits = deque()
+        self._terminal_item_ids = set()
+        self._terminal_event_ids = set()
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
@@ -150,46 +184,7 @@ class _QwenASRSession(STTBackendSession):
 
                 def on_event(cb_self, response):
                     try:
-                        event_type = response.get("type", "")
-
-                        if event_type == "session.created":
-                            session_id = response.get("session", {}).get("id", "unknown")
-                            logger.debug(f"Qwen ASR: Session created: {session_id}")
-
-                        elif event_type == "conversation.item.input_audio_transcription.completed":
-                            # Final transcript
-                            transcript = response.get("transcript", "").strip()
-                            if transcript:
-                                logger.info(
-                                    "[STT] Qwen ASR transcript final text_len=%s",
-                                    len(transcript),
-                                )
-                                event = STTBackendTranscriptEvent(text=transcript, is_final=True)
-                                cb_self.parent._put_event(event)
-
-                        elif event_type == "conversation.item.input_audio_transcription.text":
-                            # Intermediate result (stash)
-                            text = response.get("text", "").strip()
-                            stash = response.get("stash", "").strip()
-                            if text or stash:
-                                logger.debug(
-                                    "Qwen ASR: Intermediate text_len=%s stash_len=%s",
-                                    len(text),
-                                    len(stash),
-                                )
-
-                        elif event_type == "input_audio_buffer.committed":
-                            logger.debug("Qwen ASR: Audio buffer committed")
-
-                        elif event_type == "error":
-                            error_msg = response.get("error", {}).get("message", "Unknown error")
-                            logger.warning(f"Qwen ASR error: {error_msg}")
-                            if not cb_self.parent._stopped:
-                                cb_self.parent._report_error(
-                                    RuntimeError(f"Qwen ASR error: {error_msg}")
-                                )
-                                cb_self.parent._stopped = True
-                                cb_self.parent._signal_stop()
+                        cb_self.parent._handle_provider_event(response)
 
                     except Exception as e:
                         logger.debug(f"Qwen ASR callback error: {e}")
@@ -246,10 +241,7 @@ class _QwenASRSession(STTBackendSession):
                 try:
                     data = self._audio_q.get(timeout=0.1)
                 except queue.Empty:
-                    if self._stopped:
-                        break
-                    # Check if keepalive needed
-                    if time.monotonic() - last_activity > KEEPALIVE_INTERVAL:
+                    if not self._stopped and time.monotonic() - last_activity > KEEPALIVE_INTERVAL:
                         try:
                             send_keepalive_silence()
                         except Exception as e:
@@ -260,30 +252,29 @@ class _QwenASRSession(STTBackendSession):
                     logger.debug(f"Qwen ASR: Stop signal received after {audio_chunks_sent} chunks")
                     break
 
-                if data is _COMMIT:
+                if data is _END_SESSION:
                     try:
-                        conversation.commit()
-                        logger.info("[STT] Commit sent to Qwen ASR (finalize)")
-                    except Exception as e:
-                        logger.warning(f"Failed to send commit: {e}")
+                        conversation.end_session(timeout=self.finish_timeout_s)
+                    except Exception as exc:
+                        logger.debug("Qwen ASR end_session failed: %s", exc)
+                    finally:
+                        self._resolve_all_pending_empty("session_finished_without_terminal")
+                    break
+
+                if data is _COMMIT:
+                    if not self._send_commit(conversation):
+                        break
                     continue
 
                 if isinstance(data, bytes):
-                    try:
-                        # Qwen ASR requires base64-encoded audio
-                        audio_b64 = base64.b64encode(data).decode("ascii")
-                        conversation.append_audio(audio_b64)
-                        audio_chunks_sent += 1
-                        last_activity = time.monotonic()  # Update activity time
-                        if audio_chunks_sent == 1:
-                            logger.info(
-                                f"[STT] First audio chunk sent to Qwen ASR ({len(data)} bytes)"
-                            )
-                        elif audio_chunks_sent % 50 == 0:
-                            logger.debug(f"[STT] Audio chunks sent: {audio_chunks_sent}")
-                    except Exception as e:
-                        logger.warning(f"Failed to send audio: {e}")
+                    if not self._append_audio(conversation, data):
                         break
+                    audio_chunks_sent += 1
+                    last_activity = time.monotonic()
+                    if audio_chunks_sent == 1:
+                        logger.info(f"[STT] First audio chunk sent to Qwen ASR ({len(data)} bytes)")
+                    elif audio_chunks_sent % 50 == 0:
+                        logger.debug(f"[STT] Audio chunks sent: {audio_chunks_sent}")
 
             # Close conversation
             try:
@@ -293,6 +284,7 @@ class _QwenASRSession(STTBackendSession):
 
         except BaseException as exc:
             logger.exception("Qwen ASR SDK thread error")
+            self._resolve_all_pending_empty("session_error")
             self._report_error(exc)
         finally:
             self._put_event(None)
@@ -312,6 +304,219 @@ class _QwenASRSession(STTBackendSession):
         except Exception:
             pass
 
+    @staticmethod
+    def _response_item_id(response: dict[str, Any]) -> str | None:
+        item_id = response.get("item_id")
+        if not item_id and isinstance(response.get("item"), dict):
+            item_id = response["item"].get("id")
+        value = str(item_id or "").strip()
+        return value or None
+
+    def _register_commit(self) -> _PendingCommit | None:
+        with self._commit_lock:
+            if not self._accept_terminals:
+                return None
+            pending = _PendingCommit(sequence=self._next_commit_sequence)
+            self._next_commit_sequence += 1
+            self._pending_commits.append(pending)
+            return pending
+
+    def _send_commit(self, conversation: Any) -> bool:
+        pending = self._register_commit()
+        if pending is None:
+            return False
+        try:
+            conversation.commit()
+            logger.info("[STT] Commit sent to Qwen ASR (finalize)")
+            return True
+        except Exception as exc:
+            logger.warning("Failed to send commit: %s", exc)
+            self._fail_worker_session(
+                RuntimeError("Qwen ASR commit send failed"),
+                status="commit_send_failed",
+            )
+            return False
+
+    def _append_audio(self, conversation: Any, data: bytes) -> bool:
+        try:
+            audio_b64 = base64.b64encode(data).decode("ascii")
+            conversation.append_audio(audio_b64)
+            return True
+        except Exception as exc:
+            logger.warning("Failed to send audio: %s", exc)
+            self._fail_worker_session(
+                RuntimeError("Qwen ASR audio send failed"),
+                status="audio_send_failed",
+            )
+            return False
+
+    def _assign_committed_item(self, response: dict[str, Any]) -> None:
+        item_id = self._response_item_id(response)
+        event_id = str(response.get("event_id") or "").strip() or "none"
+        with self._commit_lock:
+            pending = next(
+                (
+                    item
+                    for item in self._pending_commits
+                    if item.item_id is None and item.terminal_status is None
+                ),
+                None,
+            )
+            if pending is not None and item_id is not None:
+                pending.item_id = item_id
+            sequence = pending.sequence if pending is not None else None
+        logger.info(
+            "[STT] Qwen ASR committed sequence=%s event_id=%s item_id=%s",
+            sequence,
+            event_id,
+            item_id or "none",
+        )
+
+    def _resolve_terminal(
+        self,
+        response: dict[str, Any],
+        *,
+        status: str,
+        text: str,
+    ) -> None:
+        item_id = self._response_item_id(response)
+        event_id = str(response.get("event_id") or "").strip() or None
+        ready: list[STTBackendTranscriptEvent] = []
+        with self._commit_lock:
+            if not self._accept_terminals:
+                return
+            if event_id is not None and event_id in self._terminal_event_ids:
+                logger.debug("[STT] Qwen ASR duplicate terminal ignored event_id=%s", event_id)
+                return
+            if item_id is not None and item_id in self._terminal_item_ids:
+                logger.debug("[STT] Qwen ASR duplicate terminal ignored item_id=%s", item_id)
+                return
+            pending = None
+            if item_id is not None:
+                pending = next(
+                    (item for item in self._pending_commits if item.item_id == item_id),
+                    None,
+                )
+            if pending is None:
+                pending = next(
+                    (
+                        item
+                        for item in self._pending_commits
+                        if item.item_id is None and item.terminal_status is None
+                    ),
+                    None,
+                )
+                if pending is not None and item_id is not None:
+                    pending.item_id = item_id
+            if pending is None or pending.terminal_status is not None:
+                logger.debug(
+                    "[STT] Qwen ASR terminal ignored without pending commit item_id=%s status=%s",
+                    item_id or "none",
+                    status,
+                )
+                return
+            if event_id is not None:
+                self._terminal_event_ids.add(event_id)
+            pending.terminal_status = status
+            pending.event = STTBackendTranscriptEvent(text=text, is_final=True)
+            ready = self._drain_ready_terminals_locked()
+        for event in ready:
+            self._put_event(event)
+
+    def _resolve_all_pending_empty(self, status: str) -> None:
+        ready: list[STTBackendTranscriptEvent] = []
+        resolved = 0
+        with self._commit_lock:
+            if not self._accept_terminals:
+                return
+            for pending in self._pending_commits:
+                if pending.terminal_status is None:
+                    pending.terminal_status = status
+                    pending.event = STTBackendTranscriptEvent(text="", is_final=True)
+                    resolved += 1
+            ready = self._drain_ready_terminals_locked()
+        if resolved:
+            logger.warning(
+                "[STT] Qwen ASR unresolved commits closed status=%s count=%s",
+                status,
+                resolved,
+            )
+        for event in ready:
+            self._put_event(event)
+
+    def _discard_audio_queue(self) -> None:
+        while True:
+            try:
+                self._audio_q.get_nowait()
+            except queue.Empty:
+                return
+
+    def _fail_worker_session(self, exc: BaseException, *, status: str) -> None:
+        self._resolve_all_pending_empty(status)
+        with self._commit_lock:
+            self._accept_terminals = False
+        self._discard_audio_queue()
+        self._report_error(exc)
+        self._stopped = True
+
+    def _drain_ready_terminals_locked(self) -> list[STTBackendTranscriptEvent]:
+        ready: list[STTBackendTranscriptEvent] = []
+        while self._pending_commits and self._pending_commits[0].event is not None:
+            pending = self._pending_commits.popleft()
+            if pending.item_id is not None:
+                self._terminal_item_ids.add(pending.item_id)
+            ready.append(pending.event)
+        return ready
+
+    def _handle_provider_event(self, response: dict[str, Any]) -> None:
+        event_type = str(response.get("type", "") or "")
+        if event_type == "session.created":
+            session_id = response.get("session", {}).get("id", "unknown")
+            logger.debug("Qwen ASR: Session created: %s", session_id)
+            return
+        if event_type == "input_audio_buffer.committed":
+            self._assign_committed_item(response)
+            return
+        if event_type == "conversation.item.input_audio_transcription.completed":
+            transcript = str(response.get("transcript", "") or "").strip()
+            logger.info(
+                "[STT] Qwen ASR transcript terminal status=completed text_len=%s item_id=%s",
+                len(transcript),
+                self._response_item_id(response) or "none",
+            )
+            self._resolve_terminal(response, status="completed", text=transcript)
+            return
+        if event_type == "conversation.item.input_audio_transcription.failed":
+            error = response.get("error")
+            logger.warning(
+                "[STT] Qwen ASR transcript terminal status=failed item_id=%s error=%s",
+                self._response_item_id(response) or "none",
+                error,
+            )
+            self._resolve_terminal(response, status="failed", text="")
+            return
+        if event_type == "conversation.item.input_audio_transcription.text":
+            text = str(response.get("text", "") or "").strip()
+            stash = str(response.get("stash", "") or "").strip()
+            if text or stash:
+                logger.debug(
+                    "Qwen ASR: Intermediate text_len=%s stash_len=%s",
+                    len(text),
+                    len(stash),
+                )
+            return
+        if event_type == "session.finished":
+            logger.info("[STT] Qwen ASR session finished")
+            return
+        if event_type == "error":
+            error_msg = response.get("error", {}).get("message", "Unknown error")
+            logger.warning("Qwen ASR error: %s", error_msg)
+            self._resolve_all_pending_empty("session_error")
+            if not self._stopped:
+                self._report_error(RuntimeError(f"Qwen ASR error: {error_msg}"))
+                self._stopped = True
+                self._signal_stop()
+
     def _put_event(self, event: STTBackendTranscriptEvent | BaseException | None) -> None:
         """Thread-safe event posting to the asyncio queue."""
         if self._loop is not None:
@@ -322,40 +527,48 @@ class _QwenASRSession(STTBackendSession):
             return
         self._audio_q.put_nowait(pcm16le)
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        """Handle end of speech: top up trailing silence if needed, then commit."""
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
         if self._stopped:
             return
 
-        min_silence_ms = 100
         existing_ms = max(int(trailing_silence_ms or 0), 0)
-        missing_ms = max(min_silence_ms - existing_ms, 0)
+        missing_ms = 0
+        wait_ms = boundary_wait_ms(reason, observed_tail_ms=existing_ms)
 
-        if missing_ms > 0:
-            import numpy as np
-
-            silence_samples = int(self.sample_rate_hz * (missing_ms / 1000.0))
-            if silence_samples > 0:
-                silence = np.zeros(silence_samples, dtype=np.float32)
-                pcm16 = (silence * 32767).astype(np.int16).tobytes()
-                self._audio_q.put_nowait(pcm16)
-                logger.info(
-                    "[STT] Trailing silence sent (%sms, %s samples)", missing_ms, silence_samples
-                )
-
-        # Send commit (equivalent to Deepgram's Finalize)
+        logger.info(
+            "[STT][Tail] provider=qwen boundary_reason=%s observed_tail_ms=%s "
+            "injected_padding_ms=%s "
+            "declared_trim_ms=0 boundary_wait_ms=%s",
+            reason,
+            existing_ms,
+            missing_ms,
+            wait_ms,
+        )
         self._audio_q.put_nowait(_COMMIT)
 
     async def stop(self) -> None:
         if self._stopped:
             return
         self._stopped = True
+        self._audio_q.put_nowait(_END_SESSION)
+
+    async def abort_for_toggle_off(self) -> None:
+        self._stopped = True
+        with self._commit_lock:
+            self._accept_terminals = False
+            self._pending_commits.clear()
+        self._discard_audio_queue()
         self._signal_stop()
 
     async def close(self) -> None:
         await self.stop()
         if self._thread is not None:
-            self._thread.join(timeout=5.0)
+            await asyncio.to_thread(self._thread.join, 5.0)
             self._thread = None
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:

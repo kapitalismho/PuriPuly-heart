@@ -26,6 +26,7 @@ from puripuly_heart.core.local_stt_assets import (
 )
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     STTBackend,
     STTBackendSession,
@@ -378,8 +379,13 @@ class _LocalQwenSherpaSession(STTBackendSession):
             return
         self._buffer_f32.append(samples.copy())
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        _ = trailing_silence_ms
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        _ = (trailing_silence_ms, reason)
         if self._closed or self._stopping or not self._decode_coordinator.accepting:
             return
 

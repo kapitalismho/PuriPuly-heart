@@ -482,13 +482,17 @@ class ManagedSTTProvider:
                     fallback_level=logging.WARNING,
                 )
             self._emit_detailed(
-                "[STT] Speech end handling for id=%s (trailing_silence_ms=%s)",
+                "[STT] Speech end handling for id=%s " "(reason=%s, trailing_silence_ms=%s)",
                 str(event.utterance_id)[:8],
+                event.reason,
                 event.trailing_silence_ms,
                 fallback_level=logging.INFO,
             )
             self._emit_stt_input_diagnostics(event.utterance_id, finalize=True)
-            await self._active_session.on_speech_end(trailing_silence_ms=event.trailing_silence_ms)
+            await self._active_session.on_speech_end(
+                trailing_silence_ms=event.trailing_silence_ms,
+                reason=event.reason,
+            )
 
     async def _send_audio(self, samples_f32: np.ndarray) -> None:
         samples_f32 = np.asarray(samples_f32, dtype=np.float32).reshape(-1)

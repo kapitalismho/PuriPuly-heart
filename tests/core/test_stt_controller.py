@@ -15,6 +15,7 @@ from puripuly_heart.config.settings import STTProviderName
 from puripuly_heart.core import messages
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.runtime_logging import SessionLoggingMode, SessionRuntimeLoggingService
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
@@ -116,8 +117,13 @@ class FakeSession:
         await self._queue.put(STTBackendTranscriptEvent(text="final", is_final=True))
         await self._queue.put(None)  # sentinel
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        _ = trailing_silence_ms
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        _ = (trailing_silence_ms, reason)
         self.calls.append("on_speech_end")
 
     async def close(self) -> None:
@@ -160,6 +166,7 @@ class Float32Session:
     audio_bytes: list[bytes]
     _queue: asyncio.Queue
     calls: list[str]
+    speech_ends: list[tuple[int | None, SpeechBoundaryReason | None]]
     _closed: bool = False
 
     def __init__(self) -> None:
@@ -167,6 +174,7 @@ class Float32Session:
         self.audio_bytes = []
         self._queue = asyncio.Queue()
         self.calls = []
+        self.speech_ends = []
 
     async def send_audio(self, pcm16le: bytes) -> None:
         self.audio_bytes.append(pcm16le)
@@ -178,9 +186,14 @@ class Float32Session:
         self.calls.append("stop")
         await self._queue.put(None)
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        _ = trailing_silence_ms
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
         self.calls.append("on_speech_end")
+        self.speech_ends.append((trailing_silence_ms, reason))
 
     async def close(self) -> None:
         self._closed = True
@@ -247,8 +260,13 @@ class EventOnlySession:
     async def send_audio(self, pcm16le: bytes) -> None:
         _ = pcm16le
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        _ = trailing_silence_ms
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        _ = (trailing_silence_ms, reason)
 
     async def stop(self) -> None:
         return None
@@ -281,8 +299,13 @@ class FailingSession:
     async def send_audio(self, pcm16le: bytes) -> None:
         self.audio.append(pcm16le)
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        _ = trailing_silence_ms
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        _ = (trailing_silence_ms, reason)
 
     async def stop(self) -> None:
         return None
@@ -347,8 +370,13 @@ class TerminalFailureSession:
     async def send_audio(self, pcm16le: bytes) -> None:
         _ = pcm16le
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        _ = trailing_silence_ms
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        _ = (trailing_silence_ms, reason)
 
     async def stop(self) -> None:
         self.stopped = True
@@ -500,6 +528,31 @@ async def test_stt_controller_logs_input_diagnostics_on_speech_end() -> None:
     finally:
         await stt.close()
         runtime_logging.close()
+
+
+async def test_stt_controller_preserves_soft_boundary_reason_and_observed_tail() -> None:
+    backend = Float32Backend()
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        channel="peer",
+        reset_deadline_s=90.0,
+    )
+    uid = uuid4()
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                uid,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await stt.handle_vad_event(SpeechEnd(uid, trailing_silence_ms=160, reason="soft_pause"))
+
+        assert backend.sessions[0].speech_ends == [(160, "soft_pause")]
+    finally:
+        await stt.close()
 
 
 async def test_stt_input_fault_profile_modifies_audio_after_vad() -> None:
@@ -1306,6 +1359,55 @@ async def test_managed_stt_provider_multiple_pending_finals_resolve_fifo() -> No
             "first final",
             "second final",
         ]
+    finally:
+        await stt.close()
+
+
+async def test_managed_stt_provider_emits_later_session_final_without_earlier_boundary() -> None:
+    backend = Float32Backend()
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        reset_deadline_s=0.1,
+        reconnect_window_s=0.5,
+        drain_timeout_s=0.05,
+        finalize_grace_s=0.0,
+    )
+
+    first_utterance_id = uuid4()
+    second_utterance_id = uuid4()
+    stream = stt.events()
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                first_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(first_utterance_id))
+
+        await asyncio.sleep(0.15)
+        assert len(backend.sessions) == 2
+
+        await stt.handle_vad_event(
+            SpeechStart(
+                second_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        await stt.handle_vad_event(SpeechEnd(second_utterance_id))
+
+        await backend.sessions[1]._queue.put(
+            STTBackendTranscriptEvent(text="second final", is_final=True)
+        )
+
+        event = await _next_typed_event(stream, STTFinalEvent)
+        assert event.transcript.text == "second final"
+        assert event.transcript.is_final is True
     finally:
         await stt.close()
 
@@ -2131,6 +2233,10 @@ async def test_managed_stt_provider_repeated_forced_boundaries_reuse_session_and
         assert len(backend.sessions) == 1
         session = backend.sessions[0]
         assert session.calls == ["on_speech_end", "on_speech_end"]
+        assert session.speech_ends == [
+            (0, "max_duration"),
+            (0, "max_duration"),
+        ]
         assert len(session.audio_f32) == 2
 
         await session._queue.put(STTBackendTranscriptEvent(text="first forced", is_final=True))

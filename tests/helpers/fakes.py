@@ -10,6 +10,7 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionSnapshot,
     SelfCaptureSessionState,
 )
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.domain.models import OSCMessage
 
@@ -51,8 +52,13 @@ class SpeechAwareFakeSession:
             await self._queue.put(STTBackendTranscriptEvent(text="FINAL", is_final=True))
             self._seen_speech = False
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        _ = trailing_silence_ms
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        _ = (trailing_silence_ms, reason)
         if self._seen_speech:
             await self._queue.put(STTBackendTranscriptEvent(text="FINAL", is_final=True))
             self._seen_speech = False

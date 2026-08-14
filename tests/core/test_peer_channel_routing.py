@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
@@ -27,8 +28,13 @@ class FakePeerSession:
         if any(byte != 0 for byte in pcm16le):
             self._seen_speech = True
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        _ = trailing_silence_ms
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        _ = (trailing_silence_ms, reason)
         if self._seen_speech:
             self._seen_speech = False
             await self._queue.put(STTBackendTranscriptEvent(text="peer final", is_final=True))
@@ -69,8 +75,13 @@ class LabelledPeerSession:
         if any(byte != 0 for byte in pcm16le):
             self._seen_speech = True
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        _ = trailing_silence_ms
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        _ = (trailing_silence_ms, reason)
         if self._seen_speech:
             self._seen_speech = False
             await self._queue.put(
