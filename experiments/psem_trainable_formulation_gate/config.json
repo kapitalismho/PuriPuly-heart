@@ -1,0 +1,43 @@
+{
+  "adapter_bottleneck_dimension": 64,
+  "adapter_learning_rate": 0.0001,
+  "batch_size": 256,
+  "development_false_event_targets_per_hour": [1, 5, 10, 20],
+  "direct_positive_radius_ms": 50,
+  "duplicate_suppression_ms": 200,
+  "early_stopping_patience": 4,
+  "encoder_cell_context_ms": 500,
+  "encoder_layer": "L12",
+  "eres_batch_size": 16,
+  "eres_threads": 8,
+  "epochs": 20,
+  "experiment_id": "psem_trainable_formulation_gate_v1",
+  "frontier_curve_sample_count": 512,
+  "folds": [
+    ["alimeeting_R8001_M8004", "ami_IS1009a"],
+    ["alimeeting_R8008_M8013", "ami_EN2001d"],
+    ["alimeeting_R8009_M8019", "ami_TS3006a"],
+    ["ami_ES2003a", "alimeeting_R8007_M8010"],
+    ["ami_TS3009b", "ami_ES2015d"]
+  ],
+  "head_learning_rate": 0.001,
+  "hidden_dimension": 64,
+  "hop_ms": 100,
+  "model_id": "wavlm-base-plus",
+  "model_ids": [
+    "eres2netv2-standard-prepool",
+    "wavlm-base-plus",
+    "mhubert-147"
+  ],
+  "output_relative_path": "results/psem_trainable_formulation_gate_v1",
+  "pair_dimension": 48,
+  "seeds": [7201, 7202],
+  "sequence_frontier_offsets_ms": [-500, -400, -300, -200, -100, 0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000],
+  "structured_relation_target": "singleton_endpoints_with_only_silence_between",
+  "state_loss_weight": 0.5,
+  "training_background_hop_ms": 500,
+  "training_event_radius_ms": 500,
+  "wavlm_batch_size": 32,
+  "wavlm_threads": 16,
+  "weight_decay": 0.0001
+}
