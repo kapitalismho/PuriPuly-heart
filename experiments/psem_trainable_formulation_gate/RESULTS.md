@@ -1,5 +1,7 @@
 # PSEM trainable formulation gate results
 
+> **Stopped experiment:** Read [`EXPERIMENT_STOP_SUMMARY.ko.md`](EXPERIMENT_STOP_SUMMARY.ko.md) for the consolidated interpretation and limitations. These arms did not fine-tune pretrained encoder parameters, no scratch arm was run, and clean 12-arm regeneration was not completed. The results below therefore do not answer fine-tuning versus scratch.
+
 Evidence status: **development-known direction-selection evidence only**.
 
 The three pinned models used the same ten natural continuous meetings, five out-of-fold splits, source-time grid, fixed-lag context, event semantics, duplicate handling, adapter recipe, and evaluation code.

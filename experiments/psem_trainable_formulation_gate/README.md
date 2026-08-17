@@ -1,5 +1,7 @@
 # PSEM trainable formulation gate
 
+Experiment execution stopped on 2026-08-17. The consolidated scope, results, and limitations are documented in [`EXPERIMENT_STOP_SUMMARY.ko.md`](EXPERIMENT_STOP_SUMMARY.ko.md). This experiment did not fine-tune pretrained encoder parameters and did not run a scratch arm, so it does not answer fine-tuning versus scratch.
+
 This experiment answers GitHub issue #72 plus the owner's 2026-08-16 scope amendment with three pinned models and the same four arms for each model:
 
 - `eres2netv2-standard-prepool`
@@ -9,9 +11,9 @@ This experiment answers GitHub issue #72 plus the owner's 2026-08-16 scope amend
 | Arm | Encoder | Target |
 | --- | --- | --- |
 | `A-FROZEN-DIRECT` | frozen | direct speaker-change event |
-| `B-TRAINABLE-DIRECT` | shared residual encoder adapter | direct speaker-change event |
+| `B-TRAINABLE-DIRECT` | shared residual output adapter | direct speaker-change event |
 | `C-FROZEN-STATE` | frozen | local speech state and speaker relation |
-| `D-TRAINABLE-STATE` | shared residual encoder adapter | local speech state and speaker relation |
+| `D-TRAINABLE-STATE` | shared residual output adapter | local speech state and speaker relation |
 
 All twelve arms reuse the R7-B meeting folds, labels, source-time grid, fixed-lag context, event semantics, one-to-one matching, and false-events-per-source-hour accounting. Each 100 ms cell is represented by the pinned model's final embedding over the preceding 500 ms. ERes cells are extracted directly from the receipt-bound waveform bytes with the pinned checkpoint and verified source implementation. The local head receives cell frontiers from `t - 500 ms` through `t + 1000 ms`.
 
@@ -21,7 +23,7 @@ Structured arms supervise every relation consumed by the decoder: adjacent singl
 
 The end-to-end structured result does not by itself identify a structured-representation failure. State/relation quality and the structured-to-event projection are reported separately so projection or calibration loss is not attributed to representation learning without evidence.
 
-B and D use the same bounded adaptation recipe: a 64-dimensional residual bottleneck adapter attached to the encoder output. The pretrained model parameters remain fixed; task-loss gradients update the encoder adapter and task head. There is no adaptation-method sweep.
+B and D use the same bounded output-adapter recipe: a 64-dimensional residual bottleneck attached after the encoder output. The pretrained model parameters remain fixed; task-loss gradients update only the output adapter and task head. This is not pretrained-encoder fine-tuning. There is no adaptation-method sweep.
 
 Artifacts are written outside the repository under `%SRSCD_CACHE_ROOT%/results/psem_trainable_formulation_gate_v1/`.
 
