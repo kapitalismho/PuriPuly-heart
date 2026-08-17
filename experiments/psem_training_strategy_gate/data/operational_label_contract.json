@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "contract_version": "psem-handoff-v0",
+  "authority": {
+    "experiment_issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/76",
+    "dataset_issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/77",
+    "dataset_issue_sha256": "5778025c8aca1ea1cb7cd8fc41645b520ca1f9f749155b5f5daada32e940b559"
+  },
+  "status": "provisional_annotation_only_calibration_required",
+  "source_coordinate_convention": {
+    "sample_rate_hz": 16000,
+    "coordinates": "zero_based_half_open_unsnapped_source_samples",
+    "grid_mapping": "forbidden_in_dataset_labels"
+  },
+  "constants_ms": {
+    "reliable_solo_min_duration": 200,
+    "annotation_boundary_jitter": 50,
+    "gap_topology_min_duration": 100,
+    "overlap_topology_min_duration": 100,
+    "local_continuity_max_gap": 1200,
+    "short_backchannel_min_duration": 200,
+    "short_backchannel_max_duration": 1000
+  },
+  "primary_event": {
+    "id": "handoff_confirmed",
+    "boundary": "first_source_sample_of_the_new_reliable_solo_interval",
+    "reliability_confirmation_shifts_boundary": false,
+    "initial_solo_is_handoff": false,
+    "overlap_onset_is_handoff": false
+  },
+  "boundary_reconciliation": {
+    "gap_at_or_below_jitter_ms": "direct_transition_with_boundary_jitter_gap_tag",
+    "overlap_at_or_below_jitter_ms": "direct_transition_at_post_overlap_solo_boundary_with_boundary_jitter_overlap_tag",
+    "micro_gap_above_jitter_below_topology_minimum": "valid_target_when_resolved_but_not_official_gap_coverage",
+    "micro_overlap_above_jitter_below_topology_minimum": "valid_target_when_resolved_but_not_official_overlap_coverage",
+    "overlap_then_gap_resolved_within_continuity": "valid_target_at_reliable_solo_onset_but_not_official_gap_or_overlap_coverage",
+    "audio_or_model_prediction_repair": "forbidden"
+  },
+  "official_primary_topology_precedence": [
+    "short_backchannel_return",
+    "overlap_takeover",
+    "overlap_return",
+    "silence_gap_different_speaker_handoff",
+    "same_speaker_silence_gap_resume",
+    "clean_direct_different_speaker_handoff"
+  ],
+  "exclusive_counting": {
+    "short_backchannel_return": "one_episode_replaces_its_two_member_handoff_topologies_for_coverage_only",
+    "secondary_tags": "may_preserve_non_counting_entry_and_return_semantics",
+    "one_episode_may_increment_official_primary_gate_count": 1
+  },
+  "ambiguity_and_mask_rules": {
+    "unknown_speaker_identity": "retain_activity_and_mask_handoff_and_relation",
+    "unknown_active_speech_without_ids": "represent_as_speaker_identity_known_false_with_empty_active_speakers_and_activity_state_unknown_speech",
+    "initial_solo_after_unknown_ambiguous_or_complex_prefix": "mask_handoff_and_relation",
+    "ambiguous_annotation_crossing": "mask_handoff_and_relation",
+    "complex_overlap_transition": "mask_handoff_and_relation",
+    "complex_overlap_region_three_or_more_speakers": "retain_overlap_activity_and_emit_masked_diagnostic_topology",
+    "overlap_to_silence_without_reliable_resolution": "mask_handoff_and_relation",
+    "gap_above_local_continuity_maximum": "continuity_unknown_and_mask_handoff_and_relation",
+    "activity_supervision": "retain_when_interval_activity_is_reliable"
+  },
+  "forbidden_task_authority": [
+    "experiments/speaker_representation_scd/r7_relation_verifier.py::_event_rows",
+    "experiments/speaker_representation_scd/r7b_local_segmentation.py labels/events",
+    "cached R7/R7-B event manifests",
+    "issue #72 labels"
+  ]
+}
