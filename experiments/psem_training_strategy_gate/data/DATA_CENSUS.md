@@ -4,7 +4,7 @@ This is the frozen-contract census of every accepted natural candidate meeting p
 
 Contract: `psem-handoff-v0` (`frozen_after_annotation_only_calibration`)
 
-The identity graph and pinned WavLM overlap audit cover all 76 sources in 42 components. `split_manifest.json` assigns every component exactly once in EVAL, then DEV, then TRAIN order. The split reaches the integer global upper bound for minimum normalized topology slack and passes all 22 role-specific hard gates. Dataset freeze identity and final preflight remain separate later checkpoints.
+The identity graph and pinned WavLM overlap audit cover all 76 sources in 42 components. `split_manifest.json` assigns every component exactly once in EVAL, then DEV, then TRAIN order. The split reaches the integer global upper bound for minimum normalized topology slack and passes all 22 role-specific hard gates. Dataset freeze `PSEM-STRATEGY-DATA-v1` is bound in `dataset_freeze.json`; final preflight is recorded separately.
 
 ## Overall
 

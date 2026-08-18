@@ -649,7 +649,7 @@ def render_data_census(
         f"Contract: `{census['contract_version']}` (`{census['contract_status']}`)",
         "",
         (
-            "The identity graph and pinned WavLM overlap audit cover all 76 sources in 42 components. `split_manifest.json` assigns every component exactly once in EVAL, then DEV, then TRAIN order. The split reaches the integer global upper bound for minimum normalized topology slack and passes all 22 role-specific hard gates. Dataset freeze identity and final preflight remain separate later checkpoints."
+            "The identity graph and pinned WavLM overlap audit cover all 76 sources in 42 components. `split_manifest.json` assigns every component exactly once in EVAL, then DEV, then TRAIN order. The split reaches the integer global upper bound for minimum normalized topology slack and passes all 22 role-specific hard gates. Dataset freeze `PSEM-STRATEGY-DATA-v1` is bound in `dataset_freeze.json`; final preflight is recorded separately."
             if split_selected
             else "Split roles remain unassigned until the identity graph and pretrained-checkpoint overlap audit are complete. Component counts are therefore pending and the raw-pool lower-bound audit is not split feasibility evidence."
         ),
