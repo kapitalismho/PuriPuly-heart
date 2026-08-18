@@ -22,6 +22,7 @@ Runtime/bundled notice-sensitive components:
 - certifi: MPL-2.0.
 - NumPy binary wheels may include OpenBLAS, LAPACK, and GCC runtime library exception notices.
 - OpenVR runtime DLL: BSD-3-Clause.
+- llama.cpp CPU and Vulkan runtime: MIT.
 - Noto Sans CJK Medium TTC: SIL Open Font License 1.1.
 - Silero VAD ONNX model: MIT.
 - Bundled fonts: SIL Open Font License 1.1.
@@ -45,6 +46,16 @@ For package-managed dependencies, the authoritative license texts are distribute
 - SIL Open Font License 1.1: included below for bundled fonts.
 - CC-BY-4.0: https://creativecommons.org/licenses/by/4.0/legalcode.en
 - PyInstaller bootloader exception: https://github.com/pyinstaller/pyinstaller/blob/develop/COPYING.txt
+
+----
+
+llama.cpp CPU and Vulkan runtime
+Source: https://github.com/ggml-org/llama.cpp
+Pinned release: https://github.com/ggml-org/llama.cpp/releases/tag/b10423
+Pinned commit: a94d563ed801d1da1b8c2432946de07d0231bb3d
+License: MIT
+
+Windows releases contain the pinned llama.cpp server runtime required for managed local translation. The application installer does not contain Gemma model weights. The complete llama.cpp license is installed at third_party/llama.cpp/LICENSE.
 
 ----
 
