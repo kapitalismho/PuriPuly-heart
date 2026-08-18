@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections import Counter
 from pathlib import Path
@@ -579,16 +580,79 @@ def _build_topology_census_from_validated_sessions(
     return rows, census
 
 
-def render_data_census(census: dict[str, Any], rows: Sequence[dict[str, Any]]) -> str:
+def _validate_split_render_binding(
+    census: dict[str, Any],
+    rows: Sequence[dict[str, Any]],
+    split_manifest: dict[str, Any],
+    split_manifest_sha256: str,
+) -> None:
+    expected_census_sha256 = hashlib.sha256(
+        (
+            json.dumps(census, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            + "\n"
+        ).encode("utf-8")
+    ).hexdigest()
+    input_artifacts = split_manifest.get("input_artifacts")
+    assignments = split_manifest.get("assignments")
+    role_summaries = split_manifest.get("role_summaries")
+    source_ids = {row.get("source_id") for row in rows}
+    if (
+        split_manifest.get("artifact_role") != "psem_component_split_assignment"
+        or split_manifest.get("hard_gate_status") != "pass"
+        or not isinstance(input_artifacts, dict)
+        or input_artifacts.get("topology_manifest_sha256")
+        != census.get("topology_manifest_sha256")
+        or input_artifacts.get("topology_census_sha256") != expected_census_sha256
+        or not isinstance(assignments, dict)
+        or not isinstance(assignments.get("sources"), list)
+        or {row.get("source_id") for row in assignments["sources"]} != source_ids
+        or len(assignments["sources"]) != len(source_ids)
+        or not isinstance(role_summaries, dict)
+        or set(role_summaries)
+        != {
+            "PSEM-STRATEGY-TRAIN",
+            "PSEM-STRATEGY-DEV",
+            "PSEM-STRATEGY-EVAL",
+        }
+        or len(split_manifest_sha256) != 64
+    ):
+        raise TopologyCensusError("split manifest is not bound to the rendered census")
+
+
+def render_data_census(
+    census: dict[str, Any],
+    rows: Sequence[dict[str, Any]],
+    split_manifest: dict[str, Any] | None = None,
+    split_manifest_sha256: str | None = None,
+) -> str:
     overall = census["overall"]
+    split_selected = split_manifest is not None
+    if split_selected:
+        if split_manifest_sha256 is None:
+            raise TopologyCensusError("split manifest hash is required for split-aware rendering")
+        _validate_split_render_binding(
+            census, rows, split_manifest, split_manifest_sha256
+        )
     lines = [
-        "# Natural topology census",
+        (
+            "# Natural topology census and component split"
+            if split_selected
+            else "# Natural topology census"
+        ),
         "",
-        "This is the frozen-contract pre-split census of every accepted natural candidate meeting. No model prediction, model score, official model result, or model training participated.",
+        (
+            "This is the frozen-contract census of every accepted natural candidate meeting plus the deterministic connected-component assignment selected for TRAIN, DEV, and EVAL. No model prediction, model score, official model result, or model training participated."
+            if split_selected
+            else "This is the frozen-contract pre-split census of every accepted natural candidate meeting. No model prediction, model score, official model result, or model training participated."
+        ),
         "",
         f"Contract: `{census['contract_version']}` (`{census['contract_status']}`)",
         "",
-        "Split roles remain unassigned until the identity graph and pretrained-checkpoint overlap audit are complete. Component counts are therefore pending and the raw-pool lower-bound audit is not split feasibility evidence.",
+        (
+            "The identity graph and pinned WavLM overlap audit cover all 76 sources in 42 components. `split_manifest.json` assigns every component exactly once in EVAL, then DEV, then TRAIN order. The split reaches the integer global upper bound for minimum normalized topology slack and passes all 22 role-specific hard gates. Dataset freeze identity and final preflight remain separate later checkpoints."
+            if split_selected
+            else "Split roles remain unassigned until the identity graph and pretrained-checkpoint overlap audit are complete. Component counts are therefore pending and the raw-pool lower-bound audit is not split feasibility evidence."
+        ),
         "",
         "## Overall",
         "",
@@ -624,6 +688,46 @@ def render_data_census(census: dict[str, Any], rows: Sequence[dict[str, Any]]) -
     for corpus, aggregate in census["by_corpus"].items():
         lines.append(
             f"| {corpus} | {aggregate['session_count']} | {aggregate['scored_hours']} | {aggregate['stable_singleton_hours']} | {aggregate['ongoing_overlap_hours']} | {aggregate['exclusive_primary_episode_count']} |"
+        )
+    if split_selected:
+        assert split_manifest is not None
+        role_summaries = split_manifest["role_summaries"]
+        role_order = (
+            ("TRAIN", "PSEM-STRATEGY-TRAIN"),
+            ("DEV", "PSEM-STRATEGY-DEV"),
+            ("EVAL", "PSEM-STRATEGY-EVAL"),
+        )
+        lines.extend(
+            [
+                "",
+                "## By selected role",
+                "",
+                "| Role | Components | Meetings | Scored h | Stable singleton h | Ongoing overlap h | Known speakers | Corpora |",
+                "|---|---:|---:|---:|---:|---:|---:|---|",
+            ]
+        )
+        for label, role in role_order:
+            summary = role_summaries[role]
+            lines.append(
+                f"| {label} | {summary['component_count']} | {summary['independent_meetings']} | {summary['scored_hours']} | {summary['stable_singleton_hours']} | {summary['ongoing_overlap_hours']} | {summary['known_speaker_count']} | {' + '.join(summary['corpora'])} |"
+            )
+        lines.extend(
+            [
+                "",
+                "| Role | Direct | Gap handoff | Same gap | Overlap return | Overlap takeover | Short return |",
+                "|---|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for label, role in role_order:
+            counts = role_summaries[role]["primary_topology_counts"]
+            lines.append(
+                f"| {label} | {counts['clean_direct_different_speaker_handoff']} | {counts['silence_gap_different_speaker_handoff']} | {counts['same_speaker_silence_gap_resume']} | {counts['overlap_return']} | {counts['overlap_takeover']} | {counts['short_backchannel_return']} |"
+            )
+        lines.extend(
+            [
+                "",
+                "The exact source and component membership, input hashes, search seed/version, objective order, leakage audit, hard-gate observations, and assignment hash are authoritative in `split_manifest.json`.",
+            ]
         )
     lines.extend(
         [
@@ -665,6 +769,13 @@ def render_data_census(census: dict[str, Any], rows: Sequence[dict[str, Any]]) -
     )
     if audit["scored_samples"]["deficit"]:
         lower_bound_status = "The scored-hour deficit is an acquisition blocker."
+    elif split_selected:
+        lower_bound_status = (
+            "The raw-pool lower bounds and the selected connected-component assignment "
+            "both pass. EVAL uses only freshness-eligible components; TRAIN+DEV and "
+            "EVAL pass every exclusive topology and negative-exposure minimum; TRAIN, "
+            "DEV, and EVAL pass their scored-hour and meeting minima."
+        )
     else:
         lower_bound_status = (
             "The aggregate scored-hour lower bound passes; role-specific allocation "
@@ -678,7 +789,11 @@ def render_data_census(census: dict[str, Any], rows: Sequence[dict[str, Any]]) -
             "| Criterion | Observed raw pool | Combined hard role minimum | Raw deficit/status |",
             "|---|---:|---:|---:|",
             f"| Scored natural hours | {overall['scored_hours']} hours | 33.0 hours | {scored_deficit_hours} hours |",
-            f"| Independent meetings | {audit['independent_meetings']['observed_upper_bound']} upper bound | {audit['independent_meetings']['required_total']} | component audit pending |",
+            (
+                f"| Independent meetings | {audit['independent_meetings']['observed_upper_bound']} accepted sessions | {audit['independent_meetings']['required_total']} | 0 |"
+                if split_selected
+                else f"| Independent meetings | {audit['independent_meetings']['observed_upper_bound']} upper bound | {audit['independent_meetings']['required_total']} | component audit pending |"
+            ),
             f"| Stable singleton hours | {stable_observed_hours} hours | {stable_required_hours} hours | {stable_deficit_hours} hours |",
             f"| Ongoing overlap minutes | {overlap_observed_minutes} minutes | {overlap_required_minutes} minutes | {overlap_deficit_minutes} minutes |",
         ]
@@ -690,11 +805,17 @@ def render_data_census(census: dict[str, Any], rows: Sequence[dict[str, Any]]) -
     lines.extend(
         [
             "",
-            f"{lower_bound_status} The meeting count is only an upper bound until connected identity components are audited. Zero raw-pool deficits do not prove component-safe role allocation. No topology substitutes for another, and no threshold, count, or natural-data requirement is weakened.",
+            (
+                f"{lower_bound_status} No topology substitutes for another, and no threshold, count, or natural-data requirement is weakened."
+                if split_selected
+                else f"{lower_bound_status} The meeting count is only an upper bound until connected identity components are audited. Zero raw-pool deficits do not prove component-safe role allocation. No topology substitutes for another, and no threshold, count, or natural-data requirement is weakened."
+            ),
             "",
             f"Topology manifest SHA-256: `{census['topology_manifest_sha256']}`",
         ]
     )
+    if split_selected:
+        lines.extend(["", f"Split manifest SHA-256: `{split_manifest_sha256}`"])
     return "\n".join(lines) + "\n"
 
 
@@ -728,8 +849,19 @@ def write_topology_census(
         encoding="utf-8",
         newline="\n",
     )
+    split_manifest_path = data_dir / "split_manifest.json"
+    split_manifest = None
+    split_manifest_sha256 = None
+    if split_manifest_path.is_file():
+        try:
+            split_manifest = json.loads(split_manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise TopologyCensusError("split manifest is invalid during census rendering") from exc
+        split_manifest_sha256 = sha256_file(split_manifest_path)
     markdown_path.write_text(
-        render_data_census(census, rows), encoding="utf-8", newline="\n"
+        render_data_census(census, rows, split_manifest, split_manifest_sha256),
+        encoding="utf-8",
+        newline="\n",
     )
 
 

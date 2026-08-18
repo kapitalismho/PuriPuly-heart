@@ -167,7 +167,17 @@ def test_checked_in_topology_census_binds_the_frozen_inventory() -> None:
         "masked_transition_fraction"
     ] == 0.33906608
     markdown = (DATA_DIR / "DATA_CENSUS.md").read_text(encoding="utf-8")
-    assert "component audit pending" in markdown
+    split_manifest = json.loads(
+        (DATA_DIR / "split_manifest.json").read_text(encoding="utf-8")
+    )
+    assert markdown == render_data_census(
+        census,
+        rows,
+        split_manifest,
+        sha256_file(DATA_DIR / "split_manifest.json"),
+    )
+    assert "component audit pending" not in markdown
+    assert "passes all 22 role-specific hard gates" in markdown
     assert "No topology substitutes for another" in markdown
     assert "Stable singleton hours" in markdown
     assert "Ongoing overlap minutes" in markdown

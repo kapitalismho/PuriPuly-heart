@@ -1,10 +1,10 @@
-# Natural topology census
+# Natural topology census and component split
 
-This is the frozen-contract pre-split census of every accepted natural candidate meeting. No model prediction, model score, official model result, or model training participated.
+This is the frozen-contract census of every accepted natural candidate meeting plus the deterministic connected-component assignment selected for TRAIN, DEV, and EVAL. No model prediction, model score, official model result, or model training participated.
 
 Contract: `psem-handoff-v0` (`frozen_after_annotation_only_calibration`)
 
-Split roles remain unassigned until the identity graph and pretrained-checkpoint overlap audit are complete. Component counts are therefore pending and the raw-pool lower-bound audit is not split feasibility evidence.
+The identity graph and pinned WavLM overlap audit cover all 76 sources in 42 components. `split_manifest.json` assigns every component exactly once in EVAL, then DEV, then TRAIN order. The split reaches the integer global upper bound for minimum normalized topology slack and passes all 22 role-specific hard gates. Dataset freeze identity and final preflight remain separate later checkpoints.
 
 ## Overall
 
@@ -36,6 +36,22 @@ Split roles remain unassigned until the identity graph and pretrained-checkpoint
 |---|---:|---:|---:|---:|---:|
 | AMI | 68 | 35.598119 | 24.147 | 5.355619 | 14502 |
 | AliMeeting | 8 | 4.191897 | 3.032783 | 0.838428 | 2770 |
+
+## By selected role
+
+| Role | Components | Meetings | Scored h | Stable singleton h | Ongoing overlap h | Known speakers | Corpora |
+|---|---:|---:|---:|---:|---:|---:|---|
+| TRAIN | 25 | 45 | 23.842971 | 16.420787 | 3.867015 | 95 | AMI + AliMeeting |
+| DEV | 7 | 12 | 5.958004 | 3.822364 | 1.019792 | 27 | AMI + AliMeeting |
+| EVAL | 10 | 19 | 9.989041 | 6.936632 | 1.30724 | 38 | AMI + AliMeeting |
+
+| Role | Direct | Gap handoff | Same gap | Overlap return | Overlap takeover | Short return |
+|---|---:|---:|---:|---:|---:|---:|
+| TRAIN | 437 | 2018 | 1046 | 4354 | 2161 | 526 |
+| DEV | 119 | 623 | 195 | 1105 | 661 | 152 |
+| EVAL | 111 | 656 | 531 | 1656 | 742 | 179 |
+
+The exact source and component membership, input hashes, search seed/version, objective order, leakage audit, hard-gate observations, and assignment hash are authoritative in `split_manifest.json`.
 
 ## By meeting
 
@@ -123,7 +139,7 @@ Split roles remain unassigned until the identity graph and pretrained-checkpoint
 | Criterion | Observed raw pool | Combined hard role minimum | Raw deficit/status |
 |---|---:|---:|---:|
 | Scored natural hours | 39.790016 hours | 33.0 hours | 0.0 hours |
-| Independent meetings | 76 upper bound | 22 | component audit pending |
+| Independent meetings | 76 accepted sessions | 22 | 0 |
 | Stable singleton hours | 27.179784 hours | 10.0 hours | 0.0 hours |
 | Ongoing overlap minutes | 371.6428 minutes | 75.0 minutes | 0.0 minutes |
 | `short_backchannel_return` | 857 | 100 | 0 |
@@ -133,6 +149,8 @@ Split roles remain unassigned until the identity graph and pretrained-checkpoint
 | `same_speaker_silence_gap_resume` | 1772 | 240 | 0 |
 | `clean_direct_different_speaker_handoff` | 667 | 120 | 0 |
 
-The aggregate scored-hour lower bound passes; role-specific allocation remains unproven until component assignment. The meeting count is only an upper bound until connected identity components are audited. Zero raw-pool deficits do not prove component-safe role allocation. No topology substitutes for another, and no threshold, count, or natural-data requirement is weakened.
+The raw-pool lower bounds and the selected connected-component assignment both pass. EVAL uses only freshness-eligible components; TRAIN+DEV and EVAL pass every exclusive topology and negative-exposure minimum; TRAIN, DEV, and EVAL pass their scored-hour and meeting minima. No topology substitutes for another, and no threshold, count, or natural-data requirement is weakened.
 
 Topology manifest SHA-256: `235e0c6995041d1b967907c100dc4460cbf42fc2b4574a91e7eb765f3a3f89f2`
+
+Split manifest SHA-256: `f5f06ae03e622f5958d73c1320b3ed87c87075fd93f126a13569c617f0efa721`
