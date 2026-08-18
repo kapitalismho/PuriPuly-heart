@@ -45,6 +45,7 @@ TRANSLATION_MODEL_GEMINI_37_FLASH: Final = "gemini37_flash"
 TRANSLATION_MODEL_GEMINI_31_FLASH_LITE: Final = "gemini31_flash_lite"
 TRANSLATION_MODEL_QWEN_35_PLUS: Final = "qwen35_plus"
 TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH: Final = "openrouter_qwen35_flash"
+TRANSLATION_MODEL_MANAGED_GEMMA: Final = "managed_gemma"
 TRANSLATION_MODEL_LOCAL_LLM: Final = "local_llm"
 TRANSLATION_MODEL_CUSTOM_HTTP: Final = "custom_http"
 
@@ -61,6 +62,7 @@ TranslationModelName: TypeAlias = Literal[
     "gemini31_flash_lite",
     "qwen35_plus",
     "openrouter_qwen35_flash",
+    "managed_gemma",
     "local_llm",
     "custom_http",
 ]
@@ -73,6 +75,7 @@ TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
     TRANSLATION_MODEL_GEMINI_31_FLASH_LITE,
     TRANSLATION_MODEL_QWEN_35_PLUS,
     TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH,
+    TRANSLATION_MODEL_MANAGED_GEMMA,
     TRANSLATION_MODEL_LOCAL_LLM,
     TRANSLATION_MODEL_CUSTOM_HTTP,
 )
@@ -83,6 +86,8 @@ TRANSLATION_CONNECTION_OPENROUTER: Final = "openrouter"
 TRANSLATION_CONNECTION_CEREBRAS: Final = "cerebras"
 TRANSLATION_CONNECTION_OFFICIAL_BYOK: Final = "official_byok"
 TRANSLATION_CONNECTION_OLLAMA: Final = "ollama"
+TRANSLATION_CONNECTION_CPU: Final = "cpu"
+TRANSLATION_CONNECTION_GPU: Final = "gpu"
 TRANSLATION_CONNECTION_CUSTOM_HTTP: Final = "custom_http"
 
 TranslationConnectionName: TypeAlias = Literal[
@@ -92,6 +97,8 @@ TranslationConnectionName: TypeAlias = Literal[
     "cerebras",
     "official_byok",
     "ollama",
+    "cpu",
+    "gpu",
     "custom_http",
 ]
 TRANSLATION_CONNECTIONS: Final[tuple[TranslationConnectionName, ...]] = (
@@ -101,6 +108,8 @@ TRANSLATION_CONNECTIONS: Final[tuple[TranslationConnectionName, ...]] = (
     TRANSLATION_CONNECTION_CEREBRAS,
     TRANSLATION_CONNECTION_OFFICIAL_BYOK,
     TRANSLATION_CONNECTION_OLLAMA,
+    TRANSLATION_CONNECTION_CPU,
+    TRANSLATION_CONNECTION_GPU,
     TRANSLATION_CONNECTION_CUSTOM_HTTP,
 )
 TRANSLATION_CONNECTIONS_BY_MODEL: Final[
@@ -139,6 +148,10 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
             TRANSLATION_CONNECTION_MANAGED,
             TRANSLATION_CONNECTION_OPENROUTER,
         ),
+        TRANSLATION_MODEL_MANAGED_GEMMA: (
+            TRANSLATION_CONNECTION_CPU,
+            TRANSLATION_CONNECTION_GPU,
+        ),
         TRANSLATION_MODEL_LOCAL_LLM: (TRANSLATION_CONNECTION_OLLAMA,),
         TRANSLATION_MODEL_CUSTOM_HTTP: (TRANSLATION_CONNECTION_CUSTOM_HTTP,),
     }
@@ -170,6 +183,7 @@ PROVIDER_OPENROUTER: Final = "openrouter"
 PROVIDER_DEEPSEEK: Final = "deepseek"
 PROVIDER_GEMINI: Final = "gemini"
 PROVIDER_QWEN: Final = "qwen"
+PROVIDER_MANAGED_GEMMA: Final = "managed_gemma"
 PROVIDER_LOCAL_LLM: Final = "local_llm"
 PROVIDER_CEREBRAS: Final = "cerebras"
 PROVIDER_CUSTOM_HTTP: Final = "custom_http"
@@ -177,6 +191,7 @@ LLM_PROVIDERS: Final[tuple[str, ...]] = (
     PROVIDER_GEMINI,
     PROVIDER_OPENROUTER,
     PROVIDER_QWEN,
+    PROVIDER_MANAGED_GEMMA,
     PROVIDER_DEEPSEEK,
     PROVIDER_LOCAL_LLM,
     PROVIDER_CEREBRAS,
@@ -190,6 +205,7 @@ QWEN_MODEL_35_PLUS: Final = "qwen3.5-plus"
 LOCAL_LLM_BACKEND_OLLAMA: Final = "ollama"
 LOCAL_LLM_DEFAULT_BASE_URL: Final = "http://127.0.0.1:11434/v1"
 LOCAL_LLM_DEFAULT_MODEL: Final = "llama3.1:8b"
+MANAGED_GEMMA_MODEL: Final = "puripuly-gemma-4-e4b-q4"
 CEREBRAS_MODEL_GEMMA_4_31B: Final = "gemma-4-31b"
 QWEN_REGION_BEIJING: Final = "beijing"
 QWEN_REGION_SINGAPORE: Final = "singapore"
@@ -559,6 +575,8 @@ class TranslationFallbackRuntimeIntent:
         _require_allowed(model, TRANSLATION_MODELS, field_name="fallback model")
         if model == TRANSLATION_MODEL_CUSTOM_HTTP:
             raise ValueError("custom HTTP translation cannot be used as fallback")
+        if model == TRANSLATION_MODEL_MANAGED_GEMMA:
+            raise ValueError("managed local Gemma cannot be used as provider fallback")
         if connection not in TRANSLATION_CONNECTIONS_BY_MODEL[model]:
             raise ValueError("translation fallback connection is not supported for model")
 
@@ -1015,6 +1033,13 @@ def derive_translation_runtime_intent_from_compatibility(
             concurrency_limit=concurrency,
         )
 
+    if provider == PROVIDER_MANAGED_GEMMA:
+        return TranslationRuntimeIntent(
+            model=TRANSLATION_MODEL_MANAGED_GEMMA,
+            connection=TRANSLATION_CONNECTION_CPU,
+            concurrency_limit=concurrency,
+        )
+
     if provider == PROVIDER_LOCAL_LLM:
         return TranslationRuntimeIntent(
             model=TRANSLATION_MODEL_LOCAL_LLM,
@@ -1229,6 +1254,14 @@ def _resolve_translation_target(
             provider=PROVIDER_CUSTOM_HTTP,
             model=TRANSLATION_MODEL_CUSTOM_HTTP,
             credential=_no_credential(),
+        )
+
+    if translation.model == TRANSLATION_MODEL_MANAGED_GEMMA:
+        return _resolved_direct_provider_target(
+            provider=PROVIDER_MANAGED_GEMMA,
+            model=MANAGED_GEMMA_MODEL,
+            credential=_no_credential(),
+            provider_options={"backend": translation.connection},
         )
 
     if translation.model == TRANSLATION_MODEL_GEMMA4_26B_31B:
@@ -1455,7 +1488,8 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
 
     if (
         runtime_input.translation_fallback.enabled
-        and translation.model != TRANSLATION_MODEL_CUSTOM_HTTP
+        and translation.model
+        not in (TRANSLATION_MODEL_CUSTOM_HTTP, TRANSLATION_MODEL_MANAGED_GEMMA)
     ):
         fallback_translation = TranslationRuntimeIntent(
             model=runtime_input.translation_fallback.model,
@@ -1514,6 +1548,7 @@ __all__ = [
     "LOCAL_LLM_BACKEND_OLLAMA",
     "LOCAL_LLM_DEFAULT_BASE_URL",
     "LOCAL_LLM_DEFAULT_MODEL",
+    "MANAGED_GEMMA_MODEL",
     "LLM_PROVIDERS",
     "OPENROUTER_SOURCE_BYOK",
     "OPENROUTER_MANAGED_CREDENTIAL_KINDS",
@@ -1529,6 +1564,7 @@ __all__ = [
     "PROVIDER_CEREBRAS",
     "PROVIDER_CUSTOM_HTTP",
     "PROVIDER_GEMINI",
+    "PROVIDER_MANAGED_GEMMA",
     "PROVIDER_LOCAL_LLM",
     "PROVIDER_OPENROUTER",
     "PROVIDER_QWEN",
@@ -1568,6 +1604,8 @@ __all__ = [
     "TRANSLATION_CONNECTION_CEREBRAS",
     "TRANSLATION_CONNECTION_MANAGED",
     "TRANSLATION_CONNECTION_MANAGED_CHINA",
+    "TRANSLATION_CONNECTION_CPU",
+    "TRANSLATION_CONNECTION_GPU",
     "TRANSLATION_CONNECTION_OFFICIAL_BYOK",
     "TRANSLATION_CONNECTION_OLLAMA",
     "TRANSLATION_CONNECTION_CUSTOM_HTTP",
@@ -1582,6 +1620,7 @@ __all__ = [
     "TRANSLATION_MODEL_GEMMA4_31B",
     "TRANSLATION_MODEL_CUSTOM_HTTP",
     "TRANSLATION_MODEL_LOCAL_LLM",
+    "TRANSLATION_MODEL_MANAGED_GEMMA",
     "TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH",
     "TRANSLATION_MODEL_QWEN_35_PLUS",
     "TRANSLATION_MODELS",

@@ -13,7 +13,14 @@ from types import MappingProxyType
 from typing import Mapping
 
 TRANSLATION_PROMPT_NAME = "translation_prompt"
-_LLM_PROVIDER_PROMPT_KEYS = {"gemini", "qwen", "deepseek", "openrouter", "local_llm"}
+_LLM_PROVIDER_PROMPT_KEYS = {
+    "gemini",
+    "qwen",
+    "deepseek",
+    "openrouter",
+    "local_llm",
+    "managed_gemma",
+}
 
 
 @dataclass(frozen=True)

@@ -1141,6 +1141,7 @@
         "puripuly_heart.app.wiring.wiring_local_asr_application",
         "puripuly_heart.app.wiring.wiring_local_asr_provider_runtime",
         "puripuly_heart.app.wiring.wiring_managed_account",
+        "puripuly_heart.app.wiring.wiring_managed_gemma",
         "puripuly_heart.app.wiring.wiring_microphone_test",
         "puripuly_heart.app.wiring.wiring_peer_application",
         "puripuly_heart.app.wiring.wiring_provider_runtime",

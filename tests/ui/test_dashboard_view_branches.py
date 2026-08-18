@@ -7,6 +7,7 @@ import pytest
 
 ft = pytest.importorskip("flet")
 
+from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
 from puripuly_heart.ui.dashboard import capture as dashboard_capture_module
 from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
@@ -908,6 +909,51 @@ async def test_dashboard_gpu_action_runs_as_page_task(
     await tasks[-1]
 
     assert actions == ["install"]
+
+
+@pytest.mark.asyncio
+async def test_managed_gemma_download_preempts_other_notices_and_can_be_cancelled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    tasks: list[asyncio.Task[None]] = []
+    actions: list[str] = []
+
+    class Page:
+        def run_task(self, callback) -> None:
+            tasks.append(asyncio.create_task(callback()))
+
+    async def on_action(action: str) -> None:
+        actions.append(action)
+
+    attach_dummy_page(monkeypatch, view, Page())
+    view.on_managed_gemma_notice_action = on_action
+    view.set_vrchat_osc_notice(True)
+    view.set_managed_gemma_notice(
+        ManagedGemmaDashboardNotice(
+            status="downloading",
+            progress_percent=37,
+            action="cancel",
+        )
+    )
+
+    assert view.display_card.notice_calls[-1] == (
+        dashboard_module.t("dashboard.managed_gemma_notice.downloading", percent=37),
+        "info",
+    )
+    action_label, action_callback = view.display_card.notice_actions[-1]
+    assert action_label == dashboard_module.t("dashboard.managed_gemma_action.cancel")
+    assert callable(action_callback)
+
+    action_callback()
+    await tasks[-1]
+    assert actions == ["cancel"]
+
+    view.set_managed_gemma_notice(None)
+    assert view.display_card.notice_calls[-1] == (
+        dashboard_module.t("dashboard.vrchat_osc_disabled"),
+        "warning",
+    )
 
 
 def test_dashboard_steamvr_overlay_failure_notice_uses_actionable_reason_without_status_prefix(

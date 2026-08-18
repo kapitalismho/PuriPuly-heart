@@ -37,6 +37,7 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineStartCallbacks,
 )
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
+from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
 from puripuly_heart.app.services.application_after_launch import (
@@ -81,6 +82,10 @@ from puripuly_heart.app.services.local_asr_gpu_provisioning import (
 from puripuly_heart.app.services.local_asr_selection import (
     LOCAL_CPU_PROVIDERS,
     resolve_local_asr_selection,
+)
+from puripuly_heart.app.services.managed_gemma_translation import (
+    ManagedGemmaTranslationOwner,
+    ManagedGemmaTranslationSnapshot,
 )
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
@@ -135,6 +140,7 @@ from puripuly_heart.app.wiring import (
     create_sync_secret_store_adapter,
     resolve_overlay_config,
 )
+from puripuly_heart.app.wiring.wiring_managed_gemma import create_managed_gemma_runtime
 from puripuly_heart.app.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
 )
@@ -430,6 +436,44 @@ def compose_application_runtime(
         overlay_logging_mode_update=emit_overlay_logging_mode_update,
         overlay_logging_mode_update_available=lambda: (
             overlay is not None and overlay.current_bridge() is not None
+        ),
+    )
+
+    def managed_gemma_status(snapshot: ManagedGemmaTranslationSnapshot) -> None:
+        fields = [f"state={snapshot.state}"]
+        if snapshot.backend is not None:
+            fields.append(f"backend={snapshot.backend}")
+        if snapshot.progress_percent is not None:
+            fields.append(f"progress_percent={snapshot.progress_percent}")
+        if snapshot.error_type is not None:
+            fields.append(f"error_type={snapshot.error_type}")
+        log_detailed("[ManagedGemma] " + " ".join(fields))
+        action: Literal["cancel", "retry"]
+        if snapshot.state in {"checking", "downloading", "preparing"}:
+            action = "cancel"
+        elif snapshot.state in {"failed", "cancelled"}:
+            action = "retry"
+        else:
+            presentation.set_dashboard_managed_gemma_notice(None)
+            return
+        presentation.set_dashboard_managed_gemma_notice(
+            ManagedGemmaDashboardNotice(
+                status=snapshot.state,
+                backend=snapshot.backend,
+                progress_percent=snapshot.progress_percent,
+                action=action,
+            )
+        )
+
+    managed_gemma = ManagedGemmaTranslationOwner(
+        runtime=create_managed_gemma_runtime(
+            log_sink=lambda message, level: log_detailed(message, level=level),
+        ),
+        status_sink=managed_gemma_status,
+        lifecycle_diagnostic_sink=lambda event: log_detailed(
+            "[ManagedGemma] lifecycle_diagnostic "
+            + " ".join(f"{key}={value}" for key, value in event.fields.items()),
+            level=logging.ERROR,
         ),
     )
 
@@ -1110,6 +1154,7 @@ def compose_application_runtime(
                     replace_self_stt=lambda smooth: (
                         require_self_application().replace_provider(smooth_local=smooth)
                     ),
+                    rebuild_managed_gemma=lambda: provider_runtime.llm_rebuild.rebuild(),
                 ),
                 manual_fallback=manual_fallback,
                 cpu_auto_available=lambda: (require_provisioning().snapshot.cpu_auto_available),
@@ -1542,6 +1587,7 @@ def compose_application_runtime(
         failure_sink=log_error,
         success_sink=log_basic,
         additional_signature_sink=sync_non_provider_signatures,
+        managed_gemma=managed_gemma,
         signatures=signatures,
     )
 
@@ -1642,6 +1688,7 @@ def compose_application_runtime(
         configure_vrc_mic=lambda *, enabled: (require_vrc_mic_sync().configure(enabled=enabled)),
         stt_failure_sink=log_error,
         cleanup_failure_sink=lambda message, exc: log_error(f"{message}: {exc}"),
+        managed_gemma=managed_gemma,
         http_extensions=http_extensions,
     )
 
@@ -1774,6 +1821,7 @@ def compose_application_runtime(
         github_prompt=lambda: github_prompt,
         clipboard=lambda: clipboard,
         microphone=lambda: microphone,
+        close_managed_gemma_owner=managed_gemma.close,
     )
 
     overlay_owner = require_overlay()
@@ -1813,6 +1861,7 @@ def compose_application_runtime(
             credential_verification=require_credential_verification(),
             provider_settings=require_provider_settings(),
             build_byok_target_settings=(build_managed_openrouter_byok_target_settings),
+            managed_gemma=managed_gemma,
         ),
         microphone=UiMicrophoneRuntimeAdapter(
             microphone=microphone_runtime,

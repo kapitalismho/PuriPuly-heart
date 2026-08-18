@@ -1254,6 +1254,8 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
 
 
 def _legacy_provider_llm_for_translation(model: str, connection: str) -> str:
+    if model == "managed_gemma":
+        return "managed_gemma"
     if model == "local_llm":
         return "local_llm"
     if model == "gemma4_31b_cerebras" or (model == "gemma4_31b" and connection == "cerebras"):

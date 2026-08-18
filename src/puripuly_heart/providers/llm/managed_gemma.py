@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from uuid import UUID
 
@@ -172,6 +173,7 @@ class ManagedGemmaLLMProvider:
     runtime: ManagedGemmaRuntimeOwner
     backend: GemmaBackend
     vulkan_device: str = "Vulkan0"
+    release_runtime: Callable[[], Awaitable[None]] | None = None
     _closed: bool = field(init=False, default=False, repr=False)
     _released: bool = field(init=False, default=False, repr=False)
 
@@ -207,7 +209,10 @@ class ManagedGemmaLLMProvider:
         if self._released:
             return
         self._closed = True
-        await self.runtime.release()
+        if self.release_runtime is None:
+            await self.runtime.release()
+        else:
+            await self.release_runtime()
         self._released = True
 
 

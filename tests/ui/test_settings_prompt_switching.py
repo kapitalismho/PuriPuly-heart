@@ -343,6 +343,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
     values = [option.value for option in options]
 
     assert values == [
+        TranslationModel.MANAGED_GEMMA.value,
         TranslationModel.GEMMA4_26B_31B.value,
         TranslationModel.DEEPSEEK_V4_FLASH.value,
         TranslationModel.GEMMA4_31B.value,

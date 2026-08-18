@@ -62,6 +62,33 @@ class SettingsRuntimeEffectsState:
     microphone_audio_signature: object | None = None
 
 
+def managed_gemma_prefix_refresh_required(
+    transition: SettingsRuntimeTransition[AppSettings],
+) -> bool:
+    settings = transition.settings
+    if settings.translation.model != TranslationModel.MANAGED_GEMMA:
+        return False
+    previous = transition.previous_settings
+    return bool(
+        previous is None
+        or previous.translation.model != TranslationModel.MANAGED_GEMMA
+        or transition.source_language_changed
+        or transition.target_language_changed
+        or previous.system_prompt != settings.system_prompt
+    )
+
+
+async def refresh_managed_gemma_prefix(
+    transition: SettingsRuntimeTransition[AppSettings],
+    *,
+    rebuild: Callable[[], Awaitable[bool]],
+) -> None:
+    if not managed_gemma_prefix_refresh_required(transition):
+        return
+    if not await rebuild():
+        raise RuntimeError("managed Gemma prefix rebuild failed")
+
+
 class SettingsRuntimeEffectsAdapter:
     def __init__(
         self,
@@ -87,6 +114,7 @@ class SettingsRuntimeEffectsAdapter:
         self_capture: Callable[[], SelfCaptureSessionOwner | None],
         clear_local_pending: Callable[[], None],
         replace_self_stt: Callable[[bool], Awaitable[None]],
+        rebuild_managed_gemma: Callable[[], Awaitable[bool]],
     ) -> None:
         self._state = state
         self._settings = settings
@@ -109,6 +137,7 @@ class SettingsRuntimeEffectsAdapter:
         self._self_capture = self_capture
         self._clear_local_pending = clear_local_pending
         self._replace_self_stt = replace_self_stt
+        self._rebuild_managed_gemma = rebuild_managed_gemma
 
     async def preserve_before_replace(self, settings: AppSettings) -> None:
         await self._github_prompt().preserve_before_settings_replace(settings)
@@ -420,6 +449,11 @@ class SettingsRuntimeEffectsAdapter:
                 strict_runtime_errors=strict_runtime_errors,
             )
 
+        await refresh_managed_gemma_prefix(
+            transition,
+            rebuild=self._rebuild_managed_gemma,
+        )
+
         presenter = self._overlay.current_presenter()
         if presenter is not None:
             await presenter.update_display_preferences(
@@ -569,4 +603,6 @@ class SettingsRuntimeEffectsAdapter:
 __all__ = [
     "SettingsRuntimeEffectsAdapter",
     "SettingsRuntimeEffectsState",
+    "managed_gemma_prefix_refresh_required",
+    "refresh_managed_gemma_prefix",
 ]

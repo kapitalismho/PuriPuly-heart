@@ -168,6 +168,7 @@ class LLMProviderName(str, Enum):
     QWEN = "qwen"
     DEEPSEEK = "deepseek"
     CEREBRAS = "cerebras"
+    MANAGED_GEMMA = "managed_gemma"
     LOCAL_LLM = "local_llm"
 
 
@@ -265,6 +266,7 @@ class TranslationModel(str, Enum):
     GEMINI_37_FLASH = "gemini37_flash"
     GEMINI_31_FLASH_LITE = "gemini31_flash_lite"
     QWEN_35_PLUS = "qwen35_plus"
+    MANAGED_GEMMA = "managed_gemma"
     LOCAL_LLM = "local_llm"
     CUSTOM_HTTP = "custom_http"
 
@@ -276,6 +278,8 @@ class TranslationConnection(str, Enum):
     CEREBRAS = "cerebras"
     OFFICIAL_BYOK = "official_byok"
     OLLAMA = "ollama"
+    CPU = "cpu"
+    GPU = "gpu"
     CUSTOM_HTTP = "custom_http"
 
 
@@ -293,6 +297,8 @@ class TranslationFallbackSettings:
             raise ValueError("invalid translation fallback connection")
         if self.model == TranslationModel.CUSTOM_HTTP:
             raise ValueError("custom HTTP translation cannot be used as fallback")
+        if self.model == TranslationModel.MANAGED_GEMMA:
+            raise ValueError("managed local Gemma cannot be used as provider fallback")
         if self.connection not in _supported_translation_connections(self.model):
             raise ValueError("translation fallback connection is not supported for model")
 
@@ -375,6 +381,10 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[TranslationModel, tuple[TranslationConnec
         TranslationConnection.OPENROUTER,
     ),
     TranslationModel.QWEN_35_PLUS: (TranslationConnection.OFFICIAL_BYOK,),
+    TranslationModel.MANAGED_GEMMA: (
+        TranslationConnection.CPU,
+        TranslationConnection.GPU,
+    ),
     TranslationModel.LOCAL_LLM: (TranslationConnection.OLLAMA,),
     TranslationModel.CUSTOM_HTTP: (TranslationConnection.CUSTOM_HTTP,),
 }
@@ -2417,6 +2427,16 @@ def _derive_translation_settings_from_runtime_values(
             history=normalized_history,
         )
 
+    if provider_llm == LLMProviderName.MANAGED_GEMMA:
+        return _normalize_translation_settings(
+            model=TranslationModel.MANAGED_GEMMA,
+            connection=_history_connection_or_default(
+                TranslationModel.MANAGED_GEMMA,
+                normalized_history,
+            ),
+            history=normalized_history,
+        )
+
     if provider_llm == LLMProviderName.CEREBRAS:
         return _normalize_translation_settings(
             model=TranslationModel.GEMMA4_31B,
@@ -2605,6 +2625,11 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
 
     if model == TranslationModel.LOCAL_LLM:
         settings.provider.llm = LLMProviderName.LOCAL_LLM
+        settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
+        return settings
+
+    if model == TranslationModel.MANAGED_GEMMA:
+        settings.provider.llm = LLMProviderName.MANAGED_GEMMA
         settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
         return settings
 
@@ -2847,6 +2872,15 @@ def _apply_materialized_translation_to_data(
 
     if translation.model == TranslationModel.LOCAL_LLM:
         changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.LOCAL_LLM.value)
+        return changed
+
+    if translation.model == TranslationModel.MANAGED_GEMMA:
+        changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.MANAGED_GEMMA.value)
+        changed |= _set_mapping_value(
+            openrouter_data,
+            "provider_routing",
+            OpenRouterProviderRouting.DEFAULT.value,
+        )
         return changed
 
     changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.QWEN.value)

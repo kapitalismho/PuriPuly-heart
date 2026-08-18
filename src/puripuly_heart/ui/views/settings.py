@@ -158,6 +158,7 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.LOCAL_QWEN: "settings.stt.section.cpu_inference",
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
+    TranslationModel.MANAGED_GEMMA: "provider.managed_gemma",
     TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
     TranslationModel.GEMMA4_31B: "provider.gemma4_31b",
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
@@ -169,6 +170,8 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.CUSTOM_HTTP: "provider.custom_http",
 }
 _TRANSLATION_CONNECTION_LABEL_KEYS = {
+    TranslationConnection.CPU: "settings.translation_connection.cpu",
+    TranslationConnection.GPU: "settings.translation_connection.gpu",
     TranslationConnection.MANAGED: "settings.translation_connection.managed",
     TranslationConnection.MANAGED_CHINA: "settings.translation_connection.managed_china",
     TranslationConnection.OPENROUTER: "settings.translation_connection.openrouter",
@@ -182,6 +185,7 @@ _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
 }
 _TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY = "settings.translation_connection.only_supported"
 _TRANSLATION_MODELS = (
+    TranslationModel.MANAGED_GEMMA,
     TranslationModel.GEMMA4_26B_31B,
     TranslationModel.GEMMA4_31B,
     TranslationModel.GEMMA4,
@@ -199,6 +203,7 @@ _TRANSLATION_MODEL_SECTION_ORDER = (
     "settings.translation_model.section.others",
 )
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
+    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.recommended",
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended",
     TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended",
     TranslationModel.GEMMA4_31B: "settings.translation_model.section.gemma",
@@ -2631,6 +2636,16 @@ class SettingsView(ft.Column):
         text_control.value = text
         text_control.size = 28
 
+    def _sync_translation_connection_title(self, settings: AppSettings) -> None:
+        title = getattr(self, "_translation_connection_title", None)
+        if title is None:
+            return
+        title.value = t(
+            "settings.managed_gemma.inference"
+            if settings.translation.model == TranslationModel.MANAGED_GEMMA
+            else "settings.translation_connection"
+        )
+
     def _stored_openrouter_selection_alias(
         self, settings: AppSettings
     ) -> OpenRouterSelectionAlias | None:
@@ -2782,6 +2797,8 @@ class SettingsView(ft.Column):
             return "deepseek"
         if settings.provider.llm == LLMProviderName.LOCAL_LLM:
             return "local_llm"
+        if settings.provider.llm == LLMProviderName.MANAGED_GEMMA:
+            return "managed_gemma"
         return "qwen"
 
     def _active_prompt_key(self) -> str:
@@ -3435,6 +3452,7 @@ class SettingsView(ft.Column):
         self._set_translation_connection_text(
             self._get_translation_connection_display_label(settings),
         )
+        self._sync_translation_connection_title(settings)
         self._sync_openrouter_fallback_card(settings)
         self._local_llm_base_url.value = settings.local_llm.base_url
         self._local_llm_base_url.error = None
@@ -3736,7 +3754,9 @@ class SettingsView(ft.Column):
         self._sync_openrouter_fallback_card(settings)
         openrouter_fallback_card = getattr(self, "_openrouter_fallback_card", None)
         if openrouter_fallback_card is not None:
-            openrouter_fallback_card.visible = not is_custom_http
+            openrouter_fallback_card.visible = not is_custom_http and (
+                settings.translation.model != TranslationModel.MANAGED_GEMMA
+            )
         self._sync_http_extension_card(settings)
 
         qwen_regions: set[QwenRegion] = set()
@@ -3964,6 +3984,7 @@ class SettingsView(ft.Column):
         self._set_translation_connection_text(
             self._get_translation_connection_display_label(settings),
         )
+        self._sync_translation_connection_title(settings)
         self._sync_openrouter_fallback_card(settings)
 
     def _apply_translation_selection(
@@ -4018,7 +4039,11 @@ class SettingsView(ft.Column):
         self._update_api_visibility()
 
         if (
-            connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
+            (
+                connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
+                or model == TranslationModel.MANAGED_GEMMA
+                or old_model == TranslationModel.MANAGED_GEMMA
+            )
             and getattr(self, "on_providers_changed", None) is not None
         ):
             self.on_providers_changed()
@@ -4094,7 +4119,11 @@ class SettingsView(ft.Column):
         )
         modal = SettingsModal(
             self.page,
-            t("settings.translation_connection"),
+            t(
+                "settings.managed_gemma.inference"
+                if model == TranslationModel.MANAGED_GEMMA
+                else "settings.translation_connection"
+            ),
             options,
             self._on_translation_connection_selected,
             show_description=True,
@@ -4117,6 +4146,12 @@ class SettingsView(ft.Column):
 
     def _on_openrouter_fallback_click(self, e) -> None:
         if not is_control_mounted(self):
+            return
+        display_settings = self._build_settings_with_provider_draft()
+        if (
+            display_settings is not None
+            and display_settings.translation.model == TranslationModel.MANAGED_GEMMA
+        ):
             return
         options: list[OptionItem] = [
             OptionItem(
@@ -5670,6 +5705,7 @@ class SettingsView(ft.Column):
             self._set_translation_connection_text(
                 self._get_translation_connection_display_label(display_settings),
             )
+            self._sync_translation_connection_title(display_settings)
             self._sync_openrouter_fallback_card(display_settings)
             self._sync_http_extension_card(display_settings, force_credentials=True)
             self._sync_managed_key_card(display_settings)

@@ -28,6 +28,7 @@ from puripuly_heart.app.ports.ui_application_intents import (
 from puripuly_heart.app.ports.ui_application_state import UiApplicationStatePort
 from puripuly_heart.app.ports.ui_models import (
     GpuNoticeAction,
+    ManagedGemmaNoticeAction,
     OverlayPeerPresentationState,
 )
 from puripuly_heart.app.services.application_runtime_shutdown import (
@@ -69,6 +70,7 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "cycle_debug_stt_fault_profile",
         "ensure_gpu_device_discovery",
         "handle_gpu_notice_action",
+        "handle_managed_gemma_notice_action",
         "install_selected_gpu_model_if_needed",
         "on_dashboard_language_change",
         "persist_api_key_verification",
@@ -636,6 +638,12 @@ class UiApplicationBoundary:
 
     def handle_gpu_notice_action(self, action: GpuNoticeAction) -> object:
         return self._provider.handle_gpu_notice_action(action)
+
+    async def handle_managed_gemma_notice_action(
+        self,
+        action: ManagedGemmaNoticeAction,
+    ) -> object:
+        return await self._provider.handle_managed_gemma_notice_action(action)
 
 
 for _intent_method_name in UI_APPLICATION_USER_INTENT_METHODS:

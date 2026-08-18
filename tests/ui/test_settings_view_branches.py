@@ -1437,6 +1437,58 @@ def test_on_llm_selected_updates_to_local_llms_with_ollama_connection(
     assert view.has_provider_changes is True
 
 
+def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_37_FLASH,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+        fallback=_enabled_fallback(
+            TranslationModel.DEEPSEEK_V4_FLASH,
+            TranslationConnection.OPENROUTER,
+        ),
+    )
+    settings.provider.llm = LLMProviderName.GEMINI
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    applies: list[bool] = []
+    opened: list[tuple[str, tuple[str, ...], str]] = []
+    view.on_providers_changed = lambda: applies.append(True)
+
+    view._on_llm_selected(TranslationModel.MANAGED_GEMMA.value)
+
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.translation.model == TranslationModel.MANAGED_GEMMA
+    assert pending.translation.connection == TranslationConnection.CPU
+    assert pending.provider.llm == LLMProviderName.MANAGED_GEMMA
+    assert applies == [True]
+    assert view._openrouter_fallback_card.visible is False
+    assert view._translation_connection_title.value == t("settings.managed_gemma.inference")
+
+    page = attach_dummy_page(monkeypatch, view)
+
+    class CapturingModal:
+        def __init__(self, page_arg, title, options, _on_select, **_kwargs):
+            assert page_arg is page
+            opened.append((title, tuple(option.value for option in options), ""))
+
+        def open(self, current: str) -> None:
+            title, options, _value = opened[-1]
+            opened[-1] = (title, options, current)
+
+    monkeypatch.setattr(settings_view, "SettingsModal", CapturingModal)
+    view._on_translation_connection_click(None)
+
+    assert opened == [
+        (
+            t("settings.managed_gemma.inference"),
+            (TranslationConnection.CPU.value, TranslationConnection.GPU.value),
+            TranslationConnection.CPU.value,
+        )
+    ]
+
+
 def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
