@@ -15,6 +15,7 @@ from puripuly_heart.config.settings_vnext.schema import (
     CaptureTargetIntent,
     CerebrasTranslationIntent,
     ClipboardIntent,
+    CustomSTTIntent,
     DeepgramSTTIntent,
     DeepSeekTranslationIntent,
     DesktopAudioIntent,
@@ -757,6 +758,17 @@ def from_legacy_app_settings(
                         keepalive_interval_s=float(data["soniox_stt"]["keepalive_interval_s"]),
                         trailing_silence_ms=int(data["soniox_stt"]["trailing_silence_ms"]),
                     ),
+                    custom=CustomSTTIntent(
+                        mode=str(data.get("custom_stt", {}).get("mode", "offline")),
+                        compatibility=str(
+                            data.get("custom_stt", {}).get(
+                                "compatibility",
+                                "openai_transcription",
+                            )
+                        ),
+                        endpoint=str(data.get("custom_stt", {}).get("endpoint", "")),
+                        model=str(data.get("custom_stt", {}).get("model", "")),
+                    ),
                 ),
                 peer_stt=PeerSTTIntent(provider=data["provider"]["peer_stt"]),
                 languages=LanguageIntent(
@@ -1111,6 +1123,12 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
         "endpoint": intent.stt.soniox.endpoint,
         "keepalive_interval_s": intent.stt.soniox.keepalive_interval_s,
         "trailing_silence_ms": intent.stt.soniox.trailing_silence_ms,
+    }
+    data["custom_stt"] = {
+        "mode": intent.stt.custom.mode,
+        "compatibility": intent.stt.custom.compatibility,
+        "endpoint": intent.stt.custom.endpoint,
+        "model": intent.stt.custom.model,
     }
     data["openrouter"].update(
         {

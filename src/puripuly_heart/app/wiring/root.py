@@ -117,6 +117,7 @@ _WIRING_SECRET_KEYS_FOR_COMPATIBILITY_GUARD = (
     "alibaba_api_key",
     "local_llm_api_key",
     "cerebras_api_key",
+    "custom_stt_api_key",
 )
 
 

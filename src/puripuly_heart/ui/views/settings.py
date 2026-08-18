@@ -140,10 +140,12 @@ _STT_UI_PROVIDERS = (
     STTProviderName.DEEPGRAM,
     STTProviderName.QWEN_ASR,
     STTProviderName.SONIOX,
+    STTProviderName.CUSTOM,
 )
 _STT_SECTION_ORDER = (
     "settings.stt.section.recommended",
     "settings.stt.section.cloud",
+    "settings.stt.section.custom",
     "settings.stt.section.gpu_inference",
     "settings.stt.section.cpu_inference",
 )
@@ -152,6 +154,7 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.DEEPGRAM: "settings.stt.section.recommended",
     STTProviderName.SONIOX: "settings.stt.section.recommended",
     STTProviderName.QWEN_ASR: "settings.stt.section.cloud",
+    STTProviderName.CUSTOM: "settings.stt.section.custom",
     STTProviderName.LOCAL_QWEN_GPU: "settings.stt.section.gpu_inference",
     STTProviderName.LOCAL_PARAKEET_V3: "settings.stt.section.cpu_inference",
     STTProviderName.LOCAL_PARAKEET_JAPANESE: "settings.stt.section.cpu_inference",
@@ -396,6 +399,7 @@ class SettingsView(ft.Column):
         self.on_prompt_apply_settings: Callable[[AppSettings], None] | None = None
         self.on_providers_changed: Callable[[], None] | None = None
         self.on_local_llm_secret_changed: Callable[[], None] | None = None
+        self.on_custom_stt_secret_changed: Callable[[], None] | None = None
         self.on_request_openrouter_pkce: Callable[[AppSettings], None] | None = None
         self.on_verify_api_key: Callable[[str, str], object] | None = None
         self.on_provider_secret_change: Callable[[str, str], object] | None = None
@@ -501,6 +505,9 @@ class SettingsView(ft.Column):
     def local_llm_connection_control(self) -> ft.Control:
         return self._local_llm_connection_card
 
+    def custom_stt_connection_control(self) -> ft.Control:
+        return self._custom_stt_connection_card
+
     def managed_key_control(self) -> ft.Control:
         return self._managed_key_card
 
@@ -531,6 +538,7 @@ class SettingsView(ft.Column):
         self.on_provider_secret_change = provider.provider_secret_change
         self.on_secret_cleared = provider.secret_cleared
         self.on_local_llm_secret_changed = provider.local_llm_secret_changed
+        self.on_custom_stt_secret_changed = provider.custom_stt_secret_changed
         self.on_gpu_discovery_requested = provider.gpu_discovery_requested
         self.on_start_microphone_test = general.start_microphone_test
         self.on_telemetry_consent_change = general.telemetry_consent_change
@@ -687,6 +695,8 @@ class SettingsView(ft.Column):
             self._telemetry_consent_text,
             self._http_extension_text,
             self._http_extension_path_text,
+            self._custom_stt_mode_text,
+            self._custom_stt_compatibility_text,
         )
 
     def _sync_clickable_text_control_fonts(self, font_family: str | None) -> None:
@@ -2134,6 +2144,101 @@ class SettingsView(ft.Column):
         )
         self._local_llm_connection_card.visible = False
 
+        self._custom_stt_connection_title = ft.Text(
+            t("settings.custom_stt.title"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._custom_stt_mode_label = ft.Text(
+            t("settings.custom_stt.mode"),
+            size=16,
+            color=COLOR_ON_BACKGROUND,
+        )
+        self._custom_stt_mode_text = self._build_clickable_text(
+            t("settings.custom_stt.mode.offline"),
+            self._on_custom_stt_mode_click,
+        )
+        self._custom_stt_compatibility_label = ft.Text(
+            t("settings.custom_stt.compatibility"),
+            size=16,
+            color=COLOR_ON_BACKGROUND,
+        )
+        self._custom_stt_compatibility_text = self._build_clickable_text(
+            t("settings.custom_stt.compatibility.openai_transcription"),
+            self._on_custom_stt_compatibility_click,
+        )
+        self._custom_stt_endpoint = ft.TextField(
+            label=t("settings.custom_stt.endpoint"),
+            value="",
+            border_radius=12,
+            border_color=COLOR_DIVIDER,
+            focused_border_color=COLOR_PRIMARY,
+            expand=True,
+            text_size=24,
+            color=COLOR_NEUTRAL_DARK,
+            label_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD, color=COLOR_NEUTRAL_DARK),
+            on_change=self._on_custom_stt_field_change,
+            on_blur=self._on_custom_stt_endpoint_change_end,
+            on_submit=self._on_custom_stt_endpoint_change_end,
+        )
+        self._custom_stt_model = ft.TextField(
+            label=t("settings.custom_stt.model"),
+            value="",
+            border_radius=12,
+            border_color=COLOR_DIVIDER,
+            focused_border_color=COLOR_PRIMARY,
+            expand=True,
+            text_size=24,
+            color=COLOR_NEUTRAL_DARK,
+            label_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD, color=COLOR_NEUTRAL_DARK),
+            on_change=self._on_custom_stt_field_change,
+            on_blur=self._on_custom_stt_model_change_end,
+            on_submit=self._on_custom_stt_model_change_end,
+        )
+        self._custom_stt_api_key = ApiKeyField(
+            "settings.custom_stt.api_key",
+            "custom_stt_api_key",
+            "custom",
+            on_verify=None,
+            on_save=self._on_custom_stt_secret_change,
+            show_snackbar=lambda msg, bg: (
+                self.show_snackbar(msg, bg) if self.show_snackbar else None
+            ),
+            show_status=False,
+        )
+        self._custom_stt_api_key_helper = ft.Text(
+            t("settings.custom_stt.api_key.description"),
+            size=15,
+            color=COLOR_SECONDARY,
+        )
+        self._custom_stt_test_button = ft.TextButton(
+            t("settings.custom_stt.test"),
+            on_click=self._on_custom_stt_test_click,
+        )
+        self._custom_stt_status = ft.Text("", size=15, color=COLOR_SECONDARY)
+        self._custom_stt_connection_card = self._wrap_card(
+            ft.Column(
+                [
+                    self._custom_stt_connection_title,
+                    ft.Container(height=4),
+                    self._custom_stt_mode_label,
+                    self._custom_stt_mode_text,
+                    self._custom_stt_compatibility_label,
+                    self._custom_stt_compatibility_text,
+                    self._custom_stt_endpoint,
+                    self._custom_stt_model,
+                    self._custom_stt_api_key,
+                    self._custom_stt_api_key_helper,
+                    self._custom_stt_test_button,
+                    self._custom_stt_status,
+                ],
+                spacing=8,
+            ),
+            height=None,
+        )
+        self._custom_stt_connection_card.visible = False
+
         self._http_extension_title = ft.Text(
             t("settings.http_extension.title"),
             size=24,
@@ -3091,6 +3196,7 @@ class SettingsView(ft.Column):
         target.qwen.region = source.qwen.region
         target.deepseek.llm_model = source.deepseek.llm_model
         target.local_llm = copy.deepcopy(source.local_llm)
+        target.custom_stt = copy.deepcopy(source.custom_stt)
         if source.openrouter.selected_source == OpenRouterCredentialSource.MANAGED:
             target.managed_identity.verified_hardware_hash = (
                 source.managed_identity.verified_hardware_hash
@@ -3446,6 +3552,7 @@ class SettingsView(ft.Column):
             indent=2,
         )
         self._clear_local_llm_extra_body_error()
+        self._sync_custom_stt_card(settings)
 
         # Qwen Region
         region_label = t(f"region.{settings.qwen.region.value}")
@@ -3578,6 +3685,7 @@ class SettingsView(ft.Column):
         self._deepgram_key.value = store.get("deepgram_api_key") or ""
         self._soniox_key.value = store.get("soniox_api_key") or ""
         self._local_llm_api_key.value = store.get("local_llm_api_key") or ""
+        self._custom_stt_api_key.value = store.get("custom_stt_api_key") or ""
 
         # Alibaba keys with legacy fallback
         beijing_key = _load_secret_value(
@@ -3733,6 +3841,11 @@ class SettingsView(ft.Column):
         self._local_llm_connection_card.visible = (
             not is_custom_http and llm == LLMProviderName.LOCAL_LLM
         )
+        custom_stt_card = getattr(self, "_custom_stt_connection_card", None)
+        if custom_stt_card is not None:
+            custom_stt_card.visible = STTProviderName.CUSTOM in active_stt_providers
+            if custom_stt_card.visible:
+                self._sync_custom_stt_card(settings)
         self._sync_openrouter_fallback_card(settings)
         openrouter_fallback_card = getattr(self, "_openrouter_fallback_card", None)
         if openrouter_fallback_card is not None:
@@ -4298,6 +4411,184 @@ class SettingsView(ft.Column):
                 level=logging.WARNING,
             )
             return False
+
+    def _custom_stt_mode_label_text(self, mode: str) -> str:
+        from puripuly_heart.core.stt.custom import CUSTOM_STT_MODE_I18N_KEYS
+
+        return t(CUSTOM_STT_MODE_I18N_KEYS.get(mode, ""), default=mode)
+
+    def _custom_stt_compatibility_label_text(self, compatibility: str) -> str:
+        from puripuly_heart.core.stt.custom import CUSTOM_STT_COMPATIBILITY_I18N_KEYS
+
+        return t(CUSTOM_STT_COMPATIBILITY_I18N_KEYS.get(compatibility, ""), default=compatibility)
+
+    def _sync_custom_stt_card(self, settings: AppSettings | None = None) -> None:
+        if getattr(self, "_custom_stt_connection_card", None) is None:
+            return
+        current = settings or self._build_settings_with_provider_draft()
+        if current is None:
+            return
+        custom = current.custom_stt
+        self._set_unit_card_value_text(
+            self._custom_stt_mode_text,
+            self._custom_stt_mode_label_text(custom.mode),
+        )
+        self._set_unit_card_value_text(
+            self._custom_stt_compatibility_text,
+            self._custom_stt_compatibility_label_text(custom.compatibility),
+        )
+        self._custom_stt_endpoint.value = custom.endpoint
+        self._custom_stt_endpoint.error = None
+        self._custom_stt_model.value = custom.model
+        if is_control_mounted(self):
+            _update_control_if_mounted(self._custom_stt_connection_card)
+
+    def _on_custom_stt_field_change(self, e) -> None:
+        _ = e
+        if not self._settings:
+            return
+        current = self._build_settings_with_provider_draft()
+        if current is None or (
+            current.provider.stt != STTProviderName.CUSTOM
+            and current.provider.peer_stt != STTProviderName.CUSTOM
+        ):
+            return
+        self._ensure_provider_settings_draft()
+        self.has_provider_changes = True
+
+    def _on_custom_stt_endpoint_change_end(self, e) -> None:
+        _ = e
+        if not self._settings:
+            return
+        endpoint = (self._custom_stt_endpoint.value or "").strip()
+        current = self._provider_settings_draft or self._settings
+        if current.custom_stt.endpoint != endpoint:
+            draft = self._ensure_provider_settings_draft()
+            draft.custom_stt.endpoint = endpoint
+            self.has_provider_changes = True
+        self._custom_stt_endpoint.value = endpoint
+        _update_control_if_mounted(self._custom_stt_endpoint)
+
+    def _on_custom_stt_model_change_end(self, e) -> None:
+        _ = e
+        if not self._settings:
+            return
+        model = (self._custom_stt_model.value or "").strip()
+        current = self._provider_settings_draft or self._settings
+        if current.custom_stt.model != model:
+            draft = self._ensure_provider_settings_draft()
+            draft.custom_stt.model = model
+            self.has_provider_changes = True
+        self._custom_stt_model.value = model
+        _update_control_if_mounted(self._custom_stt_model)
+
+    def _on_custom_stt_mode_click(self, e) -> None:
+        _ = e
+        if not is_control_mounted(self) or not self._settings:
+            return
+        from puripuly_heart.core.stt.custom import CUSTOM_STT_MODES
+
+        current = self._build_settings_with_provider_draft()
+        assert current is not None
+        options = [
+            OptionItem(
+                value=mode,
+                label=self._custom_stt_mode_label_text(mode),
+            )
+            for mode in CUSTOM_STT_MODES
+        ]
+        modal = SettingsModal(
+            self.page,
+            t("settings.custom_stt.mode"),
+            options,
+            self._on_custom_stt_mode_selected,
+        )
+        modal.open(current.custom_stt.mode)
+
+    def _on_custom_stt_mode_selected(self, value: str) -> None:
+        from puripuly_heart.core.stt.custom import default_compatibility_for_mode
+
+        draft = self._ensure_provider_settings_draft()
+        if draft.custom_stt.mode == value:
+            return
+        draft.custom_stt.mode = value
+        draft.custom_stt.compatibility = default_compatibility_for_mode(value)
+        self.has_provider_changes = True
+        self._sync_custom_stt_card(draft)
+
+    def _on_custom_stt_compatibility_click(self, e) -> None:
+        _ = e
+        if not is_control_mounted(self) or not self._settings:
+            return
+        from puripuly_heart.core.stt.custom import supported_compatibilities_for_mode
+
+        current = self._build_settings_with_provider_draft()
+        assert current is not None
+        options = [
+            OptionItem(
+                value=compatibility,
+                label=self._custom_stt_compatibility_label_text(compatibility),
+            )
+            for compatibility in sorted(supported_compatibilities_for_mode(current.custom_stt.mode))
+        ]
+        modal = SettingsModal(
+            self.page,
+            t("settings.custom_stt.compatibility"),
+            options,
+            self._on_custom_stt_compatibility_selected,
+        )
+        modal.open(current.custom_stt.compatibility)
+
+    def _on_custom_stt_compatibility_selected(self, value: str) -> None:
+        draft = self._ensure_provider_settings_draft()
+        if draft.custom_stt.compatibility == value:
+            return
+        draft.custom_stt.compatibility = value
+        self.has_provider_changes = True
+        self._sync_custom_stt_card(draft)
+
+    def _on_custom_stt_secret_change(self, key: str, value: str) -> None:
+        if key != "custom_stt_api_key":
+            return
+        stripped = value.strip()
+        if not self._write_secret_value(key, stripped):
+            if self.show_snackbar:
+                self.show_snackbar(t("settings.custom_stt.api_key.save_failed"), ft.Colors.RED_400)
+            return
+        self._custom_stt_api_key.value = stripped
+        from puripuly_heart.core.stt.custom import bump_custom_stt_secret_generation
+
+        bump_custom_stt_secret_generation()
+        if self.on_custom_stt_secret_changed:
+            self.on_custom_stt_secret_changed()
+
+    def _on_custom_stt_test_click(self, e) -> None:
+        _ = e
+        if self.page is None:
+            return
+        self._custom_stt_status.value = t("settings.custom_stt.test.running")
+        _update_control_if_mounted(self._custom_stt_status)
+        self.page.run_task(self._run_custom_stt_connection_test)
+
+    async def _run_custom_stt_connection_test(self) -> None:
+        from puripuly_heart.core.stt.custom_connection import validate_custom_stt_connection
+
+        settings = self._build_settings_with_provider_draft()
+        if settings is None:
+            return
+        result = await validate_custom_stt_connection(
+            mode=settings.custom_stt.mode,
+            compatibility=settings.custom_stt.compatibility,
+            endpoint=settings.custom_stt.endpoint,
+            model=settings.custom_stt.model,
+            api_key=self._custom_stt_api_key.value or "",
+            source_language=settings.languages.source_language,
+        )
+        from puripuly_heart.core.stt.custom import CUSTOM_STT_VALIDATION_I18N_KEYS
+
+        status_key = CUSTOM_STT_VALIDATION_I18N_KEYS.get(result.status, "")
+        self._custom_stt_status.value = t(status_key, default=result.message)
+        _update_control_if_mounted(self._custom_stt_status)
 
     def _on_local_llm_secret_change(self, key: str, value: str) -> None:
         if key != "local_llm_api_key":
@@ -5563,6 +5854,15 @@ class SettingsView(ft.Column):
         self._translation_connection_title.value = t("settings.translation_connection")
         self._openrouter_fallback_title.value = t("settings.fallback")
         self._local_llm_connection_title.value = t("settings.local_llm.connection")
+        self._custom_stt_connection_title.value = t("settings.custom_stt.title")
+        self._custom_stt_mode_label.value = t("settings.custom_stt.mode")
+        self._custom_stt_compatibility_label.value = t("settings.custom_stt.compatibility")
+        self._custom_stt_endpoint.label = t("settings.custom_stt.endpoint")
+        self._custom_stt_model.label = t("settings.custom_stt.model")
+        self._custom_stt_api_key.apply_locale()
+        self._custom_stt_api_key_helper.value = t("settings.custom_stt.api_key.description")
+        self._custom_stt_test_button.text = t("settings.custom_stt.test")
+        self._sync_custom_stt_card()
         self._http_extension_title.value = t("settings.http_extension.title")
         self._http_extension_path_title.value = t("settings.http_extension.path")
         self._http_extension_refresh_title.value = t("settings.http_extension.refresh")

@@ -204,6 +204,7 @@ CREDENTIAL_REF_QWEN_BEIJING: Final = "qwen:beijing"
 CREDENTIAL_REF_QWEN_SINGAPORE: Final = "qwen:singapore"
 CREDENTIAL_REF_DEEPGRAM_STT: Final = "deepgram:stt"
 CREDENTIAL_REF_SONIOX_STT: Final = "soniox:stt"
+CREDENTIAL_REF_CUSTOM_STT: Final = "custom:stt"
 
 STT_PROVIDER_LOCAL_CPU_AUTO: Final = "local_cpu_auto"
 STT_PROVIDER_LOCAL_PARAKEET_V3: Final = "local_parakeet_v3"
@@ -213,6 +214,7 @@ STT_PROVIDER_LOCAL_QWEN_GPU: Final = "local_qwen_gpu"
 STT_PROVIDER_DEEPGRAM: Final = "deepgram"
 STT_PROVIDER_QWEN_ASR: Final = "qwen_asr"
 STT_PROVIDER_SONIOX: Final = "soniox"
+STT_PROVIDER_CUSTOM: Final = "custom"
 STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_LOCAL_CPU_AUTO,
     STT_PROVIDER_LOCAL_PARAKEET_V3,
@@ -222,6 +224,7 @@ STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_DEEPGRAM,
     STT_PROVIDER_QWEN_ASR,
     STT_PROVIDER_SONIOX,
+    STT_PROVIDER_CUSTOM,
 )
 PEER_AUTO_DETECTION_STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_LOCAL_QWEN_GPU,
@@ -461,6 +464,35 @@ def _normalize_openrouter_broker_base_url(value: object) -> str | None:
     return None
 
 
+_CUSTOM_STT_COMPATIBILITIES_BY_MODE: Final[Mapping[str, tuple[str, ...]]] = {
+    "offline": ("openai_transcription",),
+    "realtime": ("openai_realtime",),
+}
+
+
+def _normalize_custom_stt_mode(value: object) -> str:
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"streaming", "realtime", "real-time"}:
+            return "realtime"
+        if normalized == "offline":
+            return "offline"
+    return "offline"
+
+
+def _normalize_custom_stt_compatibility(value: object, *, mode: str) -> str:
+    allowed = _CUSTOM_STT_COMPATIBILITIES_BY_MODE[mode]
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in allowed:
+            return normalized
+        if normalized:
+            raise ValueError(
+                f"Custom STT compatibility {normalized} is not supported in {mode} mode"
+            )
+    return allowed[0]
+
+
 def _no_credential() -> ResolvedCredentialRequirement:
     return ResolvedCredentialRequirement(
         source=CREDENTIAL_SOURCE_NONE,
@@ -675,6 +707,10 @@ class STTRuntimeIntent:
     soniox_enable_language_identification: bool = False
     soniox_language_hints: tuple[str, ...] | None = None
     soniox_language_hints_strict: bool = False
+    custom_stt_mode: str = "offline"
+    custom_stt_compatibility: str = "openai_transcription"
+    custom_stt_endpoint: str = ""
+    custom_stt_model: str = ""
 
     def __post_init__(self) -> None:
         channel = _normalize_allowed(
@@ -1177,6 +1213,23 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
                 **provider_options,
                 "language_hints_strict": True,
             }
+    elif provider == STT_PROVIDER_CUSTOM:
+        mode = _normalize_custom_stt_mode(intent.custom_stt_mode)
+        compatibility = _normalize_custom_stt_compatibility(
+            intent.custom_stt_compatibility,
+            mode=mode,
+        )
+        model = str(intent.custom_stt_model or "").strip() or None
+        endpoint = str(intent.custom_stt_endpoint or "").strip()
+        credential = ResolvedCredentialRequirement(
+            source=CREDENTIAL_SOURCE_SECRET_STORE,
+            required=False,
+            reference=CREDENTIAL_REF_CUSTOM_STT,
+        )
+        provider_options = {
+            "mode": mode,
+            "compatibility": compatibility,
+        }
 
     return ResolvedSTTConfig(
         channel=cast(str, intent.channel),
@@ -1501,6 +1554,7 @@ __all__ = [
     "CREDENTIAL_REF_OPENROUTER_BYOK",
     "CREDENTIAL_REF_OPENROUTER_MANAGED",
     "CREDENTIAL_REF_OPENROUTER_MANAGED_QQ",
+    "CREDENTIAL_REF_CUSTOM_STT",
     "CREDENTIAL_REF_DEEPGRAM_STT",
     "CREDENTIAL_REF_QWEN_BEIJING",
     "CREDENTIAL_REF_QWEN_SINGAPORE",
@@ -1563,6 +1617,7 @@ __all__ = [
     "PEER_AUTO_DETECTION_STT_PROVIDERS",
     "STT_PROVIDER_QWEN_ASR",
     "STT_PROVIDER_SONIOX",
+    "STT_PROVIDER_CUSTOM",
     "STT_PROVIDERS",
     "STTRuntimeIntent",
     "TRANSLATION_CONNECTION_CEREBRAS",

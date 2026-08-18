@@ -13,12 +13,14 @@ from puripuly_heart.config.capture_target_resolution import (
 )
 from puripuly_heart.config.resolved import ResolvedCredentialRequirement, ResolvedSTTConfig
 from puripuly_heart.config.runtime_resolution import (
+    CREDENTIAL_REF_CUSTOM_STT,
     CREDENTIAL_REF_DEEPGRAM_STT,
     CREDENTIAL_REF_QWEN_SINGAPORE,
     CREDENTIAL_REF_SONIOX_STT,
     SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S,
     SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS,
     SONIOX_STT_MODEL_RT_V5,
+    STT_PROVIDER_CUSTOM,
     STT_PROVIDER_DEEPGRAM,
     STT_PROVIDER_LOCAL_CPU_AUTO,
     STT_PROVIDER_LOCAL_PARAKEET_JAPANESE,
@@ -64,6 +66,7 @@ from puripuly_heart.core.runtime.local_qwen_lifecycle import (
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.core.stt.backend import STTBackend
+from puripuly_heart.core.stt.custom import custom_stt_secret_generation
 from puripuly_heart.core.stt.custom_vocab import (
     CustomVocabularyRuntimeConfig,
     get_effective_custom_terms,
@@ -201,7 +204,9 @@ def _self_stt_runtime_intent_from_compatibility_settings(settings: AppSettings) 
         low_latency_enabled=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
         low_latency_merge_gap_ms=settings.stt.low_latency_merge_gap_ms,
         low_latency_spec_retry_max=settings.stt.low_latency_spec_retry_max,
-        custom_vocabulary_enabled=settings.stt.custom_vocabulary_enabled,
+        custom_vocabulary_enabled=(
+            settings.stt.custom_vocabulary_enabled and provider != STT_PROVIDER_CUSTOM
+        ),
         custom_terms=_effective_custom_terms_for_resolved_config(settings, source_language),
         deepgram_model=settings.deepgram_stt.model,
         qwen_asr_model=settings.qwen_asr_stt.model,
@@ -212,6 +217,10 @@ def _self_stt_runtime_intent_from_compatibility_settings(settings: AppSettings) 
         soniox_trailing_silence_ms=settings.soniox_stt.trailing_silence_ms,
         soniox_language_hints=soniox_language_hints,
         soniox_language_hints_strict=soniox_language_hints_strict,
+        custom_stt_mode=settings.custom_stt.mode,
+        custom_stt_compatibility=settings.custom_stt.compatibility,
+        custom_stt_endpoint=settings.custom_stt.endpoint,
+        custom_stt_model=settings.custom_stt.model,
     )
 
 
@@ -274,6 +283,10 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         soniox_enable_language_identification=automatic_soniox,
         soniox_language_hints=language_hints,
         soniox_language_hints_strict=language_hints_strict,
+        custom_stt_mode=intent.stt.custom.mode,
+        custom_stt_compatibility=intent.stt.custom.compatibility,
+        custom_stt_endpoint=intent.stt.custom.endpoint,
+        custom_stt_model=intent.stt.custom.model,
     )
 
 
@@ -383,6 +396,14 @@ def build_self_stt_runtime_signature(settings: AppSettings) -> tuple[object, ...
             if settings.provider.stt == STTProviderName.SONIOX
             else None
         ),
+        (settings.custom_stt.mode if settings.provider.stt == STTProviderName.CUSTOM else None),
+        (
+            settings.custom_stt.compatibility
+            if settings.provider.stt == STTProviderName.CUSTOM
+            else None
+        ),
+        (settings.custom_stt.endpoint if settings.provider.stt == STTProviderName.CUSTOM else None),
+        (settings.custom_stt.model if settings.provider.stt == STTProviderName.CUSTOM else None),
         custom_vocab_enabled,
         custom_terms,
     )
@@ -412,6 +433,19 @@ def build_self_stt_provider_signature(settings: AppSettings) -> tuple[object, ..
         (
             settings.soniox_stt.trailing_silence_ms
             if settings.provider.stt == STTProviderName.SONIOX
+            else None
+        ),
+        (settings.custom_stt.mode if settings.provider.stt == STTProviderName.CUSTOM else None),
+        (
+            settings.custom_stt.compatibility
+            if settings.provider.stt == STTProviderName.CUSTOM
+            else None
+        ),
+        (settings.custom_stt.endpoint if settings.provider.stt == STTProviderName.CUSTOM else None),
+        (settings.custom_stt.model if settings.provider.stt == STTProviderName.CUSTOM else None),
+        (
+            custom_stt_secret_generation()
+            if settings.provider.stt == STTProviderName.CUSTOM
             else None
         ),
         (
@@ -662,7 +696,6 @@ def create_stt_backend_from_resolved_config(
             raise RuntimeError("Local Vulkan ASR worker is not available")
         if config.channel not in {"self", "peer"}:
             raise ValueError(f"Unsupported GPU ASR channel: {config.channel}")
-        from puripuly_heart.core.language import get_local_qwen_language_hint
         from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
         from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 
@@ -741,6 +774,24 @@ def create_stt_backend_from_resolved_config(
             context_terms=keyterms,
         )
 
+    if config.provider == STT_PROVIDER_CUSTOM:
+        from puripuly_heart.providers.stt.custom import CustomSTTBackend
+
+        api_key = ""
+        if config.credential.reference == CREDENTIAL_REF_CUSTOM_STT:
+            api_key = (secrets.get("custom_stt_api_key") or "").strip()
+        mode = str(config.provider_options.get("mode") or "")
+        compatibility = str(config.provider_options.get("compatibility") or "")
+        return CustomSTTBackend(
+            mode=mode,
+            compatibility=compatibility,
+            endpoint=config.endpoint or "",
+            model=config.model or "",
+            api_key=api_key,
+            source_language=config.source_language,
+            sample_rate_hz=config.sample_rate_hz,
+        )
+
     raise ValueError(f"Unsupported STT provider: {config.provider}")
 
 
@@ -794,6 +845,14 @@ def resolve_peer_stt_config(settings: AppSettings) -> ResolvedPeerSTTConfig:
             soniox_trailing_silence_ms=settings.soniox_stt.trailing_silence_ms,
             soniox_enable_language_identification=automatic_soniox,
             soniox_language_hints=language_hints,
+        )
+
+    if provider == STTProviderName.CUSTOM:
+        return ResolvedPeerSTTConfig(
+            provider=provider,
+            source_language=peer_source_language,
+            sample_rate_hz=STT_INTERNAL_SAMPLE_RATE_HZ,
+            keyterms=(),
         )
 
     if provider in {
@@ -854,7 +913,10 @@ def build_peer_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
             else None
         ),
         resolved.provider_options.get("language_hints_strict", False),
+        resolved.provider_options.get("mode"),
+        resolved.provider_options.get("compatibility"),
         resolved.source_mode,
+        (custom_stt_secret_generation() if resolved.provider == STT_PROVIDER_CUSTOM else None),
     )
 
 

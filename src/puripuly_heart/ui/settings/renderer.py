@@ -63,6 +63,7 @@ def compose_settings_api_surface(
         translation_connection_row,
         gpu_device_row,
         slots.local_llm_connection,
+        slots.custom_stt_connection,
         slots.managed_key,
         slots.peer_expected_language,
         slots.api_keys,

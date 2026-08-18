@@ -417,6 +417,14 @@ class SonioxSTTIntent:
 
 
 @dataclass(frozen=True, slots=True)
+class CustomSTTIntent:
+    mode: str = "offline"
+    compatibility: str = "openai_transcription"
+    endpoint: str = ""
+    model: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class STTIntent:
     provider: str = "local_cpu_auto"
     drain_timeout_s: float = 2.0
@@ -431,6 +439,7 @@ class STTIntent:
     deepgram: DeepgramSTTIntent = field(default_factory=DeepgramSTTIntent)
     qwen_asr: QwenASRSTTIntent = field(default_factory=QwenASRSTTIntent)
     soniox: SonioxSTTIntent = field(default_factory=SonioxSTTIntent)
+    custom: CustomSTTIntent = field(default_factory=CustomSTTIntent)
 
     def __post_init__(self) -> None:
         device_id = self.gpu_device_id if isinstance(self.gpu_device_id, str) else "auto"
@@ -1045,6 +1054,7 @@ __all__ = [
     "CaptureTargetIntent",
     "ClipboardIntent",
     "CerebrasTranslationIntent",
+    "CustomSTTIntent",
     "DeepgramSTTIntent",
     "DeepSeekTranslationIntent",
     "DesktopAudioIntent",
