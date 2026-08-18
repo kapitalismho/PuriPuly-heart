@@ -17,21 +17,29 @@ from experiments.psem_training_strategy_gate.data.label_contract import (
     load_contract,
 )
 from experiments.psem_training_strategy_gate.data.provenance import (
+    EXPECTED_ALIMEETING_MEETINGS,
+    EXPECTED_AMI_MEETINGS,
     canonical_sha256,
     sha256_file,
     wav_identity,
     write_jsonl,
 )
 from experiments.psem_training_strategy_gate.data.topology_census import (
+    FROZEN_CALIBRATION_MARKDOWN_SHA256,
+    FROZEN_CALIBRATION_SOURCE_IDS,
     OFFICIAL_PRIMARY_TOPOLOGIES,
     TopologyCensusError,
+    _build_topology_census_from_validated_sessions,
+    _validate_calibrated_inventory,
     build_topology_census,
     build_topology_row,
+    render_data_census,
     validate_waveform_inventory,
     write_topology_census,
 )
 
 DATA_DIR = Path(__file__).resolve().parents[1]
+EXPECTED_SOURCE_COUNT = len(EXPECTED_AMI_MEETINGS) + len(EXPECTED_ALIMEETING_MEETINGS)
 
 
 def _sessions(intervals: tuple[CanonicalInterval, ...]) -> list[NormalizedSession]:
@@ -101,6 +109,9 @@ def _write_inputs(data_dir: Path, sessions: list[NormalizedSession]) -> None:
         encoding="utf-8",
         newline="\n",
     )
+    (data_dir / "ANNOTATION_CALIBRATION.md").write_text(
+        "fixture calibration\n", encoding="utf-8", newline="\n"
+    )
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -113,8 +124,8 @@ def test_checked_in_topology_census_binds_the_frozen_inventory() -> None:
         (DATA_DIR / "topology_census.json").read_text(encoding="utf-8")
     )
     contract = load_contract()
-    assert len(rows) == 28
-    assert len({row["source_id"] for row in rows}) == 28
+    assert len(rows) == EXPECTED_SOURCE_COUNT
+    assert len({row["source_id"] for row in rows}) == EXPECTED_SOURCE_COUNT
     assert {row["corpus"] for row in rows} == {"AMI", "AliMeeting"}
     assert census["contract_version"] == contract.contract_version
     assert census["contract_document_sha256"] == contract.document_sha256
@@ -125,6 +136,9 @@ def test_checked_in_topology_census_binds_the_frozen_inventory() -> None:
     assert census["input_manifests"][
         "annotation_calibration_sha256"
     ] == sha256_file(DATA_DIR / "annotation_calibration.json")
+    assert census["input_manifests"][
+        "annotation_calibration_markdown_sha256"
+    ] == FROZEN_CALIBRATION_MARKDOWN_SHA256
     assert census["input_manifests"]["source_manifest_sha256"] == sha256_file(
         DATA_DIR / "source_manifest.jsonl"
     )
@@ -137,7 +151,7 @@ def test_checked_in_topology_census_binds_the_frozen_inventory() -> None:
     assert census["input_manifests"]["source_ids_sha256"] == canonical_sha256(
         sorted(row["source_id"] for row in rows)
     )
-    assert census["overall"]["session_count"] == 28
+    assert census["overall"]["session_count"] == EXPECTED_SOURCE_COUNT
     assert census["overall"]["scored_samples"] == sum(
         row["scored_samples"] for row in rows
     )
@@ -151,7 +165,7 @@ def test_checked_in_topology_census_binds_the_frozen_inventory() -> None:
     assert census["model_policy"]["official_model_training_performed"] is False
     assert census["overall"]["mask_diagnostics"][
         "masked_transition_fraction"
-    ] == 0.31654904
+    ] == 0.33906608
     markdown = (DATA_DIR / "DATA_CENSUS.md").read_text(encoding="utf-8")
     assert "component audit pending" in markdown
     assert "No topology substitutes for another" in markdown
@@ -168,7 +182,9 @@ def test_short_backchannel_is_one_exclusive_primary_episode(tmp_path: Path) -> N
     )
     sessions = _sessions(intervals)
     _write_inputs(tmp_path, sessions)
-    rows, census = build_topology_census(sessions, tmp_path, "c" * 64)
+    rows, census = _build_topology_census_from_validated_sessions(
+        sessions, tmp_path, "c" * 64
+    )
     for row in rows:
         assert row["exclusive_primary_episode_count"] == 1
         assert row["primary_topology_counts"]["short_backchannel_return"] == 1
@@ -185,6 +201,26 @@ def test_short_backchannel_is_one_exclusive_primary_episode(tmp_path: Path) -> N
     assert census["counting_policy"][
         "short_backchannel_member_handoffs_counted_separately"
     ] is False
+
+
+def test_rendered_census_does_not_report_a_zero_hour_deficit_as_blocking() -> None:
+    census = json.loads(
+        (DATA_DIR / "topology_census.json").read_text(encoding="utf-8")
+    )
+    rows = _read_jsonl(DATA_DIR / "topology_manifest.jsonl")
+    census["candidate_pool_lower_bound_audit"]["scored_samples"]["deficit"] = 0
+    markdown = render_data_census(census, rows)
+    assert "aggregate scored-hour lower bound passes" in markdown
+    assert "scored-hour deficit is an acquisition blocker" not in markdown
+
+
+def test_frozen_calibration_scope_allows_expansion_but_not_omission() -> None:
+    contract = load_contract()
+    expanded = sorted([*FROZEN_CALIBRATION_SOURCE_IDS, "ami_new_session"])
+    _validate_calibrated_inventory(DATA_DIR, expanded, contract)
+    missing = sorted(FROZEN_CALIBRATION_SOURCE_IDS)[1:]
+    with pytest.raises(TopologyCensusError, match="accepted annotation calibration"):
+        _validate_calibrated_inventory(DATA_DIR, missing, contract)
 
 
 def test_micro_diagnostics_are_not_official_primary_counts() -> None:
@@ -333,13 +369,24 @@ def test_census_outputs_are_deterministic(
     monkeypatch.setattr(
         topology_census, "validate_waveform_inventory", lambda *_: None
     )
+    monkeypatch.setattr(
+        topology_census, "_validate_calibrated_inventory", lambda *_: None
+    )
     outputs = (
         tmp_path / "topology_manifest.jsonl",
         tmp_path / "topology_census.json",
         tmp_path / "DATA_CENSUS.md",
     )
-    write_topology_census(tmp_path, tmp_path, *outputs)
+    write_topology_census(
+        tmp_path,
+        tmp_path,
+        *outputs,
+    )
     first = tuple(path.read_bytes() for path in outputs)
-    write_topology_census(tmp_path, tmp_path, *outputs)
+    write_topology_census(
+        tmp_path,
+        tmp_path,
+        *outputs,
+    )
     second = tuple(path.read_bytes() for path in outputs)
     assert first == second

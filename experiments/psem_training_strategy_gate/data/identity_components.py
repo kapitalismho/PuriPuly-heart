@@ -15,6 +15,10 @@ from experiments.psem_training_strategy_gate.data.provenance import (
     sha256_file,
 )
 from experiments.psem_training_strategy_gate.data.topology_census import (
+    FROZEN_CALIBRATION_INPUTS,
+    FROZEN_CALIBRATION_MARKDOWN_SHA256,
+    FROZEN_CALIBRATION_SHA256,
+    FROZEN_CALIBRATION_SOURCE_IDS,
     OFFICIAL_PRIMARY_TOPOLOGIES,
     _aggregate,
     _lower_bound_audit,
@@ -212,29 +216,33 @@ def _validate_calibration(
     contract_status: str,
 ) -> None:
     input_policy = calibration.get("input_policy")
-    expected_inputs = {
-        "source_manifest_sha256": sha256_file(data_dir / "source_manifest.jsonl"),
-        "annotation_manifest_sha256": sha256_file(
-            data_dir / "annotation_manifest.jsonl"
-        ),
-        "normalization_manifest_sha256": sha256_file(
-            data_dir / "normalization_manifest.jsonl"
-        ),
-        "source_ids_sha256": canonical_sha256(sorted(source_ids)),
-    }
+    calibration_sha256 = sha256_file(data_dir / "annotation_calibration.json")
+    calibrated_scope_valid = (
+        FROZEN_CALIBRATION_SOURCE_IDS.issubset(source_ids)
+        and canonical_sha256(sorted(FROZEN_CALIBRATION_SOURCE_IDS))
+        == FROZEN_CALIBRATION_INPUTS["source_ids_sha256"]
+    )
     if (
         calibration.get("artifact_role") != "annotation_only_calibration"
+        or calibration_sha256 != FROZEN_CALIBRATION_SHA256
+        or sha256_file(data_dir / "ANNOTATION_CALIBRATION.md")
+        != FROZEN_CALIBRATION_MARKDOWN_SHA256
         or calibration.get("authority_ref") != AUTHORITY_REF
         or calibration.get("authority_pin") != AUTHORITY_PIN
         or calibration.get("contract_version") != contract_version
         or calibration.get("contract_document_sha256") != contract_sha
         or calibration.get("contract_status") != contract_status
         or not isinstance(input_policy, dict)
-        or any(input_policy.get(key) != value for key, value in expected_inputs.items())
+        or not calibrated_scope_valid
+        or any(
+            input_policy.get(key) != value
+            for key, value in FROZEN_CALIBRATION_INPUTS.items()
+        )
         or any(input_policy.get(field) is not False for field in NO_MODEL_FIELDS)
         or input_policy.get("source")
         != "accepted natural source annotations only"
-        or calibration.get("overall", {}).get("session_count") != len(source_ids)
+        or calibration.get("overall", {}).get("session_count")
+        != len(FROZEN_CALIBRATION_SOURCE_IDS)
     ):
         raise IdentityGraphError("annotation calibration binding mismatch")
 
@@ -286,6 +294,9 @@ def _validate_topology_census(
         ),
         "annotation_calibration_sha256": sha256_file(
             data_dir / "annotation_calibration.json"
+        ),
+        "annotation_calibration_markdown_sha256": sha256_file(
+            data_dir / "ANNOTATION_CALIBRATION.md"
         ),
         "source_ids_sha256": canonical_sha256(sorted(source_ids)),
     }
@@ -628,6 +639,9 @@ def build_identity_graph(data_dir: Path) -> dict[str, Any]:
             "census_annotation_calibration_sha256": census["input_manifests"][
                 "annotation_calibration_sha256"
             ],
+            "census_annotation_calibration_markdown_sha256": census[
+                "input_manifests"
+            ]["annotation_calibration_markdown_sha256"],
         },
         "identity_axis_policy": {
             "meeting_session": "corpus_scoped_exact_identity",

@@ -25,6 +25,11 @@ from experiments.psem_training_strategy_gate.data.provenance import (
 )
 
 DATA_DIR = Path(__file__).resolve().parents[1]
+CALIBRATION_JSON_SHA256 = "1f10fc1980bd1a108753ef6afb45f455618df04014ad6b58dcf6e880ba01f4b1"
+CALIBRATION_MARKDOWN_SHA256 = "2efe8137b8330699a0bcc1a770e40ce22c7c615de7b49b3724ddf0ebf80cddf6"
+CALIBRATION_SOURCE_MANIFEST_SHA256 = "5cf6178a35e0c499bc3d79633c3ff1973f5f529c2b39e3bec89ca18ea96d6437"
+CALIBRATION_ANNOTATION_MANIFEST_SHA256 = "f635171f8162115e08cee49e4fd748749b372e7eb37797bc91975bf2ca85c4a3"
+CALIBRATION_NORMALIZATION_MANIFEST_SHA256 = "9805abe480eab757d29a484f67ee543a548dd91c7396007a85e2c60f44065079"
 
 
 def _synthetic_sessions(
@@ -91,14 +96,22 @@ def test_checked_in_calibration_report_binds_the_frozen_annotation_only_inputs()
     assert report["contract_status"] == contract.status
     assert report["overall"]["session_count"] == 28
     assert set(report["by_corpus"]) == {"AMI", "AliMeeting"}
-    assert report["input_policy"]["source_manifest_sha256"] == sha256_file(
-        DATA_DIR / "source_manifest.jsonl"
+    assert sha256_file(DATA_DIR / "annotation_calibration.json") == CALIBRATION_JSON_SHA256
+    assert (
+        sha256_file(DATA_DIR / "ANNOTATION_CALIBRATION.md")
+        == CALIBRATION_MARKDOWN_SHA256
     )
-    assert report["input_policy"]["annotation_manifest_sha256"] == sha256_file(
-        DATA_DIR / "annotation_manifest.jsonl"
+    assert (
+        report["input_policy"]["source_manifest_sha256"]
+        == CALIBRATION_SOURCE_MANIFEST_SHA256
     )
-    assert report["input_policy"]["normalization_manifest_sha256"] == sha256_file(
-        DATA_DIR / "normalization_manifest.jsonl"
+    assert (
+        report["input_policy"]["annotation_manifest_sha256"]
+        == CALIBRATION_ANNOTATION_MANIFEST_SHA256
+    )
+    assert (
+        report["input_policy"]["normalization_manifest_sha256"]
+        == CALIBRATION_NORMALIZATION_MANIFEST_SHA256
     )
     assert report["input_policy"]["model_predictions_consulted"] is False
     assert report["input_policy"]["model_scores_consulted"] is False

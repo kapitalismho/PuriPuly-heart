@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from experiments.psem_training_strategy_gate.data import identity_components
 from experiments.psem_training_strategy_gate.data.identity_components import (
     AUTHORITY_PIN,
     AUTHORITY_REF,
@@ -26,6 +27,18 @@ from experiments.psem_training_strategy_gate.data.topology_census import (
 )
 
 DATA_DIR = Path(__file__).resolve().parents[1]
+ORIGINAL_VALIDATE_CALIBRATION = identity_components._validate_calibration
+
+
+@pytest.fixture(autouse=True)
+def _use_fixture_calibration_only_for_synthetic_bundles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def validate(data_dir: Path, *args: object) -> None:
+        if data_dir.resolve() == DATA_DIR.resolve():
+            ORIGINAL_VALIDATE_CALIBRATION(data_dir, *args)
+
+    monkeypatch.setattr(identity_components, "_validate_calibration", validate)
 
 
 def _source_row(
@@ -196,6 +209,10 @@ def _write_bundle(data_dir: Path, rows: list[dict[str, object]]) -> None:
         encoding="utf-8",
         newline="\n",
     )
+    calibration_markdown_path = data_dir / "ANNOTATION_CALIBRATION.md"
+    calibration_markdown_path.write_text(
+        "fixture calibration\n", encoding="utf-8", newline="\n"
+    )
     overall = _aggregate(topology_rows, contract.sample_rate_hz)
     by_corpus = {
         corpus: _aggregate(
@@ -224,6 +241,9 @@ def _write_bundle(data_dir: Path, rows: list[dict[str, object]]) -> None:
             ),
             "source_ids_sha256": canonical_sha256(source_ids),
             "annotation_calibration_sha256": sha256_file(calibration_path),
+            "annotation_calibration_markdown_sha256": sha256_file(
+                calibration_markdown_path
+            ),
         },
         "topology_manifest_sha256": sha256_file(
             data_dir / "topology_manifest.jsonl"
@@ -290,15 +310,15 @@ def test_checked_in_identity_graph_covers_the_accepted_census() -> None:
     )
     assert sorted(node["source_id"] for node in graph["nodes"]) == source_ids
     assert graph["summary"] == {
-        "component_count": 28,
-        "edge_count": 0,
+        "component_count": 42,
+        "edge_count": 66,
         "eval_forbidden_component_count": 10,
-        "globally_linkable_speaker_identity_count": 80,
-        "multi_source_component_count": 0,
+        "globally_linkable_speaker_identity_count": 135,
+        "multi_source_component_count": 12,
         "prior_exposed_source_count": 10,
         "session_local_speaker_label_count": 25,
-        "singleton_component_count": 28,
-        "source_count": 28,
+        "singleton_component_count": 30,
+        "source_count": 76,
         "unknown_identity_source_count": 0,
         "unknown_identity_source_ids": [],
     }
@@ -309,10 +329,10 @@ def test_checked_in_identity_graph_covers_the_accepted_census() -> None:
     )
     assert all(node["split_assignment_eligible"] for node in graph["nodes"])
     assert graph["identity_axis_coverage"] == {
-        "annotation_identity_known_source_count": 28,
+        "annotation_identity_known_source_count": 76,
         "explicit_source_recording_parent_source_count": 0,
-        "globally_linkable_speaker_identity_source_count": 20,
-        "meeting_series_known_source_count": 20,
+        "globally_linkable_speaker_identity_source_count": 68,
+        "meeting_series_known_source_count": 68,
         "meeting_series_unknown_source_ids": [
             "alimeeting_R8001_M8004",
             "alimeeting_R8003_M8001",
@@ -323,14 +343,14 @@ def test_checked_in_identity_graph_covers_the_accepted_census() -> None:
             "alimeeting_R8009_M8019",
             "alimeeting_R8009_M8020",
         ],
-        "meeting_session_known_source_count": 28,
-        "recurring_participant_evidence_source_count": 20,
+        "meeting_session_known_source_count": 76,
+        "recurring_participant_evidence_source_count": 68,
         "session_local_speaker_label_source_count": 8,
-        "source_recording_reference_known_source_count": 28,
+        "source_recording_reference_known_source_count": 76,
         "source_utterance_parent_source_count": 0,
         "synthetic_parent_source_count": 0,
         "synthetic_transformation_seed_source_count": 0,
-        "waveform_identity_known_source_count": 28,
+        "waveform_identity_known_source_count": 76,
     }
     assert all(
         graph["model_policy"][field] is False
@@ -593,19 +613,50 @@ def test_graph_rejects_changed_census_metrics(tmp_path: Path) -> None:
 
 
 def test_graph_rejects_model_contaminated_calibration(tmp_path: Path) -> None:
-    _write_bundle(tmp_path, [_source_row("test_a")])
-    calibration_path = tmp_path / "annotation_calibration.json"
-    calibration = json.loads(calibration_path.read_text(encoding="utf-8"))
-    calibration["input_policy"]["model_predictions_consulted"] = True
-    _write_json(calibration_path, calibration)
-    census_path = tmp_path / "topology_census.json"
-    census = json.loads(census_path.read_text(encoding="utf-8"))
-    census["input_manifests"]["annotation_calibration_sha256"] = sha256_file(
-        calibration_path
+    calibration = json.loads(
+        (DATA_DIR / "annotation_calibration.json").read_text(encoding="utf-8")
     )
-    _write_json(census_path, census)
+    calibration["input_policy"]["model_predictions_consulted"] = True
     with pytest.raises(IdentityGraphError, match="calibration binding"):
-        build_identity_graph(tmp_path)
+        ORIGINAL_VALIDATE_CALIBRATION(
+            DATA_DIR,
+            calibration,
+            sorted(node["source_id"] for node in json.loads(
+                (DATA_DIR / "identity_components.json").read_text(encoding="utf-8")
+            )["nodes"]),
+            load_contract().contract_version,
+            load_contract().document_sha256,
+            load_contract().status,
+        )
+
+
+def test_graph_rejects_changed_calibration_markdown(tmp_path: Path) -> None:
+    calibration = json.loads(
+        (DATA_DIR / "annotation_calibration.json").read_text(encoding="utf-8")
+    )
+    (tmp_path / "annotation_calibration.json").write_bytes(
+        (DATA_DIR / "annotation_calibration.json").read_bytes()
+    )
+    (tmp_path / "ANNOTATION_CALIBRATION.md").write_text(
+        "changed receipt\n", encoding="utf-8", newline="\n"
+    )
+    contract = load_contract()
+    with pytest.raises(IdentityGraphError, match="calibration binding"):
+        ORIGINAL_VALIDATE_CALIBRATION(
+            tmp_path,
+            calibration,
+            sorted(
+                node["source_id"]
+                for node in json.loads(
+                    (DATA_DIR / "identity_components.json").read_text(
+                        encoding="utf-8"
+                    )
+                )["nodes"]
+            ),
+            contract.contract_version,
+            contract.document_sha256,
+            contract.status,
+        )
 
 
 def test_split_assignment_rejects_tampered_component_guards(tmp_path: Path) -> None:

@@ -23,15 +23,15 @@ SOURCE_REGISTRY_PATH = (
 )
 
 
-def test_checked_in_feasibility_proves_the_current_hour_blocker() -> None:
+def test_checked_in_feasibility_requires_component_assignment_search() -> None:
     checked = json.loads((DATA_DIR / "split_feasibility.json").read_text(encoding="utf-8"))
     assert checked == build_split_feasibility(DATA_DIR, REGISTRY_PATH, SOURCE_REGISTRY_PATH)
-    assert checked["search_status"] == "skipped_proven_infeasible_by_total_lower_bounds"
-    assert checked["valid_assignment_exists"] is False
+    assert checked["search_status"] == "component_assignment_search_required"
+    assert checked["valid_assignment_exists"] is None
     assert checked["assignments"] == {}
-    assert checked["blocking_lower_bounds"] == ["scored_samples"]
-    assert checked["deficits"]["scored_hours"] == 17.113647
-    assert checked["acquisition_handoff"]["minimum_additional_natural_scored_hours"] == 17.113647
+    assert checked["blocking_lower_bounds"] == []
+    assert checked["deficits"]["scored_hours"] == 0.0
+    assert checked["acquisition_handoff"]["minimum_additional_natural_scored_hours"] == 0.0
     assert all(deficit == 0 for deficit in checked["deficits"]["primary_topology_counts"].values())
 
 

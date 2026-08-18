@@ -50,7 +50,7 @@ ALIMEETING_ARCHIVE_URL = "https://speech-lab-share-data.oss-cn-shanghai.aliyuncs
 ALIMEETING_ARCHIVE_SIZE_BYTES = 3673718355
 SOURCE_ID_PATTERN = re.compile(r"^(ami|alimeeting)_[A-Za-z0-9_]+$")
 ALIMEETING_TIER_PATTERN = re.compile(r'^\s*name\s*=\s*"N_(SPK\d+)"\s*$')
-EXPECTED_AMI_MEETINGS = frozenset(
+BASELINE_AMI_MEETINGS = frozenset(
     {
         "EN2001d", "EN2002c", "EN2006a", "EN2009d", "ES2002b",
         "ES2003a", "ES2004a", "ES2014a", "ES2015d", "ES2016a",
@@ -58,6 +58,49 @@ EXPECTED_AMI_MEETINGS = frozenset(
         "TS3006a", "TS3007a", "TS3008b", "TS3009b", "TS3012c",
     }
 )
+AMI_EXPANSION_COMPONENTS = {
+    "EN2003": ("EN2003a",),
+    "EN2004": ("EN2004a",),
+    "ES2005": ("ES2005a", "ES2005b", "ES2005c", "ES2005d"),
+    "ES2006": ("ES2006a", "ES2006b", "ES2006c", "ES2006d"),
+    "ES2007": ("ES2007a", "ES2007b", "ES2007c", "ES2007d"),
+    "ES2008": ("ES2008a", "ES2008b", "ES2008c", "ES2008d"),
+    "ES2009": ("ES2009a", "ES2009b", "ES2009c", "ES2009d"),
+    "ES2010": ("ES2010a", "ES2010b", "ES2010c"),
+    "ES2011": ("ES2011a", "ES2011b", "ES2011d"),
+    "ES2012": ("ES2012a", "ES2012b", "ES2012c", "ES2012d"),
+    "ES2013": ("ES2013a", "ES2013b", "ES2013c", "ES2013d"),
+    "IS1007": ("IS1007a", "IS1007b", "IS1007c", "IS1007d"),
+    "TS3010": ("TS3010a", "TS3010b", "TS3010c", "TS3010d"),
+    "TS3011": ("TS3011a", "TS3011b", "TS3011c", "TS3011d"),
+}
+AMI_EXPANSION_EXCLUSIONS = {
+    "ES2010d": {
+        "reason": "official_mix_headset_is_16khz_stereo_pcm16",
+        "waveform_size_bytes": 62030212,
+        "waveform_sha256": "0435f583b7ffa7055e7c5a884ed6eafcbfcb3b4f4fe6f04a16e34f7e04c2455e",
+        "sample_rate_hz": 16000,
+        "channels": 2,
+        "sample_width_bytes": 2,
+    },
+    "ES2011c": {
+        "reason": "manual_segment_has_reversed_bounds",
+        "waveform_size_bytes": 51714092,
+        "waveform_sha256": "8c2d75e76817ab770ccab71e48e1d41e62729992e6f928bf2a6a8a4bd381e111",
+        "annotation_file": "ami/annotations/segments/ES2011c.C.segments.xml",
+        "annotation_file_size_bytes": 25179,
+        "annotation_file_sha256": "68c2e2cc866416b67166394e5a7cd77a752d04faf551264cdb22f37414b605b3",
+        "invalid_segment_index": 0,
+        "transcriber_start": "78.122",
+        "transcriber_end": "78.001",
+    },
+}
+ADDITIONAL_AMI_MEETINGS = frozenset(
+    meeting_id
+    for component in AMI_EXPANSION_COMPONENTS.values()
+    for meeting_id in component
+)
+EXPECTED_AMI_MEETINGS = BASELINE_AMI_MEETINGS | ADDITIONAL_AMI_MEETINGS
 EXPECTED_ALIMEETING_MEETINGS = frozenset(
     {
         "R8001_M8004", "R8003_M8001", "R8007_M8010", "R8007_M8011",
@@ -68,6 +111,23 @@ EXPECTED_ALIMEETING_MEETINGS = frozenset(
 
 class ProvenanceError(RuntimeError):
     pass
+
+
+class _Components:
+    def __init__(self, values: set[str]) -> None:
+        self.parent = {value: value for value in values}
+
+    def find(self, value: str) -> str:
+        parent = self.parent[value]
+        if parent != value:
+            self.parent[value] = self.find(parent)
+        return self.parent[value]
+
+    def union(self, left: str, right: str) -> None:
+        left_root = self.find(left)
+        right_root = self.find(right)
+        if left_root != right_root:
+            self.parent[right_root] = left_root
 
 
 def sha256_file(path: Path, chunk_bytes: int = 1 << 20) -> str:
@@ -225,6 +285,152 @@ def _ami_metadata(annotations_root: Path) -> dict[str, dict[str, Any]]:
     return meetings
 
 
+def _ami_identity_components(
+    meetings: dict[str, dict[str, Any]], available: set[str]
+) -> list[tuple[str, ...]]:
+    components = _Components(available)
+    members_by_axis: dict[tuple[str, str], list[str]] = defaultdict(list)
+    for meeting_id in sorted(available):
+        metadata = meetings.get(meeting_id)
+        if metadata is None:
+            raise ProvenanceError(f"AMI metadata missing for {meeting_id}")
+        members_by_axis[("meeting_series", meeting_id[:-1])].append(meeting_id)
+        for speaker_id in metadata["speaker_ids"]:
+            members_by_axis[("speaker_id", speaker_id)].append(meeting_id)
+    for members in members_by_axis.values():
+        for member in members[1:]:
+            components.union(members[0], member)
+    members_by_root: dict[str, list[str]] = defaultdict(list)
+    for meeting_id in sorted(available):
+        members_by_root[components.find(meeting_id)].append(meeting_id)
+    return sorted(tuple(sorted(members)) for members in members_by_root.values())
+
+
+def _validate_excluded_waveform(path: Path, record: dict[str, Any]) -> None:
+    try:
+        with wave.open(str(path), "rb") as handle:
+            observed = {
+                "sample_rate_hz": handle.getframerate(),
+                "channels": handle.getnchannels(),
+                "sample_width_bytes": handle.getsampwidth(),
+            }
+    except (OSError, EOFError, wave.Error) as exc:
+        raise ProvenanceError(f"invalid excluded AMI waveform: {path}") from exc
+    expected = {
+        field: record[field]
+        for field in ("sample_rate_hz", "channels", "sample_width_bytes")
+        if field in record
+    }
+    if (
+        path.stat().st_size != record["waveform_size_bytes"]
+        or sha256_file(path) != record["waveform_sha256"]
+        or any(observed[field] != value for field, value in expected.items())
+    ):
+        raise ProvenanceError(f"excluded AMI waveform evidence changed: {path}")
+
+
+def _validate_reversed_segment(path: Path, record: dict[str, Any]) -> None:
+    if (
+        not path.is_file()
+        or path.stat().st_size != record["annotation_file_size_bytes"]
+        or sha256_file(path) != record["annotation_file_sha256"]
+    ):
+        raise ProvenanceError(f"excluded AMI annotation evidence changed: {path}")
+    try:
+        segments = list(ET.parse(path).getroot().iter("segment"))
+        segment = segments[record["invalid_segment_index"]]
+    except (ET.ParseError, IndexError) as exc:
+        raise ProvenanceError(f"invalid excluded AMI annotation evidence: {path}") from exc
+    if (
+        segment.attrib.get("transcriber_start") != record["transcriber_start"]
+        or segment.attrib.get("transcriber_end") != record["transcriber_end"]
+        or float(record["transcriber_start"]) <= float(record["transcriber_end"])
+    ):
+        raise ProvenanceError(f"excluded AMI segment evidence changed: {path}")
+
+
+def _validate_expansion_exclusions(corpus_root: Path) -> None:
+    audio_root = corpus_root / "ami" / "audio"
+    for meeting_id, record in sorted(AMI_EXPANSION_EXCLUSIONS.items()):
+        canonical = audio_root / meeting_id / f"{meeting_id}.Mix-Headset.wav"
+        partial = canonical.with_suffix(canonical.suffix + ".part")
+        candidates = [path for path in (canonical, partial) if path.is_file()]
+        if len(candidates) != 1:
+            raise ProvenanceError(
+                f"excluded AMI waveform evidence must resolve exactly once: {meeting_id}"
+            )
+        _validate_excluded_waveform(candidates[0], record)
+        annotation_ref = record.get("annotation_file")
+        if annotation_ref is not None:
+            _validate_reversed_segment(corpus_root / annotation_ref, record)
+
+
+def _validate_ami_expansion_components(
+    meetings: dict[str, dict[str, Any]], available: set[str]
+) -> list[tuple[str, ...]]:
+    if not BASELINE_AMI_MEETINGS.issubset(available):
+        raise ProvenanceError(
+            "AMI baseline annotation inventory is incomplete; "
+            f"missing={sorted(BASELINE_AMI_MEETINGS - available)}"
+        )
+    configured = sorted(
+        tuple(component) for component in AMI_EXPANSION_COMPONENTS.values()
+    )
+    clean_components = [
+        component
+        for component in _ami_identity_components(meetings, available)
+        if not set(component) & BASELINE_AMI_MEETINGS
+    ]
+    excluded = set(AMI_EXPANSION_EXCLUSIONS)
+    if not excluded.issubset(
+        meeting_id for component in clean_components for meeting_id in component
+    ):
+        raise ProvenanceError("AMI expansion exclusions are not clean candidates")
+    discovered = sorted(
+        tuple(meeting_id for meeting_id in component if meeting_id not in excluded)
+        for component in clean_components
+        if set(component) - excluded
+    )
+    if configured != discovered:
+        raise ProvenanceError(
+            f"AMI expansion component selection is stale; configured={configured} "
+            f"discovered={discovered}"
+        )
+    return configured
+
+
+def validate_ami_expansion_selection(corpus_root: Path) -> dict[str, Any]:
+    annotations_root = corpus_root / "ami" / "annotations"
+    meetings = _ami_metadata(annotations_root)
+    segment_root = annotations_root / "segments"
+    available = {
+        path.name.split(".", 1)[0]
+        for path in segment_root.glob("*.segments.xml")
+        if path.is_file()
+    }
+    configured = _validate_ami_expansion_components(meetings, available)
+    for meeting_id in sorted(ADDITIONAL_AMI_MEETINGS):
+        metadata = meetings[meeting_id]
+        if metadata["unknown_speaker_agents"]:
+            raise ProvenanceError(
+                f"AMI expansion contains unresolved speaker identity: {meeting_id}"
+            )
+        if not list(segment_root.glob(f"{meeting_id}.*.segments.xml")):
+            raise ProvenanceError(
+                f"AMI expansion segment annotations missing: {meeting_id}"
+            )
+    _validate_expansion_exclusions(corpus_root)
+    receipt = {
+        "component_count": len(configured),
+        "components": configured,
+        "meeting_count": len(ADDITIONAL_AMI_MEETINGS),
+        "meeting_ids": sorted(ADDITIONAL_AMI_MEETINGS),
+        "baseline_meeting_ids": sorted(BASELINE_AMI_MEETINGS),
+        "excluded_meetings": AMI_EXPANSION_EXCLUSIONS,
+    }
+    return {**receipt, "selection_sha256": canonical_sha256(receipt)}
+
+
 def _validate_ami_segments(
     paths: list[Path], meeting_id: str, expected_agents: list[str], duration_samples: int
 ) -> None:
@@ -272,6 +478,29 @@ def _validate_ami_segments(
         raise ProvenanceError(f"AMI segment annotation bundle is empty: {meeting_id}")
 
 
+def _validate_ami_audio_inventory(audio_root: Path) -> None:
+    expected_paths = {
+        Path(meeting_id) / f"{meeting_id}.Mix-Headset.wav"
+        for meeting_id in EXPECTED_AMI_MEETINGS
+    }
+    excluded_paths = {
+        Path(meeting_id) / f"{meeting_id}.Mix-Headset.wav"
+        for meeting_id in AMI_EXPANSION_EXCLUSIONS
+    }
+    observed_paths = {
+        path.relative_to(audio_root)
+        for path in audio_root.rglob("*")
+        if path.is_file() and path.suffix.lower() == ".wav"
+    }
+    missing = expected_paths - observed_paths
+    unexpected = observed_paths - expected_paths - excluded_paths
+    if missing or unexpected:
+        raise ProvenanceError(
+            f"AMI inventory mismatch; missing={sorted(path.as_posix() for path in missing)} "
+            f"extra={sorted(path.as_posix() for path in unexpected)}"
+        )
+
+
 def _prior_fields(source_id: str, prior: dict[str, dict[str, Any]]) -> dict[str, Any]:
     exposed = source_id in prior
     return {
@@ -292,20 +521,14 @@ def _ami_rows(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     audio_root = corpus_root / "ami" / "audio"
     annotations_root = corpus_root / "ami" / "annotations"
+    selection = validate_ami_expansion_selection(corpus_root)
     meetings_meta = _ami_metadata(annotations_root)
     meetings_file = annotations_root / "corpusResources" / "meetings.xml"
     source_rows = []
     annotation_rows = []
-    discovered = {path.name for path in audio_root.iterdir() if path.is_dir()}
-    if discovered != EXPECTED_AMI_MEETINGS:
-        raise ProvenanceError(
-            f"AMI inventory mismatch; missing={sorted(EXPECTED_AMI_MEETINGS - discovered)} "
-            f"extra={sorted(discovered - EXPECTED_AMI_MEETINGS)}"
-        )
-    for meeting_dir in sorted(audio_root.iterdir()):
-        if not meeting_dir.is_dir():
-            continue
-        meeting_id = meeting_dir.name
+    _validate_ami_audio_inventory(audio_root)
+    for meeting_id in sorted(EXPECTED_AMI_MEETINGS):
+        meeting_dir = audio_root / meeting_id
         source_id = f"ami_{meeting_id}"
         wav_path = meeting_dir / f"{meeting_id}.Mix-Headset.wav"
         audio = wav_identity(wav_path)
@@ -341,6 +564,7 @@ def _ami_rows(
                 ),
                 "audio_ref": wav_path.relative_to(corpus_root).as_posix(),
                 "audio_source_url": AMI_AUDIO_URL.format(meeting=meeting_id),
+                "acquisition_selection_sha256": selection["selection_sha256"],
                 "recording_recipe": "Mix-Headset original 16 kHz mono PCM16",
                 "license_id": "CC-BY-4.0",
                 "use_authorization": "public_research_under_source_license",

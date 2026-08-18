@@ -16,7 +16,11 @@ from experiments.psem_training_strategy_gate.data.pretraining_overlap import (
     build_pretraining_overlap_audit,
     write_pretraining_overlap_audit,
 )
-from experiments.psem_training_strategy_gate.data.provenance import sha256_file
+from experiments.psem_training_strategy_gate.data.provenance import (
+    EXPECTED_ALIMEETING_MEETINGS,
+    EXPECTED_AMI_MEETINGS,
+    sha256_file,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 DATA_DIR = Path(__file__).resolve().parents[1]
@@ -24,6 +28,7 @@ REGISTRY_PATH = REPO_ROOT / "experiments/speaker_representation_scd/models/regis
 SOURCE_REGISTRY_PATH = (
     REPO_ROOT / "experiments/speaker_representation_scd/models/source_registry.json"
 )
+EXPECTED_SOURCE_COUNT = len(EXPECTED_AMI_MEETINGS) + len(EXPECTED_ALIMEETING_MEETINGS)
 
 
 def test_checked_in_audit_binds_the_exact_checkpoint_and_all_sources() -> None:
@@ -36,13 +41,16 @@ def test_checked_in_audit_binds_the_exact_checkpoint_and_all_sources() -> None:
         "revision": MODEL_REVISION,
         "artifact": MODEL_ARTIFACT,
     }
+    identity_graph = json.loads(
+        (DATA_DIR / "identity_components.json").read_text(encoding="utf-8")
+    )
     assert audit["summary"] == {
-        "source_count": 28,
-        "identity_component_count": 28,
+        "source_count": EXPECTED_SOURCE_COUNT,
+        "identity_component_count": identity_graph["summary"]["component_count"],
         "classification_counts": {
             "exact_session_overlap_known": 0,
             "corpus_level_overlap_known": 0,
-            "no_known_overlap": 28,
+            "no_known_overlap": EXPECTED_SOURCE_COUNT,
             "unknown": 0,
         },
         "eval_forbidden_source_count": 0,

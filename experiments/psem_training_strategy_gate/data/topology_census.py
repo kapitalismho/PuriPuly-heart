@@ -16,11 +16,31 @@ from experiments.psem_training_strategy_gate.data.label_contract import (
     load_contract,
 )
 from experiments.psem_training_strategy_gate.data.provenance import (
+    BASELINE_AMI_MEETINGS,
+    EXPECTED_ALIMEETING_MEETINGS,
     ProvenanceError,
     canonical_sha256,
     sha256_file,
     wav_identity,
     write_jsonl,
+)
+
+FROZEN_CALIBRATION_SHA256 = "1f10fc1980bd1a108753ef6afb45f455618df04014ad6b58dcf6e880ba01f4b1"
+FROZEN_CALIBRATION_MARKDOWN_SHA256 = "2efe8137b8330699a0bcc1a770e40ce22c7c615de7b49b3724ddf0ebf80cddf6"
+FROZEN_CALIBRATION_INPUTS = {
+    "source_manifest_sha256": "5cf6178a35e0c499bc3d79633c3ff1973f5f529c2b39e3bec89ca18ea96d6437",
+    "annotation_manifest_sha256": "f635171f8162115e08cee49e4fd748749b372e7eb37797bc91975bf2ca85c4a3",
+    "normalization_manifest_sha256": "9805abe480eab757d29a484f67ee543a548dd91c7396007a85e2c60f44065079",
+    "source_ids_sha256": "0a66aa29c39fe822b5a7f575edd0f442419b127e83654311ff733b6116cdafe6",
+}
+FROZEN_CALIBRATION_SOURCE_IDS = frozenset(
+    [
+        *(f"ami_{meeting_id}" for meeting_id in BASELINE_AMI_MEETINGS),
+        *(
+            f"alimeeting_{meeting_id}"
+            for meeting_id in EXPECTED_ALIMEETING_MEETINGS
+        ),
+    ]
 )
 
 OFFICIAL_PRIMARY_TOPOLOGIES = (
@@ -112,18 +132,14 @@ def _validate_calibrated_inventory(
     source_ids: Sequence[str],
     contract: LabelContract,
 ) -> None:
-    calibration = _load_json_object(data_dir / "annotation_calibration.json")
+    calibration_path = data_dir / "annotation_calibration.json"
+    calibration = _load_json_object(calibration_path)
     input_policy = calibration.get("input_policy")
-    expected_inputs = {
-        "source_manifest_sha256": sha256_file(data_dir / "source_manifest.jsonl"),
-        "annotation_manifest_sha256": sha256_file(
-            data_dir / "annotation_manifest.jsonl"
-        ),
-        "normalization_manifest_sha256": sha256_file(
-            data_dir / "normalization_manifest.jsonl"
-        ),
-        "source_ids_sha256": canonical_sha256(sorted(source_ids)),
-    }
+    calibrated_scope_valid = (
+        FROZEN_CALIBRATION_SOURCE_IDS.issubset(source_ids)
+        and canonical_sha256(sorted(FROZEN_CALIBRATION_SOURCE_IDS))
+        == FROZEN_CALIBRATION_INPUTS["source_ids_sha256"]
+    )
     model_fields = (
         "model_predictions_consulted",
         "model_scores_consulted",
@@ -132,11 +148,18 @@ def _validate_calibrated_inventory(
     )
     if (
         calibration.get("artifact_role") != "annotation_only_calibration"
+        or sha256_file(calibration_path) != FROZEN_CALIBRATION_SHA256
+        or sha256_file(data_dir / "ANNOTATION_CALIBRATION.md")
+        != FROZEN_CALIBRATION_MARKDOWN_SHA256
         or calibration.get("contract_version") != contract.contract_version
         or calibration.get("contract_document_sha256") != contract.document_sha256
         or calibration.get("contract_status") != contract.status
         or not isinstance(input_policy, dict)
-        or any(input_policy.get(key) != value for key, value in expected_inputs.items())
+        or not calibrated_scope_valid
+        or any(
+            input_policy.get(key) != value
+            for key, value in FROZEN_CALIBRATION_INPUTS.items()
+        )
         or any(input_policy.get(field) is not False for field in model_fields)
     ):
         raise TopologyCensusError(
@@ -483,6 +506,18 @@ def build_topology_census(
         raise TopologyCensusError("census source identities must be unique")
     _validate_normalization_manifest(sessions, data_dir)
     _validate_calibrated_inventory(data_dir, source_ids, contract)
+    return _build_topology_census_from_validated_sessions(
+        sessions, data_dir, topology_manifest_sha256
+    )
+
+
+def _build_topology_census_from_validated_sessions(
+    sessions: Sequence[NormalizedSession],
+    data_dir: Path,
+    topology_manifest_sha256: str,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    contract = load_contract()
+    source_ids = [session.source_id for session in sessions]
     rows = [
         build_topology_row(session, contract)
         for session in sorted(sessions, key=lambda session: session.source_id)
@@ -500,6 +535,9 @@ def build_topology_census(
         "input_manifests": {
             "annotation_calibration_sha256": sha256_file(
                 data_dir / "annotation_calibration.json"
+            ),
+            "annotation_calibration_markdown_sha256": sha256_file(
+                data_dir / "ANNOTATION_CALIBRATION.md"
             ),
             "source_manifest_sha256": sha256_file(data_dir / "source_manifest.jsonl"),
             "annotation_manifest_sha256": sha256_file(
@@ -625,6 +663,13 @@ def render_data_census(census: dict[str, Any], rows: Sequence[dict[str, Any]]) -
     overlap_deficit_minutes = round(
         audit["ongoing_overlap_samples"]["deficit"] / 16000 / 60, 6
     )
+    if audit["scored_samples"]["deficit"]:
+        lower_bound_status = "The scored-hour deficit is an acquisition blocker."
+    else:
+        lower_bound_status = (
+            "The aggregate scored-hour lower bound passes; role-specific allocation "
+            "remains unproven until component assignment."
+        )
     lines.extend(
         [
             "",
@@ -645,7 +690,7 @@ def render_data_census(census: dict[str, Any], rows: Sequence[dict[str, Any]]) -
     lines.extend(
         [
             "",
-            "The scored-hour deficit is an acquisition blocker. The meeting count is only an upper bound until connected identity components are audited. Zero raw-pool deficits do not prove component-safe role allocation. No topology substitutes for another, and no threshold, count, or natural-data requirement is weakened.",
+            f"{lower_bound_status} The meeting count is only an upper bound until connected identity components are audited. Zero raw-pool deficits do not prove component-safe role allocation. No topology substitutes for another, and no threshold, count, or natural-data requirement is weakened.",
             "",
             f"Topology manifest SHA-256: `{census['topology_manifest_sha256']}`",
         ]
@@ -671,7 +716,9 @@ def write_topology_census(
     ]
     write_jsonl(manifest_path, rows)
     rebuilt_rows, census = build_topology_census(
-        sessions, data_dir, sha256_file(manifest_path)
+        sessions,
+        data_dir,
+        sha256_file(manifest_path),
     )
     if rows != rebuilt_rows:
         raise TopologyCensusError("topology rows changed during census generation")

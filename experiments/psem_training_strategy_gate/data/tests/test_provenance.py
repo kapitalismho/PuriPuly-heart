@@ -6,16 +6,24 @@ from pathlib import Path
 
 import pytest
 
+from experiments.psem_training_strategy_gate.data import provenance
 from experiments.psem_training_strategy_gate.data.provenance import (
+    AMI_EXPANSION_EXCLUSIONS,
+    BASELINE_AMI_MEETINGS,
     EXPECTED_ALIMEETING_MEETINGS,
     EXPECTED_AMI_MEETINGS,
     HISTORICAL_CONFIGS,
     REQUIRED_PRIOR_SOURCE_IDS,
     ProvenanceError,
     _ami_metadata,
+    _ami_rows,
     _historical_identities,
     _parse_alimeeting_textgrid,
+    _validate_ami_audio_inventory,
+    _validate_ami_expansion_components,
     _validate_ami_segments,
+    _validate_excluded_waveform,
+    _validate_reversed_segment,
     collect_prior_exposure,
     wav_identity,
 )
@@ -40,8 +48,8 @@ def test_checked_in_provenance_inventory_is_session_specific_and_complete() -> N
     sources = read_jsonl(DATA_DIR / "source_manifest.jsonl")
     annotations = read_jsonl(DATA_DIR / "annotation_manifest.jsonl")
     prior = read_jsonl(DATA_DIR / "prior_exposure_manifest.jsonl")
-    assert len(sources) == 28
-    assert len(annotations) == 28
+    assert len(sources) == len(EXPECTED_AMI_MEETINGS) + len(EXPECTED_ALIMEETING_MEETINGS)
+    assert len(annotations) == len(sources)
     assert len(prior) == 10
     assert {row["session_id"] for row in sources if row["corpus"] == "AMI"} == EXPECTED_AMI_MEETINGS
     assert {
@@ -103,7 +111,82 @@ def test_source_waveforms_match_the_preexisting_materialization_ledgers() -> Non
         source_id = f"ami_{meeting_id}"
         assert sources[source_id]["waveform_sha256"] == existing["sha256"]
         checked.add(source_id)
-    assert checked == set(sources)
+    assert checked == {
+        *(f"ami_{meeting_id}" for meeting_id in BASELINE_AMI_MEETINGS),
+        *(f"alimeeting_{meeting_id}" for meeting_id in EXPECTED_ALIMEETING_MEETINGS),
+    }
+
+
+def test_expansion_component_validation_rejects_a_missing_baseline_annotation() -> None:
+    available = set(EXPECTED_AMI_MEETINGS) | set(AMI_EXPANSION_EXCLUSIONS)
+    meetings = {
+        meeting_id: {
+            "speaker_ids": [f"speaker-{meeting_id}"],
+            "unknown_speaker_agents": [],
+        }
+        for meeting_id in available
+    }
+    assert len(_validate_ami_expansion_components(meetings, available)) == 14
+    available.remove(next(iter(BASELINE_AMI_MEETINGS)))
+    with pytest.raises(ProvenanceError, match="baseline annotation inventory"):
+        _validate_ami_expansion_components(meetings, available)
+
+
+def test_ami_audio_inventory_rejects_noncanonical_completed_wav(tmp_path: Path) -> None:
+    for meeting_id in EXPECTED_AMI_MEETINGS:
+        path = tmp_path / meeting_id / f"{meeting_id}.Mix-Headset.wav"
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"")
+    _validate_ami_audio_inventory(tmp_path)
+    extra = tmp_path / next(iter(EXPECTED_AMI_MEETINGS)) / "recording.wav"
+    extra.write_bytes(b"")
+    with pytest.raises(ProvenanceError, match="extra=.*recording.wav"):
+        _validate_ami_audio_inventory(tmp_path)
+
+
+def test_exclusion_evidence_is_content_bound(tmp_path: Path) -> None:
+    waveform_path = tmp_path / "excluded.wav"
+    with wave.open(str(waveform_path), "wb") as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(16000)
+        handle.writeframes(b"\0\0" * 100)
+    waveform_record = wav_identity(waveform_path)
+    _validate_excluded_waveform(waveform_path, waveform_record)
+    waveform_record["waveform_sha256"] = "0" * 64
+    with pytest.raises(ProvenanceError, match="evidence changed"):
+        _validate_excluded_waveform(waveform_path, waveform_record)
+
+    segment_path = tmp_path / "segments.xml"
+    segment_path.write_text(
+        '<root><segment transcriber_start="2.0" transcriber_end="1.0"/></root>',
+        encoding="utf-8",
+        newline="\n",
+    )
+    segment_record = {
+        "annotation_file_size_bytes": segment_path.stat().st_size,
+        "annotation_file_sha256": provenance.sha256_file(segment_path),
+        "invalid_segment_index": 0,
+        "transcriber_start": "2.0",
+        "transcriber_end": "1.0",
+    }
+    _validate_reversed_segment(segment_path, segment_record)
+    segment_record["transcriber_end"] = "3.0"
+    with pytest.raises(ProvenanceError, match="segment evidence changed"):
+        _validate_reversed_segment(segment_path, segment_record)
+
+
+def test_provenance_reruns_expansion_selection_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def reject_selection(_: Path) -> dict:
+        raise ProvenanceError("selection drift")
+
+    monkeypatch.setattr(
+        provenance, "validate_ami_expansion_selection", reject_selection
+    )
+    with pytest.raises(ProvenanceError, match="selection drift"):
+        _ami_rows(tmp_path, {})
 
 
 def test_waveform_validation_fails_closed_for_missing_source(tmp_path: Path) -> None:

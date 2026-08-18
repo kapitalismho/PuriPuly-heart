@@ -16,11 +16,14 @@ from experiments.psem_training_strategy_gate.data.annotation_normalization impor
 )
 from experiments.psem_training_strategy_gate.data.label_contract import load_contract
 from experiments.psem_training_strategy_gate.data.provenance import (
+    EXPECTED_ALIMEETING_MEETINGS,
+    EXPECTED_AMI_MEETINGS,
     canonical_sha256,
     sha256_file,
 )
 
 DATA_DIR = Path(__file__).resolve().parents[1]
+EXPECTED_SOURCE_COUNT = len(EXPECTED_AMI_MEETINGS) + len(EXPECTED_ALIMEETING_MEETINGS)
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -43,7 +46,7 @@ def test_checked_in_normalization_manifest_binds_every_source_and_annotation() -
         row["source_id"]: row
         for row in read_jsonl(DATA_DIR / "normalization_manifest.jsonl")
     }
-    assert len(normalized) == 28
+    assert len(normalized) == EXPECTED_SOURCE_COUNT
     assert set(normalized) == set(sources) == set(annotations)
     for source_id, row in normalized.items():
         source = sources[source_id]
