@@ -6,7 +6,7 @@
     "dataset_issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/77",
     "dataset_issue_sha256": "5778025c8aca1ea1cb7cd8fc41645b520ca1f9f749155b5f5daada32e940b559"
   },
-  "status": "provisional_annotation_only_calibration_required",
+  "status": "frozen_after_annotation_only_calibration",
   "source_coordinate_convention": {
     "sample_rate_hz": 16000,
     "coordinates": "zero_based_half_open_unsnapped_source_samples",

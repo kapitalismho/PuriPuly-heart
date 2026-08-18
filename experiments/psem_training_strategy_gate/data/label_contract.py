@@ -10,7 +10,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 CONTRACT_PATH = Path(__file__).with_name("operational_label_contract.json")
 EXPECTED_CONTRACT_DOCUMENT_SHA256_BY_VERSION = {
-    "psem-handoff-v0": "7cbb831e1513af80827daaf4f63548eb243fd3d842ad5dd2a5c7e8c7a2812fb6",
+    "psem-handoff-v0": "74e95d1425498c6743d46fc68b2bedce35c36009646add464b844ce3e5d8464e",
 }
 
 
