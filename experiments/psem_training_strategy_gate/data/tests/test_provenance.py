@@ -16,8 +16,8 @@ from experiments.psem_training_strategy_gate.data.provenance import (
     _historical_identities,
     _parse_alimeeting_textgrid,
     _validate_ami_segments,
-    _wav_identity,
     collect_prior_exposure,
+    wav_identity,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -108,7 +108,7 @@ def test_source_waveforms_match_the_preexisting_materialization_ledgers() -> Non
 
 def test_waveform_validation_fails_closed_for_missing_source(tmp_path: Path) -> None:
     with pytest.raises(ProvenanceError, match="missing source waveform"):
-        _wav_identity(tmp_path / "missing.wav")
+        wav_identity(tmp_path / "missing.wav")
 
 
 def test_historical_config_structure_is_required() -> None:
@@ -127,7 +127,7 @@ def test_waveform_validation_rejects_a_truncated_payload(tmp_path: Path) -> None
         handle.writeframes(b"\0\0" * 100)
     path.write_bytes(path.read_bytes()[:-20])
     with pytest.raises(ProvenanceError, match="truncated or empty"):
-        _wav_identity(path)
+        wav_identity(path)
 
 
 def test_ami_segment_bundles_require_valid_xml_and_speaker_files(tmp_path: Path) -> None:

@@ -142,7 +142,7 @@ def collect_prior_exposure(repo_root: Path) -> dict[str, dict[str, Any]]:
     }
 
 
-def _wav_identity(path: Path) -> dict[str, Any]:
+def wav_identity(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise ProvenanceError(f"missing source waveform: {path}")
     with wave.open(str(path), "rb") as handle:
@@ -308,7 +308,7 @@ def _ami_rows(
         meeting_id = meeting_dir.name
         source_id = f"ami_{meeting_id}"
         wav_path = meeting_dir / f"{meeting_id}.Mix-Headset.wav"
-        audio = _wav_identity(wav_path)
+        audio = wav_identity(wav_path)
         segment_paths = sorted((annotations_root / "segments").glob(f"{meeting_id}.*.segments.xml"))
         metadata = meetings_meta.get(meeting_id)
         if metadata is None:
@@ -501,7 +501,7 @@ def _alimeeting_rows(
         meeting_id = wav_path.stem
         source_id = f"alimeeting_{meeting_id}"
         textgrid_path = textgrid_root / f"{meeting_id}.TextGrid"
-        audio = _wav_identity(wav_path)
+        audio = wav_identity(wav_path)
         annotation_files = _file_rows([textgrid_path], corpus_root)
         annotation_sha256 = canonical_sha256(annotation_files)
         textgrid = _parse_alimeeting_textgrid(textgrid_path)
