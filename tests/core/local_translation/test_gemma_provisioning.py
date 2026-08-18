@@ -47,6 +47,30 @@ class CoordinatedDownloader(FakeDownloader):
         )
 
 
+class BurstDownloader(FakeDownloader):
+    async def download(self, request, *, cancel_event, on_progress):
+        self.requests.append(request)
+        content = self.content_by_name[request.remote_path]
+        path = request.local_dir / request.remote_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        on_progress(HuggingFaceDownloadProgress(1, len(content)))
+        on_progress(HuggingFaceDownloadProgress(len(content), len(content)))
+        return path
+
+
+class CancelAfterProgressDownloader(FakeDownloader):
+    async def download(self, request, *, cancel_event, on_progress):
+        self.requests.append(request)
+        content = self.content_by_name[request.remote_path]
+        path = request.local_dir / request.remote_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        on_progress(HuggingFaceDownloadProgress(len(content), len(content)))
+        await asyncio.sleep(0)
+        raise asyncio.CancelledError
+
+
 def _pin_small_assets(monkeypatch):
     contents = {"target.gguf": b"target-model", "draft.gguf": b"draft-model"}
     pinned = tuple(
@@ -190,6 +214,120 @@ async def test_cancellation_during_initial_status_removes_staging(tmp_path, monk
             downloader=downloader,
             install_dir=install_dir,
             on_status=cancel_on_initial_status,
+        )
+
+    assert not install_dir.exists()
+    assert [path for path in tmp_path.glob("gemma.staging-*")] == []
+
+
+@pytest.mark.asyncio
+async def test_progress_callback_future_is_awaited(tmp_path, monkeypatch) -> None:
+    contents = _pin_small_assets(monkeypatch)
+    downloader = FakeDownloader(contents)
+    observed = []
+
+    async def record(update):
+        await asyncio.sleep(0)
+        observed.append(update)
+
+    def on_status(update):
+        return asyncio.create_task(record(update))
+
+    await provisioning.ensure_gemma_installed(
+        downloader=downloader,
+        install_dir=tmp_path / "gemma",
+        on_status=on_status,
+    )
+
+    assert observed
+    assert observed[-1].state == "ready"
+
+
+@pytest.mark.asyncio
+async def test_all_submitted_progress_failures_are_observed(tmp_path, monkeypatch) -> None:
+    contents = _pin_small_assets(monkeypatch)
+    asset = provisioning.GEMMA_ASSETS[0]
+    downloader = BurstDownloader(contents)
+
+    async def fail_progress(update):
+        if update.downloaded_bytes:
+            await asyncio.sleep(0)
+            raise RuntimeError(f"progress-{update.downloaded_bytes}")
+
+    with pytest.raises(BaseExceptionGroup) as caught:
+        await provisioning._download_asset(
+            downloader=downloader,
+            asset=asset,
+            staging_dir=tmp_path / "staging",
+            completed_bytes=0,
+            total_bytes=asset.size_bytes,
+            cancel_event=None,
+            on_status=fail_progress,
+        )
+
+    assert sorted(str(error) for error in caught.value.exceptions) == [
+        "progress-1",
+        f"progress-{asset.size_bytes}",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_cancellation_during_progress_drain_waits_for_accepted_callback(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    contents = _pin_small_assets(monkeypatch)
+    asset = provisioning.GEMMA_ASSETS[0]
+    downloader = FakeDownloader(contents)
+    callback_started = asyncio.Event()
+    allow_callback = asyncio.Event()
+    callback_finished = asyncio.Event()
+
+    async def block_progress(_update):
+        callback_started.set()
+        await allow_callback.wait()
+        callback_finished.set()
+
+    operation = asyncio.create_task(
+        provisioning._download_asset(
+            downloader=downloader,
+            asset=asset,
+            staging_dir=tmp_path / "staging",
+            completed_bytes=0,
+            total_bytes=asset.size_bytes,
+            cancel_event=None,
+            on_status=block_progress,
+        )
+    )
+    await callback_started.wait()
+    operation.cancel()
+    await asyncio.sleep(0)
+
+    assert not operation.done()
+    allow_callback.set()
+    with pytest.raises(asyncio.CancelledError):
+        await operation
+    assert callback_finished.is_set()
+
+
+@pytest.mark.asyncio
+async def test_mixed_download_cancellation_and_progress_failure_removes_staging(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    contents = _pin_small_assets(monkeypatch)
+    downloader = CancelAfterProgressDownloader(contents)
+    install_dir = tmp_path / "gemma"
+
+    async def fail_download_progress(update):
+        if update.downloaded_bytes:
+            raise RuntimeError("progress failed")
+
+    with pytest.raises(BaseExceptionGroup):
+        await provisioning.ensure_gemma_installed(
+            downloader=downloader,
+            install_dir=install_dir,
+            on_status=fail_download_progress,
         )
 
     assert not install_dir.exists()
