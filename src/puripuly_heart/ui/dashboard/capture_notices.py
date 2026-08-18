@@ -147,9 +147,7 @@ def managed_gemma_capture_notice(
         return None
     key = MANAGED_GEMMA_NOTICE_KEYS[notice.status]
     text = (
-        t(key, percent=notice.progress_percent or 0)
-        if notice.status == "downloading"
-        else t(key)
+        t(key, percent=notice.progress_percent or 0) if notice.status == "downloading" else t(key)
     )
     return CaptureNotice(
         text=text,

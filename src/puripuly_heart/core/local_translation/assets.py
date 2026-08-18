@@ -150,7 +150,9 @@ def validate_gemma_install(
         if not path.is_file():
             raise GemmaInstallInvalidError(f"missing required Gemma file: {asset.filename}")
         if path.stat().st_size != asset.size_bytes:
-            raise GemmaInstallInvalidError(f"size mismatch for required Gemma file: {asset.filename}")
+            raise GemmaInstallInvalidError(
+                f"size mismatch for required Gemma file: {asset.filename}"
+            )
         if verify_checksums and _sha256_file(path) != asset.sha256:
             raise GemmaInstallInvalidError(
                 f"checksum mismatch for required Gemma file: {asset.filename}"

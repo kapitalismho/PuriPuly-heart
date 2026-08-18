@@ -127,9 +127,9 @@ class DashboardView(ft.Column):
         self.on_toggle_peer_translation = None
         self.on_retry_peer_process_capture = None
         self.on_gpu_notice_action: Callable[[GpuNoticeAction], object] | None = None
-        self.on_managed_gemma_notice_action: (
-            Callable[[ManagedGemmaNoticeAction], object] | None
-        ) = None
+        self.on_managed_gemma_notice_action: Callable[[ManagedGemmaNoticeAction], object] | None = (
+            None
+        )
         self.on_language_change: Callable[[LanguageSelectionChange], None] | None = None
         self.on_message_input_activity = None
         self.runtime_log_detailed: Callable[..., bool | None] | None = None
@@ -797,10 +797,11 @@ class DashboardView(ft.Column):
                 self._notice_started[source] = self._notice_sequence
 
         download_source = None
-        if (
-            self._managed_gemma_notice is not None
-            and self._managed_gemma_notice.status in {"checking", "downloading", "preparing"}
-        ):
+        if self._managed_gemma_notice is not None and self._managed_gemma_notice.status in {
+            "checking",
+            "downloading",
+            "preparing",
+        }:
             download_source = "managed_gemma"
         elif self._gpu_notice is not None and self._gpu_notice.status == "installing":
             download_source = "gpu"
@@ -819,9 +820,7 @@ class DashboardView(ft.Column):
         text, tone, _action = candidates[selected]
         if selected == "managed_gemma":
             managed_action = (
-                None
-                if self._managed_gemma_notice is None
-                else self._managed_gemma_notice.action
+                None if self._managed_gemma_notice is None else self._managed_gemma_notice.action
             )
             action_label = managed_gemma_action_label(managed_action)
             on_action = (

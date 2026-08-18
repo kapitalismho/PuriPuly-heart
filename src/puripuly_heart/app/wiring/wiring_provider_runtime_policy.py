@@ -101,12 +101,14 @@ def build_llm_provider_signature(
             else None
         ),
         (
-            settings.languages.source_language,
-            settings.languages.target_language,
-            settings.system_prompt,
-        )
-        if managed_gemma_selected
-        else None,
+            (
+                settings.languages.source_language,
+                settings.languages.target_language,
+                settings.system_prompt,
+            )
+            if managed_gemma_selected
+            else None
+        ),
     )
 
 

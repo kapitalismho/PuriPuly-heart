@@ -26,9 +26,7 @@ class DashboardCaptureIntents:
     toggle_overlay: Callable[[bool], None]
     retry_peer_process_capture: Callable[[], object]
     run_gpu_notice_action: Callable[[GpuNoticeAction], object]
-    run_managed_gemma_notice_action: (
-        Callable[[ManagedGemmaNoticeAction], object] | None
-    ) = None
+    run_managed_gemma_notice_action: Callable[[ManagedGemmaNoticeAction], object] | None = None
 
 
 class DashboardIntentConsumer(Protocol):

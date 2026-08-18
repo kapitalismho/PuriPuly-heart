@@ -4039,13 +4039,10 @@ class SettingsView(ft.Column):
         self._update_api_visibility()
 
         if (
-            (
-                connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
-                or model == TranslationModel.MANAGED_GEMMA
-                or old_model == TranslationModel.MANAGED_GEMMA
-            )
-            and getattr(self, "on_providers_changed", None) is not None
-        ):
+            connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
+            or model == TranslationModel.MANAGED_GEMMA
+            or old_model == TranslationModel.MANAGED_GEMMA
+        ) and getattr(self, "on_providers_changed", None) is not None:
             self.on_providers_changed()
 
         display_settings = self._build_settings_with_provider_draft()

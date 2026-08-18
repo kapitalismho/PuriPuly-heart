@@ -120,18 +120,12 @@ def test_every_managed_gemma_status_renders_text_and_tone(status: str) -> None:
     assert notice is not None
     assert notice.tone in {"info", "warning", "error"}
     if status == "downloading":
-        assert notice.text == (
-            "i18n:dashboard.managed_gemma_notice.downloading:percent=42"
-        )
+        assert notice.text == ("i18n:dashboard.managed_gemma_notice.downloading:percent=42")
     else:
         assert notice.text == f"i18n:{MANAGED_GEMMA_NOTICE_KEYS[status]}"
 
 
 def test_managed_gemma_notice_actions_are_localized() -> None:
     assert managed_gemma_action_label(None) is None
-    assert managed_gemma_action_label("cancel") == (
-        "i18n:dashboard.managed_gemma_action.cancel"
-    )
-    assert managed_gemma_action_label("retry") == (
-        "i18n:dashboard.managed_gemma_action.retry"
-    )
+    assert managed_gemma_action_label("cancel") == ("i18n:dashboard.managed_gemma_action.cancel")
+    assert managed_gemma_action_label("retry") == ("i18n:dashboard.managed_gemma_action.retry")
