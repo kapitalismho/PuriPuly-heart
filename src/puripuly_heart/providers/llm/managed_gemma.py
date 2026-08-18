@@ -12,10 +12,7 @@ from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaResponse,
     ManagedGemmaRuntimeOwner,
 )
-from puripuly_heart.core.local_translation.runtime_profile import (
-    MANAGED_GEMMA_MODEL_ALIAS,
-    GemmaBackend,
-)
+from puripuly_heart.core.local_translation.runtime_profile import GemmaBackend
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
@@ -35,13 +32,7 @@ def _optional_integer(value: object) -> int | None:
 def _response_text(payload: object) -> str:
     if not isinstance(payload, dict):
         raise RuntimeError("managed Gemma response was not an object")
-    choices = payload.get("choices")
-    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
-        raise RuntimeError("managed Gemma response did not contain choices")
-    message = choices[0].get("message")
-    if not isinstance(message, dict):
-        raise RuntimeError("managed Gemma response did not contain a message")
-    content = message.get("content")
+    content = payload.get("content")
     if not isinstance(content, str) or not content.strip():
         raise RuntimeError("managed Gemma response contained empty content")
     return content.strip()
@@ -50,15 +41,9 @@ def _response_text(payload: object) -> str:
 def _response_metrics(payload: object) -> ManagedGemmaMetrics:
     if not isinstance(payload, dict):
         raise RuntimeError("managed Gemma response was not an object")
-    usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
     timings = payload.get("timings") if isinstance(payload.get("timings"), dict) else {}
-    prompt_details = (
-        usage.get("prompt_tokens_details")
-        if isinstance(usage.get("prompt_tokens_details"), dict)
-        else {}
-    )
-    prompt_tokens = _integer(usage.get("prompt_tokens", timings.get("prompt_n")))
-    completion_tokens = _integer(usage.get("completion_tokens", timings.get("predicted_n")))
+    prompt_tokens = _integer(timings.get("prompt_n"))
+    completion_tokens = _integer(timings.get("predicted_n"))
     prompt_ms = _number(timings.get("prompt_ms"))
     generation_ms = _number(timings.get("predicted_ms", timings.get("generation_ms")))
     generation_tps = _number(timings.get("predicted_per_second", timings.get("generation_tps")))
@@ -66,12 +51,7 @@ def _response_metrics(payload: object) -> ManagedGemmaMetrics:
         generation_tps = completion_tokens * 1000.0 / generation_ms
     return ManagedGemmaMetrics(
         prompt_tokens=prompt_tokens,
-        cached_prompt_tokens=_optional_integer(
-            prompt_details.get(
-                "cached_tokens",
-                usage.get("cached_prompt_tokens", timings.get("cache_n")),
-            )
-        ),
+        cached_prompt_tokens=_optional_integer(timings.get("cache_n")),
         completion_tokens=completion_tokens,
         prompt_ms=prompt_ms,
         generation_ms=generation_ms,
@@ -115,7 +95,7 @@ class HttpxManagedGemmaTransport:
         raise TimeoutError("managed llama.cpp server did not become ready") from last_error
 
     async def prepare_prefix(self, *, system_prompt: str) -> None:
-        await self._chat(
+        await self._completion(
             messages=(
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": " "},
@@ -129,7 +109,7 @@ class HttpxManagedGemmaTransport:
         system_prompt: str,
         user_message: str,
     ) -> ManagedGemmaResponse:
-        payload = await self._chat(
+        payload = await self._completion(
             messages=(
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
@@ -140,23 +120,35 @@ class HttpxManagedGemmaTransport:
             metrics=_response_metrics(payload),
         )
 
-    async def _chat(
+    async def _completion(
         self,
         *,
         messages: tuple[dict[str, str], ...],
         max_tokens: int | None = None,
     ) -> object:
+        template_response = await self._require_client().post(
+            "/apply-template",
+            json={
+                "messages": list(messages),
+                "add_generation_prompt": True,
+            },
+        )
+        template_response.raise_for_status()
+        template_payload = template_response.json()
+        if not isinstance(template_payload, dict):
+            raise RuntimeError("managed Gemma template response was not an object")
+        prompt = template_payload.get("prompt")
+        if not isinstance(prompt, str) or not prompt:
+            raise RuntimeError("managed Gemma template response did not contain a prompt")
         body: dict[str, object] = {
-            "model": MANAGED_GEMMA_MODEL_ALIAS,
-            "messages": list(messages),
+            "prompt": prompt,
             "stream": False,
             "temperature": 0,
             "cache_prompt": True,
-            "reasoning_effort": "none",
         }
         if max_tokens is not None:
-            body["max_tokens"] = max_tokens
-        response = await self._require_client().post("/v1/chat/completions", json=body)
+            body["n_predict"] = max_tokens
+        response = await self._require_client().post("/completion", json=body)
         response.raise_for_status()
         return response.json()
 

@@ -454,6 +454,11 @@ def pyinstaller_data_entries(repo_root: Path) -> list[tuple[str, str]]:
     return entries
 
 
+def validate_runtime_root(runtime_root: Path) -> dict[str, object]:
+    runtime_root = runtime_root.resolve()
+    return _validate_runtime_tree(runtime_root / "manifest.json", runtime_root)
+
+
 def normalize_pyinstaller_binaries(binaries: list[tuple[str, str, str]], repo_root: Path) -> None:
     prepared_root = (
         repo_root.resolve() / "build" / "llama.cpp" / LLAMA_CPP_RUNTIME_DIRNAME

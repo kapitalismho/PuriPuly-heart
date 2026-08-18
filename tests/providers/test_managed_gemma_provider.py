@@ -74,22 +74,26 @@ async def test_provider_keeps_llama_details_behind_llm_boundary() -> None:
 
 @pytest.mark.asyncio
 async def test_http_transport_prefills_cache_and_extracts_llama_metrics() -> None:
-    bodies = []
+    requests = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/health":
             return httpx.Response(200, json={"status": "ok"})
-        bodies.append(json.loads(request.content))
+        body = json.loads(request.content)
+        requests.append((request.url.path, body))
+        if request.url.path == "/apply-template":
+            return httpx.Response(
+                200,
+                json={"prompt": f"rendered:{body['messages'][1]['content']}"},
+            )
         return httpx.Response(
             200,
             json={
-                "choices": [{"message": {"content": " hello "}}],
-                "usage": {
-                    "prompt_tokens": 30,
-                    "prompt_tokens_details": {"cached_tokens": 25},
-                    "completion_tokens": 5,
-                },
+                "content": " hello ",
                 "timings": {
+                    "prompt_n": 30,
+                    "cache_n": 25,
+                    "predicted_n": 5,
                     "prompt_ms": 7.5,
                     "predicted_ms": 125.0,
                     "predicted_per_second": 40.0,
@@ -109,14 +113,31 @@ async def test_http_transport_prefills_cache_and_extracts_llama_metrics() -> Non
     response = await transport.translate(system_prompt="system", user_message="input")
     await transport.close()
 
-    assert bodies[0]["cache_prompt"] is True
-    assert bodies[0]["messages"] == [
+    assert [path for path, _body in requests] == [
+        "/apply-template",
+        "/completion",
+        "/apply-template",
+        "/completion",
+    ]
+    assert requests[0][1]["messages"] == [
         {"role": "system", "content": "system"},
         {"role": "user", "content": " "},
     ]
-    assert bodies[0]["max_tokens"] == 1
-    assert bodies[1]["messages"][0] == bodies[0]["messages"][0]
-    assert "max_tokens" not in bodies[1]
+    assert requests[0][1]["add_generation_prompt"] is True
+    assert requests[1][1] == {
+        "prompt": "rendered: ",
+        "stream": False,
+        "temperature": 0,
+        "cache_prompt": True,
+        "n_predict": 1,
+    }
+    assert requests[2][1]["messages"][0] == requests[0][1]["messages"][0]
+    assert requests[3][1] == {
+        "prompt": "rendered:input",
+        "stream": False,
+        "temperature": 0,
+        "cache_prompt": True,
+    }
     assert response.text == "hello"
     assert response.metrics == ManagedGemmaMetrics(
         prompt_tokens=30,

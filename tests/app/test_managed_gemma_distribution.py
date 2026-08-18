@@ -134,6 +134,21 @@ def test_package_verifier_proves_both_backends_and_no_model_weights(tmp_path: Pa
     assert result["model_artifacts"] == []
 
 
+def test_runtime_root_validator_binds_release_and_file_identities(tmp_path: Path) -> None:
+    _write_package(tmp_path)
+    runtime_root = tmp_path / distribution.PACKAGED_RUNTIME_RELATIVE_DIR
+
+    manifest = distribution.validate_runtime_root(runtime_root)
+
+    assert manifest["release"]["build"] == distribution.LLAMA_CPP_BUILD
+    assert manifest["release"]["commit"] == distribution.LLAMA_CPP_COMMIT
+
+    server = runtime_root / "vulkan" / "llama-server.exe"
+    server.write_bytes(b"tampered")
+    with pytest.raises(RuntimeError, match="(?:size|identity) mismatch"):
+        distribution.validate_runtime_root(runtime_root)
+
+
 def test_package_verifier_rejects_model_anywhere_in_installed_tree(tmp_path: Path) -> None:
     _write_package(tmp_path)
     model = tmp_path / "puripuly_heart" / "data" / "models" / "unexpected.gguf"
