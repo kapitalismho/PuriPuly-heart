@@ -197,15 +197,16 @@ _TRANSLATION_MODELS = (
     TranslationModel.QWEN_35_PLUS,
 )
 _TRANSLATION_MODEL_SECTION_ORDER = (
-    "settings.translation_model.section.recommended",
+    "settings.translation_model.section.recommended_cloud",
+    "settings.translation_model.section.recommended_local",
     "settings.translation_model.section.gemma",
     "settings.translation_model.section.user_settings",
     "settings.translation_model.section.others",
 )
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
-    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.recommended",
-    TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended",
-    TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended",
+    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.recommended_local",
+    TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
+    TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended_cloud",
     TranslationModel.GEMMA4_31B: "settings.translation_model.section.gemma",
     TranslationModel.GEMMA4: "settings.translation_model.section.gemma",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
@@ -2617,7 +2618,13 @@ class SettingsView(ft.Column):
         return pending
 
     def _get_llm_modal_value(self, settings: AppSettings) -> str:
-        return settings.translation.model.value
+        model = settings.translation.model
+        if model == TranslationModel.MANAGED_GEMMA:
+            connection = settings.translation.connection
+            if connection == TranslationConnection.GPU:
+                return "managed_gemma_gpu"
+            return "managed_gemma_cpu"
+        return model.value
 
     def _translation_model_display_label(self, model: TranslationModel) -> str:
         return t(_TRANSLATION_MODEL_LABEL_KEYS[model])
@@ -2640,11 +2647,7 @@ class SettingsView(ft.Column):
         title = getattr(self, "_translation_connection_title", None)
         if title is None:
             return
-        title.value = t(
-            "settings.managed_gemma.inference"
-            if settings.translation.model == TranslationModel.MANAGED_GEMMA
-            else "settings.translation_connection"
-        )
+        title.value = t("settings.translation_connection")
 
     def _stored_openrouter_selection_alias(
         self, settings: AppSettings
@@ -3747,7 +3750,10 @@ class SettingsView(ft.Column):
             )
         )
         self._sync_openrouter_pkce_button_state(settings)
-        self._translation_connection_row.visible = not is_custom_http
+        self._translation_connection_row.visible = (
+            not is_custom_http
+            and settings.translation.model != TranslationModel.MANAGED_GEMMA
+        )
         self._local_llm_connection_card.visible = (
             not is_custom_http and llm == LLMProviderName.LOCAL_LLM
         )
@@ -3934,17 +3940,46 @@ class SettingsView(ft.Column):
         """Open LLM provider selection modal."""
         if not is_control_mounted(self):
             return
-        options = [
-            OptionItem(
-                value=model.value,
-                label=self._translation_model_display_label(model),
-                description=t(f"settings.translation_model.{model.value}.description", default=""),
-                section=t(section_key),
-            )
-            for section_key in _TRANSLATION_MODEL_SECTION_ORDER
-            for model in _TRANSLATION_MODELS
-            if _TRANSLATION_MODEL_SECTION_BY_MODEL.get(model) == section_key
-        ]
+        options: list[OptionItem] = []
+        for section_key in _TRANSLATION_MODEL_SECTION_ORDER:
+            for model in _TRANSLATION_MODELS:
+                if _TRANSLATION_MODEL_SECTION_BY_MODEL.get(model) != section_key:
+                    continue
+                if model == TranslationModel.MANAGED_GEMMA:
+                    options.extend(
+                        [
+                            OptionItem(
+                                value="managed_gemma_cpu",
+                                label=t("provider.managed_gemma_cpu"),
+                                description=t(
+                                    "settings.translation_model.managed_gemma_cpu.description",
+                                    default="",
+                                ),
+                                section=t(section_key),
+                            ),
+                            OptionItem(
+                                value="managed_gemma_gpu",
+                                label=t("provider.managed_gemma_gpu"),
+                                description=t(
+                                    "settings.translation_model.managed_gemma_gpu.description",
+                                    default="",
+                                ),
+                                section=t(section_key),
+                            ),
+                        ]
+                    )
+                else:
+                    options.append(
+                        OptionItem(
+                            value=model.value,
+                            label=self._translation_model_display_label(model),
+                            description=t(
+                                f"settings.translation_model.{model.value}.description",
+                                default="",
+                            ),
+                            section=t(section_key),
+                        )
+                    )
         display_settings = self._build_settings_with_provider_draft()
         current = (
             self._get_llm_modal_value(display_settings)
@@ -4073,18 +4108,32 @@ class SettingsView(ft.Column):
             return
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
-        try:
-            model = TranslationModel(value)
-        except (TypeError, ValueError):
-            if value == LLMProviderName.OPENROUTER.value:
-                model = TranslationModel.GEMMA4
-            else:
-                return
+        if value in ("managed_gemma_cpu", "managed_gemma_gpu"):
+            model = TranslationModel.MANAGED_GEMMA
+            connection = (
+                TranslationConnection.GPU
+                if value == "managed_gemma_gpu"
+                else TranslationConnection.CPU
+            )
+        else:
+            try:
+                model = TranslationModel(value)
+            except (TypeError, ValueError):
+                if value == LLMProviderName.OPENROUTER.value:
+                    model = TranslationModel.GEMMA4
+                else:
+                    return
+            connection = None
 
         if current_settings.translation.model == model:
-            return
+            if connection is not None:
+                if current_settings.translation.connection == connection:
+                    return
+            else:
+                return
         history = copy.deepcopy(current_settings.translation.connection_history)
-        connection = self._restore_translation_connection_for_model(model, history)
+        if connection is None:
+            connection = self._restore_translation_connection_for_model(model, history)
         self._apply_translation_selection(model, connection)
 
     def _on_translation_connection_click(self, e) -> None:
@@ -4116,11 +4165,7 @@ class SettingsView(ft.Column):
         )
         modal = SettingsModal(
             self.page,
-            t(
-                "settings.managed_gemma.inference"
-                if model == TranslationModel.MANAGED_GEMMA
-                else "settings.translation_connection"
-            ),
+            t("settings.translation_connection"),
             options,
             self._on_translation_connection_selected,
             show_description=True,

@@ -1452,10 +1452,9 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
     settings.provider.llm = LLMProviderName.GEMINI
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     applies: list[bool] = []
-    opened: list[tuple[str, tuple[str, ...], str]] = []
     view.on_providers_changed = lambda: applies.append(True)
 
-    view._on_llm_selected(TranslationModel.MANAGED_GEMMA.value)
+    view._on_llm_selected("managed_gemma_cpu")
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
@@ -1464,29 +1463,23 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
     assert pending.provider.llm == LLMProviderName.MANAGED_GEMMA
     assert applies == [True]
     assert view._openrouter_fallback_card.visible is False
-    assert view._translation_connection_title.value == t("settings.managed_gemma.inference")
+    assert view._translation_connection_row.visible is False
+    assert view._translation_connection_title.value == t("settings.translation_connection")
 
-    page = attach_dummy_page(monkeypatch, view)
+    view._on_llm_selected("managed_gemma_gpu")
 
-    class CapturingModal:
-        def __init__(self, page_arg, title, options, _on_select, **_kwargs):
-            assert page_arg is page
-            opened.append((title, tuple(option.value for option in options), ""))
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.translation.model == TranslationModel.MANAGED_GEMMA
+    assert pending.translation.connection == TranslationConnection.GPU
+    assert applies == [True, True]
 
-        def open(self, current: str) -> None:
-            title, options, _value = opened[-1]
-            opened[-1] = (title, options, current)
+    view._on_llm_selected("managed_gemma_gpu")
 
-    monkeypatch.setattr(settings_view, "SettingsModal", CapturingModal)
-    view._on_translation_connection_click(None)
-
-    assert opened == [
-        (
-            t("settings.managed_gemma.inference"),
-            (TranslationConnection.CPU.value, TranslationConnection.GPU.value),
-            TranslationConnection.CPU.value,
-        )
-    ]
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.translation.connection == TranslationConnection.GPU
+    assert applies == [True, True]
 
 
 def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
