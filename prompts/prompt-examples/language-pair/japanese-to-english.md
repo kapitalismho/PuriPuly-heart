@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self, 6s ago] 昨日、新しいフレンドができたんだ。
+[self] 昨日、新しいフレンドができたんだ。
 </context>
 
 <input>
@@ -12,7 +12,7 @@ I'll introduce them to you sometime.
 
 ### Context Ignore Example
 <context>
-[self, 10s ago] 昨日のワールド、すごく面白かったよ。
+[self] 昨日のワールド、すごく面白かったよ。
 </context>
 
 <input>

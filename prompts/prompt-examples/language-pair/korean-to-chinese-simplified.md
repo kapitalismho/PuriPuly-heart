@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self, 4s ago] 방금 들어온 분, 한국인인 것 같아요.
+[self] 방금 들어온 분, 한국인인 것 같아요.
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Your response:
 
 ### Context Ignore Example
 <context>
-[self, 8s ago] 아까 갔던 월드 정말 예뻤어요.
+[self] 아까 갔던 월드 정말 예뻤어요.
 </context>
 
 <input>
