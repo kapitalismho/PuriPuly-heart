@@ -63,8 +63,15 @@ Official upstream sources: https://huggingface.co/Qwen/Qwen3-ASR-0.6B , https://
 Manifest mirror sources used by the app: https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25 , https://modelscope.cn/models/zengshuishui/Qwen3-ASR-onnx
 License: Apache-2.0
 
-The local Qwen3-ASR-0.6B model is a default local CPU STT model. The app manifest identifies pinned downloadable ONNX/tokenizer assets for local ASR setup.
-Official upstream Qwen3-ASR assets are Apache-2.0. The mirror or converted assets referenced by the manifest may not expose complete license metadata, so pinned mirror provenance and license metadata must be verified before release.
+Provenance chain verified 2026-08-20 (all links Apache-2.0):
+Qwen3-ASR official (Qwen/Qwen3-ASR-0.6B, Apache-2.0)
+  -> sherpa-onnx ONNX conversion (Wasser1462/Qwen3-ASR-onnx, Apache-2.0)
+  -> ModelScope source (zengshuishui/Qwen3-ASR-onnx, Apache-2.0)
+  -> HF mirror used by the app (csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25, pinned revision 2cc50d1abfe4d4f2df8d71f536d108bb40f943d2)
+  -> PuriPuly manifest (exact SHA-256 pins)
+  -> local execution
+
+The mirror's own README states the files are downloaded from the ModelScope source above, and the conversion uses the official sherpa-onnx export scripts (https://github.com/Wasser1462/Qwen3-ASR-onnx, https://k2-fsa.github.io/sherpa/onnx/qwen3-asr/export.html). The local Qwen3-ASR-0.6B model is a default local CPU STT model; the app manifest identifies pinned downloadable ONNX/tokenizer assets for local ASR setup.
 
 ----
 
@@ -73,7 +80,7 @@ Official upstream source: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
 Manifest mirror source used by the app: https://huggingface.co/handy-computer/Qwen3-ASR-1.7B-gguf
 License: Apache-2.0
 
-The local GPU Qwen ASR GGUF model is not committed directly to this repository. The app manifest identifies the pinned downloadable GGUF asset for GPU-based local ASR setup. Official upstream Qwen3-ASR-1.7B assets are Apache-2.0.
+The local GPU Qwen ASR GGUF model is not committed directly to this repository. The app manifest identifies the pinned downloadable GGUF asset for GPU-based local ASR setup. The GGUF mirror is the official transcribe.cpp port of Qwen3-ASR-1.7B and its model card inherits Apache-2.0 from the upstream Qwen model (see https://github.com/handy-computer/transcribe.cpp/blob/main/docs/models/qwen3-asr-1.7b.md).
 
 ----
 
