@@ -505,7 +505,6 @@
   "settings.custom_stt.endpoint": "Base URL",
   "settings.custom_stt.model": "Model ID",
   "settings.custom_stt.extra": "Extra JSON",
-  "settings.custom_stt.extra.description": "Optional free-form JSON. In offline mode it is sent as extra form fields; in realtime mode as URL query parameters (e.g. {\"model\": \"my-model\"}).",
   "settings.custom_stt.extra.invalid_json": "Enter valid JSON.",
   "settings.custom_stt.extra.must_be_object": "Extra must be a JSON object.",
   "settings.custom_stt.extra.rejected_key": "Rejected extra key: {key}",

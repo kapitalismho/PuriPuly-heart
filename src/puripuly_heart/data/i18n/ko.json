@@ -505,7 +505,6 @@
   "settings.custom_stt.endpoint": "Base URL",
   "settings.custom_stt.model": "모델 ID",
   "settings.custom_stt.extra": "추가 JSON",
-  "settings.custom_stt.extra.description": "선택적인 자유 형식 JSON이에요. 오프라인 모드에서는 추가 form 필드로, 실시간 모드에서는 URL 쿼리 파라미터로 전송돼요 (예: {\"model\": \"my-model\"}).",
   "settings.custom_stt.extra.invalid_json": "올바른 JSON을 입력해주세요.",
   "settings.custom_stt.extra.must_be_object": "추가 JSON은 객체여야 해요.",
   "settings.custom_stt.extra.rejected_key": "사용할 수 없는 추가 키: {key}",

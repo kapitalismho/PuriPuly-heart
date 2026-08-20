@@ -505,7 +505,6 @@
   "settings.custom_stt.endpoint": "Base URL",
   "settings.custom_stt.model": "模型 ID",
   "settings.custom_stt.extra": "额外 JSON",
-  "settings.custom_stt.extra.description": "可选的自由格式 JSON。离线模式下作为额外的表单字段发送，实时模式下作为 URL 查询参数发送（例如 {\"model\": \"my-model\"}）。",
   "settings.custom_stt.extra.invalid_json": "请输入有效的 JSON。",
   "settings.custom_stt.extra.must_be_object": "额外 JSON 必须是对象。",
   "settings.custom_stt.extra.rejected_key": "不允许的额外键: {key}",

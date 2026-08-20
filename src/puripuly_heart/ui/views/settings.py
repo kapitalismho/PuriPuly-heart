@@ -11,7 +11,7 @@ import logging
 import math
 import re
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 import flet as ft
 from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
@@ -325,6 +325,12 @@ def _set_text_button_label(button: ft.TextButton, label: str) -> None:
 
 def _reject_json_constant(value: str) -> None:
     raise json.JSONDecodeError(f"invalid JSON constant: {value}", value, 0)
+
+
+def _custom_stt_extra_to_text(extra: Mapping[str, object]) -> str:
+    if not extra:
+        return "{}"
+    return json.dumps(extra, ensure_ascii=False, indent=2)
 
 
 def _update_control_if_mounted(control: ft.Control) -> None:
@@ -2208,8 +2214,8 @@ class SettingsView(ft.Column):
             label=t("settings.custom_stt.extra"),
             value="{}",
             multiline=True,
-            min_lines=3,
-            max_lines=6,
+            min_lines=1,
+            max_lines=12,
             border_radius=12,
             border_color=COLOR_DIVIDER,
             focused_border_color=COLOR_PRIMARY,
@@ -2220,11 +2226,6 @@ class SettingsView(ft.Column):
             on_change=self._on_custom_stt_field_change,
             on_blur=self._on_custom_stt_extra_change_end,
             on_submit=self._on_custom_stt_extra_change_end,
-        )
-        self._custom_stt_extra_helper = ft.Text(
-            t("settings.custom_stt.extra.description"),
-            size=15,
-            color=COLOR_SECONDARY,
         )
         self._custom_stt_extra_error = ft.Text(
             "",
@@ -2241,7 +2242,6 @@ class SettingsView(ft.Column):
                     ft.Container(height=4),
                     self._custom_stt_endpoint,
                     self._custom_stt_model,
-                    self._custom_stt_extra_helper,
                     self._custom_stt_extra,
                     self._custom_stt_extra_error,
                     self._custom_stt_api_key,
@@ -4460,11 +4460,7 @@ class SettingsView(ft.Column):
         self._custom_stt_endpoint.value = custom.endpoint
         self._custom_stt_endpoint.error = None
         self._custom_stt_model.value = custom.model
-        self._custom_stt_extra.value = json.dumps(
-            custom.extra,
-            ensure_ascii=False,
-            indent=2,
-        )
+        self._custom_stt_extra.value = _custom_stt_extra_to_text(custom.extra)
         self._clear_custom_stt_extra_error()
         if is_control_mounted(self):
             _update_control_if_mounted(self._custom_stt_connection_card)
@@ -4561,12 +4557,7 @@ class SettingsView(ft.Column):
             draft = self._ensure_provider_settings_draft()
             draft.custom_stt.extra = normalized
             self.has_provider_changes = True
-        self._custom_stt_extra.value = json.dumps(
-            normalized,
-            ensure_ascii=False,
-            indent=2,
-            allow_nan=False,
-        )
+        self._custom_stt_extra.value = _custom_stt_extra_to_text(normalized)
         self._clear_custom_stt_extra_error()
         _update_control_if_mounted(self._custom_stt_extra)
 

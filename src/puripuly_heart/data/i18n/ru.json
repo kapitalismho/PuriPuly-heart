@@ -505,7 +505,6 @@
   "settings.custom_stt.endpoint": "Base URL",
   "settings.custom_stt.model": "ID модели",
   "settings.custom_stt.extra": "Дополнительный JSON",
-  "settings.custom_stt.extra.description": "Необязательный свободный JSON. В офлайн-режиме отправляется как дополнительные поля формы, в режиме реального времени — как параметры запроса URL (например, {\"model\": \"my-model\"}).",
   "settings.custom_stt.extra.invalid_json": "Введите корректный JSON.",
   "settings.custom_stt.extra.must_be_object": "Дополнительный JSON должен быть объектом.",
   "settings.custom_stt.extra.rejected_key": "Недопустимый дополнительный ключ: {key}",

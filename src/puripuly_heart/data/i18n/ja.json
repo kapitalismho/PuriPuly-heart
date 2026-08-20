@@ -505,7 +505,6 @@
   "settings.custom_stt.endpoint": "Base URL",
   "settings.custom_stt.model": "モデルID",
   "settings.custom_stt.extra": "追加JSON",
-  "settings.custom_stt.extra.description": "任意の自由形式JSONです。オフラインモードでは追加のフォームフィールドとして、リアルタイムモードではURLクエリパラメータとして送信されます（例: {\"model\": \"my-model\"}）。",
   "settings.custom_stt.extra.invalid_json": "有効なJSONを入力してください。",
   "settings.custom_stt.extra.must_be_object": "追加JSONはオブジェクトである必要があります。",
   "settings.custom_stt.extra.rejected_key": "使用できない追加キー: {key}",
