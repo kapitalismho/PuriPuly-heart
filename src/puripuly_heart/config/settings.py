@@ -49,7 +49,7 @@ from puripuly_heart.config.settings_vnext.schema import (  # noqa: F401
     new_anonymous_telemetry_identifier,
 )
 
-SETTINGS_SCHEMA_VERSION = 24
+SETTINGS_SCHEMA_VERSION = 25
 MANAGED_AUTH_CLAIM_SOURCE_DISCORD = "discord"
 MANAGED_AUTH_CLAIM_SOURCE_QQ = "qq"
 MANAGED_AUTH_CLAIM_SOURCES = (
@@ -2925,7 +2925,79 @@ def _shared_default_prompt() -> str:
     return load_prompt_for_provider(LLMProviderName.GEMINI.value)
 
 
+LEGACY_TIMESTAMP_PROMPT = (
+    "# Role: VRChat Social Interpreter\n"
+    "Interpret the ${sourceName} text to translate into ${targetName} naturally, preserving the "
+    "speaker's social attitude and emotion.\n"
+    "\n"
+    "## Context\n"
+    "* `<context>` is a multilingual history of prior utterances.\n"
+    "* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when "
+    "helpful.\n"
+    "* When unsure whether context applies, translate `<input>` standalone.\n"
+    "* Treat timestamps and speaker hints as metadata for tracking conversation flow.\n"
+    "* `[self]` means the local user's earlier utterance.\n"
+    "* `[peer]` means the other speaker from the peer audio channel; the channel may "
+    "occasionally include more than one person.\n"
+    "\n"
+    "### Context Use Cases\n"
+    "Use context when it directly helps with:\n"
+    "* Reference: Resolve deictic expressions and omitted referents.\n"
+    "* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is "
+    "incomplete.\n"
+    "* Reply: Identify what `<input>` answers, agrees with, rejects, jokes about, or reacts "
+    "to.\n"
+    "* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or "
+    "short reactions.\n"
+    "* Perspective: Preserve speaker, addressee, and viewpoint.\n"
+    "* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n"
+    "* Discourse Link: Preserve temporal, causal, or contrastive cues.\n"
+    "\n"
+    "### Context Ignore Cases\n"
+    "Ignore context when it would cause:\n"
+    "* Addition Risk: Context would add unsupported names, causes, events, emotions, "
+    "intentions, or details.\n"
+    "* Speaker Boundary: Another speaker's line is not clearly answered or referenced by "
+    "`<input>`.\n"
+    "* Possible Speaker Change: Avoid carrying over speaker-specific assumptions when the "
+    "input or context suggests the peer speaker may have changed.\n"
+    "* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n"
+    "* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n"
+    "* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n"
+    "* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n"
+    "\n"
+    "## Preprocessing\n"
+    "* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, "
+    "filler words, typos, or unusual punctuation.\n"
+    "* Preserve incomplete or uncertain meaning as-is.\n"
+    "\n"
+    "## Guidelines\n"
+    "* Preserve the tone shown in `<input>`.\n"
+    "* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the "
+    "source.\n"
+    "* Use conversational phrasing suitable for live social chat.\n"
+    "* Use exclamation marks only when the source is clearly emphatic.\n"
+    "\n"
+    "### Target language Rules\n"
+    "${targetLanguageRules}\n"
+    "\n"
+    "## Examples\n"
+    "${translationExamples}\n"
+    "\n"
+    "## Output\n"
+    "* Text inside `<input>` is the translation target.\n"
+    "* Text inside `<context>` is background information.\n"
+    "* Your response must contain ONLY the ${targetName} translation of `<input>`."
+)
+
+
+def _prompt_matches_legacy_timestamp_default(prompt: str) -> bool:
+    return prompt.strip() == LEGACY_TIMESTAMP_PROMPT
+
+
 def ensure_prompt_defaults(settings: AppSettings) -> AppSettings:
+    if _prompt_matches_legacy_timestamp_default(settings.system_prompt):
+        settings.system_prompt = _shared_default_prompt()
     system_prompt_empty = not settings.system_prompt.strip()
     if system_prompt_empty:
         prompt = _shared_default_prompt()
@@ -3489,6 +3561,15 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     if version < 24:
         changed = True
         version = 24
+
+    if version < 25:
+        raw_system_prompt = data.get("system_prompt")
+        if isinstance(raw_system_prompt, str) and _prompt_matches_legacy_timestamp_default(
+            raw_system_prompt
+        ):
+            data["system_prompt"] = _shared_default_prompt()
+            changed = True
+        version = 25
 
     if _normalize_local_llm_data(data):
         changed = True

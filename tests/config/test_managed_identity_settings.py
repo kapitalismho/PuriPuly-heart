@@ -119,7 +119,7 @@ def test_load_settings_migrates_v22_referral_id_values(tmp_path, persisted_value
     loaded = load_settings(path)
     persisted = legacy_projected_settings_file(path)
 
-    assert SETTINGS_SCHEMA_VERSION == 24
+    assert SETTINGS_SCHEMA_VERSION == 25
     assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
     assert loaded.managed_identity.referral_id == expected
     assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
