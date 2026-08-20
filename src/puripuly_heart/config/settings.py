@@ -2992,7 +2992,7 @@ LEGACY_TIMESTAMP_PROMPT = (
 
 
 def _prompt_matches_legacy_timestamp_default(prompt: str) -> bool:
-    return prompt.strip() == LEGACY_TIMESTAMP_PROMPT
+    return prompt == LEGACY_TIMESTAMP_PROMPT
 
 
 def ensure_prompt_defaults(settings: AppSettings) -> AppSettings:

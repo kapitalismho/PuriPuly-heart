@@ -3047,6 +3047,31 @@ def test_migrate_settings_dict_prompt_upgrade_is_idempotent() -> None:
     assert twice["system_prompt"] == once["system_prompt"]
 
 
+def test_migrate_settings_dict_preserves_prompt_with_boundary_whitespace() -> None:
+    raw = to_dict(AppSettings())
+    raw["settings_version"] = SETTINGS_SCHEMA_VERSION - 1
+    raw["system_prompt"] = f"\n{LEGACY_TIMESTAMP_PROMPT}\n"
+
+    migrated, changed = _migrate_settings_dict(copy.deepcopy(raw))
+
+    assert changed is True
+    assert migrated["system_prompt"] == f"\n{LEGACY_TIMESTAMP_PROMPT}\n"
+
+
+def test_load_settings_preserves_prompt_with_boundary_whitespace(tmp_path) -> None:
+    path = tmp_path / "settings.json"
+    legacy = to_dict(AppSettings())
+    legacy["settings_version"] = SETTINGS_SCHEMA_VERSION
+    legacy["system_prompt"] = f"  {LEGACY_TIMESTAMP_PROMPT}  "
+    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    loaded = load_settings(path)
+    persisted = legacy_projected_settings_file(path)
+
+    assert loaded.system_prompt == f"  {LEGACY_TIMESTAMP_PROMPT}  "
+    assert persisted["system_prompt"] == f"  {LEGACY_TIMESTAMP_PROMPT}  "
+
+
 def test_from_dict_initializes_empty_prompt_fields_to_shared_default() -> None:
     data = to_dict(AppSettings())
     data["system_prompt"] = "  "

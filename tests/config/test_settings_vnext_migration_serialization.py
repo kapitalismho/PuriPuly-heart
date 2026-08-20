@@ -376,6 +376,20 @@ def test_vnext_dict_preserves_custom_prompt_through_migration() -> None:
     assert migrated.intent.prompts.system_prompt == "my customized prompt"
 
 
+def test_vnext_dict_preserves_prompt_with_boundary_whitespace() -> None:
+    from puripuly_heart.config.settings import LEGACY_TIMESTAMP_PROMPT
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    stored_prompt = f"  {LEGACY_TIMESTAMP_PROMPT}  "
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    canonical["intent"]["prompts"]["system_prompt"] = stored_prompt
+
+    migrated = migration.from_dict(canonical)
+
+    assert migrated.intent.prompts.system_prompt == stored_prompt
+
+
 def test_vnext_dict_migrates_disabled_gemini_3_flash_fallback_to_none() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 
