@@ -521,8 +521,7 @@ class ZeroconfOscQueryService(OscQueryServicePort):
         writer.write(
             f"HTTP/1.1 {status} {reasons.get(status, 'Error')}\r\n"
             "Content-Type: application/json\r\n"
-            f"Content-Length: {len(encoded)}\r\nConnection: close\r\n\r\n".encode("ascii")
-            + encoded
+            f"Content-Length: {len(encoded)}\r\nConnection: close\r\n\r\n".encode("ascii") + encoded
         )
         await writer.drain()
 
