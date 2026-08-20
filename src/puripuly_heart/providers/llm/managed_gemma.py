@@ -143,7 +143,7 @@ class HttpxManagedGemmaTransport:
         body: dict[str, object] = {
             "prompt": prompt,
             "stream": False,
-            "temperature": 0,
+            "temperature": 0.2,
             "cache_prompt": True,
         }
         if max_tokens is not None:

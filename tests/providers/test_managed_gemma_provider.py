@@ -127,7 +127,7 @@ async def test_http_transport_prefills_cache_and_extracts_llama_metrics() -> Non
     assert requests[1][1] == {
         "prompt": "rendered: ",
         "stream": False,
-        "temperature": 0,
+        "temperature": 0.2,
         "cache_prompt": True,
         "n_predict": 1,
     }
@@ -135,7 +135,7 @@ async def test_http_transport_prefills_cache_and_extracts_llama_metrics() -> Non
     assert requests[3][1] == {
         "prompt": "rendered:input",
         "stream": False,
-        "temperature": 0,
+        "temperature": 0.2,
         "cache_prompt": True,
     }
     assert response.text == "hello"
