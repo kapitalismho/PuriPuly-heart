@@ -34,6 +34,14 @@ def _write_install(tmp_path, monkeypatch, *, corrupt: bool = False):
 def test_pinned_gemma_contract_has_exact_target_and_drafter() -> None:
     assert assets.GEMMA_REPO_ID == "unsloth/gemma-4-E4B-it-qat-GGUF"
     assert assets.GEMMA_REVISION == "8c5a9e4fd5482e2be20fe0bf013b4c262a8f4265"
+    assert assets.GEMMA_UPSTREAM_REPO_ID == "google/gemma-4-E4B-it"
+    assert assets.GEMMA_LICENSE == "Apache-2.0"
+    assert assets.GEMMA_LICENSE_URL == "https://www.apache.org/licenses/LICENSE-2.0"
+    assert assets.InstalledGemmaManifest.expected().upstream_repo_id == "google/gemma-4-E4B-it"
+    assert assets.InstalledGemmaManifest.expected().license == "Apache-2.0"
+    assert assets.InstalledGemmaManifest.expected().license_url == (
+        "https://www.apache.org/licenses/LICENSE-2.0"
+    )
     assert [(item.filename, item.size_bytes, item.sha256) for item in assets.GEMMA_ASSETS] == [
         (
             "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",

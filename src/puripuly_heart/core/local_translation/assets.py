@@ -16,6 +16,9 @@ GEMMA_DRAFT_FILENAME = "mtp-gemma-4-E4B-it.gguf"
 GEMMA_INSTALL_DIRNAME = GEMMA_MODEL_ID
 GEMMA_INSTALLED_MANIFEST_FILENAME = "installed-manifest.json"
 GEMMA_INSTALLED_MANIFEST_VERSION = 1
+GEMMA_UPSTREAM_REPO_ID = "google/gemma-4-E4B-it"
+GEMMA_LICENSE = "Apache-2.0"
+GEMMA_LICENSE_URL = "https://www.apache.org/licenses/LICENSE-2.0"
 
 
 class GemmaAssetError(RuntimeError):
@@ -57,6 +60,9 @@ class InstalledGemmaManifest:
     model_id: str
     repo_id: str
     revision: str
+    upstream_repo_id: str
+    license: str
+    license_url: str
     files: tuple[str, ...]
 
     def to_dict(self) -> dict[str, object]:
@@ -65,6 +71,9 @@ class InstalledGemmaManifest:
             "model_id": self.model_id,
             "repo_id": self.repo_id,
             "revision": self.revision,
+            "upstream_repo_id": self.upstream_repo_id,
+            "license": self.license,
+            "license_url": self.license_url,
             "files": list(self.files),
         }
 
@@ -75,6 +84,9 @@ class InstalledGemmaManifest:
             model_id=GEMMA_MODEL_ID,
             repo_id=GEMMA_REPO_ID,
             revision=GEMMA_REVISION,
+            upstream_repo_id=GEMMA_UPSTREAM_REPO_ID,
+            license=GEMMA_LICENSE,
+            license_url=GEMMA_LICENSE_URL,
             files=tuple(asset.filename for asset in GEMMA_ASSETS),
         )
 
@@ -91,6 +103,9 @@ class InstalledGemmaManifest:
                 model_id=str(value["model_id"]),
                 repo_id=str(value["repo_id"]),
                 revision=str(value["revision"]),
+                upstream_repo_id=GEMMA_UPSTREAM_REPO_ID,
+                license=GEMMA_LICENSE,
+                license_url=GEMMA_LICENSE_URL,
                 files=tuple(raw_files),
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -188,6 +203,9 @@ __all__ = [
     "GEMMA_MODEL_ID",
     "GEMMA_REPO_ID",
     "GEMMA_REVISION",
+    "GEMMA_UPSTREAM_REPO_ID",
+    "GEMMA_LICENSE",
+    "GEMMA_LICENSE_URL",
     "GemmaAsset",
     "GemmaAssetError",
     "GemmaInstallInvalidError",
