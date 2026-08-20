@@ -202,6 +202,22 @@ class DelayedDiscoveryService(FakeService):
         return await super().discover_vrchat()
 
 
+class DelayedAdvertiseService(FakeService):
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.advertise_started = asyncio.Event()
+        self.advertise_gate = asyncio.Event()
+
+    async def advertise_receiver(self, advertisement: OscQueryAdvertisement) -> None:
+        self.advertise_started.set()
+        await self.advertise_gate.wait()
+        await super().advertise_receiver(advertisement)
+
+
+async def _wait_automatic_query(integration: OscControlIntegrationOwner) -> None:
+    await integration.wait_automatic_query_start()
+
+
 def _integration(
     settings: AppSettings,
     receiver_owner: FakeReceiverOwner,
@@ -243,13 +259,15 @@ async def test_integration_shares_dynamic_receiver_and_transitions_modes() -> No
     integration = _integration(settings, receiver_owner, sender, service)
 
     await integration.configure(enabled=False)
+    await _wait_automatic_query(integration)
 
     assert integration.connection_mode == "automatic"
     assert receiver_owner.control_calls[-1] == (True, "127.0.0.1", 0, True)
     assert service.advertisements is not None
     assert service.advertisements[0].port == 49152
     assert sender.destinations[-1] == ("127.0.0.1", 9010)
-    assert len(sender.messages) == 15
+    automatic_messages = len(sender.messages)
+    assert automatic_messages >= 15
     diagnostics = integration.avatar_parameter_diagnostics
     assert "PuriPuly_Talk" in diagnostics["present"]
     assert "PuriPuly_SelfASR" in diagnostics["present"]
@@ -264,7 +282,7 @@ async def test_integration_shares_dynamic_receiver_and_transitions_modes() -> No
     assert receiver_owner.control_calls[-1] == (True, "127.0.0.1", 9021, True)
     assert service.stopped == 1
     assert sender.destinations[-1] == ("127.0.0.1", 9020)
-    assert len(sender.messages) == 30
+    assert len(sender.messages) == automatic_messages + 15
 
     message_count = len(sender.messages)
     await integration.configure_connection(
@@ -276,6 +294,36 @@ async def test_integration_shares_dynamic_receiver_and_transitions_modes() -> No
     assert len(sender.messages) == message_count
     await integration.close()
     assert receiver_owner.closed is True
+
+
+@pytest.mark.asyncio
+async def test_automatic_configure_returns_before_oscquery_advertise() -> None:
+    settings = AppSettings()
+    receiver_owner = FakeReceiverOwner()
+    sender = FakeSender()
+    service = DelayedAdvertiseService(None)
+    integration = _integration(settings, receiver_owner, sender, service)
+
+    await integration.configure_connection(
+        mode="automatic",
+        send_port=9020,
+        receive_port=9021,
+    )
+
+    assert receiver_owner.control_calls[-1] == (True, "127.0.0.1", 0, True)
+    assert integration.query_runtime.started is False
+    assert service.advertisements == []
+
+    await service.advertise_started.wait()
+    assert service.advertisements == []
+
+    service.advertise_gate.set()
+    await _wait_automatic_query(integration)
+
+    assert integration.query_runtime.started is True
+    assert service.advertisements is not None
+    assert service.advertisements[0].port == 49152
+    await integration.close()
 
 
 @pytest.mark.asyncio
@@ -291,6 +339,7 @@ async def test_automatic_refresh_uses_vrchat_default_instead_of_saved_manual_por
         send_port=9123,
         receive_port=9124,
     )
+    await _wait_automatic_query(integration)
     assert sender.destinations[-1] == ("127.0.0.1", 9000)
     assert integration.effective_send_port == 9000
 
@@ -328,6 +377,7 @@ async def test_automatic_discovery_recovers_after_vrchat_disappears_and_reappear
         send_port=9130,
         receive_port=9131,
     )
+    await _wait_automatic_query(integration)
     assert sender.destinations[-1] == ("127.0.0.1", 9030)
 
     service.info = None
@@ -365,6 +415,7 @@ async def test_avatar_change_requeries_and_republishes_full_state() -> None:
         send_port=9110,
         receive_port=9111,
     )
+    await _wait_automatic_query(integration)
     initial_queries = service.avatar_queries
     sender.messages.clear()
 
@@ -500,12 +551,10 @@ async def test_automatic_connection_packet_before_delayed_snapshot_cannot_settle
     service.block_avatar_queries = True
     integration = _integration(settings, receiver_owner, sender, service)
 
-    configure_task = asyncio.create_task(
-        integration.configure_connection(
-            mode="automatic",
-            send_port=9020,
-            receive_port=9021,
-        )
+    await integration.configure_connection(
+        mode="automatic",
+        send_port=9020,
+        receive_port=9021,
     )
     await service.query_started.wait()
     control_handler = receiver_owner.packet_handlers["control_packet_handler"]
@@ -515,7 +564,7 @@ async def test_automatic_connection_packet_before_delayed_snapshot_cannot_settle
     assert "PuriPuly_SelfDstLang" in integration._resync_unsettled
 
     service.query_gate.set()
-    await configure_task
+    await _wait_automatic_query(integration)
 
     assert integration._resync_ready_generation == integration._resync_generation
     assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (7,)) is False
@@ -544,6 +593,7 @@ async def test_avatar_packet_before_delayed_snapshot_cannot_settle_parameter() -
         send_port=9020,
         receive_port=9021,
     )
+    await _wait_automatic_query(integration)
     service.block_avatar_queries = True
     service.query_started.clear()
     integration._handle_avatar_change(())
@@ -711,6 +761,7 @@ async def test_discovery_epoch_is_anchored_before_avatar_query_completion(
         send_port=9020,
         receive_port=9021,
     )
+    await _wait_automatic_query(integration)
     initial_generation = integration._resync_generation
     service.info = OscQueryServiceInfo(
         service_id="VRChat-restarted",
@@ -760,6 +811,7 @@ async def test_stale_discovery_cannot_supersede_newer_avatar_epoch(
         send_port=9020,
         receive_port=9021,
     )
+    await _wait_automatic_query(integration)
     service.info = OscQueryServiceInfo(
         service_id="VRChat-restarted",
         host="127.0.0.1",

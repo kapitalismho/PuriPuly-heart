@@ -235,6 +235,7 @@ def _make_llm_selection_view(
         update=lambda: None,
     )
     view._local_llm_connection_card = SimpleNamespace(visible=False, update=lambda: None)
+    view._custom_stt_connection_card = SimpleNamespace(visible=False, update=lambda: None)
     view._managed_trial_usage_bar = SimpleNamespace(
         visible=False,
         percent=None,
@@ -2093,6 +2094,8 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
         STTProviderName.DEEPGRAM.value,
         STTProviderName.QWEN_ASR.value,
         STTProviderName.SONIOX.value,
+        STTProviderName.CUSTOM_OFFLINE.value,
+        STTProviderName.CUSTOM_REALTIME.value,
     }
     assert STTProviderName.LOCAL_QWEN_GPU.value in {option.value for option in options}
 
@@ -4531,7 +4534,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     view, _ = _make_settings_view(monkeypatch)
     api_controls = _subtab_controls(view, "api")
 
-    assert len(api_controls) == 8
+    assert len(api_controls) == 9
     assert _row_card_titles(api_controls[0]) == [
         t("settings.section.stt"),
         t("settings.section.peer_stt"),
@@ -4551,11 +4554,13 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     assert view._gpu_device_card.visible is False
     assert _row_card_titles(api_controls[4]) == [t("settings.local_llm.connection")]
     assert api_controls[4] is view._local_llm_connection_card
-    assert api_controls[5] is view._managed_key_card
-    assert _row_card_titles(api_controls[5]) == [t("settings.managed_key.title")]
-    assert api_controls[6] is view._peer_auto_languages_card
-    assert api_controls[7] is not view._api_keys_column
-    assert _row_card_titles(api_controls[7]) == [t("settings.section.api_keys")]
+    assert api_controls[5] is view._custom_stt_connection_card
+    assert _row_card_titles(api_controls[5]) == [t("settings.custom_stt.title")]
+    assert api_controls[6] is view._managed_key_card
+    assert _row_card_titles(api_controls[6]) == [t("settings.managed_key.title")]
+    assert api_controls[7] is view._peer_auto_languages_card
+    assert api_controls[8] is not view._api_keys_column
+    assert _row_card_titles(api_controls[8]) == [t("settings.section.api_keys")]
 
 
 def test_api_tab_primary_value_typography_is_consistent_across_rows(

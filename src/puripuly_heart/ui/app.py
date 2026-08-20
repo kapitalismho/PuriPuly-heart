@@ -257,6 +257,7 @@ class TranslatorApp:
                 provider_secret_change=self._on_provider_secret_change,
                 secret_cleared=self._on_secret_cleared,
                 local_llm_secret_changed=self._on_local_llm_secret_changed,
+                custom_stt_secret_changed=self._on_custom_stt_secret_changed,
                 gpu_discovery_requested=self._on_gpu_discovery_requested,
             ),
             general=SettingsGeneralIntents(
@@ -1522,6 +1523,15 @@ class TranslatorApp:
             if not self.application.local_llm_selected():
                 return
             await self.application.apply_providers(force_rebuild_llm=True)
+
+        self._queue_settings_mutation_task(_task)
+
+    def _on_custom_stt_secret_changed(self) -> None:
+        async def _task():
+            await self.application.apply_providers(
+                persist_settings=False,
+                refresh_ui=False,
+            )
 
         self._queue_settings_mutation_task(_task)
 

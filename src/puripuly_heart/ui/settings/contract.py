@@ -29,6 +29,7 @@ class SettingsProviderIntents:
     secret_cleared: Callable[[str], None]
     local_llm_secret_changed: Callable[[], None]
     gpu_discovery_requested: Callable[[], object]
+    custom_stt_secret_changed: Callable[[], None] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +136,8 @@ class SettingsApiSlotProvider(Protocol):
 
     def local_llm_connection_control(self) -> ft.Control: ...
 
+    def custom_stt_connection_control(self) -> ft.Control: ...
+
     def managed_key_control(self) -> ft.Control: ...
 
     def peer_expected_language_control(self) -> ft.Control: ...
@@ -151,6 +154,7 @@ class SettingsApiSurfaceSlots:
     translation_fallback: ft.Control
     gpu_device: ft.Control
     local_llm_connection: ft.Control
+    custom_stt_connection: ft.Control
     managed_key: ft.Control
     peer_expected_language: ft.Control
     api_keys: ft.Control
@@ -167,6 +171,7 @@ class SettingsApiSurfaceSlots:
             translation_fallback=provider.translation_fallback_control(),
             gpu_device=provider.gpu_device_control(),
             local_llm_connection=provider.local_llm_connection_control(),
+            custom_stt_connection=provider.custom_stt_connection_control(),
             managed_key=provider.managed_key_control(),
             peer_expected_language=provider.peer_expected_language_control(),
             api_keys=provider.api_keys_control(),

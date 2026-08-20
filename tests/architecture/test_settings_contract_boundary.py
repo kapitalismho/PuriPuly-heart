@@ -32,6 +32,7 @@ G14_PROVIDER_INTENT_FIELDS = (
     "secret_cleared",
     "local_llm_secret_changed",
     "gpu_discovery_requested",
+    "custom_stt_secret_changed",
 )
 G14_OWNED_VIEW_CALLBACKS = (
     "on_settings_changed",
@@ -42,6 +43,7 @@ G14_OWNED_VIEW_CALLBACKS = (
     "on_secret_cleared",
     "on_local_llm_secret_changed",
     "on_gpu_discovery_requested",
+    "on_custom_stt_secret_changed",
 )
 G14_OWNED_VIEW_SINKS = (
     "show_snackbar",
@@ -136,6 +138,7 @@ def test_settings_view_implements_the_explicit_contract() -> None:
         "translation_fallback_control",
         "gpu_device_control",
         "local_llm_connection_control",
+        "custom_stt_connection_control",
         "managed_key_control",
         "peer_expected_language_control",
         "api_keys_control",

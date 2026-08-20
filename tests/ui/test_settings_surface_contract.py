@@ -54,6 +54,7 @@ class _SlotProvider:
                 "translation_fallback",
                 "gpu_device",
                 "local_llm_connection",
+                "custom_stt_connection",
                 "managed_key",
                 "peer_expected_language",
                 "api_keys",
@@ -80,6 +81,9 @@ class _SlotProvider:
 
     def local_llm_connection_control(self) -> ft.Control:
         return self.controls["local_llm_connection"]
+
+    def custom_stt_connection_control(self) -> ft.Control:
+        return self.controls["custom_stt_connection"]
 
     def managed_key_control(self) -> ft.Control:
         return self.controls["managed_key"]
@@ -128,6 +132,7 @@ def test_settings_api_surface_preserves_the_accepted_row_order() -> None:
         surface.translation_connection_row,
         surface.gpu_device_row,
         provider.controls["local_llm_connection"],
+        provider.controls["custom_stt_connection"],
         provider.controls["managed_key"],
         provider.controls["peer_expected_language"],
         provider.controls["api_keys"],
