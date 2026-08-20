@@ -461,9 +461,9 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     data["audio"]["internal_channels"] = "1"
     data["local_llm"]["backend"] = "fixture_backend"
     data["openrouter"]["provider_routing"] = OpenRouterProviderRouting.DEEPSEEK_ONLY.value
-    data["openrouter"]["fallback_selection_alias"] = (
-        OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value
-    )
+    data["openrouter"][
+        "fallback_selection_alias"
+    ] = OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value
     return data
 
 
