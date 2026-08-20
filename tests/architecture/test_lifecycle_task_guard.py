@@ -34,7 +34,7 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
         ("src/puripuly_heart/ui/flet_runtime.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/components/settings/api_key_field.py", RUN_TASK): 1,
         ("src/puripuly_heart/ui/views/dashboard.py", BARE_RUN_TASK): 1,
-        ("src/puripuly_heart/ui/views/settings.py", RUN_TASK): 2,
+        ("src/puripuly_heart/ui/views/settings.py", RUN_TASK): 1,
         ("src/puripuly_heart/ui/presentation_adapter.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/desktop_overlay.py", ASYNCIO_CREATE_TASK): 11,
         ("src/puripuly_heart/ui/desktop_overlay.py", BARE_RUN_TASK): 1,
@@ -151,7 +151,7 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
     (
         "src/puripuly_heart/ui/views/settings.py",
         RUN_TASK,
-    ): "SettingsView uses page.run_task at the UI boundary for loopback process capture options and Custom STT connection tests while keeping the modal responsive",
+    ): "SettingsView uses page.run_task at the UI boundary for loopback process capture options while keeping the modal responsive",
     (
         "src/puripuly_heart/ui/presentation_adapter.py",
         BARE_RUN_TASK,

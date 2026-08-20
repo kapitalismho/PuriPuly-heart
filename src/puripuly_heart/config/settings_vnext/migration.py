@@ -167,6 +167,7 @@ _LEGACY_OPEN_MAPPING_PATHS = frozenset(
         ("translation", "connection_history"),
         ("stt", "custom_terms"),
         ("local_llm", "extra_body"),
+        ("custom_stt", "extra"),
         ("system_prompts",),
     }
 )
@@ -768,6 +769,7 @@ def from_legacy_app_settings(
                         ),
                         endpoint=str(data.get("custom_stt", {}).get("endpoint", "")),
                         model=str(data.get("custom_stt", {}).get("model", "")),
+                        extra=copy.deepcopy(data.get("custom_stt", {}).get("extra") or {}),
                     ),
                 ),
                 peer_stt=PeerSTTIntent(provider=data["provider"]["peer_stt"]),
@@ -1129,6 +1131,7 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
         "compatibility": intent.stt.custom.compatibility,
         "endpoint": intent.stt.custom.endpoint,
         "model": intent.stt.custom.model,
+        "extra": copy.deepcopy(intent.stt.custom.extra),
     }
     data["openrouter"].update(
         {

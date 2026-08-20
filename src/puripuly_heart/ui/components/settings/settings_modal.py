@@ -192,18 +192,24 @@ class SettingsModal:
     def _partition_sections(sections: list[str], n_columns: int) -> list[list[str]]:
         """Distribute sections across a fixed number of columns.
 
-        The first column receives a single section (when available); the
-        remaining sections are balanced across the other columns. This
-        keeps the recommended grouping prominent on the left while the
-        detailed classifications flow down the right column.
+        The first column receives the leading recommended group(s) while
+        the remaining sections are balanced across the other columns. When
+        the STT provider list is split into ``Recommended / Cloud`` and
+        ``Recommended / Local`` the left column keeps both recommended
+        sections together; otherwise it keeps a single leading section
+        prominent on the left.
         """
         n = len(sections)
         if n == 0:
             return [[] for _ in range(n_columns)]
         if n_columns <= 1:
             return [list(sections)]
-        left = [sections[0]]
-        rest = sections[1:]
+        if n_columns == 2 and n >= 5:
+            left_size = 2
+        else:
+            left_size = 1
+        left = sections[:left_size]
+        rest = sections[left_size:]
         remaining = n_columns - 1
         base = len(rest) // remaining
         extra = len(rest) % remaining

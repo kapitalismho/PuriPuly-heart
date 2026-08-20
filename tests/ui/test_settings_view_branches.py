@@ -2094,7 +2094,8 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
         STTProviderName.DEEPGRAM.value,
         STTProviderName.QWEN_ASR.value,
         STTProviderName.SONIOX.value,
-        STTProviderName.CUSTOM.value,
+        STTProviderName.CUSTOM_OFFLINE.value,
+        STTProviderName.CUSTOM_REALTIME.value,
     }
     assert STTProviderName.LOCAL_QWEN_GPU.value in {option.value for option in options}
 

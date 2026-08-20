@@ -7,7 +7,12 @@ from puripuly_heart.app.services.osc.state_publisher import (
     OscStatePublisher,
     state_from_settings,
 )
-from puripuly_heart.config.settings import AppSettings, TranslationConnection, TranslationModel
+from puripuly_heart.config.settings import (
+    AppSettings,
+    STTProviderName,
+    TranslationConnection,
+    TranslationModel,
+)
 
 
 class FakeSender:
@@ -116,3 +121,24 @@ def test_state_from_settings_publishes_each_fallback_alias(
     settings.translation.fallback.connection = connection
 
     assert state_from_settings(settings).fallback == expected
+
+
+@pytest.mark.parametrize(
+    ("provider", "expected_id"),
+    [
+        (STTProviderName.CUSTOM_OFFLINE, 8),
+        (STTProviderName.CUSTOM_REALTIME, 9),
+        (STTProviderName.CUSTOM, 8),
+    ],
+)
+def test_state_publisher_publishes_custom_asr_ids(
+    provider: STTProviderName,
+    expected_id: int,
+) -> None:
+    settings = AppSettings()
+    settings.provider.stt = provider
+    sender = FakeSender()
+
+    OscStatePublisher(sender).start(state_from_settings(settings))
+
+    assert ("/avatar/parameters/PuriPuly_SelfASR", expected_id) in sender.messages

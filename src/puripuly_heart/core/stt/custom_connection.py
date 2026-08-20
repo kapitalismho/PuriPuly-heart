@@ -5,7 +5,7 @@ import contextlib
 import io
 import json
 import wave
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import httpx
@@ -20,8 +20,10 @@ from puripuly_heart.core.stt.custom import (
     CUSTOM_STT_VALIDATION_UNREACHABLE,
     CustomSTTConfigurationError,
     CustomSTTConnectionValidation,
+    append_custom_stt_query,
     classify_http_failure,
     language_hint_for_source,
+    normalize_custom_stt_extra,
     resolve_openai_realtime_url,
     resolve_openai_transcription_url,
     sanitize_custom_stt_text,
@@ -101,11 +103,13 @@ async def validate_custom_stt_connection(
     api_key: str = "",
     source_language: str = "",
     sample_rate_hz: int = 16000,
+    extra: Mapping[str, object] | None = None,
     http_client_factory: Callable[..., httpx.AsyncClient] = httpx.AsyncClient,
     websocket_connect: Callable[..., Any] | None = None,
 ) -> CustomSTTConnectionValidation:
     try:
         validate_mode_compatibility(mode, compatibility)
+        normalized_extra = normalize_custom_stt_extra(extra)
         if mode == CUSTOM_STT_MODE_OFFLINE:
             return await _validate_offline_connection(
                 endpoint=endpoint,
@@ -113,6 +117,7 @@ async def validate_custom_stt_connection(
                 api_key=api_key,
                 source_language=source_language,
                 sample_rate_hz=sample_rate_hz,
+                extra=normalized_extra,
                 http_client_factory=http_client_factory,
             )
         return await _validate_realtime_connection(
@@ -121,6 +126,7 @@ async def validate_custom_stt_connection(
             api_key=api_key,
             source_language=source_language,
             sample_rate_hz=sample_rate_hz,
+            extra=normalized_extra,
             websocket_connect=websocket_connect,
         )
     except CustomSTTConfigurationError as exc:
@@ -138,16 +144,19 @@ async def _validate_offline_connection(
     api_key: str,
     source_language: str,
     sample_rate_hz: int,
+    extra: Mapping[str, object],
     http_client_factory: Callable[..., httpx.AsyncClient],
 ) -> CustomSTTConnectionValidation:
-    url = resolve_openai_transcription_url(endpoint)
+    url = append_custom_stt_query(resolve_openai_transcription_url(endpoint), extra)
     display = sanitize_endpoint_for_display(url)
     data: dict[str, str] = {}
-    if model:
+    if model and "model" not in extra:
         data["model"] = model
     language = language_hint_for_source(source_language)
-    if language:
+    if language and "language" not in extra:
         data["language"] = language
+    for key, value in extra.items():
+        data[key] = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
     try:
         async with http_client_factory(
             timeout=_VALIDATION_TIMEOUT,
@@ -219,10 +228,13 @@ async def _validate_realtime_connection(
     api_key: str,
     source_language: str,
     sample_rate_hz: int,
+    extra: Mapping[str, object],
     websocket_connect: Callable[..., Any] | None,
 ) -> CustomSTTConnectionValidation:
     _ = sample_rate_hz
-    url = resolve_openai_realtime_url(endpoint)
+    url = append_custom_stt_query(resolve_openai_realtime_url(endpoint), extra)
+    if model and "model" not in extra:
+        url = append_custom_stt_query(url, {"model": model})
     display = sanitize_endpoint_for_display(url)
     connect = websocket_connect
     if connect is None:
@@ -258,13 +270,11 @@ async def _validate_realtime_connection(
         return _validation_from_connect_failure(exc, display=display)
     try:
         language = language_hint_for_source(source_language)
-        session = {
+        session: dict[str, object] = {
             "type": "session.update",
             "session": {
-                "input_audio_format": "pcm16",
                 "input_audio_transcription": ({"model": model} if model else {})
                 | ({"language": language} if language else {}),
-                "turn_detection": None,
             },
         }
         await ws.send(json.dumps(session))

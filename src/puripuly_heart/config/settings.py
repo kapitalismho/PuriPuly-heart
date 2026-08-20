@@ -161,6 +161,50 @@ class STTProviderName(str, Enum):
     QWEN_ASR = "qwen_asr"
     SONIOX = "soniox"
     CUSTOM = "custom"
+    CUSTOM_OFFLINE = "custom_offline"
+    CUSTOM_REALTIME = "custom_realtime"
+
+
+_CUSTOM_STT_PROVIDER_VALUES = frozenset(
+    {
+        STTProviderName.CUSTOM.value,
+        STTProviderName.CUSTOM_OFFLINE.value,
+        STTProviderName.CUSTOM_REALTIME.value,
+    }
+)
+
+
+def is_custom_stt_provider(provider: STTProviderName | str | None) -> bool:
+    if provider is None:
+        return False
+    value = provider.value if isinstance(provider, STTProviderName) else str(provider)
+    return value in _CUSTOM_STT_PROVIDER_VALUES
+
+
+def display_stt_provider(
+    provider: STTProviderName,
+    *,
+    custom_mode: str = "offline",
+) -> STTProviderName:
+    if provider is not STTProviderName.CUSTOM:
+        return provider
+    if custom_mode == "realtime":
+        return STTProviderName.CUSTOM_REALTIME
+    return STTProviderName.CUSTOM_OFFLINE
+
+
+def custom_stt_selection_for_provider(
+    provider: STTProviderName | str,
+    *,
+    stored_mode: str,
+    stored_compatibility: str,
+) -> tuple[str, str]:
+    value = provider.value if isinstance(provider, STTProviderName) else str(provider)
+    if value == STTProviderName.CUSTOM_REALTIME.value:
+        return "realtime", "openai_realtime"
+    if value == STTProviderName.CUSTOM_OFFLINE.value:
+        return "offline", "openai_transcription"
+    return stored_mode, stored_compatibility
 
 
 class LLMProviderName(str, Enum):
@@ -756,11 +800,13 @@ class CustomSTTSettings:
     compatibility: str = "openai_transcription"
     endpoint: str = ""
     model: str = ""
+    extra: dict[str, object] = field(default_factory=dict)
 
     def validate(self) -> None:
         from puripuly_heart.core.stt.custom import (
             normalize_custom_stt_compatibility,
             normalize_custom_stt_endpoint,
+            normalize_custom_stt_extra,
             normalize_custom_stt_mode,
             normalize_custom_stt_model,
             validate_mode_compatibility,
@@ -773,6 +819,7 @@ class CustomSTTSettings:
         )
         self.endpoint = normalize_custom_stt_endpoint(self.endpoint)
         self.model = normalize_custom_stt_model(self.model)
+        self.extra = normalize_custom_stt_extra(self.extra)
         validate_mode_compatibility(self.mode, self.compatibility)
 
 
@@ -1780,6 +1827,7 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
             "compatibility": settings.custom_stt.compatibility,
             "endpoint": settings.custom_stt.endpoint,
             "model": settings.custom_stt.model,
+            "extra": copy.deepcopy(settings.custom_stt.extra),
         },
         "gemini": {
             "llm_model": settings.gemini.llm_model.value,
@@ -1957,6 +2005,7 @@ def _parse_custom_stt_settings(value: object) -> CustomSTTSettings:
         CUSTOM_STT_MODE_OFFLINE,
         normalize_custom_stt_compatibility,
         normalize_custom_stt_endpoint,
+        normalize_custom_stt_extra,
         normalize_custom_stt_mode,
         normalize_custom_stt_model,
     )
@@ -1973,6 +2022,7 @@ def _parse_custom_stt_settings(value: object) -> CustomSTTSettings:
         compatibility=compatibility,
         endpoint=normalize_custom_stt_endpoint(raw.get("endpoint")),
         model=normalize_custom_stt_model(raw.get("model")),
+        extra=normalize_custom_stt_extra(raw.get("extra")),
     )
     settings.validate()
     return settings

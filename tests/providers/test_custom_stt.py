@@ -178,6 +178,127 @@ async def test_offline_failure_does_not_leak_secret() -> None:
 
 
 @pytest.mark.asyncio
+async def test_offline_session_merges_extra_into_form_and_query() -> None:
+    captured: dict[str, Any] = {}
+
+    async def handler(url: str, **kwargs: Any) -> _FakeResponse:
+        captured["url"] = url
+        captured["data"] = kwargs.get("data")
+        return _FakeResponse(200, {"text": "hello there"})
+
+    backend = _backend(
+        http_client_factory=lambda **_: _FakeAsyncClient(handler),
+        extra={"prompt": "custom hint", "max_tokens": 32},
+    )
+    session = await backend.open_session()
+    await session.send_audio(b"\x00\x00" * 160)
+    await session.on_speech_end()
+    event = await anext(session.events())
+    await session.close()
+
+    assert event.text == "hello there"
+    assert captured["data"]["prompt"] == "custom hint"
+    assert captured["data"]["max_tokens"] == "32"
+    assert "prompt=" in captured["url"]
+
+
+@pytest.mark.asyncio
+async def test_realtime_session_appends_extra_query_params() -> None:
+    ws = _FakeWebSocket(
+        [
+            json.dumps({"type": "session.updated"}),
+            json.dumps(
+                {
+                    "type": "conversation.item.input_audio_transcription.completed",
+                    "text": "hello",
+                }
+            ),
+        ],
+        hang=True,
+    )
+
+    async def connect(url: str, **kwargs: object) -> _FakeWebSocket:
+        captured["url"] = url
+        _ = kwargs
+        return ws
+
+    captured: dict[str, Any] = {}
+    backend = CustomSTTBackend(
+        mode="realtime",
+        compatibility="openai_realtime",
+        endpoint="http://127.0.0.1:8000",
+        model="gpt-4o-mini-transcribe",
+        extra={"model": "speaches-model", "language": "en"},
+        websocket_connect=connect,
+    )
+    session = await backend.open_session()
+    await session.send_audio(b"\x00\x00" * 80)
+    await session.on_speech_end()
+    event = await anext(session.events())
+    await session.close()
+
+    assert event.text == "hello"
+    assert captured["url"].startswith("ws://127.0.0.1:8000/v1/realtime?")
+    assert "model=speaches-model" in captured["url"]
+    assert "language=en" in captured["url"]
+
+
+@pytest.mark.asyncio
+async def test_realtime_validation_with_extra_model_query() -> None:
+    ws = _FakeWebSocket([json.dumps({"type": "session.updated"})])
+
+    async def connect(url: str, **kwargs: object) -> _FakeWebSocket:
+        captured["url"] = url
+        _ = kwargs
+        return ws
+
+    captured: dict[str, Any] = {}
+    result = await validate_custom_stt_connection(
+        mode="realtime",
+        compatibility="openai_realtime",
+        endpoint="http://127.0.0.1:8000",
+        model="gpt-4o-mini-transcribe",
+        extra={"model": "speaches-model"},
+        websocket_connect=connect,
+    )
+    assert result.status == CUSTOM_STT_VALIDATION_TRANSCRIPTION_UNVERIFIED
+    assert "model=speaches-model" in captured["url"]
+
+
+def test_normalize_custom_stt_extra_rejects_secrets_and_reserved() -> None:
+    from puripuly_heart.core.stt.custom import normalize_custom_stt_extra
+
+    assert normalize_custom_stt_extra(None) == {}
+    assert normalize_custom_stt_extra({"prompt": "x", "num": 3}) == {"prompt": "x", "num": 3}
+    with pytest.raises(Exception):
+        normalize_custom_stt_extra({"api_key": "secret"})
+    with pytest.raises(Exception):
+        normalize_custom_stt_extra({"file": "x"})
+
+
+@pytest.mark.asyncio
+async def test_offline_validation_sends_extra_form_fields() -> None:
+    captured: dict[str, Any] = {}
+
+    async def handler(url: str, **kwargs: Any) -> _FakeResponse:
+        captured["data"] = kwargs.get("data")
+        captured["url"] = url
+        return _FakeResponse(200, {"text": ""})
+
+    result = await validate_custom_stt_connection(
+        mode="offline",
+        compatibility="openai_transcription",
+        endpoint="http://127.0.0.1:8000",
+        model="whisper-1",
+        extra={"prompt": "hello"},
+        http_client_factory=lambda **_: _FakeAsyncClient(handler),
+    )
+    assert result.status == CUSTOM_STT_VALIDATION_READY
+    assert captured["data"]["prompt"] == "hello"
+    assert "prompt=hello" in captured["url"]
+
+
+@pytest.mark.asyncio
 async def test_streaming_session_discards_partials_and_keeps_finals() -> None:
     ws = _FakeWebSocket(
         [

@@ -422,6 +422,7 @@ class CustomSTTIntent:
     compatibility: str = "openai_transcription"
     endpoint: str = ""
     model: str = ""
+    extra: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

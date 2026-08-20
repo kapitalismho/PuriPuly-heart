@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import Final, Mapping
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 CUSTOM_STT_PROVIDER: Final = "custom"
 _CUSTOM_STT_SECRET_GENERATION = 0
@@ -39,14 +40,6 @@ CUSTOM_STT_VALIDATION_STATUSES: Final[tuple[str, ...]] = (
     CUSTOM_STT_VALIDATION_READY,
 )
 
-CUSTOM_STT_MODE_I18N_KEYS: Final[Mapping[str, str]] = {
-    CUSTOM_STT_MODE_OFFLINE: "settings.custom_stt.mode.offline",
-    CUSTOM_STT_MODE_REALTIME: "settings.custom_stt.mode.realtime",
-}
-CUSTOM_STT_COMPATIBILITY_I18N_KEYS: Final[Mapping[str, str]] = {
-    CUSTOM_STT_COMPAT_OPENAI_TRANSCRIPTION: "settings.custom_stt.compatibility.openai_transcription",
-    CUSTOM_STT_COMPAT_OPENAI_REALTIME: "settings.custom_stt.compatibility.openai_realtime",
-}
 CUSTOM_STT_VALIDATION_I18N_KEYS: Final[Mapping[str, str]] = {
     CUSTOM_STT_VALIDATION_UNREACHABLE: "settings.custom_stt.validation.unreachable",
     CUSTOM_STT_VALIDATION_AUTH_FAILURE: "settings.custom_stt.validation.auth_failure",
@@ -80,6 +73,22 @@ _QUERY_SECRET_RE: Final = re.compile(
 )
 _OPENAI_STYLE_SECRET_RE: Final = re.compile(r"\bsk-[A-Za-z0-9_-]{8,}\b")
 _EMBEDDED_USERINFO_RE: Final = re.compile(r"(?i)((?:https?|wss?)://)[^/\s:@]+(?::[^/\s@]*)?@")
+
+CUSTOM_STT_RESERVED_EXTRA_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        # 전송 구조와 충돌하는 키 (offline form / realtime JSON)
+        "file",
+        "type",
+        "session",
+        "audio",
+        "input_audio_format",
+        "input_audio_transcription",
+        "turn_detection",
+    }
+)
+CUSTOM_STT_SENSITIVE_EXTRA_KEYS: Final[frozenset[str]] = frozenset(
+    {"api_key", "authorization", "headers", "token", "secret", "password"}
+)
 
 
 class CustomSTTConfigurationError(ValueError):
@@ -195,6 +204,50 @@ def normalize_custom_stt_model(value: object) -> str:
     return value.strip()
 
 
+def normalize_custom_stt_extra(value: object) -> dict[str, object]:
+    """Normalize the free-form Custom STT extra JSON mapping.
+
+    Values must be JSON-serializable scalars, mappings, or lists. Keys must be
+    strings and must not collide with reserved transport keys or carry secrets.
+    """
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise CustomSTTConfigurationError("Custom STT extra must be a JSON object")
+    normalized: dict[str, object] = {}
+    for raw_key, raw_value in value.items():
+        if not isinstance(raw_key, str) or not raw_key.strip():
+            raise CustomSTTConfigurationError("Custom STT extra keys must be non-empty strings")
+        key = raw_key.strip().lower()
+        if key in CUSTOM_STT_SENSITIVE_EXTRA_KEYS:
+            raise CustomSTTConfigurationError(f"sensitive Custom STT extra key: {key}")
+        if key in CUSTOM_STT_RESERVED_EXTRA_KEYS:
+            raise CustomSTTConfigurationError(f"reserved Custom STT extra key: {key}")
+        normalized[raw_key.strip()] = _copy_custom_stt_extra_value(raw_value)
+    try:
+        json.dumps(normalized, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise CustomSTTConfigurationError("Custom STT extra must be JSON serializable") from exc
+    return normalized
+
+
+def _copy_custom_stt_extra_value(value: object) -> object:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        copied: dict[str, object] = {}
+        for key, child in value.items():
+            if not isinstance(key, str):
+                raise CustomSTTConfigurationError("Custom STT extra mapping keys must be strings")
+            copied[key] = _copy_custom_stt_extra_value(child)
+        return copied
+    if isinstance(value, list):
+        return [_copy_custom_stt_extra_value(item) for item in value]
+    raise CustomSTTConfigurationError(
+        "Custom STT extra values must be JSON-like scalars, mappings, or lists"
+    )
+
+
 def language_hint_for_source(source_language: str) -> str | None:
     normalized = source_language.strip()
     if not normalized:
@@ -275,7 +328,7 @@ def resolve_openai_transcription_url(endpoint: str) -> str:
         resolved_path = f"{path}/v1/audio/transcriptions"
     else:
         resolved_path = "/v1/audio/transcriptions"
-    return urlunsplit((parsed.scheme, parsed.netloc, resolved_path, "", ""))
+    return urlunsplit((parsed.scheme, parsed.netloc, resolved_path, parsed.query, ""))
 
 
 def resolve_openai_realtime_url(endpoint: str) -> str:
@@ -290,7 +343,30 @@ def resolve_openai_realtime_url(endpoint: str) -> str:
         resolved_path = f"{path}/v1/realtime"
     else:
         resolved_path = "/v1/realtime"
-    return urlunsplit((scheme, parsed.netloc, resolved_path, "", ""))
+    return urlunsplit((scheme, parsed.netloc, resolved_path, parsed.query, ""))
+
+
+def append_custom_stt_query(endpoint: str, extra: Mapping[str, object]) -> str:
+    """Append free-form extra entries as query parameters to an endpoint URL.
+
+    String values are appended as plain text; other JSON values are serialized
+    so structured values survive round-trips. Empty extra mappings return the
+    endpoint unchanged.
+    """
+    if not extra:
+        return endpoint
+    parsed = urlsplit(endpoint)
+    pairs: list[str] = []
+    for key, value in extra.items():
+        if isinstance(value, str):
+            serialized = value
+        else:
+            serialized = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        pairs.append(f"{quote(str(key), safe='')}={quote(serialized, safe='')}")
+    existing = parsed.query
+    joined = "&".join(pairs)
+    query = f"{existing}&{joined}" if existing else joined
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, parsed.fragment))
 
 
 def _require_http_endpoint(endpoint: str, *, allowed_schemes: tuple[str, ...]) -> urlsplit:

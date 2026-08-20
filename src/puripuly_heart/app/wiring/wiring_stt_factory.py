@@ -20,7 +20,7 @@ from puripuly_heart.config.runtime_resolution import (
     SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S,
     SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS,
     SONIOX_STT_MODEL_RT_V5,
-    STT_PROVIDER_CUSTOM,
+    STT_CUSTOM_PROVIDERS,
     STT_PROVIDER_DEEPGRAM,
     STT_PROVIDER_LOCAL_CPU_AUTO,
     STT_PROVIDER_LOCAL_PARAKEET_JAPANESE,
@@ -39,6 +39,8 @@ from puripuly_heart.config.settings import (
     AppSettings,
     QwenRegion,
     STTProviderName,
+    custom_stt_selection_for_provider,
+    is_custom_stt_provider,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.language import get_local_qwen_language_hint
@@ -187,6 +189,11 @@ def _self_stt_runtime_intent_from_compatibility_settings(settings: AppSettings) 
 
         soniox_language_hints = tuple(get_soniox_language_hints(source_language))
         soniox_language_hints_strict = True
+    custom_mode, custom_compatibility = custom_stt_selection_for_provider(
+        provider,
+        stored_mode=settings.custom_stt.mode,
+        stored_compatibility=settings.custom_stt.compatibility,
+    )
     return STTRuntimeIntent(
         channel="self",
         provider=provider,
@@ -205,7 +212,7 @@ def _self_stt_runtime_intent_from_compatibility_settings(settings: AppSettings) 
         low_latency_merge_gap_ms=settings.stt.low_latency_merge_gap_ms,
         low_latency_spec_retry_max=settings.stt.low_latency_spec_retry_max,
         custom_vocabulary_enabled=(
-            settings.stt.custom_vocabulary_enabled and provider != STT_PROVIDER_CUSTOM
+            settings.stt.custom_vocabulary_enabled and not is_custom_stt_provider(provider)
         ),
         custom_terms=_effective_custom_terms_for_resolved_config(settings, source_language),
         deepgram_model=settings.deepgram_stt.model,
@@ -217,10 +224,11 @@ def _self_stt_runtime_intent_from_compatibility_settings(settings: AppSettings) 
         soniox_trailing_silence_ms=settings.soniox_stt.trailing_silence_ms,
         soniox_language_hints=soniox_language_hints,
         soniox_language_hints_strict=soniox_language_hints_strict,
-        custom_stt_mode=settings.custom_stt.mode,
-        custom_stt_compatibility=settings.custom_stt.compatibility,
+        custom_stt_mode=custom_mode,
+        custom_stt_compatibility=custom_compatibility,
         custom_stt_endpoint=settings.custom_stt.endpoint,
         custom_stt_model=settings.custom_stt.model,
+        custom_stt_extra=dict(settings.custom_stt.extra),
     )
 
 
@@ -253,6 +261,11 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
             language_hints = mapped_language_hints or None
         else:
             language_hints = tuple(get_soniox_language_hints(source_language))
+    custom_mode, custom_compatibility = custom_stt_selection_for_provider(
+        provider,
+        stored_mode=intent.stt.custom.mode,
+        stored_compatibility=intent.stt.custom.compatibility,
+    )
     return STTRuntimeIntent(
         channel="peer",
         provider=provider,
@@ -283,10 +296,11 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         soniox_enable_language_identification=automatic_soniox,
         soniox_language_hints=language_hints,
         soniox_language_hints_strict=language_hints_strict,
-        custom_stt_mode=intent.stt.custom.mode,
-        custom_stt_compatibility=intent.stt.custom.compatibility,
+        custom_stt_mode=custom_mode,
+        custom_stt_compatibility=custom_compatibility,
         custom_stt_endpoint=intent.stt.custom.endpoint,
         custom_stt_model=intent.stt.custom.model,
+        custom_stt_extra=dict(intent.stt.custom.extra),
     )
 
 
@@ -396,14 +410,14 @@ def build_self_stt_runtime_signature(settings: AppSettings) -> tuple[object, ...
             if settings.provider.stt == STTProviderName.SONIOX
             else None
         ),
-        (settings.custom_stt.mode if settings.provider.stt == STTProviderName.CUSTOM else None),
+        (settings.custom_stt.mode if is_custom_stt_provider(settings.provider.stt) else None),
         (
             settings.custom_stt.compatibility
-            if settings.provider.stt == STTProviderName.CUSTOM
+            if is_custom_stt_provider(settings.provider.stt)
             else None
         ),
-        (settings.custom_stt.endpoint if settings.provider.stt == STTProviderName.CUSTOM else None),
-        (settings.custom_stt.model if settings.provider.stt == STTProviderName.CUSTOM else None),
+        (settings.custom_stt.endpoint if is_custom_stt_provider(settings.provider.stt) else None),
+        (settings.custom_stt.model if is_custom_stt_provider(settings.provider.stt) else None),
         custom_vocab_enabled,
         custom_terms,
     )
@@ -435,19 +449,15 @@ def build_self_stt_provider_signature(settings: AppSettings) -> tuple[object, ..
             if settings.provider.stt == STTProviderName.SONIOX
             else None
         ),
-        (settings.custom_stt.mode if settings.provider.stt == STTProviderName.CUSTOM else None),
+        (settings.custom_stt.mode if is_custom_stt_provider(settings.provider.stt) else None),
         (
             settings.custom_stt.compatibility
-            if settings.provider.stt == STTProviderName.CUSTOM
+            if is_custom_stt_provider(settings.provider.stt)
             else None
         ),
-        (settings.custom_stt.endpoint if settings.provider.stt == STTProviderName.CUSTOM else None),
-        (settings.custom_stt.model if settings.provider.stt == STTProviderName.CUSTOM else None),
-        (
-            custom_stt_secret_generation()
-            if settings.provider.stt == STTProviderName.CUSTOM
-            else None
-        ),
+        (settings.custom_stt.endpoint if is_custom_stt_provider(settings.provider.stt) else None),
+        (settings.custom_stt.model if is_custom_stt_provider(settings.provider.stt) else None),
+        (custom_stt_secret_generation() if is_custom_stt_provider(settings.provider.stt) else None),
         (
             str(default_local_stt_model_dir())
             if settings.provider.stt == STTProviderName.LOCAL_QWEN
@@ -774,7 +784,7 @@ def create_stt_backend_from_resolved_config(
             context_terms=keyterms,
         )
 
-    if config.provider == STT_PROVIDER_CUSTOM:
+    if config.provider in STT_CUSTOM_PROVIDERS:
         from puripuly_heart.providers.stt.custom import CustomSTTBackend
 
         api_key = ""
@@ -782,6 +792,8 @@ def create_stt_backend_from_resolved_config(
             api_key = (secrets.get("custom_stt_api_key") or "").strip()
         mode = str(config.provider_options.get("mode") or "")
         compatibility = str(config.provider_options.get("compatibility") or "")
+        extra = config.provider_options.get("extra")
+        extra_mapping = extra if isinstance(extra, Mapping) else {}
         return CustomSTTBackend(
             mode=mode,
             compatibility=compatibility,
@@ -790,6 +802,7 @@ def create_stt_backend_from_resolved_config(
             api_key=api_key,
             source_language=config.source_language,
             sample_rate_hz=config.sample_rate_hz,
+            extra=dict(extra_mapping),
         )
 
     raise ValueError(f"Unsupported STT provider: {config.provider}")
@@ -847,7 +860,7 @@ def resolve_peer_stt_config(settings: AppSettings) -> ResolvedPeerSTTConfig:
             soniox_language_hints=language_hints,
         )
 
-    if provider == STTProviderName.CUSTOM:
+    if is_custom_stt_provider(provider):
         return ResolvedPeerSTTConfig(
             provider=provider,
             source_language=peer_source_language,
@@ -916,7 +929,7 @@ def build_peer_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         resolved.provider_options.get("mode"),
         resolved.provider_options.get("compatibility"),
         resolved.source_mode,
-        (custom_stt_secret_generation() if resolved.provider == STT_PROVIDER_CUSTOM else None),
+        (custom_stt_secret_generation() if resolved.provider in STT_CUSTOM_PROVIDERS else None),
     )
 
 

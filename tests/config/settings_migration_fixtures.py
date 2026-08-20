@@ -42,6 +42,7 @@ DYNAMIC_MAPPING_PATHS = frozenset(
         "local_llm.extra_body",
         "stt.custom_terms",
         "translation.connection_history",
+        "custom_stt.extra",
     }
 )
 
@@ -88,6 +89,7 @@ CURRENT_USER_INTENT_DESTINATIONS = {
     "cerebras.llm_model": "intent.translation.cerebras.llm_model",
     "custom_stt.compatibility": "intent.stt.custom.compatibility",
     "custom_stt.endpoint": "intent.stt.custom.endpoint",
+    "custom_stt.extra": "intent.stt.custom.extra",
     "custom_stt.mode": "intent.stt.custom.mode",
     "custom_stt.model": "intent.stt.custom.model",
     "deepseek.llm_model": "intent.translation.deepseek.llm_model",
@@ -385,6 +387,7 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     settings.custom_stt.compatibility = "openai_realtime"
     settings.custom_stt.endpoint = "https://custom-stt.fixture.test"
     settings.custom_stt.model = "fixture-transcribe"
+    settings.custom_stt.extra = {"prompt": "fixture-prompt", "max_tokens": 16}
     settings.gemini.llm_model = GeminiLLMModel.GEMINI_37_FLASH
     settings.openrouter.llm_model = OpenRouterLLMModel.QWEN_35_FLASH_02_23
     settings.openrouter.routing_mode = OpenRouterRoutingMode.LATENCY
@@ -458,9 +461,9 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     data["audio"]["internal_channels"] = "1"
     data["local_llm"]["backend"] = "fixture_backend"
     data["openrouter"]["provider_routing"] = OpenRouterProviderRouting.DEEPSEEK_ONLY.value
-    data["openrouter"][
-        "fallback_selection_alias"
-    ] = OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value
+    data["openrouter"]["fallback_selection_alias"] = (
+        OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value
+    )
     return data
 
 

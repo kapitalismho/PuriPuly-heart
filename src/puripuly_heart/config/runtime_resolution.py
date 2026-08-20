@@ -215,6 +215,13 @@ STT_PROVIDER_DEEPGRAM: Final = "deepgram"
 STT_PROVIDER_QWEN_ASR: Final = "qwen_asr"
 STT_PROVIDER_SONIOX: Final = "soniox"
 STT_PROVIDER_CUSTOM: Final = "custom"
+STT_PROVIDER_CUSTOM_OFFLINE: Final = "custom_offline"
+STT_PROVIDER_CUSTOM_REALTIME: Final = "custom_realtime"
+STT_CUSTOM_PROVIDERS: Final[tuple[str, ...]] = (
+    STT_PROVIDER_CUSTOM,
+    STT_PROVIDER_CUSTOM_OFFLINE,
+    STT_PROVIDER_CUSTOM_REALTIME,
+)
 STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_LOCAL_CPU_AUTO,
     STT_PROVIDER_LOCAL_PARAKEET_V3,
@@ -225,6 +232,8 @@ STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_QWEN_ASR,
     STT_PROVIDER_SONIOX,
     STT_PROVIDER_CUSTOM,
+    STT_PROVIDER_CUSTOM_OFFLINE,
+    STT_PROVIDER_CUSTOM_REALTIME,
 )
 PEER_AUTO_DETECTION_STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_LOCAL_QWEN_GPU,
@@ -711,6 +720,7 @@ class STTRuntimeIntent:
     custom_stt_compatibility: str = "openai_transcription"
     custom_stt_endpoint: str = ""
     custom_stt_model: str = ""
+    custom_stt_extra: Mapping[str, ResolvedOptionValue] = field(default_factory=_empty_options)
 
     def __post_init__(self) -> None:
         channel = _normalize_allowed(
@@ -1213,12 +1223,19 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
                 **provider_options,
                 "language_hints_strict": True,
             }
-    elif provider == STT_PROVIDER_CUSTOM:
-        mode = _normalize_custom_stt_mode(intent.custom_stt_mode)
-        compatibility = _normalize_custom_stt_compatibility(
-            intent.custom_stt_compatibility,
-            mode=mode,
-        )
+    elif provider in STT_CUSTOM_PROVIDERS:
+        if provider == STT_PROVIDER_CUSTOM_REALTIME:
+            mode = "realtime"
+            compatibility = "openai_realtime"
+        elif provider == STT_PROVIDER_CUSTOM_OFFLINE:
+            mode = "offline"
+            compatibility = "openai_transcription"
+        else:
+            mode = _normalize_custom_stt_mode(intent.custom_stt_mode)
+            compatibility = _normalize_custom_stt_compatibility(
+                intent.custom_stt_compatibility,
+                mode=mode,
+            )
         model = str(intent.custom_stt_model or "").strip() or None
         endpoint = str(intent.custom_stt_endpoint or "").strip()
         credential = ResolvedCredentialRequirement(
@@ -1229,6 +1246,7 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
         provider_options = {
             "mode": mode,
             "compatibility": compatibility,
+            "extra": _freeze_option_mapping(cast(Mapping[str, object], intent.custom_stt_extra)),
         }
 
     return ResolvedSTTConfig(
