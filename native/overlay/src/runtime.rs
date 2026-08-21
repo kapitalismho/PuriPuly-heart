@@ -1511,6 +1511,7 @@ pub const NATIVE_FRESH_RETRY_CADENCE: Duration = Duration::from_millis(100);
 pub const NATIVE_FRESH_RETRY_DEADLINE: Duration = Duration::from_millis(500);
 pub const NATIVE_FRESH_RETRY_MAX_COMPLETED: u32 = 5;
 pub const NATIVE_STREAM_RETRY_MAX_COMPLETED: u32 = 4;
+pub const NATIVE_READINESS_TIMEOUT_RETRY_MAX: u32 = NATIVE_FRESH_RETRY_MAX_COMPLETED;
 const NATIVE_FRESH_AUDIT_CAPACITY: usize = 128;
 
 #[derive(Debug, Clone, Copy)]
@@ -1635,6 +1636,9 @@ pub struct NativePresentationOwner<S: OverlayFrameSubmitter> {
     fresh_retry_audit: VecDeque<NativeFreshAuditFact>,
     fresh_retry_audit_dropped: u64,
     successful_attempt_audit: VecDeque<PresentationCorrelation>,
+    consecutive_readiness_timeouts: u32,
+    max_consecutive_readiness_timeouts: u32,
+    readiness_retry_due: Option<Instant>,
 }
 
 impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
@@ -1664,6 +1668,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             fresh_retry_audit: VecDeque::with_capacity(NATIVE_FRESH_AUDIT_CAPACITY),
             fresh_retry_audit_dropped: 0,
             successful_attempt_audit: VecDeque::with_capacity(NATIVE_FRESH_AUDIT_CAPACITY),
+            consecutive_readiness_timeouts: 0,
+            max_consecutive_readiness_timeouts: NATIVE_READINESS_TIMEOUT_RETRY_MAX,
+            readiness_retry_due: None,
         }
     }
 
@@ -1697,6 +1704,11 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             max_completed,
         };
         owner
+    }
+
+    #[doc(hidden)]
+    pub fn set_max_consecutive_readiness_timeouts_for_test(&mut self, max_timeouts: u32) {
+        self.max_consecutive_readiness_timeouts = max_timeouts;
     }
 
     pub fn runtime(&self) -> &PresentationRuntime {
@@ -1746,6 +1758,8 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     }
 
     fn capture_successful_attempt(&mut self) {
+        self.consecutive_readiness_timeouts = 0;
+        self.readiness_retry_due = None;
         let Some(correlation) = self.runtime.last_presentation_correlation else {
             return;
         };
@@ -2046,6 +2060,61 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             .min()
     }
 
+    fn next_retry_wake(&self) -> Option<Instant> {
+        [self.next_fresh_due(), self.readiness_retry_due]
+            .into_iter()
+            .flatten()
+            .min()
+    }
+
+    async fn note_readiness_timeout(
+        &mut self,
+        logger: &OverlayLogger,
+    ) -> Result<(), RuntimeFailure> {
+        self.consecutive_readiness_timeouts = self.consecutive_readiness_timeouts.saturating_add(1);
+        self.runtime.request_native_presentation_retry();
+        let due = Instant::now() + self.retry_policy.cadence;
+        let mut deferred_schedule = false;
+        if let Some(schedule) = self.self_schedule.as_mut() {
+            schedule.next_due = due;
+            deferred_schedule = true;
+        }
+        if let Some(schedule) = self.peer_schedule.as_mut() {
+            schedule.next_due = due;
+            deferred_schedule = true;
+        }
+        if !deferred_schedule {
+            self.readiness_retry_due = Some(due);
+        }
+        log_runtime_info(
+            logger,
+            format!(
+                "readiness_timeout_retry consecutive={} max={} physical_hmd_visibility=not_observable",
+                self.consecutive_readiness_timeouts, self.max_consecutive_readiness_timeouts,
+            ),
+        )
+        .await?;
+        if self.consecutive_readiness_timeouts >= self.max_consecutive_readiness_timeouts {
+            return Err(RuntimeFailure::ReadinessTimedOut);
+        }
+        Ok(())
+    }
+
+    async fn complete_frame_cycle(
+        &mut self,
+        result: Result<FrameCycleOutcome, RuntimeFailure>,
+        logger: &OverlayLogger,
+    ) -> Result<Option<FrameCycleOutcome>, RuntimeFailure> {
+        match result {
+            Ok(outcome) => Ok(Some(outcome)),
+            Err(RuntimeFailure::ReadinessTimedOut) => {
+                self.note_readiness_timeout(logger).await?;
+                Ok(None)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     fn due_fresh_channels(&self, now: Instant) -> Vec<FreshRetryChannel> {
         [self.self_schedule.clone(), self.peer_schedule.clone()]
             .into_iter()
@@ -2134,6 +2203,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         if due.is_empty() {
             return Ok(FrameCycleOutcome::NoWork);
         }
+        self.readiness_retry_due = None;
         for schedule in &due {
             self.runtime
                 .request_fresh_presentation_retry(schedule.channel, schedule.trigger_generation);
@@ -2149,6 +2219,10 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         };
         let outcome = match attempt {
             Ok(outcome) => outcome,
+            Err(RuntimeFailure::ReadinessTimedOut) => {
+                self.note_readiness_timeout(logger).await?;
+                return Ok(FrameCycleOutcome::NoWork);
+            }
             Err(primary_failure) => {
                 for schedule in due {
                     let active = match schedule.channel {
@@ -2270,15 +2344,24 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 .submit_initial_frame_message_aware(renderer, openvr, bridge, logger)
                 .await
         };
+        let initial_timed_out = matches!(&initial_result, Err(RuntimeFailure::ReadinessTimedOut));
         if let Err(error) = initial_result {
-            self.teardown();
-            return Err(error);
+            if !initial_timed_out {
+                self.teardown();
+                return Err(error);
+            }
+            if let Err(error) = self.note_readiness_timeout(logger).await {
+                self.teardown();
+                return Err(error);
+            }
         }
         if self.runtime.is_stopped() {
             self.teardown();
             return Ok(());
         }
-        self.capture_successful_attempt();
+        if !initial_timed_out {
+            self.capture_successful_attempt();
+        }
         let reconcile_result = self.reconcile_fresh_schedules(logger).await;
         self.finish_initial_reconcile(reconcile_result)?;
 
@@ -2300,11 +2383,29 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             } else {
                 tokio::select! {
                     biased;
-                    _ = sleep_until(self.next_fresh_due().unwrap_or_else(Instant::now)), if self.next_fresh_due().is_some() => {
-                        let channels = self.due_fresh_channels(Instant::now());
+                    _ = sleep_until(self.next_retry_wake().unwrap_or_else(Instant::now)), if self.next_retry_wake().is_some() => {
+                        let now = Instant::now();
+                        let channels = self.due_fresh_channels(now);
                         if !channels.is_empty() {
                             let outcome = self.run_due_fresh_attempt(channels, bridge, logger).await?;
                             pending_message = outcome.pending_message();
+                        } else if self.readiness_retry_due.is_some_and(|due| due <= now) {
+                            self.readiness_retry_due = None;
+                            let result = {
+                                let renderer = self.renderer.as_ref().expect("active renderer");
+                                let openvr = self.openvr.as_mut().expect("active OpenVR session");
+                                self.runtime
+                                    .submit_frame_if_needed_with_timing(
+                                        renderer, openvr, bridge, logger, None, None, true,
+                                    )
+                                    .await
+                            };
+                            if let Some(outcome) = self.complete_frame_cycle(result, logger).await? {
+                                if matches!(&outcome, FrameCycleOutcome::Submitted) {
+                                    self.capture_successful_attempt();
+                                }
+                                pending_message = outcome.pending_message();
+                            }
                         }
                         None
                     }
@@ -2322,27 +2423,35 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                         self.runtime.request_native_presentation_retry();
                         let renderer = self.renderer.as_ref().expect("active renderer");
                         let openvr = self.openvr.as_mut().expect("active OpenVR session");
-                        let outcome = self.runtime
+                        let result = self.runtime
                             .submit_frame_if_needed_with_timing(
                                 renderer, openvr, bridge, logger, None, None, true,
                             )
-                            .await?;
-                        if matches!(&outcome, FrameCycleOutcome::Submitted) {
-                            self.capture_successful_attempt();
-                            self.satisfy_schedules_from_last_submission(
-                                logger,
-                                &captured_schedules,
-                                PresentationCauseKind::ActiveRetryIntent,
-                            ).await?;
-                        } else {
-                            for schedule in captured_schedules {
-                                self.runtime.pending_presentation_causes.remove(Self::intent_cause(
-                                    &schedule,
-                                    PresentationCauseKind::ActiveRetryIntent,
-                                ));
+                            .await;
+                        match self.complete_frame_cycle(result, logger).await? {
+                            Some(outcome) => {
+                                if matches!(&outcome, FrameCycleOutcome::Submitted) {
+                                    self.capture_successful_attempt();
+                                    self.satisfy_schedules_from_last_submission(
+                                        logger,
+                                        &captured_schedules,
+                                        PresentationCauseKind::ActiveRetryIntent,
+                                    ).await?;
+                                } else {
+                                    for schedule in captured_schedules {
+                                        self.runtime.pending_presentation_causes.remove(Self::intent_cause(
+                                            &schedule,
+                                            PresentationCauseKind::ActiveRetryIntent,
+                                        ));
+                                    }
+                                }
+                                pending_message = outcome.pending_message();
+                            }
+                            None => {
+                                self.remove_temporary_intent_causes(&captured_schedules);
+                                pending_message = None;
                             }
                         }
-                        pending_message = outcome.pending_message();
                         None
                     }
                     _ = sleep_until(hide_deadline.unwrap_or_else(Instant::now)), if hide_deadline.is_some() => {
@@ -2372,6 +2481,11 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     .await;
                 let (continue_running, preempted_message) = match handled {
                     Ok(handled) => handled,
+                    Err(RuntimeFailure::ReadinessTimedOut) => {
+                        self.note_readiness_timeout(logger).await?;
+                        self.remove_temporary_intent_causes(&captured_schedules);
+                        continue;
+                    }
                     Err(error) => {
                         self.remove_temporary_intent_causes(&captured_schedules);
                         return Err(error);
