@@ -199,6 +199,7 @@ _TRANSLATION_MODELS = (
 _TRANSLATION_MODEL_SECTION_ORDER = (
     "settings.translation_model.section.recommended_cloud",
     "settings.translation_model.section.recommended_local",
+    "settings.translation_model.section.gpu_inference",
     "settings.translation_model.section.gemma",
     "settings.translation_model.section.user_settings",
     "settings.translation_model.section.others",
@@ -206,8 +207,8 @@ _TRANSLATION_MODEL_SECTION_ORDER = (
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.recommended_local",
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
+    TranslationModel.GEMMA4_31B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended_cloud",
-    TranslationModel.GEMMA4_31B: "settings.translation_model.section.gemma",
     TranslationModel.GEMMA4: "settings.translation_model.section.gemma",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
     TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
@@ -2741,7 +2742,12 @@ class SettingsView(ft.Column):
         return t(profile.description_key, default="")
 
     def _get_llm_display_label(self, settings: AppSettings) -> str:
-        return self._translation_model_display_label(settings.translation.model)
+        model = settings.translation.model
+        if model == TranslationModel.MANAGED_GEMMA:
+            if settings.translation.connection == TranslationConnection.GPU:
+                return t("provider.managed_gemma_gpu")
+            return t("provider.managed_gemma_cpu")
+        return self._translation_model_display_label(model)
 
     def _get_translation_connection_display_label(self, settings: AppSettings | None) -> str:
         if settings is None:
@@ -3943,11 +3949,9 @@ class SettingsView(ft.Column):
         options: list[OptionItem] = []
         for section_key in _TRANSLATION_MODEL_SECTION_ORDER:
             for model in _TRANSLATION_MODELS:
-                if _TRANSLATION_MODEL_SECTION_BY_MODEL.get(model) != section_key:
-                    continue
                 if model == TranslationModel.MANAGED_GEMMA:
-                    options.extend(
-                        [
+                    if section_key == "settings.translation_model.section.recommended_local":
+                        options.append(
                             OptionItem(
                                 value="managed_gemma_cpu",
                                 label=t("provider.managed_gemma_cpu"),
@@ -3956,7 +3960,10 @@ class SettingsView(ft.Column):
                                     default="",
                                 ),
                                 section=t(section_key),
-                            ),
+                            )
+                        )
+                    elif section_key == "settings.translation_model.section.gpu_inference":
+                        options.append(
                             OptionItem(
                                 value="managed_gemma_gpu",
                                 label=t("provider.managed_gemma_gpu"),
@@ -3965,21 +3972,22 @@ class SettingsView(ft.Column):
                                     default="",
                                 ),
                                 section=t(section_key),
-                            ),
-                        ]
-                    )
-                else:
-                    options.append(
-                        OptionItem(
-                            value=model.value,
-                            label=self._translation_model_display_label(model),
-                            description=t(
-                                f"settings.translation_model.{model.value}.description",
-                                default="",
-                            ),
-                            section=t(section_key),
+                            )
                         )
+                    continue
+                if _TRANSLATION_MODEL_SECTION_BY_MODEL.get(model) != section_key:
+                    continue
+                options.append(
+                    OptionItem(
+                        value=model.value,
+                        label=self._translation_model_display_label(model),
+                        description=t(
+                            f"settings.translation_model.{model.value}.description",
+                            default="",
+                        ),
+                        section=t(section_key),
                     )
+                )
         display_settings = self._build_settings_with_provider_draft()
         current = (
             self._get_llm_modal_value(display_settings)
@@ -3993,6 +4001,7 @@ class SettingsView(ft.Column):
             self._on_llm_selected,
             show_description=True,
             two_column=True,
+            left_column_sections=2,
         )
         modal.open(current)
 
@@ -4145,6 +4154,8 @@ class SettingsView(ft.Column):
             if display_settings is not None
             else TranslationModel.GEMMA4
         )
+        if model == TranslationModel.MANAGED_GEMMA:
+            return
         connections = supported_translation_connections(model)
         options = [
             OptionItem(

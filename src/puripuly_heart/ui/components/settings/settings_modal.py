@@ -40,6 +40,7 @@ class SettingsModal:
         *,
         show_description: bool = False,
         two_column: bool = False,
+        left_column_sections: int = 1,
     ):
         """Initialize settings modal.
 
@@ -52,6 +53,8 @@ class SettingsModal:
             two_column: Whether to force a 2-column layout. When False, the
                 modal always renders as a single column regardless of how
                 many sections the options carry.
+            left_column_sections: Number of sections placed in the left column
+                of a two-column layout. Only used when two_column is True.
         """
         self._page = page
         self._title = title
@@ -59,11 +62,13 @@ class SettingsModal:
         self._on_select = on_select
         self._show_description = show_description
         self._two_column = two_column
+        self._left_column_sections = left_column_sections
         self._dialog: ft.AlertDialog | None = None
         self._option_list: ft.ListView | ft.Row | None = None
         self._section_lists: list[tuple[ft.ListView, list[str]]] | None = None
         self._current: str = ""
         self._loading_section: str = ""
+        self._partition_left_sections = left_column_sections
 
     def open(self, current: str, *, loading_section: str = "") -> None:
         """Open the settings selection dialog.
@@ -188,8 +193,7 @@ class SettingsModal:
         )
         return self._option_list
 
-    @staticmethod
-    def _partition_sections(sections: list[str], n_columns: int) -> list[list[str]]:
+    def _partition_sections(self, sections: list[str], n_columns: int) -> list[list[str]]:
         """Distribute sections across a fixed number of columns.
 
         The first column receives a single section (when available); the
@@ -202,9 +206,13 @@ class SettingsModal:
             return [[] for _ in range(n_columns)]
         if n_columns <= 1:
             return [list(sections)]
-        left = [sections[0]]
-        rest = sections[1:]
+        left_count = self._partition_left_sections
+        left_count = max(1, min(left_count, n))
+        left = list(sections[:left_count])
+        rest = sections[left_count:]
         remaining = n_columns - 1
+        if not rest:
+            return [left, []]
         base = len(rest) // remaining
         extra = len(rest) % remaining
         cols: list[list[str]] = [left]

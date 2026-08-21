@@ -1465,6 +1465,7 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
     assert view._openrouter_fallback_card.visible is False
     assert view._translation_connection_row.visible is False
     assert view._translation_connection_title.value == t("settings.translation_connection")
+    assert view._get_llm_display_label(pending) == t("provider.managed_gemma_cpu")
 
     view._on_llm_selected("managed_gemma_gpu")
 
@@ -1473,6 +1474,7 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
     assert pending.translation.model == TranslationModel.MANAGED_GEMMA
     assert pending.translation.connection == TranslationConnection.GPU
     assert applies == [True, True]
+    assert view._get_llm_display_label(pending) == t("provider.managed_gemma_gpu")
 
     view._on_llm_selected("managed_gemma_gpu")
 

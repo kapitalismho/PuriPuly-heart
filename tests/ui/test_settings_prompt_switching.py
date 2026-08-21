@@ -324,12 +324,14 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
             options,
             _on_select,
             *,
-            show_description=False,
-            two_column=False,
-        ):
-            captured["options"] = options
-            captured["show_description"] = show_description
-            captured["two_column"] = two_column
+                show_description=False,
+                two_column=False,
+                left_column_sections=1,
+            ):
+                captured["options"] = options
+                captured["show_description"] = show_description
+                captured["two_column"] = two_column
+                captured["left_column_sections"] = left_column_sections
 
         def open(self, current: str) -> None:
             captured["current"] = current
@@ -339,15 +341,17 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
     view._on_llm_click(None)
 
     assert captured["show_description"] is True
+    assert captured["two_column"] is True
+    assert captured["left_column_sections"] == 2
     options = captured["options"]
     values = [option.value for option in options]
 
     assert values == [
         TranslationModel.GEMMA4_26B_31B.value,
+        TranslationModel.GEMMA4_31B.value,
         TranslationModel.DEEPSEEK_V4_FLASH.value,
         "managed_gemma_cpu",
         "managed_gemma_gpu",
-        TranslationModel.GEMMA4_31B.value,
         TranslationModel.GEMMA4.value,
         TranslationModel.LOCAL_LLM.value,
         TranslationModel.CUSTOM_HTTP.value,
@@ -374,7 +378,15 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         "settings.translation_model.section.recommended_local"
     )
     assert managed["managed_gemma_gpu"].section == t(
-        "settings.translation_model.section.recommended_local"
+        "settings.translation_model.section.gpu_inference"
+    )
+
+    gemma31 = next(
+        option for option in options if option.value == TranslationModel.GEMMA4_31B.value
+    )
+    assert gemma31.section == t("settings.translation_model.section.recommended_cloud")
+    assert gemma31.description == t(
+        "settings.translation_model.gemma4_31b.description"
     )
 
     sections: list[str] = []
@@ -384,6 +396,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
     assert sections == [
         t("settings.translation_model.section.recommended_cloud"),
         t("settings.translation_model.section.recommended_local"),
+        t("settings.translation_model.section.gpu_inference"),
         t("settings.translation_model.section.gemma"),
         t("settings.translation_model.section.user_settings"),
         t("settings.translation_model.section.others"),
