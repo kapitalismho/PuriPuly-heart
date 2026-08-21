@@ -583,7 +583,7 @@ def test_prepare_llm_request_routes_context_logs_by_runtime_visibility() -> None
 
         basic_messages = _runtime_log_messages(basic_stream)
         detailed_messages = _runtime_log_messages(detailed_stream)
-        expected_context_chars = len('- [self, 1s ago] "안녕"')
+        expected_context_chars = len('- [self] "안녕"')
         expected_context_apply_log = (
             "[Translation] Context apply: channel=self mode=local "
             "request_chars=2 entries=1 self_entries=1 peer_entries=0 "

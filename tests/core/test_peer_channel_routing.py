@@ -294,8 +294,8 @@ def test_integrated_context_includes_opposite_direction_peer_entries() -> None:
 
     assert self_mode == "integrated"
     assert peer_mode == "integrated"
-    assert self_context == ('- [self, 12s ago] "self previous"\n- [peer, 7s ago] "peer previous"')
-    assert peer_context == ('- [self, 12s ago] "self previous"\n- [peer, 7s ago] "peer previous"')
+    assert self_context == ('- [self] "self previous"\n- [peer] "peer previous"')
+    assert peer_context == ('- [self] "self previous"\n- [peer] "peer previous"')
 
 
 @pytest.mark.asyncio

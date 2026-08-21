@@ -379,7 +379,7 @@ class TranslationLatencyDiagnosticsOwner:
             peer_entries = sum(
                 1
                 for line in diagnostic.context_lines
-                if line.startswith("- [peer,") or line.startswith("- [others,")
+                if line.startswith("- [peer]") or line.startswith("- [others]")
             )
             self_entries = len(diagnostic.context_lines) - peer_entries
         self.emit(

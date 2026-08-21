@@ -19,6 +19,7 @@ def _adapter(
     *,
     change_secret: AsyncMock,
     apply: AsyncMock,
+    managed_gemma: object | None = None,
 ) -> UiProviderRuntimeAdapter:
     return UiProviderRuntimeAdapter(
         settings=SimpleNamespace(current=settings),
@@ -28,6 +29,7 @@ def _adapter(
         credential_verification=object(),
         provider_settings=SimpleNamespace(change_secret=change_secret),
         build_byok_target_settings=lambda _settings: None,
+        managed_gemma=managed_gemma,
     )
 
 
@@ -78,3 +80,37 @@ async def test_inactive_custom_http_secret_change_does_not_rebuild_active_runtim
     )
 
     apply.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_managed_gemma_notice_cancel_targets_owned_prepare() -> None:
+    settings = AppSettings()
+    cancel_calls: list[bool] = []
+    adapter = _adapter(
+        settings,
+        change_secret=AsyncMock(),
+        apply=AsyncMock(),
+        managed_gemma=SimpleNamespace(cancel=lambda: cancel_calls.append(True) or True),
+    )
+
+    assert await adapter.handle_managed_gemma_notice_action("cancel") is True
+    assert cancel_calls == [True]
+
+
+@pytest.mark.asyncio
+async def test_managed_gemma_notice_retry_rebuilds_current_selection_without_persisting() -> None:
+    settings = AppSettings()
+    apply = AsyncMock(return_value=True)
+    adapter = _adapter(
+        settings,
+        change_secret=AsyncMock(),
+        apply=apply,
+    )
+
+    assert await adapter.handle_managed_gemma_notice_action("retry") is True
+    apply.assert_awaited_once_with(
+        None,
+        force_rebuild_llm=True,
+        persist_settings=False,
+        refresh_ui=True,
+    )

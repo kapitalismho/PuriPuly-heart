@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self, 5s ago] 刚才在那边弹吉他的那个人挺厉害的。
+[self] 刚才在那边弹吉他的那个人挺厉害的。
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Too bad I didn't get to add them.
 
 ### Context Ignore Example
 <context>
-[self, 8s ago] 这张地图的风景做得很漂亮啊。
+[self] 这张地图的风景做得很漂亮啊。
 </context>
 
 <input>

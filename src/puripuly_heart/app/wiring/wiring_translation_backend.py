@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from puripuly_heart.app.wiring.wiring_llm_factory import create_llm_provider
 from puripuly_heart.core.http_extensions import (
     HttpExtensionConfigurationError,
     HttpExtensionRegistry,
 )
+from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackend
 from puripuly_heart.providers.extensions.http_extension_backend import (
@@ -22,6 +23,8 @@ def create_translation_backend(
     managed_release_service: object | None = None,
     managed_delegate_ready: Callable[[], object] | None = None,
     runtime_logging: object | None = None,
+    managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
+    managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
 ) -> TranslationBackend:
     translation = getattr(settings, "translation")
     model = getattr(translation, "model")
@@ -33,6 +36,8 @@ def create_translation_backend(
                 managed_release_service=managed_release_service,
                 managed_delegate_ready=managed_delegate_ready,
                 runtime_logging=runtime_logging,
+                managed_gemma_runtime=managed_gemma_runtime,
+                managed_gemma_release=managed_gemma_release,
             )
         )
 

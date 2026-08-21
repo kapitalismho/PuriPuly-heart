@@ -7,7 +7,10 @@ from typing import Any
 
 import flet as ft
 
-from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.ports.ui_models import (
+    ManagedGemmaDashboardNotice,
+    OverlayPeerPresentationState,
+)
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.ui.event_bridge import (
     AppConversationEventDestination,
@@ -211,6 +214,21 @@ class FletUiPresentationAdapter:
         set_notice = getattr(dashboard, "set_local_stt_notice", None)
         if callable(set_notice):
             set_notice(status, percent=percent)
+
+    def set_dashboard_managed_gemma_notice(
+        self,
+        notice: ManagedGemmaDashboardNotice | None,
+    ) -> None:
+        dashboard = getattr(self._app, "view_dashboard", None)
+        setter = getattr(dashboard, "set_managed_gemma_notice", None)
+        if callable(setter):
+            setter(notice)
+
+    def set_dashboard_translation_starting(self, starting: bool) -> None:
+        dashboard = getattr(self._app, "view_dashboard", None)
+        setter = getattr(dashboard, "set_translation_starting", None)
+        if callable(setter):
+            setter(bool(starting))
 
     def set_dashboard_vrchat_osc_notice(self, active: bool) -> None:
         dashboard = getattr(self._app, "view_dashboard", None)

@@ -673,6 +673,7 @@
       "deepseek",
       "gemini",
       "local_llm",
+      "managed_gemma",
       "openrouter",
       "qwen"
     ]

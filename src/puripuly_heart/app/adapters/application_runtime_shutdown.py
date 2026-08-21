@@ -49,6 +49,7 @@ class ApplicationRuntimeShutdownAdapter:
     github_prompt: Callable[[], GithubStarPromptOwner | None]
     clipboard: Callable[[], ClipboardAutoTranslationOwner | None]
     microphone: Callable[[], MicrophoneTestRuntime | None]
+    close_managed_gemma_owner: Callable[[], Awaitable[None]] | None = None
 
     def effective_osc_ports(self) -> tuple[int | None, int | None]:
         owner = self.vrc_mic_sync()
@@ -226,6 +227,10 @@ class ApplicationRuntimeShutdownAdapter:
         await self._invoke_pipeline_close(components.close_callbacks.close_llm)
         if components.resource_owner.llm_runtime is None:
             self.pipeline.llm_runtime = None
+
+    async def close_managed_gemma_runtime(self) -> None:
+        if self.close_managed_gemma_owner is not None:
+            await self.close_managed_gemma_owner()
 
     def close_vrchat_sender(self) -> None:
         components = self.pipeline.current

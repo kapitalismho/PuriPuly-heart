@@ -37,6 +37,7 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineStartCallbacks,
 )
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
+from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
 from puripuly_heart.app.services.application_after_launch import (
@@ -81,6 +82,10 @@ from puripuly_heart.app.services.local_asr_gpu_provisioning import (
 from puripuly_heart.app.services.local_asr_selection import (
     LOCAL_CPU_PROVIDERS,
     resolve_local_asr_selection,
+)
+from puripuly_heart.app.services.managed_gemma_translation import (
+    ManagedGemmaTranslationOwner,
+    ManagedGemmaTranslationSnapshot,
 )
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
@@ -134,6 +139,12 @@ from puripuly_heart.app.wiring import (
     create_self_capture_admission_adapter,
     create_sync_secret_store_adapter,
     resolve_overlay_config,
+)
+from puripuly_heart.app.wiring.wiring_managed_gemma import (
+    create_managed_gemma_runtime,
+    managed_gemma_selection,
+    managed_gemma_translation_desired,
+    sync_managed_gemma_demand,
 )
 from puripuly_heart.app.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
@@ -433,6 +444,76 @@ def compose_application_runtime(
         ),
     )
 
+    def managed_gemma_status(snapshot: ManagedGemmaTranslationSnapshot) -> None:
+        fields = [f"state={snapshot.state}"]
+        if snapshot.backend is not None:
+            fields.append(f"backend={snapshot.backend}")
+        if snapshot.progress_percent is not None:
+            fields.append(f"progress_percent={snapshot.progress_percent}")
+        if snapshot.error_type is not None:
+            fields.append(f"error_type={snapshot.error_type}")
+        log_detailed("[ManagedGemma] " + " ".join(fields))
+        if snapshot.state in {"checking", "downloading", "preparing"}:
+            action = None
+        elif snapshot.state in {"failed", "cancelled"}:
+            action = "retry"
+        else:
+            presentation.set_dashboard_managed_gemma_notice(None)
+            return
+        presentation.set_dashboard_managed_gemma_notice(
+            ManagedGemmaDashboardNotice(
+                status=snapshot.state,
+                backend=snapshot.backend,
+                progress_percent=snapshot.progress_percent,
+                action=action,
+            )
+        )
+
+    managed_gemma = ManagedGemmaTranslationOwner(
+        runtime=create_managed_gemma_runtime(
+            log_sink=lambda message, level: log_detailed(message, level=level),
+        ),
+        status_sink=managed_gemma_status,
+        lifecycle_diagnostic_sink=lambda event: log_detailed(
+            "[ManagedGemma] lifecycle_diagnostic "
+            + " ".join(f"{key}={value}" for key, value in event.fields.items()),
+            level=logging.ERROR,
+        ),
+    )
+
+    def _managed_gemma_demand() -> tuple[bool, object | None]:
+        settings_value = current_settings()
+        config = pipeline.translation_runtime_configuration
+        desired = managed_gemma_translation_desired(
+            translation_enabled=bool(
+                config is not None and config.snapshot().value.translation_enabled
+            ),
+            peer_translation_enabled=bool(
+                settings_value is not None and settings_value.ui.peer_translation_enabled
+            ),
+        )
+        return desired, settings_value
+
+    async def sync_local_translation_demand() -> None:
+        desired, settings_value = _managed_gemma_demand()
+        await sync_managed_gemma_demand(
+            managed_gemma=managed_gemma,
+            settings=settings_value,
+            desired=desired,
+        )
+
+    def schedule_local_translation_demand() -> None:
+        desired, settings_value = _managed_gemma_demand()
+        selection = None
+        if desired and settings_value is not None:
+            with contextlib.suppress(ValueError):
+                selection = managed_gemma_selection(settings_value)
+        managed_gemma.schedule_demand_sync(desired=desired, selection=selection)
+
+    def disable_peer_intent() -> None:
+        require_peer().owner.disable_for_overlay()
+        schedule_local_translation_demand()
+
     def require_runtime_components() -> RuntimeCompositionComponents:
         if runtime_components is None:
             raise RuntimeError("runtime composition is incomplete")
@@ -527,7 +608,7 @@ def compose_application_runtime(
                 output_provider=lambda: pipeline.translation_output_projection,
                 diagnostics_provider=lambda: pipeline.translation_diagnostics,
                 peer_snapshot_provider=lambda: require_peer().owner.snapshot(),
-                disable_peer_intent=lambda: require_peer().owner.disable_for_overlay(),
+                disable_peer_intent=disable_peer_intent,
                 sync_peer_effective=lambda: require_peer().owner.sync_effective_flags(),
                 cancel_peer_activation=(lambda: require_peer().owner.cancel_activation_starting()),
                 refresh_peer_dependencies=refresh_overlay_runtime_dependencies,
@@ -613,6 +694,7 @@ def compose_application_runtime(
                 settings_presentation_sink=(presentation.refresh_settings_loopback_capture_target),
                 log_basic=log_basic,
                 log_detailed=log_detailed,
+                translation_demand_sink=sync_local_translation_demand,
             )
         return peer
 
@@ -1110,6 +1192,7 @@ def compose_application_runtime(
                     replace_self_stt=lambda smooth: (
                         require_self_application().replace_provider(smooth_local=smooth)
                     ),
+                    rebuild_managed_gemma=lambda: provider_runtime.llm_rebuild.rebuild(),
                 ),
                 manual_fallback=manual_fallback,
                 cpu_auto_available=lambda: (require_provisioning().snapshot.cpu_auto_available),
@@ -1542,6 +1625,7 @@ def compose_application_runtime(
         failure_sink=log_error,
         success_sink=log_basic,
         additional_signature_sink=sync_non_provider_signatures,
+        managed_gemma=managed_gemma,
         signatures=signatures,
     )
 
@@ -1578,6 +1662,7 @@ def compose_application_runtime(
         pending_sink=presentation.set_dashboard_managed_auth_pending,
         usage_view_sink=apply_managed_usage_view,
         dashboard_sink=presentation.set_dashboard_translation_enabled,
+        starting_sink=presentation.set_dashboard_translation_starting,
         runtime_state_changed=lambda: require_vrc_mic_sync().publish_delta(),
         message_sink=lambda key, values: show_short_message(
             key,
@@ -1598,6 +1683,8 @@ def compose_application_runtime(
             level=logging.WARNING,
             exception=exception,
         ),
+        managed_gemma=managed_gemma,
+        sync_local_translation_demand=sync_local_translation_demand,
     )
 
     provider_application = ProviderApplicationOwner(
@@ -1642,6 +1729,7 @@ def compose_application_runtime(
         configure_vrc_mic=lambda *, enabled: (require_vrc_mic_sync().configure(enabled=enabled)),
         stt_failure_sink=log_error,
         cleanup_failure_sink=lambda message, exc: log_error(f"{message}: {exc}"),
+        managed_gemma=managed_gemma,
         http_extensions=http_extensions,
     )
 
@@ -1774,6 +1862,7 @@ def compose_application_runtime(
         github_prompt=lambda: github_prompt,
         clipboard=lambda: clipboard,
         microphone=lambda: microphone,
+        close_managed_gemma_owner=managed_gemma.close,
     )
 
     overlay_owner = require_overlay()
@@ -1813,6 +1902,7 @@ def compose_application_runtime(
             credential_verification=require_credential_verification(),
             provider_settings=require_provider_settings(),
             build_byok_target_settings=(build_managed_openrouter_byok_target_settings),
+            managed_gemma=managed_gemma,
         ),
         microphone=UiMicrophoneRuntimeAdapter(
             microphone=microphone_runtime,

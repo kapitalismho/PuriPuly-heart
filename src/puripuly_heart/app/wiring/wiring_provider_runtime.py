@@ -8,6 +8,7 @@ from puripuly_heart.app.ports.translation_runtime_configuration import (
     TranslationRuntimeSettingsValues,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTranslationOwner
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.app.services.provider_runtime_apply import (
     LlmProviderRebuildContext,
@@ -36,6 +37,11 @@ from puripuly_heart.core.self_capture import SelfCaptureSessionSnapshot
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 from .wiring_managed_account import ManagedOpenRouterReleaseRuntime
+from .wiring_managed_gemma import (
+    managed_gemma_selection,
+    managed_gemma_translation_desired,
+    noop_managed_gemma_release,
+)
 from .wiring_provider_runtime_policy import (
     build_llm_provider_signature,
     provider_runtime_requires_gpu_restart,
@@ -296,6 +302,7 @@ def compose_provider_runtime(
     failure_sink: Callable[[str], None],
     success_sink: Callable[[str], None],
     additional_signature_sink: Callable[[AppSettings], None],
+    managed_gemma: ManagedGemmaTranslationOwner | None = None,
     signatures: ProviderRuntimeSignatures | None = None,
 ) -> ProviderRuntimeComponents:
     effective_http_extensions = http_extensions
@@ -363,6 +370,36 @@ def compose_provider_runtime(
         if not isinstance(settings_value, AppSettings):
             raise TypeError("LLM provider rebuild settings must be AppSettings")
         secrets = create_secret_store(settings_value.secrets, config_path=config_path)
+        if settings_value.translation.model == TranslationModel.MANAGED_GEMMA:
+            if managed_gemma is None:
+                raise RuntimeError("managed Gemma translation runtime is unavailable")
+            config = translation_runtime_configuration_provider()
+            translation_on = managed_gemma_translation_desired(
+                translation_enabled=bool(
+                    config is not None and config.snapshot().value.translation_enabled
+                ),
+                peer_translation_enabled=bool(settings_value.ui.peer_translation_enabled),
+            )
+            if not translation_on:
+                return create_translation_backend(
+                    settings_value,
+                    secrets=secrets,
+                    http_extensions=effective_http_extensions,
+                    runtime_logging=runtime_logging,
+                    managed_gemma_runtime=managed_gemma.runtime,
+                    managed_gemma_release=noop_managed_gemma_release,
+                )
+            activation = await managed_gemma.prepare(managed_gemma_selection(settings_value))
+            return create_translation_backend(
+                settings_value,
+                secrets=secrets,
+                http_extensions=effective_http_extensions,
+                runtime_logging=runtime_logging,
+                managed_gemma_runtime=activation.runtime,
+                managed_gemma_release=noop_managed_gemma_release,
+            )
+        if managed_gemma is not None:
+            await managed_gemma.deactivate()
         if settings_value.translation.model == TranslationModel.CUSTOM_HTTP:
             return create_translation_backend(
                 settings_value,

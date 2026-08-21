@@ -116,7 +116,7 @@ class ContextResolver:
 
     def _format_entry(self, entry: ContextEntry) -> str:
         label = "peer" if entry.channel == "peer" else "self"
-        return f'- [{label}, {self._relative_age(entry.timestamp)}s ago] "{entry.text}"'
+        return f'- [{label}] "{entry.text}"'
 
     def format_integrated(self, entries: list[tuple[ChannelRuntime, ContextEntry]]) -> str:
         if not entries:
@@ -160,6 +160,3 @@ class ContextResolver:
         if max_entries > 0:
             return combined[-max_entries:]
         return combined
-
-    def _relative_age(self, timestamp: float) -> int:
-        return max(0, int(self.clock.now() - timestamp))

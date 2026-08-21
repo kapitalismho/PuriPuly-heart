@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self, 6s ago] 刚才发给你的那个链接。
+[self] 刚才发给你的那个链接。
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Your response:
 
 ### Context Ignore Example
 <context>
-[self, 12s ago] 我这边有点卡。
+[self] 我这边有点卡。
 </context>
 
 <input>

@@ -4,6 +4,10 @@ from typing import Callable
 import flet as ft
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.ports.ui_models import (
+    ManagedGemmaDashboardNotice,
+    ManagedGemmaNoticeAction,
+)
 from puripuly_heart.core.language import get_all_language_options
 from puripuly_heart.ui.components.display_card import DisplayCard
 from puripuly_heart.ui.components.language_card import LanguageCard
@@ -17,6 +21,8 @@ from puripuly_heart.ui.dashboard.capture_notices import (
     gpu_capture_action_label,
     gpu_capture_notice,
     local_asr_capture_notice,
+    managed_gemma_action_label,
+    managed_gemma_capture_notice,
 )
 from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
@@ -72,6 +78,7 @@ class DashboardView(ft.Column):
         self.is_translation_on = False
         self.is_stt_on = False
         self._stt_is_starting = False
+        self._translation_is_starting = False
         self.translation_needs_key = False
         self.stt_needs_key = False
         self.last_sent_text = t("dashboard.ready")
@@ -85,6 +92,7 @@ class DashboardView(ft.Column):
         self._local_stt_notice_percent: int | None = None
         self._local_stt_notice_model_id: str | None = None
         self._gpu_notice: GpuDashboardNotice | None = None
+        self._managed_gemma_notice: ManagedGemmaDashboardNotice | None = None
         self._notice_sequence = 0
         self._notice_started: dict[str, int] = {}
         self._visible_notice_source: str | None = None
@@ -120,6 +128,9 @@ class DashboardView(ft.Column):
         self.on_toggle_peer_translation = None
         self.on_retry_peer_process_capture = None
         self.on_gpu_notice_action: Callable[[GpuNoticeAction], object] | None = None
+        self.on_managed_gemma_notice_action: Callable[[ManagedGemmaNoticeAction], object] | None = (
+            None
+        )
         self.on_language_change: Callable[[LanguageSelectionChange], None] | None = None
         self.on_message_input_activity = None
         self.runtime_log_detailed: Callable[..., bool | None] | None = None
@@ -221,6 +232,7 @@ class DashboardView(ft.Column):
         self.on_toggle_overlay = capture.toggle_overlay
         self.on_retry_peer_process_capture = capture.retry_peer_process_capture
         self.on_gpu_notice_action = capture.run_gpu_notice_action
+        self.on_managed_gemma_notice_action = capture.run_managed_gemma_notice_action
 
     def _toggle_overlay(self) -> None:
         enabled = True
@@ -248,6 +260,7 @@ class DashboardView(ft.Column):
         self.trans_button.set_state(
             self.is_translation_on,
             needs_key=self._translation_showing_warning,
+            is_starting=self._translation_is_starting,
         )
 
     def _sync_overlay_peer_buttons(self) -> None:
@@ -534,6 +547,10 @@ class DashboardView(ft.Column):
         self._stt_is_starting = bool(starting)
         self._sync_stt_button_state()
 
+    def set_translation_starting(self, starting: bool) -> None:
+        self._translation_is_starting = bool(starting)
+        self._sync_translation_button_state()
+
     def set_overlay_peer_contract(self, contract: OverlayPeerConsumerContract) -> None:
         self._overlay_peer_contract = contract
         self._sync_overlay_peer_buttons()
@@ -666,8 +683,21 @@ class DashboardView(ft.Column):
         self._gpu_notice = notice
         self._sync_notice()
 
+    def set_managed_gemma_notice(
+        self,
+        notice: ManagedGemmaDashboardNotice | None,
+    ) -> None:
+        self._managed_gemma_notice = notice
+        self._sync_notice()
+
     def _run_gpu_notice_action(self, action: GpuNoticeAction) -> None:
-        callback = self.on_gpu_notice_action
+        self._run_notice_action(self.on_gpu_notice_action, action)
+
+    def _run_notice_action(
+        self,
+        callback: Callable[..., object] | None,
+        action: str,
+    ) -> None:
         page = control_page(self)
         run_task = getattr(page, "run_task", None)
         if callback is None or not callable(run_task):
@@ -679,6 +709,12 @@ class DashboardView(ft.Column):
                 await result
 
         run_task(invoke)
+
+    def _run_managed_gemma_notice_action(
+        self,
+        action: ManagedGemmaNoticeAction,
+    ) -> None:
+        self._run_notice_action(self.on_managed_gemma_notice_action, action)
 
     def set_vrchat_osc_notice(self, active: bool) -> None:
         self._vrchat_osc_notice_active = bool(active)
@@ -734,6 +770,13 @@ class DashboardView(ft.Column):
         gpu_notice = gpu_capture_notice(self._gpu_notice)
         if gpu_notice is not None:
             candidates["gpu"] = (gpu_notice.text, gpu_notice.tone, gpu_notice.action)
+        managed_gemma_notice = managed_gemma_capture_notice(self._managed_gemma_notice)
+        if managed_gemma_notice is not None:
+            candidates["managed_gemma"] = (
+                managed_gemma_notice.text,
+                managed_gemma_notice.tone,
+                self._managed_gemma_notice.action,
+            )
         if self._overlay_session_fallback_notice_active:
             candidates["overlay_fallback"] = (
                 t("dashboard.overlay_session_fallback_desktop"),
@@ -760,7 +803,13 @@ class DashboardView(ft.Column):
                 self._notice_started[source] = self._notice_sequence
 
         download_source = None
-        if self._gpu_notice is not None and self._gpu_notice.status == "installing":
+        if self._managed_gemma_notice is not None and self._managed_gemma_notice.status in {
+            "checking",
+            "downloading",
+            "preparing",
+        }:
+            download_source = "managed_gemma"
+        elif self._gpu_notice is not None and self._gpu_notice.status == "installing":
             download_source = "gpu"
         elif self._local_stt_notice_status == "downloading":
             download_source = "local_stt"
@@ -774,15 +823,32 @@ class DashboardView(ft.Column):
         if selected is None:
             self.display_card.set_notice(None, None)
             return
-        text, tone, action = candidates[selected]
-        action_label = gpu_capture_action_label(action)
+        text, tone, _action = candidates[selected]
+        if selected == "managed_gemma":
+            managed_action = (
+                None if self._managed_gemma_notice is None else self._managed_gemma_notice.action
+            )
+            action_label = managed_gemma_action_label(managed_action)
+            on_action = (
+                None
+                if managed_action is None
+                else lambda: self._run_managed_gemma_notice_action(managed_action)
+            )
+        else:
+            gpu_action = None if self._gpu_notice is None else self._gpu_notice.action
+            action_label = gpu_capture_action_label(gpu_action if selected == "gpu" else None)
+            on_action = (
+                None
+                if selected != "gpu" or gpu_action is None
+                else lambda: self._run_gpu_notice_action(gpu_action)
+            )
         yields_to_content = selected in OVERLAY_YIELDING_NOTICE_SOURCES
         try:
             self.display_card.set_notice(
                 text,
                 tone,
                 action_label=action_label,
-                on_action=(None if action is None else lambda: self._run_gpu_notice_action(action)),
+                on_action=on_action,
                 yields_to_content=yields_to_content,
             )
         except TypeError:

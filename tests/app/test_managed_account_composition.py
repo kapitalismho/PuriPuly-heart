@@ -40,6 +40,8 @@ from puripuly_heart.config.settings import (
     LLMProviderName,
     OpenRouterCredentialSource,
     TranslationConnection,
+    TranslationModel,
+    materialize_translation_settings,
 )
 from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
 from puripuly_heart.core.orchestrator.configuration import (
@@ -249,6 +251,60 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
         (owner.current.secrets, owner.path),
         (owner.current.secrets, owner.path),
     ]
+
+
+@pytest.mark.asyncio
+async def test_managed_account_warmup_and_teardown_own_gemma_lifecycle(
+    tmp_path,
+) -> None:
+    owner = compose_settings_owner(tmp_path / "settings.json")
+    settings = AppSettings()
+    settings.translation.model = TranslationModel.MANAGED_GEMMA
+    settings.translation.connection = TranslationConnection.GPU
+    owner.current = materialize_translation_settings(settings)
+    events: list[str] = []
+
+    class ManagedGemma:
+        async def prepare(self, _selection: object) -> object:
+            events.append("prepare")
+            return object()
+
+        async def deactivate(self, *, linger: bool = False) -> None:
+            events.append(("deactivate", linger))
+
+    components = compose_managed_account(
+        config_path=owner.path,
+        settings=owner,
+        provider_settings=cast(ProviderSettingsOwner, object()),
+        provider_runtime=cast(ProviderRuntimeOwner, object()),
+        verifier=cast(ProviderVerifierPort, object()),
+        results=SettingsTransactionResultOwner(),
+        runtime=ManagedTranslationRuntimeAccess(
+            llm_runtime_provider=lambda: None,
+            context_provider=lambda: None,
+            translation_runtime_configuration_provider=lambda: None,
+            rebuild_llm=lambda: pytest.fail("runtime rebuild must not run"),
+        ),
+        ingress_provider=lambda: False,
+        pending_sink=lambda _pending: None,
+        usage_view_sink=lambda _state: None,
+        dashboard_sink=lambda _enabled: None,
+        message_sink=lambda _key, _kwargs: None,
+        qq_dialog_sink=lambda: None,
+        founder_dialog=lambda: False,
+        failure_route=lambda _source: None,
+        log_basic=lambda _message: None,
+        log_detailed=lambda _message: None,
+        log_error=lambda _message: None,
+        basic_warning_sink=lambda _message: None,
+        detailed_warning_sink=lambda _message, _exception: None,
+        managed_gemma=ManagedGemma(),
+    )
+
+    await components.translation.warmup()
+    await components.translation.teardown()
+
+    assert events == ["prepare", ("deactivate", True)]
 
 
 @pytest.mark.asyncio

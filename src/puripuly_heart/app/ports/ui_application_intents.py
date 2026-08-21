@@ -6,6 +6,7 @@ from typing import Protocol
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_models import (
     GpuNoticeAction,
+    ManagedGemmaNoticeAction,
     OverlayPeerPresentationState,
 )
 
@@ -107,6 +108,11 @@ class UiProviderRuntimePort(Protocol):
     def clear_provider_verification(self, provider: str) -> None: ...
 
     def handle_gpu_notice_action(self, action: GpuNoticeAction) -> object: ...
+
+    async def handle_managed_gemma_notice_action(
+        self,
+        action: ManagedGemmaNoticeAction,
+    ) -> object: ...
 
 
 class UiMicrophoneRuntimePort(Protocol):

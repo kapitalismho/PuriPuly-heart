@@ -88,6 +88,7 @@ class Harness:
     ready: bool = True
     ingress_frozen: bool = False
     events: list[object] = field(default_factory=list)
+    translation_demands: list[bool] = field(default_factory=list)
     effective: list[tuple[bool, bool]] = field(default_factory=list)
     lifecycle_traces: list[tuple[str, dict[str, object]]] = field(default_factory=list)
     readiness_entered: asyncio.Event | None = None
@@ -149,7 +150,11 @@ class Harness:
             lifecycle_trace_sink=lambda event, fields: self.lifecycle_traces.append(
                 (event, fields)
             ),
+            translation_demand_sink=self._notify_translation_demand,
         )
+
+    async def _notify_translation_demand(self) -> None:
+        self.translation_demands.append(self.settings.ui.peer_translation_enabled)
 
 
 @pytest.mark.asyncio
@@ -171,6 +176,26 @@ async def test_peer_owner_preserves_eula_and_effective_activation_contract() -> 
     assert harness.settings.ui.overlay_enabled is True
     assert "overlay_start" in harness.events
     assert owner.snapshot().activation_requested is True
+    assert harness.translation_demands == [False, True]
+
+
+@pytest.mark.asyncio
+async def test_peer_owner_notifies_translation_demand_before_local_ready() -> None:
+    harness = Harness(
+        readiness_entered=asyncio.Event(),
+        readiness_release=asyncio.Event(),
+    )
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+
+    enabling = asyncio.create_task(owner.set_enabled(True))
+    await harness.readiness_entered.wait()
+
+    assert harness.translation_demands == [True]
+    assert harness.settings.ui.peer_translation_enabled is True
+
+    harness.readiness_release.set()
+    await enabling
 
 
 @pytest.mark.asyncio

@@ -3,7 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Protocol
 
-from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.ports.ui_models import (
+    ManagedGemmaDashboardNotice,
+    OverlayPeerPresentationState,
+)
 from puripuly_heart.core.runtime.output import UIEventBridgePort
 
 
@@ -67,6 +70,13 @@ class UiPresentationPort(Protocol):
         percent: int | None,
         starting: bool,
     ) -> None: ...
+
+    def set_dashboard_managed_gemma_notice(
+        self,
+        notice: ManagedGemmaDashboardNotice | None,
+    ) -> None: ...
+
+    def set_dashboard_translation_starting(self, starting: bool) -> None: ...
 
     def set_dashboard_vrchat_osc_notice(self, active: bool) -> None: ...
 

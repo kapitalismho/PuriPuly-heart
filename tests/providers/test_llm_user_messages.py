@@ -4,8 +4,8 @@ from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 
 def test_build_translation_user_message_with_context() -> None:
-    assert build_translation_user_message(text="hello", context='- [self, 1s ago] "hi"') == (
-        '<context>\n- [self, 1s ago] "hi"\n</context>\n\n' "<input>\nhello\n</input>"
+    assert build_translation_user_message(text="hello", context='- [self] "hi"') == (
+        '<context>\n- [self] "hi"\n</context>\n\n' "<input>\nhello\n</input>"
     )
 
 
@@ -14,12 +14,12 @@ def test_build_translation_user_message_without_context() -> None:
 
 
 def test_openai_compatible_provider_builders_use_tagged_input() -> None:
-    expected = '<context>\n- [self, 1s ago] "hi"\n</context>\n\n<input>\nhello\n</input>'
+    expected = '<context>\n- [self] "hi"\n</context>\n\n<input>\nhello\n</input>'
 
-    assert qwen._build_user_message(text="hello", context='- [self, 1s ago] "hi"') == expected
-    assert qwen_async._build_user_message(text="hello", context='- [self, 1s ago] "hi"') == expected
-    assert deepseek._build_user_message(text="hello", context='- [self, 1s ago] "hi"') == expected
-    assert openrouter._build_user_message(text="hello", context='- [self, 1s ago] "hi"') == expected
+    assert qwen._build_user_message(text="hello", context='- [self] "hi"') == expected
+    assert qwen_async._build_user_message(text="hello", context='- [self] "hi"') == expected
+    assert deepseek._build_user_message(text="hello", context='- [self] "hi"') == expected
+    assert openrouter._build_user_message(text="hello", context='- [self] "hi"') == expected
 
 
 def test_gemini_build_request_uses_tagged_input() -> None:
@@ -31,9 +31,7 @@ def test_gemini_build_request_uses_tagged_input() -> None:
         system_prompt="PROMPT",
         source_language="en",
         target_language="ko",
-        context='- [self, 1s ago] "hi"',
+        context='- [self] "hi"',
     )
 
-    assert user_message == (
-        '<context>\n- [self, 1s ago] "hi"\n</context>\n\n<input>\nhello\n</input>'
-    )
+    assert user_message == ('<context>\n- [self] "hi"\n</context>\n\n<input>\nhello\n</input>')

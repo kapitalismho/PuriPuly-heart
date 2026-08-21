@@ -12,7 +12,12 @@ from puripuly_heart.app.wiring_runtime_pipeline import (
 )
 
 from puripuly_heart.app import wiring_runtime_pipeline as runtime_pipeline_module
-from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings import (
+    AppSettings,
+    TranslationConnection,
+    TranslationModel,
+    materialize_translation_settings,
+)
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import SystemClock
 from puripuly_heart.core.orchestrator.peer_translation_channel import (
@@ -158,6 +163,75 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
     assert "llm" not in PeerTranslationChannelOwner.__dataclass_fields__
     assert "stt" not in PeerTranslationChannelOwner.__dataclass_fields__
     assert "peer_stt" not in PeerTranslationChannelOwner.__dataclass_fields__
+
+
+@pytest.mark.asyncio
+async def test_managed_gemma_startup_constructs_provider_without_preparing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[object] = []
+    activation_runtime = object()
+
+    class ManagedGemma:
+        runtime = activation_runtime
+
+        async def prepare(self, _selection: object) -> object:
+            events.append("prepare")
+            raise AssertionError("compose must not prepare managed Gemma")
+
+        async def deactivate(self) -> None:
+            events.append("deactivate")
+
+    class Provider:
+        async def close(self) -> None:
+            events.append("close")
+
+    def create_backend(_settings: AppSettings, **kwargs: object) -> Provider:
+        events.append("create")
+        assert kwargs["managed_gemma_runtime"] is activation_runtime
+        assert kwargs["managed_gemma_release"] is runtime_pipeline_module.noop_managed_gemma_release
+        return Provider()
+
+    monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
+    monkeypatch.setattr(runtime_pipeline_module, "create_translation_backend", create_backend)
+    monkeypatch.setattr(
+        runtime_pipeline_module,
+        "VrchatOscUdpSender",
+        lambda *_a, **_k: RecordingSender(),
+    )
+    monkeypatch.setattr(
+        runtime_pipeline_module,
+        "ChatboxPaginator",
+        lambda *_a, **_k: RecordingChatbox(),
+    )
+    settings = AppSettings()
+    settings.translation.model = TranslationModel.MANAGED_GEMMA
+    settings.translation.connection = TranslationConnection.GPU
+    materialize_translation_settings(settings)
+
+    pipeline = await compose_runtime_pipeline(
+        settings=settings,
+        config_path=Path("settings.json"),
+        clock=SystemClock(),
+        runtime_logging=None,
+        managed_release=ManagedRelease(),
+        managed_delegate_ready=lambda: None,
+        managed_gemma=ManagedGemma(),
+        local_asr_factory=lambda _secrets: PrebuiltLocalASRProviderRuntimeFactory(
+            self_provider=None,
+            peer_provider=None,
+        ),
+        self_capture_factory=lambda *_args: CaptureOwner("self"),
+        peer_capture_factory=lambda *_args: CaptureOwner("peer"),
+        vrc_mic_state=None,
+        vrc_mic_audio_gate=None,
+        receiver_active=False,
+        stt_failure_sink=lambda _message: None,
+    )
+
+    assert events == ["create"]
+    await pipeline.resource_owner.close_llm()
+    assert events[-1] == "close"
     assert not hasattr(PeerTranslationChannelOwner, "start")
     assert not hasattr(PeerTranslationChannelOwner, "stop")
     assert not pipeline.translation_turns.channel_ingress_open("self")

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 GpuNoticeAction = Literal["install", "repair", "reinstall", "rediscover", "restart"]
+ManagedGemmaNoticeAction = Literal["cancel", "retry"]
 
 
 @dataclass
@@ -30,6 +31,14 @@ class GpuDashboardNotice:
 
 
 @dataclass(frozen=True, slots=True)
+class ManagedGemmaDashboardNotice:
+    status: str
+    backend: str | None = None
+    progress_percent: int | None = None
+    action: ManagedGemmaNoticeAction | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class OverlayPeerPresentationState:
     overlay_intent_enabled: bool
     overlay_state: str
@@ -44,6 +53,8 @@ __all__ = [
     "GpuDashboardNotice",
     "GpuDeviceOption",
     "GpuNoticeAction",
+    "ManagedGemmaDashboardNotice",
+    "ManagedGemmaNoticeAction",
     "OptionItem",
     "OverlayPeerPresentationState",
 ]

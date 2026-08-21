@@ -16,6 +16,7 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineCloseCallbacks,
     RuntimePipelineStartCallbacks,
 )
+from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTranslationOwner
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.config.paths import default_http_extensions_dir
 from puripuly_heart.config.settings import AppSettings, STTProviderName, TranslationModel
@@ -64,6 +65,7 @@ from puripuly_heart.core.runtime.stt_session_projection import SttSessionStatePr
 from puripuly_heart.domain.events import UIEvent
 
 from .wiring_managed_account import ManagedOpenRouterReleaseRuntime
+from .wiring_managed_gemma import noop_managed_gemma_release
 from .wiring_provider_runtime import (
     project_translation_runtime_settings,
 )
@@ -508,6 +510,7 @@ class RuntimePipelineLauncher:
     configure_vrc_mic: Callable[..., Awaitable[None]]
     stt_failure_sink: Callable[[str], None]
     cleanup_failure_sink: Callable[[str, BaseException], None]
+    managed_gemma: ManagedGemmaTranslationOwner | None = None
     http_extensions: HttpExtensionRegistry | None = None
     failed_resources: RuntimePipelineResourceOwner | None = field(
         init=False,
@@ -551,6 +554,7 @@ class RuntimePipelineLauncher:
                 runtime_logging=self.runtime_logging,
                 managed_release=self.managed_release,
                 managed_delegate_ready=self.managed_delegate_ready,
+                managed_gemma=self.managed_gemma,
                 local_asr_factory=self.local_asr_factory,
                 self_capture_factory=self.self_capture_factory,
                 peer_capture_factory=self.peer_capture_factory,
@@ -626,6 +630,7 @@ async def compose_runtime_pipeline(
     vrc_mic_audio_gate: VrcMicAudioGate | None,
     receiver_active: bool,
     stt_failure_sink: Callable[[str], None],
+    managed_gemma: ManagedGemmaTranslationOwner | None = None,
     http_extensions: HttpExtensionRegistry | None = None,
     resources: RuntimePipelineResourceOwner | None = None,
 ) -> RuntimePipelineComponents:
@@ -639,6 +644,7 @@ async def compose_runtime_pipeline(
             runtime_logging=runtime_logging,
             managed_release=managed_release,
             managed_delegate_ready=managed_delegate_ready,
+            managed_gemma=managed_gemma,
             local_asr_factory=local_asr_factory,
             self_capture_factory=self_capture_factory,
             peer_capture_factory=peer_capture_factory,
@@ -670,6 +676,7 @@ async def _compose_runtime_pipeline(
     runtime_logging: object,
     managed_release: ManagedOpenRouterReleaseRuntime,
     managed_delegate_ready: Callable[[], None],
+    managed_gemma: ManagedGemmaTranslationOwner | None,
     local_asr_factory: Callable[[object], LocalASRProviderRuntimeFactoryPort],
     self_capture_factory: Callable[
         [
@@ -699,18 +706,34 @@ async def _compose_runtime_pipeline(
     if http_extensions is None and settings.translation.model == TranslationModel.CUSTOM_HTTP:
         http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
         http_extensions.reload()
-    if settings.translation.model != TranslationModel.CUSTOM_HTTP:
+    if settings.translation.model != TranslationModel.MANAGED_GEMMA and managed_gemma is not None:
+        await managed_gemma.deactivate()
+    if settings.translation.model not in {
+        TranslationModel.CUSTOM_HTTP,
+        TranslationModel.MANAGED_GEMMA,
+    }:
         await managed_release.rebuild(secrets=secrets)
 
     llm = None
     with contextlib.suppress(Exception):
+        gemma_runtime = None
+        gemma_release = None
+        if settings.translation.model == TranslationModel.MANAGED_GEMMA:
+            if managed_gemma is None:
+                raise RuntimeError("managed Gemma translation runtime is unavailable")
+            gemma_runtime = managed_gemma.runtime
+            gemma_release = noop_managed_gemma_release
         llm = create_translation_backend(
             settings,
             secrets=secrets,
-            http_extensions=http_extensions or HttpExtensionRegistry(default_http_extensions_dir()),
+            http_extensions=(
+                http_extensions or HttpExtensionRegistry(default_http_extensions_dir())
+            ),
             managed_release_service=managed_release.service,
             managed_delegate_ready=managed_delegate_ready,
             runtime_logging=runtime_logging,
+            managed_gemma_runtime=gemma_runtime,
+            managed_gemma_release=gemma_release,
         )
         resources.pending_llm = llm
 

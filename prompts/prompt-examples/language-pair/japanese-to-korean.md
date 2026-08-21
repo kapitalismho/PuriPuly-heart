@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self, 4s ago] Unityでずっとエラーが出てるんですよ。
+[self] Unityでずっとエラーが出てるんですよ。
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Your response:
 
 ### Context Ignore Example
 <context>
-[self, 6s ago] 昨日買ったアバター、すごく可愛かったんですよ。
+[self] 昨日買ったアバター、すごく可愛かったんですよ。
 </context>
 
 <input>

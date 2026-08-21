@@ -19,6 +19,7 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
         set_stt_needs_key=lambda value: events.append(("stt-key", value)),
         set_managed_auth_pending=lambda value: events.append(("managed-auth", value)),
         set_gpu_notice=lambda value: events.append(("gpu-notice", value)),
+        set_managed_gemma_notice=lambda value: events.append(("gemma-notice", value)),
         set_stt_starting=lambda value: events.append(("stt-starting", value)),
         set_local_stt_notice_model=lambda value: events.append(("stt-model", value)),
         set_local_stt_notice=lambda value, **kwargs: events.append(("stt-notice", value, kwargs)),
@@ -133,6 +134,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
         set_stt_needs_key=lambda value: events.append(("stt-key", value)),
         set_managed_auth_pending=lambda value: events.append(("managed-auth", value)),
         set_gpu_notice=lambda value: events.append(("gpu-notice", value)),
+        set_managed_gemma_notice=lambda value: events.append(("gemma-notice", value)),
         set_stt_starting=lambda value: events.append(("stt-starting", value)),
         set_local_stt_notice_model=lambda value: events.append(("stt-model", value)),
         set_local_stt_notice=lambda value, **kwargs: events.append(("stt-notice", value, kwargs)),
@@ -176,6 +178,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     settings_value = object()
     calibration = object()
     notice = object()
+    gemma_notice = object()
     devices = (object(),)
 
     adapter.attach_runtime_log_sink(runtime_logging)
@@ -197,6 +200,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
         percent=25,
         starting=True,
     )
+    adapter.set_dashboard_managed_gemma_notice(gemma_notice)
     adapter.set_dashboard_vrchat_osc_notice(True)
     adapter.set_dashboard_overlay_session_fallback_notice(True)
     adapter.set_dashboard_languages(
@@ -230,6 +234,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     assert ("gpu-devices", {"devices": devices}) in events
     assert ("gpu-notice", notice) in events
     assert ("stt-notice", "downloading", {"percent": 25}) in events
+    assert ("gemma-notice", gemma_notice) in events
     assert (
         "load-settings",
         (settings_value,),

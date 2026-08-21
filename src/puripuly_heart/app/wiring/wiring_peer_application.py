@@ -67,6 +67,7 @@ def compose_peer_application(
     settings_presentation_sink: Callable[[AppSettings], None],
     log_basic: Callable[..., object],
     log_detailed: Callable[..., object],
+    translation_demand_sink: Callable[[], Awaitable[None]] | None = None,
 ) -> PeerApplicationRuntime:
     def application_settings(
         settings: AppSettings | None,
@@ -140,6 +141,7 @@ def compose_peer_application(
             event,
             **fields,
         ),
+        translation_demand_sink=translation_demand_sink,
     )
     target = PeerCaptureTargetApplicationOwner(
         settings=settings_owner,

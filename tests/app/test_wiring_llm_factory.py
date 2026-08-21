@@ -34,6 +34,7 @@ from puripuly_heart.config.settings import (
 )
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.providers.llm.managed_gemma import ManagedGemmaLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 
 
@@ -106,6 +107,38 @@ def _qq_managed_credential() -> ResolvedCredentialRequirement:
         required=True,
         reference="openrouter:managed_qq",
     )
+
+
+@pytest.mark.asyncio
+async def test_managed_gemma_target_uses_injected_runtime_and_activation_release() -> None:
+    runtime = object()
+    releases = 0
+
+    async def release() -> None:
+        nonlocal releases
+        releases += 1
+
+    provider = create_llm_provider_from_resolved_config(
+        ResolvedLLMConfig(
+            primary=ResolvedLLMTarget(
+                provider="managed_gemma",
+                model="puripuly-gemma-4-e4b-q4",
+                provider_options={"backend": "gpu"},
+            )
+        ),
+        secrets=InMemorySecretStore(),
+        managed_gemma_runtime=runtime,
+        managed_gemma_release=release,
+    )
+
+    assert isinstance(provider, SemaphoreLLMProvider)
+    assert isinstance(provider.inner, ManagedGemmaLLMProvider)
+    assert provider.inner.runtime is runtime
+    assert provider.inner.backend == "gpu"
+
+    await provider.close()
+    await provider.close()
+    assert releases == 1
 
 
 def test_managed_china_direct_provider_uses_qq_managed_secret() -> None:
