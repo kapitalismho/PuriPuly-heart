@@ -19,7 +19,8 @@ use crate::manifest::{
 use crate::openvr::OpenVrError;
 use crate::openvr::{
     format_openvr_visibility_api_call_log, perform_startup_preflight, FrameTimingSample,
-    OpenVrOverlay, OpenVrStartupPreflightError, OverlayFrameSubmitter, SpatialReanchorOutcome,
+    OpenVrEventClass, OpenVrOverlay, OpenVrRuntimeEvent, OpenVrStartupPreflightError,
+    OverlayFrameSubmitter, SpatialReanchorOutcome,
 };
 use crate::presentation::{
     PresentationBackend, PresentationCause, PresentationCauseChannel, PresentationCauseKind,
@@ -42,6 +43,8 @@ const TWO_ROW_WINDOW_STABILITY_THRESHOLD_MS: u64 = 500;
 const PRESENTATION_DIAGNOSTIC_WRITE_TIMEOUT: Duration = Duration::from_millis(25);
 const GPU_READINESS_OWNER_TIMEOUT: Duration = Duration::from_millis(50);
 const MAX_IGNORED_MESSAGES_BEFORE_READINESS_POLL: usize = 8;
+const MAX_OPENVR_EVENTS_PER_TURN: usize = 8;
+const OPENVR_EVENT_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum StartupError {
@@ -875,6 +878,11 @@ impl PresentationRuntime {
             &self.pending_peer_first_render_ids,
         );
         cpu_prepare_us = cpu_prepare_us.saturating_add(duration_us(prepare_resumed.elapsed()));
+        if has_drawable_text {
+            if let Some(actual_visible) = openvr.observed_overlay_visible() {
+                self.overlay_visible = actual_visible;
+            }
+        }
         let overlay_visible_before = self.overlay_visible;
         let should_show_after_submit = has_drawable_text && !self.overlay_visible;
         let hide_deadline_was_active = self.hide_deadline.is_some();
@@ -1360,6 +1368,14 @@ impl PresentationRuntime {
         self.caption_blocks()
             .iter()
             .any(CaptionBlock::has_drawable_text)
+    }
+
+    fn desires_overlay_visible(&self) -> bool {
+        self.first_texture_submitted && (self.has_drawable_text() || self.hide_deadline.is_some())
+    }
+
+    fn note_observed_runtime_visible(&mut self, visible: bool) {
+        self.overlay_visible = visible;
     }
 
     async fn emit_pending_spatial_diagnostics(&mut self, logger: &OverlayLogger) {
@@ -2370,6 +2386,68 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         result
     }
 
+    async fn pump_openvr_events(&mut self, logger: &OverlayLogger) -> Result<(), RuntimeFailure> {
+        let events = {
+            let openvr = self.openvr.as_mut().expect("active OpenVR session");
+            openvr.poll_runtime_events(MAX_OPENVR_EVENTS_PER_TURN)
+        };
+        let mut saw_overlay_hidden = false;
+        for event in events {
+            match event.classify() {
+                OpenVrEventClass::Ignore => {}
+                OpenVrEventClass::Fatal => {
+                    return Err(RuntimeFailure::OpenVr(format!("event={}", event.as_str())));
+                }
+                OpenVrEventClass::Reconfigure => {
+                    log_runtime_info(
+                        logger,
+                        format!(
+                            "openvr_event_classified type={} class=reconfigure physical_hmd_visibility=not_observable",
+                            event.as_str()
+                        ),
+                    )
+                    .await?;
+                    match event {
+                        OpenVrRuntimeEvent::OverlayShown => {
+                            self.runtime.note_observed_runtime_visible(true);
+                        }
+                        OpenVrRuntimeEvent::OverlayHidden => {
+                            saw_overlay_hidden = true;
+                            self.runtime.note_observed_runtime_visible(false);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        let observed = {
+            let openvr = self.openvr.as_mut().expect("active OpenVR session");
+            openvr.observed_overlay_visible()
+        };
+        if let Some(visible) = observed {
+            self.runtime.note_observed_runtime_visible(visible);
+        }
+        let desired_visible = self.runtime.desires_overlay_visible();
+        let needs_reassert = match observed {
+            Some(visible) => visible != desired_visible,
+            None => saw_overlay_hidden && desired_visible,
+        };
+        if needs_reassert {
+            let message = {
+                let openvr = self.openvr.as_mut().expect("active OpenVR session");
+                openvr
+                    .set_overlay_visible(desired_visible)
+                    .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
+                openvr.take_visibility_api_call_log()
+            };
+            self.runtime.note_observed_runtime_visible(desired_visible);
+            if let Some(message) = message {
+                log_runtime_info(logger, message).await?;
+            }
+        }
+        Ok(())
+    }
+
     async fn run_owned_event_loop(
         &mut self,
         bridge: &mut BridgeClient,
@@ -2377,6 +2455,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     ) -> Result<(), RuntimeFailure> {
         let mut pending_message = None;
         loop {
+            self.pump_openvr_events(logger).await?;
             let hide_deadline = self.runtime.hide_deadline;
             let message = if let Some(message) = pending_message.take() {
                 Some(message)
@@ -2459,7 +2538,8 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                         self.runtime.handle_hide_deadline(openvr, logger).await?;
                         None
                     }
-                    message = bridge.next_message() => Some(message)
+                    message = bridge.next_message() => Some(message),
+                    _ = sleep_until(Instant::now() + OPENVR_EVENT_POLL_INTERVAL) => None,
                 }
             };
             if let Some(message) = message {
