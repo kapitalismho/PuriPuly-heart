@@ -656,6 +656,7 @@ class DesktopFletOverlayIntent:
     position: DesktopFletOverlayPositionIntent = field(
         default_factory=DesktopFletOverlayPositionIntent
     )
+    swap_caption_languages: bool = False
     visual: DesktopFletOverlayVisualIntent = field(default_factory=DesktopFletOverlayVisualIntent)
 
 

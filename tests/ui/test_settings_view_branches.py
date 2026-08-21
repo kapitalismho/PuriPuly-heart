@@ -3711,13 +3711,16 @@ def test_overlay_display_toggles_update_persistent_settings(
 
     view._on_overlay_translation_click(None)
     view._on_overlay_peer_original_click(None)
+    view._on_desktop_overlay_swap_caption_languages_click(None)
 
     assert settings.overlay.show_translation is False
     assert settings.overlay.show_peer_original is False
-    assert len(settings_calls) == 2
+    assert settings.overlay.desktop_flet.swap_caption_languages is True
+    assert len(settings_calls) == 3
     assert all(incoming is not settings for incoming in settings_calls)
     assert settings_calls[-1].overlay.show_translation is False
     assert settings_calls[-1].overlay.show_peer_original is False
+    assert settings_calls[-1].overlay.desktop_flet.swap_caption_languages is True
 
 
 def test_overlay_single_action_cards_use_broad_value_slot_click_targets(
@@ -3855,6 +3858,7 @@ def test_desktop_gui_product_standard_cards_show_current_values_and_desktop_only
         assert t("settings.overlay.desktop.size.title") in overlay_titles
         assert t("settings.overlay.desktop.background_alpha.title") in overlay_titles
         assert t("settings.overlay.desktop.lock.title") in overlay_titles
+        assert t("settings.overlay.desktop.swap_caption_languages.title") in overlay_titles
         assert t("settings.overlay.position_reset.desktop.title") in overlay_titles
         assert t("settings.overlay.calibration.anchor") not in overlay_titles
         assert t("settings.overlay.calibration.distance") not in overlay_titles
@@ -3909,6 +3913,7 @@ def test_overlay_tab_switches_visible_cards_when_caption_location_changes(
     assert t("settings.overlay.desktop.size.title") in overlay_titles
     assert t("settings.overlay.desktop.background_alpha.title") in overlay_titles
     assert t("settings.overlay.desktop.lock.title") in overlay_titles
+    assert t("settings.overlay.desktop.swap_caption_languages.title") in overlay_titles
     assert t("settings.overlay.position_reset.desktop.title") in overlay_titles
     assert t("settings.overlay.calibration.anchor") not in overlay_titles
     assert all(row.visible is False for row in view._overlay_vr_rows)
@@ -4734,6 +4739,7 @@ def test_overlay_tab_uses_target_specific_unit_card_rows(
         t("settings.overlay.desktop.background_alpha.title"),
     ]
     assert _row_card_titles(overlay_controls[4]) == [
+        t("settings.overlay.desktop.swap_caption_languages.title"),
         t("settings.overlay.position_reset.desktop.title"),
     ]
     assert len(_layout_cards(overlay_controls[4])) == 3

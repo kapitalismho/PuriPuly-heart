@@ -21,6 +21,7 @@ def _desktop_overlay_options_from_settings(settings: AppSettings) -> dict[str, o
             "y": desktop_settings.position.y,
         },
         "locked": desktop_settings.locked,
+        "swap_caption_languages": desktop_settings.swap_caption_languages,
         "visual": {
             "text_scale": visual.text_scale,
             "background_alpha": visual.background_alpha,

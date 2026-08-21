@@ -240,6 +240,7 @@
   "settings.overlay.desktop.size.option.medium": "Средний",
   "settings.overlay.desktop.size.option.large": "Большой",
   "settings.overlay.desktop.size.option.xlarge": "Очень большой",
+  "settings.overlay.desktop.swap_caption_languages.title": "Поменять порядок языков",
   "settings.overlay.desktop.lock.title": "Блокировка оверлея",
   "settings.overlay.desktop.lock.value.move": "Перемещение",
   "settings.overlay.desktop.lock.value.locked": "Заблокирован",

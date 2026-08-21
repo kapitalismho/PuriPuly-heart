@@ -240,6 +240,7 @@
   "settings.overlay.desktop.size.option.medium": "標準",
   "settings.overlay.desktop.size.option.large": "大きめ",
   "settings.overlay.desktop.size.option.xlarge": "さらに大きく",
+  "settings.overlay.desktop.swap_caption_languages.title": "言語の順番を入れ替え",
   "settings.overlay.desktop.lock.title": "オーバーレイ固定",
   "settings.overlay.desktop.lock.value.move": "移動",
   "settings.overlay.desktop.lock.value.locked": "固定",

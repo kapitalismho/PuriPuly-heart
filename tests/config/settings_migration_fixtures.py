@@ -141,6 +141,9 @@ CURRENT_USER_INTENT_DESTINATIONS = {
     "overlay.desktop_flet.position.x": "intent.overlay.desktop_flet.position.x",
     "overlay.desktop_flet.position.y": "intent.overlay.desktop_flet.position.y",
     "overlay.desktop_flet.size_preset": "intent.overlay.desktop_flet.size_preset",
+    "overlay.desktop_flet.swap_caption_languages": (
+        "intent.overlay.desktop_flet.swap_caption_languages"
+    ),
     "overlay.desktop_flet.visual.background_alpha": (
         "intent.overlay.desktop_flet.visual.background_alpha"
     ),
@@ -367,6 +370,7 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     settings.overlay.desktop_flet.size_preset = "large"
     settings.overlay.desktop_flet.position.x = 321
     settings.overlay.desktop_flet.position.y = 654
+    settings.overlay.desktop_flet.swap_caption_languages = True
     settings.overlay.desktop_flet.visual.background_alpha = 0.42
     settings.stt.drain_timeout_s = 3.5
     settings.stt.vad_speech_threshold = 0.3

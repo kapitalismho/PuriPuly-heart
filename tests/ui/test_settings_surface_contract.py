@@ -419,9 +419,9 @@ def test_overlay_surface_preserves_the_accepted_six_rows_and_recovery_visibility
         slots.desktop_background_alpha,
     ]
     assert surface.rows[4].content.controls == [
+        slots.desktop_swap_caption_languages,
         slots.desktop_reset,
-        slots.desktop_reset_spacer_a,
-        slots.desktop_reset_spacer_b,
+        slots.desktop_reset_spacer,
     ]
     assert surface.recovery_row.content.controls == [
         slots.desktop_status,

@@ -240,6 +240,7 @@
   "settings.overlay.desktop.size.option.medium": "Medium",
   "settings.overlay.desktop.size.option.large": "Large",
   "settings.overlay.desktop.size.option.xlarge": "Extra large",
+  "settings.overlay.desktop.swap_caption_languages.title": "Reverse language order",
   "settings.overlay.desktop.lock.title": "Overlay lock",
   "settings.overlay.desktop.lock.value.move": "Move",
   "settings.overlay.desktop.lock.value.locked": "Locked",

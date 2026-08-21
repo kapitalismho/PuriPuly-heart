@@ -97,6 +97,7 @@ ORDER23_OVERLAY_OSC_OUTPUT_SETTINGS_PATHS: Final[tuple[str, ...]] = (
     "overlay.desktop_flet.size_preset",
     "overlay.desktop_flet.position.x",
     "overlay.desktop_flet.position.y",
+    "overlay.desktop_flet.swap_caption_languages",
     "overlay.desktop_flet.visual.background_alpha",
     "osc.host",
     "osc.port",

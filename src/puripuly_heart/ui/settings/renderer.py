@@ -162,9 +162,9 @@ def compose_settings_overlay_surface(
         slots.desktop_background_alpha,
     )
     desktop_reset_row = compose_settings_triple_row(
+        slots.desktop_swap_caption_languages,
         slots.desktop_reset,
-        slots.desktop_reset_spacer_a,
-        slots.desktop_reset_spacer_b,
+        slots.desktop_reset_spacer,
     )
     recovery_row_placeholder = placeholder_factory()
     recovery_row = compose_settings_triple_row(

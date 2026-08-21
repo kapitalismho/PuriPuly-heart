@@ -227,9 +227,9 @@ class SettingsOverlaySurfaceSlots:
     desktop_size: ft.Control
     desktop_lock: ft.Control
     desktop_background_alpha: ft.Control
+    desktop_swap_caption_languages: ft.Control
     desktop_reset: ft.Control
-    desktop_reset_spacer_a: ft.Control
-    desktop_reset_spacer_b: ft.Control
+    desktop_reset_spacer: ft.Control
     desktop_status: ft.Control
     desktop_status_trailing: ft.Control
 

@@ -120,6 +120,7 @@ def test_vnext_schema_represents_current_intent_and_state_leaves() -> None:
         "intent.overlay.desktop_flet.position.x",
         "intent.overlay.desktop_flet.position.y",
         "intent.overlay.desktop_flet.size_preset",
+        "intent.overlay.desktop_flet.swap_caption_languages",
         "intent.overlay.desktop_flet.visual.background_alpha",
         "intent.overlay.show_peer_original",
         "intent.overlay.show_translation",

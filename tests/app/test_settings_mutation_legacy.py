@@ -116,6 +116,7 @@ def test_order23_overlay_osc_output_patch_records_initial_covered_surface_list()
         "overlay.desktop_flet.size_preset",
         "overlay.desktop_flet.position.x",
         "overlay.desktop_flet.position.y",
+        "overlay.desktop_flet.swap_caption_languages",
         "overlay.desktop_flet.visual.background_alpha",
         "osc.host",
         "osc.port",

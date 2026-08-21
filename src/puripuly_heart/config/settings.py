@@ -1188,6 +1188,7 @@ class DesktopFletOverlaySettings:
     size_preset: str = DESKTOP_FLET_DEFAULT_SIZE_PRESET
     position: DesktopFletOverlayPosition = field(default_factory=DesktopFletOverlayPosition)
     locked: bool = False
+    swap_caption_languages: bool = False
     visual: DesktopFletOverlayVisualSettings = field(
         default_factory=DesktopFletOverlayVisualSettings
     )
@@ -1198,6 +1199,8 @@ class DesktopFletOverlaySettings:
             self.position = DesktopFletOverlayPosition()
         if not isinstance(self.locked, bool):
             self.locked = False
+        if not isinstance(self.swap_caption_languages, bool):
+            self.swap_caption_languages = False
         if not isinstance(self.visual, DesktopFletOverlayVisualSettings):
             self.visual = DesktopFletOverlayVisualSettings()
         self.position.validate()
@@ -1641,6 +1644,12 @@ def _parse_desktop_flet_visual(value: object) -> DesktopFletOverlayVisualSetting
     )
 
 
+def _parse_desktop_flet_swap_caption_languages(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    return False
+
+
 def _parse_desktop_flet_settings(value: object) -> DesktopFletOverlaySettings:
     if isinstance(value, DesktopFletOverlaySettings):
         settings = copy.deepcopy(value)
@@ -1665,6 +1674,9 @@ def _parse_desktop_flet_settings(value: object) -> DesktopFletOverlaySettings:
         size_preset=size_preset,
         position=position,
         locked=False,
+        swap_caption_languages=_parse_desktop_flet_swap_caption_languages(
+            data.get("swap_caption_languages")
+        ),
         visual=_parse_desktop_flet_visual(data.get("visual")),
     )
 
@@ -1702,6 +1714,7 @@ def _desktop_flet_settings_to_dict(settings: DesktopFletOverlaySettings) -> dict
     return {
         "size_preset": settings.size_preset,
         "position": {"x": settings.position.x, "y": settings.position.y},
+        "swap_caption_languages": settings.swap_caption_languages,
         "visual": _desktop_flet_visual_to_dict(settings.visual),
     }
 

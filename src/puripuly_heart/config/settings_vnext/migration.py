@@ -831,6 +831,9 @@ def from_legacy_app_settings(
                             x=data["overlay"]["desktop_flet"]["position"]["x"],
                             y=data["overlay"]["desktop_flet"]["position"]["y"],
                         ),
+                        swap_caption_languages=(
+                            data["overlay"]["desktop_flet"].get("swap_caption_languages") is True
+                        ),
                         visual=DesktopFletOverlayVisualIntent(
                             background_alpha=float(
                                 data["overlay"]["desktop_flet"]["visual"]["background_alpha"]
@@ -1119,6 +1122,7 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
                 "x": intent.overlay.desktop_flet.position.x,
                 "y": intent.overlay.desktop_flet.position.y,
             },
+            "swap_caption_languages": intent.overlay.desktop_flet.swap_caption_languages,
             "visual": {
                 "background_alpha": intent.overlay.desktop_flet.visual.background_alpha,
             },

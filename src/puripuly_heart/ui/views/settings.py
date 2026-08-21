@@ -709,6 +709,7 @@ class SettingsView(ft.Column):
             self._overlay_text_scale_text,
             self._desktop_overlay_size_button,
             self._desktop_overlay_lock_button,
+            self._desktop_overlay_swap_caption_languages_button,
             self._overlay_vr_reset_button,
             self._overlay_desktop_reset_button,
             self._desktop_overlay_primary_action,
@@ -1942,6 +1943,21 @@ class SettingsView(ft.Column):
             value=self._desktop_overlay_lock_button,
         )
 
+        self._desktop_overlay_swap_caption_languages_title = ft.Text(
+            t("settings.overlay.desktop.swap_caption_languages.title"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._desktop_overlay_swap_caption_languages_button = self._build_clickable_text(
+            t("settings.option.off"),
+            self._on_desktop_overlay_swap_caption_languages_click,
+        )
+        self._desktop_overlay_swap_caption_languages_card = self._wrap_unit_card(
+            title=self._desktop_overlay_swap_caption_languages_title,
+            value=self._desktop_overlay_swap_caption_languages_button,
+        )
+
         self._desktop_overlay_status_title = ft.Text(
             t("settings.overlay.status.off"),
             size=24,
@@ -1999,8 +2015,7 @@ class SettingsView(ft.Column):
             value=self._desktop_overlay_status_body,
         )
         self._overlay_empty_card = self._wrap_empty_unit_card()
-        self._overlay_desktop_reset_spacer_a = self._wrap_empty_unit_card()
-        self._overlay_desktop_reset_spacer_b = self._wrap_empty_unit_card()
+        self._overlay_desktop_reset_spacer = self._wrap_empty_unit_card()
 
         self._overlay_surface = compose_settings_overlay_surface(
             SettingsOverlaySurfaceSlots(
@@ -2016,9 +2031,9 @@ class SettingsView(ft.Column):
                 desktop_size=self._desktop_overlay_size_card,
                 desktop_lock=self._desktop_overlay_lock_card,
                 desktop_background_alpha=self._desktop_overlay_background_alpha_card,
+                desktop_swap_caption_languages=self._desktop_overlay_swap_caption_languages_card,
                 desktop_reset=self._overlay_desktop_reset_card,
-                desktop_reset_spacer_a=self._overlay_desktop_reset_spacer_a,
-                desktop_reset_spacer_b=self._overlay_desktop_reset_spacer_b,
+                desktop_reset_spacer=self._overlay_desktop_reset_spacer,
                 desktop_status=self._desktop_overlay_status_card,
                 desktop_status_trailing=self._overlay_empty_card,
             ),
@@ -4954,6 +4969,14 @@ class SettingsView(ft.Column):
             self._desktop_overlay_lock_button,
             self._desktop_overlay_lock_label_for(self._current_desktop_overlay_locked()),
         )
+        self._set_unit_card_value_text(
+            self._desktop_overlay_swap_caption_languages_button,
+            t(
+                "settings.option.on"
+                if self._current_desktop_overlay_swap_caption_languages()
+                else "settings.option.off"
+            ),
+        )
         self._desktop_overlay_background_alpha_value_text.value = (
             self._desktop_overlay_background_alpha_label_for(
                 self._current_desktop_overlay_background_alpha()
@@ -4964,6 +4987,7 @@ class SettingsView(ft.Column):
         self._desktop_overlay_background_alpha_decrease_button.disabled = disabled
         self._desktop_overlay_background_alpha_increase_button.disabled = disabled
         self._desktop_overlay_lock_button.disabled = disabled
+        self._desktop_overlay_swap_caption_languages_button.disabled = disabled
         self._overlay_vr_reset_button.disabled = disabled
         self._overlay_desktop_reset_button.disabled = disabled
 
@@ -5109,6 +5133,24 @@ class SettingsView(ft.Column):
             return
         self._settings.overlay.desktop_flet.size_preset = size_preset
         self._desktop_overlay_pending_size_preset = None
+        self._sync_desktop_overlay_main_controls()
+        self._emit_settings_changed()
+
+    def _current_desktop_overlay_swap_caption_languages(self) -> bool:
+        if self._settings is None:
+            return False
+        return bool(self._settings.overlay.desktop_flet.swap_caption_languages)
+
+    def _on_desktop_overlay_swap_caption_languages_click(self, e) -> None:
+        if not self._settings or self._desktop_overlay_swap_caption_languages_button.disabled:
+            return
+        next_value = "off" if self._current_desktop_overlay_swap_caption_languages() else "on"
+        self._on_desktop_overlay_swap_caption_languages_selected(next_value)
+
+    def _on_desktop_overlay_swap_caption_languages_selected(self, value: str) -> None:
+        if not self._settings:
+            return
+        self._settings.overlay.desktop_flet.swap_caption_languages = value == "on"
         self._sync_desktop_overlay_main_controls()
         self._emit_settings_changed()
 
@@ -5992,6 +6034,9 @@ class SettingsView(ft.Column):
             "settings.overlay.desktop.background_alpha.title"
         )
         self._desktop_overlay_lock_title.value = t("settings.overlay.desktop.lock.title")
+        self._desktop_overlay_swap_caption_languages_title.value = t(
+            "settings.overlay.desktop.swap_caption_languages.title"
+        )
         self._set_unit_card_value_text(
             self._overlay_vr_reset_button, t("settings.overlay.position_reset.action.vr")
         )
