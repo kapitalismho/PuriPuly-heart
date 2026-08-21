@@ -370,6 +370,8 @@ def test_llama_cpp_license_and_notice_are_shipped_from_pinned_provenance() -> No
         encoding="utf-8"
     )
 
-    assert hashlib.sha256(license_path.read_bytes()).hexdigest() == distribution.LICENSE_SHA256
+    license_bytes = license_path.read_bytes()
+    assert b"\r\n" not in license_bytes
+    assert hashlib.sha256(license_bytes).hexdigest() == distribution.LICENSE_SHA256
     assert "llama.cpp CPU and Vulkan runtime" in notice
     assert distribution.LLAMA_CPP_COMMIT in notice
