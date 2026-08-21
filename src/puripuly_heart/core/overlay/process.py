@@ -1402,7 +1402,8 @@ class OverlayProcessManager:
     ) -> None:
         self.state = "failed"
         self.failure_reason = failure_reason
-        self.restart_scheduled = False
+        connected_session = self._last_transition in {"overlay_ready", "bridge_ready"}
+        self.restart_scheduled = connected_session and not self._shutdown_requested
         self._current_phase = "failed"
         stdout_count = (
             len(self.diagnostics.child_stdout_lines) if self.diagnostics is not None else 0

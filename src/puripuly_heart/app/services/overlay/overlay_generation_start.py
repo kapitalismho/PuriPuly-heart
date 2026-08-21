@@ -72,6 +72,7 @@ class OverlayGenerationStartRequest:
     clock: Clock
     startup_timeout_ms: int
     fallback_reason: str | None = None
+    recovering_from_crash: bool = False
 
     @property
     def desktop(self) -> bool:
@@ -176,7 +177,10 @@ class OverlayGenerationStartOwner:
             presenter = cast(OverlayPresenter, runtime.adopt_presenter(presenter))
             presenter.runtime_log_detailed = effects.log_runtime
             if not request.desktop:
-                await presenter.update_native_retry_ownership(False)
+                if request.recovering_from_crash:
+                    await presenter.discard_epoch_retry_intent()
+                else:
+                    await presenter.update_native_retry_ownership(False)
             await presenter.update_calibration(effects.calibration_snapshot())
             await presenter.update_display_preferences(
                 show_translation=request.config.show_translation,
