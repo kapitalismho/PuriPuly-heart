@@ -104,6 +104,7 @@ _OPEN_MAPPING_PATHS: Final = frozenset(
         ("intent", "translation", "connection_history"),
         ("intent", "local_llm", "extra_body"),
         ("intent", "stt", "custom_terms"),
+        ("intent", "stt", "custom", "extra"),
     }
 )
 

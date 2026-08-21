@@ -77,6 +77,8 @@ ASR_IDS: Final[Mapping[int, str]] = MappingProxyType(
         5: "deepgram",
         6: "qwen_asr",
         7: "soniox",
+        8: "custom_offline",
+        9: "custom_realtime",
     }
 )
 
@@ -151,7 +153,10 @@ if {code for _identifier, code in _LANGUAGE_ABI_ENTRIES} != set(SUPPORTED_LANGUA
 
 LANGUAGE_IDS: Final[Mapping[int, str]] = MappingProxyType(dict(_LANGUAGE_ABI_ENTRIES))
 ASR_ID_BY_PROVIDER: Final[Mapping[str, int]] = MappingProxyType(
-    {value: identifier for identifier, value in ASR_IDS.items()}
+    {
+        **{value: identifier for identifier, value in ASR_IDS.items()},
+        "custom": 8,
+    }
 )
 TRANSLATION_MODEL_ID_BY_VALUE: Final[Mapping[str, int]] = MappingProxyType(
     {

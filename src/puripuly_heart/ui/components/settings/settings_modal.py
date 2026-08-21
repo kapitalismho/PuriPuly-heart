@@ -196,10 +196,8 @@ class SettingsModal:
     def _partition_sections(self, sections: list[str], n_columns: int) -> list[list[str]]:
         """Distribute sections across a fixed number of columns.
 
-        The first column receives a single section (when available); the
-        remaining sections are balanced across the other columns. This
-        keeps the recommended grouping prominent on the left while the
-        detailed classifications flow down the right column.
+        The first column receives ``left_column_sections`` leading groups;
+        the remaining sections are balanced across the other columns.
         """
         n = len(sections)
         if n == 0:

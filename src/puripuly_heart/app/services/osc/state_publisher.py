@@ -185,11 +185,20 @@ def state_from_settings(
         self_target_language=languages.target_language,
         peer_source_language=languages.peer_source_language,
         peer_target_language=languages.peer_target_language,
-        self_asr=settings.provider.stt.value,
-        peer_asr=settings.provider.peer_stt.value,
+        self_asr=_osc_asr_provider(settings.provider.stt, settings.custom_stt.mode),
+        peer_asr=_osc_asr_provider(settings.provider.peer_stt, settings.custom_stt.mode),
         translation_model=settings.translation.model.value,
         fallback=fallback_alias_from_settings(settings),
     )
+
+
+def _osc_asr_provider(provider: object, custom_mode: object) -> str:
+    value = str(getattr(provider, "value", provider))
+    if value != "custom":
+        return value
+    if str(custom_mode) == "realtime":
+        return "custom_realtime"
+    return "custom_offline"
 
 
 def fallback_alias_from_settings(settings: Any) -> str:

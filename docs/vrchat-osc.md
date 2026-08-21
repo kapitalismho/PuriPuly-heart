@@ -79,6 +79,8 @@
 | 5 | Deepgram |
 | 6 | Qwen3 ASR Flash Realtime |
 | 7 | Soniox |
+| 8 | Custom Speech Recognition (Offline) |
+| 9 | Custom Speech Recognition (Realtime) |
 
 - Used by: `PuriPuly_SelfASR`, `PuriPuly_PeerASR`
 
