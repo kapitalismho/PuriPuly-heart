@@ -423,9 +423,22 @@ def build_self_stt_runtime_signature(settings: AppSettings) -> tuple[object, ...
     )
 
 
+def _self_stt_provider_language_identity(settings: AppSettings) -> str | None:
+    if build_self_local_asr_transition_request(settings, trigger="runtime") is not None:
+        return None
+    return settings.languages.source_language
+
+
+def _self_stt_provider_model_identity(settings: AppSettings) -> str | None:
+    transition = build_self_local_asr_transition_request(settings, trigger="runtime")
+    return None if transition is None else transition.model_id
+
+
 def build_self_stt_provider_signature(settings: AppSettings) -> tuple[object, ...]:
     return (
         settings.provider.stt,
+        _self_stt_provider_language_identity(settings),
+        _self_stt_provider_model_identity(settings),
         (
             settings.deepgram_stt.model
             if settings.provider.stt == STTProviderName.DEEPGRAM

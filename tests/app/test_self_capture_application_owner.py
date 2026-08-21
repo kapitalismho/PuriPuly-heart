@@ -38,11 +38,19 @@ async def test_replace_provider_propagates_updated_config_by_capture_activity(
 
         async def prepare_provider(self, config: object) -> object:
             calls.append(("prepare", config, {}))
-            return SimpleNamespace(provider_status=SelfCaptureProviderStatus.READY)
+            return SimpleNamespace(
+                provider_status=SelfCaptureProviderStatus.READY,
+                failure_reason=None,
+                runtime_signature=capture_config.runtime_signature,
+            )
 
         async def apply_intent(self, config: object, **kwargs: object) -> object:
             calls.append(("apply", config, kwargs))
-            return SimpleNamespace(provider_status=SelfCaptureProviderStatus.READY)
+            return SimpleNamespace(
+                provider_status=SelfCaptureProviderStatus.READY,
+                failure_reason=None,
+                runtime_signature=capture_config.runtime_signature,
+            )
 
     capture_owner = CaptureOwner()
     owner = SelfCaptureApplicationOwner(

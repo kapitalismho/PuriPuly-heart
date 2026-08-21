@@ -820,6 +820,46 @@ async def test_close_cancels_pending_admission_and_rejects_future_intent() -> No
 
 
 @pytest.mark.asyncio
+async def test_prepare_provider_replaces_when_provider_identity_changes() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+
+    await owner.prepare_provider(config("one"))
+    snapshot = await owner.prepare_provider(config("two"))
+
+    assert provider.replace_calls == [
+        (("provider-one", False), False),
+        (("provider-two", False), False),
+    ]
+    assert snapshot.runtime_signature == config("two").runtime_signature
+    assert sources == []
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_prepare_provider_reuses_ready_provider_with_same_identity() -> None:
+    owner, _, provider, _, _, _ = build_owner()
+    session_config = config("one")
+
+    await owner.prepare_provider(session_config)
+    await owner.prepare_provider(session_config)
+
+    assert provider.replace_calls == [(("provider-one", False), False)]
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_start_replaces_ready_provider_when_identity_changed() -> None:
+    owner, _, provider, _, _, _ = build_owner()
+
+    await owner.prepare_provider(config("one"))
+    snapshot = await owner.apply_intent(config("two"), enabled=True)
+
+    assert ("provider-two", False) in {request for request, _start in provider.replace_calls}
+    assert snapshot.runtime_signature == config("two").runtime_signature
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_prepare_provider_attaches_without_opening_capture_resources() -> None:
     owner, _, provider, sources, _, _ = build_owner()
     session_config = config(local_cpu=True)
