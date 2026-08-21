@@ -149,6 +149,7 @@ def build_gemma_server_command(
     port: int,
     vulkan_device: str = "Vulkan0",
     threads_profile: LlamaCppThreadProfile | None = None,
+    slot_save_path: Path | None = None,
 ) -> tuple[str, ...]:
     if threads_profile is None:
         threads_profile = load_or_detect_thread_profile()
@@ -161,9 +162,9 @@ def build_gemma_server_command(
         "--load-mode",
         "mmap",
         "--ctx-size",
-        "2048",
+        "4096",
         "--parallel",
-        "1",
+        "2",
         "--batch-size",
         "512",
         "--ubatch-size",
@@ -190,6 +191,8 @@ def build_gemma_server_command(
         "--prio",
         "-1",
     )
+    if slot_save_path is not None:
+        common = common + ("--slot-save-path", str(slot_save_path))
     if backend == "gpu":
         return common + (
             "--threads",

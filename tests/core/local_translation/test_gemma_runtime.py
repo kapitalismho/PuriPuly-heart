@@ -39,7 +39,14 @@ class FakeTransport:
         self.base_url = base_url
         self.ready_calls = []
         self.prefixes = []
+        self.prefix_slots: list[int] = []
+        self.restores: list[str] = []
+        self.restore_slots: list[int] = []
+        self.saves: list[str] = []
+        self.save_slots: list[int] = []
+        self.restore_hits: set[str] = set()
         self.translations = []
+        self.translation_slots: list[int] = []
         self.closed = False
         self.prefix_failure = prefix_failure
         self.response = ManagedGemmaResponse(
@@ -59,13 +66,24 @@ class FakeTransport:
     async def wait_until_ready(self, *, timeout_s: float) -> None:
         self.ready_calls.append(timeout_s)
 
-    async def prepare_prefix(self, *, system_prompt: str) -> None:
+    async def prepare_prefix(self, *, system_prompt: str, slot_id: int) -> None:
         if self.prefix_failure is not None:
             raise self.prefix_failure
         self.prefixes.append(system_prompt)
+        self.prefix_slots.append(slot_id)
 
-    async def translate(self, *, system_prompt: str, user_message: str):
+    async def restore_prefix(self, *, filename: str, slot_id: int) -> bool:
+        self.restores.append(filename)
+        self.restore_slots.append(slot_id)
+        return filename in self.restore_hits
+
+    async def save_prefix(self, *, filename: str, slot_id: int) -> None:
+        self.saves.append(filename)
+        self.save_slots.append(slot_id)
+
+    async def translate(self, *, system_prompt: str, user_message: str, slot_id: int):
         self.translations.append((system_prompt, user_message))
+        self.translation_slots.append(slot_id)
         return self.response
 
     async def close(self) -> None:
@@ -77,7 +95,7 @@ class HangingTransport(FakeTransport):
         super().__init__(base_url)
         self.translation_started = asyncio.Event()
 
-    async def translate(self, *, system_prompt: str, user_message: str):
+    async def translate(self, *, system_prompt: str, user_message: str, slot_id: int):
         self.translation_started.set()
         await asyncio.Event().wait()
 
@@ -88,7 +106,7 @@ class UncooperativeTranslationTransport(FakeTransport):
         self.translation_started = asyncio.Event()
         self.allow_finish = asyncio.Event()
 
-    async def translate(self, *, system_prompt: str, user_message: str):
+    async def translate(self, *, system_prompt: str, user_message: str, slot_id: int):
         self.translation_started.set()
         try:
             await asyncio.Event().wait()
@@ -103,11 +121,11 @@ class BlockingSecondPrefixTransport(FakeTransport):
         self.second_prefix_started = asyncio.Event()
         self.allow_second_prefix = asyncio.Event()
 
-    async def prepare_prefix(self, *, system_prompt: str) -> None:
+    async def prepare_prefix(self, *, system_prompt: str, slot_id: int) -> None:
         if self.prefixes:
             self.second_prefix_started.set()
             await self.allow_second_prefix.wait()
-        await super().prepare_prefix(system_prompt=system_prompt)
+        await super().prepare_prefix(system_prompt=system_prompt, slot_id=slot_id)
 
 
 class DyingPrefixTransport(FakeTransport):
@@ -115,8 +133,8 @@ class DyingPrefixTransport(FakeTransport):
         super().__init__(base_url)
         self.process = process
 
-    async def prepare_prefix(self, *, system_prompt: str) -> None:
-        await super().prepare_prefix(system_prompt=system_prompt)
+    async def prepare_prefix(self, *, system_prompt: str, slot_id: int) -> None:
+        await super().prepare_prefix(system_prompt=system_prompt, slot_id=slot_id)
         self.process.returncode = 1
 
 
@@ -155,6 +173,7 @@ def _runtime(
     transport_builder=None,
     process_builder=None,
     shutdown_timeout_s: float = 5.0,
+    prefix_cache=None,
 ):
     cpu = tmp_path / "cpu" / "llama-server.exe"
     gpu = tmp_path / "gpu" / "llama-server.exe"
@@ -202,6 +221,7 @@ def _runtime(
         port_allocator=lambda: 38191 + len(commands),
         log_sink=lambda message, level: logs.append((message, level)),
         shutdown_timeout_s=shutdown_timeout_s,
+        prefix_cache=prefix_cache,
     )
     return owner, commands, processes, transports, provision_calls, logs
 
@@ -235,6 +255,7 @@ async def test_readiness_prefills_once_and_rebuilds_for_language_pair(tmp_path: 
     assert len(commands) == 1
     assert len(processes) == 1
     assert transports[0].prefixes == ["Translate ko to en", "Translate ja to en"]
+    assert transports[0].prefix_slots == [0, 1]
 
 
 @pytest.mark.asyncio
@@ -294,6 +315,7 @@ async def test_translation_is_serialized_uses_current_prefix_and_logs_only_metri
         ("Translate ko to en", source_text),
         ("Translate ko to en", "second"),
     ]
+    assert transports[0].translation_slots == [0, 0]
     messages = [message for message, _level in logs]
     assert all(source_text not in message for message in messages)
     assert all("translated" not in message for message in messages)
@@ -649,3 +671,128 @@ async def test_failed_cleanup_retains_resources_for_retry(tmp_path: Path) -> Non
     assert processes[0].returncode == -9
     assert transports[0].closed
     await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_prefix_cache_restore_skips_prefill_after_process_restart(tmp_path: Path) -> None:
+    from puripuly_heart.core.local_translation.prefix_cache import GemmaPrefixCache
+
+    cache = GemmaPrefixCache(tmp_path / "prefix-cache")
+    restore_hits: set[str] = set()
+
+    def transport_builder(base_url: str) -> FakeTransport:
+        transport = FakeTransport(base_url)
+        transport.restore_hits = restore_hits
+        return transport
+
+    owner, commands, _processes, transports, _provision_calls, _logs = _runtime(
+        tmp_path,
+        transport_builder=transport_builder,
+        prefix_cache=cache,
+    )
+    first = await owner.prepare(
+        backend="cpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt="translate",
+    )
+
+    assert transports[0].prefixes
+    assert transports[0].saves
+    filename = transports[0].saves[0]
+    (cache.cache_dir / filename).write_bytes(b"kv")
+    restore_hits.add(filename)
+    await owner.release()
+
+    second = await owner.prepare(
+        backend="cpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt="translate",
+    )
+
+    assert first.prefix_identity == second.prefix_identity
+    assert "--slot-save-path" in commands[0]
+    assert transports[-1].restores == [filename]
+    assert transports[-1].restore_slots == [0]
+    assert transports[-1].prefixes == []
+
+
+@pytest.mark.asyncio
+async def test_two_identities_stay_resident_without_second_prefill(tmp_path: Path) -> None:
+    owner, _commands, _processes, transports, _provision_calls, _logs = _runtime(tmp_path)
+    template = "Translate {source_language} to {target_language}"
+
+    await owner.prepare(
+        backend="cpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt=template,
+    )
+    await owner.prepare(
+        backend="cpu",
+        source_language="en",
+        target_language="ko",
+        system_prompt=template,
+    )
+    await owner.prepare(
+        backend="cpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt=template,
+    )
+    await owner.translate(
+        backend="cpu",
+        source_language="en",
+        target_language="ko",
+        system_prompt=template,
+        user_message="hello",
+    )
+
+    assert transports[0].prefixes == ["Translate ko to en", "Translate en to ko"]
+    assert transports[0].prefix_slots == [0, 1]
+    assert transports[0].translation_slots == [1]
+
+
+@pytest.mark.asyncio
+async def test_third_identity_evicts_only_lru_slot(tmp_path: Path) -> None:
+    owner, _commands, _processes, transports, _provision_calls, _logs = _runtime(tmp_path)
+    template = "Translate {source_language} to {target_language}"
+
+    await owner.prepare(
+        backend="cpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt=template,
+    )
+    await owner.prepare(
+        backend="cpu",
+        source_language="en",
+        target_language="ko",
+        system_prompt=template,
+    )
+    await owner.prepare(
+        backend="cpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt=template,
+    )
+    await owner.prepare(
+        backend="cpu",
+        source_language="ja",
+        target_language="en",
+        system_prompt=template,
+    )
+    await owner.prepare(
+        backend="cpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt=template,
+    )
+
+    assert transports[0].prefixes == [
+        "Translate ko to en",
+        "Translate en to ko",
+        "Translate ja to en",
+    ]
+    assert transports[0].prefix_slots == [0, 1, 1]

@@ -690,6 +690,7 @@ def _provider_from_resolved_target(
             runtime=managed_gemma_runtime,
             backend=backend,
             release_runtime=managed_gemma_release,
+            runtime_logging=runtime_logging,
         )
 
     if target.provider == PROVIDER_GEMINI:

@@ -28,8 +28,8 @@ def test_cpu_profile_preserves_fixed_common_and_mtp_contract(tmp_path: Path) -> 
     assert _values(command, "--load-mode") == ["mmap"]
     assert _values(command, "--threads") == ["4"]
     assert _values(command, "--threads-batch") == ["12"]
-    assert _values(command, "--ctx-size") == ["2048"]
-    assert _values(command, "--parallel") == ["1"]
+    assert _values(command, "--ctx-size") == ["4096"]
+    assert _values(command, "--parallel") == ["2"]
     assert _values(command, "--batch-size") == ["512"]
     assert _values(command, "--ubatch-size") == ["512"]
     assert _values(command, "--cache-type-k") == ["f16"]
@@ -57,6 +57,21 @@ def test_cpu_profile_preserves_fixed_common_and_mtp_contract(tmp_path: Path) -> 
     assert _values(command, "--spec-draft-type-v") == ["f16"]
     assert _values(command, "--flash-attn") == ["off"]
     assert _values(command, "--prio") == ["-1"]
+    assert "--slot-save-path" not in command
+
+
+def test_slot_save_path_is_opt_in(tmp_path: Path) -> None:
+    cache_dir = tmp_path / "prefix-cache"
+    command = build_gemma_server_command(
+        executable=Path("llama-server.exe"),
+        install_dir=tmp_path,
+        backend="cpu",
+        port=38191,
+        threads_profile=CPU_PROFILE,
+        slot_save_path=cache_dir,
+    )
+
+    assert _values(command, "--slot-save-path") == [str(cache_dir)]
 
 
 def test_gpu_profile_is_vulkan_full_offload_without_mtp(tmp_path: Path) -> None:
@@ -76,7 +91,8 @@ def test_gpu_profile_is_vulkan_full_offload_without_mtp(tmp_path: Path) -> None:
     assert _values(command, "--n-gpu-layers") == ["99"]
     assert _values(command, "--flash-attn") == ["on"]
     assert _values(command, "--prio") == ["-1"]
-    assert _values(command, "--ctx-size") == ["2048"]
+    assert _values(command, "--ctx-size") == ["4096"]
+    assert _values(command, "--parallel") == ["2"]
     assert not any(item.startswith("--spec-") for item in command)
 
 
