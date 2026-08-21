@@ -98,9 +98,7 @@ class GemmaPrefixCache:
                 continue
             if not (self.cache_dir / expected).is_file():
                 continue
-            entries.append(
-                PrefixCacheEntry(identity=identity, backend=backend, filename=expected)
-            )
+            entries.append(PrefixCacheEntry(identity=identity, backend=backend, filename=expected))
         return entries[: self.max_entries]
 
     def _save(self) -> None:

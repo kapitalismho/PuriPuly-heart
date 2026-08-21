@@ -34,6 +34,4 @@ def test_gemini_build_request_uses_tagged_input() -> None:
         context='- [self] "hi"',
     )
 
-    assert user_message == (
-        '<context>\n- [self] "hi"\n</context>\n\n<input>\nhello\n</input>'
-    )
+    assert user_message == ('<context>\n- [self] "hi"\n</context>\n\n<input>\nhello\n</input>')

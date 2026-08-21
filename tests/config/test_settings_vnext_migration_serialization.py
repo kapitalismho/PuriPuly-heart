@@ -343,10 +343,7 @@ def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
 
     migrated = migration.from_dict(canonical)
 
-    assert (
-        migrated.intent.prompts.system_prompt
-        == load_prompt_for_provider("gemini")
-    )
+    assert migrated.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
 
 
 def test_vnext_dict_migrates_legacy_timestamp_prompt_from_legacy_shape() -> None:

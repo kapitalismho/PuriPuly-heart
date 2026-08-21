@@ -70,7 +70,9 @@ def _logical_cores() -> int:
 
 def derive_thread_profile(physical_cores: int, logical_cores: int) -> LlamaCppThreadProfile:
     threads = min(math.ceil(physical_cores * THREADS_PHYSICAL_FRACTION), THREADS_MAX)
-    threads_batch = min(math.ceil(logical_cores * THREADS_BATCH_LOGICAL_FRACTION), THREADS_BATCH_MAX)
+    threads_batch = min(
+        math.ceil(logical_cores * THREADS_BATCH_LOGICAL_FRACTION), THREADS_BATCH_MAX
+    )
     return LlamaCppThreadProfile(
         threads=max(1, threads),
         threads_batch=max(1, threads_batch),

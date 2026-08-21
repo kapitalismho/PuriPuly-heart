@@ -548,9 +548,7 @@ class TestContextInternalPaths:
         assert mode == "integrated"
         assert "41 seconds old" not in context
         assert context == (
-            '- [self] "self recent"\n'
-            '- [peer] "peer recent"\n'
-            '- [self] "self newest"'
+            '- [self] "self recent"\n' '- [peer] "peer recent"\n' '- [self] "self newest"'
         )
 
     def test_integrated_context_uses_latest_4_combined_entries_after_timestamp_merge(self):
@@ -592,10 +590,7 @@ class TestContextInternalPaths:
         assert mode == "integrated"
         assert "self 1" not in context
         assert context == (
-            '- [peer] "peer 1"\n'
-            '- [self] "self 2"\n'
-            '- [peer] "peer 2"\n'
-            '- [self] "self 3"'
+            '- [peer] "peer 1"\n' '- [self] "self 2"\n' '- [peer] "peer 2"\n' '- [self] "self 3"'
         )
 
     def test_context_resolver_default_integrated_context_uses_40_second_window_and_latest_4_entries(

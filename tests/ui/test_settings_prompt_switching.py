@@ -324,14 +324,14 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
             options,
             _on_select,
             *,
-                show_description=False,
-                two_column=False,
-                left_column_sections=1,
-            ):
-                captured["options"] = options
-                captured["show_description"] = show_description
-                captured["two_column"] = two_column
-                captured["left_column_sections"] = left_column_sections
+            show_description=False,
+            two_column=False,
+            left_column_sections=1,
+        ):
+            captured["options"] = options
+            captured["show_description"] = show_description
+            captured["two_column"] = two_column
+            captured["left_column_sections"] = left_column_sections
 
         def open(self, current: str) -> None:
             captured["current"] = current
@@ -385,9 +385,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         option for option in options if option.value == TranslationModel.GEMMA4_31B.value
     )
     assert gemma31.section == t("settings.translation_model.section.recommended_cloud")
-    assert gemma31.description == t(
-        "settings.translation_model.gemma4_31b.description"
-    )
+    assert gemma31.description == t("settings.translation_model.gemma4_31b.description")
 
     sections: list[str] = []
     for option in options:

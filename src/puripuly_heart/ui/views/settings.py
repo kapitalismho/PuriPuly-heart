@@ -3757,8 +3757,7 @@ class SettingsView(ft.Column):
         )
         self._sync_openrouter_pkce_button_state(settings)
         self._translation_connection_row.visible = (
-            not is_custom_http
-            and settings.translation.model != TranslationModel.MANAGED_GEMMA
+            not is_custom_http and settings.translation.model != TranslationModel.MANAGED_GEMMA
         )
         self._local_llm_connection_card.visible = (
             not is_custom_http and llm == LLMProviderName.LOCAL_LLM
