@@ -2784,6 +2784,70 @@ async def test_desktop_overlay_native_ready_failure_reports_page_configured_phas
     await window.close()
 
 
+def test_desktop_overlay_startup_timeouts_cover_hidden_window_handshake() -> None:
+    from puripuly_heart.app.services.overlay.overlay_application import (
+        OVERLAY_STARTUP_TIMEOUT_MS,
+    )
+
+    nested_handshake_s = (
+        desktop_overlay.DESKTOP_OVERLAY_WAIT_UNTIL_READY_TIMEOUT_S
+        + 0.5
+        + (desktop_window_zorder.WINDOWS_WINDOW_VISIBILITY_TIMEOUT_S * 2)
+        + 2.0
+    )
+    assert desktop_overlay.DESKTOP_OVERLAY_RENDERER_STARTUP_TIMEOUT_S >= nested_handshake_s
+    assert OVERLAY_STARTUP_TIMEOUT_MS / 1000.0 > (
+        desktop_overlay.DESKTOP_OVERLAY_RENDERER_STARTUP_TIMEOUT_S + 1.0
+    )
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_wait_until_ready_timeout_reports_page_configured_phase() -> None:
+    app = FakeFletApp()
+
+    async def hang_ready() -> None:
+        await asyncio.Event().wait()
+
+    app.page.window.wait_until_ready_to_show = hang_ready
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=RecordingLifecycleSink().emit,
+        locale="en",
+        wait_until_ready_timeout_s=0.05,
+    )
+
+    with pytest.raises(RuntimeError, match="Flet page configuration failed") as excinfo:
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+
+    assert "native window was not ready to show" in str(excinfo.value.__cause__)
+    assert window.startup_phase == "page_configured"
+    assert app.page.window.visible is False
+    await window.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_startup_timeout_after_page_exists_reports_phase() -> None:
+    app = FakeFletApp()
+
+    async def hang_ready() -> None:
+        await asyncio.Event().wait()
+
+    app.page.window.wait_until_ready_to_show = hang_ready
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=RecordingLifecycleSink().emit,
+        locale="en",
+        startup_timeout_s=0.05,
+        wait_until_ready_timeout_s=5.0,
+    )
+
+    with pytest.raises(RuntimeError, match="startup timed out before ready"):
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+
+    assert window.startup_phase == "page_configured"
+    await window.close()
+
+
 @pytest.mark.asyncio
 async def test_desktop_overlay_reasserts_topmost_after_locked_render_update() -> None:
     app = FakeFletApp()

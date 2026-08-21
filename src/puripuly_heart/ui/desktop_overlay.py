@@ -427,6 +427,8 @@ from puripuly_heart.ui.i18n import t_for_locale
 
 logger = logging.getLogger(__name__)
 
+DESKTOP_OVERLAY_RENDERER_STARTUP_TIMEOUT_S = 12.0
+DESKTOP_OVERLAY_WAIT_UNTIL_READY_TIMEOUT_S = 3.0
 _LOOPBACK_BRIDGE_HOSTS = {"127.0.0.1", "::1"}
 _SENSITIVE_EVENT_KEYS = {
     "accesstoken",
@@ -772,7 +774,8 @@ class FletDesktopRendererWindow:
         locale: str | None = None,
         logging_mode: str = "basic",
         bounds_debounce_s: float = 0.15,
-        startup_timeout_s: float = 5.0,
+        startup_timeout_s: float = DESKTOP_OVERLAY_RENDERER_STARTUP_TIMEOUT_S,
+        wait_until_ready_timeout_s: float = DESKTOP_OVERLAY_WAIT_UNTIL_READY_TIMEOUT_S,
         preview_catalog: DesktopOverlayPreviewCatalog | None = None,
         window_z_order_port: WindowZOrderPort | None = None,
         window_process_info_provider: FletProcessInfoProvider | None = None,
@@ -819,6 +822,7 @@ class FletDesktopRendererWindow:
         self._logging_mode = normalize_overlay_logging_mode(logging_mode)
         self._bounds_debounce_s = max(0.0, float(bounds_debounce_s))
         self._startup_timeout_s = max(0.1, float(startup_timeout_s))
+        self._wait_until_ready_timeout_s = max(0.1, float(wait_until_ready_timeout_s))
         self._preview_catalog = preview_catalog
         self._preview_fixture_id = preview_catalog.fixtures[0].id if preview_catalog else None
         self._preview_background_surface_id = _DESKTOP_PREVIEW_DEFAULT_BACKGROUND_SURFACE_ID
@@ -950,6 +954,11 @@ class FletDesktopRendererWindow:
             if ready_task not in done:
                 if self._app_task in done:
                     await self._app_task
+                if self._page is not None:
+                    phase = self.startup_phase or "launched"
+                    raise RuntimeError(
+                        f"desktop overlay startup timed out before ready (phase={phase})"
+                    )
                 raise RuntimeError("desktop overlay Flet page was not created")
             if self._page_start_error is not None:
                 if self._app_task.done():
@@ -1186,7 +1195,13 @@ class FletDesktopRendererWindow:
             page = self._page
             if page is None:
                 raise RuntimeError("desktop overlay Flet page is missing")
-            await invoke_control_method(page.window, "wait_until_ready_to_show")
+            try:
+                await asyncio.wait_for(
+                    invoke_control_method(page.window, "wait_until_ready_to_show"),
+                    timeout=self._wait_until_ready_timeout_s,
+                )
+            except TimeoutError as exc:
+                raise RuntimeError("desktop overlay native window was not ready to show") from exc
             coordinator.advance(DesktopOverlayStartupPhase.NATIVE_READY)
             bounds_confirmation = await self._confirm_window_bounds()
             coordinator.advance(

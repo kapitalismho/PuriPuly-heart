@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from typing import cast
 
 from puripuly_heart.app.services.overlay_application import (
+    OVERLAY_STARTUP_TIMEOUT_MS,
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
@@ -334,11 +335,26 @@ async def test_retry_every_enable_policy_retries_configured_steamvr_after_disabl
     request = owner._generation_request()
     assert request.target == "desktop"
     assert request.fallback_reason == "steamvr_not_running"
+    assert request.startup_timeout_ms == OVERLAY_STARTUP_TIMEOUT_MS
 
     await owner.set_enabled(False)
 
     assert owner.snapshot.fallback_active is False
     assert owner.effective_target_for_start() == "steamvr"
+
+
+async def test_overlay_startup_timeout_is_shared_for_desktop_and_steamvr() -> None:
+    recorder = Recorder()
+    owner = make_owner(recorder)
+
+    owner.active_target = "steamvr"
+    steamvr_request = owner._generation_request()
+    owner.active_target = "desktop"
+    desktop_request = owner._generation_request()
+
+    assert steamvr_request.startup_timeout_ms == OVERLAY_STARTUP_TIMEOUT_MS
+    assert desktop_request.startup_timeout_ms == OVERLAY_STARTUP_TIMEOUT_MS
+    assert OVERLAY_STARTUP_TIMEOUT_MS == 15000
 
 
 async def test_fallback_task_creation_failure_terminates_real_peer_activation() -> None:

@@ -49,7 +49,7 @@ from .overlay_session_transition import (
     OverlaySessionTransitionOwner,
 )
 
-OVERLAY_STARTUP_TIMEOUT_MS = 3000
+OVERLAY_STARTUP_TIMEOUT_MS = 15000
 OVERLAY_SHUTDOWN_GRACE_S = 0.05
 OVERLAY_STEAMVR_FALLBACK_POLICY: Literal["retry_every_enable"] = "retry_every_enable"
 OVERLAY_FAILURE_REASONS = frozenset(
