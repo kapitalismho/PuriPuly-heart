@@ -14,6 +14,9 @@ if TYPE_CHECKING:
 FONT_FAMILY_NANUM = "NanumSquareRound"
 FONT_FAMILY_MPLUS = "MPLUSRounded1c"
 FONT_FAMILY_RESOURCE_HAN_CN = "ResourceHanRoundedCN"
+FONT_FAMILY_NOTO_SANS = "Noto Sans"
+FONT_FAMILY_NOTO_SANS_CJK_JP = "Noto Sans CJK JP"
+_NOTO_CJK_FILENAME = "NotoSansCJK-Medium.ttc"
 
 DEFAULT_FONT_FAMILY = FOUNDATION_DESIGN_TOKENS.default_font_family
 
@@ -28,6 +31,8 @@ _FONT_FILE_CANDIDATES: dict[str, tuple[str, ...]] = {
         "MPLUSRounded1c-Bold.otf",
     ),
     FONT_FAMILY_RESOURCE_HAN_CN: ("ResourceHanRoundedCN-Bold.ttf",),
+    FONT_FAMILY_NOTO_SANS: (_NOTO_CJK_FILENAME,),
+    FONT_FAMILY_NOTO_SANS_CJK_JP: (_NOTO_CJK_FILENAME,),
 }
 
 

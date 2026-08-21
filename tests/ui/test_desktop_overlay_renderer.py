@@ -38,7 +38,11 @@ from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_WHITE,
     _DESKTOP_PREVIEW_BACKGROUND_ALPHA_PRESETS,
 )
-from puripuly_heart.ui.fonts import assets_dir
+from puripuly_heart.ui.fonts import (
+    FONT_FAMILY_NOTO_SANS,
+    FONT_FAMILY_NOTO_SANS_CJK_JP,
+    assets_dir,
+)
 
 
 def _manifest(**overrides: object) -> OverlayLaunchManifest:
@@ -2278,6 +2282,26 @@ def test_desktop_overlay_preview_fixtures_run_local_app_without_renderer_or_pers
         in visible_text
     )
     assert any("긴 문장" in text for text in visible_text)
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_registers_bundled_noto_cjk_on_the_flet_page() -> None:
+    app = FakeFletApp()
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=RecordingLifecycleSink().emit,
+        locale="en",
+        window_z_order_port=RecordingWindowZOrderPort(),
+        window_process_info_provider=lambda: (4321, None),
+    )
+
+    try:
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+    finally:
+        await window.close()
+
+    assert app.page.fonts[FONT_FAMILY_NOTO_SANS] == "/fonts/NotoSansCJK-Medium.ttc"
+    assert app.page.fonts[FONT_FAMILY_NOTO_SANS_CJK_JP] == "/fonts/NotoSansCJK-Medium.ttc"
 
 
 @pytest.mark.asyncio
