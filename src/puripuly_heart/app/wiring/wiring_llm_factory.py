@@ -38,6 +38,7 @@ from puripuly_heart.config.runtime_resolution import (
     PROVIDER_QWEN,
     TRANSLATION_CONNECTION_OFFICIAL_BYOK,
     TRANSLATION_MODEL_MANAGED_GEMMA,
+    TRANSLATION_MODEL_MANAGED_GEMMA_12B,
     TRANSLATION_MODEL_QWEN_35_PLUS,
     DirectProviderRuntimeIntent,
     RuntimeResolutionInput,
@@ -217,6 +218,12 @@ def _runtime_resolution_input_from_compatibility_settings(
     elif settings.translation.model == TranslationModel.MANAGED_GEMMA:
         translation_intent = normalize_translation_runtime_intent(
             model=TRANSLATION_MODEL_MANAGED_GEMMA,
+            connection=settings.translation.connection.value,
+            concurrency_limit=settings.llm.concurrency_limit,
+        )
+    elif settings.translation.model == TranslationModel.MANAGED_GEMMA_12B:
+        translation_intent = normalize_translation_runtime_intent(
+            model=TRANSLATION_MODEL_MANAGED_GEMMA_12B,
             connection=settings.translation.connection.value,
             concurrency_limit=settings.llm.concurrency_limit,
         )

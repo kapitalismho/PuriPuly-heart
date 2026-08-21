@@ -312,6 +312,7 @@ class TranslationModel(str, Enum):
     GEMINI_31_FLASH_LITE = "gemini31_flash_lite"
     QWEN_35_PLUS = "qwen35_plus"
     MANAGED_GEMMA = "managed_gemma"
+    MANAGED_GEMMA_12B = "managed_gemma_12b"
     LOCAL_LLM = "local_llm"
     CUSTOM_HTTP = "custom_http"
 
@@ -342,7 +343,10 @@ class TranslationFallbackSettings:
             raise ValueError("invalid translation fallback connection")
         if self.model == TranslationModel.CUSTOM_HTTP:
             raise ValueError("custom HTTP translation cannot be used as fallback")
-        if self.model == TranslationModel.MANAGED_GEMMA:
+        if self.model in (
+            TranslationModel.MANAGED_GEMMA,
+            TranslationModel.MANAGED_GEMMA_12B,
+        ):
             raise ValueError("managed local Gemma cannot be used as provider fallback")
         if self.connection not in _supported_translation_connections(self.model):
             raise ValueError("translation fallback connection is not supported for model")
@@ -430,6 +434,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[TranslationModel, tuple[TranslationConnec
         TranslationConnection.CPU,
         TranslationConnection.GPU,
     ),
+    TranslationModel.MANAGED_GEMMA_12B: (TranslationConnection.GPU,),
     TranslationModel.LOCAL_LLM: (TranslationConnection.OLLAMA,),
     TranslationModel.CUSTOM_HTTP: (TranslationConnection.CUSTOM_HTTP,),
 }
@@ -2753,7 +2758,7 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
         return settings
 
-    if model == TranslationModel.MANAGED_GEMMA:
+    if model in (TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B):
         settings.provider.llm = LLMProviderName.MANAGED_GEMMA
         settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
         return settings
@@ -2999,7 +3004,10 @@ def _apply_materialized_translation_to_data(
         changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.LOCAL_LLM.value)
         return changed
 
-    if translation.model == TranslationModel.MANAGED_GEMMA:
+    if translation.model in (
+        TranslationModel.MANAGED_GEMMA,
+        TranslationModel.MANAGED_GEMMA_12B,
+    ):
         changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.MANAGED_GEMMA.value)
         changed |= _set_mapping_value(
             openrouter_data,

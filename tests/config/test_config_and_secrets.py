@@ -479,6 +479,7 @@ def test_translation_model_public_member_names_and_values_match_plan() -> None:
         ("GEMINI_31_FLASH_LITE", "gemini31_flash_lite"),
         ("QWEN_35_PLUS", "qwen35_plus"),
         ("MANAGED_GEMMA", "managed_gemma"),
+        ("MANAGED_GEMMA_12B", "managed_gemma_12b"),
         ("LOCAL_LLM", "local_llm"),
         ("CUSTOM_HTTP", "custom_http"),
     )

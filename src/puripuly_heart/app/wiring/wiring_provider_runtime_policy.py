@@ -20,7 +20,10 @@ def build_llm_provider_signature(
     *,
     http_extensions: HttpExtensionRegistry | None = None,
 ) -> tuple[object, ...]:
-    managed_gemma_selected = settings.translation.model == TranslationModel.MANAGED_GEMMA
+    managed_gemma_selected = settings.translation.model in (
+        TranslationModel.MANAGED_GEMMA,
+        TranslationModel.MANAGED_GEMMA_12B,
+    )
     primary_uses_openrouter = settings.provider.llm == LLMProviderName.OPENROUTER
     fallback_uses_openrouter = bool(
         not managed_gemma_selected

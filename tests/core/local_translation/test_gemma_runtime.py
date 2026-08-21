@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 import puripuly_heart.core.local_translation.runtime as runtime_module
+from puripuly_heart.core.local_translation.assets import GEMMA_12B_SPEC
 from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaMetrics,
     ManagedGemmaResponse,
@@ -460,6 +461,27 @@ async def test_gpu_device_change_restarts_runtime_with_new_device(tmp_path: Path
     second_device = commands[1].index("--device")
     assert commands[0][first_device + 1] == "Vulkan0"
     assert commands[1][second_device + 1] == "Vulkan1"
+
+
+@pytest.mark.asyncio
+async def test_model_spec_change_restarts_runtime_without_mtp(tmp_path: Path) -> None:
+    owner, commands, processes, _transports, provision_calls, _logs = _runtime(tmp_path)
+    arguments = {
+        "backend": "gpu",
+        "source_language": "ko",
+        "target_language": "en",
+        "system_prompt": "translate",
+    }
+
+    await owner.prepare(**arguments)
+    await owner.prepare(**arguments, spec=GEMMA_12B_SPEC)
+
+    assert len(commands) == 2
+    assert len(provision_calls) == 2
+    assert processes[0].terminated
+    assert provision_calls[1]["spec"] == GEMMA_12B_SPEC
+    assert str(tmp_path / "models" / GEMMA_12B_SPEC.model_filename) in commands[1]
+    assert not any(item.startswith("--spec-") for item in commands[1])
 
 
 @pytest.mark.asyncio

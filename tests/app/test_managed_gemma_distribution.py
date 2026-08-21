@@ -96,6 +96,7 @@ def test_runtime_archive_stages_only_server_dependency_closure(tmp_path: Path) -
     [
         "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
         "mtp-gemma-4-E4B-it.gguf",
+        "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
         "mmproj-model-f16.gguf",
     ],
 )
@@ -360,6 +361,8 @@ def test_release_paths_prepare_verify_and_install_pinned_runtime_without_gemma_d
         "unsloth/gemma-4-E4B-it-qat-GGUF",
         "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
         "mtp-gemma-4-E4B-it.gguf",
+        "unsloth/gemma-4-12B-it-qat-GGUF",
+        "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
     ):
         assert forbidden not in installer
 

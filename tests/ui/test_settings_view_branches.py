@@ -1485,6 +1485,32 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
     assert applies == [True, True]
 
 
+def test_managed_gemma_12b_selection_auto_applies_gpu_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_37_FLASH,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+    )
+    settings.provider.llm = LLMProviderName.GEMINI
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    applies: list[bool] = []
+    view.on_providers_changed = lambda: applies.append(True)
+
+    view._on_llm_selected(TranslationModel.MANAGED_GEMMA_12B.value)
+
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.translation.model == TranslationModel.MANAGED_GEMMA_12B
+    assert pending.translation.connection == TranslationConnection.GPU
+    assert pending.provider.llm == LLMProviderName.MANAGED_GEMMA
+    assert applies == [True]
+    assert view._openrouter_fallback_card.visible is False
+    assert view._translation_connection_row.visible is False
+    assert view._get_llm_display_label(pending) == t("provider.managed_gemma_12b")
+
+
 def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

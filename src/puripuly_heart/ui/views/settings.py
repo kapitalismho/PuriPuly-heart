@@ -172,6 +172,7 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.MANAGED_GEMMA: "provider.managed_gemma",
+    TranslationModel.MANAGED_GEMMA_12B: "provider.managed_gemma_12b",
     TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
     TranslationModel.GEMMA4_31B: "provider.gemma4_31b",
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
@@ -199,6 +200,7 @@ _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
 _TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY = "settings.translation_connection.only_supported"
 _TRANSLATION_MODELS = (
     TranslationModel.MANAGED_GEMMA,
+    TranslationModel.MANAGED_GEMMA_12B,
     TranslationModel.GEMMA4_26B_31B,
     TranslationModel.GEMMA4_31B,
     TranslationModel.GEMMA4,
@@ -219,6 +221,7 @@ _TRANSLATION_MODEL_SECTION_ORDER = (
 )
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.recommended_local",
+    TranslationModel.MANAGED_GEMMA_12B: "settings.translation_model.section.gpu_inference",
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.GEMMA4_31B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended_cloud",
@@ -3908,7 +3911,9 @@ class SettingsView(ft.Column):
         )
         self._sync_openrouter_pkce_button_state(settings)
         self._translation_connection_row.visible = (
-            not is_custom_http and settings.translation.model != TranslationModel.MANAGED_GEMMA
+            not is_custom_http
+            and settings.translation.model
+            not in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
         )
         self._local_llm_connection_card.visible = (
             not is_custom_http and llm == LLMProviderName.LOCAL_LLM
@@ -3924,7 +3929,8 @@ class SettingsView(ft.Column):
         openrouter_fallback_card = getattr(self, "_openrouter_fallback_card", None)
         if openrouter_fallback_card is not None:
             openrouter_fallback_card.visible = not is_custom_http and (
-                settings.translation.model != TranslationModel.MANAGED_GEMMA
+                settings.translation.model
+                not in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
             )
         self._sync_http_extension_card(settings)
 
@@ -4251,8 +4257,8 @@ class SettingsView(ft.Column):
 
         if (
             connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
-            or model == TranslationModel.MANAGED_GEMMA
-            or old_model == TranslationModel.MANAGED_GEMMA
+            or model in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
+            or old_model in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
         ) and getattr(self, "on_providers_changed", None) is not None:
             self.on_providers_changed()
 
@@ -4321,7 +4327,7 @@ class SettingsView(ft.Column):
             if display_settings is not None
             else TranslationModel.GEMMA4
         )
-        if model == TranslationModel.MANAGED_GEMMA:
+        if model in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}:
             return
         connections = supported_translation_connections(model)
         options = [
@@ -4368,10 +4374,10 @@ class SettingsView(ft.Column):
         if not is_control_mounted(self):
             return
         display_settings = self._build_settings_with_provider_draft()
-        if (
-            display_settings is not None
-            and display_settings.translation.model == TranslationModel.MANAGED_GEMMA
-        ):
+        if display_settings is not None and display_settings.translation.model in {
+            TranslationModel.MANAGED_GEMMA,
+            TranslationModel.MANAGED_GEMMA_12B,
+        }:
             return
         options: list[OptionItem] = [
             OptionItem(

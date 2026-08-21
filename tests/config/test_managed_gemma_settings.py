@@ -26,6 +26,15 @@ def test_managed_gemma_exposes_exact_cpu_gpu_product_choices() -> None:
     )
 
 
+def test_managed_gemma_12b_exposes_gpu_only_product_choice() -> None:
+    assert supported_translation_connections(TranslationModel.MANAGED_GEMMA_12B) == (
+        TranslationConnection.GPU,
+    )
+    assert default_translation_connection(TranslationModel.MANAGED_GEMMA_12B) == (
+        TranslationConnection.GPU
+    )
+
+
 @pytest.mark.parametrize(
     "connection",
     [TranslationConnection.CPU, TranslationConnection.GPU],
@@ -57,11 +66,41 @@ def test_managed_gemma_materializes_and_round_trips_as_distinct_provider(
     assert restored.intent.translation.fallback.enabled is True
 
 
+def test_managed_gemma_12b_materializes_and_round_trips_as_gpu_local_model() -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.MANAGED_GEMMA_12B,
+        connection=TranslationConnection.GPU,
+    )
+
+    materialize_translation_settings(settings)
+    canonical = migration.from_legacy_app_settings(settings)
+    serialized = serialization.to_dict(canonical)
+    restored = migration.from_dict(serialized)
+
+    assert settings.provider.llm == LLMProviderName.MANAGED_GEMMA
+    assert serialized["intent"]["translation"]["model"] == "managed_gemma_12b"
+    assert serialized["intent"]["translation"]["connection"] == TranslationConnection.GPU.value
+    assert restored.intent.translation.model == "managed_gemma_12b"
+    assert restored.intent.translation.connection == TranslationConnection.GPU.value
+
+
 def test_managed_gemma_cannot_be_configured_as_provider_fallback() -> None:
     fallback = TranslationFallbackSettings(
         enabled=True,
         model=TranslationModel.MANAGED_GEMMA,
         connection=TranslationConnection.CPU,
+    )
+
+    with pytest.raises(ValueError, match="cannot be used as provider fallback"):
+        fallback.validate()
+
+
+def test_managed_gemma_12b_cannot_be_configured_as_provider_fallback() -> None:
+    fallback = TranslationFallbackSettings(
+        enabled=True,
+        model=TranslationModel.MANAGED_GEMMA_12B,
+        connection=TranslationConnection.GPU,
     )
 
     with pytest.raises(ValueError, match="cannot be used as provider fallback"):
