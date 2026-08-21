@@ -41,6 +41,32 @@ class RecordingOutput:
             self.trace.append(("output", submission.sequence, submission.outcome))
 
 
+def _translated_result(child: TranslationTurnChild) -> TranslationTurnProcessResult:
+    return TranslationTurnProcessResult(
+        "translated",
+        TranslationOutputSubmission(
+            parent_utterance_id=child.parent_utterance_id,
+            child_utterance_id=child.utterance_id,
+            sequence=child.sequence,
+            channel=child.channel,
+            source=child.source,
+            source_text=child.transcript.text,
+            source_language="en",
+            target_language=child.target_language,
+            outcome="translated",
+            config_snapshot=child.config_snapshot,
+            translation=Translation(
+                utterance_id=child.utterance_id,
+                text="안녕",
+                source_text=child.transcript.text,
+                source_language="en",
+                target_language=child.target_language,
+                channel=child.channel,
+            ),
+        ),
+    )
+
+
 def _request(
     *,
     parent_id: UUID,
@@ -597,3 +623,153 @@ async def test_same_channel_predecessor_wait_is_observed_without_source_text() -
         "predecessor_wait_start",
         "predecessor_wait_end",
     ]
+
+
+@pytest.mark.asyncio
+async def test_blocked_overlay_does_not_delay_next_same_channel_llm() -> None:
+    first_overlay_released = asyncio.Event()
+    events: list[str] = []
+
+    async def process(child: TranslationTurnChild, _cancellation_requested):
+        events.append(f"llm:{child.transcript.text}")
+        return _translated_result(child)
+
+    class BlockingOutput:
+        async def submit_translation_output(
+            self,
+            submission: TranslationOutputSubmission,
+        ) -> None:
+            events.append(f"overlay-start:{submission.source_text}")
+            if submission.source_text == "first":
+                await first_overlay_released.wait()
+            events.append(f"overlay-end:{submission.source_text}")
+
+    owner = _owner(process_child=process, output=BlockingOutput())
+    try:
+        await owner.submit(
+            _request(
+                parent_id=uuid4(),
+                turn_kind="self",
+                runs=(FinalLanguageRun("first", "en"),),
+            )
+        )
+        await owner.submit(
+            _request(
+                parent_id=uuid4(),
+                turn_kind="self",
+                runs=(FinalLanguageRun("second", "en"),),
+            )
+        )
+        for _ in range(50):
+            if "llm:second" in events:
+                break
+            await asyncio.sleep(0)
+        assert events == [
+            "llm:first",
+            "overlay-start:first",
+            "llm:second",
+        ]
+        first_overlay_released.set()
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+    assert events == [
+        "llm:first",
+        "overlay-start:first",
+        "llm:second",
+        "overlay-end:first",
+        "overlay-start:second",
+        "overlay-end:second",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_same_channel_output_order_follows_submission_order() -> None:
+    started: list[str] = []
+    output = RecordingOutput()
+
+    async def process(child: TranslationTurnChild, _cancellation_requested):
+        started.append(child.transcript.text)
+        return _translated_result(child)
+
+    owner = _owner(process_child=process, output=output)
+    try:
+        await owner.submit(
+            _request(
+                parent_id=uuid4(),
+                turn_kind="self",
+                runs=(FinalLanguageRun("first", "en"),),
+            )
+        )
+        await owner.submit(
+            _request(
+                parent_id=uuid4(),
+                turn_kind="self",
+                runs=(FinalLanguageRun("second", "en"),),
+            )
+        )
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+    assert started == ["first", "second"]
+    assert [submission.source_text for submission in output.submissions] == [
+        "first",
+        "second",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_unexecuted_child_does_not_hold_semantic_gate_on_overlay() -> None:
+    overlay_released = asyncio.Event()
+    events: list[str] = []
+
+    async def created(child: TranslationTurnChild) -> None:
+        events.append(f"created:{child.transcript.text}")
+        if child.transcript.text == "a1":
+            raise RuntimeError("create failed")
+
+    async def process(child: TranslationTurnChild, _cancellation_requested):
+        events.append(f"llm:{child.transcript.text}")
+        return _translated_result(child)
+
+    class BlockingOutput:
+        async def submit_translation_output(
+            self,
+            submission: TranslationOutputSubmission,
+        ) -> None:
+            events.append(f"overlay-start:{submission.source_text}")
+            if submission.source_text == "a2":
+                await overlay_released.wait()
+            events.append(f"overlay-end:{submission.source_text}")
+
+    owner = _owner(process_child=process, output=BlockingOutput())
+    owner.on_child_created = created
+    try:
+        await owner.submit(
+            _request(
+                parent_id=uuid4(),
+                turn_kind="peer",
+                runs=(FinalLanguageRun("a1", "en"), FinalLanguageRun("a2", "ja")),
+            )
+        )
+        await owner.submit(
+            _request(
+                parent_id=uuid4(),
+                turn_kind="peer",
+                runs=(FinalLanguageRun("b", "en"),),
+            )
+        )
+        for _ in range(50):
+            if "llm:b" in events:
+                break
+            await asyncio.sleep(0)
+        assert "llm:a2" in events
+        assert "llm:b" in events
+        assert "overlay-start:a2" in events
+        assert "overlay-end:a2" not in events
+        overlay_released.set()
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+    assert "llm:a1" not in events
+    assert events[-2:] == ["overlay-start:b", "overlay-end:b"]

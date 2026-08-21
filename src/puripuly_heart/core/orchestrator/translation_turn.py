@@ -136,6 +136,8 @@ class _TranslationTurnParent:
     channel: ChannelId
     children: tuple[TranslationTurnChild, ...]
     completed_child_ids: set[UUID] = field(default_factory=set)
+    semantic_completed_child_ids: set[UUID] = field(default_factory=set)
+    semantic_done_event: asyncio.Event = field(default_factory=asyncio.Event)
     closed_event: asyncio.Event = field(default_factory=asyncio.Event)
     closed: bool = False
 
@@ -215,7 +217,9 @@ class TranslationTurnLifecycleOwner:
                 "child tasks",
                 "parent/child terminal state",
             ),
-            "ordering": "submission FIFO within each channel",
+            "ordering": (
+                "same-channel LLM admission waits on predecessor semantic completion"
+            ),
             "stop_ingress": "stop accepting translation turns",
             "shutdown_policy": "cancel parent tasks, terminalize unfinished children, await scope",
             "late_callback_rule": "closed parents reject child completion and output submission",
@@ -437,7 +441,7 @@ class TranslationTurnLifecycleOwner:
                     parent=parent,
                     predecessor=predecessor,
                 )
-                await predecessor.closed_event.wait()
+                await predecessor.semantic_done_event.wait()
                 self._observe_predecessor_wait(
                     "predecessor_wait_end",
                     parent=parent,
@@ -449,7 +453,7 @@ class TranslationTurnLifecycleOwner:
                 if self.is_child_cancellation_requested(child):
                     await self._terminalize_child(child, "cancelled")
                     continue
-                await self._run_child(child)
+                await self._run_child(child, predecessor)
         except asyncio.CancelledError:
             await self._terminalize_parent_remaining(parent, "cancelled")
             raise
@@ -478,10 +482,14 @@ class TranslationTurnLifecycleOwner:
             },
         )
 
-    async def _run_child(self, child: TranslationTurnChild) -> None:
+    async def _run_child(
+        self,
+        child: TranslationTurnChild,
+        predecessor: _TranslationTurnParent | None,
+    ) -> None:
         child_task = start_lifecycle_task(
             self._scope,
-            self._execute_started_child(child),
+            self._execute_started_child(child, predecessor),
             name=f"child:{child.utterance_id}",
             eager_start=True,
         )
@@ -505,21 +513,26 @@ class TranslationTurnLifecycleOwner:
     async def _execute_started_child(
         self,
         child: TranslationTurnChild,
+        predecessor: _TranslationTurnParent | None,
     ) -> TranslationTurnProcessResult:
         child_task = asyncio.current_task()
         if child_task is None:
             raise RuntimeError("translation child task is unavailable")
         await self.on_child_started(child, child_task)
-        return await self._execute_child(child)
+        return await self._execute_child(child, predecessor)
 
     async def _execute_child(
         self,
         child: TranslationTurnChild,
+        predecessor: _TranslationTurnParent | None,
     ) -> TranslationTurnProcessResult:
         result = await self._process_child(child)
         if self.is_child_cancellation_requested(child):
             await self._terminalize_child(child, "cancelled")
             raise asyncio.CancelledError
+        self._mark_child_semantic_done(child)
+        if predecessor is not None:
+            await predecessor.closed_event.wait()
         if result.output is not None and self.output is not None:
             try:
                 await self.output.submit_translation_output(result.output)
@@ -530,6 +543,14 @@ class TranslationTurnLifecycleOwner:
                 result = TranslationTurnProcessResult("failed")
         await self._terminalize_child(child, result.outcome)
         return result
+
+    def _mark_child_semantic_done(self, child: TranslationTurnChild) -> None:
+        parent = self._parents.get(child.parent_utterance_id)
+        if parent is None or parent.closed:
+            return
+        parent.semantic_completed_child_ids.add(child.utterance_id)
+        if parent.semantic_completed_child_ids == set(parent.child_ids):
+            parent.semantic_done_event.set()
 
     async def _process_child(self, child: TranslationTurnChild) -> TranslationTurnProcessResult:
         try:
@@ -589,6 +610,7 @@ class TranslationTurnLifecycleOwner:
             logger.exception("translation child terminal adapter failed")
         finally:
             parent.completed_child_ids.add(child.utterance_id)
+            self._mark_child_semantic_done(child)
             if parent.completed_child_ids == set(parent.child_ids):
                 await self._close_parent(parent)
 
@@ -607,6 +629,7 @@ class TranslationTurnLifecycleOwner:
             except Exception:
                 logger.exception("translation parent closure adapter failed")
         finally:
+            parent.semantic_done_event.set()
             parent.closed_event.set()
 
 
