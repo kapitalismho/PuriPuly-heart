@@ -20,8 +20,12 @@ from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 from puripuly_heart.ui.fonts import (
     FONT_FAMILY_NOTO_SANS,
     FONT_FAMILY_NOTO_SANS_CJK_JP,
+    FONT_FAMILY_NOTO_SANS_CJK_KR,
+    FONT_FAMILY_NOTO_SANS_CJK_SC,
+    FONT_FAMILY_NOTO_SANS_CJK_TC,
     assets_dir,
     font_asset_path,
+    noto_cjk_family_for_ui_locale,
     register_fonts,
 )
 from puripuly_heart.ui.foundation.adapter import FletFoundationAdapter
@@ -253,7 +257,10 @@ def test_foundation_resource_locator_is_cwd_independent_and_read_only(
     assert assets_dir() == DEFAULT_FOUNDATION_RESOURCES.assets_root
     assert font_asset_path("NanumSquareRound") == "/fonts/NanumSquareRoundEB.ttf"
     assert font_asset_path(FONT_FAMILY_NOTO_SANS) == "/fonts/NotoSansCJK-Medium.ttc"
+    assert font_asset_path(FONT_FAMILY_NOTO_SANS_CJK_KR) == "/fonts/NotoSansCJK-Medium.ttc"
     assert font_asset_path(FONT_FAMILY_NOTO_SANS_CJK_JP) == "/fonts/NotoSansCJK-Medium.ttc"
+    assert font_asset_path(FONT_FAMILY_NOTO_SANS_CJK_SC) == "/fonts/NotoSansCJK-Medium.ttc"
+    assert font_asset_path(FONT_FAMILY_NOTO_SANS_CJK_TC) == "/fonts/NotoSansCJK-Medium.ttc"
     assert not {
         "write",
         "write_bytes",
@@ -275,8 +282,19 @@ def test_register_fonts_maps_desktop_overlay_caption_families_to_bundled_noto_cj
     register_fonts(page)
 
     assert page.fonts[FONT_FAMILY_NOTO_SANS] == "/fonts/NotoSansCJK-Medium.ttc"
+    assert page.fonts[FONT_FAMILY_NOTO_SANS_CJK_KR] == "/fonts/NotoSansCJK-Medium.ttc"
     assert page.fonts[FONT_FAMILY_NOTO_SANS_CJK_JP] == "/fonts/NotoSansCJK-Medium.ttc"
+    assert page.fonts[FONT_FAMILY_NOTO_SANS_CJK_SC] == "/fonts/NotoSansCJK-Medium.ttc"
+    assert page.fonts[FONT_FAMILY_NOTO_SANS_CJK_TC] == "/fonts/NotoSansCJK-Medium.ttc"
     assert page.fonts["NanumSquareRound"] == "/fonts/NanumSquareRoundEB.ttf"
+
+
+def test_noto_cjk_family_follows_ui_locale() -> None:
+    assert noto_cjk_family_for_ui_locale("ko") == FONT_FAMILY_NOTO_SANS_CJK_KR
+    assert noto_cjk_family_for_ui_locale("ja") == FONT_FAMILY_NOTO_SANS_CJK_JP
+    assert noto_cjk_family_for_ui_locale("zh-CN") == FONT_FAMILY_NOTO_SANS_CJK_SC
+    assert noto_cjk_family_for_ui_locale("en") == FONT_FAMILY_NOTO_SANS_CJK_JP
+    assert noto_cjk_family_for_ui_locale("ru") == FONT_FAMILY_NOTO_SANS_CJK_JP
 
 
 def test_foundation_preview_copy_has_distinct_inputs_for_all_five_locales() -> None:
