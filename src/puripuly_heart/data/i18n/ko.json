@@ -486,7 +486,6 @@
   "dashboard.managed_gemma_notice.failed": "로컬 번역 모델을 준비하지 못했어요.",
   "dashboard.managed_gemma_notice.cancelled": "로컬 번역 모델 설정을 취소했어요.",
   "dashboard.managed_gemma_action.cancel": "취소",
-  "dashboard.managed_gemma_action.retry": "다시 시도",
   "dashboard.gpu_action.install": "설치",
   "dashboard.gpu_action.repair": "복구",
   "dashboard.gpu_action.reinstall": "다시 설치",

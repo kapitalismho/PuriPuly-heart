@@ -128,4 +128,3 @@ def test_every_managed_gemma_status_renders_text_and_tone(status: str) -> None:
 def test_managed_gemma_notice_actions_are_localized() -> None:
     assert managed_gemma_action_label(None) is None
     assert managed_gemma_action_label("cancel") == ("i18n:dashboard.managed_gemma_action.cancel")
-    assert managed_gemma_action_label("retry") == ("i18n:dashboard.managed_gemma_action.retry")

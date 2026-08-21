@@ -486,7 +486,6 @@
   "dashboard.managed_gemma_notice.failed": "Couldn't prepare the local translation model.",
   "dashboard.managed_gemma_notice.cancelled": "Local translation model setup was cancelled.",
   "dashboard.managed_gemma_action.cancel": "Cancel",
-  "dashboard.managed_gemma_action.retry": "Retry",
   "dashboard.gpu_action.install": "Install",
   "dashboard.gpu_action.repair": "Repair",
   "dashboard.gpu_action.reinstall": "Install again",

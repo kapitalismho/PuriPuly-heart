@@ -453,11 +453,13 @@ def compose_application_runtime(
         if snapshot.error_type is not None:
             fields.append(f"error_type={snapshot.error_type}")
         log_detailed("[ManagedGemma] " + " ".join(fields))
-        if snapshot.state in {"checking", "downloading", "preparing"}:
-            action = None
-        elif snapshot.state in {"failed", "cancelled"}:
-            action = "retry"
-        else:
+        if snapshot.state not in {
+            "checking",
+            "downloading",
+            "preparing",
+            "failed",
+            "cancelled",
+        }:
             presentation.set_dashboard_managed_gemma_notice(None)
             return
         presentation.set_dashboard_managed_gemma_notice(
@@ -465,7 +467,6 @@ def compose_application_runtime(
                 status=snapshot.state,
                 backend=snapshot.backend,
                 progress_percent=snapshot.progress_percent,
-                action=action,
             )
         )
 

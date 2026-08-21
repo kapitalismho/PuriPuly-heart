@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 GpuNoticeAction = Literal["install", "repair", "reinstall", "rediscover", "restart"]
-ManagedGemmaNoticeAction = Literal["cancel", "retry"]
+ManagedGemmaNoticeAction = Literal["cancel"]
 
 
 @dataclass

@@ -82,7 +82,6 @@ MANAGED_GEMMA_NOTICE_TONES = {
 }
 MANAGED_GEMMA_ACTION_KEYS = {
     "cancel": "dashboard.managed_gemma_action.cancel",
-    "retry": "dashboard.managed_gemma_action.retry",
 }
 
 

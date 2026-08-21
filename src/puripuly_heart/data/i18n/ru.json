@@ -486,7 +486,6 @@
   "dashboard.managed_gemma_notice.failed": "Не удалось подготовить локальную модель перевода.",
   "dashboard.managed_gemma_notice.cancelled": "Настройка локальной модели перевода отменена.",
   "dashboard.managed_gemma_action.cancel": "Отмена",
-  "dashboard.managed_gemma_action.retry": "Повторить",
   "dashboard.gpu_action.install": "Установить",
   "dashboard.gpu_action.repair": "Восстановить",
   "dashboard.gpu_action.reinstall": "Установить снова",

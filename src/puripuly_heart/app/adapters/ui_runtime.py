@@ -355,11 +355,6 @@ class UiProviderRuntimeAdapter:
     ) -> object:
         if action == "cancel":
             return False if self.managed_gemma is None else self.managed_gemma.cancel()
-        if action == "retry":
-            return await self.apply_providers(
-                force_rebuild_llm=True,
-                persist_settings=False,
-            )
         raise ValueError(f"unsupported managed Gemma notice action: {action}")
 
 

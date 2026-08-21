@@ -95,22 +95,3 @@ async def test_managed_gemma_notice_cancel_targets_owned_prepare() -> None:
 
     assert await adapter.handle_managed_gemma_notice_action("cancel") is True
     assert cancel_calls == [True]
-
-
-@pytest.mark.asyncio
-async def test_managed_gemma_notice_retry_rebuilds_current_selection_without_persisting() -> None:
-    settings = AppSettings()
-    apply = AsyncMock(return_value=True)
-    adapter = _adapter(
-        settings,
-        change_secret=AsyncMock(),
-        apply=apply,
-    )
-
-    assert await adapter.handle_managed_gemma_notice_action("retry") is True
-    apply.assert_awaited_once_with(
-        None,
-        force_rebuild_llm=True,
-        persist_settings=False,
-        refresh_ui=True,
-    )

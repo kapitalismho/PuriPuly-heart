@@ -486,7 +486,6 @@
   "dashboard.managed_gemma_notice.failed": "未能准备本地翻译模型。",
   "dashboard.managed_gemma_notice.cancelled": "已取消本地翻译模型设置。",
   "dashboard.managed_gemma_action.cancel": "取消",
-  "dashboard.managed_gemma_action.retry": "重试",
   "dashboard.gpu_action.install": "安装",
   "dashboard.gpu_action.repair": "修复",
   "dashboard.gpu_action.reinstall": "重新安装",
