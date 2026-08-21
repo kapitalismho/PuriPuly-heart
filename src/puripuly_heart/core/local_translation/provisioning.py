@@ -26,7 +26,6 @@ from puripuly_heart.core.local_translation.assets import (
     GEMMA_REPO_ID,
     GEMMA_REVISION,
     GemmaAsset,
-    GemmaAssetError,
     InstalledGemmaManifest,
     default_gemma_install_dir,
     inspect_gemma_install,
@@ -230,19 +229,14 @@ async def _ensure_gemma_installed_with_lease(
     total_bytes = sum(asset.size_bytes for asset in GEMMA_ASSETS)
     _raise_if_cancelled(cancel_event)
     state = inspect_gemma_install(resolved)
-    if state.status == "ready":
-        try:
-            installed = await asyncio.to_thread(validate_gemma_install, resolved)
-        except GemmaAssetError:
-            pass
-        else:
-            await _emit(
-                on_status,
-                state="ready",
-                downloaded_bytes=total_bytes,
-                total_bytes=total_bytes,
-            )
-            return installed
+    if state.status == "ready" and state.manifest is not None:
+        await _emit(
+            on_status,
+            state="ready",
+            downloaded_bytes=total_bytes,
+            total_bytes=total_bytes,
+        )
+        return state.manifest
 
     if downloader is None:
         from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (

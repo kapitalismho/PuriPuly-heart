@@ -132,6 +132,29 @@ async def test_valid_install_is_reused_without_downloading(tmp_path, monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_valid_install_reuse_skips_checksum(tmp_path, monkeypatch) -> None:
+    contents = _pin_small_assets(monkeypatch)
+    downloader = FakeDownloader(contents)
+    install_dir = tmp_path / "gemma"
+    await provisioning.ensure_gemma_installed(
+        downloader=downloader,
+        install_dir=install_dir,
+    )
+
+    def fail_if_hashed(_path) -> str:
+        raise AssertionError("ready install must not hash files")
+
+    monkeypatch.setattr(assets, "_sha256_file", fail_if_hashed)
+
+    reused = await provisioning.ensure_gemma_installed(
+        downloader=downloader,
+        install_dir=install_dir,
+    )
+
+    assert reused == assets.InstalledGemmaManifest.expected()
+
+
+@pytest.mark.asyncio
 async def test_failed_repair_preserves_existing_install(tmp_path, monkeypatch) -> None:
     contents = _pin_small_assets(monkeypatch)
     install_dir = tmp_path / "gemma"
