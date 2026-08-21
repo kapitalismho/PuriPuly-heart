@@ -192,12 +192,11 @@ class _AsyncioOverlayProcess:
                 if event is not None:
                     await self._events.put(event)
                     continue
-                if (
-                    line
-                    and self._diagnostics is not None
-                    and self._should_capture_failure_line(line, stream_name)
-                ):
-                    self._diagnostics.record_child_line(stream_name, line)
+                if line and self._diagnostics is not None:
+                    if self._diagnostics.ingest_native_child_line(line):
+                        pass
+                    elif self._should_capture_failure_line(line, stream_name):
+                        self._diagnostics.record_child_line(stream_name, line)
                 self._log_passthrough_line(line, stream_name)
         except asyncio.CancelledError:
             raise

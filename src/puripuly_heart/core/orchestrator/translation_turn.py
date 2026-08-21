@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 from uuid import UUID, uuid5
@@ -166,6 +166,7 @@ class TranslationTurnLifecycleOwner:
     on_child_terminal: ChildTerminal
     on_parent_closed: ParentClosed
     on_parent_rejected: ParentRejected
+    predecessor_wait_observer: Callable[[str, Mapping[str, object]], None] | None = None
     output: TranslationOutputSubmissionPort | None = None
     config_snapshot: TranslationRuntimeConfigSnapshotPort = _default_config_snapshot
     policy: TranslationRuntimePolicy = field(default_factory=TranslationRuntimePolicy)
@@ -431,7 +432,17 @@ class TranslationTurnLifecycleOwner:
     ) -> None:
         try:
             if predecessor is not None:
+                self._observe_predecessor_wait(
+                    "predecessor_wait_start",
+                    parent=parent,
+                    predecessor=predecessor,
+                )
                 await predecessor.closed_event.wait()
+                self._observe_predecessor_wait(
+                    "predecessor_wait_end",
+                    parent=parent,
+                    predecessor=predecessor,
+                )
             for child in parent.children:
                 if child.utterance_id in parent.completed_child_ids:
                     continue
@@ -447,6 +458,25 @@ class TranslationTurnLifecycleOwner:
             await self._terminalize_parent_remaining(parent, "failed")
         finally:
             self._parent_tasks.pop(parent.parent_utterance_id, None)
+
+    def _observe_predecessor_wait(
+        self,
+        event: str,
+        *,
+        parent: _TranslationTurnParent,
+        predecessor: _TranslationTurnParent,
+    ) -> None:
+        if self.predecessor_wait_observer is None:
+            return
+        self.predecessor_wait_observer(
+            event,
+            {
+                "channel": parent.channel,
+                "parent_utterance_id": str(parent.parent_utterance_id),
+                "predecessor_utterance_id": str(predecessor.parent_utterance_id),
+                "active_parent_count": len(self._parents),
+            },
+        )
 
     async def _run_child(self, child: TranslationTurnChild) -> None:
         child_task = start_lifecycle_task(

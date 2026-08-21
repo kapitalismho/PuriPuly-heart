@@ -72,6 +72,7 @@ def _owner(
     process_child=None,
     output=None,
     trace=None,
+    predecessor_wait_observer=None,
 ) -> TranslationTurnLifecycleOwner:
     events = trace if trace is not None else []
 
@@ -102,6 +103,7 @@ def _owner(
         on_child_terminal=terminal,
         on_parent_closed=closed,
         on_parent_rejected=rejected,
+        predecessor_wait_observer=predecessor_wait_observer,
         output=output,
     )
 
@@ -561,3 +563,37 @@ async def test_terminal_adapter_failure_does_not_strand_parent() -> None:
         await owner.close()
     assert owner.is_parent_closed(parent_id)
     assert owner.has_resources is False
+
+
+@pytest.mark.asyncio
+async def test_same_channel_predecessor_wait_is_observed_without_source_text() -> None:
+    release_first = asyncio.Event()
+    waits: list[tuple[str, dict[str, object]]] = []
+
+    async def process(child, _cancellation_requested):
+        if child.parent_utterance_id == first_id:
+            await release_first.wait()
+        return "translated"
+
+    def observe(event: str, fields) -> None:
+        waits.append((event, dict(fields)))
+
+    first_id = uuid4()
+    second_id = uuid4()
+    owner = _owner(process_child=process, predecessor_wait_observer=observe)
+    try:
+        await owner.submit(_request(parent_id=first_id, turn_kind="self"))
+        await owner.submit(_request(parent_id=second_id, turn_kind="self"))
+        await asyncio.sleep(0)
+        assert [event for event, _fields in waits] == ["predecessor_wait_start"]
+        assert waits[0][1]["parent_utterance_id"] == str(second_id)
+        assert waits[0][1]["predecessor_utterance_id"] == str(first_id)
+        assert "hello" not in str(waits)
+        release_first.set()
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+    assert [event for event, _fields in waits] == [
+        "predecessor_wait_start",
+        "predecessor_wait_end",
+    ]

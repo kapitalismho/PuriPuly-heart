@@ -22,6 +22,10 @@ _PRESENTER_SNAPSHOT_LIMIT = 30
 _PRESENTER_REMOVAL_LIMIT = 50
 _BRIDGE_EVENT_LIMIT = 30
 _TRANSLATION_EVENT_LIMIT = 50
+_CHATBOX_EVENT_LIMIT = 50
+_STT_EVENT_LIMIT = 50
+_NATIVE_EVENT_LIMIT = 50
+_PRESENTATION_DIAGNOSTICS_MARKER = "presentation_diagnostics "
 _SENSITIVE_DIAGNOSTIC_FIELD_KEYS = {
     "accesstoken",
     "apikey",
@@ -104,6 +108,15 @@ class OverlayDiagnosticsRecorder:
     translation_events: deque[dict[str, Any]] = field(
         default_factory=lambda: deque(maxlen=_TRANSLATION_EVENT_LIMIT)
     )
+    chatbox_events: deque[dict[str, Any]] = field(
+        default_factory=lambda: deque(maxlen=_CHATBOX_EVENT_LIMIT)
+    )
+    stt_events: deque[dict[str, Any]] = field(
+        default_factory=lambda: deque(maxlen=_STT_EVENT_LIMIT)
+    )
+    native_events: deque[dict[str, Any]] = field(
+        default_factory=lambda: deque(maxlen=_NATIVE_EVENT_LIMIT)
+    )
     last_dump_path: Path | None = None
 
     _sequence: int = field(init=False, default=0)
@@ -119,22 +132,62 @@ class OverlayDiagnosticsRecorder:
         )
 
     def record_presenter(self, event: str, **fields: Any) -> dict[str, Any]:
-        _ = (event, fields)
-        return {}
+        return self._append(self.presenter_events, category="presenter", event=event, **fields)
 
     def record_presenter_removal(
         self, event: str = "entry_removed", **fields: Any
     ) -> dict[str, Any]:
-        _ = (event, fields)
-        return {}
+        return self._append(
+            self.presenter_removal_events,
+            category="presenter_removal",
+            event=event,
+            **fields,
+        )
 
     def record_bridge(self, event: str, **fields: Any) -> dict[str, Any]:
-        _ = (event, fields)
-        return {}
+        return self._append(self.bridge_events, category="bridge", event=event, **fields)
 
     def record_translation(self, event: str, **fields: Any) -> dict[str, Any]:
-        _ = (event, fields)
-        return {}
+        return self._append(
+            self.translation_events, category="translation", event=event, **fields
+        )
+
+    def record_chatbox(self, event: str, **fields: Any) -> dict[str, Any]:
+        return self._append(self.chatbox_events, category="chatbox", event=event, **fields)
+
+    def record_stt(self, event: str, **fields: Any) -> dict[str, Any]:
+        return self._append(self.stt_events, category="stt", event=event, **fields)
+
+    def record_native(self, event: str, **fields: Any) -> dict[str, Any]:
+        return self._append(self.native_events, category="native", event=event, **fields)
+
+    def ingest_native_child_line(self, line: str) -> bool:
+        marker_at = line.find(_PRESENTATION_DIAGNOSTICS_MARKER)
+        if marker_at < 0:
+            return False
+        raw = line[marker_at + len(_PRESENTATION_DIAGNOSTICS_MARKER) :].strip()
+        try:
+            records = json.loads(raw)
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(records, list):
+            return False
+        ingested = False
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            self.record_native(
+                str(record.get("stage") or "presentation"),
+                logical_revision=record.get("logical_revision"),
+                outcome=record.get("outcome"),
+                readiness_us=record.get("readiness_us"),
+                cached_visibility=record.get("observed_runtime_visible"),
+                desired_visible=record.get("desired_visible"),
+                actual_visibility="not_queried",
+                physical_hmd_visibility=record.get("physical_hmd_visibility"),
+            )
+            ingested = True
+        return ingested
 
     def dump_failure(self, **summary_fields: Any) -> Path:
         self.diagnostics_dir.mkdir(parents=True, exist_ok=True)
@@ -193,3 +246,10 @@ class OverlayDiagnosticsRecorder:
         yield from self.process_events
         yield from self.child_stdout_lines
         yield from self.child_stderr_lines
+        yield from self.presenter_events
+        yield from self.presenter_removal_events
+        yield from self.bridge_events
+        yield from self.translation_events
+        yield from self.chatbox_events
+        yield from self.stt_events
+        yield from self.native_events
