@@ -134,6 +134,11 @@ class SelfCaptureApplicationOwner:
         self.state_sink(snapshot)
         self.project_availability(snapshot)
         self.restart_requested = False
+        if (
+            snapshot.failure_reason is not None
+            or snapshot.runtime_signature != config.runtime_signature
+        ):
+            raise RuntimeError("Self STT runtime did not apply the requested configuration")
 
     def project_availability(self, snapshot: SelfCaptureSessionSnapshot) -> bool:
         available = snapshot.provider_status is SelfCaptureProviderStatus.READY

@@ -277,7 +277,7 @@ class SelfCaptureSessionOwner:
             if self._is_superseded(generation):
                 return self.snapshot
             attachment_token = self._provider_attachment_token
-            if self._provider.is_ready(config):
+            if self._attached_provider_matches(config):
                 result_status = SelfCaptureProviderMutationStatus.APPLIED
                 failure_reason = None
             else:
@@ -577,7 +577,7 @@ class SelfCaptureSessionOwner:
             return
 
         attachment_token = self._provider_attachment_token
-        provider_was_ready = self._provider.is_ready(config)
+        provider_was_ready = self._attached_provider_matches(config)
         if not provider_was_ready:
             attachment_token = object()
             self._provider_status = SelfCaptureProviderStatus.PENDING
@@ -1071,6 +1071,12 @@ class SelfCaptureSessionOwner:
     def _retain_source(self, source: object) -> None:
         if not any(item is source for item in self._retired_sources):
             self._retired_sources.append(source)
+
+    def _attached_provider_matches(self, config: SelfCaptureSessionConfig) -> bool:
+        return (
+            self._provider.is_ready(config)
+            and self._provider_signature == config.provider_signature
+        )
 
     def _release_plan(
         self,
