@@ -65,7 +65,7 @@ from puripuly_heart.core.runtime.stt_session_projection import SttSessionStatePr
 from puripuly_heart.domain.events import UIEvent
 
 from .wiring_managed_account import ManagedOpenRouterReleaseRuntime
-from .wiring_managed_gemma import managed_gemma_selection
+from .wiring_managed_gemma import noop_managed_gemma_release
 from .wiring_provider_runtime import (
     project_translation_runtime_settings,
 )
@@ -716,32 +716,25 @@ async def _compose_runtime_pipeline(
 
     llm = None
     with contextlib.suppress(Exception):
-        activation = None
+        gemma_runtime = None
+        gemma_release = None
         if settings.translation.model == TranslationModel.MANAGED_GEMMA:
             if managed_gemma is None:
                 raise RuntimeError("managed Gemma translation runtime is unavailable")
-            activation = await managed_gemma.prepare(managed_gemma_selection(settings))
-        try:
-            llm = create_translation_backend(
-                settings,
-                secrets=secrets,
-                http_extensions=(
-                    http_extensions or HttpExtensionRegistry(default_http_extensions_dir())
-                ),
-                managed_release_service=managed_release.service,
-                managed_delegate_ready=managed_delegate_ready,
-                runtime_logging=runtime_logging,
-                managed_gemma_runtime=(activation.runtime if activation is not None else None),
-                managed_gemma_release=(activation.release if activation is not None else None),
-            )
-            if llm is None and activation is not None:
-                await activation.release()
-                activation = None
-        except BaseException:
-            if activation is not None:
-                with contextlib.suppress(BaseException):
-                    await activation.release()
-            raise
+            gemma_runtime = managed_gemma.runtime
+            gemma_release = noop_managed_gemma_release
+        llm = create_translation_backend(
+            settings,
+            secrets=secrets,
+            http_extensions=(
+                http_extensions or HttpExtensionRegistry(default_http_extensions_dir())
+            ),
+            managed_release_service=managed_release.service,
+            managed_delegate_ready=managed_delegate_ready,
+            runtime_logging=runtime_logging,
+            managed_gemma_runtime=gemma_runtime,
+            managed_gemma_release=gemma_release,
+        )
         resources.pending_llm = llm
 
     prepare_self_provider = settings.provider.stt != STTProviderName.LOCAL_QWEN_GPU

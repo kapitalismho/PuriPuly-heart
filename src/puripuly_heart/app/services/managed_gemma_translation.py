@@ -59,10 +59,12 @@ class ManagedGemmaTranslationOwner:
         downloader: HuggingFaceDownloadPort | None = None,
         status_sink: ManagedGemmaTranslationStatusSink | None = None,
         lifecycle_diagnostic_sink: ManagedGemmaLifecycleDiagnosticSink | None = None,
+        idle_linger_s: float = 10.0,
     ) -> None:
         self._runtime = runtime
         self._downloader = downloader
         self._status_sink = status_sink
+        self._idle_linger_s = max(0.0, float(idle_linger_s))
         self._snapshot = ManagedGemmaTranslationSnapshot("idle", None, None)
         self._lock = asyncio.Lock()
         self._task_scope = LifecycleScope(
@@ -72,6 +74,7 @@ class ManagedGemmaTranslationOwner:
         self._generation = 0
         self._cancel_event: threading.Event | None = None
         self._prepare_task: asyncio.Task[ManagedGemmaReadiness] | None = None
+        self._linger_task: asyncio.Task[None] | None = None
         self._active_generation: int | None = None
         self._closed = False
 
@@ -88,6 +91,8 @@ class ManagedGemmaTranslationOwner:
         selection: ManagedGemmaTranslationSelection,
     ) -> ManagedGemmaActivation:
         backend = selection.backend
+        lingering = self._cancel_linger()
+        await self._await_cancelled_linger(lingering)
         async with self._lock:
             if self._closed:
                 raise RuntimeError("managed Gemma translation owner is closed")
@@ -169,19 +174,45 @@ class ManagedGemmaTranslationOwner:
             task.cancel()
         return True
 
-    async def deactivate(self) -> None:
+    def schedule_demand_sync(
+        self,
+        *,
+        desired: bool,
+        selection: ManagedGemmaTranslationSelection | None = None,
+    ) -> None:
+        async def run() -> None:
+            if self._closed:
+                return
+            if desired:
+                if selection is None:
+                    return
+                await self.prepare(selection)
+                return
+            await self.deactivate(linger=True)
+
+        start_lifecycle_task(self._task_scope, run(), name="demand-sync")
+
+    async def deactivate(self, *, linger: bool = False) -> None:
         self._generation += 1
         self._active_generation = None
         self.cancel()
         task = self._prepare_task
         if task is not None and task is not asyncio.current_task():
             await asyncio.gather(task, return_exceptions=True)
+        if linger and not self._closed:
+            self._publish("idle", backend=None, progress_percent=None)
+            self._schedule_linger(self._idle_linger_s)
+            return
+        lingering = self._cancel_linger()
+        await self._await_cancelled_linger(lingering)
         async with self._lock:
             await self._runtime.release()
             self._publish("idle", backend=None, progress_percent=None)
 
     async def close(self) -> None:
+        lingering = self._cancel_linger()
         if self._closed and self._prepare_task is None:
+            await self._await_cancelled_linger(lingering)
             await self._runtime.close()
             return
         self._closed = True
@@ -191,12 +222,54 @@ class ManagedGemmaTranslationOwner:
         task = self._prepare_task
         if task is not None and task is not asyncio.current_task():
             await asyncio.gather(task, return_exceptions=True)
+        await self._await_cancelled_linger(lingering)
         try:
             await self._task_scope.close()
         finally:
             async with self._lock:
                 await self._runtime.close()
                 self._publish("closed", backend=None, progress_percent=None)
+
+    def _cancel_linger(self) -> asyncio.Task[None] | None:
+        task = self._linger_task
+        self._linger_task = None
+        if task is not None and not task.done():
+            task.cancel()
+            return task
+        return None
+
+    async def _await_cancelled_linger(self, task: asyncio.Task[None] | None) -> None:
+        if task is None or task is asyncio.current_task():
+            return
+        await asyncio.gather(task, return_exceptions=True)
+
+    def _schedule_linger(self, delay_s: float) -> None:
+        self._cancel_linger()
+        generation = self._generation
+        self._linger_task = start_lifecycle_task(
+            self._task_scope,
+            self._linger_release(generation, delay_s),
+            name=f"linger-{generation}",
+        )
+
+    async def _linger_release(self, generation: int, delay_s: float) -> None:
+        try:
+            await asyncio.sleep(delay_s)
+        except asyncio.CancelledError:
+            return
+        if generation != self._generation or self._closed:
+            return
+        async with self._lock:
+            if generation != self._generation or self._closed:
+                return
+            try:
+                await self._runtime.release()
+            except asyncio.CancelledError:
+                if self._closed:
+                    return
+                raise
+            if not self._closed:
+                self._publish("idle", backend=None, progress_percent=None)
 
     async def _release_generation(self, generation: int) -> None:
         if self._active_generation != generation:

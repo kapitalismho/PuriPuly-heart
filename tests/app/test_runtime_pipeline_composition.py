@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -167,32 +166,30 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
 
 
 @pytest.mark.asyncio
-async def test_managed_gemma_startup_waits_for_readiness_before_provider_construction(
+async def test_managed_gemma_startup_constructs_provider_without_preparing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     events: list[object] = []
-    entered = asyncio.Event()
-    ready = asyncio.Event()
     activation_runtime = object()
 
-    async def release() -> None:
-        events.append("release")
-
     class ManagedGemma:
+        runtime = activation_runtime
+
         async def prepare(self, _selection: object) -> object:
             events.append("prepare")
-            entered.set()
-            await ready.wait()
-            return SimpleNamespace(runtime=activation_runtime, release=release)
+            raise AssertionError("compose must not prepare managed Gemma")
+
+        async def deactivate(self) -> None:
+            events.append("deactivate")
 
     class Provider:
         async def close(self) -> None:
-            await release()
+            events.append("close")
 
     def create_backend(_settings: AppSettings, **kwargs: object) -> Provider:
         events.append("create")
         assert kwargs["managed_gemma_runtime"] is activation_runtime
-        assert kwargs["managed_gemma_release"] is release
+        assert kwargs["managed_gemma_release"] is runtime_pipeline_module.noop_managed_gemma_release
         return Provider()
 
     monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
@@ -212,37 +209,29 @@ async def test_managed_gemma_startup_waits_for_readiness_before_provider_constru
     settings.translation.connection = TranslationConnection.GPU
     materialize_translation_settings(settings)
 
-    composition = asyncio.create_task(
-        compose_runtime_pipeline(
-            settings=settings,
-            config_path=Path("settings.json"),
-            clock=SystemClock(),
-            runtime_logging=None,
-            managed_release=ManagedRelease(),
-            managed_delegate_ready=lambda: None,
-            managed_gemma=ManagedGemma(),
-            local_asr_factory=lambda _secrets: PrebuiltLocalASRProviderRuntimeFactory(
-                self_provider=None,
-                peer_provider=None,
-            ),
-            self_capture_factory=lambda *_args: CaptureOwner("self"),
-            peer_capture_factory=lambda *_args: CaptureOwner("peer"),
-            vrc_mic_state=None,
-            vrc_mic_audio_gate=None,
-            receiver_active=False,
-            stt_failure_sink=lambda _message: None,
-        )
+    pipeline = await compose_runtime_pipeline(
+        settings=settings,
+        config_path=Path("settings.json"),
+        clock=SystemClock(),
+        runtime_logging=None,
+        managed_release=ManagedRelease(),
+        managed_delegate_ready=lambda: None,
+        managed_gemma=ManagedGemma(),
+        local_asr_factory=lambda _secrets: PrebuiltLocalASRProviderRuntimeFactory(
+            self_provider=None,
+            peer_provider=None,
+        ),
+        self_capture_factory=lambda *_args: CaptureOwner("self"),
+        peer_capture_factory=lambda *_args: CaptureOwner("peer"),
+        vrc_mic_state=None,
+        vrc_mic_audio_gate=None,
+        receiver_active=False,
+        stt_failure_sink=lambda _message: None,
     )
-    await entered.wait()
 
-    assert events == ["prepare"]
-
-    ready.set()
-    pipeline = await composition
-
-    assert events[:2] == ["prepare", "create"]
+    assert events == ["create"]
     await pipeline.resource_owner.close_llm()
-    assert events[-1] == "release"
+    assert events[-1] == "close"
     assert not hasattr(PeerTranslationChannelOwner, "start")
     assert not hasattr(PeerTranslationChannelOwner, "stop")
     assert not pipeline.translation_turns.channel_ingress_open("self")

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,7 +37,11 @@ from puripuly_heart.core.self_capture import SelfCaptureSessionSnapshot
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 from .wiring_managed_account import ManagedOpenRouterReleaseRuntime
-from .wiring_managed_gemma import managed_gemma_selection
+from .wiring_managed_gemma import (
+    managed_gemma_selection,
+    managed_gemma_translation_desired,
+    noop_managed_gemma_release,
+)
 from .wiring_provider_runtime_policy import (
     build_llm_provider_signature,
     provider_runtime_requires_gpu_restart,
@@ -370,23 +373,31 @@ def compose_provider_runtime(
         if settings_value.translation.model == TranslationModel.MANAGED_GEMMA:
             if managed_gemma is None:
                 raise RuntimeError("managed Gemma translation runtime is unavailable")
-            activation = await managed_gemma.prepare(managed_gemma_selection(settings_value))
-            try:
-                backend = create_translation_backend(
+            config = translation_runtime_configuration_provider()
+            translation_on = managed_gemma_translation_desired(
+                translation_enabled=bool(
+                    config is not None and config.snapshot().value.translation_enabled
+                ),
+                peer_translation_enabled=bool(settings_value.ui.peer_translation_enabled),
+            )
+            if not translation_on:
+                return create_translation_backend(
                     settings_value,
                     secrets=secrets,
                     http_extensions=effective_http_extensions,
                     runtime_logging=runtime_logging,
-                    managed_gemma_runtime=activation.runtime,
-                    managed_gemma_release=activation.release,
+                    managed_gemma_runtime=managed_gemma.runtime,
+                    managed_gemma_release=noop_managed_gemma_release,
                 )
-                if backend is None:
-                    await activation.release()
-                return backend
-            except BaseException:
-                with contextlib.suppress(BaseException):
-                    await activation.release()
-                raise
+            activation = await managed_gemma.prepare(managed_gemma_selection(settings_value))
+            return create_translation_backend(
+                settings_value,
+                secrets=secrets,
+                http_extensions=effective_http_extensions,
+                runtime_logging=runtime_logging,
+                managed_gemma_runtime=activation.runtime,
+                managed_gemma_release=noop_managed_gemma_release,
+            )
         if managed_gemma is not None:
             await managed_gemma.deactivate()
         if settings_value.translation.model == TranslationModel.CUSTOM_HTTP:

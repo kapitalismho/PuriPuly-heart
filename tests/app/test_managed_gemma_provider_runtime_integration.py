@@ -41,12 +41,19 @@ def _managed_settings() -> AppSettings:
     return materialize_translation_settings(settings)
 
 
+def _translation_config(*, enabled: bool) -> object:
+    return SimpleNamespace(
+        snapshot=lambda: SimpleNamespace(value=SimpleNamespace(translation_enabled=enabled))
+    )
+
+
 def _components(
     *,
     settings: AppSettings,
     runtime: RecordingLlmRuntime,
     managed_gemma: object,
     events: list[object],
+    translation_enabled: bool | None = None,
 ):
     async def no_op() -> None:
         return None
@@ -60,7 +67,11 @@ def _components(
         llm_runtime_provider=lambda: runtime,
         http_extensions=SimpleNamespace(),
         local_asr_runtime_provider=lambda: None,
-        translation_runtime_configuration_provider=lambda: None,
+        translation_runtime_configuration_provider=lambda: (
+            None
+            if translation_enabled is None
+            else _translation_config(enabled=translation_enabled)
+        ),
         self_capture_provider=lambda: None,
         self_capture_owner=lambda: SimpleNamespace(),
         peer=lambda: SimpleNamespace(),
@@ -91,7 +102,45 @@ def _components(
 
 
 @pytest.mark.asyncio
-async def test_provider_is_not_installed_until_managed_readiness_finishes(
+async def test_provider_is_installed_without_preparing_when_translation_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[object] = []
+    provider = object()
+    activation_runtime = object()
+
+    class ManagedGemma:
+        runtime = activation_runtime
+
+        async def prepare(self, _selection: ManagedGemmaTranslationSelection) -> object:
+            events.append("prepare")
+            raise AssertionError("rebuild must not prepare managed Gemma while translation is off")
+
+    def create_backend(_settings: AppSettings, **kwargs: object) -> object:
+        events.append("create")
+        assert kwargs["managed_gemma_runtime"] is activation_runtime
+        assert kwargs["managed_gemma_release"] is wiring_provider_runtime.noop_managed_gemma_release
+        return provider
+
+    monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", create_backend)
+    runtime = RecordingLlmRuntime(events)
+    settings = _managed_settings()
+    components = _components(
+        settings=settings,
+        runtime=runtime,
+        managed_gemma=ManagedGemma(),
+        events=events,
+    )
+
+    await components.llm_rebuild.rebuild()
+
+    assert runtime.provider is provider
+    assert events[:3] == [("replace", None), "create", ("replace", provider)]
+    assert "prepare" not in events
+
+
+@pytest.mark.asyncio
+async def test_provider_waits_for_readiness_when_translation_is_on(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     events: list[object] = []
@@ -104,6 +153,8 @@ async def test_provider_is_not_installed_until_managed_readiness_finishes(
         events.append("release")
 
     class ManagedGemma:
+        runtime = object()
+
         async def prepare(self, selection: ManagedGemmaTranslationSelection) -> object:
             assert selection == ManagedGemmaTranslationSelection(
                 backend="gpu",
@@ -123,7 +174,7 @@ async def test_provider_is_not_installed_until_managed_readiness_finishes(
     def create_backend(_settings: AppSettings, **kwargs: object) -> object:
         events.append("create")
         assert kwargs["managed_gemma_runtime"] is activation_runtime
-        assert kwargs["managed_gemma_release"] is release
+        assert kwargs["managed_gemma_release"] is wiring_provider_runtime.noop_managed_gemma_release
         return provider
 
     monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", create_backend)
@@ -134,6 +185,7 @@ async def test_provider_is_not_installed_until_managed_readiness_finishes(
         runtime=runtime,
         managed_gemma=ManagedGemma(),
         events=events,
+        translation_enabled=True,
     )
 
     rebuild = asyncio.create_task(components.llm_rebuild.rebuild())
@@ -150,7 +202,46 @@ async def test_provider_is_not_installed_until_managed_readiness_finishes(
 
 
 @pytest.mark.asyncio
-async def test_provider_construction_failure_releases_prepared_activation(
+async def test_provider_prepares_when_peer_translation_is_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[object] = []
+    provider = object()
+    activation_runtime = object()
+
+    class ManagedGemma:
+        runtime = object()
+
+        async def prepare(self, _selection: ManagedGemmaTranslationSelection) -> object:
+            events.append("prepare")
+            return SimpleNamespace(runtime=activation_runtime, release=lambda: None)
+
+    def create_backend(_settings: AppSettings, **kwargs: object) -> object:
+        events.append("create")
+        assert kwargs["managed_gemma_runtime"] is activation_runtime
+        assert kwargs["managed_gemma_release"] is wiring_provider_runtime.noop_managed_gemma_release
+        return provider
+
+    monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", create_backend)
+    runtime = RecordingLlmRuntime(events)
+    settings = _managed_settings()
+    settings.ui.peer_translation_enabled = True
+    components = _components(
+        settings=settings,
+        runtime=runtime,
+        managed_gemma=ManagedGemma(),
+        events=events,
+        translation_enabled=False,
+    )
+
+    await components.llm_rebuild.rebuild()
+
+    assert runtime.provider is provider
+    assert events[:4] == [("replace", None), "prepare", "create", ("replace", provider)]
+
+
+@pytest.mark.asyncio
+async def test_provider_construction_failure_keeps_demand_owned_activation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     events: list[object] = []
@@ -159,6 +250,8 @@ async def test_provider_construction_failure_releases_prepared_activation(
         events.append("release")
 
     class ManagedGemma:
+        runtime = object()
+
         async def prepare(self, _selection: ManagedGemmaTranslationSelection) -> object:
             return SimpleNamespace(runtime=object(), release=release)
 
@@ -172,12 +265,13 @@ async def test_provider_construction_failure_releases_prepared_activation(
         runtime=runtime,
         managed_gemma=ManagedGemma(),
         events=events,
+        translation_enabled=True,
     )
 
     await components.llm_rebuild.rebuild()
 
     assert runtime.provider is None
-    assert "release" in events
+    assert "release" not in events
     assert events[-2:] == [
         ("needs-key", False),
         ("failure", "LLM provider not available"),

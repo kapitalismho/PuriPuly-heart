@@ -206,3 +206,50 @@ async def test_retired_activation_cannot_release_newer_shared_runtime() -> None:
     await second.release()
     assert runtime.release_count == 1
     assert owner.snapshot.state == "idle"
+
+
+@pytest.mark.asyncio
+async def test_linger_deactivate_keeps_runtime_until_timer_elapses() -> None:
+    runtime = RecordingRuntime(lambda **kwargs: _readiness(str(kwargs["backend"])))
+    owner = ManagedGemmaTranslationOwner(runtime=runtime, idle_linger_s=0.05)
+    await owner.prepare(_selection())
+
+    await owner.deactivate(linger=True)
+
+    assert runtime.release_count == 0
+    assert owner.snapshot.state == "idle"
+    await asyncio.sleep(0.12)
+    assert runtime.release_count == 1
+
+
+@pytest.mark.asyncio
+async def test_prepare_during_linger_cancels_shutdown_and_reuses_runtime() -> None:
+    runtime = RecordingRuntime(lambda **kwargs: _readiness(str(kwargs["backend"])))
+    owner = ManagedGemmaTranslationOwner(runtime=runtime, idle_linger_s=0.2)
+    await owner.prepare(_selection())
+    await owner.deactivate(linger=True)
+
+    await owner.prepare(_selection())
+
+    assert runtime.release_count == 0
+    assert owner.snapshot.state == "ready"
+    await asyncio.sleep(0.25)
+    assert runtime.release_count == 0
+
+
+@pytest.mark.asyncio
+async def test_immediate_deactivate_and_close_skip_linger() -> None:
+    runtime = RecordingRuntime(lambda **kwargs: _readiness(str(kwargs["backend"])))
+    owner = ManagedGemmaTranslationOwner(runtime=runtime, idle_linger_s=1.0)
+    await owner.prepare(_selection())
+
+    await owner.deactivate()
+    assert runtime.release_count == 1
+
+    await owner.prepare(_selection())
+    await owner.deactivate(linger=True)
+    await owner.close()
+
+    assert runtime.release_count == 1
+    assert runtime.close_count == 1
+    assert owner.snapshot.state == "closed"

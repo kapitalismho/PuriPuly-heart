@@ -42,6 +42,7 @@ TranslationEnableRuntimeSink = Callable[[bool], None]
 TranslationEnableDashboardSink = Callable[[bool], None]
 TranslationEnableClearContext = Callable[[], None]
 TranslationEnableWarmup = Callable[[], Awaitable[None]]
+TranslationEnableTeardown = Callable[[], Awaitable[None]]
 TranslationEnableMessageSink = Callable[[str, Mapping[str, object]], None]
 TranslationEnableQqDialogSink = Callable[[], None]
 TranslationEnableResultSink = Callable[[TransactionResult], None]
@@ -69,6 +70,7 @@ class TranslationEnableOwner:
     log_detailed: TranslationEnableLogSink
     log_error: TranslationEnableLogSink
     founder_letter_sink: TranslationEnableFounderLetterSink
+    teardown: TranslationEnableTeardown | None = None
     intent_enabled: bool = False
     generation: int = 0
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
@@ -87,6 +89,8 @@ class TranslationEnableOwner:
             self.pending_sink(False)
         state = self.state_provider()
         if self._ingress_stopped or state.ingress_frozen or not state.runtime_available:
+            if not enabled:
+                await self._teardown()
             return False
         self.log_basic(f"[Translation] Toggle request: enabled={enabled}")
         self.log_detailed(
@@ -122,6 +126,8 @@ class TranslationEnableOwner:
         self.runtime_sink(enabled)
         if enabled:
             await self.warmup()
+        else:
+            await self._teardown()
         return self.state_provider().translation_enabled
 
     async def _prepare_managed(
@@ -165,6 +171,11 @@ class TranslationEnableOwner:
         if result.message_key is not None:
             self.message_sink(result.message_key, result.message_kwargs)
         return False
+
+    async def _teardown(self) -> None:
+        if self.teardown is None:
+            return
+        await self.teardown()
 
     def disable_for_managed_exhaustion(self, *, reopen_founder_letter: bool) -> None:
         self.record_intent(False)

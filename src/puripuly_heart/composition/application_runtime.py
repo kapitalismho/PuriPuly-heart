@@ -140,7 +140,12 @@ from puripuly_heart.app.wiring import (
     create_sync_secret_store_adapter,
     resolve_overlay_config,
 )
-from puripuly_heart.app.wiring.wiring_managed_gemma import create_managed_gemma_runtime
+from puripuly_heart.app.wiring.wiring_managed_gemma import (
+    create_managed_gemma_runtime,
+    managed_gemma_selection,
+    managed_gemma_translation_desired,
+    sync_managed_gemma_demand,
+)
 from puripuly_heart.app.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
 )
@@ -477,6 +482,39 @@ def compose_application_runtime(
         ),
     )
 
+    def _managed_gemma_demand() -> tuple[bool, object | None]:
+        settings_value = current_settings()
+        config = pipeline.translation_runtime_configuration
+        desired = managed_gemma_translation_desired(
+            translation_enabled=bool(
+                config is not None and config.snapshot().value.translation_enabled
+            ),
+            peer_translation_enabled=bool(
+                settings_value is not None and settings_value.ui.peer_translation_enabled
+            ),
+        )
+        return desired, settings_value
+
+    async def sync_local_translation_demand() -> None:
+        desired, settings_value = _managed_gemma_demand()
+        await sync_managed_gemma_demand(
+            managed_gemma=managed_gemma,
+            settings=settings_value,
+            desired=desired,
+        )
+
+    def schedule_local_translation_demand() -> None:
+        desired, settings_value = _managed_gemma_demand()
+        selection = None
+        if desired and settings_value is not None:
+            with contextlib.suppress(ValueError):
+                selection = managed_gemma_selection(settings_value)
+        managed_gemma.schedule_demand_sync(desired=desired, selection=selection)
+
+    def disable_peer_intent() -> None:
+        require_peer().owner.disable_for_overlay()
+        schedule_local_translation_demand()
+
     def require_runtime_components() -> RuntimeCompositionComponents:
         if runtime_components is None:
             raise RuntimeError("runtime composition is incomplete")
@@ -571,7 +609,7 @@ def compose_application_runtime(
                 output_provider=lambda: pipeline.translation_output_projection,
                 diagnostics_provider=lambda: pipeline.translation_diagnostics,
                 peer_snapshot_provider=lambda: require_peer().owner.snapshot(),
-                disable_peer_intent=lambda: require_peer().owner.disable_for_overlay(),
+                disable_peer_intent=disable_peer_intent,
                 sync_peer_effective=lambda: require_peer().owner.sync_effective_flags(),
                 cancel_peer_activation=(lambda: require_peer().owner.cancel_activation_starting()),
                 refresh_peer_dependencies=refresh_overlay_runtime_dependencies,
@@ -657,6 +695,7 @@ def compose_application_runtime(
                 settings_presentation_sink=(presentation.refresh_settings_loopback_capture_target),
                 log_basic=log_basic,
                 log_detailed=log_detailed,
+                translation_demand_sink=sync_local_translation_demand,
             )
         return peer
 
@@ -1644,6 +1683,8 @@ def compose_application_runtime(
             level=logging.WARNING,
             exception=exception,
         ),
+        managed_gemma=managed_gemma,
+        sync_local_translation_demand=sync_local_translation_demand,
     )
 
     provider_application = ProviderApplicationOwner(
