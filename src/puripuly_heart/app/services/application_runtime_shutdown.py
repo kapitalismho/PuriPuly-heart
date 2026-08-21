@@ -17,6 +17,12 @@ from puripuly_heart.core.lifecycle import (
 )
 
 
+async def _close_managed_gemma_if_available(runtime: object) -> None:
+    callback = getattr(runtime, "close_managed_gemma_runtime", None)
+    if callable(callback):
+        await callback()
+
+
 def compose_application_runtime_shutdown_callbacks(
     runtime: ApplicationRuntimeShutdownPort,
 ) -> tuple[ApplicationShutdownCallback, ...]:
@@ -188,6 +194,12 @@ def compose_application_runtime_shutdown_callbacks(
             owner_name="ProviderRuntimeHandle:llm",
             callback_name="close",
             callback=runtime.close_llm_runtime,
+        ),
+        application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+            owner_name="ManagedGemmaTranslationOwner",
+            callback_name="close",
+            callback=lambda: _close_managed_gemma_if_available(runtime),
         ),
         application_shutdown_callback(
             phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,

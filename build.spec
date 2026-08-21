@@ -6,6 +6,7 @@ Direct Windows PyInstaller packaging (executable-only / manual installer packagi
     This direct path is not the release-complete compliance-packaging path and requires the staged overlay executable at build/overlay/PuriPulyHeartOverlay.exe plus the vendored OpenVR bundle under third_party/openvr/ (enforced below).
     pwsh -File scripts/ci/prepare-soxr-release-inputs.ps1
     pwsh -File scripts/ci/prepare-flet-runtime.ps1
+    python -m puripuly_heart.release_evidence.managed_gemma_distribution prepare
     pyinstaller build.spec
     ISCC installer.iss
 
@@ -74,6 +75,10 @@ if not gpu_worker_staged_path.exists():
 from puripuly_heart.core.local_qwen_runtime import LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR
 
 from puripuly_heart.core.overlay.openvr_vendor import collect_vendored_openvr_runtime_binaries
+from puripuly_heart.release_evidence.managed_gemma_distribution import (
+    normalize_pyinstaller_binaries,
+    pyinstaller_data_entries,
+)
 
 block_cipher = None
 SOXR_RELEASE_INPUTS_MANIFEST_PATH = Path("build/soxr-release-inputs/manifest.json").resolve()
@@ -85,6 +90,7 @@ NOTO_CJK_PROVENANCE_DIR = Path("third_party/noto-sans-cjk").resolve()
 NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR = Path("third_party/noto-sans-cjk")
 HTTP_EXTENSION_EXAMPLES_SOURCE_DIR = Path("examples/http_extensions").resolve()
 HTTP_EXTENSION_EXAMPLES_PACKAGED_DIR = Path("examples/http_extensions")
+managed_gemma_runtime_datas = [] if release_smoke else pyinstaller_data_entries(Path.cwd())
 
 if not NOTO_CJK_SOURCE_FONT_PATH.is_file():
     raise SystemExit(f"Noto Sans CJK Medium TTC not found: {NOTO_CJK_SOURCE_FONT_PATH}")
@@ -186,7 +192,7 @@ datas = [
     (str(NOTO_CJK_PROVENANCE_DIR / "OFL.txt"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
     (str(NOTO_CJK_PROVENANCE_DIR / "README.md"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
     (str(NOTO_CJK_PROVENANCE_DIR / "SHA256SUMS.txt"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
-] + collect_data_files("flet_desktop") + collect_data_files("huggingface_hub")
+] + collect_data_files("flet_desktop") + collect_data_files("huggingface_hub") + managed_gemma_runtime_datas
 
 runtime_binaries = collect_dynamic_libs(
     "onnxruntime", destdir=LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR.as_posix()
@@ -273,6 +279,7 @@ a = Analysis(
 )
 
 normalize_soxr_runtime_binaries(a.binaries)
+normalize_pyinstaller_binaries(a.binaries, Path.cwd())
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 

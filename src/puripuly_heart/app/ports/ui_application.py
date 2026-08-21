@@ -9,6 +9,7 @@ from typing import Any, Protocol
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_models import (
     GpuNoticeAction,
+    ManagedGemmaNoticeAction,
     OverlayPeerPresentationState,
 )
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
@@ -279,6 +280,11 @@ class UiApplicationPort(Protocol):
     def clear_debug_audio_fault_profiles(self) -> None: ...
 
     def handle_gpu_notice_action(self, action: GpuNoticeAction) -> object: ...
+
+    async def handle_managed_gemma_notice_action(
+        self,
+        action: ManagedGemmaNoticeAction,
+    ) -> object: ...
 
 
 __all__ = ["UiApplicationPort", "UiApplicationState"]

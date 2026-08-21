@@ -13,6 +13,7 @@ Set-StrictMode -Version Latest
 $PinnedOpenVrVendorDllSha256 = "bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a"
 $PinnedNotoCjkFontSha256 = "197d5e1e019faca33a4d55931c7d68b8056f3b97cb862049f5cb8de9efdfb8ce"
 $PrepareFletRuntimeScript = Join-Path $PSScriptRoot "prepare-flet-runtime.ps1"
+$ManagedGemmaDistributionModule = "puripuly_heart.release_evidence.managed_gemma_distribution"
 
 function Invoke-External {
     param(
@@ -511,6 +512,13 @@ Remove-Item -Recurse -Force $distDir -ErrorAction SilentlyContinue
 Write-Host "Preparing pinned Flet desktop runtime..."
 Invoke-External -FilePath "pwsh" -ArgumentList @("-File", $PrepareFletRuntimeScript)
 
+Write-Host "Preparing pinned llama.cpp runtime..."
+Invoke-External -FilePath $pythonCommand -ArgumentList @(
+    "-m",
+    $ManagedGemmaDistributionModule,
+    "prepare"
+)
+
 Write-Host "Building Windows executable..."
 Invoke-ExternalProcess -FilePath $pythonCommand -ArgumentList @(
     "-m",
@@ -545,6 +553,20 @@ try {
 if (-not (Test-Path $processCaptureSmokeHelperPath)) {
     throw "Release-only process-capture smoke helper not found: $processCaptureSmokeHelperPath"
 }
+
+Invoke-External -FilePath $pythonCommand -ArgumentList @(
+    "-m",
+    $ManagedGemmaDistributionModule,
+    "verify-installer",
+    "installer.iss"
+)
+Invoke-External -FilePath $pythonCommand -ArgumentList @(
+    "-m",
+    $ManagedGemmaDistributionModule,
+    "verify-package",
+    $distDir,
+    "--launch"
+)
 
 $exePath = Join-Path $PWD "dist/PuriPulyHeart/PuriPulyHeart.exe"
 if (-not (Test-Path $exePath)) {
@@ -859,6 +881,13 @@ if (-not (Test-Path $installedExePath)) {
 if (-not (Test-Path $installedProcessCaptureSmokeHelperPath)) {
     throw "Installed release-only process-capture smoke helper not found: $installedProcessCaptureSmokeHelperPath"
 }
+Invoke-External -FilePath $pythonCommand -ArgumentList @(
+    "-m",
+    $ManagedGemmaDistributionModule,
+    "verify-package",
+    $InstallerSmokeDir,
+    "--launch"
+)
 if (-not (Test-Path $installedOpenVrDllPath)) {
     throw "Installed OpenVR runtime DLL not found after installer smoke: $installedOpenVrDllPath"
 }
@@ -994,6 +1023,13 @@ if (Test-Path $legacyRootLevelSoxrDllPath) {
 Invoke-SoxrRuntimeSmokeCheck -ExePath $installedExePath -ReportPath $reinstalledSoxrRuntimeReportPath -ExpectedExtensionPath $installedSoxrExtensionPath -ExpectedSoxrDllPath $installedSoxrDllPath -Label "Reinstalled"
 Invoke-GuiStartupSmokeCheck -ExePath $installedExePath -Label "Reinstalled"
 Invoke-ProcessCaptureRuntimeSmokeCheck -HelperExePath $installedProcessCaptureSmokeHelperPath -ArtifactRoot $installedProcessCaptureSmokeArtifactRoot -ReportPath $reinstalledProcessCaptureRuntimeReportPath -Label "Reinstalled"
+Invoke-External -FilePath $pythonCommand -ArgumentList @(
+    "-m",
+    $ManagedGemmaDistributionModule,
+    "verify-package",
+    $InstallerSmokeDir,
+    "--launch"
+)
 
 $installedUninstallerPath = Join-Path $InstallerSmokeDir "unins000.exe"
 if (-not (Test-Path $installedUninstallerPath)) {

@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self, 4s ago] There's a guy playing guitar over there.
+[self] There's a guy playing guitar over there.
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Your response:
 
 ### Context Ignore Example
 <context>
-[self, 8s ago] My controller is dying.
+[self] My controller is dying.
 </context>
 
 <input>

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from typing import Literal, Protocol
 
 ProviderFactory = Callable[[], object | Awaitable[object | None] | None]
@@ -27,16 +29,23 @@ class ProviderRebuildOutcome:
 
 @dataclass(frozen=True, slots=True)
 class ProviderRuntimeRebuildService:
+    _llm_rebuild_lock: asyncio.Lock = dataclass_field(
+        default_factory=asyncio.Lock,
+        compare=False,
+        repr=False,
+    )
+
     async def rebuild_llm_provider(
         self,
         *,
         replace_provider: ProviderReplacer,
         create_provider: ProviderFactory,
     ) -> ProviderRebuildOutcome:
-        await replace_provider(None)
-        outcome = await self._create_provider(create_provider)
-        await replace_provider(outcome.provider)
-        return outcome
+        async with self._llm_rebuild_lock:
+            await replace_provider(None)
+            outcome = await self._create_provider(create_provider)
+            await replace_provider(outcome.provider)
+            return outcome
 
     async def rebuild_stt_provider(
         self,

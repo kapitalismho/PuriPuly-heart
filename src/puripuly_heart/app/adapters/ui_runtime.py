@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_models import (
     GpuNoticeAction,
+    ManagedGemmaNoticeAction,
     OverlayPeerPresentationState,
 )
 from puripuly_heart.app.services.application_after_launch import (
@@ -20,6 +21,9 @@ from puripuly_heart.app.services.desktop_overlay_application import (
 )
 from puripuly_heart.app.services.github_star_prompt import GithubStarPromptOwner
 from puripuly_heart.app.services.gpu_runtime_interaction import GpuRuntimeInteractionOwner
+from puripuly_heart.app.services.managed_gemma_translation import (
+    ManagedGemmaTranslationOwner,
+)
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.overlay_calibration_application import (
@@ -261,6 +265,7 @@ class UiProviderRuntimeAdapter:
     credential_verification: ProviderCredentialVerificationInteractionOwner
     provider_settings: ProviderSettingsOwner
     build_byok_target_settings: Callable[[object | None], object | None]
+    managed_gemma: ManagedGemmaTranslationOwner | None = None
 
     async def apply_providers(
         self,
@@ -343,6 +348,19 @@ class UiProviderRuntimeAdapter:
 
     def handle_gpu_notice_action(self, action: GpuNoticeAction) -> object:
         return self.gpu.handle_notice_action(action)
+
+    async def handle_managed_gemma_notice_action(
+        self,
+        action: ManagedGemmaNoticeAction,
+    ) -> object:
+        if action == "cancel":
+            return False if self.managed_gemma is None else self.managed_gemma.cancel()
+        if action == "retry":
+            return await self.apply_providers(
+                force_rebuild_llm=True,
+                persist_settings=False,
+            )
+        raise ValueError(f"unsupported managed Gemma notice action: {action}")
 
 
 @dataclass(slots=True)

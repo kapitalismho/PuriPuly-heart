@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self, 4s ago] 你这副黑框眼镜挺好看的。
+[self] 你这副黑框眼镜挺好看的。
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Your response:
 
 ### Context Ignore Example
 <context>
-[self, 5s ago] 刚才那个恐怖地图真的吓死我了。
+[self] 刚才那个恐怖地图真的吓死我了。
 </context>
 
 <input>

@@ -281,7 +281,7 @@ class TestContextPassedToLLM:
         # Verify LLM was called with context
         assert len(fake_llm.calls) == 1
         call = fake_llm.calls[0]
-        assert call["context"] == '- [self, 2s ago] "hello"'
+        assert call["context"] == '- [self] "hello"'
 
     @pytest.mark.asyncio
     async def test_empty_context_when_no_history(self):
@@ -361,7 +361,7 @@ class TestContextFormatting:
         ]
         result = harness.format_context(entries)
 
-        assert result == '- [self, 12s ago] "안녕"'
+        assert result == '- [self] "안녕"'
 
     def test_format_context_multiple_entries(self):
         """Multiple entries should all be included."""
@@ -378,12 +378,12 @@ class TestContextFormatting:
         ]
         result = harness.format_context(entries)
 
-        assert '- [self, 12s ago] "a"' in result
-        assert '- [self, 11s ago] "b"' in result
+        assert '- [self] "a"' in result
+        assert '- [self] "b"' in result
 
 
 class TestContextInternalPaths:
-    def test_context_resolver_formats_local_with_relative_age_only(self):
+    def test_context_resolver_formats_local_without_relative_age(self):
         runtime = compose_translation_test_harness(
             stt=None,
             llm=FakeLLMProvider(),
@@ -400,7 +400,7 @@ class TestContextInternalPaths:
         )
 
         assert mode == "local"
-        assert context == '- [self, 12s ago] "hello there"'
+        assert context == '- [self] "hello there"'
 
     def test_translation_fixture_uses_local_context_when_peer_translation_is_off(self):
         harness = compose_translation_test_harness(
@@ -423,9 +423,9 @@ class TestContextInternalPaths:
         )
 
         assert mode == "local"
-        assert context == '- [self, 12s ago] "self only"'
+        assert context == '- [self] "self only"'
 
-    def test_context_resolver_formats_integrated_with_channel_prefix_and_relative_age(self):
+    def test_context_resolver_formats_integrated_with_channel_prefix(self):
         self_runtime = compose_translation_test_harness(
             stt=None,
             llm=None,
@@ -455,7 +455,7 @@ class TestContextInternalPaths:
         )
 
         assert mode == "integrated"
-        assert context == ('- [self, 12s ago] "I am ready"\n- [peer, 7s ago] "hello from peer"')
+        assert context == ('- [self] "I am ready"\n- [peer] "hello from peer"')
 
     def test_context_resolver_always_uses_integrated_when_peer_enabled(self):
         self_runtime = compose_translation_test_harness(
@@ -487,7 +487,7 @@ class TestContextInternalPaths:
         )
 
         assert mode == "integrated"
-        assert '- [peer, 7s ago] "peer line"' in context
+        assert '- [peer] "peer line"' in context
 
     def test_context_resolver_falls_back_to_local_when_peer_context_is_empty(self):
         self_runtime = ChannelRuntime(channel="self")
@@ -510,7 +510,7 @@ class TestContextInternalPaths:
         )
 
         assert mode == "local"
-        assert context == '- [self, 12s ago] "safe local line"'
+        assert context == '- [self] "safe local line"'
 
     def test_integrated_context_uses_40_second_window_before_entry_budget(self):
         harness = compose_translation_test_harness(
@@ -548,9 +548,7 @@ class TestContextInternalPaths:
         assert mode == "integrated"
         assert "41 seconds old" not in context
         assert context == (
-            '- [self, 30s ago] "self recent"\n'
-            '- [peer, 29s ago] "peer recent"\n'
-            '- [self, 28s ago] "self newest"'
+            '- [self] "self recent"\n' '- [peer] "peer recent"\n' '- [self] "self newest"'
         )
 
     def test_integrated_context_uses_latest_4_combined_entries_after_timestamp_merge(self):
@@ -592,10 +590,7 @@ class TestContextInternalPaths:
         assert mode == "integrated"
         assert "self 1" not in context
         assert context == (
-            '- [peer, 29s ago] "peer 1"\n'
-            '- [self, 28s ago] "self 2"\n'
-            '- [peer, 27s ago] "peer 2"\n'
-            '- [self, 26s ago] "self 3"'
+            '- [peer] "peer 1"\n' '- [self] "self 2"\n' '- [peer] "peer 2"\n' '- [self] "self 3"'
         )
 
     def test_context_resolver_default_integrated_context_uses_40_second_window_and_latest_4_entries(
@@ -638,10 +633,10 @@ class TestContextInternalPaths:
         assert "41 seconds old" not in context
         assert "recent 1" not in context
         assert context == (
-            '- [peer, 38s ago] "recent 2"\n'
-            '- [self, 37s ago] "recent 3"\n'
-            '- [peer, 36s ago] "recent 4"\n'
-            '- [self, 35s ago] "recent 5"'
+            '- [peer] "recent 2"\n'
+            '- [self] "recent 3"\n'
+            '- [peer] "recent 4"\n'
+            '- [self] "recent 5"'
         )
 
     def test_prepare_llm_request_formats_prompt_and_context(self):
@@ -661,8 +656,77 @@ class TestContextInternalPaths:
 
         assert "${sourceName}" not in prompt
         assert "${targetName}" not in prompt
-        assert context == '- [self, 1s ago] "안녕"'
+        assert context == '- [self] "안녕"'
         assert now == 20.0
+
+
+class TestContextSerializationContract:
+    def test_context_serialization_is_stable_as_time_advances(self):
+        entry = ContextEntry(
+            text="hello",
+            source_language="en",
+            target_language="ko",
+            timestamp=100.0,
+        )
+
+        first = ContextResolver(clock=FakeClock(initial_time=105.0)).format_local([entry])
+        second = ContextResolver(clock=FakeClock(initial_time=115.0)).format_local([entry])
+
+        assert first == '- [self] "hello"'
+        assert second == '- [self] "hello"'
+        assert first == second
+
+    def test_formatted_context_contains_no_timestamp_derived_syntax(self):
+        entries = [
+            ContextEntry(
+                text="hello",
+                source_language="en",
+                target_language="ko",
+                timestamp=100.0,
+                channel="self",
+            ),
+            ContextEntry(
+                text="hi",
+                source_language="en",
+                target_language="ko",
+                timestamp=101.0,
+                channel="peer",
+            ),
+        ]
+
+        context = ContextResolver(clock=FakeClock(initial_time=110.0)).format_local(entries)
+
+        assert context == '- [self] "hello"\n- [peer] "hi"'
+        assert "ago" not in context
+        assert "seconds" not in context
+        assert "100.0" not in context
+        assert "101.0" not in context
+
+    @pytest.mark.asyncio
+    async def test_provider_request_context_contains_no_relative_time_syntax(self):
+        clock = FakeClock(initial_time=110.0)
+        fake_llm = FakeLLMProvider()
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=fake_llm,
+            osc=FakeOscQueue(),
+            clock=clock,
+            context_time_window_s=60.0,
+            context_max_entries=3,
+        )
+        harness.self_runtime.translation_history = [
+            ContextEntry(text="hello", source_language="ko", target_language="en", timestamp=100.0),
+        ]
+
+        await harness.self_owner.submit_text("world")
+        await asyncio.gather(
+            *harness.self_runtime.translation_tasks.values(), return_exceptions=True
+        )
+
+        assert len(fake_llm.calls) == 1
+        assert fake_llm.calls[0]["context"] == '- [self] "hello"'
+        assert "ago" not in fake_llm.calls[0]["context"]
+        assert "seconds" not in fake_llm.calls[0]["context"]
 
 
 class TestContextLogging:
@@ -701,7 +765,7 @@ class TestContextLogging:
             source_language="ko",
             target_language="en",
         )
-        expected_context = '- [self, 1s ago] "secret context"'
+        expected_context = '- [self] "secret context"'
 
         with caplog.at_level(logging.INFO, logger="puripuly_heart.core.orchestrator.translation"):
             harness.prepare_translation_request("secret request")
@@ -731,7 +795,7 @@ class TestContextLogging:
             source_language="ko",
             target_language="en",
         )
-        expected_context = '- [peer, 1s ago] "secret peer context"'
+        expected_context = '- [peer] "secret peer context"'
 
         with caplog.at_level(logging.INFO, logger="puripuly_heart.core.orchestrator.translation"):
             _, context, _ = harness.prepare_translation_request(

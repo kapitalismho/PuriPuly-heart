@@ -47,6 +47,20 @@ from puripuly_heart.domain.events import UIEventType
 from puripuly_heart.domain.models import ChannelId, Translation
 
 
+def render_translation_system_prompt(
+    template: str,
+    *,
+    source_language: str,
+    target_language: str,
+    source_name: str | None = None,
+) -> str:
+    return render_translation_prompt_template(
+        template,
+        source_name=source_name or get_llm_language_name(source_language),
+        target_name=get_llm_language_name(target_language),
+    )
+
+
 class TranslationProviderGenerationPort(Protocol):
     @property
     def provider(self) -> object | None: ...
@@ -329,10 +343,11 @@ class TranslationRequestOwner:
         )
         target_language = self.target_language_for(channel, configuration)
         return PreparedTranslationRequest(
-            system_prompt=render_translation_prompt_template(
+            system_prompt=render_translation_system_prompt(
                 configuration.system_prompt,
+                source_language=source_language,
+                target_language=target_language,
                 source_name=source_name,
-                target_name=get_llm_language_name(target_language),
             ),
             context=context,
             requested_at=self.clock.now(),
@@ -661,4 +676,5 @@ __all__ = [
     "TranslationRequestOwner",
     "TranslationRequestPort",
     "TranslationRequestPresentationPort",
+    "render_translation_system_prompt",
 ]

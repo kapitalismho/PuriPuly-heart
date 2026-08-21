@@ -2,6 +2,7 @@ from typing import Callable
 
 import flet as ft
 
+from puripuly_heart.ui.components.loading_spinner import create_button_spinner
 from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
 from puripuly_heart.ui.theme import (
     COLOR_PRIMARY,
@@ -35,13 +36,8 @@ class PowerButton(ft.Container):
         self._color_on = color_on if color_on is not None else COLOR_PRIMARY
 
         self._icon_control = ft.Icon(icon=icon, size=icon_size, color=COLOR_SECONDARY)
-        self._progress_control = ft.ProgressRing(
-            width=icon_size * 0.7,
-            height=icon_size * 0.7,
-            stroke_width=max(3, icon_size * 0.06),
-            color=COLOR_PRIMARY,
-            visible=False,
-            semantics_label=label,
+        self._progress_control = create_button_spinner(
+            icon_size, semantics_label=label, color=COLOR_PRIMARY
         )
         self._icon_slot = ft.Stack(
             controls=[self._icon_control, self._progress_control],

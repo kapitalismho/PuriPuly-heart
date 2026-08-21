@@ -243,8 +243,25 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
                 else ""
             )
         intent["desktop_audio"] = desktop_audio
+        prompts = intent.get("prompts") if isinstance(intent.get("prompts"), Mapping) else {}
+        if isinstance(prompts, dict):
+            _migrate_legacy_timestamp_prompt(prompts)
+            intent["prompts"] = prompts
         prepared["intent"] = intent
     return prepared
+
+
+def _migrate_legacy_timestamp_prompt(prompts: dict[str, Any]) -> None:
+    from puripuly_heart.config.settings import (
+        _prompt_matches_legacy_timestamp_default,
+        _shared_default_prompt,
+    )
+
+    raw_system_prompt = prompts.get("system_prompt")
+    if isinstance(raw_system_prompt, str) and _prompt_matches_legacy_timestamp_default(
+        raw_system_prompt
+    ):
+        prompts["system_prompt"] = _shared_default_prompt()
 
 
 def _requires_local_qwen_cpu_auto_migration(settings_version: object) -> bool:
@@ -1275,6 +1292,8 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
 
 
 def _legacy_provider_llm_for_translation(model: str, connection: str) -> str:
+    if model == "managed_gemma":
+        return "managed_gemma"
     if model == "local_llm":
         return "local_llm"
     if model == "gemma4_31b_cerebras" or (model == "gemma4_31b" and connection == "cerebras"):

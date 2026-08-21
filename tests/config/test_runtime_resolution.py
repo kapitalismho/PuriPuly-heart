@@ -570,6 +570,57 @@ def test_translation_model_connection_matrix_resolves_llm_config(
 
 
 @pytest.mark.parametrize(
+    ("connection", "backend"),
+    [
+        ("cpu", "cpu"),
+        ("gpu", "gpu"),
+    ],
+)
+def test_managed_gemma_resolves_distinct_local_target_without_provider_fallback(
+    connection: str,
+    backend: str,
+) -> None:
+    runtime_resolution = _runtime_resolution_module()
+    resolved = _resolved_module()
+
+    config = runtime_resolution.resolve_llm_config(
+        _runtime_input(
+            runtime_resolution,
+            model=runtime_resolution.TRANSLATION_MODEL_MANAGED_GEMMA,
+            connection=connection,
+            translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
+                enabled=True,
+                model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
+                connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER,
+            ),
+        )
+    )
+
+    assert config.provider == runtime_resolution.PROVIDER_MANAGED_GEMMA
+    assert config.model == runtime_resolution.MANAGED_GEMMA_MODEL
+    assert config.credential == resolved.ResolvedCredentialRequirement(
+        source=resolved.CREDENTIAL_SOURCE_NONE,
+        required=False,
+        reference=None,
+    )
+    assert config.provider_options == {"backend": backend}
+    assert config.fallback is None
+    assert len(config.attempts) == 1
+    assert config.attempts[0].target == config.primary
+
+
+def test_legacy_managed_gemma_provider_derives_cpu_product_intent() -> None:
+    runtime_resolution = _runtime_resolution_module()
+
+    intent = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
+        provider_llm=runtime_resolution.PROVIDER_MANAGED_GEMMA,
+    )
+
+    assert intent.model == runtime_resolution.TRANSLATION_MODEL_MANAGED_GEMMA
+    assert intent.connection == runtime_resolution.TRANSLATION_CONNECTION_CPU
+
+
+@pytest.mark.parametrize(
     (
         "selection_alias",
         "fallback_enabled",

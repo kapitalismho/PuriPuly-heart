@@ -58,6 +58,8 @@ def _owner(
     founder_calls: list[str] | None = None,
     clears: list[str] | None = None,
     warmups: list[str] | None = None,
+    teardowns: list[str] | None = None,
+    starting_values: list[bool] | None = None,
 ) -> TranslationEnableOwner:
     pending_values = pending if pending is not None else []
     runtime_mode_values = runtime_modes if runtime_modes is not None else []
@@ -70,6 +72,8 @@ def _owner(
     founder_values = founder_calls if founder_calls is not None else []
     clear_values = clears if clears is not None else []
     warmup_values = warmups if warmups is not None else []
+    teardown_values = teardowns if teardowns is not None else []
+    starting_sink_values = starting_values if starting_values is not None else []
 
     async def default_prepare() -> ManagedTranslationPreparation:
         return preparation or ManagedTranslationPreparation(ready=True)
@@ -92,6 +96,9 @@ def _owner(
     async def warmup() -> None:
         warmup_values.append("warmup")
 
+    async def teardown() -> None:
+        teardown_values.append("teardown")
+
     return TranslationEnableOwner(
         state_provider=lambda: state_box[0],
         managed_prepare=prepare or default_prepare,
@@ -111,6 +118,8 @@ def _owner(
         log_detailed=lambda message: log_values.append(("detailed", message)),
         log_error=lambda message: log_values.append(("error", message)),
         founder_letter_sink=lambda: founder_values.append("show"),
+        teardown=teardown,
+        starting_sink=starting_sink_values.append,
     )
 
 
@@ -139,6 +148,69 @@ async def test_nonmanaged_enable_owns_runtime_context_and_warmup_sequence() -> N
         "detailed",
         "[Translation] Provider detail: provider=qwen region=china",
     ) in logs
+
+
+@pytest.mark.asyncio
+async def test_disable_owns_runtime_context_and_teardown_sequence() -> None:
+    state_box = [_state(translation_enabled=True)]
+    runtime_values: list[bool] = []
+    clears: list[str] = []
+    teardowns: list[str] = []
+    owner = _owner(
+        state_box,
+        runtime_values=runtime_values,
+        clears=clears,
+        teardowns=teardowns,
+    )
+
+    assert await owner.set_enabled(False) is False
+
+    assert runtime_values == [False]
+    assert clears == ["clear"]
+    assert teardowns == ["teardown"]
+
+
+@pytest.mark.asyncio
+async def test_enable_owns_starting_flag_around_warmup() -> None:
+    state_box = [_state()]
+    starting_values: list[bool] = []
+    warmups: list[str] = []
+
+    async def warmup() -> None:
+        assert starting_values == [True]
+        warmups.append("warmup")
+
+    owner = _owner(state_box, starting_values=starting_values, warmups=warmups)
+    owner.warmup = warmup
+
+    assert await owner.set_enabled(True) is True
+    assert starting_values == [True, False]
+    assert warmups == ["warmup"]
+
+
+@pytest.mark.asyncio
+async def test_stale_enable_does_not_clear_newer_starting_flag() -> None:
+    state_box = [_state()]
+    starting_values: list[bool] = []
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def warmup() -> None:
+        entered.set()
+        await release.wait()
+
+    owner = _owner(state_box, starting_values=starting_values)
+    owner.warmup = warmup
+
+    enabling = asyncio.create_task(owner.set_enabled(True))
+    await entered.wait()
+    assert starting_values == [True]
+
+    await owner.set_enabled(False)
+    assert starting_values[-1] is False
+    release.set()
+    await enabling
+    assert starting_values[-1] is False
 
 
 @pytest.mark.asyncio

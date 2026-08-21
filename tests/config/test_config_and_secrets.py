@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import re
 from pathlib import Path
@@ -21,6 +22,7 @@ from puripuly_heart.config.llm_profiles import (
 from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.config.settings import (
     LEGACY_QWEN_DEFAULT_PROMPT,
+    LEGACY_TIMESTAMP_PROMPT,
     LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
     LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS,
     SETTINGS_SCHEMA_VERSION,
@@ -329,7 +331,7 @@ def test_migrate_v17_normalizes_directsound_host_api_and_preserves_device() -> N
 
 
 def test_migrate_v18_preserves_directsound_when_removing_legacy_osc_rate_limits() -> None:
-    assert SETTINGS_SCHEMA_VERSION == 24
+    assert SETTINGS_SCHEMA_VERSION == 25
 
     raw = to_dict(AppSettings())
     raw["settings_version"] = 17
@@ -373,7 +375,7 @@ def test_load_settings_persists_v17_directsound_preservation(tmp_path) -> None:
 
 
 def test_load_settings_persists_v18_osc_rate_limit_key_removal(tmp_path) -> None:
-    assert SETTINGS_SCHEMA_VERSION == 24
+    assert SETTINGS_SCHEMA_VERSION == 25
 
     path = tmp_path / "settings.json"
     raw = to_dict(AppSettings())
@@ -476,6 +478,7 @@ def test_translation_model_public_member_names_and_values_match_plan() -> None:
         ("GEMINI_37_FLASH", "gemini37_flash"),
         ("GEMINI_31_FLASH_LITE", "gemini31_flash_lite"),
         ("QWEN_35_PLUS", "qwen35_plus"),
+        ("MANAGED_GEMMA", "managed_gemma"),
         ("LOCAL_LLM", "local_llm"),
         ("CUSTOM_HTTP", "custom_http"),
     )
@@ -2997,6 +3000,76 @@ def test_load_settings_schema_migration_resets_all_prompt_values(tmp_path) -> No
     assert persisted["system_prompt"] == shared_prompt
     assert loaded.system_prompts == {}
     assert "system_prompts" not in persisted
+
+
+def test_load_settings_migrates_legacy_timestamp_prompt_to_new_default(tmp_path) -> None:
+    path = tmp_path / "settings.json"
+    legacy = to_dict(AppSettings())
+    legacy["settings_version"] = SETTINGS_SCHEMA_VERSION - 1
+    legacy["system_prompt"] = LEGACY_TIMESTAMP_PROMPT
+    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    loaded = load_settings(path)
+    persisted = legacy_projected_settings_file(path)
+    shared_prompt = load_prompt_for_provider("gemini")
+
+    assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
+    assert loaded.system_prompt == shared_prompt
+    assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
+    assert persisted["system_prompt"] == shared_prompt
+
+
+def test_load_settings_preserves_custom_prompt_when_upgrading_schema(tmp_path) -> None:
+    path = tmp_path / "settings.json"
+    legacy = to_dict(AppSettings())
+    legacy["settings_version"] = SETTINGS_SCHEMA_VERSION - 1
+    legacy["system_prompt"] = "my customized prompt"
+    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    loaded = load_settings(path)
+    persisted = legacy_projected_settings_file(path)
+
+    assert loaded.system_prompt == "my customized prompt"
+    assert persisted["system_prompt"] == "my customized prompt"
+
+
+def test_migrate_settings_dict_prompt_upgrade_is_idempotent() -> None:
+    raw = to_dict(AppSettings())
+    raw["settings_version"] = SETTINGS_SCHEMA_VERSION - 1
+    raw["system_prompt"] = LEGACY_TIMESTAMP_PROMPT
+
+    once, first_changed = _migrate_settings_dict(copy.deepcopy(raw))
+    twice, second_changed = _migrate_settings_dict(copy.deepcopy(once))
+
+    assert first_changed is True
+    assert second_changed is False
+    assert once["system_prompt"] == load_prompt_for_provider("gemini")
+    assert twice["system_prompt"] == once["system_prompt"]
+
+
+def test_migrate_settings_dict_preserves_prompt_with_boundary_whitespace() -> None:
+    raw = to_dict(AppSettings())
+    raw["settings_version"] = SETTINGS_SCHEMA_VERSION - 1
+    raw["system_prompt"] = f"\n{LEGACY_TIMESTAMP_PROMPT}\n"
+
+    migrated, changed = _migrate_settings_dict(copy.deepcopy(raw))
+
+    assert changed is True
+    assert migrated["system_prompt"] == f"\n{LEGACY_TIMESTAMP_PROMPT}\n"
+
+
+def test_load_settings_preserves_prompt_with_boundary_whitespace(tmp_path) -> None:
+    path = tmp_path / "settings.json"
+    legacy = to_dict(AppSettings())
+    legacy["settings_version"] = SETTINGS_SCHEMA_VERSION
+    legacy["system_prompt"] = f"  {LEGACY_TIMESTAMP_PROMPT}  "
+    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    loaded = load_settings(path)
+    persisted = legacy_projected_settings_file(path)
+
+    assert loaded.system_prompt == f"  {LEGACY_TIMESTAMP_PROMPT}  "
+    assert persisted["system_prompt"] == f"  {LEGACY_TIMESTAMP_PROMPT}  "
 
 
 def test_from_dict_initializes_empty_prompt_fields_to_shared_default() -> None:

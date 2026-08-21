@@ -1438,6 +1438,53 @@ def test_on_llm_selected_updates_to_local_llms_with_ollama_connection(
     assert view.has_provider_changes is True
 
 
+def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_37_FLASH,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+        fallback=_enabled_fallback(
+            TranslationModel.DEEPSEEK_V4_FLASH,
+            TranslationConnection.OPENROUTER,
+        ),
+    )
+    settings.provider.llm = LLMProviderName.GEMINI
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    applies: list[bool] = []
+    view.on_providers_changed = lambda: applies.append(True)
+
+    view._on_llm_selected("managed_gemma_cpu")
+
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.translation.model == TranslationModel.MANAGED_GEMMA
+    assert pending.translation.connection == TranslationConnection.CPU
+    assert pending.provider.llm == LLMProviderName.MANAGED_GEMMA
+    assert applies == [True]
+    assert view._openrouter_fallback_card.visible is False
+    assert view._translation_connection_row.visible is False
+    assert view._translation_connection_title.value == t("settings.translation_connection")
+    assert view._get_llm_display_label(pending) == t("provider.managed_gemma_cpu")
+
+    view._on_llm_selected("managed_gemma_gpu")
+
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.translation.model == TranslationModel.MANAGED_GEMMA
+    assert pending.translation.connection == TranslationConnection.GPU
+    assert applies == [True, True]
+    assert view._get_llm_display_label(pending) == t("provider.managed_gemma_gpu")
+
+    view._on_llm_selected("managed_gemma_gpu")
+
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.translation.connection == TranslationConnection.GPU
+    assert applies == [True, True]
+
+
 def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2057,11 +2104,13 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
             *,
             show_description=False,
             two_column=False,
+            left_column_sections=1,
         ):
             captured["title"] = title
             captured["options"] = options
             captured["show_description"] = show_description
             captured["two_column"] = two_column
+            captured["left_column_sections"] = left_column_sections
 
         def open(self, current: str) -> None:
             captured["current"] = current
@@ -2078,6 +2127,7 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
     assert captured["title"] == t("settings.section.peer_stt")
     assert captured["show_description"] is True
     assert captured["two_column"] is True
+    assert captured["left_column_sections"] == 2
     assert local_qwen_option.label == "Qwen3 ASR 0.6B"
     assert local_qwen_option.disabled is False
     assert local_qwen_option.description == t("provider.local_qwen.description")

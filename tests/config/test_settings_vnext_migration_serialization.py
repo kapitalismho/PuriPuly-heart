@@ -332,6 +332,61 @@ def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
     }
 
 
+def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
+    from puripuly_heart.config.prompts import load_prompt_for_provider
+    from puripuly_heart.config.settings import LEGACY_TIMESTAMP_PROMPT
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    canonical["intent"]["prompts"]["system_prompt"] = LEGACY_TIMESTAMP_PROMPT
+
+    migrated = migration.from_dict(canonical)
+
+    assert migrated.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
+
+
+def test_vnext_dict_migrates_legacy_timestamp_prompt_from_legacy_shape() -> None:
+    from puripuly_heart.config.prompts import load_prompt_for_provider
+    from puripuly_heart.config.settings import LEGACY_TIMESTAMP_PROMPT
+    from puripuly_heart.config.settings_vnext import migration
+
+    raw = {
+        "settings_version": SETTINGS_SCHEMA_VERSION - 1,
+        "system_prompt": LEGACY_TIMESTAMP_PROMPT,
+    }
+
+    migrated = migration.from_dict(raw)
+
+    assert migrated.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
+
+
+def test_vnext_dict_preserves_custom_prompt_through_migration() -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    canonical["intent"]["prompts"]["system_prompt"] = "my customized prompt"
+
+    migrated = migration.from_dict(canonical)
+
+    assert migrated.intent.prompts.system_prompt == "my customized prompt"
+
+
+def test_vnext_dict_preserves_prompt_with_boundary_whitespace() -> None:
+    from puripuly_heart.config.settings import LEGACY_TIMESTAMP_PROMPT
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    stored_prompt = f"  {LEGACY_TIMESTAMP_PROMPT}  "
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    canonical["intent"]["prompts"]["system_prompt"] = stored_prompt
+
+    migrated = migration.from_dict(canonical)
+
+    assert migrated.intent.prompts.system_prompt == stored_prompt
+
+
 def test_vnext_dict_migrates_disabled_gemini_3_flash_fallback_to_none() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 
@@ -1621,14 +1676,14 @@ def test_migration_on_load_creates_byte_identical_backup_and_writes_vnext_with_c
     fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
     path = tmp_path / "settings.json"
     original_bytes = _write_json_bytes(path, maximal_v24_settings_fixture())
-    colliding_backup = tmp_path / "settings.json.pre-v24.20260609T010203Z.bak"
+    colliding_backup = tmp_path / "settings.json.pre-v25.20260609T010203Z.bak"
     colliding_backup.write_bytes(b"existing backup")
 
     result = compat.load_vnext_settings(path, now=fixed_now)
 
     assert result.status == compat.SettingsPersistenceStatus.SUCCESS
     assert result.migrated is True
-    assert result.backup_path == tmp_path / "settings.json.pre-v24.20260609T010203Z.1.bak"
+    assert result.backup_path == tmp_path / "settings.json.pre-v25.20260609T010203Z.1.bak"
     assert result.backup_path.read_bytes() == original_bytes
     assert colliding_backup.read_bytes() == b"existing backup"
     persisted = json.loads(path.read_text(encoding="utf-8"))
@@ -1643,7 +1698,7 @@ def test_backup_creation_failure_aborts_vnext_save_and_leaves_original_bytes(
     fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
     path = tmp_path / "settings.json"
     original_bytes = _write_json_bytes(path, maximal_v24_settings_fixture())
-    first_backup = tmp_path / "settings.json.pre-v24.20260609T010203Z.bak"
+    first_backup = tmp_path / "settings.json.pre-v25.20260609T010203Z.bak"
     first_backup.write_bytes(b"collision")
 
     result = compat.load_vnext_settings(path, now=fixed_now, max_backup_attempts=1)
@@ -1668,7 +1723,7 @@ def test_save_failure_before_final_replace_leaves_original_and_backup_safe(
     assert result.status == compat.SettingsPersistenceStatus.SAVE_FAILED
     assert result.settings is None
     assert path.read_bytes() == original_bytes
-    backup_path = tmp_path / "settings.json.pre-v24.20260609T010203Z.bak"
+    backup_path = tmp_path / "settings.json.pre-v25.20260609T010203Z.bak"
     assert backup_path.read_bytes() == original_bytes
 
 

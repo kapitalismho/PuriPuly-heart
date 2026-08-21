@@ -171,6 +171,7 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.LOCAL_QWEN: "settings.stt.section.cpu_inference",
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
+    TranslationModel.MANAGED_GEMMA: "provider.managed_gemma",
     TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
     TranslationModel.GEMMA4_31B: "provider.gemma4_31b",
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
@@ -182,6 +183,8 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.CUSTOM_HTTP: "provider.custom_http",
 }
 _TRANSLATION_CONNECTION_LABEL_KEYS = {
+    TranslationConnection.CPU: "settings.translation_connection.cpu",
+    TranslationConnection.GPU: "settings.translation_connection.gpu",
     TranslationConnection.MANAGED: "settings.translation_connection.managed",
     TranslationConnection.MANAGED_CHINA: "settings.translation_connection.managed_china",
     TranslationConnection.OPENROUTER: "settings.translation_connection.openrouter",
@@ -195,6 +198,7 @@ _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
 }
 _TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY = "settings.translation_connection.only_supported"
 _TRANSLATION_MODELS = (
+    TranslationModel.MANAGED_GEMMA,
     TranslationModel.GEMMA4_26B_31B,
     TranslationModel.GEMMA4_31B,
     TranslationModel.GEMMA4,
@@ -206,15 +210,18 @@ _TRANSLATION_MODELS = (
     TranslationModel.QWEN_35_PLUS,
 )
 _TRANSLATION_MODEL_SECTION_ORDER = (
-    "settings.translation_model.section.recommended",
+    "settings.translation_model.section.recommended_cloud",
+    "settings.translation_model.section.recommended_local",
+    "settings.translation_model.section.gpu_inference",
     "settings.translation_model.section.gemma",
     "settings.translation_model.section.user_settings",
     "settings.translation_model.section.others",
 )
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
-    TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended",
-    TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended",
-    TranslationModel.GEMMA4_31B: "settings.translation_model.section.gemma",
+    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.recommended_local",
+    TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
+    TranslationModel.GEMMA4_31B: "settings.translation_model.section.recommended_cloud",
+    TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended_cloud",
     TranslationModel.GEMMA4: "settings.translation_model.section.gemma",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
     TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
@@ -2731,7 +2738,13 @@ class SettingsView(ft.Column):
         return pending
 
     def _get_llm_modal_value(self, settings: AppSettings) -> str:
-        return settings.translation.model.value
+        model = settings.translation.model
+        if model == TranslationModel.MANAGED_GEMMA:
+            connection = settings.translation.connection
+            if connection == TranslationConnection.GPU:
+                return "managed_gemma_gpu"
+            return "managed_gemma_cpu"
+        return model.value
 
     def _translation_model_display_label(self, model: TranslationModel) -> str:
         return t(_TRANSLATION_MODEL_LABEL_KEYS[model])
@@ -2749,6 +2762,12 @@ class SettingsView(ft.Column):
         text_control = self._translation_connection_text.content
         text_control.value = text
         text_control.size = 28
+
+    def _sync_translation_connection_title(self, settings: AppSettings) -> None:
+        title = getattr(self, "_translation_connection_title", None)
+        if title is None:
+            return
+        title.value = t("settings.translation_connection")
 
     def _stored_openrouter_selection_alias(
         self, settings: AppSettings
@@ -2842,7 +2861,12 @@ class SettingsView(ft.Column):
         return t(profile.description_key, default="")
 
     def _get_llm_display_label(self, settings: AppSettings) -> str:
-        return self._translation_model_display_label(settings.translation.model)
+        model = settings.translation.model
+        if model == TranslationModel.MANAGED_GEMMA:
+            if settings.translation.connection == TranslationConnection.GPU:
+                return t("provider.managed_gemma_gpu")
+            return t("provider.managed_gemma_cpu")
+        return self._translation_model_display_label(model)
 
     def _get_translation_connection_display_label(self, settings: AppSettings | None) -> str:
         if settings is None:
@@ -2901,6 +2925,8 @@ class SettingsView(ft.Column):
             return "deepseek"
         if settings.provider.llm == LLMProviderName.LOCAL_LLM:
             return "local_llm"
+        if settings.provider.llm == LLMProviderName.MANAGED_GEMMA:
+            return "managed_gemma"
         return "qwen"
 
     def _active_prompt_key(self) -> str:
@@ -3569,6 +3595,7 @@ class SettingsView(ft.Column):
         self._set_translation_connection_text(
             self._get_translation_connection_display_label(settings),
         )
+        self._sync_translation_connection_title(settings)
         self._sync_openrouter_fallback_card(settings)
         self._local_llm_base_url.value = settings.local_llm.base_url
         self._local_llm_base_url.error = None
@@ -3865,7 +3892,9 @@ class SettingsView(ft.Column):
             )
         )
         self._sync_openrouter_pkce_button_state(settings)
-        self._translation_connection_row.visible = not is_custom_http
+        self._translation_connection_row.visible = (
+            not is_custom_http and settings.translation.model != TranslationModel.MANAGED_GEMMA
+        )
         self._local_llm_connection_card.visible = (
             not is_custom_http and llm == LLMProviderName.LOCAL_LLM
         )
@@ -3879,7 +3908,9 @@ class SettingsView(ft.Column):
         self._sync_openrouter_fallback_card(settings)
         openrouter_fallback_card = getattr(self, "_openrouter_fallback_card", None)
         if openrouter_fallback_card is not None:
-            openrouter_fallback_card.visible = not is_custom_http
+            openrouter_fallback_card.visible = not is_custom_http and (
+                settings.translation.model != TranslationModel.MANAGED_GEMMA
+            )
         self._sync_http_extension_card(settings)
 
         qwen_regions: set[QwenRegion] = set()
@@ -3926,6 +3957,7 @@ class SettingsView(ft.Column):
             self._on_stt_selected,
             show_description=True,
             two_column=True,
+            left_column_sections=2,
         )
         modal.open(current)
 
@@ -4009,6 +4041,7 @@ class SettingsView(ft.Column):
             self._on_peer_stt_selected,
             show_description=True,
             two_column=True,
+            left_column_sections=2,
         ).open(current)
 
     def _on_peer_stt_selected(self, value: str) -> None:
@@ -4065,17 +4098,48 @@ class SettingsView(ft.Column):
         """Open LLM provider selection modal."""
         if not is_control_mounted(self):
             return
-        options = [
-            OptionItem(
-                value=model.value,
-                label=self._translation_model_display_label(model),
-                description=t(f"settings.translation_model.{model.value}.description", default=""),
-                section=t(section_key),
-            )
-            for section_key in _TRANSLATION_MODEL_SECTION_ORDER
-            for model in _TRANSLATION_MODELS
-            if _TRANSLATION_MODEL_SECTION_BY_MODEL.get(model) == section_key
-        ]
+        options: list[OptionItem] = []
+        for section_key in _TRANSLATION_MODEL_SECTION_ORDER:
+            for model in _TRANSLATION_MODELS:
+                if model == TranslationModel.MANAGED_GEMMA:
+                    if section_key == "settings.translation_model.section.recommended_local":
+                        options.append(
+                            OptionItem(
+                                value="managed_gemma_cpu",
+                                label=t("provider.managed_gemma_cpu"),
+                                description=t(
+                                    "settings.translation_model.managed_gemma_cpu.description",
+                                    default="",
+                                ),
+                                section=t(section_key),
+                            )
+                        )
+                    elif section_key == "settings.translation_model.section.gpu_inference":
+                        options.append(
+                            OptionItem(
+                                value="managed_gemma_gpu",
+                                label=t("provider.managed_gemma_gpu"),
+                                description=t(
+                                    "settings.translation_model.managed_gemma_gpu.description",
+                                    default="",
+                                ),
+                                section=t(section_key),
+                            )
+                        )
+                    continue
+                if _TRANSLATION_MODEL_SECTION_BY_MODEL.get(model) != section_key:
+                    continue
+                options.append(
+                    OptionItem(
+                        value=model.value,
+                        label=self._translation_model_display_label(model),
+                        description=t(
+                            f"settings.translation_model.{model.value}.description",
+                            default="",
+                        ),
+                        section=t(section_key),
+                    )
+                )
         display_settings = self._build_settings_with_provider_draft()
         current = (
             self._get_llm_modal_value(display_settings)
@@ -4089,6 +4153,7 @@ class SettingsView(ft.Column):
             self._on_llm_selected,
             show_description=True,
             two_column=True,
+            left_column_sections=2,
         )
         modal.open(current)
 
@@ -4115,6 +4180,7 @@ class SettingsView(ft.Column):
         self._set_translation_connection_text(
             self._get_translation_connection_display_label(settings),
         )
+        self._sync_translation_connection_title(settings)
         self._sync_openrouter_fallback_card(settings)
 
     def _apply_translation_selection(
@@ -4170,8 +4236,9 @@ class SettingsView(ft.Column):
 
         if (
             connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
-            and getattr(self, "on_providers_changed", None) is not None
-        ):
+            or model == TranslationModel.MANAGED_GEMMA
+            or old_model == TranslationModel.MANAGED_GEMMA
+        ) and getattr(self, "on_providers_changed", None) is not None:
             self.on_providers_changed()
 
         display_settings = self._build_settings_with_provider_draft()
@@ -4202,18 +4269,32 @@ class SettingsView(ft.Column):
             return
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
-        try:
-            model = TranslationModel(value)
-        except (TypeError, ValueError):
-            if value == LLMProviderName.OPENROUTER.value:
-                model = TranslationModel.GEMMA4
-            else:
-                return
+        if value in ("managed_gemma_cpu", "managed_gemma_gpu"):
+            model = TranslationModel.MANAGED_GEMMA
+            connection = (
+                TranslationConnection.GPU
+                if value == "managed_gemma_gpu"
+                else TranslationConnection.CPU
+            )
+        else:
+            try:
+                model = TranslationModel(value)
+            except (TypeError, ValueError):
+                if value == LLMProviderName.OPENROUTER.value:
+                    model = TranslationModel.GEMMA4
+                else:
+                    return
+            connection = None
 
         if current_settings.translation.model == model:
-            return
+            if connection is not None:
+                if current_settings.translation.connection == connection:
+                    return
+            else:
+                return
         history = copy.deepcopy(current_settings.translation.connection_history)
-        connection = self._restore_translation_connection_for_model(model, history)
+        if connection is None:
+            connection = self._restore_translation_connection_for_model(model, history)
         self._apply_translation_selection(model, connection)
 
     def _on_translation_connection_click(self, e) -> None:
@@ -4225,6 +4306,8 @@ class SettingsView(ft.Column):
             if display_settings is not None
             else TranslationModel.GEMMA4
         )
+        if model == TranslationModel.MANAGED_GEMMA:
+            return
         connections = supported_translation_connections(model)
         options = [
             OptionItem(
@@ -4268,6 +4351,12 @@ class SettingsView(ft.Column):
 
     def _on_openrouter_fallback_click(self, e) -> None:
         if not is_control_mounted(self):
+            return
+        display_settings = self._build_settings_with_provider_draft()
+        if (
+            display_settings is not None
+            and display_settings.translation.model == TranslationModel.MANAGED_GEMMA
+        ):
             return
         options: list[OptionItem] = [
             OptionItem(
@@ -5961,6 +6050,7 @@ class SettingsView(ft.Column):
             self._set_translation_connection_text(
                 self._get_translation_connection_display_label(display_settings),
             )
+            self._sync_translation_connection_title(display_settings)
             self._sync_openrouter_fallback_card(display_settings)
             self._sync_http_extension_card(display_settings, force_credentials=True)
             self._sync_managed_key_card(display_settings)

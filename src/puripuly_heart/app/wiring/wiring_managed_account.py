@@ -11,6 +11,7 @@ from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.managed_auth import ManagedAuthOwner
+from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTranslationOwner
 from puripuly_heart.app.services.managed_usage import (
     ManagedUsageMetadataResult,
     ManagedUsageOwner,
@@ -32,6 +33,7 @@ from puripuly_heart.config.settings import (
     LLMProviderName,
     OpenRouterCredentialSource,
     TranslationConnection,
+    TranslationModel,
     normalize_owned_referral_id,
 )
 from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
@@ -57,6 +59,7 @@ from .wiring_managed_auth_factory import (
     build_openrouter_credential_runtime_config,
     build_openrouter_release_runtime_config,
 )
+from .wiring_managed_gemma import managed_gemma_selection
 from .wiring_secrets_factory import create_secret_store
 from .wiring_translation_runtime_configuration import (
     replace_translation_runtime_enabled,
@@ -353,6 +356,7 @@ def compose_managed_account(
     pending_sink: Callable[[bool], None],
     usage_view_sink: Callable[[ManagedUsageViewState], None],
     dashboard_sink: Callable[[bool], None],
+    starting_sink: Callable[[bool], None] | None = None,
     message_sink: Callable[[str, Mapping[str, object]], None],
     qq_dialog_sink: Callable[[], None],
     founder_dialog: Callable[[], bool],
@@ -363,6 +367,8 @@ def compose_managed_account(
     basic_warning_sink: Callable[[str], None],
     detailed_warning_sink: Callable[[str, BaseException | None], None],
     runtime_state_changed: Callable[[], None] | None = None,
+    managed_gemma: ManagedGemmaTranslationOwner | None = None,
+    sync_local_translation_demand: Callable[[], Awaitable[None]] | None = None,
 ) -> ManagedAccountComponents:
     auth_owner: ManagedAuthOwner | None = None
 
@@ -446,6 +452,27 @@ def compose_managed_account(
     )
     translation_owner: TranslationEnableOwner | None = None
 
+    async def warmup_translation() -> None:
+        current = settings.current
+        if (
+            current is not None
+            and current.translation.model == TranslationModel.MANAGED_GEMMA
+            and managed_gemma is not None
+        ):
+            if sync_local_translation_demand is not None:
+                await sync_local_translation_demand()
+            else:
+                await managed_gemma.prepare(managed_gemma_selection(current))
+            return
+        await translation_adapter.warmup()
+
+    async def teardown_translation() -> None:
+        if sync_local_translation_demand is not None:
+            await sync_local_translation_demand()
+            return
+        if managed_gemma is not None:
+            await managed_gemma.deactivate(linger=True)
+
     def disable_translation(reopen: bool) -> None:
         if translation_owner is not None:
             translation_owner.disable_for_managed_exhaustion(
@@ -477,8 +504,9 @@ def compose_managed_account(
             runtime_state_changed,
         ),
         dashboard_sink=dashboard_sink,
+        starting_sink=starting_sink,
         clear_context=runtime.clear_context,
-        warmup=translation_adapter.warmup,
+        warmup=warmup_translation,
         message_sink=message_sink,
         qq_dialog_sink=qq_dialog_sink,
         result_sink=results.set,
@@ -486,6 +514,7 @@ def compose_managed_account(
         log_detailed=log_detailed,
         log_error=log_error,
         founder_letter_sink=translation_adapter.show_founder_letter,
+        teardown=teardown_translation,
     )
     pkce_flow = OpenRouterPkceFlowOwner(
         client_factory=lambda: OpenRouterPKCEClient(

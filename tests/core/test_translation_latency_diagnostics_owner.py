@@ -186,8 +186,8 @@ def test_owner_suppresses_duplicate_context_mode_and_logs_metadata_only() -> Non
         ContextApplicationDiagnostic(
             channel="self",
             request_chars=17,
-            context_lines=("- [self, ko→en] first", "- [peer, ja→en] second"),
-            context_chars=49,
+            context_lines=("- [self] first", "- [peer] second"),
+            context_chars=35,
         )
     )
 

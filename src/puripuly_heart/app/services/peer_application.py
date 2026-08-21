@@ -59,6 +59,7 @@ PeerApplicationEffectiveSink = Callable[[bool, bool], None]
 PeerApplicationLogSink = Callable[[str], object]
 PeerApplicationSupersededSink = Callable[[], None]
 PeerApplicationLifecycleTraceSink = Callable[[str, dict[str, object]], None]
+PeerApplicationTranslationDemandSink = Callable[[], Awaitable[None]]
 
 
 @dataclass(slots=True)
@@ -82,6 +83,10 @@ class PeerApplicationOwner:
     log_detailed: PeerApplicationLogSink = field(repr=False)
     log_failure: PeerApplicationLogSink = field(repr=False)
     lifecycle_trace_sink: PeerApplicationLifecycleTraceSink | None = field(
+        default=None,
+        repr=False,
+    )
+    translation_demand_sink: PeerApplicationTranslationDemandSink | None = field(
         default=None,
         repr=False,
     )
@@ -335,6 +340,7 @@ class PeerApplicationOwner:
             self.sync_effective_flags()
             self.presentation_changed()
             self.log_basic("[Peer] Toggle ignored: eula_accepted=False")
+            await self._notify_translation_demand()
             return
         if enabled and not state.overlay_intent_enabled:
             self.overlay_intent_sink(True)
@@ -346,6 +352,7 @@ class PeerApplicationOwner:
         )
         self._activation_starting = enabled
         self.presentation_changed()
+        await self._notify_translation_demand()
         ready = False
         if enabled:
             ready = await self.ensure_local_ready(generation)
@@ -411,6 +418,12 @@ class PeerApplicationOwner:
         if enabled:
             self.disclosure_sink()
         self.presentation_changed()
+
+    async def _notify_translation_demand(self) -> None:
+        sink = self.translation_demand_sink
+        if sink is None:
+            return
+        await sink()
 
     def disable_intent(self) -> None:
         if self.state_provider().settings_available:
