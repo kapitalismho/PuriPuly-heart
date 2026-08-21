@@ -224,6 +224,12 @@ class FletUiPresentationAdapter:
         if callable(setter):
             setter(notice)
 
+    def set_dashboard_translation_starting(self, starting: bool) -> None:
+        dashboard = getattr(self._app, "view_dashboard", None)
+        setter = getattr(dashboard, "set_translation_starting", None)
+        if callable(setter):
+            setter(bool(starting))
+
     def set_dashboard_vrchat_osc_notice(self, active: bool) -> None:
         dashboard = getattr(self._app, "view_dashboard", None)
         setter = getattr(dashboard, "set_vrchat_osc_notice", None)

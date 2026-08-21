@@ -481,7 +481,7 @@
   "dashboard.gpu_notice.activation_failed": "Не удалось запустить распознавание речи!",
   "dashboard.managed_gemma_notice.checking": "Проверка локальной модели перевода…",
   "dashboard.managed_gemma_notice.downloading": "Загрузка локальной модели перевода {percent}%",
-  "dashboard.managed_gemma_notice.preparing": "Подготовка локального перевода…",
+  "dashboard.managed_gemma_notice.preparing": "Загрузка модели перевода…",
   "dashboard.managed_gemma_notice.failed": "Не удалось подготовить локальную модель перевода.",
   "dashboard.managed_gemma_notice.cancelled": "Настройка локальной модели перевода отменена.",
   "dashboard.managed_gemma_action.cancel": "Отмена",

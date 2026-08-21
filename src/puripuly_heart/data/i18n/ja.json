@@ -481,7 +481,7 @@
   "dashboard.gpu_notice.activation_failed": "音声認識を開始できませんでした！",
   "dashboard.managed_gemma_notice.checking": "ローカル翻訳モデルを確認しています…",
   "dashboard.managed_gemma_notice.downloading": "ローカル翻訳モデルをダウンロードしています {percent}%",
-  "dashboard.managed_gemma_notice.preparing": "ローカル翻訳を準備しています…",
+  "dashboard.managed_gemma_notice.preparing": "翻訳モデルを読み込んでいます…",
   "dashboard.managed_gemma_notice.failed": "ローカル翻訳モデルを準備できませんでした。",
   "dashboard.managed_gemma_notice.cancelled": "ローカル翻訳モデルのセットアップをキャンセルしました。",
   "dashboard.managed_gemma_action.cancel": "キャンセル",

@@ -78,6 +78,7 @@ class DashboardView(ft.Column):
         self.is_translation_on = False
         self.is_stt_on = False
         self._stt_is_starting = False
+        self._translation_is_starting = False
         self.translation_needs_key = False
         self.stt_needs_key = False
         self.last_sent_text = t("dashboard.ready")
@@ -259,6 +260,7 @@ class DashboardView(ft.Column):
         self.trans_button.set_state(
             self.is_translation_on,
             needs_key=self._translation_showing_warning,
+            is_starting=self._translation_is_starting,
         )
 
     def _sync_overlay_peer_buttons(self) -> None:
@@ -544,6 +546,10 @@ class DashboardView(ft.Column):
     def set_stt_starting(self, starting: bool) -> None:
         self._stt_is_starting = bool(starting)
         self._sync_stt_button_state()
+
+    def set_translation_starting(self, starting: bool) -> None:
+        self._translation_is_starting = bool(starting)
+        self._sync_translation_button_state()
 
     def set_overlay_peer_contract(self, contract: OverlayPeerConsumerContract) -> None:
         self._overlay_peer_contract = contract

@@ -322,10 +322,12 @@ class SettingsModal:
 
     def _build_loading_placeholder(self) -> ft.Control:
         """Build a loading placeholder with a spinner."""
+        from puripuly_heart.ui.components.loading_spinner import create_section_spinner
+
         return ft.Container(
             content=ft.Row(
                 controls=[
-                    ft.ProgressRing(width=32, height=32, stroke_width=3),
+                    create_section_spinner(size=32, stroke_width=3),
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
             ),

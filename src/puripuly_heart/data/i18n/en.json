@@ -481,7 +481,7 @@
   "dashboard.gpu_notice.activation_failed": "Couldn't start speech recognition!",
   "dashboard.managed_gemma_notice.checking": "Checking the local translation model…",
   "dashboard.managed_gemma_notice.downloading": "Downloading the local translation model {percent}%",
-  "dashboard.managed_gemma_notice.preparing": "Preparing local translation…",
+  "dashboard.managed_gemma_notice.preparing": "Loading the translation model…",
   "dashboard.managed_gemma_notice.failed": "Couldn't prepare the local translation model.",
   "dashboard.managed_gemma_notice.cancelled": "Local translation model setup was cancelled.",
   "dashboard.managed_gemma_action.cancel": "Cancel",

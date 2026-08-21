@@ -481,7 +481,7 @@
   "dashboard.gpu_notice.activation_failed": "未能启动语音识别！",
   "dashboard.managed_gemma_notice.checking": "正在检查本地翻译模型…",
   "dashboard.managed_gemma_notice.downloading": "正在下载本地翻译模型 {percent}%",
-  "dashboard.managed_gemma_notice.preparing": "正在准备本地翻译…",
+  "dashboard.managed_gemma_notice.preparing": "正在加载翻译模型…",
   "dashboard.managed_gemma_notice.failed": "未能准备本地翻译模型。",
   "dashboard.managed_gemma_notice.cancelled": "已取消本地翻译模型设置。",
   "dashboard.managed_gemma_action.cancel": "取消",

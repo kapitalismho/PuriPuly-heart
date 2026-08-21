@@ -453,9 +453,8 @@ def compose_application_runtime(
         if snapshot.error_type is not None:
             fields.append(f"error_type={snapshot.error_type}")
         log_detailed("[ManagedGemma] " + " ".join(fields))
-        action: Literal["cancel", "retry"]
         if snapshot.state in {"checking", "downloading", "preparing"}:
-            action = "cancel"
+            action = None
         elif snapshot.state in {"failed", "cancelled"}:
             action = "retry"
         else:
@@ -1663,6 +1662,7 @@ def compose_application_runtime(
         pending_sink=presentation.set_dashboard_managed_auth_pending,
         usage_view_sink=apply_managed_usage_view,
         dashboard_sink=presentation.set_dashboard_translation_enabled,
+        starting_sink=presentation.set_dashboard_translation_starting,
         runtime_state_changed=lambda: require_vrc_mic_sync().publish_delta(),
         message_sink=lambda key, values: show_short_message(
             key,
