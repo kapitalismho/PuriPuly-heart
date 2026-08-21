@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import Callable
 from dataclasses import replace
 
@@ -92,7 +93,6 @@ class RecordingProvisioning:
         *,
         result_handler=None,
     ) -> asyncio.Task[LocalASRInstallResult]:
-        assert result_handler is None
         self.requests.append(request)
         self._snapshot = replace(
             self._snapshot,
@@ -106,7 +106,16 @@ class RecordingProvisioning:
                 ),
             ),
         )
-        return asyncio.create_task(self._finish(request))
+
+        async def finish_and_deliver() -> LocalASRInstallResult:
+            result = await self._finish(request)
+            if result_handler is not None:
+                outcome = result_handler(result)
+                if inspect.isawaitable(outcome):
+                    await outcome
+            return result
+
+        return asyncio.create_task(finish_and_deliver())
 
     async def _finish(
         self,
@@ -194,6 +203,47 @@ async def test_selected_install_rechecks_provider_after_explicit_inspection() ->
     assert await _owner(provisioning, state_box).install_selected_model_if_needed() is False
     assert provisioning.inspect_calls == [(True, False)]
     assert provisioning.requests == []
+
+
+@pytest.mark.asyncio
+async def test_request_install_starts_background_activation_origin() -> None:
+    state_box = [
+        LocalASRGpuProvisioningState(
+            selected_provider_requires_model=True,
+            locale="ko",
+            pending_channels=frozenset(),
+        )
+    ]
+    release = asyncio.Event()
+    provisioning = RecordingProvisioning(_snapshot("missing"), release=release)
+    effects: list[LocalASRGpuProvisioningEffect] = []
+    owner = _owner(provisioning, state_box, effects=effects)
+
+    assert owner.request_install() is True
+    assert owner.request_install() is False
+    await asyncio.sleep(0)
+    assert provisioning.requests == [
+        LocalASRInstallRequest(
+            backend="gpu",
+            model_ids=(LOCAL_QWEN_GPU_MODEL_ID,),
+            locale="ko",
+            origin="activation",
+            explicit_gpu_intent=True,
+        )
+    ]
+    assert effects[0] == LocalASRGpuProvisioningEffect(
+        state="installing",
+        origin="activation",
+        progress_percent=0,
+        publish_notice=True,
+    )
+    release.set()
+    while effects[-1].state != "installed":
+        await asyncio.sleep(0)
+    assert effects[-1] == LocalASRGpuProvisioningEffect(
+        state="installed",
+        origin="activation",
+    )
 
 
 @pytest.mark.asyncio

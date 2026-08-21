@@ -186,6 +186,15 @@ class GpuRuntimeInteractionOwner:
                 origin="activation",
             )
             return True
+        if phase in {"not_installed", "invalid"}:
+            if self._provisioning_owner.request_install(origin="activation"):
+                self.set_ui_state(
+                    "installing",
+                    progress_percent=0,
+                    publish_notice=True,
+                    origin="activation",
+                )
+                return False
         state_by_phase = {
             "unsupported": "unsupported",
             "not_installed": "not_installed",
@@ -220,7 +229,9 @@ class GpuRuntimeInteractionOwner:
         self._discovery_failure_state = (
             "unsupported"
             if snapshot.gpu.phase == "unsupported"
-            else "discovery_failed" if snapshot.gpu.phase == "failed" else None
+            else "discovery_failed"
+            if snapshot.gpu.phase == "failed"
+            else None
         )
 
     def observe_provisioning(self, snapshot: LocalASRProvisioningSnapshot) -> None:

@@ -1493,7 +1493,7 @@ def test_translator_app_4x3_window_keeps_shell_navigation_usable(
     app._on_nav_change(0)
     assert app.content_area.content is app.view_dashboard
     assert app.content_area.padding == app_module.APP_CONTENT_PADDING
-    assert len(page.tasks) == 2
+    assert len(page.tasks) == 1
 
 
 def test_app_tab_key_reverses_message_input_languages_only_on_dashboard() -> None:
@@ -1988,10 +1988,8 @@ def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -
         ),
     )
     pkce_calls: list[tuple[AppSettings, str]] = []
-    app._on_request_openrouter_pkce = (
-        lambda target_settings, *, launch_source="settings": pkce_calls.append(
-            (target_settings, launch_source)
-        )
+    app._on_request_openrouter_pkce = lambda target_settings, *, launch_source="settings": (
+        pkce_calls.append((target_settings, launch_source))
     )
     app._show_snackbar = lambda *_args, **_kwargs: pytest.fail(
         "managed Discord auth BYOK should build a valid OpenRouter target"
@@ -2863,9 +2861,8 @@ async def test_on_nav_change_applies_provider_changes_when_leaving_settings() ->
     assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
     assert seen == ["merged-settings"]
-    assert len(app.page.tasks) == 2
-    await app.page.tasks[1]()
-    assert auto_installs == ["started"]
+    assert len(app.page.tasks) == 1
+    assert auto_installs == []
 
 
 @pytest.mark.asyncio
@@ -3017,10 +3014,9 @@ async def test_on_nav_change_refreshes_prompt_and_schedules_log_scroll() -> None
 
     app._on_nav_change(2)
     assert app.content_area.content is app.view_logs
-    assert len(app.page.tasks) == 2
+    assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
-    await app.page.tasks[1]()
-    assert auto_installs["count"] == 1
+    assert auto_installs["count"] == 0
     assert scrolled["count"] == 1
 
 
@@ -3570,10 +3566,9 @@ async def test_on_request_openrouter_pkce_uses_draft_preserving_refresh_on_succe
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         settings=updated_settings,
         config_path=Path("settings.json"),
-        refresh_settings_after_openrouter_pkce_success=lambda: refresh_calls.append(
-            (updated_settings, Path("settings.json"))
-        )
-        or True,
+        refresh_settings_after_openrouter_pkce_success=lambda: (
+            refresh_calls.append((updated_settings, Path("settings.json"))) or True
+        ),
     )
     app._show_snackbar = lambda message, bgcolor: snackbar_calls.append((message, bgcolor))
     queued: list[object] = []
@@ -3606,10 +3601,9 @@ async def test_on_request_openrouter_pkce_does_not_refresh_settings_view_on_fail
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         settings=AppSettings(),
         config_path=Path("settings.json"),
-        refresh_settings_after_openrouter_pkce_success=lambda: refresh_calls.append(
-            (AppSettings(), Path("settings.json"))
-        )
-        or True,
+        refresh_settings_after_openrouter_pkce_success=lambda: (
+            refresh_calls.append((AppSettings(), Path("settings.json"))) or True
+        ),
     )
     queued: list[object] = []
     monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
@@ -4094,8 +4088,8 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
         set_stt_needs_key=lambda value, update_ui=False: app.view_dashboard.stt_calls.append(
             (value, update_ui)
         ),
-        set_translation_needs_key=lambda value, update_ui=False: app.view_dashboard.trans_calls.append(
-            (value, update_ui)
+        set_translation_needs_key=lambda value, update_ui=False: (
+            app.view_dashboard.trans_calls.append((value, update_ui))
         ),
     )
 
@@ -4157,8 +4151,8 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
         set_stt_needs_key=lambda value, update_ui=False: app.view_dashboard.stt_calls.append(
             (value, update_ui)
         ),
-        set_translation_needs_key=lambda value, update_ui=False: app.view_dashboard.trans_calls.append(
-            (value, update_ui)
+        set_translation_needs_key=lambda value, update_ui=False: (
+            app.view_dashboard.trans_calls.append((value, update_ui))
         ),
     )
 
