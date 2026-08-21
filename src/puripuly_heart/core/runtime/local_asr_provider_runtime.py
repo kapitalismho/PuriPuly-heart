@@ -47,6 +47,7 @@ ProviderGpuRuntimeFactory = Callable[
 
 _CHANNELS: tuple[ProviderRuntimeChannel, ...] = ("self", "peer")
 _GPU_PROVIDER_ID = "local_qwen_gpu"
+_COMPLETED_NO_GPU_FAILURE_CODES = frozenset({"unsupported_capability"})
 
 
 class LocalASRProviderRuntimeOwner:
@@ -265,6 +266,8 @@ class LocalASRProviderRuntimeOwner:
             await self.discover_gpu()
             known_devices = {device.device_id for device in self._gpu_devices}
             if not self._gpu_devices:
+                if self._gpu_phase == "failed":
+                    return self.snapshot
                 self._gpu_phase = "unsupported"
                 self._gpu_failure_code = "no_supported_gpu"
                 await self._publish_state()
@@ -932,16 +935,22 @@ class LocalASRProviderRuntimeOwner:
             )
             await self._publish_state()
             try:
-                self._gpu_devices = await self._gpu_runtime.discover_devices()
+                devices = await self._gpu_runtime.discover_devices()
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                self._gpu_discovery_attempted = True
+                failure_code = _gpu_discovery_failure_code(exc)
+                if failure_code in _COMPLETED_NO_GPU_FAILURE_CODES:
+                    return await self._finish_gpu_discovery(
+                        devices=(),
+                        phase="unsupported",
+                        outcome="unsupported",
+                        failure_code="no_supported_gpu",
+                    )
+                self._gpu_discovery_attempted = False
                 self._gpu_devices = ()
                 self._gpu_phase = "failed"
-                self._gpu_failure_code = (
-                    _optional_string(getattr(exc, "code", None)) or type(exc).__name__
-                )
+                self._gpu_failure_code = failure_code
                 await self._emit_diagnostic(
                     ProviderRuntimeDiagnostic(
                         event="gpu_discovery",
@@ -953,18 +962,35 @@ class LocalASRProviderRuntimeOwner:
                 )
                 await self._publish_state()
                 return self.snapshot
-            self._gpu_discovery_attempted = True
-            self._gpu_phase = "idle" if self._gpu_devices else "unsupported"
-            self._gpu_failure_code = None if self._gpu_devices else "no_supported_gpu"
-            await self._emit_diagnostic(
-                ProviderRuntimeDiagnostic(
-                    event="gpu_discovery",
-                    outcome="ready" if self._gpu_devices else "unsupported",
-                    phase=self._gpu_phase,
-                )
+            return await self._finish_gpu_discovery(
+                devices=devices,
+                phase="idle" if devices else "unsupported",
+                outcome="ready" if devices else "unsupported",
+                failure_code=None if devices else "no_supported_gpu",
             )
-            await self._publish_state()
-            return self.snapshot
+
+    async def _finish_gpu_discovery(
+        self,
+        *,
+        devices: tuple[object, ...],
+        phase: ProviderRuntimeGpuPhase,
+        outcome: str,
+        failure_code: str | None,
+    ) -> LocalASRProviderRuntimeSnapshot:
+        self._gpu_discovery_attempted = True
+        self._gpu_devices = devices
+        self._gpu_phase = phase
+        self._gpu_failure_code = failure_code
+        await self._emit_diagnostic(
+            ProviderRuntimeDiagnostic(
+                event="gpu_discovery",
+                outcome=outcome,
+                phase=self._gpu_phase,
+                failure_code=failure_code,
+            )
+        )
+        await self._publish_state()
+        return self.snapshot
 
     async def _ensure_request_ready(self, request: ProviderRuntimeBuildRequest) -> bool:
         if request.provider_id != _GPU_PROVIDER_ID:
@@ -1289,6 +1315,10 @@ def _safe_channel(value: object) -> ProviderRuntimeChannel | None:
 
 def _optional_string(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
+
+
+def _gpu_discovery_failure_code(exc: BaseException) -> str:
+    return _optional_string(getattr(exc, "code", None)) or type(exc).__name__
 
 
 def _prebuilt_provider_id(provider: object | None) -> str | None:

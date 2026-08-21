@@ -26,6 +26,7 @@ from puripuly_heart.config.resolved import (
 from puripuly_heart.core.gpu_worker import (
     GpuWorkerActivation,
     GpuWorkerDevice,
+    GpuWorkerRequestError,
     GpuWorkerTranscription,
 )
 from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnostic
@@ -121,9 +122,16 @@ class FakeProvisioningPort:
 
 
 class FakeGpuRuntime:
-    def __init__(self, sink, *, discovery_gate: asyncio.Event | None = None) -> None:
+    def __init__(
+        self,
+        sink,
+        *,
+        discovery_gate: asyncio.Event | None = None,
+        discovery_results: list[tuple[GpuWorkerDevice, ...] | BaseException] | None = None,
+    ) -> None:
         self.sink = sink
         self.discovery_gate = discovery_gate
+        self.discovery_results = discovery_results
         self.state = "idle"
         self.discovery_state = "idle"
         self.active_channels = frozenset()
@@ -145,6 +153,14 @@ class FakeGpuRuntime:
         await self.emit(GpuASRDiagnostic(kind="discovery_pending", fields={}))
         if self.discovery_gate is not None:
             await self.discovery_gate.wait()
+        if self.discovery_results is not None:
+            if not self.discovery_results:
+                raise AssertionError("unexpected extra GPU discovery")
+            result = self.discovery_results.pop(0)
+            if isinstance(result, BaseException):
+                raise result
+            self.discovery_state = "ready"
+            return result
         self.discovery_state = "ready"
         return (GPU_DEVICE,)
 
@@ -222,12 +238,23 @@ class FakeGpuRuntime:
 
 
 class FakeGpuRuntimeFactory:
-    def __init__(self, *, discovery_gate: asyncio.Event | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        discovery_gate: asyncio.Event | None = None,
+        discovery_results: list[tuple[GpuWorkerDevice, ...] | BaseException] | None = None,
+    ) -> None:
         self.discovery_gate = discovery_gate
+        self.discovery_results = discovery_results
         self.instances: list[FakeGpuRuntime] = []
 
     def __call__(self, sink) -> FakeGpuRuntime:
-        runtime = FakeGpuRuntime(sink, discovery_gate=self.discovery_gate)
+        results = None if self.discovery_results is None else list(self.discovery_results)
+        runtime = FakeGpuRuntime(
+            sink,
+            discovery_gate=self.discovery_gate,
+            discovery_results=results,
+        )
         self.instances.append(runtime)
         return runtime
 
@@ -593,6 +620,109 @@ async def test_gpu_discovery_is_single_flight_and_exposes_pending_state() -> Non
     assert first_snapshot.gpu.devices == (GPU_DEVICE,)
     assert second_snapshot.gpu.devices == (GPU_DEVICE,)
     assert gpu_factory.instances[0].discovery_calls == 1
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_failed_gpu_discovery_is_not_cached_and_retries_on_next_intent() -> None:
+    gpu_factory = FakeGpuRuntimeFactory(
+        discovery_results=[
+            RuntimeError("worker_process_exited"),
+            (GPU_DEVICE,),
+        ]
+    )
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner(gpu_factory=gpu_factory)
+
+    first = await owner.discover_gpu()
+    second = await owner.discover_gpu()
+
+    assert first.gpu.phase == "failed"
+    assert first.gpu.failure_code == "RuntimeError"
+    assert second.gpu.phase == "idle"
+    assert second.gpu.devices == (GPU_DEVICE,)
+    assert gpu_factory.instances[0].discovery_calls == 2
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_empty_gpu_discovery_is_unsupported_and_cached() -> None:
+    gpu_factory = FakeGpuRuntimeFactory(discovery_results=[()])
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner(gpu_factory=gpu_factory)
+
+    first = await owner.discover_gpu()
+    second = await owner.discover_gpu()
+
+    assert first.gpu.phase == "unsupported"
+    assert first.gpu.failure_code == "no_supported_gpu"
+    assert second.gpu.phase == "unsupported"
+    assert gpu_factory.instances[0].discovery_calls == 1
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_unsupported_capability_is_completed_no_gpu_answer() -> None:
+    gpu_factory = FakeGpuRuntimeFactory(
+        discovery_results=[GpuWorkerRequestError("unsupported_capability")]
+    )
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner(gpu_factory=gpu_factory)
+
+    first = await owner.discover_gpu()
+    second = await owner.discover_gpu()
+
+    assert first.gpu.phase == "unsupported"
+    assert first.gpu.failure_code == "no_supported_gpu"
+    assert second.gpu.phase == "unsupported"
+    assert gpu_factory.instances[0].discovery_calls == 1
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_inspect_gpu_readiness_does_not_rewrite_failed_discovery_as_unsupported() -> None:
+    gpu_factory = FakeGpuRuntimeFactory(
+        discovery_results=[
+            RuntimeError("worker_process_exited"),
+            RuntimeError("worker_process_exited"),
+        ]
+    )
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner(gpu_factory=gpu_factory)
+
+    await owner.discover_gpu()
+    snapshot = await owner.inspect_gpu_readiness(
+        explicit_intent=True,
+        device_id="auto",
+    )
+
+    assert snapshot.gpu.phase == "failed"
+    assert snapshot.gpu.failure_code == "RuntimeError"
+    assert gpu_factory.instances[0].discovery_calls == 2
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_inspect_gpu_readiness_retries_incomplete_discovery_failure() -> None:
+    gpu_factory = FakeGpuRuntimeFactory(
+        discovery_results=[
+            RuntimeError("worker_process_exited"),
+            (GPU_DEVICE,),
+        ]
+    )
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner(gpu_factory=gpu_factory)
+
+    first = await owner.discover_gpu()
+    snapshot = await owner.inspect_gpu_readiness(
+        explicit_intent=True,
+        device_id=GPU_DEVICE.device_id,
+    )
+
+    assert first.gpu.phase == "failed"
+    assert snapshot.gpu.phase == "available"
+    assert snapshot.gpu.devices == (GPU_DEVICE,)
+    assert gpu_factory.instances[0].discovery_calls == 2
 
     await owner.close()
 
