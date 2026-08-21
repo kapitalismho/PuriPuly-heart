@@ -422,7 +422,7 @@ from puripuly_heart.ui.flet_desktop_runtime import (
     patch_hidden_view_launcher,
 )
 from puripuly_heart.ui.flet_runtime import invoke_control_method
-from puripuly_heart.ui.fonts import assets_dir
+from puripuly_heart.ui.fonts import assets_dir, register_fonts
 from puripuly_heart.ui.i18n import t_for_locale
 
 logger = logging.getLogger(__name__)
@@ -1272,6 +1272,7 @@ class FletDesktopRendererWindow:
         import flet as ft
 
         window = page.window
+        register_fonts(page)
         page.title = self._window_title()
         window.icon = "icons/icon.ico"
         window.frameless = True
