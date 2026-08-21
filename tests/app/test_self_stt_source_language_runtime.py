@@ -5,7 +5,6 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Literal, cast
 
 import pytest
-
 from puripuly_heart.app.services.self_capture_application import (
     SelfCaptureApplicationOwner,
     SelfCaptureApplicationSettings,
@@ -17,6 +16,7 @@ from puripuly_heart.app.wiring_stt_factory import (
     build_self_stt_provider_signature,
     build_self_stt_runtime_signature,
 )
+
 from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import (
@@ -213,9 +213,7 @@ def test_local_cpu_auto_model_identity_changes_with_source_language() -> None:
     korean = _settings(STTProviderName.LOCAL_QWEN, "ko")
     japanese_qwen = _settings(STTProviderName.LOCAL_QWEN, "ja")
 
-    assert build_self_stt_provider_signature(english) != build_self_stt_provider_signature(
-        japanese
-    )
+    assert build_self_stt_provider_signature(english) != build_self_stt_provider_signature(japanese)
     assert build_self_stt_provider_signature(korean) == build_self_stt_provider_signature(
         japanese_qwen
     )
@@ -311,9 +309,9 @@ async def test_language_change_while_stt_off_prepares_new_language() -> None:
 
     assert snapshot.runtime_signature == build_self_stt_runtime_signature(japanese)
     assert started.runtime_signature == build_self_stt_runtime_signature(japanese)
-    assert [cast(Any, request).config.source_language for request, _start in provider.replace_calls][
-        -1
-    ] == "ja"
+    assert [
+        cast(Any, request).config.source_language for request, _start in provider.replace_calls
+    ][-1] == "ja"
     await owner.close()
 
 
