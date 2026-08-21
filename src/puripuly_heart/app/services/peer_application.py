@@ -577,10 +577,7 @@ class PeerApplicationOwner:
     def _should_hold_runtime_refresh(self, state: PeerApplicationState) -> bool:
         if not self.local_stt_requested(state):
             return False
-        if (
-            self._model_loading
-            and self._model_loading_generation == self._activation_generation
-        ):
+        if self._model_loading and self._model_loading_generation == self._activation_generation:
             return True
         return self._runtime_refresh_hold_generation == self._activation_generation
 

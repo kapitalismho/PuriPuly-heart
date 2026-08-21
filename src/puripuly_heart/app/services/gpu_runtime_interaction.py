@@ -229,9 +229,7 @@ class GpuRuntimeInteractionOwner:
         self._discovery_failure_state = (
             "unsupported"
             if snapshot.gpu.phase == "unsupported"
-            else "discovery_failed"
-            if snapshot.gpu.phase == "failed"
-            else None
+            else "discovery_failed" if snapshot.gpu.phase == "failed" else None
         )
 
     def observe_provisioning(self, snapshot: LocalASRProvisioningSnapshot) -> None:
