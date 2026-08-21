@@ -1011,7 +1011,7 @@ def test_desktop_overlay_caption_rendering_preserves_cjk_emoji_and_minimum_secon
     ]
     assert plan.primary_font_size == _DESKTOP_CAPTION_SIZE_PRESETS["small"].primary_font_size
     assert plan.secondary_font_size == _DESKTOP_CAPTION_SIZE_PRESETS["small"].secondary_font_size
-    assert {line.font_family for line in plan.lines} == {"Noto Sans CJK JP"}
+    assert {line.font_family for line in plan.lines} == {"Noto Sans CJK SC"}
 
 
 @pytest.mark.parametrize(
@@ -1140,6 +1140,28 @@ def test_desktop_overlay_caption_font_policy_uses_latin_and_jp_unified_cjk_faces
         ("Live captions stay readable tonight", "Noto Sans"),
         ("오늘도 captions are readable", "Noto Sans CJK JP"),
     ]
+
+
+def test_desktop_overlay_caption_cjk_font_follows_ui_locale() -> None:
+    snapshot = OverlayPresentationSnapshot(
+        blocks=[
+            _block(
+                "cjk-line",
+                channel="self",
+                block_variant="finalized",
+                appearance_seq=1,
+                primary_text="오늘도 captions are readable",
+            )
+        ]
+    )
+
+    ko_plan = desktop_overlay.build_desktop_caption_plan(snapshot, locale="ko")
+    ja_plan = desktop_overlay.build_desktop_caption_plan(snapshot, locale="ja")
+    zh_plan = desktop_overlay.build_desktop_caption_plan(snapshot, locale="zh-CN")
+
+    assert ko_plan.lines[0].font_family == "Noto Sans CJK KR"
+    assert ja_plan.lines[0].font_family == "Noto Sans CJK JP"
+    assert zh_plan.lines[0].font_family == "Noto Sans CJK SC"
 
 
 def test_desktop_overlay_caption_weight_uses_semibold_for_general_text() -> None:
@@ -2302,6 +2324,8 @@ async def test_desktop_overlay_registers_bundled_noto_cjk_on_the_flet_page() -> 
 
     assert app.page.fonts[FONT_FAMILY_NOTO_SANS] == "/fonts/NotoSansCJK-Medium.ttc"
     assert app.page.fonts[FONT_FAMILY_NOTO_SANS_CJK_JP] == "/fonts/NotoSansCJK-Medium.ttc"
+    assert app.page.fonts["Noto Sans CJK KR"] == "/fonts/NotoSansCJK-Medium.ttc"
+    assert app.page.fonts["Noto Sans CJK SC"] == "/fonts/NotoSansCJK-Medium.ttc"
 
 
 @pytest.mark.asyncio

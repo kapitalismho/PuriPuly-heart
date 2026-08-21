@@ -68,6 +68,7 @@ from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _positive_int_or_default,
     _RetainedDesktopCaptionSurface,
 )
+from puripuly_heart.ui.fonts import noto_cjk_family_for_ui_locale
 from puripuly_heart.ui.i18n import t_for_locale
 
 _DESKTOP_PREVIEW_SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -100,12 +101,15 @@ def build_desktop_caption_plan(
     primary_font_size = preset.primary_font_size
     secondary_font_size = preset.secondary_font_size
     outline_width = 0.0
-    _ = locale
+    cjk_font_family = noto_cjk_family_for_ui_locale(locale)
 
-    candidate_slots = _caption_slots_for_snapshot(
-        snapshot,
-        primary_font_size=primary_font_size,
-        secondary_font_size=secondary_font_size,
+    candidate_slots = _caption_slots_with_ui_cjk_font(
+        _caption_slots_for_snapshot(
+            snapshot,
+            primary_font_size=primary_font_size,
+            secondary_font_size=secondary_font_size,
+        ),
+        cjk_font_family=cjk_font_family,
     )
     slots = tuple(
         _caption_slot_with_dynamic_width(
@@ -153,6 +157,7 @@ def build_desktop_caption_plan(
         background_color=_caption_background_color(background_alpha),
         surface_visible=surface_visible,
         full_window_background_visible=full_window_background_visible,
+        cjk_font_family=cjk_font_family,
     )
 
 
@@ -192,7 +197,9 @@ def build_desktop_empty_lock_action(
         size=font_size,
         height=1.0,
         weight=ft.FontWeight.BOLD,
-        font_family=_desktop_caption_font_family_for_text(label),
+        font_family=_desktop_caption_font_family_for_text(
+            label, ui_locale_cjk_family=plan.cjk_font_family
+        ),
         decoration=None,
     )
     return ft.TextButton(
@@ -982,9 +989,35 @@ def _desktop_caption_char_is_cjk(char: str) -> bool:
     return _is_caption_cjk_or_hangul(ord(char))
 
 
-def _desktop_caption_font_family_for_text(text: str, language: str | None = None) -> str:
+def _caption_slots_with_ui_cjk_font(
+    slots: tuple[DesktopCaptionSlot, ...],
+    *,
+    cjk_font_family: str,
+) -> tuple[DesktopCaptionSlot, ...]:
+    if cjk_font_family == _DESKTOP_CAPTION_CJK_FONT_FAMILY:
+        return slots
+    return tuple(
+        replace(
+            slot,
+            lines=tuple(
+                replace(line, font_family=cjk_font_family)
+                if line.font_family == _DESKTOP_CAPTION_CJK_FONT_FAMILY
+                else line
+                for line in slot.lines
+            ),
+        )
+        for slot in slots
+    )
+
+
+def _desktop_caption_font_family_for_text(
+    text: str,
+    language: str | None = None,
+    *,
+    ui_locale_cjk_family: str | None = None,
+) -> str:
     if _desktop_caption_uses_cjk_font_policy(text, language):
-        return _DESKTOP_CAPTION_CJK_FONT_FAMILY
+        return ui_locale_cjk_family or _DESKTOP_CAPTION_CJK_FONT_FAMILY
     return _DESKTOP_CAPTION_LATIN_FONT_FAMILY
 
 

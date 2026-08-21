@@ -331,6 +331,7 @@ class DesktopCaptionPlan:
     background_color: str
     surface_visible: bool
     full_window_background_visible: bool
+    cjk_font_family: str = _DESKTOP_CAPTION_CJK_FONT_FAMILY
     no_scrollbars: bool = True
     max_visible_lines: int = _DESKTOP_CAPTION_MAX_VISIBLE_LINES
     max_visible_slots: int = _DESKTOP_CAPTION_MAX_VISIBLE_SLOTS
