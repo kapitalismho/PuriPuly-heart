@@ -12,6 +12,7 @@ from puripuly_heart.core.audio.format import pcm16le_bytes_to_float32
 from puripuly_heart.core.runtime.gpu_asr import (
     GpuASRChannel,
     GpuASRDecodeDropped,
+    GpuASRWorkExpired,
     SharedGpuASRRuntime,
 )
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
@@ -122,7 +123,7 @@ class _LocalGpuSTTSession(STTBackendSession):
             )
         except asyncio.CancelledError:
             raise
-        except GpuASRDecodeDropped:
+        except (GpuASRDecodeDropped, GpuASRWorkExpired):
             await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
             return
         except BaseException as exc:

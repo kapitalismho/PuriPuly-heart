@@ -2743,3 +2743,29 @@ async def test_stt_emits_error_event_when_not_closing() -> None:
     while not stt._events.empty():
         events.append(stt._events.get_nowait())
     assert any(isinstance(e, STTErrorEvent) for e in events)
+
+
+async def test_stt_event_ingress_records_enqueue_before_handler_start() -> None:
+    clock = FakeClock()
+    backend = FakeBackend()
+    stages: list[tuple[str, dict[str, object]]] = []
+
+    def observe(event: str, **fields: object) -> None:
+        stages.append((event, fields))
+
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        clock=clock,
+        reset_deadline_s=90.0,
+        event_ingress_observer=observe,
+    )
+    await stt._publish_event(STTSessionStateEvent(STTSessionState.STREAMING, channel="self"))
+    assert stages[0][0] == "stt_enqueue"
+    assert stages[0][1]["queue_depth"] == 1
+    stream = stt.events()
+    event = await _next_event(stream)
+    assert isinstance(event, STTSessionStateEvent)
+    assert [name for name, _fields in stages] == ["stt_enqueue", "stt_handler_start"]
+    assert stages[1][1]["queue_depth"] == 0
+    await stt.close()

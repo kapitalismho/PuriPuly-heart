@@ -400,6 +400,24 @@ class TranslationLatencyDiagnosticsOwner:
             )
         )
 
+    def record_chatbox_stage(self, event: str, **fields: object) -> None:
+        recorder = self.overlay_diagnostics
+        if recorder is None:
+            return
+        recorder.record_chatbox(event, **fields)
+
+    def record_translation_wait(self, event: str, fields: dict[str, object]) -> None:
+        recorder = self.overlay_diagnostics
+        if recorder is None:
+            return
+        recorder.record_translation(event, **fields)
+
+    def record_stt_ingress(self, event: str, **fields: object) -> None:
+        recorder = self.overlay_diagnostics
+        if recorder is None:
+            return
+        recorder.record_stt(event, **fields)
+
     def record_latency_stage(self, diagnostic: LatencyStageDiagnostic) -> None:
         timeline = self._get_timeline(
             diagnostic.channel,

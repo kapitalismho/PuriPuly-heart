@@ -374,3 +374,49 @@ def test_invalid_limits_raise_value_error() -> None:
 
     with pytest.raises(ValueError, match="page_interval_s"):
         ChatboxPaginator(sender=sender, clock=clock, page_interval_s=0)
+
+
+def test_chatbox_stage_recorder_separates_enqueue_from_udp_page_send() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    stages: list[tuple[str, dict[str, object]]] = []
+
+    def record(event: str, **fields: object) -> None:
+        stages.append((event, fields))
+
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=4,
+        page_interval_s=3.0,
+        stage_recorder=record,
+    )
+    first = _message("abcdefgh", clock)
+    second = _message("ijkl", clock)
+
+    paginator.enqueue(first)
+    paginator.enqueue(second)
+
+    assert [event for event, _fields in stages] == [
+        "message_enqueue",
+        "page_send",
+        "message_enqueue",
+    ]
+    assert stages[0][1]["started"] is True
+    assert stages[1][1]["page_index"] == 0
+    assert stages[1][1]["remaining_parts"] == 1
+    assert stages[2][1]["started"] is False
+    assert stages[2][1]["pending_messages"] == 1
+    assert "text" not in stages[1][1]
+    assert all("abcdefgh" not in str(fields) for _event, fields in stages)
+
+    clock.advance(3.0)
+    paginator.process_due()
+
+    first_pages = [
+        fields
+        for event, fields in stages
+        if event == "page_send" and fields["utterance_id"] == str(first.utterance_id)
+    ]
+    assert [fields["page_index"] for fields in first_pages] == [0, 1]
+    assert first_pages[1]["remaining_parts"] == 0

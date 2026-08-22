@@ -5,6 +5,10 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from puripuly_heart.app.wiring_local_asr_provider_runtime import (
+    LocalASRProviderRuntimeFactory,
+    ManagedSTTProviderFactory,
+)
 from puripuly_heart.app.wiring_runtime_pipeline import (
     RuntimePipelineLauncher,
     RuntimePipelineResourceOwner,
@@ -163,6 +167,60 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
     assert "llm" not in PeerTranslationChannelOwner.__dataclass_fields__
     assert "stt" not in PeerTranslationChannelOwner.__dataclass_fields__
     assert "peer_stt" not in PeerTranslationChannelOwner.__dataclass_fields__
+
+
+@pytest.mark.asyncio
+async def test_pipeline_binds_stt_event_ingress_observer_to_translation_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
+    monkeypatch.setattr(
+        runtime_pipeline_module,
+        "create_translation_backend",
+        lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        runtime_pipeline_module,
+        "VrchatOscUdpSender",
+        lambda *_a, **_k: RecordingSender(),
+    )
+    monkeypatch.setattr(
+        runtime_pipeline_module,
+        "ChatboxPaginator",
+        lambda *_a, **_k: RecordingChatbox(),
+    )
+    inner = ManagedSTTProviderFactory(
+        secrets=object(),
+        clock=SystemClock(),
+        reset_deadline_s=1.0,
+        gpu_model_path=Path("gpu.gguf"),
+    )
+    asr_factory = LocalASRProviderRuntimeFactory(
+        provider_factory=inner,
+        provisioning=object(),
+        clock=SystemClock(),
+    )
+
+    pipeline = await compose_runtime_pipeline(
+        settings=AppSettings(),
+        config_path=Path("settings.json"),
+        clock=SystemClock(),
+        runtime_logging=None,
+        managed_release=ManagedRelease(),
+        managed_delegate_ready=lambda: None,
+        local_asr_factory=lambda _secrets: asr_factory,
+        self_capture_factory=lambda *_args: CaptureOwner("self"),
+        peer_capture_factory=lambda *_args: CaptureOwner("peer"),
+        vrc_mic_state=None,
+        vrc_mic_audio_gate=None,
+        receiver_active=False,
+        stt_failure_sink=lambda _message: None,
+    )
+
+    observer = inner.event_ingress_observer
+    assert observer is not None
+    assert observer.__self__ is pipeline.translation_diagnostics
+    assert observer.__func__ is type(pipeline.translation_diagnostics).record_stt_ingress
 
 
 @pytest.mark.asyncio

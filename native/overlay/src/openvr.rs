@@ -1,4 +1,5 @@
 use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
 use std::ffi::c_void;
 #[cfg(any(windows, test))]
 use std::ffi::{CStr, CString};
@@ -352,6 +353,61 @@ pub trait OverlayTextureSubmitter {
     fn set_overlay_texture(&self, texture_handle: *mut c_void) -> Result<(), OpenVrError>;
 }
 
+pub const OPENVR_EVENT_OVERLAY_SHOWN: u32 = 500;
+pub const OPENVR_EVENT_OVERLAY_HIDDEN: u32 = 501;
+pub const OPENVR_EVENT_QUIT: u32 = 700;
+pub const OPENVR_EVENT_PROCESS_QUIT: u32 = 701;
+pub const OPENVR_EVENT_DRIVER_REQUESTED_QUIT: u32 = 704;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenVrEventClass {
+    Fatal,
+    Reconfigure,
+    Ignore,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenVrRuntimeEvent {
+    OverlayShown,
+    OverlayHidden,
+    Quit,
+    ProcessQuit,
+    DriverRequestedQuit,
+    Ignored(u32),
+}
+
+impl OpenVrRuntimeEvent {
+    pub fn from_event_type(event_type: u32) -> Self {
+        match event_type {
+            OPENVR_EVENT_OVERLAY_SHOWN => Self::OverlayShown,
+            OPENVR_EVENT_OVERLAY_HIDDEN => Self::OverlayHidden,
+            OPENVR_EVENT_QUIT => Self::Quit,
+            OPENVR_EVENT_PROCESS_QUIT => Self::ProcessQuit,
+            OPENVR_EVENT_DRIVER_REQUESTED_QUIT => Self::DriverRequestedQuit,
+            other => Self::Ignored(other),
+        }
+    }
+
+    pub fn classify(self) -> OpenVrEventClass {
+        match self {
+            Self::Quit | Self::ProcessQuit | Self::DriverRequestedQuit => OpenVrEventClass::Fatal,
+            Self::OverlayShown | Self::OverlayHidden => OpenVrEventClass::Reconfigure,
+            Self::Ignored(_) => OpenVrEventClass::Ignore,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::OverlayShown => "overlay_shown",
+            Self::OverlayHidden => "overlay_hidden",
+            Self::Quit => "quit",
+            Self::ProcessQuit => "process_quit",
+            Self::DriverRequestedQuit => "driver_requested_quit",
+            Self::Ignored(_) => "ignored",
+        }
+    }
+}
+
 pub trait OverlayFrameSubmitter {
     fn submit_frame(&mut self, frame: &RenderedFrame) -> Result<(), OpenVrError>;
 
@@ -369,6 +425,15 @@ pub trait OverlayFrameSubmitter {
 
     fn set_overlay_visible(&mut self, _visible: bool) -> Result<(), OpenVrError> {
         Ok(())
+    }
+
+    fn observed_overlay_visible(&self) -> Option<bool> {
+        None
+    }
+
+    fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
+        let _ = max_events;
+        Vec::new()
     }
 
     fn take_visibility_api_call_log(&mut self) -> Option<String> {
@@ -434,6 +499,8 @@ pub struct FakeOpenVr {
     call_sequence: RefCell<Vec<&'static str>>,
     spatial_reanchor_count: Cell<usize>,
     visible: Cell<bool>,
+    observed_visible: Cell<Option<bool>>,
+    pending_events: RefCell<VecDeque<OpenVrRuntimeEvent>>,
     last_visibility_api_call_log: RefCell<Option<String>>,
 }
 
@@ -448,6 +515,14 @@ impl FakeOpenVr {
 
     pub fn spatial_reanchor_count(&self) -> usize {
         self.spatial_reanchor_count.get()
+    }
+
+    pub fn set_observed_overlay_visible(&self, visible: Option<bool>) {
+        self.observed_visible.set(visible);
+    }
+
+    pub fn push_runtime_event(&self, event: OpenVrRuntimeEvent) {
+        self.pending_events.borrow_mut().push_back(event);
     }
 }
 
@@ -495,6 +570,14 @@ impl OverlayFrameSubmitter for OpenVrOverlay {
 
     fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
         self.backend.set_overlay_visible(visible)
+    }
+
+    fn observed_overlay_visible(&self) -> Option<bool> {
+        self.backend.observed_overlay_visible()
+    }
+
+    fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
+        self.backend.poll_runtime_events(max_events)
     }
 
     fn take_visibility_api_call_log(&mut self) -> Option<String> {
@@ -615,6 +698,24 @@ impl OpenVrBackend {
             Self::Windows(openvr) => openvr.set_overlay_visible(visible),
             #[cfg(not(windows))]
             Self::Test(openvr) => openvr.set_overlay_visible(visible),
+        }
+    }
+
+    fn observed_overlay_visible(&self) -> Option<bool> {
+        match self {
+            #[cfg(windows)]
+            Self::Windows(openvr) => openvr.observed_overlay_visible(),
+            #[cfg(not(windows))]
+            Self::Test(openvr) => openvr.observed_overlay_visible(),
+        }
+    }
+
+    fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
+        match self {
+            #[cfg(windows)]
+            Self::Windows(openvr) => openvr.poll_runtime_events(max_events),
+            #[cfg(not(windows))]
+            Self::Test(openvr) => openvr.poll_runtime_events(max_events),
         }
     }
 
@@ -755,9 +856,55 @@ impl WindowsOpenVrOverlay {
         reanchor_spatial_locked_with_api(&policy, self)
     }
 
+    fn observed_overlay_visible(&self) -> Option<bool> {
+        let is_visible = self.overlay_api().IsOverlayVisible?;
+        Some(unsafe { is_visible(self.overlay_handle) })
+    }
+
+    fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
+        let mut events = Vec::new();
+        if max_events == 0 {
+            return events;
+        }
+        if let Some(poll) = self.overlay_api().PollNextOverlayEvent {
+            while events.len() < max_events {
+                let mut event = unsafe { std::mem::zeroed::<openvr_sys::VREvent_t>() };
+                let got = unsafe {
+                    poll(
+                        self.overlay_handle,
+                        &mut event,
+                        std::mem::size_of::<openvr_sys::VREvent_t>() as u32,
+                    )
+                };
+                if !got {
+                    break;
+                }
+                events.push(OpenVrRuntimeEvent::from_event_type(event.eventType));
+            }
+        }
+        if let Some(poll) = self.system_api().PollNextEvent {
+            while events.len() < max_events {
+                let mut event = unsafe { std::mem::zeroed::<openvr_sys::VREvent_t>() };
+                let got = unsafe {
+                    poll(
+                        &mut event,
+                        std::mem::size_of::<openvr_sys::VREvent_t>() as u32,
+                    )
+                };
+                if !got {
+                    break;
+                }
+                events.push(OpenVrRuntimeEvent::from_event_type(event.eventType));
+            }
+        }
+        events
+    }
+
     fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
         let cached_visible_before = self.visible;
-        if self.visible == visible {
+        let actual_visible = self.observed_overlay_visible();
+        if actual_visible.unwrap_or(self.visible) == visible {
+            self.visible = actual_visible.unwrap_or(visible);
             self.last_visibility_api_call_log = Some(format_openvr_visibility_api_call_log(
                 visible,
                 cached_visible_before,
@@ -777,6 +924,9 @@ impl WindowsOpenVrOverlay {
             self.hide_overlay()?;
         }
         self.visible = visible;
+        if let Some(actual_visible) = self.observed_overlay_visible() {
+            self.visible = actual_visible;
+        }
         self.last_visibility_api_call_log = Some(format_openvr_visibility_api_call_log(
             visible,
             cached_visible_before,
@@ -1025,15 +1175,21 @@ impl OverlayFrameSubmitter for FakeOpenVr {
 
     fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
         let cached_visible_before = self.visible.get();
-        let api = if cached_visible_before == visible {
+        let actual_visible = self
+            .observed_overlay_visible()
+            .unwrap_or(cached_visible_before);
+        let api = if actual_visible == visible {
             "SkipCachedMatch"
         } else if visible {
             "ShowOverlay"
         } else {
             "HideOverlay"
         };
-        if cached_visible_before != visible {
+        if actual_visible != visible {
             self.last_call.replace(Some(api.to_string()));
+            self.visible.set(visible);
+            self.observed_visible.set(Some(visible));
+        } else {
             self.visible.set(visible);
         }
         self.last_visibility_api_call_log
@@ -1044,6 +1200,26 @@ impl OverlayFrameSubmitter for FakeOpenVr {
                 self.visible.get(),
             )));
         Ok(())
+    }
+
+    fn observed_overlay_visible(&self) -> Option<bool> {
+        Some(
+            self.observed_visible
+                .get()
+                .unwrap_or_else(|| self.visible.get()),
+        )
+    }
+
+    fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
+        let mut events = Vec::new();
+        let mut pending = self.pending_events.borrow_mut();
+        while events.len() < max_events {
+            let Some(event) = pending.pop_front() else {
+                break;
+            };
+            events.push(event);
+        }
+        events
     }
 
     fn take_visibility_api_call_log(&mut self) -> Option<String> {
@@ -1272,9 +1448,10 @@ mod tests {
         fn_table_interface_version, reanchor_spatial_locked_with_api, requested_adapter_identity,
         run_startup_preflight, spatial_locked_transform, split_output_device_luid,
         validate_resolved_adapter, FakeOpenVr, OpenVrBackgroundInitError, OpenVrError,
-        OpenVrPreflightApi, OpenVrStartupPreflightError, OverlayAnchorMode, OverlayFrameSubmitter,
-        OverlayPlacementApi, OverlayPlacementPolicy, SpatialHmdPose, SpatialReanchorApi,
-        SpatialReanchorOutcome, SpatialTrackingOrigin, DEFAULT_OVERLAY_WIDTH_METERS,
+        OpenVrEventClass, OpenVrPreflightApi, OpenVrRuntimeEvent, OpenVrStartupPreflightError,
+        OverlayAnchorMode, OverlayFrameSubmitter, OverlayPlacementApi, OverlayPlacementPolicy,
+        SpatialHmdPose, SpatialReanchorApi, SpatialReanchorOutcome, SpatialTrackingOrigin,
+        DEFAULT_OVERLAY_WIDTH_METERS, OPENVR_EVENT_OVERLAY_HIDDEN, OPENVR_EVENT_QUIT,
     };
     use crate::state::OverlayCalibration;
 
@@ -1781,5 +1958,57 @@ mod tests {
         assert!(skip_log.contains("cached_visible_before=true"));
         assert!(skip_log.contains("api=SkipCachedMatch"));
         assert!(skip_log.contains("cached_visible_after=true"));
+    }
+
+    #[test]
+    fn fake_openvr_reasserts_show_when_cached_visible_but_actual_hidden() {
+        let mut openvr = FakeOpenVr::default();
+        openvr.set_overlay_visible(true).expect("show overlay");
+        openvr.set_observed_overlay_visible(Some(false));
+
+        openvr
+            .set_overlay_visible(true)
+            .expect("reassert show overlay");
+        let log = openvr
+            .take_visibility_api_call_log()
+            .expect("reassert visibility log");
+        assert!(log.contains("desired_visible=true"));
+        assert!(log.contains("cached_visible_before=true"));
+        assert!(log.contains("api=ShowOverlay"));
+        assert_eq!(openvr.observed_overlay_visible(), Some(true));
+    }
+
+    #[test]
+    fn openvr_runtime_events_classify_fatal_reconfigure_and_ignore() {
+        assert_eq!(
+            OpenVrRuntimeEvent::from_event_type(OPENVR_EVENT_QUIT).classify(),
+            OpenVrEventClass::Fatal
+        );
+        assert_eq!(
+            OpenVrRuntimeEvent::from_event_type(OPENVR_EVENT_OVERLAY_HIDDEN).classify(),
+            OpenVrEventClass::Reconfigure
+        );
+        assert_eq!(
+            OpenVrRuntimeEvent::from_event_type(1).classify(),
+            OpenVrEventClass::Ignore
+        );
+    }
+
+    #[test]
+    fn fake_openvr_poll_runtime_events_are_bounded() {
+        let mut openvr = FakeOpenVr::default();
+        for _ in 0..8 {
+            openvr.push_runtime_event(OpenVrRuntimeEvent::Ignored(1));
+        }
+        openvr.push_runtime_event(OpenVrRuntimeEvent::Quit);
+
+        let first = openvr.poll_runtime_events(3);
+        assert_eq!(first.len(), 3);
+        assert!(first
+            .iter()
+            .all(|event| *event == OpenVrRuntimeEvent::Ignored(1)));
+        let rest = openvr.poll_runtime_events(16);
+        assert_eq!(rest.len(), 6);
+        assert_eq!(rest[5], OpenVrRuntimeEvent::Quit);
     }
 }

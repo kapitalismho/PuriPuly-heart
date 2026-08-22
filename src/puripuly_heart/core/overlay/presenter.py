@@ -553,6 +553,28 @@ class OverlayPresenter(OverlaySink):
             ):
                 await self._publish_if_changed()
 
+    async def discard_epoch_retry_intent(self) -> None:
+        async with self._ownership_transition_lock:
+            await self._cancel_peer_presentation_refresh_burst_task_and_wait()
+            await self._cancel_self_presentation_refresh_burst_task_and_wait(reason="epoch_discard")
+            self.native_retry_trigger_emission = False
+            self.peer_presentation_refresh_burst = False
+            self.self_presentation_refresh_burst = False
+            self._native_fresh_render_generations = NativeFreshRenderGenerations()
+            self._native_fresh_render_targets = NativeFreshRenderTargets()
+            self._native_quiet_tail_episodes = NativeQuietTailEpisodes()
+            self._native_quiet_tail_self_target = None
+            self._native_quiet_tail_peer_target = None
+            self._native_quiet_tail_self_generation = None
+            self._native_quiet_tail_peer_generation = None
+            peer_refresh_key = self._presentation_state.peer_presentation_refresh_target_key
+            if peer_refresh_key is not None:
+                self._presentation_state.end_peer_presentation_refresh(peer_refresh_key)
+            self_refresh_key = self._presentation_state.self_presentation_refresh_target_key
+            if self_refresh_key is not None:
+                self._presentation_state.end_self_presentation_refresh(self_refresh_key)
+            await self._publish_if_changed(force_protocol_publish=True)
+
     async def update_native_retry_ownership(self, confirmed: bool) -> None:
         async with self._ownership_transition_lock:
             await self._update_native_retry_ownership_serialized(confirmed)

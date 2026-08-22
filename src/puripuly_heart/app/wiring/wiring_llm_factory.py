@@ -303,7 +303,6 @@ def _require_openrouter_byok_api_key(secrets: SecretStore) -> str:
 def _openrouter_managed_api_key(
     secrets: SecretStore,
     credential: ResolvedCredentialRequirement,
-    settings: AppSettings,
 ) -> str | None:
     requested_secret_key = _openrouter_managed_api_key_secret_for_resolved_credential(credential)
     opposite_secret_key = _opposite_openrouter_managed_api_key_secret(requested_secret_key)
@@ -311,11 +310,6 @@ def _openrouter_managed_api_key(
     opposite_value = _normalize_secret_value(secrets.get(opposite_secret_key))
     if opposite_value is not None:
         raise ValueError("OpenRouter managed local claim conflict")
-    if (
-        credential.reference == CREDENTIAL_REF_OPENROUTER_MANAGED_QQ
-        and _normalize_secret_value(settings.managed_identity.active_managed_credential_ref) is None
-    ):
-        return None
     return requested_value
 
 
@@ -630,7 +624,7 @@ def _openrouter_provider_from_resolved_fields(
             secrets=secrets,
             credential=credential,
         )
-        managed_api_key = _openrouter_managed_api_key(secrets, credential, openrouter_settings)
+        managed_api_key = _openrouter_managed_api_key(secrets, credential)
         if force_managed_wrapper or managed_api_key is None:
             from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
 

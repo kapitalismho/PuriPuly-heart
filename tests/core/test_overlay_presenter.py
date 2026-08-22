@@ -7750,3 +7750,45 @@ async def test_native_ownership_transition_serializes_concurrent_target_replacem
     await presenter.update_native_retry_ownership(False)
     assert presenter._peer_presentation_refresh_burst_task is None
     assert presenter._self_presentation_refresh_burst_task is None
+
+
+@pytest.mark.asyncio
+async def test_discard_epoch_retry_intent_drops_old_epoch_generations_and_keeps_captions() -> None:
+    bridge = RecordingPresentationBridge()
+    presenter = OverlayPresenter(
+        bridge=bridge,
+        calibration=OverlayCalibration(),
+        clock=FakeClock(_now=1.0),
+        native_retry_trigger_emission=True,
+        peer_presentation_refresh_burst=False,
+        self_presentation_refresh_burst=False,
+    )
+    adapter = OverlayEventAdapter(clock=FakeClock(_now=1.0))
+    turn_id = uuid4()
+    await presenter.emit(
+        adapter.transcript_final(
+            Transcript(
+                utterance_id=turn_id,
+                channel="self",
+                text="keep this caption",
+                is_final=True,
+                created_at=1.0,
+            ),
+            source_language="en",
+            target_language="ko",
+        )
+    )
+    presenter._native_fresh_render_generations = NativeFreshRenderGenerations(self=4)
+    await presenter._publish_if_changed(force_protocol_publish=True)
+    assert presenter.snapshot().native_fresh_render_generations is not None
+    assert any(block.primary_text == "keep this caption" for block in presenter.snapshot().blocks)
+
+    await presenter.discard_epoch_retry_intent()
+
+    snapshot = presenter.snapshot()
+    assert snapshot.native_fresh_render_generations is None
+    assert snapshot.native_fresh_render_targets is None
+    assert any(block.primary_text == "keep this caption" for block in snapshot.blocks)
+    assert presenter.native_retry_trigger_emission is False
+    assert presenter.peer_presentation_refresh_burst is False
+    assert presenter.self_presentation_refresh_burst is False

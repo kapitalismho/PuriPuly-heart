@@ -533,7 +533,9 @@ async def test_managed_china_prepare_uses_only_qq_key_with_active_entitlement_st
 
 
 @pytest.mark.asyncio
-async def test_managed_china_prepare_requires_qq_auth_without_active_entitlement_state() -> None:
+async def test_managed_china_prepare_survives_missing_active_entitlement_state_with_local_qq_key() -> (
+    None
+):
     settings = AppSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
@@ -545,9 +547,9 @@ async def test_managed_china_prepare_requires_qq_auth_without_active_entitlement
 
     result = await service.prepare_for_translation()
 
-    assert result.behavior == ManagedOpenRouterReleaseBehavior.RESTART
-    assert result.message_key == "qq_managed_auth.required"
-    assert result.api_key is None
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.READY
+    assert result.api_key == "qq-managed-key"
+    assert result.local_key_available is True
     assert client.calls == []
 
 
