@@ -39,6 +39,15 @@ class FakePresenter:
     async def update_native_retry_ownership(self, confirmed: bool) -> None:
         self.events.append(f"presenter:native_retry:{confirmed}")
 
+    async def discard_epoch_retry_intent(self) -> None:
+        self.events.append("presenter:discard_epoch")
+        if isinstance(self.snapshot_value, dict):
+            self.snapshot_value = {
+                key: value
+                for key, value in self.snapshot_value.items()
+                if key != "native_fresh_render_generations"
+            }
+
     async def update_calibration(self, calibration: OverlayCalibration) -> None:
         self.events.append(f"presenter:calibration:{calibration.distance}")
 
@@ -155,7 +164,12 @@ class StartHarness:
         FakeBridge.events = self.events
         FakeProcessManager.events = self.events
 
-    def request(self, *, desktop: bool) -> OverlayGenerationStartRequest:
+    def request(
+        self,
+        *,
+        desktop: bool,
+        recovering_from_crash: bool = False,
+    ) -> OverlayGenerationStartRequest:
         target = "desktop" if desktop else "steamvr"
         return OverlayGenerationStartRequest(
             config=ResolvedOverlayConfig(
@@ -167,6 +181,7 @@ class StartHarness:
                 desktop_overlay_options={},
             ),
             target=target,
+            recovering_from_crash=recovering_from_crash,
             clock=FakeClock(),
             startup_timeout_ms=3210,
         )
@@ -475,6 +490,41 @@ async def test_owner_propagates_cancellation_after_attaching_generation_resource
     assert runtime.bridge is FakeBridge.instances[0]
     assert harness.failure_reasons == []
     assert harness.owner_diagnostics[-1].outcome == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_owner_crash_recovery_discards_old_epoch_snapshot_before_new_process() -> None:
+    harness = StartHarness()
+    runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    presenter = FakePresenter(
+        runtime_log_detailed=lambda message, *, level=logging.INFO: False,
+        diagnostics=None,
+        task_factory=runtime.create_child_task,
+    )
+    presenter.snapshot_value = {
+        "native_fresh_render_generations": {"self": 4},
+        "text": "keep this caption",
+    }
+    runtime.adopt_presenter(presenter)
+    owner = OverlayGenerationStartOwner(
+        diagnostic_sink=harness.owner_diagnostics.append,
+        instance_token_factory=lambda: "recovered",
+        session_token_factory=lambda: "new-session",
+    )
+
+    status = await owner.start(
+        runtime,
+        lambda: harness.request(desktop=False, recovering_from_crash=True),
+        harness.effects(),
+    )
+    await asyncio.sleep(0)
+
+    assert status == "connected"
+    assert "presenter:discard_epoch" in FakePresenter.events
+    assert "presenter:native_retry:False" not in FakePresenter.events
+    assert FakeBridge.instances[0].session_token == "new-session"
+    assert FakeBridge.instances[0].current_snapshot == {"text": "keep this caption"}
+    assert runtime.overlay_instance_id == "overlay-recovered"
 
 
 def test_owner_declares_generation_assembly_without_absorbing_resource_teardown() -> None:

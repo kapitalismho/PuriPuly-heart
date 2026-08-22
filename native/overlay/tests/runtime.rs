@@ -16,14 +16,15 @@ use puripuly_heart_overlay::runtime::SnapshotApplyOutcome;
 use puripuly_heart_overlay::{
     load_manifest, resolve_quiet_tail_profile, run_with_manifest, submit_texture,
     validate_manifest, AdapterIdentity, BridgeClient, CaptionBlock, CaptionChannel,
-    CaptionRenderer, FakeOpenVr, NativePresentationOwner, OpenVrError, OverlayBridgeEvent,
-    OverlayFrameSubmitter, OverlayLoggingMode, OverlayManifest, OverlayPresentationBlock,
-    OverlayPresentationBlockVariant, OverlayPresentationCalibration, OverlayPresentationSnapshot,
-    OverlayRuntime, PresentationBackend, PresentationCause, PresentationCauseChannel,
-    PresentationCauseKind, PresentationOutcome, PresentationStage, PresentationStrategy,
-    QuietTailProfile, ReadinessOutcome, RenderedFrame, RuntimeFailure, SpatialReanchorOutcome,
-    StartupError, EXPECTED_CONTRACT_VERSION, NATIVE_FRESH_RETRY_CADENCE,
+    CaptionRenderer, FakeOpenVr, NativePresentationOwner, OpenVrError, OpenVrRuntimeEvent,
+    OverlayBridgeEvent, OverlayFrameSubmitter, OverlayLoggingMode, OverlayManifest,
+    OverlayPresentationBlock, OverlayPresentationBlockVariant, OverlayPresentationCalibration,
+    OverlayPresentationSnapshot, OverlayRuntime, PresentationBackend, PresentationCause,
+    PresentationCauseChannel, PresentationCauseKind, PresentationOutcome, PresentationStage,
+    PresentationStrategy, QuietTailProfile, ReadinessOutcome, RenderedFrame, RuntimeFailure,
+    SpatialReanchorOutcome, StartupError, EXPECTED_CONTRACT_VERSION, NATIVE_FRESH_RETRY_CADENCE,
     NATIVE_FRESH_RETRY_DEADLINE, NATIVE_FRESH_RETRY_MAX_COMPLETED,
+    NATIVE_READINESS_TIMEOUT_RETRY_MAX,
 };
 
 #[test]
@@ -31,6 +32,7 @@ fn native_fresh_retry_production_policy_matches_dd_002() {
     assert_eq!(NATIVE_FRESH_RETRY_CADENCE, Duration::from_millis(100));
     assert_eq!(NATIVE_FRESH_RETRY_DEADLINE, Duration::from_millis(500));
     assert_eq!(NATIVE_FRESH_RETRY_MAX_COMPLETED, 5);
+    assert_eq!(NATIVE_READINESS_TIMEOUT_RETRY_MAX, 5);
     assert_ne!(u64::MAX, 0);
 }
 
@@ -509,6 +511,153 @@ impl OverlayFrameSubmitter for OwnedSubmitterProbe {
             .unwrap()
             .push(if visible { "show" } else { "hide" });
         Ok(())
+    }
+}
+
+#[derive(Default)]
+struct DivergingVisibilitySubmitter {
+    operations: Vec<&'static str>,
+    observed: Option<bool>,
+}
+
+impl OverlayFrameSubmitter for DivergingVisibilitySubmitter {
+    fn submit_frame(&mut self, frame: &RenderedFrame) -> Result<(), OpenVrError> {
+        self.operations
+            .push(if frame.layout().visible_blocks.is_empty() {
+                "submit:empty"
+            } else {
+                "submit:text"
+            });
+        Ok(())
+    }
+
+    fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
+        self.operations.push(if visible { "show" } else { "hide" });
+        self.observed = Some(visible);
+        Ok(())
+    }
+
+    fn observed_overlay_visible(&self) -> Option<bool> {
+        self.observed
+    }
+}
+
+#[derive(Default)]
+struct EventFloodState {
+    operations: Mutex<Vec<&'static str>>,
+    poll_calls: AtomicUsize,
+    max_events_in_one_poll: AtomicUsize,
+}
+
+struct EventFloodSubmitter {
+    state: Arc<EventFloodState>,
+}
+
+impl OverlayFrameSubmitter for EventFloodSubmitter {
+    fn submit_frame(&mut self, frame: &RenderedFrame) -> Result<(), OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push(if frame.layout().visible_blocks.is_empty() {
+                "submit:empty"
+            } else {
+                "submit:text"
+            });
+        Ok(())
+    }
+
+    fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push(if visible { "show" } else { "hide" });
+        Ok(())
+    }
+
+    fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
+        self.state.poll_calls.fetch_add(1, Ordering::SeqCst);
+        self.state
+            .max_events_in_one_poll
+            .fetch_max(max_events, Ordering::SeqCst);
+        vec![OpenVrRuntimeEvent::Ignored(1); max_events]
+    }
+}
+
+struct OverlayHiddenSubmitter {
+    state: Arc<OwnedSubmitterState>,
+    shown: bool,
+    hidden_emitted: bool,
+}
+
+impl OverlayFrameSubmitter for OverlayHiddenSubmitter {
+    fn submit_frame(&mut self, frame: &RenderedFrame) -> Result<(), OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push(if frame.layout().visible_blocks.is_empty() {
+                "submit:empty"
+            } else {
+                "submit:text"
+            });
+        Ok(())
+    }
+
+    fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push(if visible { "show" } else { "hide" });
+        if visible {
+            self.shown = true;
+        }
+        Ok(())
+    }
+
+    fn poll_runtime_events(&mut self, _max_events: usize) -> Vec<OpenVrRuntimeEvent> {
+        if self.shown && !self.hidden_emitted {
+            self.hidden_emitted = true;
+            vec![OpenVrRuntimeEvent::OverlayHidden]
+        } else {
+            Vec::new()
+        }
+    }
+}
+
+struct ObservedVisibilitySubmitter {
+    state: Arc<OwnedSubmitterState>,
+    observed: Option<bool>,
+}
+
+impl OverlayFrameSubmitter for ObservedVisibilitySubmitter {
+    fn submit_frame(&mut self, frame: &RenderedFrame) -> Result<(), OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push(if frame.layout().visible_blocks.is_empty() {
+                "submit:empty"
+            } else {
+                "submit:text"
+            });
+        Ok(())
+    }
+
+    fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push(if visible { "show" } else { "hide" });
+        self.observed = Some(visible);
+        Ok(())
+    }
+
+    fn observed_overlay_visible(&self) -> Option<bool> {
+        self.observed
     }
 }
 
@@ -2312,6 +2461,44 @@ async fn runtime_records_failed_hide_visibility_without_false_observation() {
     assert_eq!(visibility.desired_visible, Some(false));
     assert_eq!(visibility.observed_runtime_visible, Some(true));
     assert_eq!(submitter.operations.last(), Some(&"hide"));
+    drop(bridge);
+    let _ = server.await.unwrap();
+}
+
+#[tokio::test]
+async fn runtime_reasserts_show_when_cached_visible_but_actual_hidden() {
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    let logger = test_logger("cached-visible-actual-hidden").await;
+    let (mut bridge, server) = connect_test_bridge().await;
+    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
+        revision: 1,
+        calibration: OverlayPresentationCalibration::default(),
+        native_fresh_render_generations: None,
+        blocks: vec![block("self:visible", "self", "visible", "", true)],
+    });
+    let mut submitter = DivergingVisibilitySubmitter::default();
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.operations, vec!["submit:text", "show"]);
+
+    submitter.observed = Some(false);
+    runtime.apply_snapshot(OverlayPresentationSnapshot {
+        revision: 2,
+        calibration: OverlayPresentationCalibration::default(),
+        native_fresh_render_generations: None,
+        blocks: vec![block("self:later", "self", "later", "", true)],
+    });
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        submitter.operations,
+        vec!["submit:text", "show", "submit:text", "show"]
+    );
     drop(bridge);
     let _ = server.await.unwrap();
 }
@@ -4366,6 +4553,419 @@ async fn production_owner_active_schedule_readiness_failure_is_terminal() {
         .runtime()
         .pending_presentation_causes_for_test()
         .is_empty());
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_single_readiness_timeout_retries_without_submit_or_exit() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":{
+                "revision":1,
+                "native_fresh_render_generations":{"peer":4},
+                "blocks":[block("peer:timeout","peer","text","",true)]
+            }})
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        loop {
+            let message = ws.next().await.unwrap().unwrap();
+            if message.to_text().unwrap().contains("overlay_ready") {
+                break;
+            }
+        }
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    renderer.set_test_readiness_terminal_outcome_on_call(1, ReadinessOutcome::TimedOut);
+    let state = Arc::new(OwnedSubmitterState::default());
+    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
+        snapshot,
+        renderer,
+        OwnedSubmitterProbe {
+            state: state.clone(),
+            fail_submit: false,
+            fail_on_submission: None,
+            submit_delay: Duration::ZERO,
+        },
+        Duration::from_millis(10),
+        Duration::from_millis(100),
+        2,
+    );
+
+    owner
+        .run(
+            &mut bridge,
+            &test_logger("single-readiness-timeout-retry").await,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        state
+            .operations
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|operation| operation.starts_with("submit"))
+            .count(),
+        1
+    );
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_openvr_event_flood_does_not_starve_snapshot_submit() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(EventFloodState::default());
+    let server_state = state.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":{
+                "revision":1,
+                "blocks":[block("self:flood-1","self","first","",true)]
+            }})
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        loop {
+            let message = ws.next().await.unwrap().unwrap();
+            if message.to_text().unwrap().contains("overlay_ready") {
+                break;
+            }
+        }
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":{
+                "revision":2,
+                "blocks":[block("self:flood-2","self","second","",true)]
+            }})
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        let waited = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let submits = server_state
+                    .operations
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|operation| operation.starts_with("submit"))
+                    .count();
+                if submits >= 2 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        assert!(
+            waited.is_ok(),
+            "second snapshot submit starved by OpenVR event flood"
+        );
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        EventFloodSubmitter {
+            state: state.clone(),
+        },
+        Duration::from_millis(10),
+        Duration::from_millis(100),
+        2,
+    );
+
+    owner
+        .run(
+            &mut bridge,
+            &test_logger("openvr-event-flood-fairness").await,
+        )
+        .await
+        .unwrap();
+
+    assert!(state.poll_calls.load(Ordering::SeqCst) >= 1);
+    assert!(state.max_events_in_one_poll.load(Ordering::SeqCst) <= 8);
+    assert_eq!(
+        state
+            .operations
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|operation| operation.starts_with("submit"))
+            .count(),
+        2
+    );
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_overlay_hidden_reasserts_show_when_desired_visible() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let server_state = state.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":{
+                "revision":1,
+                "blocks":[block("self:hidden","self","visible","",true)]
+            }})
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        loop {
+            let message = ws.next().await.unwrap().unwrap();
+            if message.to_text().unwrap().contains("overlay_ready") {
+                break;
+            }
+        }
+        let waited = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let shows = server_state
+                    .operations
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|operation| **operation == "show")
+                    .count();
+                if shows >= 2 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        assert!(waited.is_ok(), "OverlayHidden did not reassert ShowOverlay");
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        OverlayHiddenSubmitter {
+            state: state.clone(),
+            shown: false,
+            hidden_emitted: false,
+        },
+        Duration::from_millis(10),
+        Duration::from_millis(100),
+        2,
+    );
+
+    owner
+        .run(
+            &mut bridge,
+            &test_logger("overlay-hidden-reassert-show").await,
+        )
+        .await
+        .unwrap();
+
+    let operations = state.operations.lock().unwrap().clone();
+    assert!(
+        operations.starts_with(&["submit:text", "show", "show"]),
+        "unexpected visibility operations: {operations:?}"
+    );
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_event_pump_preserves_idle_hide_tail() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let server_state = state.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":{
+                "revision":1,
+                "blocks":[block("self:tail","self","visible","",true)]
+            }})
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        loop {
+            let message = ws.next().await.unwrap().unwrap();
+            if message.to_text().unwrap().contains("overlay_ready") {
+                break;
+            }
+        }
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":{
+                "revision":2,
+                "blocks":[]
+            }})
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if server_state
+                    .operations
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|operation| *operation == "submit:empty")
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("empty snapshot was not submitted");
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        let mid_tail = server_state.operations.lock().unwrap().clone();
+        assert!(
+            !mid_tail.iter().any(|operation| *operation == "hide"),
+            "event pump hid overlay during idle-hide tail: {mid_tail:?}"
+        );
+        tokio::time::sleep(Duration::from_millis(450)).await;
+        let after_tail = server_state.operations.lock().unwrap().clone();
+        assert!(
+            after_tail.iter().any(|operation| *operation == "hide"),
+            "overlay was not hidden after idle-hide tail: {after_tail:?}"
+        );
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        ObservedVisibilitySubmitter {
+            state: state.clone(),
+            observed: None,
+        },
+        Duration::from_millis(10),
+        Duration::from_millis(100),
+        2,
+    );
+
+    owner
+        .run(
+            &mut bridge,
+            &test_logger("event-pump-preserves-idle-hide-tail").await,
+        )
+        .await
+        .unwrap();
+
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_consecutive_readiness_timeouts_escalate_without_submit() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":{
+                "revision":1,
+                "native_fresh_render_generations":{"peer":4},
+                "blocks":[block("peer:timeouts","peer","text","",true)]
+            }})
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        tokio::time::sleep(Duration::from_millis(800)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    renderer.set_test_readiness_pending_yields(1_000_000);
+    let state = Arc::new(OwnedSubmitterState::default());
+    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
+        snapshot,
+        renderer,
+        OwnedSubmitterProbe {
+            state: state.clone(),
+            fail_submit: false,
+            fail_on_submission: None,
+            submit_delay: Duration::ZERO,
+        },
+        Duration::from_millis(10),
+        Duration::from_millis(100),
+        2,
+    );
+    owner.set_max_consecutive_readiness_timeouts_for_test(2);
+
+    let failure = owner
+        .run(
+            &mut bridge,
+            &test_logger("consecutive-readiness-timeouts").await,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(failure, RuntimeFailure::ReadinessTimedOut);
+    assert_eq!(
+        state
+            .operations
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|operation| operation.starts_with("submit"))
+            .count(),
+        0
+    );
+    assert!(owner.resources_released());
     server.await.unwrap();
 }
 

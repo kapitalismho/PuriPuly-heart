@@ -15,6 +15,8 @@ from puripuly_heart.core.diagnostic_validation import (
     DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED,
     redact_text_for_sink,
 )
+from puripuly_heart.core.overlay.manifest import normalize_overlay_logging_mode
+from puripuly_heart.core.runtime_logging import SessionLoggingMode
 
 _PROCESS_EVENT_LIMIT = 256
 _CHILD_LINE_LIMIT = 100
@@ -22,6 +24,10 @@ _PRESENTER_SNAPSHOT_LIMIT = 30
 _PRESENTER_REMOVAL_LIMIT = 50
 _BRIDGE_EVENT_LIMIT = 30
 _TRANSLATION_EVENT_LIMIT = 50
+_CHATBOX_EVENT_LIMIT = 50
+_STT_EVENT_LIMIT = 50
+_NATIVE_EVENT_LIMIT = 50
+_PRESENTATION_DIAGNOSTICS_MARKER = "presentation_diagnostics "
 _SENSITIVE_DIAGNOSTIC_FIELD_KEYS = {
     "accesstoken",
     "apikey",
@@ -82,6 +88,7 @@ def _redact_failure_jsonl_text(text: str) -> str:
 class OverlayDiagnosticsRecorder:
     overlay_instance_id: str
     diagnostics_dir: Path = field(default_factory=default_overlay_diagnostics_dir)
+    logging_mode: str = SessionLoggingMode.BASIC.value
 
     process_events: deque[dict[str, Any]] = field(
         default_factory=lambda: deque(maxlen=_PROCESS_EVENT_LIMIT)
@@ -104,10 +111,28 @@ class OverlayDiagnosticsRecorder:
     translation_events: deque[dict[str, Any]] = field(
         default_factory=lambda: deque(maxlen=_TRANSLATION_EVENT_LIMIT)
     )
+    chatbox_events: deque[dict[str, Any]] = field(
+        default_factory=lambda: deque(maxlen=_CHATBOX_EVENT_LIMIT)
+    )
+    stt_events: deque[dict[str, Any]] = field(
+        default_factory=lambda: deque(maxlen=_STT_EVENT_LIMIT)
+    )
+    native_events: deque[dict[str, Any]] = field(
+        default_factory=lambda: deque(maxlen=_NATIVE_EVENT_LIMIT)
+    )
     last_dump_path: Path | None = None
 
     _sequence: int = field(init=False, default=0)
     _started_at: float = field(init=False, default_factory=time.monotonic)
+
+    def __post_init__(self) -> None:
+        self.set_logging_mode(self.logging_mode)
+
+    def set_logging_mode(self, mode: SessionLoggingMode | str | bool | object) -> None:
+        normalized = normalize_overlay_logging_mode(mode)
+        if normalized != SessionLoggingMode.DETAILED.value:
+            self._clear_stage_events()
+        self.logging_mode = normalized
 
     def record_process(self, event: str, **fields: Any) -> dict[str, Any]:
         return self._append(self.process_events, category="process", event=event, **fields)
@@ -119,22 +144,66 @@ class OverlayDiagnosticsRecorder:
         )
 
     def record_presenter(self, event: str, **fields: Any) -> dict[str, Any]:
-        _ = (event, fields)
-        return {}
+        return self._append_stage(
+            self.presenter_events, category="presenter", event=event, **fields
+        )
 
     def record_presenter_removal(
         self, event: str = "entry_removed", **fields: Any
     ) -> dict[str, Any]:
-        _ = (event, fields)
-        return {}
+        return self._append_stage(
+            self.presenter_removal_events,
+            category="presenter_removal",
+            event=event,
+            **fields,
+        )
 
     def record_bridge(self, event: str, **fields: Any) -> dict[str, Any]:
-        _ = (event, fields)
-        return {}
+        return self._append_stage(self.bridge_events, category="bridge", event=event, **fields)
 
     def record_translation(self, event: str, **fields: Any) -> dict[str, Any]:
-        _ = (event, fields)
-        return {}
+        return self._append_stage(
+            self.translation_events, category="translation", event=event, **fields
+        )
+
+    def record_chatbox(self, event: str, **fields: Any) -> dict[str, Any]:
+        return self._append_stage(self.chatbox_events, category="chatbox", event=event, **fields)
+
+    def record_stt(self, event: str, **fields: Any) -> dict[str, Any]:
+        return self._append_stage(self.stt_events, category="stt", event=event, **fields)
+
+    def record_native(self, event: str, **fields: Any) -> dict[str, Any]:
+        return self._append_stage(self.native_events, category="native", event=event, **fields)
+
+    def ingest_native_child_line(self, line: str) -> bool:
+        if not self._stage_recording_enabled():
+            return False
+        marker_at = line.find(_PRESENTATION_DIAGNOSTICS_MARKER)
+        if marker_at < 0:
+            return False
+        raw = line[marker_at + len(_PRESENTATION_DIAGNOSTICS_MARKER) :].strip()
+        try:
+            records = json.loads(raw)
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(records, list):
+            return False
+        ingested = False
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            self.record_native(
+                str(record.get("stage") or "presentation"),
+                logical_revision=record.get("logical_revision"),
+                outcome=record.get("outcome"),
+                readiness_us=record.get("readiness_us"),
+                cached_visibility=record.get("observed_runtime_visible"),
+                desired_visible=record.get("desired_visible"),
+                actual_visibility="not_queried",
+                physical_hmd_visibility=record.get("physical_hmd_visibility"),
+            )
+            ingested = True
+        return ingested
 
     def dump_failure(self, **summary_fields: Any) -> Path:
         self.diagnostics_dir.mkdir(parents=True, exist_ok=True)
@@ -153,6 +222,30 @@ class OverlayDiagnosticsRecorder:
                 handle.write("\n")
         self.last_dump_path = path
         return path
+
+    def _stage_recording_enabled(self) -> bool:
+        return self.logging_mode == SessionLoggingMode.DETAILED.value
+
+    def _clear_stage_events(self) -> None:
+        self.presenter_events.clear()
+        self.presenter_removal_events.clear()
+        self.bridge_events.clear()
+        self.translation_events.clear()
+        self.chatbox_events.clear()
+        self.stt_events.clear()
+        self.native_events.clear()
+
+    def _append_stage(
+        self,
+        target: deque[dict[str, Any]],
+        *,
+        category: str,
+        event: str,
+        **fields: Any,
+    ) -> dict[str, Any]:
+        if not self._stage_recording_enabled():
+            return {}
+        return self._append(target, category=category, event=event, **fields)
 
     def _append(
         self,
@@ -193,3 +286,10 @@ class OverlayDiagnosticsRecorder:
         yield from self.process_events
         yield from self.child_stdout_lines
         yield from self.child_stderr_lines
+        yield from self.presenter_events
+        yield from self.presenter_removal_events
+        yield from self.bridge_events
+        yield from self.translation_events
+        yield from self.chatbox_events
+        yield from self.stt_events
+        yield from self.native_events

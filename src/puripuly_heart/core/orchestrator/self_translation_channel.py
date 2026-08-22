@@ -219,6 +219,13 @@ class SelfTranslationChannelOwner:
 
     async def handle_stt_event(self, event: object) -> None:
         self._require_ingress()
+        utterance_id = getattr(event, "utterance_id", None)
+        self.diagnostics.record_stt_ingress(
+            "stt_handler_start",
+            channel="self",
+            event_type=type(event).__name__,
+            utterance_id=None if utterance_id is None else str(utterance_id),
+        )
         low_latency_mode = self.config_snapshot().value.low_latency_mode
         if isinstance(event, STTSessionStateEvent):
             if event.channel != "self":

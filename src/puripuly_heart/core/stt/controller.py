@@ -75,6 +75,7 @@ class ManagedSTTProvider:
     ) = None
     runtime_logging: SessionRuntimeLoggingService | None = None
     stt_input_fault_profile_provider: Callable[[], AudioFaultProfile | str | None] | None = None
+    event_ingress_observer: Callable[..., object] | None = None
 
     _state: STTSessionState = STTSessionState.DISCONNECTED
     _active_session: STTBackendSession | None = None
@@ -82,6 +83,7 @@ class ManagedSTTProvider:
     _consumer_task: asyncio.Task[None] | None = None
     _draining: set[asyncio.Task[None]] = field(default_factory=set)
     _events: asyncio.Queue = field(default_factory=asyncio.Queue)
+    _event_enqueued_at: deque[float] = field(default_factory=deque)
     _session_open_lock: asyncio.Lock = field(init=False, repr=False)
 
     _active_utterance_id: UUID | None = None
@@ -396,7 +398,10 @@ class ManagedSTTProvider:
             try:
                 self._events.get_nowait()
             except asyncio.QueueEmpty:
+                self._event_enqueued_at.clear()
                 return
+            if self._event_enqueued_at:
+                self._event_enqueued_at.popleft()
 
     async def handle_vad_event(self, event: VadEvent) -> None:
         if isinstance(event, SpeechStart):
@@ -410,11 +415,44 @@ class ManagedSTTProvider:
 
     async def events(self) -> AsyncIterator[object]:
         while True:
-            item = await self._events.get()
+            item = await self._take_event()
             if isinstance(item, _EventIngressBarrier):
                 item.reached.set()
                 continue
+            self._observe_event_ingress("stt_handler_start", item)
             yield item
+
+    def event_ingress_snapshot(self) -> dict[str, object]:
+        now = self.clock.now()
+        oldest = self._event_enqueued_at[0] if self._event_enqueued_at else None
+        return {
+            "queue_depth": self._events.qsize(),
+            "oldest_age_s": None if oldest is None else round(max(0.0, now - oldest), 3),
+        }
+
+    async def _publish_event(self, item: object) -> None:
+        await self._events.put(item)
+        if not isinstance(item, _EventIngressBarrier):
+            self._event_enqueued_at.append(self.clock.now())
+            self._observe_event_ingress("stt_enqueue", item)
+
+    async def _take_event(self) -> object:
+        item = await self._events.get()
+        if not isinstance(item, _EventIngressBarrier) and self._event_enqueued_at:
+            self._event_enqueued_at.popleft()
+        return item
+
+    def _observe_event_ingress(self, event: str, item: object) -> None:
+        if self.event_ingress_observer is None:
+            return
+        utterance_id = getattr(item, "utterance_id", None)
+        self.event_ingress_observer(
+            event,
+            channel=self.channel,
+            event_type=type(item).__name__,
+            utterance_id=None if utterance_id is None else str(utterance_id),
+            **self.event_ingress_snapshot(),
+        )
 
     @property
     def is_at_utterance_boundary(self) -> bool:
@@ -684,7 +722,7 @@ class ManagedSTTProvider:
                 fallback_level=logging.ERROR,
             )
             await self._set_state(STTSessionState.DISCONNECTED)
-            await self._events.put(
+            await self._publish_event(
                 STTErrorEvent(
                     message=report.message,
                     diagnostics=report.diagnostics,
@@ -1074,9 +1112,9 @@ class ManagedSTTProvider:
                     final_language_runs=ev.final_language_runs,
                 )
                 if ev.is_final:
-                    await self._events.put(STTFinalEvent(utterance_id, transcript))
+                    await self._publish_event(STTFinalEvent(utterance_id, transcript))
                 else:
-                    await self._events.put(STTPartialEvent(utterance_id, transcript))
+                    await self._publish_event(STTPartialEvent(utterance_id, transcript))
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -1123,7 +1161,7 @@ class ManagedSTTProvider:
             fallback_level=logging.ERROR,
         )
         if not self._closing:
-            await self._events.put(
+            await self._publish_event(
                 STTErrorEvent(
                     message=report.message,
                     diagnostics=report.diagnostics,
@@ -1141,7 +1179,7 @@ class ManagedSTTProvider:
             f"[STT] State: {old_state.name} -> {state.name}",
             fallback_level=logging.INFO,
         )
-        await self._events.put(STTSessionStateEvent(state, channel=self.channel))
+        await self._publish_event(STTSessionStateEvent(state, channel=self.channel))
 
     def _has_recent_speech(self) -> bool:
         """Check if speech ended recently within the reconnect window."""

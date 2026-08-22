@@ -51,6 +51,8 @@ from .overlay_session_transition import (
 
 OVERLAY_STARTUP_TIMEOUT_MS = 15000
 OVERLAY_SHUTDOWN_GRACE_S = 0.05
+OVERLAY_TERMINAL_RESTART_MAX = 3
+OVERLAY_TERMINAL_RESTART_BACKOFF_S = 0.05
 OVERLAY_STEAMVR_FALLBACK_POLICY: Literal["retry_every_enable"] = "retry_every_enable"
 OVERLAY_FAILURE_REASONS = frozenset(
     {
@@ -155,6 +157,8 @@ class OverlayApplicationOwner:
     _state: str = field(init=False, default="off", repr=False)
     _failure_reason: str | None = field(init=False, default=None, repr=False)
     _auto_restart_scheduled: bool = field(init=False, default=False, repr=False)
+    _terminal_restart_attempts: int = field(init=False, default=0, repr=False)
+    _recovering_from_crash: bool = field(init=False, default=False, repr=False)
     _active_target: str | None = field(init=False, default=None, repr=False)
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
     _transition_owner: OverlaySessionTransitionOwner = field(init=False, repr=False)
@@ -492,7 +496,9 @@ class OverlayApplicationOwner:
         if self._runtime is not runtime:
             raise RuntimeError("overlay start transition runtime is not current")
         self._active_target = target
-        self._auto_restart_scheduled = False
+        if not self._recovering_from_crash:
+            self._auto_restart_scheduled = False
+            self._terminal_restart_attempts = 0
         if self._state != "starting":
             self._transition_state("starting")
             self._notify_state()
@@ -535,6 +541,7 @@ class OverlayApplicationOwner:
             clock=self.clock,
             startup_timeout_ms=OVERLAY_STARTUP_TIMEOUT_MS,
             fallback_reason=self._fallback_owner.reason if self._fallback_owner.active else None,
+            recovering_from_crash=self._recovering_from_crash,
         )
 
     def record_lifecycle_trace(self, event: str, **fields: object) -> None:
@@ -591,6 +598,60 @@ class OverlayApplicationOwner:
                 overlay_instance_id=instance_id,
             ),
         )
+
+    def _should_restart_after_terminal_failure(self, manager: OverlayProcessManager) -> bool:
+        if not manager.restart_scheduled:
+            return False
+        if self._ingress_stopped:
+            return False
+        state = self.state_provider()
+        if not state.settings_available or not state.overlay_intent_enabled:
+            return False
+        return self._terminal_restart_attempts < OVERLAY_TERMINAL_RESTART_MAX
+
+    async def _restart_after_terminal_failure(
+        self,
+        *,
+        failure_reason: str | None,
+    ) -> None:
+        self._terminal_restart_attempts += 1
+        self._recovering_from_crash = True
+        self._auto_restart_scheduled = True
+        self._failure_reason = None
+        if self._state != "starting":
+            self._transition_state("starting")
+            self._notify_state()
+        presenter = None
+        runtime = self._runtime
+        if runtime is not None:
+            presenter = runtime.presenter
+        if isinstance(presenter, OverlayPresenter):
+            await presenter.discard_epoch_retry_intent()
+        await asyncio.sleep(OVERLAY_TERMINAL_RESTART_BACKOFF_S * self._terminal_restart_attempts)
+        if self._ingress_stopped or not self.state_provider().overlay_intent_enabled:
+            self._recovering_from_crash = False
+            self._auto_restart_scheduled = False
+            await self.teardown(preserve_presenter_state=True)
+            return
+        try:
+            status = await self._transition_owner.begin_start(
+                lambda: self._start_execution(replace_starting=True)
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            await self._fail_terminal_restart(failure_reason)
+            return
+        if status == "started":
+            return
+        if status == "already_active" and self._state == "connected":
+            return
+        await self._fail_terminal_restart(failure_reason)
+
+    async def _fail_terminal_restart(self, failure_reason: str | None) -> None:
+        self.on_start_failed(failure_reason)
+        await self.teardown(preserve_presenter_state=True)
+        await self.refresh_peer_dependencies()
 
     def attach_translation_diagnostics(self, diagnostics: object) -> None:
         owner = self.diagnostics_provider()
@@ -656,6 +717,11 @@ class OverlayApplicationOwner:
             if runtime is None or runtime.process_manager is not manager:
                 return
             if manager.state != "failed":
+                return
+            if self._should_restart_after_terminal_failure(manager):
+                await self._restart_after_terminal_failure(
+                    failure_reason=manager.failure_reason,
+                )
                 return
             self.on_start_failed(manager.failure_reason)
             await self.teardown(preserve_presenter_state=True)
@@ -723,6 +789,7 @@ class OverlayApplicationOwner:
     def on_start_failed(self, failure_reason: str | None) -> None:
         self._failure_reason = self.normalize_failure_reason(failure_reason)
         self._auto_restart_scheduled = False
+        self._recovering_from_crash = False
         self._transition_state("failed")
         self._notify_state()
 
@@ -834,6 +901,8 @@ class OverlayApplicationOwner:
     def mark_connected(self) -> None:
         self._failure_reason = None
         self._auto_restart_scheduled = False
+        self._recovering_from_crash = False
+        self._terminal_restart_attempts = 0
         self._transition_state("connected")
         self._notify_state()
 
