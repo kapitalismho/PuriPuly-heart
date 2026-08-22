@@ -1053,9 +1053,11 @@ def _caption_slots_with_ui_cjk_font(
         replace(
             slot,
             lines=tuple(
-                replace(line, font_family=cjk_font_family)
-                if line.font_family == _DESKTOP_CAPTION_CJK_FONT_FAMILY
-                else line
+                (
+                    replace(line, font_family=cjk_font_family)
+                    if line.font_family == _DESKTOP_CAPTION_CJK_FONT_FAMILY
+                    else line
+                )
                 for line in slot.lines
             ),
         )

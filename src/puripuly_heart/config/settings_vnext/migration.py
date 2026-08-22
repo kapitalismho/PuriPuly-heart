@@ -750,9 +750,7 @@ def from_legacy_app_settings(
                     cerebras=CerebrasTranslationIntent(
                         llm_model=data["cerebras"]["llm_model"],
                     ),
-                    gpu_device_id=str(
-                        data["translation"].get("gpu_device_id", "auto")
-                    ).strip()
+                    gpu_device_id=str(data["translation"].get("gpu_device_id", "auto")).strip()
                     or "auto",
                 ),
                 local_llm=LocalLLMIntent(
