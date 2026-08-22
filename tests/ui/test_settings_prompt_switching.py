@@ -353,9 +353,9 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         "managed_gemma_cpu",
         "managed_gemma_gpu",
         TranslationModel.MANAGED_GEMMA_12B.value,
-        TranslationModel.GEMMA4.value,
         TranslationModel.LOCAL_LLM.value,
         TranslationModel.CUSTOM_HTTP.value,
+        TranslationModel.GEMMA4.value,
         TranslationModel.GEMINI_37_FLASH.value,
         TranslationModel.GEMINI_31_FLASH_LITE.value,
         TranslationModel.QWEN_35_PLUS.value,
@@ -397,6 +397,11 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
     assert gemma31.section == t("settings.translation_model.section.recommended_cloud")
     assert gemma31.description == t("settings.translation_model.gemma4_31b.description")
 
+    gemma26_a4b = next(
+        option for option in options if option.value == TranslationModel.GEMMA4.value
+    )
+    assert gemma26_a4b.section == t("settings.translation_model.section.others")
+
     sections: list[str] = []
     for option in options:
         if option.section and option.section not in sections:
@@ -405,10 +410,12 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         t("settings.translation_model.section.recommended_cloud"),
         t("settings.translation_model.section.recommended_local"),
         t("settings.translation_model.section.gpu_inference"),
-        t("settings.translation_model.section.gemma"),
         t("settings.translation_model.section.user_settings"),
         t("settings.translation_model.section.others"),
     ]
+
+    others_options = [option for option in options if option.section == gemma26_a4b.section]
+    assert others_options[0] is gemma26_a4b
 
 
 def test_gemma31_connection_modal_lists_managed_openrouter_and_cerebras(monkeypatch) -> None:

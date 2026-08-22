@@ -215,7 +215,6 @@ _TRANSLATION_MODEL_SECTION_ORDER = (
     "settings.translation_model.section.recommended_cloud",
     "settings.translation_model.section.recommended_local",
     "settings.translation_model.section.gpu_inference",
-    "settings.translation_model.section.gemma",
     "settings.translation_model.section.user_settings",
     "settings.translation_model.section.others",
 )
@@ -225,7 +224,7 @@ _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.GEMMA4_31B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended_cloud",
-    TranslationModel.GEMMA4: "settings.translation_model.section.gemma",
+    TranslationModel.GEMMA4: "settings.translation_model.section.others",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
     TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
     TranslationModel.GEMINI_37_FLASH: "settings.translation_model.section.others",
