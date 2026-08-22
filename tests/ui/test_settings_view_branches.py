@@ -3844,7 +3844,7 @@ def test_overlay_display_toggles_update_persistent_settings(
 
     assert settings.overlay.show_translation is False
     assert settings.overlay.show_peer_original is False
-    assert settings.overlay.desktop_flet.swap_caption_languages is True
+    assert settings.overlay.desktop_flet.swap_caption_languages is False
     assert len(settings_calls) == 3
     assert all(incoming is not settings for incoming in settings_calls)
     assert settings_calls[-1].overlay.show_translation is False
@@ -4076,6 +4076,27 @@ def test_desktop_gui_background_transparency_card_adjusts_in_ten_percent_steps(
     assert [
         incoming.overlay.desktop_flet.visual.background_alpha for incoming in changed
     ] == pytest.approx([0.4, 0.5, 0.6])
+
+
+def test_desktop_overlay_swap_caption_languages_emits_copy_without_mutating_loaded_settings_reference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.overlay.target = "desktop"
+    changed: list[AppSettings] = []
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view.on_settings_changed = lambda incoming: changed.append(incoming)
+
+    view._on_desktop_overlay_swap_caption_languages_click(None)
+
+    assert settings.overlay.desktop_flet.swap_caption_languages is False
+    assert changed
+    assert changed[-1] is not settings
+    assert changed[-1].overlay.desktop_flet.swap_caption_languages is True
+    assert view._settings is not changed[-1]
+    assert view._settings is not None
+    assert view._settings.overlay.desktop_flet.swap_caption_languages is True
 
 
 def test_desktop_gui_background_alpha_emits_copy_without_mutating_loaded_settings_reference(

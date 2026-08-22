@@ -5315,7 +5315,13 @@ class SettingsView(ft.Column):
     def _on_desktop_overlay_swap_caption_languages_selected(self, value: str) -> None:
         if not self._settings:
             return
-        self._settings.overlay.desktop_flet.swap_caption_languages = value == "on"
+        enabled = value == "on"
+        if self._current_desktop_overlay_swap_caption_languages() == enabled:
+            self._sync_desktop_overlay_main_controls()
+            return
+        updated = copy.deepcopy(self._settings)
+        updated.overlay.desktop_flet.swap_caption_languages = enabled
+        self._settings = updated
         self._sync_desktop_overlay_main_controls()
         self._emit_settings_changed()
 
