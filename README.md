@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly <3" width="128" />
+  <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — Real-Time Two-Way Voice Translator for VRChat" width="128" />
 </p>
 
-<h1 align="center">PuriPuly <3</h1>
+<h1 align="center">PuriPuly — Real-Time Two-Way Voice Translator for VRChat</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.4.0-blue" alt="Version" />
@@ -10,8 +10,6 @@
   <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
-
-<p align="center">LLM-based two-way translator for VRChat</p>
 
 <h2 align="center">
   🇺🇸 English ·
@@ -49,10 +47,18 @@ can't carry what's truly in your heart.
 
 So I built one that can.
 
+## What is PuriPuly?
+
+PuriPuly is a two-way voice translator for Windows that translates your voice and the other person's voice in real time.
+We aim for natural translation through LLMs.
+Beyond stiff literal translation, so real person-to-person conversation can happen.
+It works in many environments, including VRChat and Discord.
+
 - **LLM-Powered Localization** — Slang, colloquialisms, and casual/formal speech, all rendered naturally.
 - **Context Memory** — Keeps the conversation flowing naturally with awareness of prior context.
 - **Two-way Voice Translation** — Translates the other person's voice too, with VR subtitle overlay support.
 - **Start via Discord** — Get going right away without a complex setup process.
+- **The most powerful local full stack** — From Parakeet to Gemma 4 E4B, built with the most efficient models available today.
 
 ## Q&A
 
@@ -82,7 +88,7 @@ So I built one that can.
 ---
 
 ## Translation Comparison
-![Translation quality benchmark chart. It shows the mean error penalty per sentence (lower is better) evaluated using the Gemba MQM framework (judge model: Gemini 3.1 Pro Preview) on 216 multi-turn Korean to EN, JA, and ZH-Hans samples. Scores: Gemini 3.1 Flash-lite 0.573, Gemini 3 Flash 0.596, Gemma 4 26B A4B 0.813, Qwen 3.5 Plus 0.958, DeepSeek V4 Flash 1.025, Gemma 4 26B A4B (no-context) 1.265, DeepSeek V4 Flash (no-context) 1.647, Qwen 3.5 Flash 2.198, DeepL 4.963, DeepL (no-context) 5.717, Google Translation Basic 5.998.](docs/images/performance/1.png)
+![Translation quality benchmark chart. Mean error penalty per sentence (lower is better), ranked by model: 1st Gemma 4 31B (0.353), 2nd Gemma 4 26B A4B (0.387), 3rd DeepSeek V4 Flash 0731 (0.571), 4th Gemma 4 E4B QAT Q4 (1.577), 5th Papago (2.699), 6th Gemini 3.5 Live Translate (2.991), 7th MiLMMT 46-4B (3.087), 8th DeepL (3.914), 9th Google Cloud Translation Basic (5.731).](docs/images/performance/1.png)
 
 - We ran the experiment using Microsoft's Gemba MQM framework.
 - It was set up as a multi-turn environment to better resemble real conversation.
@@ -94,60 +100,60 @@ So I built one that can.
 
 #### Recommended Models
 
-| LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
+| LLM \ ASR | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B + 31B** | 14,380 | 2,920 | 3,710 | 1,180 |
-| **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
+| **Gemma 4 E4B (Local)** | Unlimited | 5,000 | 3,660 | 1,290 |
+| **Gemma 4 26B A4B + 31B** | 13,940 | 3,680 | 2,900 | 1,180 |
+| **DeepSeek V4 Flash** | 11,620 | 3,500 | 2,780 | 1,160 |
 
 #### Other Models
 
-| LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
+| LLM \ ASR | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
-| **Gemma 4 31B (OpenRouter)** | 13,700 | 2,780 | 3,530 | 1,120 |
-| **Gemma 4 31B (Cerebras)** | 920 | 730 | 770 | 540 |
-| **Gemini 3 Flash** | 1,710 | 1,170 | 1,280 | 740 |
-| **Gemini 3.1 Flash-Lite** | 3,430 | 1,770 | 2,030 | 940 |
-| **Qwen 3.5 Plus** | 7,460 | 2,460 | — | — |
-| **Local LLMs** | Unlimited | 3,660 | 5,000 | 1,290 |
+| **Gemma 4 12B (Local)** | Unlimited | 5,000 | 3,660 | 1,290 |
+| **Gemma 4 26B A4B** | 14,380 | 3,710 | 2,920 | 1,180 |
+| **Gemma 4 31B (OpenRouter)** | 10,940 | 3,430 | 2,740 | 1,150 |
+| **Gemma 4 31B (Cerebras)** | 920 | 770 | 730 | 540 |
+| **Gemini 3.7 Flash** | 1,160 | 940 | 880 | 610 |
+| **Gemini 3.1 Flash-Lite** | 3,430 | 2,030 | 1,770 | 940 |
+| **Qwen 3.5 Plus** | 7,460 | — | 2,460 | — |
 
 ### Cost per Utterance
 
 #### Recommended Models
 
-| LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
+| LLM \ ASR | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
 |---|---|---|---|---|
+| **Gemma 4 E4B (Local)** | $0 | ~$0.0002 | ~$0.0003 | ~$0.0008 |
 | **Gemma 4 26B A4B + 31B** | ~$0.00007 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
-| **DeepSeek V4 Flash** | ~$0.00005 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
+| **DeepSeek V4 Flash** | ~$0.00009 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
 
 #### Other Models
 
-| LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
+| LLM \ ASR | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
 |---|---|---|---|---|
+| **Gemma 4 12B (Local)** | $0 | ~$0.0002 | ~$0.0003 | ~$0.0008 |
 | **Gemma 4 26B A4B** | ~$0.00007 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
-| **Gemma 4 31B (OpenRouter)** | ~$0.00007 | ~$0.0003 | ~$0.0003 | ~$0.0009 |
-| **Gemma 4 31B (Cerebras)** | ~$0.0011 | ~$0.0014 | ~$0.0013 | ~$0.0019 |
-| **Gemini 3 Flash** | ~$0.0006 | ~$0.0009 | ~$0.0008 | ~$0.0014 |
-| **Gemini 3.1 Flash-Lite** | ~$0.0003 | ~$0.0006 | ~$0.0005 | ~$0.0011 |
-| **Qwen 3.5 Plus** | ~$0.0001 | ~$0.0004 | — | — |
-| **Local LLMs** | $0 | ~$0.0003 | ~$0.0002 | ~$0.0008 |
+| **Gemma 4 31B (OpenRouter)** | ~$0.00009 | ~$0.0003 | ~$0.0003 | ~$0.0009 |
+| **Gemma 4 31B (Cerebras)** | ~$0.0011 | ~$0.0013 | ~$0.0014 | ~$0.0019 |
+| **Gemini 3.7 Flash** | ~$0.0009 | ~$0.0011 | ~$0.0011 | ~$0.0016 |
+| **Gemini 3.1 Flash-Lite** | ~$0.0003 | ~$0.0005 | ~$0.0006 | ~$0.0011 |
+| **Qwen 3.5 Plus** | ~$0.0001 | — | ~$0.0004 | — |
 
 *   *Based on (Input 900 tokens + Output 12 tokens) × 1.2 avg LLM calls per utterance.*
 *   *Uses per Dollar is derived from the un-rounded values in the Cost per Utterance table.*
 *   *All costs and usage counts are approximate.*
 *   *DeepSeek assumes a 70% cache hit rate.*
 *   *Qwen API costs are based on the Beijing region.*
-*   *Pricing as of May 25, 2026 / Fast Response mode active.*
+*   *Pricing as of August 21, 2026.*
 
 ### Free Credits
 
 | Service | Free Credit | Duration | Note |
 |--------|------------|------|------|
 | **Deepgram** | $200 | None | - |
-| **Google AI Studio** | $10 | 1 year | Monthly for Gemini subscribers |
 | **Alibaba Cloud** | 1M tokens per model | 90 days | Singapore region |
 | **Alibaba Cloud** | ¥300 | 1 year | Students in China |
-| **Cerebras** | 1M tokens daily | None | 5 calls per minute limit |
 
 ---
 
@@ -408,6 +414,11 @@ The tier transition may take a moment.
 ---
 
 ## Architecture
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture-dark.png">
+  <img src="docs/architecture-light.png" alt="PuriPuly Heart hexagonal architecture: core runtimes surrounded by eight port adapters">
+</picture>
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md).
 

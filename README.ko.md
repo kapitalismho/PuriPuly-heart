@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly <3" width="128" />
+  <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — VRChat 실시간 양방향 음성 번역기" width="128" />
 </p>
 
-<h1 align="center">PuriPuly <3</h1>
+<h1 align="center">PuriPuly — VRChat 실시간 양방향 음성 번역기</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.4.0-blue" alt="Version" />
@@ -10,8 +10,6 @@
   <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
-
-<p align="center">LLM-based two-way translator for VRChat</p>
 
 <h2 align="center">
   <a href="README.md">🇺🇸 English</a> ·
@@ -23,7 +21,7 @@
 
 ---
 
-## Demo
+## 데모
 
 ![PuriPuly(Deepgram + Gemini 3 Flash)와 VRCT(Google Web Speech + Google Translate)의 번역 비교. PuriPuly 전사: "てか俺にも声かけてくんないかな まあ関係ないんだけどさ。", 번역: "그나저나 나 한테도 말 좀 해주지. 뭐, 나랑은 상관없는 일이긴 하지만." | VRCT 전사: "てか俺에도声かけてくんないかな ま 관계ないんだけどさ", 번역: "나는 나에게도 말하지 않을 거야. 상관 없다."](docs/images/demo/jp-ko_screenshot.png)
 
@@ -48,15 +46,23 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 
 그래서 만들었어요.
 
+## PuriPuly란?
+
+PuriPuly는 내 목소리와 상대방의 목소리를 실시간으로 번역하는 Windows용 양방향 음성 번역기예요.
+LLM을 통한 자연스러운 번역을 추구하고 있어요.
+딱딱한 번역을 넘어 진짜 사람 대 사람간의 소통이 가능할 수 있도록요.
+VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
+
 - **LLM 기반 현지화** — 슬랭, 구어체, 반말/존댓말까지 자연스럽게
 - **맥락 기억** — 문맥을 고려한 자연스러운 대화 흐름 유지
 - **양방향 음성 번역** — 상대 음성도 같이 번역, VR 자막 오버레이 지원
-- **디스코드로 시작** — 복잡한 설정 과정 없이 바로 사용 가능
+- **디스코드로 시작** — 복잡한 설정 과정 없이 최적의 옵션으로 사용 가능
+- **가장 강력한 로컬 풀스택** — Parakeet에서 Gemma 4까지, 지금 가장 효율적인 모델을 탑재
 
-## Q&A
+## 자주 묻는 질문
 
 - **번역 품질은 어느정도인가요?**
-→ 상대방과 나 둘 다 이 번역기를 사용했을 시 가장 깊은 대화까지 할 수 있을 정도에요. 정량적인 면에서 말씀드리자면 Gemma 4 기준으로 DeepL보다 6배 더 나았어요. 자세한 내용은 아래의 '번역 비교' 항목을 봐주세요.
+→ 상대방과 나 둘 다 이 번역기를 사용했을 시 가장 깊은 대화까지 할 수 있을 정도에요. 정량적인 면에서 말씀드리자면 Gemma 4 기준으로 DeepL보다 6배 더 나았어요. 자세한 내용은 아래의 '번역 품질 비교' 항목을 봐주세요.
 
 - **말하고 번역이 되기까지 시간이 얼마나 걸리나요?**
 → Gemma 4와 클라우드 STT 서비스를 사용한 기준에서 지연 시간은 보통 1초 중후반대에요.
@@ -80,11 +86,11 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 
 ---
 
-## 비교
-![번역 품질 벤치마크 차트. 한국어에서 영어, 일본어, 중국어 간체로의 216개 멀티턴 대화 샘플을 Gemba MQM 프레임워크(판정 모델: Gemini 3.1 Pro Preview)로 평가한 문장당 평균 에러 페널티(낮을수록 좋음) 결과이다. 각 모델별 점수는 Gemini 3.1 Flash-lite 0.573, Gemini 3 Flash 0.596, Gemma 4 26B A4B 0.813, Qwen 3.5 Plus 0.958, DeepSeek V4 Flash 1.025, Gemma 4 26B A4B (no-context) 1.265, DeepSeek V4 Flash (no-context) 1.647, Qwen 3.5 Flash 2.198, DeepL 4.963, DeepL (no-context) 5.717, Google Translation Basic 5.998 이다.](docs/images/performance/1.png)
+## 번역 품질 비교
+![번역 품질 벤치마크 차트. 문장당 평균 에러 페널티(낮을수록 좋음)를 모델별로 나열한 순위표이다. 1위 Gemma 4 31B (0.353), 2위 Gemma 4 26B A4B (0.387), 3위 DeepSeek V4 Flash 0731 (0.571), 4위 Gemma 4 E4B QAT Q4 (1.577), 5위 Papago (2.699), 6위 Gemini 3.5 Live Translate (2.991), 7위 MiLMMT 46-4B (3.087), 8위 DeepL (3.914), 9위 Google Cloud Translation Basic (5.731) 이다.](docs/images/performance/1.png)
 
 - 마이크로소프트의 Gemba MQM 프레임워크를 사용해서 실험했어요.
-- 실제 대화 환경과 가깝게 하기 위해 멀티턴 환경으로 구성했어요.
+- 실제 대화 환경과 가깝게 맥락을 포함한 멀티턴 환경으로 구성했어요.
 - 전체 실험 결과는 [여기](https://github.com/kapitalismho/korean-llm-context-translation-benchmark)를 참조해주세요.
 
 ## 비용
@@ -93,65 +99,65 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 
 #### 권장 모델
 
-| LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
+| LLM \ ASR | Local ASR | Soniox | Qwen3 ASR (Cloud) | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B + 31B** | 14,380회 | 2,920회 | 3,710회 | 1,180회 |
-| **DeepSeek V4 Flash** | 19,410회 | 3,080회 | 3,980회 | 1,210회 |
+| **Gemma 4 E4B (Local)** | 무제한 | 5,000회 | 3,660회 | 1,290회 |
+| **Gemma 4 26B A4B + 31B** | 13,940회 | 3,680회 | 2,900회 | 1,180회 |
+| **DeepSeek V4 Flash** | 11,620회 | 3,500회 | 2,780회 | 1,160회 |
 
 #### 기타 모델
 
-| LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
+| LLM \ ASR | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B** | 14,380회 | 2,920회 | 3,710회 | 1,180회 |
-| **Gemma 4 31B (OpenRouter)** | 13,700회 | 2,780회 | 3,530회 | 1,120회 |
-| **Gemma 4 31B (Cerebras)** | 920회 | 730회 | 770회 | 540회 |
-| **Gemini 3 Flash** | 1,710회 | 1,170회 | 1,280회 | 740회 |
-| **Gemini 3.1 Flash-Lite** | 3,430회 | 1,770회 | 2,030회 | 940회 |
-| **Qwen 3.5 Plus** | 7,460회 | 2,460회 | — | — |
-| **Local LLMs** | 무제한 | 3,660회 | 5,000회 | 1,290회 |
+| **Gemma 4 12B (Local)** | 무제한 | 5,000회 | 3,660회 | 1,290회 |
+| **Gemma 4 26B A4B** | 14,380회 | 3,710회 | 2,920회 | 1,180회 |
+| **Gemma 4 31B (OpenRouter)** | 10,940회 | 3,430회 | 2,740회 | 1,150회 |
+| **Gemma 4 31B (Cerebras)** | 920회 | 770회 | 730회 | 540회 |
+| **Gemini 3.7 Flash** | 1,160회 | 940회 | 880회 | 610회 |
+| **Gemini 3.1 Flash-Lite** | 3,430회 | 2,030회 | 1,770회 | 940회 |
+| **Qwen 3.5 Plus** | 7,460회 | — | 2,460회 | — |
 
 ### 발화당 비용
 
 #### 권장 모델
 
-| LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
+| LLM \ ASR | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B + 31B** | ~0.1원 | ~0.5원 | ~0.4원 | ~1.3원 |
-| **DeepSeek V4 Flash** | ~0.08원 | ~0.5원 | ~0.4원 | ~1.2원 |
+| **Gemma 4 E4B (Local)** | 0원 | ~0.3원 | ~0.4원 | ~1.1원 |
+| **Gemma 4 26B A4B + 31B** | ~0.1원 | ~0.4원 | ~0.5원 | ~1.2원 |
+| **DeepSeek V4 Flash** | ~0.12원 | ~0.4원 | ~0.5원 | ~1.2원 |
 
 #### 기타 모델
 
-| LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
+| LLM \ ASR | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B** | ~0.1원 | ~0.5원 | ~0.4원 | ~1.3원 |
-| **Gemma 4 31B (OpenRouter)** | ~0.1원 | ~0.5원 | ~0.4원 | ~1.4원 |
-| **Gemma 4 31B (Cerebras)** | ~1.6원 | ~2.0원 | ~1.9원 | ~2.8원 |
-| **Gemini 3 Flash** | ~0.9원 | ~1.3원 | ~1.2원 | ~2.0원 |
-| **Gemini 3.1 Flash-Lite** | ~0.4원 | ~0.8원 | ~0.7원 | ~1.6원 |
-| **Qwen 3.5 Plus** | ~0.2원 | ~0.6원 | — | — |
-| **Local LLMs** | 0원 | ~0.4원 | ~0.3원 | ~1.2원 |
+| **Gemma 4 12B (Local)** | 0원 | ~0.3원 | ~0.4원 | ~1.1원 |
+| **Gemma 4 26B A4B** | ~0.1원 | ~0.4원 | ~0.5원 | ~1.2원 |
+| **Gemma 4 31B (OpenRouter)** | ~0.13원 | ~0.4원 | ~0.5원 | ~1.2원 |
+| **Gemma 4 31B (Cerebras)** | ~1.5원 | ~1.8원 | ~1.9원 | ~2.6원 |
+| **Gemini 3.7 Flash** | ~1.2원 | ~1.5원 | ~1.6원 | ~2.3원 |
+| **Gemini 3.1 Flash-Lite** | ~0.4원 | ~0.7원 | ~0.8원 | ~1.5원 |
+| **Qwen 3.5 Plus** | ~0.2원 | — | ~0.6원 | — |
 
 *   *(입력 900 토큰 + 출력 12토큰) x 발화 1회당 평균 LLM 호출 횟수 1.2회 가정*
 *   *1달러 당 사용 가능 횟수는 발화당 비용 테이블의 반올림 전 계산값 기준*
 *   *모든 비용과 사용 가능 횟수는 근사치 계산*
-*   *DeepSeek의 경우 캐시 히트율 70% 가정*
+*   *DeepSeek의 경우 캐시 히트율 70% 가정 / 피크 타임은 고려하지 않음*
 *   *Qwen API 비용은 베이징 리전 기준*
-*   *요금표 기준: 2026년 5월 25일 / 빠른 응답 모드 활성화*
-*   *1 달러 = 1500원*
+*   *요금표 기준: 2026년 8월 21일*
+*   *1 달러 = 1400원*
 
 ### 무료 크레딧
 
 | 서비스 | 무료 크레딧 | 기한 | 비고 |
 |--------|------------|------|------|
 | **Deepgram** | $200 | 없음 | - |
-| **Google AI Studio** | $10 | 1년 | Gemini 구독자에게 매월 지급 |
 | **Alibaba Cloud** | 모델당 100만 토큰 | 90일 | 싱가포르 리전 기준|
 | **Alibaba Cloud** | ¥300 | 1년 | 중국 내 학생 대상 |
-| **Cerebras** | 매일 100만 토큰 | 없음 | 분당 호출 제한 5회 |
 
 ---
 
-# 문제가 생기거나 애매모한 게 있다면 편하게 [트위터](https://x.com/kapitalismho)에서 DM을 보내주세요.
+# 문제가 생기거나 애매모한 게 있다면 [트위터](https://x.com/kapitalismho)로 DM을 보내주세요.
 
 ## 사용법
 
@@ -540,7 +546,7 @@ VRChat OSC 컨트롤은 [`docs/vrchat-osc.md`](docs/vrchat-osc.md)를 참조하�
 
 ---
 
-## Special Thanks
+## 감사의 말
 
 SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299
 
