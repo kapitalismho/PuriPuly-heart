@@ -105,6 +105,7 @@ def test_overlay_presenter_bridge_translation_events_are_recorded_and_dumped(
     recorder = OverlayDiagnosticsRecorder(
         overlay_instance_id="overlay-stage-trace-test",
         diagnostics_dir=tmp_path,
+        logging_mode="detailed",
     )
 
     presenter_event = recorder.record_presenter(
@@ -152,6 +153,7 @@ def test_overlay_chatbox_stt_and_native_stages_are_dumped_without_payload_text(
     recorder = OverlayDiagnosticsRecorder(
         overlay_instance_id="overlay-gate0-trace-test",
         diagnostics_dir=tmp_path,
+        logging_mode="detailed",
     )
     recorder.record_chatbox(
         "page_send",
@@ -185,3 +187,35 @@ def test_overlay_chatbox_stt_and_native_stages_are_dumped_without_payload_text(
     assert '"actual_visibility": "not_queried"' in raw_dump
     assert "secret chatbox page" not in raw_dump
     assert "secret stt text" not in raw_dump
+
+
+def test_overlay_stage_memory_is_recorded_only_in_detailed_mode(tmp_path) -> None:
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-stage-mode-test",
+        diagnostics_dir=tmp_path,
+    )
+
+    assert recorder.record_presenter("snapshot_publish", revision=1) == {}
+    assert recorder.record_bridge("send_start", revision=1) == {}
+    assert recorder.record_translation("overlay_emit") == {}
+    assert recorder.record_chatbox("page_send") == {}
+    assert recorder.record_stt("stt_enqueue") == {}
+    assert recorder.ingest_native_child_line(
+        'presentation_diagnostics [{"stage":"readiness_observed"}]'
+    ) is False
+    assert list(recorder.presenter_events) == []
+    assert list(recorder.bridge_events) == []
+    assert list(recorder.translation_events) == []
+    assert list(recorder.chatbox_events) == []
+    assert list(recorder.stt_events) == []
+    assert list(recorder.native_events) == []
+
+    recorder.set_logging_mode("detailed")
+    recorder.record_presenter("snapshot_publish", revision=2)
+    recorder.record_process("overlay_trace", trace_event="bounds_confirmed")
+    assert [event["event"] for event in recorder.presenter_events] == ["snapshot_publish"]
+    assert [event["event"] for event in recorder.process_events] == ["overlay_trace"]
+
+    recorder.set_logging_mode("basic")
+    assert list(recorder.presenter_events) == []
+    assert [event["event"] for event in recorder.process_events] == ["overlay_trace"]

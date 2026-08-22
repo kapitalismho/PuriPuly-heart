@@ -549,10 +549,15 @@ class OverlayProcessManager:
             self.diagnostics = OverlayDiagnosticsRecorder(
                 overlay_instance_id=self.overlay_instance_id,
                 diagnostics_dir=self.diagnostics_dir,
+                logging_mode=self.logging_mode,
             )
+        else:
+            self.diagnostics.set_logging_mode(self.logging_mode)
 
     def set_logging_mode(self, mode: str) -> None:
         self.logging_mode = normalize_overlay_logging_mode(mode)
+        if self.diagnostics is not None:
+            self.diagnostics.set_logging_mode(self.logging_mode)
         process = self._process
         if process is not None:
             set_logging_mode = getattr(process, "set_logging_mode", None)

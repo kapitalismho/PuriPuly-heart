@@ -146,7 +146,10 @@ class OverlayGenerationStartOwner:
             presenter = cast(OverlayPresenter | None, runtime.presenter)
             overlay_instance_id = f"overlay-{self.instance_token_factory()}"
             runtime.set_overlay_instance_id(overlay_instance_id)
-            diagnostics = OverlayDiagnosticsRecorder(overlay_instance_id=overlay_instance_id)
+            diagnostics = OverlayDiagnosticsRecorder(
+                overlay_instance_id=overlay_instance_id,
+                logging_mode=effects.logging_mode(),
+            )
             runtime.attach_diagnostics(diagnostics)
             request = request_factory()
             effects.set_target(request.target)

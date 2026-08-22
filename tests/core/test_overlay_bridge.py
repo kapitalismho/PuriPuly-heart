@@ -697,6 +697,7 @@ async def test_overlay_bridge_records_disconnect_code_and_reason(
     diagnostics = OverlayDiagnosticsRecorder(
         overlay_instance_id="overlay-test",
         diagnostics_dir=tmp_path,
+        logging_mode="detailed",
     )
     bridge = OverlayBridge(
         session_token="expected-token",
@@ -737,6 +738,7 @@ async def test_overlay_bridge_records_send_failures_and_prunes_stale_connections
     diagnostics = OverlayDiagnosticsRecorder(
         overlay_instance_id="overlay-test",
         diagnostics_dir=tmp_path,
+        logging_mode="detailed",
     )
     bridge = OverlayBridge(
         session_token="expected-token",
@@ -860,7 +862,10 @@ async def test_overlay_bridge_snapshot_broadcast_logs_only_in_detailed_mode(
 
 @pytest.mark.asyncio
 async def test_overlay_bridge_records_snapshot_send_stages_without_payload_text() -> None:
-    recorder = OverlayDiagnosticsRecorder(overlay_instance_id="bridge-stage-test")
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="bridge-stage-test",
+        logging_mode="detailed",
+    )
     bridge = OverlayBridge(session_token="expected-token", diagnostics=recorder)
     snapshot = OverlayPresentationSnapshot(
         revision=1,
