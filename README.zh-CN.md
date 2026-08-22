@@ -413,6 +413,10 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 
 参见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
 
+## 路线图
+
+后续工作在 [PuriPuly 项目看板](https://github.com/users/kapitalismho/projects/2)中公开跟踪。
+
 ---
 
 ## 开发

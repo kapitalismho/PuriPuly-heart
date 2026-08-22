@@ -415,6 +415,10 @@ Authorize 버튼을 눌렀는데도 인증이 안되어 있다면 재시도 하�
 
 [`ARCHITECTURE.md`](ARCHITECTURE.md)를 참고하세요.
 
+## 로드맵
+
+앞으로의 작업은 [PuriPuly 프로젝트 보드](https://github.com/users/kapitalismho/projects/2)에서 공개적으로 관리되고 있어요.
+
 ---
 
 ## 개발

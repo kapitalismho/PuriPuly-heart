@@ -416,6 +416,10 @@ PuriPuly работает лучше всего с облачным STT.
 
 См. [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
+## Дорожная карта
+
+Предстоящая работа отслеживается публично на [доске проекта PuriPuly](https://github.com/users/kapitalismho/projects/2).
+
 ---
 
 ## Разработка

@@ -415,6 +415,10 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
 
 [`ARCHITECTURE.md`](ARCHITECTURE.md) を参照してください。
 
+## ロードマップ
+
+今後の作業は [PuriPulyプロジェクトボード](https://github.com/users/kapitalismho/projects/2)で公開管理されています。
+
 ---
 
 ## 開発
