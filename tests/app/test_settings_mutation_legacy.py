@@ -29,6 +29,7 @@ def test_order21_translation_provider_patch_records_initial_covered_surface_list
         "translation.fallback",
         "translation.http_extension_id",
         "translation.previous_llm_model",
+        "translation.gpu_device_id",
         "provider.llm",
         "gemini.llm_model",
         "openrouter.llm_model",

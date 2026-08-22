@@ -9,6 +9,7 @@ from puripuly_heart.app.services.managed_gemma_translation import (
     ManagedGemmaTranslationOwner,
 )
 from puripuly_heart.core.local_translation.assets import GEMMA_12B_MODEL_ID, GEMMA_MODEL_ID
+from puripuly_heart.core.local_translation.devices import resolve_llama_vulkan_device
 from puripuly_heart.core.local_translation.prefix_cache import (
     GemmaPrefixCache,
     default_gemma_prefix_cache_dir,
@@ -51,6 +52,7 @@ def managed_gemma_selection(
         target_language=target_language,
         system_prompt=system_prompt,
         model_id=model_id,
+        vulkan_device=resolve_llama_vulkan_device(getattr(translation, "gpu_device_id", "auto")),
     )
 
 

@@ -2236,12 +2236,12 @@ def test_gpu_selection_shows_one_shared_device_card_and_retains_unavailable_save
     view.load_from_settings(settings, config_path=Path("settings.json"))
     view.set_gpu_devices(devices=(GpuDeviceOption("vk:0", "NVIDIA GeForce RTX 4070", "Vulkan0"),))
 
-    assert view._gpu_device_card.visible is True
     assert view._gpu_device_row.visible is True
     assert view._gpu_device_text.content.value == t(
         "settings.gpu_device.unavailable",
         device="vk:saved",
     )
+    assert view._gpu_llm_text.content.value == t("settings.gpu_device.auto")
 
     view._on_gpu_device_selected("vk:0")
 
@@ -2267,9 +2267,11 @@ def test_gpu_card_is_standard_one_by_one_and_contains_only_device_selection(
     assert view._gpu_device_text.content.size == view._stt_text.content.size
     assert view._gpu_device_text.content.color == view._stt_text.content.color
     assert view._gpu_device_text.content.text_align == view._stt_text.content.text_align
-    assert len(view._gpu_device_row.content.controls) == 3
-    assert view._gpu_device_row.content.controls[1].opacity == 1.0
-    assert view._gpu_device_row.content.controls[2].opacity == 1.0
+    assert view._gpu_device_row.content.controls == [
+        view._gpu_device_card,
+        view._gpu_llm_card,
+        view._gpu_refresh_card,
+    ]
 
 
 def test_gpu_row_repaints_and_collapses_immediately_with_provider_selection(
@@ -2282,22 +2284,100 @@ def test_gpu_row_repaints_and_collapses_immediately_with_provider_selection(
     monkeypatch.setattr(settings_view, "_update_control_if_mounted", repainted.append)
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
-    assert view._gpu_device_card.visible is False
     assert view._gpu_device_row.visible is False
+    assert view._http_extension_host.visible is False
 
     repainted.clear()
     view._on_stt_selected(STTProviderName.LOCAL_QWEN_GPU.value)
 
-    assert view._gpu_device_card.visible is True
     assert view._gpu_device_row.visible is True
+    assert view._http_extension_host.visible is False
     assert view._gpu_device_row in repainted
 
     repainted.clear()
     view._on_stt_selected(STTProviderName.LOCAL_QWEN.value)
 
-    assert view._gpu_device_card.visible is False
     assert view._gpu_device_row.visible is False
     assert view._gpu_device_row in repainted
+
+
+def test_gpu_card_shows_split_labels_when_asr_and_gemma_use_different_devices(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view._on_llm_selected(TranslationModel.MANAGED_GEMMA_12B.value)
+    view.set_gpu_devices(
+        devices=(GpuDeviceOption("vk:0", "NVIDIA GeForce RTX 4070", "Vulkan0"),),
+        llm_devices=(GpuDeviceOption("Vulkan1", "AMD Radeon Graphics", "Vulkan1"),),
+    )
+    view._on_gpu_device_selected("vk:0")
+    view._on_llm_gpu_device_selected("Vulkan1")
+
+    assert view._gpu_device_row.visible is True
+    assert view._gpu_device_text.content.value == "NVIDIA GeForce RTX 4070"
+    assert view._gpu_llm_text.content.value == "AMD Radeon Graphics"
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.stt.gpu_device_id == "vk:0"
+    assert pending.translation.gpu_device_id == "Vulkan1"
+
+    view._on_stt_selected(STTProviderName.LOCAL_QWEN.value)
+
+    assert view._gpu_device_row.visible is True
+    assert view._gpu_device_text.content.value == "NVIDIA GeForce RTX 4070"
+    assert view._gpu_llm_text.content.value == "AMD Radeon Graphics"
+
+
+def test_gpu_card_click_opens_column_modal_and_refresh_requests_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
+    view, _ = _make_settings_view(monkeypatch)
+    page = attach_dummy_page(monkeypatch, view)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    requests: list[str] = []
+    opened: list[object] = []
+    view.on_gpu_discovery_requested = lambda: requests.append("discover")
+
+    class CapturingModal:
+        def __init__(self, page_arg, title, options, on_select, **kwargs):
+            assert page_arg is page
+            opened.append((title, options[0].value, on_select))
+
+        def open(self, current: str) -> None:
+            opened.append(current)
+
+    monkeypatch.setattr(settings_view, "SettingsModal", CapturingModal)
+    view._on_gpu_device_click(None)
+    view._on_llm_gpu_device_click(None)
+    view._on_gpu_refresh_click(None)
+
+    assert requests == ["discover", "discover", "discover"]
+    assert opened[0][0] == t("settings.gpu_device.asr")
+    assert opened[0][1] == "auto"
+    assert opened[1] == "auto"
+    assert opened[2][0] == t("settings.gpu_device.llm")
+    assert opened[3] == "auto"
+
+
+def test_selecting_gemma_gpu_requests_discovery_and_shows_card(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    requests: list[str] = []
+    view.on_gpu_discovery_requested = lambda: requests.append("discover")
+
+    assert view._gpu_device_row.visible is False
+    view._on_llm_selected(TranslationModel.MANAGED_GEMMA_12B.value)
+
+    assert requests == ["discover"]
+    assert view._gpu_device_row.visible is True
 
 
 def test_selecting_gpu_for_self_or_peer_requests_discovery_once_per_new_selection(
@@ -4648,14 +4728,20 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
         t("settings.translation_connection"),
         t("settings.fallback"),
     ]
+    assert api_controls[2] is view._http_extension_host
     assert api_controls[2].content is view._http_extension_row
+    assert api_controls[2].visible is False
     assert _row_card_titles(api_controls[2]) == [
         t("settings.http_extension.title"),
         t("settings.http_extension.path"),
         t("settings.http_extension.refresh"),
     ]
-    assert _row_card_titles(api_controls[3]) == [t("settings.gpu_device.title")]
-    assert view._gpu_device_card.visible is False
+    assert _row_card_titles(api_controls[3]) == [
+        t("settings.gpu_device.asr"),
+        t("settings.gpu_device.llm"),
+        t("settings.gpu_device.refresh"),
+    ]
+    assert view._gpu_device_row.visible is False
     assert _row_card_titles(api_controls[4]) == [t("settings.local_llm.connection")]
     assert api_controls[4] is view._local_llm_connection_card
     assert api_controls[5] is view._custom_stt_connection_card

@@ -30,7 +30,7 @@ def test_cpu_profile_preserves_fixed_common_and_mtp_contract(tmp_path: Path) -> 
     assert _values(command, "--load-mode") == ["mmap"]
     assert _values(command, "--threads") == ["4"]
     assert _values(command, "--threads-batch") == ["12"]
-    assert _values(command, "--ctx-size") == ["4096"]
+    assert _values(command, "--ctx-size") == ["3072"]
     assert _values(command, "--parallel") == ["2"]
     assert _values(command, "--batch-size") == ["512"]
     assert _values(command, "--ubatch-size") == ["512"]
@@ -96,7 +96,7 @@ def test_gpu_profile_is_vulkan_full_offload_without_mtp(tmp_path: Path) -> None:
     assert _values(command, "--prio") == ["-1"]
     assert _values(command, "--cache-type-k") == ["f16"]
     assert _values(command, "--cache-type-v") == ["f16"]
-    assert _values(command, "--ctx-size") == ["4096"]
+    assert _values(command, "--ctx-size") == ["3072"]
     assert _values(command, "--parallel") == ["2"]
     assert "--swa-full" not in command
     assert not any(item.startswith("--spec-") for item in command)

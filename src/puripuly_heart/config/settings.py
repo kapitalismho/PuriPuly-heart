@@ -362,6 +362,7 @@ class TranslationSettings:
     fallback: TranslationFallbackSettings = field(default_factory=TranslationFallbackSettings)
     http_extension_id: str | None = None
     previous_llm_model: TranslationModel | None = None
+    gpu_device_id: str = "auto"
 
     def validate(self) -> None:
         if not isinstance(self.model, TranslationModel):
@@ -391,6 +392,8 @@ class TranslationSettings:
             TranslationModel,
         ):
             raise ValueError("invalid previous LLM translation model")
+        if not isinstance(self.gpu_device_id, str) or not self.gpu_device_id.strip():
+            raise ValueError("gpu_device_id must be a non-empty string")
         if self.model == TranslationModel.CUSTOM_HTTP:
             if self.connection != TranslationConnection.CUSTOM_HTTP:
                 raise ValueError("custom HTTP translation requires custom_http connection")
@@ -558,6 +561,12 @@ def _parse_translation_fallback(value: object) -> TranslationFallbackSettings:
     return fallback
 
 
+def _normalize_gpu_device_id(value: object) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return "auto"
+
+
 def _normalize_translation_settings(
     *,
     model: TranslationModel | None,
@@ -566,6 +575,7 @@ def _normalize_translation_settings(
     history: object = None,
     http_extension_id: object = None,
     previous_llm_model: object = None,
+    gpu_device_id: object = "auto",
 ) -> TranslationSettings:
     normalized_model = model or TranslationModel.GEMMA4_26B_31B
     normalized_history = _parse_translation_connection_history(history)
@@ -589,6 +599,7 @@ def _normalize_translation_settings(
         fallback=_parse_translation_fallback(fallback),
         http_extension_id=normalized_http_extension_id,
         previous_llm_model=normalized_previous_llm_model,
+        gpu_device_id=_normalize_gpu_device_id(gpu_device_id),
     )
 
 
@@ -636,6 +647,7 @@ def _translation_settings_to_dict(settings: TranslationSettings) -> dict[str, An
             "model": settings.fallback.model.value,
             "connection": settings.fallback.connection.value,
         },
+        "gpu_device_id": settings.gpu_device_id.strip(),
     }
     if settings.model == TranslationModel.CUSTOM_HTTP or settings.http_extension_id is not None:
         data["http_extension_id"] = settings.http_extension_id
@@ -656,6 +668,7 @@ def _default_translation_settings_dict() -> dict[str, Any]:
             "model": TranslationModel.DEEPSEEK_V4_FLASH.value,
             "connection": TranslationConnection.OFFICIAL_BYOK.value,
         },
+        "gpu_device_id": "auto",
     }
 
 
@@ -2634,6 +2647,7 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         history=settings.translation.connection_history,
         http_extension_id=settings.translation.http_extension_id,
         previous_llm_model=settings.translation.previous_llm_model,
+        gpu_device_id=settings.translation.gpu_device_id,
     )
     model = settings.translation.model
     connection = settings.translation.connection
@@ -2807,6 +2821,7 @@ def _apply_materialized_translation_to_data(
         history=translation.connection_history,
         http_extension_id=translation.http_extension_id,
         previous_llm_model=translation.previous_llm_model,
+        gpu_device_id=translation.gpu_device_id,
     )
 
     if translation.model == TranslationModel.CUSTOM_HTTP:
@@ -3931,6 +3946,7 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
             history=translation_history,
             http_extension_id=translation_data.get("http_extension_id"),
             previous_llm_model=translation_data.get("previous_llm_model"),
+            gpu_device_id=translation_data.get("gpu_device_id"),
         )
     else:
         normalized_translation_settings = _derive_translation_settings_from_runtime_values(
@@ -4652,6 +4668,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             history=translation_history,
             http_extension_id=translation_data.get("http_extension_id"),
             previous_llm_model=translation_data.get("previous_llm_model"),
+            gpu_device_id=translation_data.get("gpu_device_id"),
         )
     else:
         settings.translation = _derive_translation_settings_from_runtime(

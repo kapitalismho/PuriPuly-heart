@@ -121,6 +121,7 @@ class ManagedGemmaTranslationOwner:
                     source_language=selection.source_language,
                     target_language=selection.target_language,
                     system_prompt=selection.system_prompt,
+                    vulkan_device=selection.vulkan_device,
                     spec=spec,
                     provision_kwargs={
                         "downloader": self._downloader,

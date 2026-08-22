@@ -151,6 +151,7 @@ def test_vnext_schema_represents_current_intent_and_state_leaves() -> None:
         "intent.translation.concurrency_limit",
         "intent.translation.connection",
         "intent.translation.connection_history",
+        "intent.translation.gpu_device_id",
         "intent.translation.cerebras.llm_model",
         "intent.translation.http_extension_id",
         "intent.translation.fallback.connection",

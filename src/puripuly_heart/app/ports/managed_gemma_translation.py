@@ -15,6 +15,7 @@ class ManagedGemmaTranslationSelection:
     target_language: str
     system_prompt: str
     model_id: str = GEMMA_MODEL_ID
+    vulkan_device: str = "Vulkan0"
 
     def __post_init__(self) -> None:
         if self.backend not in {"cpu", "gpu"}:
@@ -23,6 +24,8 @@ class ManagedGemmaTranslationSelection:
             raise ValueError("managed Gemma language pair must be non-empty")
         if not self.model_id.strip():
             raise ValueError("managed Gemma model id must be non-empty")
+        if not self.vulkan_device.strip():
+            raise ValueError("managed Gemma vulkan device must be non-empty")
 
 
 __all__ = ["ManagedGemmaBackend", "ManagedGemmaTranslationSelection"]

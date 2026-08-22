@@ -6,12 +6,14 @@ from unittest.mock import AsyncMock
 import pytest
 
 from puripuly_heart.app.adapters.ui_runtime import UiProviderRuntimeAdapter
+from puripuly_heart.app.ports.ui_models import GpuDeviceOption
 from puripuly_heart.config.settings import (
     AppSettings,
     TranslationConnection,
     TranslationModel,
     TranslationSettings,
 )
+from puripuly_heart.core.local_translation.devices import LlamaVulkanDevice
 
 
 def _adapter(
@@ -95,3 +97,29 @@ async def test_managed_gemma_notice_cancel_targets_owned_prepare() -> None:
 
     assert await adapter.handle_managed_gemma_notice_action("cancel") is True
     assert cancel_calls == [True]
+
+
+@pytest.mark.asyncio
+async def test_gpu_discovery_publishes_llama_devices(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    published: list[tuple[GpuDeviceOption, ...]] = []
+    adapter = _adapter(
+        AppSettings(),
+        change_secret=AsyncMock(),
+        apply=AsyncMock(),
+    )
+    adapter.gpu = SimpleNamespace(ensure_device_discovery=AsyncMock())
+    adapter.llm_devices_sink = published.append
+    monkeypatch.setattr(
+        "puripuly_heart.app.adapters.ui_runtime.list_llama_vulkan_devices",
+        lambda: (LlamaVulkanDevice("Vulkan1", "AMD Radeon Graphics"),),
+    )
+
+    await adapter.ensure_gpu_device_discovery()
+
+    adapter.gpu.ensure_device_discovery.assert_awaited_once_with(
+        force=False,
+        origin="settings",
+    )
+    assert published == [(GpuDeviceOption("Vulkan1", "AMD Radeon Graphics", "Vulkan1"),)]

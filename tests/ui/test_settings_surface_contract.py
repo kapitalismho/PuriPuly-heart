@@ -20,7 +20,6 @@ from puripuly_heart.ui.settings.contract import (
     SettingsSurfaceIntents,
 )
 from puripuly_heart.ui.settings.renderer import (
-    SETTINGS_API_GPU_PLACEHOLDER_COUNT,
     SETTINGS_ROW_SPACING,
     compose_settings_api_surface,
     compose_settings_general_surface,
@@ -53,6 +52,8 @@ class _SlotProvider:
                 "translation_connection",
                 "translation_fallback",
                 "gpu_device",
+                "gpu_llm",
+                "gpu_refresh",
                 "local_llm_connection",
                 "custom_stt_connection",
                 "managed_key",
@@ -78,6 +79,12 @@ class _SlotProvider:
 
     def gpu_device_control(self) -> ft.Control:
         return self.controls["gpu_device"]
+
+    def gpu_llm_control(self) -> ft.Control:
+        return self.controls["gpu_llm"]
+
+    def gpu_refresh_control(self) -> ft.Control:
+        return self.controls["gpu_refresh"]
 
     def local_llm_connection_control(self) -> ft.Control:
         return self.controls["local_llm_connection"]
@@ -142,7 +149,7 @@ def test_settings_api_surface_preserves_the_accepted_row_order() -> None:
 def test_settings_api_surface_places_every_slot_in_the_accepted_position() -> None:
     surface, provider, placeholders = _compose()
 
-    assert len(placeholders) == 1 + SETTINGS_API_GPU_PLACEHOLDER_COUNT
+    assert len(placeholders) == 1
     assert surface.provider_controls.controls == [
         provider.controls["self_stt"],
         provider.controls["peer_stt"],
@@ -155,7 +162,8 @@ def test_settings_api_surface_places_every_slot_in_the_accepted_position() -> No
     ]
     assert surface.gpu_device_controls.controls == [
         provider.controls["gpu_device"],
-        *surface.gpu_device_placeholders,
+        provider.controls["gpu_llm"],
+        provider.controls["gpu_refresh"],
     ]
 
 

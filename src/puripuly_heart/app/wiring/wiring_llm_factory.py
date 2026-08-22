@@ -63,6 +63,7 @@ from puripuly_heart.config.settings import (
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.fallback_racing import LLMProviderAttempt
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
+from puripuly_heart.core.local_translation.devices import resolve_llama_vulkan_device
 from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_ENV,
@@ -693,9 +694,16 @@ def _provider_from_resolved_target(
         backend = target.provider_options.get("backend")
         if backend not in {"cpu", "gpu"}:
             raise ValueError("managed Gemma backend must be cpu or gpu")
+        vulkan_device = "Vulkan0"
+        if compatibility_settings is not None:
+            translation = getattr(compatibility_settings, "translation", None)
+            vulkan_device = resolve_llama_vulkan_device(
+                getattr(translation, "gpu_device_id", "auto")
+            )
         return ManagedGemmaLLMProvider(
             runtime=managed_gemma_runtime,
             backend=backend,
+            vulkan_device=vulkan_device,
             release_runtime=managed_gemma_release,
             runtime_logging=runtime_logging,
         )

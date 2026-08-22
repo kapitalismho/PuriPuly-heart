@@ -30,6 +30,7 @@ ORDER21_TRANSLATION_PROVIDER_SETTINGS_PATHS: Final[tuple[str, ...]] = (
     "translation.fallback",
     "translation.http_extension_id",
     "translation.previous_llm_model",
+    "translation.gpu_device_id",
     "provider.llm",
     "gemini.llm_model",
     "openrouter.llm_model",

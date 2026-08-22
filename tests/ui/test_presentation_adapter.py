@@ -194,6 +194,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
         notice=notice,
         publish_notice=True,
     )
+    adapter.set_dashboard_llm_gpu_devices(devices=devices)
     adapter.set_dashboard_local_stt_notice(
         status="downloading",
         model_id="model",
@@ -232,6 +233,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     assert ("log-sink", logs) in events
     assert ("translation-enabled", True) in events
     assert ("gpu-devices", {"devices": devices}) in events
+    assert ("gpu-devices", {"llm_devices": devices}) in events
     assert ("gpu-notice", notice) in events
     assert ("stt-notice", "downloading", {"percent": 25}) in events
     assert ("gemma-notice", gemma_notice) in events

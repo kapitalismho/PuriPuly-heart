@@ -175,7 +175,7 @@ def build_gemma_server_command(
         "--load-mode",
         "mmap",
         "--ctx-size",
-        "4096",
+        "3072",
         "--parallel",
         "2",
         "--batch-size",

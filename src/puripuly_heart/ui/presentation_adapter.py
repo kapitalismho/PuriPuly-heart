@@ -196,6 +196,12 @@ class FletUiPresentationAdapter:
                     progress_percent=progress_percent,
                 )
 
+    def set_dashboard_llm_gpu_devices(self, *, devices: tuple[object, ...]) -> None:
+        settings_view = getattr(self._app, "view_settings", None)
+        set_devices = getattr(settings_view, "set_gpu_devices", None)
+        if callable(set_devices):
+            set_devices(llm_devices=devices)
+
     def set_dashboard_local_stt_notice(
         self,
         *,

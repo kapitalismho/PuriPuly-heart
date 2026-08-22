@@ -750,6 +750,10 @@ def from_legacy_app_settings(
                     cerebras=CerebrasTranslationIntent(
                         llm_model=data["cerebras"]["llm_model"],
                     ),
+                    gpu_device_id=str(
+                        data["translation"].get("gpu_device_id", "auto")
+                    ).strip()
+                    or "auto",
                 ),
                 local_llm=LocalLLMIntent(
                     backend=data["local_llm"]["backend"],
@@ -1080,6 +1084,7 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
             "model": intent.translation.fallback.model,
             "connection": intent.translation.fallback.connection,
         },
+        "gpu_device_id": intent.translation.gpu_device_id,
     }
     if (
         intent.translation.model == "custom_http"

@@ -137,6 +137,8 @@ def test_settings_view_implements_the_explicit_contract() -> None:
         "translation_connection_control",
         "translation_fallback_control",
         "gpu_device_control",
+        "gpu_llm_control",
+        "gpu_refresh_control",
         "local_llm_connection_control",
         "custom_stt_connection_control",
         "managed_key_control",

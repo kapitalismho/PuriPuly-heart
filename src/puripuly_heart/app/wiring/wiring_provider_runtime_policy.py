@@ -108,6 +108,7 @@ def build_llm_provider_signature(
                 settings.languages.source_language,
                 settings.languages.target_language,
                 settings.system_prompt,
+                settings.translation.gpu_device_id,
             )
             if managed_gemma_selected
             else None
