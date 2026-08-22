@@ -476,7 +476,7 @@
   "settings.gpu_device.unavailable": "{device}（不可用）",
   "settings.gpu_device.asr": "ASR 推理 GPU",
   "settings.gpu_device.llm": "LLM 推理 GPU",
-  "settings.gpu_device.refresh": "刷新",
+  "settings.gpu_device.refresh": "GPU 搜索",
   "dashboard.gpu_notice.discovery_failed": "未能找到GPU！",
   "dashboard.gpu_notice.unsupported": "没有可用的GPU！",
   "dashboard.gpu_notice.unavailable_device": "所选GPU不可用！",

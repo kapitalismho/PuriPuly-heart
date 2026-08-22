@@ -476,7 +476,7 @@
   "settings.gpu_device.unavailable": "{device} (사용할 수 없음)",
   "settings.gpu_device.asr": "ASR 추론 GPU",
   "settings.gpu_device.llm": "LLM 추론 GPU",
-  "settings.gpu_device.refresh": "새로고침",
+  "settings.gpu_device.refresh": "GPU 검색",
   "dashboard.gpu_notice.discovery_failed": "GPU를 찾지 못했어요!",
   "dashboard.gpu_notice.unsupported": "사용할 수 있는 GPU가 없어요!",
   "dashboard.gpu_notice.unavailable_device": "선택한 GPU를 사용할 수 없어요!",

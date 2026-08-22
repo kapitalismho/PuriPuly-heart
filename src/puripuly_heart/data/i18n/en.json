@@ -476,7 +476,7 @@
   "settings.gpu_device.unavailable": "{device} (unavailable)",
   "settings.gpu_device.asr": "ASR inference GPU",
   "settings.gpu_device.llm": "LLM inference GPU",
-  "settings.gpu_device.refresh": "Refresh",
+  "settings.gpu_device.refresh": "GPU search",
   "dashboard.gpu_notice.discovery_failed": "Couldn't find a GPU!",
   "dashboard.gpu_notice.unsupported": "There are no GPUs available to use!",
   "dashboard.gpu_notice.unavailable_device": "The selected GPU isn't available!",

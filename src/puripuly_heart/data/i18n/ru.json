@@ -476,7 +476,7 @@
   "settings.gpu_device.unavailable": "{device} (недоступно)",
   "settings.gpu_device.asr": "GPU для ASR",
   "settings.gpu_device.llm": "GPU для LLM",
-  "settings.gpu_device.refresh": "Обновить",
+  "settings.gpu_device.refresh": "Поиск GPU",
   "dashboard.gpu_notice.discovery_failed": "Не удалось найти GPU!",
   "dashboard.gpu_notice.unsupported": "Нет доступных GPU!",
   "dashboard.gpu_notice.unavailable_device": "Выбранный GPU недоступен!",

@@ -476,7 +476,7 @@
   "settings.gpu_device.unavailable": "{device}（利用不可）",
   "settings.gpu_device.asr": "ASR推論GPU",
   "settings.gpu_device.llm": "LLM推論GPU",
-  "settings.gpu_device.refresh": "更新",
+  "settings.gpu_device.refresh": "GPU検索",
   "dashboard.gpu_notice.discovery_failed": "GPUが見つかりませんでした！",
   "dashboard.gpu_notice.unsupported": "使用できるGPUがありません！",
   "dashboard.gpu_notice.unavailable_device": "選択したGPUは使用できません！",
