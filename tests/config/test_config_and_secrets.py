@@ -563,6 +563,7 @@ def test_translation_settings_defaults_to_gemma_managed_with_only_gemma_history(
             TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
         },
         "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
+        "gpu_device_id": "auto",
     }
 
 
@@ -1959,8 +1960,9 @@ def test_translation_settings_roundtrip_materializes_deepseek_openrouter_byok(tm
         "model": "deepseek_v4_flash",
         "connection": "openrouter",
         "connection_history": {"deepseek_v4_flash": "openrouter"},
-        "fallback": MIGRATED_DEFAULT_TRANSLATION_FALLBACK_DICT,
-    }
+            "fallback": MIGRATED_DEFAULT_TRANSLATION_FALLBACK_DICT,
+            "gpu_device_id": "auto",
+        }
     assert loaded.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
     assert loaded.translation.connection == TranslationConnection.OPENROUTER
     assert loaded.provider.llm == LLMProviderName.OPENROUTER
@@ -2384,8 +2386,9 @@ def test_load_settings_persists_default_translation_for_malformed_non_dict_secti
         "connection_history": {
             TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
         },
-        "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
-    }
+            "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
+            "gpu_device_id": "auto",
+        }
 
 
 def test_migrate_v20_marks_valid_translation_schema_version_changed() -> None:
@@ -2422,8 +2425,9 @@ def test_invalid_translation_connection_falls_back_to_model_default() -> None:
         "connection_history": {
             TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
         },
-        "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
-    }
+            "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
+            "gpu_device_id": "auto",
+        }
 
 
 def test_load_settings_persists_normalized_translation_section(tmp_path) -> None:
@@ -2449,8 +2453,9 @@ def test_load_settings_persists_normalized_translation_section(tmp_path) -> None
         "connection_history": {
             TranslationModel.GEMINI_31_FLASH_LITE.value: TranslationConnection.OPENROUTER.value,
         },
-        "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
-    }
+            "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
+            "gpu_device_id": "auto",
+        }
 
 
 def test_load_settings_persists_materialized_runtime_fields_for_current_translation_schema(
