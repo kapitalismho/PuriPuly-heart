@@ -158,7 +158,7 @@ def test_managed_china_direct_provider_uses_qq_managed_secret() -> None:
     assert provider.inner.api_key == "qq-managed-key"
 
 
-def test_managed_china_does_not_use_qq_secret_without_active_managed_state() -> None:
+def test_managed_china_direct_provider_survives_missing_active_managed_state() -> None:
     settings = _managed_china_settings()
     settings.managed_identity.active_managed_credential_ref = None
     secrets = InMemorySecretStore()
@@ -172,7 +172,8 @@ def test_managed_china_does_not_use_qq_secret_without_active_managed_state() -> 
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert not isinstance(provider.inner, OpenRouterLLMProvider)
+    assert isinstance(provider.inner, OpenRouterLLMProvider)
+    assert provider.inner.api_key == "qq-managed-key"
 
 
 def test_managed_china_blocks_opposite_discord_managed_secret() -> None:
