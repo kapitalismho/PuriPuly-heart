@@ -1574,6 +1574,7 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
         TRANSLATION_MODEL_CUSTOM_HTTP,
         TRANSLATION_MODEL_MANAGED_GEMMA,
         TRANSLATION_MODEL_MANAGED_GEMMA_12B,
+        TRANSLATION_MODEL_LOCAL_LLM,
     ):
         fallback_translation = TranslationRuntimeIntent(
             model=runtime_input.translation_fallback.model,

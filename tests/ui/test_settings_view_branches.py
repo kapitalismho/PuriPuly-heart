@@ -1528,6 +1528,29 @@ def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
     assert view._alibaba_key_singapore.visible is False
 
 
+def test_local_llm_hides_openrouter_key_and_fallback_card_even_with_saved_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
+    settings.translation = TranslationSettings(
+        model=TranslationModel.LOCAL_LLM,
+        connection=TranslationConnection.OLLAMA,
+        fallback=_enabled_fallback(
+            TranslationModel.GEMMA4_26B_31B,
+            TranslationConnection.OPENROUTER,
+        ),
+    )
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+
+    view._update_api_visibility()
+
+    assert view._openrouter_key.visible is False
+    assert view._openrouter_pkce_button_row.visible is False
+    assert view._openrouter_fallback_card.visible is False
+    assert view._api_keys_card.visible is False
+    assert view._managed_key_card.visible is False
+
+
 def test_local_llm_connection_card_matches_api_field_scale_and_copy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

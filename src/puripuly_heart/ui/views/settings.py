@@ -232,6 +232,14 @@ _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.GEMINI_31_FLASH_LITE: "settings.translation_model.section.others",
     TranslationModel.QWEN_35_PLUS: "settings.translation_model.section.others",
 }
+_TRANSLATION_MODELS_WITHOUT_PROVIDER_FALLBACK = frozenset(
+    {
+        TranslationModel.CUSTOM_HTTP,
+        TranslationModel.MANAGED_GEMMA,
+        TranslationModel.MANAGED_GEMMA_12B,
+        TranslationModel.LOCAL_LLM,
+    }
+)
 _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str], ...] = (
     (
         "none",
@@ -2858,7 +2866,7 @@ class SettingsView(ft.Column):
     def _openrouter_fallback_source(
         self, settings: AppSettings | None
     ) -> OpenRouterCredentialSource:
-        if settings is None:
+        if settings is None or not self._translation_uses_provider_fallback(settings):
             return OpenRouterCredentialSource.NONE
         fallback = settings.translation.fallback
         if not fallback.enabled:
@@ -3069,10 +3077,16 @@ class SettingsView(ft.Column):
             "remaining_percent": self._managed_trial_usage_remaining_percent,
         }
 
+    def _translation_uses_provider_fallback(self, settings: AppSettings | None) -> bool:
+        return bool(
+            settings is not None
+            and settings.translation.model not in _TRANSLATION_MODELS_WITHOUT_PROVIDER_FALLBACK
+        )
+
     def _is_managed_translation_connection_selected(self, settings: AppSettings | None) -> bool:
         if settings is None:
             return False
-        if settings.translation.model == TranslationModel.CUSTOM_HTTP:
+        if not self._translation_uses_provider_fallback(settings):
             return False
         managed_connections = (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
         return bool(
@@ -3887,12 +3901,14 @@ class SettingsView(ft.Column):
             and (openrouter_byok_selected or fallback_source == OpenRouterCredentialSource.BYOK)
         )
         self._openrouter_pkce_button_row.visible = openrouter_byok_selected
+        uses_provider_fallback = self._translation_uses_provider_fallback(settings)
         self._deepseek_key.visible = bool(
             not is_custom_http
             and (
                 llm == LLMProviderName.DEEPSEEK
                 or (
-                    fallback.enabled
+                    uses_provider_fallback
+                    and fallback.enabled
                     and fallback.model == TranslationModel.DEEPSEEK_V4_FLASH
                     and fallback.connection == TranslationConnection.OFFICIAL_BYOK
                 )
@@ -3903,7 +3919,8 @@ class SettingsView(ft.Column):
             and (
                 llm == LLMProviderName.CEREBRAS
                 or (
-                    fallback.enabled
+                    uses_provider_fallback
+                    and fallback.enabled
                     and fallback.model == TranslationModel.GEMMA4_31B
                     and fallback.connection == TranslationConnection.CEREBRAS
                 )
@@ -3928,10 +3945,7 @@ class SettingsView(ft.Column):
         self._sync_openrouter_fallback_card(settings)
         openrouter_fallback_card = getattr(self, "_openrouter_fallback_card", None)
         if openrouter_fallback_card is not None:
-            openrouter_fallback_card.visible = not is_custom_http and (
-                settings.translation.model
-                not in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
-            )
+            openrouter_fallback_card.visible = self._translation_uses_provider_fallback(settings)
         self._sync_http_extension_card(settings)
 
         qwen_regions: set[QwenRegion] = set()
@@ -3949,6 +3963,25 @@ class SettingsView(ft.Column):
         )
         self._alibaba_key_beijing.visible = QwenRegion.BEIJING in qwen_regions
         self._alibaba_key_singapore.visible = QwenRegion.SINGAPORE in qwen_regions
+        api_keys_card = getattr(self, "_api_keys_card", None)
+        if api_keys_card is not None:
+            api_keys_card.visible = any(
+                getattr(control, "visible", False)
+                for control in (
+                    self._deepgram_key,
+                    self._soniox_key,
+                    self._google_key,
+                    self._deepseek_key,
+                    self._cerebras_key,
+                    self._alibaba_key_beijing,
+                    self._alibaba_key_singapore,
+                    self._openrouter_key,
+                    self._openrouter_pkce_button_row,
+                    self._qwen_region_btn,
+                    getattr(self, "_http_extension_credentials", None),
+                )
+                if control is not None
+            )
 
     # --- Event Handlers ---
     def _on_stt_click(self, e) -> None:
@@ -4374,10 +4407,7 @@ class SettingsView(ft.Column):
         if not is_control_mounted(self):
             return
         display_settings = self._build_settings_with_provider_draft()
-        if display_settings is not None and display_settings.translation.model in {
-            TranslationModel.MANAGED_GEMMA,
-            TranslationModel.MANAGED_GEMMA_12B,
-        }:
+        if not self._translation_uses_provider_fallback(display_settings):
             return
         options: list[OptionItem] = [
             OptionItem(
