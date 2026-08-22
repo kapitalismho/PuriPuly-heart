@@ -273,6 +273,7 @@ class DesktopCaptionVisualState:
     text_scale: float = DESKTOP_FLET_DEFAULT_TEXT_SCALE
     background_alpha: float = DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA
     outline_width: float | None = None
+    swap_caption_languages: bool = False
 
 
 @dataclass(frozen=True, slots=True)

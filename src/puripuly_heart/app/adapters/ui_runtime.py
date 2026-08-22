@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_models import (
+    GpuDeviceOption,
     GpuNoticeAction,
     ManagedGemmaNoticeAction,
     OverlayPeerPresentationState,
@@ -51,10 +53,22 @@ from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
 from puripuly_heart.core.http_extensions import (
     http_extension_secret_key_prefix,
 )
+from puripuly_heart.core.local_translation.devices import list_llama_vulkan_devices
 from puripuly_heart.core.telemetry import (
     TranslationSuccessTelemetryResult,
     TranslationSuccessTelemetryService,
 )
+
+
+def _llama_gpu_device_options() -> tuple[GpuDeviceOption, ...]:
+    return tuple(
+        GpuDeviceOption(
+            device_id=device.device_id,
+            display_name=device.display_name,
+            backend_name=device.device_id,
+        )
+        for device in list_llama_vulkan_devices()
+    )
 
 
 @dataclass(slots=True)
@@ -266,6 +280,7 @@ class UiProviderRuntimeAdapter:
     provider_settings: ProviderSettingsOwner
     build_byok_target_settings: Callable[[object | None], object | None]
     managed_gemma: ManagedGemmaTranslationOwner | None = None
+    llm_devices_sink: Callable[[tuple[GpuDeviceOption, ...]], None] | None = None
 
     async def apply_providers(
         self,
@@ -296,6 +311,10 @@ class UiProviderRuntimeAdapter:
             force=False,
             origin="settings",
         )
+        sink = self.llm_devices_sink
+        if sink is None:
+            return
+        sink(await asyncio.to_thread(_llama_gpu_device_options))
 
     async def connect_openrouter_via_pkce(
         self,

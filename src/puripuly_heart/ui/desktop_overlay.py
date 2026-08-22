@@ -1145,7 +1145,8 @@ class FletDesktopRendererWindow:
                 "runtime_control command=apply_visual_config "
                 f"text_scale={visual_state.text_scale} "
                 f"background_alpha={visual_state.background_alpha} "
-                f"outline_width={visual_state.outline_width}"
+                f"outline_width={visual_state.outline_width} "
+                f"swap_caption_languages={visual_state.swap_caption_languages}"
             )
             self._render_page()
             return
@@ -2309,10 +2310,14 @@ def _parse_runtime_visual_state(payload: dict[str, object]) -> DesktopCaptionVis
         if not DESKTOP_FLET_MIN_OUTLINE_WIDTH <= outline_number <= DESKTOP_FLET_MAX_OUTLINE_WIDTH:
             return None
         outline_width = float(outline_number)
+    swap_caption_languages = payload.get("swap_caption_languages", False)
+    if not isinstance(swap_caption_languages, bool):
+        return None
     return DesktopCaptionVisualState(
         text_scale=float(text_scale),
         background_alpha=float(background_alpha),
         outline_width=outline_width,
+        swap_caption_languages=swap_caption_languages,
     )
 
 

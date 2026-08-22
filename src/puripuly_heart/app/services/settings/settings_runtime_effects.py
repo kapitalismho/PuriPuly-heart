@@ -66,12 +66,15 @@ def managed_gemma_prefix_refresh_required(
     transition: SettingsRuntimeTransition[AppSettings],
 ) -> bool:
     settings = transition.settings
-    if settings.translation.model != TranslationModel.MANAGED_GEMMA:
+    if settings.translation.model not in {
+        TranslationModel.MANAGED_GEMMA,
+        TranslationModel.MANAGED_GEMMA_12B,
+    }:
         return False
     previous = transition.previous_settings
     return bool(
         previous is None
-        or previous.translation.model != TranslationModel.MANAGED_GEMMA
+        or previous.translation.model != settings.translation.model
         or transition.source_language_changed
         or transition.target_language_changed
         or previous.system_prompt != settings.system_prompt

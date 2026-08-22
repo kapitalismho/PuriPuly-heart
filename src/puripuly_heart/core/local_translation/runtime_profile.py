@@ -10,8 +10,9 @@ from typing import Literal
 
 from puripuly_heart.config.paths import user_config_dir
 from puripuly_heart.core.local_translation.assets import (
-    GEMMA_DRAFT_FILENAME,
-    GEMMA_MODEL_FILENAME,
+    GEMMA_12B_MODEL_ID,
+    GemmaModelSpec,
+    e4b_gemma_spec,
 )
 
 LLAMA_CPP_BUILD = "b10423"
@@ -24,6 +25,7 @@ LLAMA_CPP_VULKAN_ARCHIVE_SIZE = 34_563_676
 LLAMA_CPP_VULKAN_ARCHIVE_SHA256 = "510447fb021c80a264b2181c885b5f2ce9cc5b66c65d447cd1f9ce7ba81dc222"
 LLAMA_CPP_RUNTIME_DIRNAME = "llama.cpp-b10423"
 MANAGED_GEMMA_MODEL_ALIAS = "puripuly-gemma-4-e4b-q4"
+MANAGED_GEMMA_12B_MODEL_ALIAS = "puripuly-gemma-4-12b-q4"
 THREADS_PROFILE_FILENAME = "llama_cpp_threads.json"
 
 # Generalization rule from benchmark (Stage 10):
@@ -143,6 +145,12 @@ def default_gemma_runtime_paths(root: Path | None = None) -> GemmaRuntimePaths:
     )
 
 
+def gemma_model_alias(spec: GemmaModelSpec) -> str:
+    if spec.model_id == GEMMA_12B_MODEL_ID:
+        return MANAGED_GEMMA_12B_MODEL_ALIAS
+    return MANAGED_GEMMA_MODEL_ALIAS
+
+
 def build_gemma_server_command(
     *,
     executable: Path,
@@ -152,19 +160,22 @@ def build_gemma_server_command(
     vulkan_device: str = "Vulkan0",
     threads_profile: LlamaCppThreadProfile | None = None,
     slot_save_path: Path | None = None,
+    spec: GemmaModelSpec | None = None,
 ) -> tuple[str, ...]:
     if threads_profile is None:
         threads_profile = load_or_detect_thread_profile()
+    resolved_spec = spec or e4b_gemma_spec()
+    cache_type = "q8_0" if resolved_spec.model_id == GEMMA_12B_MODEL_ID else "f16"
     common = (
         str(executable),
         "--model",
-        str(install_dir / GEMMA_MODEL_FILENAME),
+        str(install_dir / resolved_spec.model_filename),
         "--alias",
-        MANAGED_GEMMA_MODEL_ALIAS,
+        gemma_model_alias(resolved_spec),
         "--load-mode",
         "mmap",
         "--ctx-size",
-        "4096",
+        "3072",
         "--parallel",
         "2",
         "--batch-size",
@@ -172,9 +183,9 @@ def build_gemma_server_command(
         "--ubatch-size",
         "512",
         "--cache-type-k",
-        "f16",
+        cache_type,
         "--cache-type-v",
-        "f16",
+        cache_type,
         "--cache-prompt",
         "--reasoning",
         "off",
@@ -196,7 +207,7 @@ def build_gemma_server_command(
     if slot_save_path is not None:
         common = common + ("--slot-save-path", str(slot_save_path))
     if backend == "gpu":
-        return common + (
+        command = common + (
             "--threads",
             "4",
             "--threads-batch",
@@ -208,40 +219,47 @@ def build_gemma_server_command(
             "--flash-attn",
             "on",
         )
-    return common + (
-        "--threads",
-        str(threads_profile.threads),
-        "--threads-batch",
-        str(threads_profile.threads_batch),
-        "--device",
-        "none",
-        "--n-gpu-layers",
-        "0",
-        "--spec-draft-model",
-        str(install_dir / GEMMA_DRAFT_FILENAME),
-        "--spec-type",
-        "draft-mtp",
-        "--spec-draft-n-max",
-        "3",
-        "--spec-draft-n-min",
-        "2",
-        "--spec-draft-p-min",
-        "0.0",
-        "--spec-draft-device",
-        "none",
-        "--spec-draft-ngl",
-        "0",
-        "--spec-draft-threads",
-        str(threads_profile.draft_threads),
-        "--spec-draft-threads-batch",
-        str(threads_profile.draft_threads),
-        "--spec-draft-type-k",
-        "f16",
-        "--spec-draft-type-v",
-        "f16",
-        "--flash-attn",
-        "off",
-    )
+    else:
+        command = common + (
+            "--threads",
+            str(threads_profile.threads),
+            "--threads-batch",
+            str(threads_profile.threads_batch),
+            "--device",
+            "none",
+            "--n-gpu-layers",
+            "0",
+            "--flash-attn",
+            "off",
+        )
+        if resolved_spec.draft_filename is not None:
+            command = command + (
+                "--spec-draft-model",
+                str(install_dir / resolved_spec.draft_filename),
+                "--spec-type",
+                "draft-mtp",
+                "--spec-draft-n-max",
+                "3",
+                "--spec-draft-n-min",
+                "2",
+                "--spec-draft-p-min",
+                "0.0",
+                "--spec-draft-device",
+                "none",
+                "--spec-draft-ngl",
+                "0",
+                "--spec-draft-threads",
+                str(threads_profile.draft_threads),
+                "--spec-draft-threads-batch",
+                str(threads_profile.draft_threads),
+                "--spec-draft-type-k",
+                "f16",
+                "--spec-draft-type-v",
+                "f16",
+            )
+    if resolved_spec.model_id == GEMMA_12B_MODEL_ID:
+        return command + ("--swa-full",)
+    return command
 
 
 __all__ = [
@@ -257,10 +275,12 @@ __all__ = [
     "LLAMA_CPP_VULKAN_ARCHIVE",
     "LLAMA_CPP_VULKAN_ARCHIVE_SHA256",
     "LLAMA_CPP_VULKAN_ARCHIVE_SIZE",
+    "MANAGED_GEMMA_12B_MODEL_ALIAS",
     "MANAGED_GEMMA_MODEL_ALIAS",
     "THREADS_PROFILE_FILENAME",
     "LlamaCppThreadProfile",
     "build_gemma_server_command",
+    "gemma_model_alias",
     "default_gemma_runtime_paths",
     "default_llama_runtime_root",
     "default_threads_profile_path",

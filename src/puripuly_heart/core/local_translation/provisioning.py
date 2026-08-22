@@ -21,13 +21,12 @@ from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     LocalSTTRuntimeInstallCancelled,
 )
 from puripuly_heart.core.local_translation.assets import (
-    GEMMA_ASSETS,
     GEMMA_INSTALLED_MANIFEST_FILENAME,
-    GEMMA_REPO_ID,
-    GEMMA_REVISION,
     GemmaAsset,
+    GemmaModelSpec,
     InstalledGemmaManifest,
     default_gemma_install_dir,
+    e4b_gemma_spec,
     inspect_gemma_install,
     validate_gemma_install,
 )
@@ -83,6 +82,7 @@ async def _emit(
 async def _download_asset(
     *,
     downloader: HuggingFaceDownloadPort,
+    spec: GemmaModelSpec,
     asset: GemmaAsset,
     staging_dir: Path,
     completed_bytes: int,
@@ -140,8 +140,8 @@ async def _download_asset(
     try:
         downloaded_path = await downloader.download(
             HuggingFaceDownloadRequest(
-                repo_id=GEMMA_REPO_ID,
-                revision=GEMMA_REVISION,
+                repo_id=spec.repo_id,
+                revision=spec.revision,
                 remote_path=asset.filename,
                 local_dir=staging_dir,
                 expected_size_bytes=asset.size_bytes,
@@ -193,8 +193,10 @@ async def ensure_gemma_installed(
     install_dir: Path | None = None,
     cancel_event: threading.Event | None = None,
     on_status: GemmaProvisioningCallback | None = None,
+    spec: GemmaModelSpec | None = None,
 ) -> InstalledGemmaManifest:
-    resolved = (install_dir or default_gemma_install_dir()).resolve()
+    resolved_spec = spec or e4b_gemma_spec()
+    resolved = (install_dir or default_gemma_install_dir(resolved_spec)).resolve()
     _raise_if_cancelled(cancel_event)
     try:
         lease = await asyncio.to_thread(
@@ -213,6 +215,7 @@ async def ensure_gemma_installed(
             install_dir=resolved,
             cancel_event=cancel_event,
             on_status=on_status,
+            spec=resolved_spec,
         )
     finally:
         await asyncio.to_thread(lease.close)
@@ -224,11 +227,12 @@ async def _ensure_gemma_installed_with_lease(
     install_dir: Path,
     cancel_event: threading.Event | None,
     on_status: GemmaProvisioningCallback | None,
+    spec: GemmaModelSpec,
 ) -> InstalledGemmaManifest:
     resolved = install_dir
-    total_bytes = sum(asset.size_bytes for asset in GEMMA_ASSETS)
+    total_bytes = sum(asset.size_bytes for asset in spec.assets)
     _raise_if_cancelled(cancel_event)
-    state = inspect_gemma_install(resolved)
+    state = inspect_gemma_install(resolved, spec=spec)
     if state.status == "ready" and state.manifest is not None:
         await _emit(
             on_status,
@@ -256,10 +260,11 @@ async def _ensure_gemma_installed_with_lease(
             downloaded_bytes=0,
             total_bytes=total_bytes,
         )
-        for asset in GEMMA_ASSETS:
+        for asset in spec.assets:
             _raise_if_cancelled(cancel_event)
             completed_bytes = await _download_asset(
                 downloader=downloader,
+                spec=spec,
                 asset=asset,
                 staging_dir=staging_dir,
                 completed_bytes=completed_bytes,
@@ -274,12 +279,12 @@ async def _ensure_gemma_installed_with_lease(
                 total_bytes=total_bytes,
             )
         _raise_if_cancelled(cancel_event)
-        manifest = InstalledGemmaManifest.expected()
+        manifest = InstalledGemmaManifest.expected(spec)
         (staging_dir / GEMMA_INSTALLED_MANIFEST_FILENAME).write_text(
             json.dumps(manifest.to_dict(), indent=2),
             encoding="utf-8",
         )
-        await asyncio.to_thread(validate_gemma_install, staging_dir)
+        await asyncio.to_thread(validate_gemma_install, staging_dir, spec=spec)
         _raise_if_cancelled(cancel_event)
         await asyncio.to_thread(_promote, staging_dir, resolved)
         await _emit(

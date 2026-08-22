@@ -352,6 +352,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         TranslationModel.DEEPSEEK_V4_FLASH.value,
         "managed_gemma_cpu",
         "managed_gemma_gpu",
+        TranslationModel.MANAGED_GEMMA_12B.value,
         TranslationModel.GEMMA4.value,
         TranslationModel.LOCAL_LLM.value,
         TranslationModel.CUSTOM_HTTP.value,
@@ -378,6 +379,15 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         "settings.translation_model.section.recommended_local"
     )
     assert managed["managed_gemma_gpu"].section == t(
+        "settings.translation_model.section.gpu_inference"
+    )
+    assert managed[TranslationModel.MANAGED_GEMMA_12B.value].label == t(
+        "provider.managed_gemma_12b"
+    )
+    assert managed[TranslationModel.MANAGED_GEMMA_12B.value].description == t(
+        "settings.translation_model.managed_gemma_12b.description"
+    )
+    assert managed[TranslationModel.MANAGED_GEMMA_12B.value].section == t(
         "settings.translation_model.section.gpu_inference"
     )
 

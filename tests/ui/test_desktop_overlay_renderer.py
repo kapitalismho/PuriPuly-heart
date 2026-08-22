@@ -242,6 +242,94 @@ def test_desktop_overlay_snapshot_mapping_table_matches_emitted_caption_lines() 
             )
 
 
+def test_desktop_overlay_swap_caption_languages_reverses_source_and_target_slots() -> None:
+    snapshot = OverlayPresentationSnapshot(
+        blocks=[
+            _block(
+                "self-finalized",
+                channel="self",
+                block_variant="finalized",
+                appearance_seq=1,
+                primary_text="korean source",
+                secondary_text="chinese target",
+                secondary_enabled=True,
+            ),
+            _block(
+                "peer-finalized",
+                channel="peer",
+                block_variant="finalized",
+                appearance_seq=2,
+                primary_text="korean translation",
+                secondary_text="chinese original",
+                secondary_enabled=True,
+            ),
+        ]
+    )
+    default_plan = desktop_overlay.build_desktop_caption_plan(snapshot)
+    swapped_plan = desktop_overlay.build_desktop_caption_plan(
+        snapshot,
+        visual_state=desktop_overlay.DesktopCaptionVisualState(swap_caption_languages=True),
+    )
+
+    default_by_id = {slot.block_id: slot for slot in default_plan.slots}
+    swapped_by_id = {slot.block_id: slot for slot in swapped_plan.slots}
+
+    assert [line.text for line in default_by_id["self-finalized"].lines] == [
+        "korean source",
+        "chinese target",
+    ]
+    assert [line.slot for line in default_by_id["self-finalized"].lines] == [
+        "primary",
+        "secondary",
+    ]
+    assert [line.text for line in swapped_by_id["self-finalized"].lines] == [
+        "chinese target",
+        "korean source",
+    ]
+    assert [line.slot for line in swapped_by_id["self-finalized"].lines] == [
+        "primary",
+        "secondary",
+    ]
+    assert [line.role for line in swapped_by_id["self-finalized"].lines] == [
+        "self_translation",
+        "self_source",
+    ]
+    assert [line.text for line in default_by_id["peer-finalized"].lines] == [
+        "korean translation",
+        "chinese original",
+    ]
+    assert [line.text for line in swapped_by_id["peer-finalized"].lines] == [
+        "chinese original",
+        "korean translation",
+    ]
+    assert [line.role for line in swapped_by_id["peer-finalized"].lines] == [
+        "peer_source_original",
+        "peer_translation",
+    ]
+
+    promoted_snapshot = OverlayPresentationSnapshot(
+        blocks=[
+            _block(
+                "peer-active",
+                channel="peer",
+                block_variant="active_peer",
+                appearance_seq=3,
+                primary_text="",
+                secondary_text="live original only",
+                secondary_enabled=True,
+            )
+        ]
+    )
+    promoted_default = desktop_overlay.build_desktop_caption_plan(promoted_snapshot)
+    promoted_swapped = desktop_overlay.build_desktop_caption_plan(
+        promoted_snapshot,
+        visual_state=desktop_overlay.DesktopCaptionVisualState(swap_caption_languages=True),
+    )
+    assert [line.text for line in promoted_default.lines] == ["live original only"]
+    assert [line.text for line in promoted_swapped.lines] == ["live original only"]
+    assert promoted_swapped.lines[0].promoted is True
+
+
 def test_desktop_overlay_snapshot_mapping_roles_secondary_promotion_and_channel_colors() -> None:
     active_self_plan = desktop_overlay.build_desktop_caption_plan(
         OverlayPresentationSnapshot(

@@ -39,9 +39,11 @@ README_SIZE = 495
 KNOWN_MODEL_FILENAMES = {
     "gemma-4-e4b-it-qat-ud-q4_k_xl.gguf",
     "mtp-gemma-4-e4b-it.gguf",
+    "gemma-4-12b-it-qat-ud-q4_k_xl.gguf",
 }
 INSTALLER_FORBIDDEN_IDENTITIES = KNOWN_MODEL_FILENAMES | {
     "unsloth/gemma-4-e4b-it-qat-gguf",
+    "unsloth/gemma-4-12b-it-qat-gguf",
 }
 COMMON_REQUIRED_FILES = {
     "ggml-base.dll",

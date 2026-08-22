@@ -1904,6 +1904,9 @@ def compose_application_runtime(
             provider_settings=require_provider_settings(),
             build_byok_target_settings=(build_managed_openrouter_byok_target_settings),
             managed_gemma=managed_gemma,
+            llm_devices_sink=lambda devices: presentation.set_dashboard_llm_gpu_devices(
+                devices=devices
+            ),
         ),
         microphone=UiMicrophoneRuntimeAdapter(
             microphone=microphone_runtime,

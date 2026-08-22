@@ -112,6 +112,7 @@ class DesktopOverlayApplicationOwner:
             self.policy.default_background_alpha,
         )
         outline_width = visual.get("outline_width")
+        swap_caption_languages = bool(desktop_options.get("swap_caption_languages", False))
         self._log(
             "[DesktopOverlay][Launch] "
             f"target=desktop locked={bool(desktop_options.get('locked', False))} "
@@ -119,7 +120,8 @@ class DesktopOverlayApplicationOwner:
             f"size_preset={desktop_options.get('size_preset')} "
             f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
             f"height={bounds['height']} text_scale={text_scale} "
-            f"background_alpha={background_alpha} outline_width={outline_width}"
+            f"background_alpha={background_alpha} outline_width={outline_width} "
+            f"swap_caption_languages={swap_caption_languages}"
         )
         return [
             {"command": "apply_window_bounds", **bounds},
@@ -128,6 +130,7 @@ class DesktopOverlayApplicationOwner:
                 "text_scale": text_scale,
                 "background_alpha": background_alpha,
                 "outline_width": outline_width,
+                "swap_caption_languages": swap_caption_languages,
             },
             {
                 "command": "set_interaction_mode",
@@ -480,6 +483,7 @@ class DesktopOverlayApplicationOwner:
             previous.visual.text_scale != next_desktop.visual.text_scale
             or previous.visual.background_alpha != next_desktop.visual.background_alpha
             or previous.visual.outline_width != next_desktop.visual.outline_width
+            or previous.swap_caption_languages != next_desktop.swap_caption_languages
         ):
             controls.append(
                 {
@@ -487,6 +491,7 @@ class DesktopOverlayApplicationOwner:
                     "text_scale": next_desktop.visual.text_scale,
                     "background_alpha": next_desktop.visual.background_alpha,
                     "outline_width": next_desktop.visual.outline_width,
+                    "swap_caption_languages": next_desktop.swap_caption_languages,
                 }
             )
         return tuple(controls)

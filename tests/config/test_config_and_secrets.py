@@ -479,6 +479,7 @@ def test_translation_model_public_member_names_and_values_match_plan() -> None:
         ("GEMINI_31_FLASH_LITE", "gemini31_flash_lite"),
         ("QWEN_35_PLUS", "qwen35_plus"),
         ("MANAGED_GEMMA", "managed_gemma"),
+        ("MANAGED_GEMMA_12B", "managed_gemma_12b"),
         ("LOCAL_LLM", "local_llm"),
         ("CUSTOM_HTTP", "custom_http"),
     )
@@ -562,6 +563,7 @@ def test_translation_settings_defaults_to_gemma_managed_with_only_gemma_history(
             TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
         },
         "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
+        "gpu_device_id": "auto",
     }
 
 
@@ -1959,6 +1961,7 @@ def test_translation_settings_roundtrip_materializes_deepseek_openrouter_byok(tm
         "connection": "openrouter",
         "connection_history": {"deepseek_v4_flash": "openrouter"},
         "fallback": MIGRATED_DEFAULT_TRANSLATION_FALLBACK_DICT,
+        "gpu_device_id": "auto",
     }
     assert loaded.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
     assert loaded.translation.connection == TranslationConnection.OPENROUTER
@@ -2384,6 +2387,7 @@ def test_load_settings_persists_default_translation_for_malformed_non_dict_secti
             TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
         },
         "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
+        "gpu_device_id": "auto",
     }
 
 
@@ -2422,6 +2426,7 @@ def test_invalid_translation_connection_falls_back_to_model_default() -> None:
             TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
         },
         "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
+        "gpu_device_id": "auto",
     }
 
 
@@ -2449,6 +2454,7 @@ def test_load_settings_persists_normalized_translation_section(tmp_path) -> None
             TranslationModel.GEMINI_31_FLASH_LITE.value: TranslationConnection.OPENROUTER.value,
         },
         "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
+        "gpu_device_id": "auto",
     }
 
 

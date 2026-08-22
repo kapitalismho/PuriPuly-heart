@@ -17,7 +17,6 @@ from puripuly_heart.ui.settings.contract import (
 )
 
 SETTINGS_ROW_SPACING = FOUNDATION_DESIGN_TOKENS.spacing.page
-SETTINGS_API_GPU_PLACEHOLDER_COUNT = 2
 
 
 def compose_settings_api_surface(
@@ -47,11 +46,8 @@ def compose_settings_api_surface(
         visible=True,
     )
 
-    gpu_device_placeholders = tuple(
-        placeholder_factory() for _ in range(SETTINGS_API_GPU_PLACEHOLDER_COUNT)
-    )
     gpu_device_controls = ft.Row(
-        [slots.gpu_device, *gpu_device_placeholders],
+        [slots.gpu_device, slots.gpu_llm, slots.gpu_refresh],
         spacing=SETTINGS_ROW_SPACING,
         expand=True,
     )
@@ -80,7 +76,6 @@ def compose_settings_api_surface(
         translation_connection_leading_placeholder=translation_connection_leading_placeholder,
         gpu_device_row=gpu_device_row,
         gpu_device_controls=gpu_device_controls,
-        gpu_device_placeholders=gpu_device_placeholders,
     )
 
 
@@ -162,9 +157,9 @@ def compose_settings_overlay_surface(
         slots.desktop_background_alpha,
     )
     desktop_reset_row = compose_settings_triple_row(
+        slots.desktop_swap_caption_languages,
         slots.desktop_reset,
-        slots.desktop_reset_spacer_a,
-        slots.desktop_reset_spacer_b,
+        slots.desktop_reset_spacer,
     )
     recovery_row_placeholder = placeholder_factory()
     recovery_row = compose_settings_triple_row(
@@ -192,7 +187,6 @@ def compose_settings_overlay_surface(
 
 
 __all__ = [
-    "SETTINGS_API_GPU_PLACEHOLDER_COUNT",
     "SETTINGS_ROW_SPACING",
     "compose_settings_api_surface",
     "compose_settings_general_surface",

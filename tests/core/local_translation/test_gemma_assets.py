@@ -56,6 +56,23 @@ def test_pinned_gemma_contract_has_exact_target_and_drafter() -> None:
     ]
 
 
+def test_pinned_gemma_12b_contract_has_target_without_drafter() -> None:
+    assert assets.GEMMA_12B_REPO_ID == "unsloth/gemma-4-12B-it-qat-GGUF"
+    assert assets.GEMMA_12B_REVISION == "980b060c40a8539ac159e0501a3e0f66a6365af3"
+    assert assets.GEMMA_12B_UPSTREAM_REPO_ID == "google/gemma-4-12B-it"
+    assert assets.GEMMA_12B_SPEC.draft_filename is None
+    assert assets.InstalledGemmaManifest.expected(assets.GEMMA_12B_SPEC).files == (
+        "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+    )
+    assert [(item.filename, item.size_bytes, item.sha256) for item in assets.GEMMA_12B_ASSETS] == [
+        (
+            "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+            6_716_356_800,
+            "90fd44e29e0d7cffeb0fd00dc73cfdab9ed0b0e95306ecf7821ea634c940c370",
+        ),
+    ]
+
+
 def test_full_validation_rejects_checksum_mismatch(tmp_path, monkeypatch) -> None:
     _write_install(tmp_path, monkeypatch, corrupt=True)
 

@@ -312,6 +312,7 @@ class TranslationModel(str, Enum):
     GEMINI_31_FLASH_LITE = "gemini31_flash_lite"
     QWEN_35_PLUS = "qwen35_plus"
     MANAGED_GEMMA = "managed_gemma"
+    MANAGED_GEMMA_12B = "managed_gemma_12b"
     LOCAL_LLM = "local_llm"
     CUSTOM_HTTP = "custom_http"
 
@@ -342,7 +343,10 @@ class TranslationFallbackSettings:
             raise ValueError("invalid translation fallback connection")
         if self.model == TranslationModel.CUSTOM_HTTP:
             raise ValueError("custom HTTP translation cannot be used as fallback")
-        if self.model == TranslationModel.MANAGED_GEMMA:
+        if self.model in (
+            TranslationModel.MANAGED_GEMMA,
+            TranslationModel.MANAGED_GEMMA_12B,
+        ):
             raise ValueError("managed local Gemma cannot be used as provider fallback")
         if self.connection not in _supported_translation_connections(self.model):
             raise ValueError("translation fallback connection is not supported for model")
@@ -358,6 +362,7 @@ class TranslationSettings:
     fallback: TranslationFallbackSettings = field(default_factory=TranslationFallbackSettings)
     http_extension_id: str | None = None
     previous_llm_model: TranslationModel | None = None
+    gpu_device_id: str = "auto"
 
     def validate(self) -> None:
         if not isinstance(self.model, TranslationModel):
@@ -387,6 +392,8 @@ class TranslationSettings:
             TranslationModel,
         ):
             raise ValueError("invalid previous LLM translation model")
+        if not isinstance(self.gpu_device_id, str) or not self.gpu_device_id.strip():
+            raise ValueError("gpu_device_id must be a non-empty string")
         if self.model == TranslationModel.CUSTOM_HTTP:
             if self.connection != TranslationConnection.CUSTOM_HTTP:
                 raise ValueError("custom HTTP translation requires custom_http connection")
@@ -430,6 +437,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[TranslationModel, tuple[TranslationConnec
         TranslationConnection.CPU,
         TranslationConnection.GPU,
     ),
+    TranslationModel.MANAGED_GEMMA_12B: (TranslationConnection.GPU,),
     TranslationModel.LOCAL_LLM: (TranslationConnection.OLLAMA,),
     TranslationModel.CUSTOM_HTTP: (TranslationConnection.CUSTOM_HTTP,),
 }
@@ -553,6 +561,12 @@ def _parse_translation_fallback(value: object) -> TranslationFallbackSettings:
     return fallback
 
 
+def _normalize_gpu_device_id(value: object) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return "auto"
+
+
 def _normalize_translation_settings(
     *,
     model: TranslationModel | None,
@@ -561,6 +575,7 @@ def _normalize_translation_settings(
     history: object = None,
     http_extension_id: object = None,
     previous_llm_model: object = None,
+    gpu_device_id: object = "auto",
 ) -> TranslationSettings:
     normalized_model = model or TranslationModel.GEMMA4_26B_31B
     normalized_history = _parse_translation_connection_history(history)
@@ -584,6 +599,7 @@ def _normalize_translation_settings(
         fallback=_parse_translation_fallback(fallback),
         http_extension_id=normalized_http_extension_id,
         previous_llm_model=normalized_previous_llm_model,
+        gpu_device_id=_normalize_gpu_device_id(gpu_device_id),
     )
 
 
@@ -631,6 +647,7 @@ def _translation_settings_to_dict(settings: TranslationSettings) -> dict[str, An
             "model": settings.fallback.model.value,
             "connection": settings.fallback.connection.value,
         },
+        "gpu_device_id": settings.gpu_device_id.strip(),
     }
     if settings.model == TranslationModel.CUSTOM_HTTP or settings.http_extension_id is not None:
         data["http_extension_id"] = settings.http_extension_id
@@ -651,6 +668,7 @@ def _default_translation_settings_dict() -> dict[str, Any]:
             "model": TranslationModel.DEEPSEEK_V4_FLASH.value,
             "connection": TranslationConnection.OFFICIAL_BYOK.value,
         },
+        "gpu_device_id": "auto",
     }
 
 
@@ -1188,6 +1206,7 @@ class DesktopFletOverlaySettings:
     size_preset: str = DESKTOP_FLET_DEFAULT_SIZE_PRESET
     position: DesktopFletOverlayPosition = field(default_factory=DesktopFletOverlayPosition)
     locked: bool = False
+    swap_caption_languages: bool = False
     visual: DesktopFletOverlayVisualSettings = field(
         default_factory=DesktopFletOverlayVisualSettings
     )
@@ -1198,6 +1217,8 @@ class DesktopFletOverlaySettings:
             self.position = DesktopFletOverlayPosition()
         if not isinstance(self.locked, bool):
             self.locked = False
+        if not isinstance(self.swap_caption_languages, bool):
+            self.swap_caption_languages = False
         if not isinstance(self.visual, DesktopFletOverlayVisualSettings):
             self.visual = DesktopFletOverlayVisualSettings()
         self.position.validate()
@@ -1641,6 +1662,12 @@ def _parse_desktop_flet_visual(value: object) -> DesktopFletOverlayVisualSetting
     )
 
 
+def _parse_desktop_flet_swap_caption_languages(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    return False
+
+
 def _parse_desktop_flet_settings(value: object) -> DesktopFletOverlaySettings:
     if isinstance(value, DesktopFletOverlaySettings):
         settings = copy.deepcopy(value)
@@ -1665,6 +1692,9 @@ def _parse_desktop_flet_settings(value: object) -> DesktopFletOverlaySettings:
         size_preset=size_preset,
         position=position,
         locked=False,
+        swap_caption_languages=_parse_desktop_flet_swap_caption_languages(
+            data.get("swap_caption_languages")
+        ),
         visual=_parse_desktop_flet_visual(data.get("visual")),
     )
 
@@ -1702,6 +1732,7 @@ def _desktop_flet_settings_to_dict(settings: DesktopFletOverlaySettings) -> dict
     return {
         "size_preset": settings.size_preset,
         "position": {"x": settings.position.x, "y": settings.position.y},
+        "swap_caption_languages": settings.swap_caption_languages,
         "visual": _desktop_flet_visual_to_dict(settings.visual),
     }
 
@@ -2616,6 +2647,7 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         history=settings.translation.connection_history,
         http_extension_id=settings.translation.http_extension_id,
         previous_llm_model=settings.translation.previous_llm_model,
+        gpu_device_id=settings.translation.gpu_device_id,
     )
     model = settings.translation.model
     connection = settings.translation.connection
@@ -2740,7 +2772,7 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
         return settings
 
-    if model == TranslationModel.MANAGED_GEMMA:
+    if model in (TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B):
         settings.provider.llm = LLMProviderName.MANAGED_GEMMA
         settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
         return settings
@@ -2789,6 +2821,7 @@ def _apply_materialized_translation_to_data(
         history=translation.connection_history,
         http_extension_id=translation.http_extension_id,
         previous_llm_model=translation.previous_llm_model,
+        gpu_device_id=translation.gpu_device_id,
     )
 
     if translation.model == TranslationModel.CUSTOM_HTTP:
@@ -2986,7 +3019,10 @@ def _apply_materialized_translation_to_data(
         changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.LOCAL_LLM.value)
         return changed
 
-    if translation.model == TranslationModel.MANAGED_GEMMA:
+    if translation.model in (
+        TranslationModel.MANAGED_GEMMA,
+        TranslationModel.MANAGED_GEMMA_12B,
+    ):
         changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.MANAGED_GEMMA.value)
         changed |= _set_mapping_value(
             openrouter_data,
@@ -3910,6 +3946,7 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
             history=translation_history,
             http_extension_id=translation_data.get("http_extension_id"),
             previous_llm_model=translation_data.get("previous_llm_model"),
+            gpu_device_id=translation_data.get("gpu_device_id"),
         )
     else:
         normalized_translation_settings = _derive_translation_settings_from_runtime_values(
@@ -4631,6 +4668,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             history=translation_history,
             http_extension_id=translation_data.get("http_extension_id"),
             previous_llm_model=translation_data.get("previous_llm_model"),
+            gpu_device_id=translation_data.get("gpu_device_id"),
         )
     else:
         settings.translation = _derive_translation_settings_from_runtime(

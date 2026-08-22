@@ -62,6 +62,8 @@ class UiPresentationPort(Protocol):
         publish_notice: bool,
     ) -> None: ...
 
+    def set_dashboard_llm_gpu_devices(self, *, devices: tuple[object, ...]) -> None: ...
+
     def set_dashboard_local_stt_notice(
         self,
         *,
