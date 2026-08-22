@@ -556,9 +556,7 @@ class OverlayPresenter(OverlaySink):
     async def discard_epoch_retry_intent(self) -> None:
         async with self._ownership_transition_lock:
             await self._cancel_peer_presentation_refresh_burst_task_and_wait()
-            await self._cancel_self_presentation_refresh_burst_task_and_wait(
-                reason="epoch_discard"
-            )
+            await self._cancel_self_presentation_refresh_burst_task_and_wait(reason="epoch_discard")
             self.native_retry_trigger_emission = False
             self.peer_presentation_refresh_burst = False
             self.self_presentation_refresh_burst = False

@@ -627,9 +627,7 @@ class OverlayApplicationOwner:
             presenter = runtime.presenter
         if isinstance(presenter, OverlayPresenter):
             await presenter.discard_epoch_retry_intent()
-        await asyncio.sleep(
-            OVERLAY_TERMINAL_RESTART_BACKOFF_S * self._terminal_restart_attempts
-        )
+        await asyncio.sleep(OVERLAY_TERMINAL_RESTART_BACKOFF_S * self._terminal_restart_attempts)
         if self._ingress_stopped or not self.state_provider().overlay_intent_enabled:
             self._recovering_from_crash = False
             self._auto_restart_scheduled = False

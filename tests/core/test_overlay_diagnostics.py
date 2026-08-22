@@ -200,9 +200,12 @@ def test_overlay_stage_memory_is_recorded_only_in_detailed_mode(tmp_path) -> Non
     assert recorder.record_translation("overlay_emit") == {}
     assert recorder.record_chatbox("page_send") == {}
     assert recorder.record_stt("stt_enqueue") == {}
-    assert recorder.ingest_native_child_line(
-        'presentation_diagnostics [{"stage":"readiness_observed"}]'
-    ) is False
+    assert (
+        recorder.ingest_native_child_line(
+            'presentation_diagnostics [{"stage":"readiness_observed"}]'
+        )
+        is False
+    )
     assert list(recorder.presenter_events) == []
     assert list(recorder.bridge_events) == []
     assert list(recorder.translation_events) == []

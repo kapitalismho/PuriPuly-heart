@@ -829,9 +829,7 @@ async def _compose_runtime_pipeline(
     await translation_turns.close_channel_ingress("peer")
     asr_factory = local_asr_factory(secrets)
     if isinstance(asr_factory, LocalASRProviderRuntimeFactory):
-        asr_factory.bind_stt_event_ingress_observer(
-            translation_diagnostics.record_stt_ingress
-        )
+        asr_factory.bind_stt_event_ingress_observer(translation_diagnostics.record_stt_ingress)
     local_asr_runtime = asr_factory.create(
         LocalASRProviderRuntimeCallbacks(
             self_event_handler=callbacks.self_event_handler,

@@ -217,9 +217,7 @@ class TranslationTurnLifecycleOwner:
                 "child tasks",
                 "parent/child terminal state",
             ),
-            "ordering": (
-                "same-channel LLM admission waits on predecessor semantic completion"
-            ),
+            "ordering": ("same-channel LLM admission waits on predecessor semantic completion"),
             "stop_ingress": "stop accepting translation turns",
             "shutdown_policy": "cancel parent tasks, terminalize unfinished children, await scope",
             "late_callback_rule": "closed parents reject child completion and output submission",
