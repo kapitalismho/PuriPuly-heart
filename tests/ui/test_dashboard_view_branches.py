@@ -8,6 +8,7 @@ import pytest
 ft = pytest.importorskip("flet")
 
 from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
+from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.ui.dashboard import capture as dashboard_capture_module
 from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
@@ -20,6 +21,7 @@ from puripuly_heart.ui.overlay_peer_contract import (
 )
 from puripuly_heart.ui.views import dashboard as dashboard_module
 from tests.helpers.flet_page import attach_dummy_page
+from tests.helpers.osc_presentation import osc_control_presentation_state
 
 
 class FakePowerButton:
@@ -159,6 +161,7 @@ class FakeLanguageCard:
 class FakeLanguageModal:
     opened: list[tuple[str, list[str]]] = []
     languages: list[tuple[str, str]] = []
+    disabled_codes: list[set[str]] = []
 
     def __init__(
         self,
@@ -169,8 +172,9 @@ class FakeLanguageModal:
         description_for_code=None,
         disabled_codes=None,
     ):
-        _ = (page, label_for_code, description_for_code, disabled_codes)
+        _ = (page, label_for_code, description_for_code)
         self.__class__.languages = list(languages)
+        self.__class__.disabled_codes.append(set(disabled_codes or ()))
         self.on_select = on_select
 
     def open(self, *, current: str, recent: list[str]) -> None:
@@ -188,6 +192,7 @@ def _make_dashboard(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(dashboard_module, "get_locale", lambda: "en")
     view = dashboard_module.DashboardView()
     FakeLanguageModal.opened = []
+    FakeLanguageModal.disabled_codes = []
     return view
 
 
@@ -492,6 +497,155 @@ def test_dashboard_public_setters_update_components(monkeypatch: pytest.MonkeyPa
         "helper_text": None,
     }
     assert view._recent_source_langs == ["a", "b", "c", "d", "e", "f"]
+
+
+def test_dashboard_projects_osc_state_without_emitting_intents(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    attach_dummy_page(monkeypatch, view)
+    emitted: list[tuple[str, object]] = []
+    view.on_toggle_stt = lambda value: emitted.append(("stt", value))
+    view.on_toggle_translation = lambda value: emitted.append(("translation", value))
+    view.on_toggle_peer_translation = lambda value: emitted.append(("peer", value))
+    view.on_toggle_overlay = lambda value: emitted.append(("captions", value))
+    view.on_language_change = lambda value: emitted.append(("languages", value))
+    settings = AppSettings()
+    settings.languages.source_language = "ja"
+    settings.languages.target_language = "fr"
+    settings.languages.peer_source_language = "de"
+    settings.languages.peer_target_language = "ko"
+    settings.languages.peer_source_mode = "auto"
+    settings.provider.peer_stt = STTProviderName.SONIOX
+
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_Talk",
+            settings=settings,
+            self_capture=True,
+        )
+    )
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_Trans",
+            settings=settings,
+            translation=True,
+        )
+    )
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_SelfSrcLang",
+            settings=settings,
+        )
+    )
+    unavailable_settings = AppSettings()
+    unavailable_settings.provider.peer_stt = STTProviderName.LOCAL_PARAKEET_V3
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_PeerASR",
+            settings=unavailable_settings,
+        )
+    )
+    view.language_card.on_peer_source_click()
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_PeerASR",
+            settings=settings,
+        )
+    )
+    view.language_card.on_peer_source_click()
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_Listen",
+            settings=settings,
+            peer_capture=True,
+        )
+    )
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_Captions",
+            settings=settings,
+            captions=True,
+        )
+    )
+
+    assert view.is_stt_on is True
+    assert view.is_translation_on is True
+    assert view.language_card.languages[-1] == (
+        "name-ja",
+        "name-fr",
+        dashboard_module.t("dashboard.peer_source.automatic"),
+        "name-ko",
+    )
+    assert FakeLanguageModal.disabled_codes[-2:] == [{"auto"}, set()]
+    assert view.peer_button.states[-1]["is_on"] is True
+    assert view.overlay_button.states[-1]["is_on"] is True
+    assert emitted == []
+
+
+def test_dashboard_osc_projection_preserves_rich_peer_and_overlay_states(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    view.is_stt_on = False
+    view._stt_is_starting = True
+    view.set_overlay_peer_contract(
+        _make_overlay_peer_contract(
+            overlay_intent_enabled=True,
+            overlay_state="warning",
+            overlay_status_text="Overlay warning",
+            peer_intent_enabled=True,
+            peer_effective_enabled=False,
+            peer_status_text="Peer starting",
+            peer_state="starting",
+        )
+    )
+
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_Talk",
+            self_capture=False,
+        )
+    )
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_Listen",
+            peer_capture=True,
+        )
+    )
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_Captions",
+            captions=True,
+        )
+    )
+
+    assert view.is_stt_on is False
+    assert view._stt_is_starting is True
+    assert view.peer_button.states[-1] == {
+        "is_on": False,
+        "needs_key": False,
+        "status_text": None,
+        "helper_text": None,
+        "is_starting": True,
+    }
+    assert view.overlay_button.states[-1] == {
+        "is_on": False,
+        "needs_key": True,
+        "status_text": None,
+        "helper_text": None,
+    }
+
+    view._stt_is_starting = False
+    view._stt_showing_warning = True
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_Talk",
+            self_capture=False,
+        )
+    )
+    assert view.is_stt_on is False
+    assert view._stt_showing_warning is True
 
 
 def test_dashboard_managed_auth_pending_restores_local_stt_notice_when_cleared(

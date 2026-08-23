@@ -4,6 +4,10 @@ import logging
 from collections.abc import Awaitable, Callable, Mapping
 
 from puripuly_heart.app.ports.oscquery import OscQueryServicePort
+from puripuly_heart.app.ports.ui_models import (
+    OscControlPresentationName,
+    OscControlPresentationState,
+)
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
 from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState
 from puripuly_heart.app.services.vrc_mic_sync import (
@@ -29,6 +33,8 @@ def compose_vrc_mic_sync(
     application_provider: Callable[[], object | None],
     sender_provider: Callable[[], object | None],
     osc_state_provider: Callable[[], OscCanonicalState],
+    ui_state_provider: Callable[[OscControlPresentationName], OscControlPresentationState],
+    ui_state_sink: Callable[[OscControlPresentationState], None],
     language_state_provider: Callable[[], tuple[str, str, str, str]],
     translation_model_normalizer: Callable[[object], object],
     query_service: OscQueryServicePort | None = None,
@@ -55,6 +61,8 @@ def compose_vrc_mic_sync(
         application_provider=application_provider,
         sender_provider=sender_provider,
         state_provider=osc_state_provider,
+        ui_state_provider=ui_state_provider,
+        ui_state_sink=ui_state_sink,
         language_state_provider=language_state_provider,
         translation_model_normalizer=translation_model_normalizer,
         query_service=query_service or ZeroconfOscQueryService(),

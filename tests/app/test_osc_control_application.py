@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import copy
+
 import pytest
 
 from puripuly_heart.app.services.osc.control_application import (
+    OscControlApplyResult,
     SettingsBackedOscControlApplication,
 )
 from puripuly_heart.config.settings import (
     AppSettings,
     DeepSeekLLMModel,
     LLMProviderName,
+    STTProviderName,
     TranslationConnection,
     TranslationModel,
     materialize_translation_settings,
@@ -152,6 +156,33 @@ async def test_settings_control_rejects_when_application_keeps_the_previous_stat
 
     assert result is False
     assert current.osc.vrc_mic_intercept is False
+
+
+@pytest.mark.asyncio
+async def test_settings_control_reports_a_committed_normalized_canonical_state() -> None:
+    current = AppSettings()
+    current.provider.stt = STTProviderName.DEEPGRAM
+
+    async def apply_settings(settings: object) -> object:
+        nonlocal current
+        assert isinstance(settings, AppSettings)
+        current = copy.deepcopy(settings)
+        current.provider.stt = STTProviderName.LOCAL_CPU_AUTO
+        return True
+
+    application = SettingsBackedOscControlApplication(
+        settings_provider=lambda: current,
+        apply_settings=apply_settings,
+        translation_model_normalizer=materialize_translation_settings,
+    )
+
+    result = await application.set_self_asr(STTProviderName.LOCAL_QWEN_GPU.value)
+
+    assert result == OscControlApplyResult(
+        applied=False,
+        canonical_state_changed=True,
+    )
+    assert current.provider.stt is STTProviderName.LOCAL_CPU_AUTO
 
 
 @pytest.mark.asyncio

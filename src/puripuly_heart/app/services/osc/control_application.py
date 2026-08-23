@@ -17,6 +17,12 @@ ApplicationCall = Callable[..., Awaitable[object]]
 TranslationModelNormalizer = Callable[[object], object]
 
 
+@dataclass(frozen=True, slots=True)
+class OscControlApplyResult:
+    applied: bool
+    canonical_state_changed: bool
+
+
 @dataclass(slots=True)
 class SettingsBackedOscControlApplication(OscControlApplicationPort):
     settings_provider: SettingsProvider
@@ -166,10 +172,17 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         current = self.settings_provider()
         if current is None:
             raise RuntimeError("OSC control settings are unavailable")
+        previous = copy.deepcopy(current)
         updated = copy.deepcopy(current)
         mutator(updated)
         result = await self.apply_settings(updated)
-        if not _settings_control_values_match(self.settings_provider(), updated):
+        actual = self.settings_provider()
+        if not _settings_control_values_match(actual, updated):
+            if not _settings_control_values_match(actual, previous):
+                return OscControlApplyResult(
+                    applied=False,
+                    canonical_state_changed=True,
+                )
             return False
         return result
 
@@ -324,4 +337,4 @@ def _enum_value_for_compare(value: object) -> object:
     return getattr(value, "value", value)
 
 
-__all__ = ["SettingsBackedOscControlApplication"]
+__all__ = ["OscControlApplyResult", "SettingsBackedOscControlApplication"]

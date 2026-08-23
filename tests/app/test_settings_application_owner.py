@@ -20,6 +20,9 @@ from puripuly_heart.app.services.canonical_settings_persistence import SettingsO
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
 )
+from puripuly_heart.app.services.settings import (
+    settings_application as settings_application_module,
+)
 from puripuly_heart.config.settings import AppSettings, to_dict
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import (
@@ -105,6 +108,7 @@ class FakeRuntimeEffects:
     ) -> None:
         self.events = events
         self.failure = failure
+        self.reload_settings_view: list[bool] = []
 
     async def preserve_before_replace(self, _settings: AppSettings) -> None:
         self.events.append("preserve")
@@ -170,9 +174,10 @@ class FakeRuntimeEffects:
     async def apply_after_persist(
         self,
         _transition: SettingsRuntimeTransition[AppSettings],
-        **_kwargs: object,
+        **kwargs: object,
     ) -> None:
         self.events.append("runtime")
+        self.reload_settings_view.append(bool(kwargs.get("reload_settings_view", True)))
         if self.failure is not None:
             raise self.failure
 
@@ -233,6 +238,63 @@ async def test_settings_application_owner_routes_mixed_surfaces_in_transaction_o
     assert (
         owner.results.current.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
     )
+
+
+@pytest.mark.asyncio
+async def test_settings_application_owner_can_suppress_language_view_reload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = FakeSettingsOwner(AppSettings())
+    renders: list[object] = []
+    projection = SettingsProjectionOwner(
+        presentation=SimpleNamespace(
+            render_settings=lambda *args, **_kwargs: renders.append(args[0])
+        ),
+        config_path=Path("settings.json"),
+        current_settings=lambda: settings.current,
+    )
+    projection.remember_all(settings.current)
+    effects = FakeRuntimeEffects([])
+
+    class ApplyingMutationService:
+        def __init__(self, *, runtime_apply: object, **_kwargs: object) -> None:
+            self.runtime_apply = runtime_apply
+
+        async def mutate(self, _request: object) -> TransactionResult:
+            await self.runtime_apply.apply_runtime(SimpleNamespace())
+            return TransactionResult(
+                status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+                message=None,
+                diagnostics=None,
+            )
+
+    monkeypatch.setattr(
+        settings_application_module,
+        "SettingsMutationService",
+        ApplyingMutationService,
+    )
+    owner = SettingsApplicationOwner(
+        settings=settings,
+        projection=projection,
+        runtime_effects=effects,
+        manual_fallback=ManualLocalASRFallbackOwner(),
+        cpu_auto_available=lambda: True,
+        inspect_cpu=lambda: None,
+        fallback_sink=lambda _channels, _installation: None,
+        sync_ui=lambda: None,
+        fallback_log_sink=lambda _previous, _normalized, _channels: None,
+        mutation_service_provider=lambda: None,
+        consume_superseded_settings=lambda _settings: False,
+        active_local_asr_change=lambda _base, _next: False,
+        failure_sink=lambda _message: None,
+    )
+    pending = copy.deepcopy(settings.current)
+    pending.languages.source_language = "ja"
+
+    assert await owner.apply(pending, reload_settings_view=False)
+
+    assert effects.reload_settings_view == [False]
+    assert renders == []
 
 
 @pytest.mark.asyncio
