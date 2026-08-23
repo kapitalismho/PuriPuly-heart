@@ -9,9 +9,16 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 CONTRACT_PATH = Path(__file__).with_name("operational_label_contract.json")
+V1_CONTRACT_PATH = Path(__file__).with_name("v2") / "operational_label_contract.json"
 EXPECTED_CONTRACT_DOCUMENT_SHA256_BY_VERSION = {
     "psem-handoff-v0": "74e95d1425498c6743d46fc68b2bedce35c36009646add464b844ce3e5d8464e",
+    "psem-handoff-v1": "3915ab5d6fe3c8e2eb0933ce619f425eb9a08cf6bc3a46eacf370647956772d2",
 }
+CONTRACT_PATH_BY_VERSION = {
+    "psem-handoff-v0": CONTRACT_PATH,
+    "psem-handoff-v1": V1_CONTRACT_PATH,
+}
+HANDOFF_RELATION_MASK_CLASS = "ambiguous_nonlexical_vocalization"
 
 
 class LabelContractError(ValueError):
@@ -26,13 +33,15 @@ class CanonicalInterval:
     ambiguous: bool = False
     speaker_identity_known: bool = True
     source_annotation_ids: tuple[str, ...] = ()
+    handoff_relation_mask_classes: tuple[str, ...] = ()
+    mask_annotation_ids: tuple[str, ...] = ()
 
     @property
     def duration_samples(self) -> int:
         return self.end_sample - self.start_sample
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        row = {
             "start_sample": self.start_sample,
             "end_sample": self.end_sample,
             "active_speakers": list(self.active_speakers),
@@ -40,6 +49,12 @@ class CanonicalInterval:
             "speaker_identity_known": self.speaker_identity_known,
             "source_annotation_ids": list(self.source_annotation_ids),
         }
+        if self.handoff_relation_mask_classes:
+            row["handoff_relation_mask_classes"] = list(
+                self.handoff_relation_mask_classes
+            )
+            row["mask_annotation_ids"] = list(self.mask_annotation_ids)
+        return row
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,9 +187,19 @@ def _validate_contract(contract: LabelContract) -> LabelContract:
     return contract
 
 
-def load_contract(path: Path | None = None) -> LabelContract:
+def load_contract(
+    path: Path | None = None, *, version: str | None = None
+) -> LabelContract:
+    if path is not None and version is not None:
+        raise LabelContractError("contract path and version are mutually exclusive")
     installed_document = path is None
-    contract_path = path or CONTRACT_PATH
+    if version is None:
+        contract_path = path or CONTRACT_PATH
+    else:
+        try:
+            contract_path = CONTRACT_PATH_BY_VERSION[version]
+        except KeyError as exc:
+            raise LabelContractError(f"unsupported installed contract version: {version}") from exc
     raw = json.loads(contract_path.read_text(encoding="utf-8"))
     coordinates = raw["source_coordinate_convention"]
     constants = raw["constants_ms"]
@@ -218,6 +243,8 @@ def load_contract(path: Path | None = None) -> LabelContract:
     )
     validated = _validate_contract(contract)
     if installed_document:
+        if version is not None and validated.contract_version != version:
+            raise LabelContractError("installed contract version does not match its path")
         expected_sha256 = EXPECTED_CONTRACT_DOCUMENT_SHA256_BY_VERSION.get(
             validated.contract_version
         )
@@ -236,6 +263,8 @@ def _coerce_interval(value: CanonicalInterval | Mapping[str, Any]) -> CanonicalI
         ambiguous = value.ambiguous
         speaker_identity_known = value.speaker_identity_known
         source_annotation_ids = value.source_annotation_ids
+        handoff_relation_mask_classes = value.handoff_relation_mask_classes
+        mask_annotation_ids = value.mask_annotation_ids
     elif isinstance(value, Mapping):
         start_sample = value["start_sample"]
         end_sample = value["end_sample"]
@@ -243,10 +272,28 @@ def _coerce_interval(value: CanonicalInterval | Mapping[str, Any]) -> CanonicalI
         ambiguous = value.get("ambiguous", False)
         speaker_identity_known = value.get("speaker_identity_known", True)
         source_annotation_ids = value.get("source_annotation_ids", [])
+        handoff_relation_mask_classes = value.get(
+            "handoff_relation_mask_classes", []
+        )
+        mask_annotation_ids = value.get("mask_annotation_ids", [])
     else:
         raise LabelContractError("canonical interval must be a mapping or CanonicalInterval")
     speakers = tuple(sorted(_exact_string_sequence(active_speakers, "active_speakers")))
     annotation_ids = _exact_string_sequence(source_annotation_ids, "source_annotation_ids")
+    mask_classes = tuple(
+        sorted(
+            _exact_string_sequence(
+                handoff_relation_mask_classes, "handoff_relation_mask_classes"
+            )
+        )
+    )
+    mask_ids = _exact_string_sequence(mask_annotation_ids, "mask_annotation_ids")
+    if bool(mask_classes) != bool(mask_ids):
+        raise LabelContractError(
+            "handoff/relation mask classes and annotation IDs must both be present"
+        )
+    if any(mask_class != HANDOFF_RELATION_MASK_CLASS for mask_class in mask_classes):
+        raise LabelContractError("unsupported handoff/relation mask class")
     return CanonicalInterval(
         start_sample=_exact_sample(start_sample, "start_sample"),
         end_sample=_exact_sample(end_sample, "end_sample"),
@@ -254,6 +301,8 @@ def _coerce_interval(value: CanonicalInterval | Mapping[str, Any]) -> CanonicalI
         ambiguous=_exact_bool(ambiguous, "ambiguous"),
         speaker_identity_known=_exact_bool(speaker_identity_known, "speaker_identity_known"),
         source_annotation_ids=annotation_ids,
+        handoff_relation_mask_classes=mask_classes,
+        mask_annotation_ids=mask_ids,
     )
 
 
@@ -332,6 +381,8 @@ def normalize_intervals(
             and merged[-1].active_speakers == interval.active_speakers
             and merged[-1].ambiguous == interval.ambiguous
             and merged[-1].speaker_identity_known == interval.speaker_identity_known
+            and merged[-1].handoff_relation_mask_classes
+            == interval.handoff_relation_mask_classes
         ):
             previous = merged[-1]
             merged[-1] = CanonicalInterval(
@@ -342,6 +393,10 @@ def normalize_intervals(
                 speaker_identity_known=previous.speaker_identity_known,
                 source_annotation_ids=tuple(
                     dict.fromkeys(previous.source_annotation_ids + interval.source_annotation_ids)
+                ),
+                handoff_relation_mask_classes=previous.handoff_relation_mask_classes,
+                mask_annotation_ids=tuple(
+                    dict.fromkeys(previous.mask_annotation_ids + interval.mask_annotation_ids)
                 ),
             )
         else:
@@ -366,6 +421,9 @@ def _reconcile_same_speaker_jitter_gaps(
             not left.ambiguous
             and not gap.ambiguous
             and not right.ambiguous
+            and not left.handoff_relation_mask_classes
+            and not gap.handoff_relation_mask_classes
+            and not right.handoff_relation_mask_classes
             and left.speaker_identity_known
             and gap.speaker_identity_known
             and right.speaker_identity_known
@@ -411,6 +469,8 @@ def _is_complex_overlap_boundary(
     return (
         not left.ambiguous
         and not right.ambiguous
+        and not left.handoff_relation_mask_classes
+        and not right.handoff_relation_mask_classes
         and len(left.active_speakers) >= 2
         and len(right.active_speakers) >= 2
         and left.active_speakers != right.active_speakers
@@ -421,10 +481,42 @@ def _is_complex_overlap_boundary(
 def _is_reliable_solo(interval: CanonicalInterval, contract: LabelContract) -> bool:
     return (
         not interval.ambiguous
+        and not interval.handoff_relation_mask_classes
         and interval.speaker_identity_known
         and len(interval.active_speakers) == 1
         and interval.duration_samples >= contract.reliable_solo_min_duration_samples
     )
+
+
+def _stable_singleton_exposure_samples(
+    intervals: Sequence[CanonicalInterval], contract: LabelContract
+) -> int:
+    total = 0
+    group_start = 0
+    while group_start < len(intervals):
+        first = intervals[group_start]
+        group_end = group_start + 1
+        while group_end < len(intervals):
+            candidate = intervals[group_end]
+            if (
+                candidate.active_speakers != first.active_speakers
+                or candidate.ambiguous != first.ambiguous
+                or candidate.speaker_identity_known != first.speaker_identity_known
+            ):
+                break
+            group_end += 1
+        duration_samples = sum(
+            interval.duration_samples for interval in intervals[group_start:group_end]
+        )
+        if (
+            not first.ambiguous
+            and first.speaker_identity_known
+            and len(first.active_speakers) == 1
+            and duration_samples >= contract.reliable_solo_min_duration_samples
+        ):
+            total += duration_samples
+        group_start = group_end
+    return total
 
 
 def _transition_row(
@@ -498,6 +590,31 @@ def _classify_transition(
             mask_state="masked",
             primary_topology="ambiguous_annotation_crossing",
             secondary_tags=("ambiguous",),
+            gap_samples=gap_samples,
+            overlap_samples=overlap_samples,
+        )
+    mask_classes = tuple(
+        sorted(
+            {
+                mask_class
+                for interval in between
+                for mask_class in interval.handoff_relation_mask_classes
+            }
+        )
+    )
+    if mask_classes:
+        return _transition_row(
+            transition_id=transition_id,
+            from_interval_index=previous_index,
+            to_interval_index=current_index,
+            from_speaker=previous_speaker,
+            to_speaker=current_speaker,
+            source_sample=None,
+            handoff_target=None,
+            relation_target=None,
+            mask_state="masked",
+            primary_topology="ambiguous_nonlexical_vocalization_crossing",
+            secondary_tags=mask_classes,
             gap_samples=gap_samples,
             overlap_samples=overlap_samples,
         )
@@ -801,6 +918,35 @@ def _diagnostic_rows(
                 )
             )
             ambiguous_start = None
+    mask_start: int | None = None
+    mask_classes: set[str] = set()
+    for index, interval in enumerate(intervals):
+        if interval.handoff_relation_mask_classes:
+            if mask_start is None:
+                mask_start = index
+            mask_classes.update(interval.handoff_relation_mask_classes)
+        if mask_start is not None and (
+            not interval.handoff_relation_mask_classes or index == len(intervals) - 1
+        ):
+            end_index = index if interval.handoff_relation_mask_classes else index - 1
+            serial += 1
+            rows.append(
+                _transition_row(
+                    transition_id=f"D{serial:05d}",
+                    from_interval_index=mask_start,
+                    to_interval_index=end_index,
+                    from_speaker=None,
+                    to_speaker=None,
+                    source_sample=None,
+                    handoff_target=None,
+                    relation_target=None,
+                    mask_state="masked",
+                    primary_topology="ambiguous_nonlexical_vocalization_region",
+                    secondary_tags=tuple(sorted(mask_classes)) + ("diagnostic",),
+                )
+            )
+            mask_start = None
+            mask_classes = set()
     for index, interval in enumerate(intervals):
         if (
             not interval.ambiguous
@@ -1009,40 +1155,50 @@ def generate_labels(
     scored_start_sample: int | None = None,
     scored_end_sample: int | None = None,
 ) -> LabelResult:
-    installed_contract = load_contract()
     if contract is None:
-        active_contract = installed_contract
+        active_contract = load_contract()
     else:
         active_contract = _validate_contract(contract)
+        try:
+            installed_contract = load_contract(version=active_contract.contract_version)
+        except LabelContractError as exc:
+            raise LabelContractError(
+                "supplied contract does not match an installed contract version"
+            ) from exc
         if active_contract != installed_contract:
             raise LabelContractError(
-                "supplied contract does not match the installed contract version"
+                "supplied contract does not match an installed contract version"
             )
-    intervals = _reconcile_same_speaker_jitter_gaps(
-        normalize_intervals(
-            values,
-            scored_start_sample=scored_start_sample,
-            scored_end_sample=scored_end_sample,
-        ),
-        active_contract,
+    intervals = normalize_intervals(
+        values,
+        scored_start_sample=scored_start_sample,
+        scored_end_sample=scored_end_sample,
     )
+    if active_contract.contract_version == "psem-handoff-v0" and any(
+        interval.handoff_relation_mask_classes for interval in intervals
+    ):
+        raise LabelContractError("psem-handoff-v0 does not accept relation-only masks")
+    intervals = _reconcile_same_speaker_jitter_gaps(intervals, active_contract)
     activity_labels: list[dict[str, Any]] = []
     for interval in intervals:
         state = _activity_state(interval)
-        activity_labels.append(
-            {
-                "start_sample": interval.start_sample,
-                "end_sample": interval.end_sample,
-                "state": state,
-                "active_speakers": list(interval.active_speakers),
-                "mask_state": (
-                    "masked"
-                    if interval.ambiguous
-                    or (not interval.speaker_identity_known and not interval.active_speakers)
-                    else "valid"
-                ),
-            }
-        )
+        row = {
+            "start_sample": interval.start_sample,
+            "end_sample": interval.end_sample,
+            "state": state,
+            "active_speakers": list(interval.active_speakers),
+            "mask_state": (
+                "masked"
+                if interval.ambiguous
+                or (not interval.speaker_identity_known and not interval.active_speakers)
+                else "valid"
+            ),
+        }
+        if interval.handoff_relation_mask_classes:
+            row["handoff_relation_mask_classes"] = list(
+                interval.handoff_relation_mask_classes
+            )
+        activity_labels.append(row)
     reliable_indices = [
         index
         for index, interval in enumerate(intervals)
@@ -1055,6 +1211,7 @@ def generate_labels(
         prefix = intervals[:first_index]
         prefix_requires_mask = any(
             interval.ambiguous
+            or interval.handoff_relation_mask_classes
             or not interval.speaker_identity_known
             or len(interval.active_speakers) >= 3
             for interval in prefix
@@ -1096,10 +1253,8 @@ def generate_labels(
         )
     )
     episodes = _topology_episodes(transitions, intervals, active_contract)
-    stable_singleton_samples = sum(
-        interval.duration_samples
-        for interval in intervals
-        if _is_reliable_solo(interval, active_contract)
+    stable_singleton_samples = _stable_singleton_exposure_samples(
+        intervals, active_contract
     )
     ongoing_overlap_samples = sum(
         interval.duration_samples
@@ -1109,10 +1264,24 @@ def generate_labels(
     ambiguous_samples = sum(
         interval.duration_samples for interval in intervals if interval.ambiguous
     )
+    nonlexical_mask_samples = sum(
+        interval.duration_samples
+        for interval in intervals
+        if interval.handoff_relation_mask_classes
+    )
     unknown_identity_samples = sum(
         interval.duration_samples for interval in intervals if not interval.speaker_identity_known
     )
     scored_samples = intervals[-1].end_sample - intervals[0].start_sample
+    exposure = {
+        "scored_samples": scored_samples,
+        "stable_singleton_samples": stable_singleton_samples,
+        "ongoing_overlap_samples": ongoing_overlap_samples,
+        "ambiguous_samples": ambiguous_samples,
+        "unknown_identity_samples": unknown_identity_samples,
+    }
+    if active_contract.contract_version == "psem-handoff-v1":
+        exposure["ambiguous_nonlexical_vocalization_samples"] = nonlexical_mask_samples
     return LabelResult(
         contract_version=active_contract.contract_version,
         contract_document_sha256=active_contract.document_sha256,
@@ -1121,11 +1290,5 @@ def generate_labels(
         activity_labels=tuple(activity_labels),
         transitions=tuple(transitions),
         topology_episodes=tuple(episodes),
-        exposure={
-            "scored_samples": scored_samples,
-            "stable_singleton_samples": stable_singleton_samples,
-            "ongoing_overlap_samples": ongoing_overlap_samples,
-            "ambiguous_samples": ambiguous_samples,
-            "unknown_identity_samples": unknown_identity_samples,
-        },
+        exposure=exposure,
     )

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "inventory_version": "psem-nonlexical-v1",
+  "contract_version": "psem-handoff-v1",
+  "mask_class": "ambiguous_nonlexical_vocalization",
+  "ami": {
+    "element_types": {
+      "w": "rttm_activity_only",
+      "vocalsound": "mask_by_explicit_or_point_timing",
+      "disfmarker": "no_activity_no_mask",
+      "gap": "no_activity_no_mask",
+      "transformerror": "no_activity_no_mask"
+    },
+    "nonzero_padding_samples": 800,
+    "point_padding_samples": 4000,
+    "reversed_vocalsound_timing": "sort_bounds_then_mask_nonzero_interval",
+    "missing_starttime": "mask_between_nearest_timed_siblings_plus_nonzero_padding",
+    "missing_endtime": "treat_starttime_as_point_and_apply_point_padding",
+    "unmapped_empty_speaker_file": "bind_as_empty_corpus_placeholder_without_activity_or_mask"
+  },
+  "alimeeting": {
+    "text_normalization": "unicode_nfkc_trim_and_collapse_whitespace",
+    "markup_delimiters": [
+      "square",
+      "angle",
+      "curly",
+      "round"
+    ],
+    "marker_tokens": {},
+    "class_actions": {
+      "empty": "no_activity_no_mask",
+      "lexical_text": "rttm_activity_only",
+      "human_vocal_marker_only": "full_interval_handoff_relation_mask",
+      "mixed_lexical_human_vocal": "rttm_activity_and_full_interval_handoff_relation_mask",
+      "nonhuman_noise_marker_only": "no_activity_no_mask",
+      "mixed_lexical_nonhuman_noise": "rttm_activity_only"
+    },
+    "unseen_or_malformed_markup": "fail_preflight"
+  }
+}

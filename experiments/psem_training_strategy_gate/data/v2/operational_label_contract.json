@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "contract_version": "psem-handoff-v1",
+  "authority": {
+    "experiment_issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/76",
+    "dataset_issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/86",
+    "dataset_issue_sha256": "90078d66026f1374b065a5b9022788c40fac076cd4cf307df87b5027ea3fcb63",
+    "supersedes_for_model_selection": "psem-handoff-v0"
+  },
+  "status": "forced_alignment_reference_contract",
+  "source_coordinate_convention": {
+    "sample_rate_hz": 16000,
+    "coordinates": "zero_based_half_open_unsnapped_source_samples",
+    "grid_mapping": "forbidden_in_dataset_labels"
+  },
+  "constants_ms": {
+    "reliable_solo_min_duration": 200,
+    "annotation_boundary_jitter": 50,
+    "gap_topology_min_duration": 100,
+    "overlap_topology_min_duration": 100,
+    "local_continuity_max_gap": 1200,
+    "short_backchannel_min_duration": 200,
+    "short_backchannel_max_duration": 1000
+  },
+  "temporal_activity_authority": {
+    "repository": "https://github.com/nttcslab-sp/diar-forced-alignment",
+    "commit": "9527b7c64846fb38316a610f32e9d3466bd6d8b7",
+    "reference_paths": [
+      "AMI/train/*.rttm",
+      "AMI/dev/*.rttm",
+      "AMI/test/*.rttm",
+      "AliMeeting/Train_Ali_far/*.rttm",
+      "AliMeeting/Eval_Ali_far/*.rttm"
+    ],
+    "same_speaker_rows": "union_only_when_overlapping_or_touching",
+    "cross_speaker_rows": "preserve_as_overlap",
+    "original_transcript_intervals": "text_identity_and_nonlexical_metadata_only",
+    "neural_or_model_prediction_repair": "forbidden",
+    "alignment_reproduction_or_improvement": "forbidden"
+  },
+  "floor_speech_activity": {
+    "aligned_lexical_words": "activity_when_present_in_rttm",
+    "aligned_filled_pauses_and_hesitations": "activity_when_present_in_rttm",
+    "aligned_lexicalized_backchannels": "activity_when_present_in_rttm",
+    "aligned_truncated_or_mispronounced_words": "activity_when_present_in_rttm"
+  },
+  "nonlexical_mask": {
+    "class": "ambiguous_nonlexical_vocalization",
+    "scope": "handoff_and_relation_supervision_only",
+    "activity": "always_preserved_from_rttm",
+    "ami_nonzero_vocalsound": "explicit_interval_plus_50_ms_each_side_clipped_to_source",
+    "ami_point_or_zero_vocalsound": "point_plus_or_minus_250_ms_clipped_to_source",
+    "ami_reversed_vocalsound_bounds": "sort_bounds_then_apply_nonzero_vocalsound_mask",
+    "ami_missing_vocalsound_starttime": "mask_between_nearest_timed_siblings_plus_50_ms_each_side",
+    "ami_missing_vocalsound_endtime": "treat_starttime_as_point_and_mask_plus_or_minus_250_ms",
+    "ami_unmapped_empty_speaker_file": "bind_as_empty_corpus_placeholder_without_activity_or_mask",
+    "ami_punctuation_and_disfluency": "no_activity_and_no_mask_without_acoustic_duration",
+    "alimeeting_human_vocal_only": "full_textgrid_interval",
+    "alimeeting_mixed_lexical_human_vocal": "rttm_activity_and_full_textgrid_interval_mask",
+    "alimeeting_nonhuman_noise": "no_activity_and_no_mask",
+    "unknown_human_vocal_class": "fail_preflight"
+  },
+  "primary_event": {
+    "id": "handoff_confirmed",
+    "boundary": "first_source_sample_of_the_new_reliable_solo_interval",
+    "reliability_confirmation_shifts_boundary": false,
+    "initial_solo_is_handoff": false,
+    "overlap_onset_is_handoff": false
+  },
+  "boundary_reconciliation": {
+    "gap_at_or_below_jitter_ms": "direct_transition_with_boundary_jitter_gap_tag",
+    "overlap_at_or_below_jitter_ms": "direct_transition_at_post_overlap_solo_boundary_with_boundary_jitter_overlap_tag",
+    "micro_gap_above_jitter_below_topology_minimum": "valid_target_when_resolved_but_not_official_gap_coverage",
+    "micro_overlap_above_jitter_below_topology_minimum": "valid_target_when_resolved_but_not_official_overlap_coverage",
+    "overlap_then_gap_resolved_within_continuity": "valid_target_at_reliable_solo_onset_but_not_official_gap_or_overlap_coverage",
+    "annotation_boundary_jitter_interpretation": "deterministic_topology_reconciliation_not_empirical_accuracy",
+    "audio_or_model_prediction_repair": "forbidden"
+  },
+  "official_primary_topology_precedence": [
+    "short_backchannel_return",
+    "overlap_takeover",
+    "overlap_return",
+    "silence_gap_different_speaker_handoff",
+    "same_speaker_silence_gap_resume",
+    "clean_direct_different_speaker_handoff"
+  ],
+  "exclusive_counting": {
+    "short_backchannel_return": "one_episode_replaces_its_two_member_handoff_topologies_for_coverage_only",
+    "secondary_tags": "may_preserve_non_counting_entry_and_return_semantics",
+    "one_episode_may_increment_official_primary_gate_count": 1
+  },
+  "ambiguity_and_mask_rules": {
+    "unknown_speaker_identity": "retain_activity_and_mask_handoff_and_relation",
+    "unknown_active_speech_without_ids": "represent_as_speaker_identity_known_false_with_empty_active_speakers_and_activity_state_unknown_speech",
+    "initial_solo_after_unknown_ambiguous_or_complex_prefix": "mask_handoff_and_relation",
+    "ambiguous_annotation_crossing": "mask_handoff_and_relation",
+    "ambiguous_nonlexical_vocalization_crossing": "retain_rttm_activity_and_mask_handoff_and_relation",
+    "complex_overlap_transition": "mask_handoff_and_relation",
+    "complex_overlap_region_three_or_more_speakers": "retain_overlap_activity_and_emit_masked_diagnostic_topology",
+    "overlap_to_silence_without_reliable_resolution": "mask_handoff_and_relation",
+    "gap_above_local_continuity_maximum": "continuity_unknown_and_mask_handoff_and_relation",
+    "activity_supervision": "retain_when_interval_activity_is_reliable"
+  },
+  "forbidden_task_authority": [
+    "experiments/speaker_representation_scd/r7_relation_verifier.py::_event_rows",
+    "experiments/speaker_representation_scd/r7b_local_segmentation.py labels/events",
+    "cached R7/R7-B event manifests",
+    "issue #72 labels",
+    "AMI segment boundaries as literal activity",
+    "AliMeeting nonempty TextGrid intervals as literal activity"
+  ]
+}
