@@ -448,7 +448,11 @@ def _validate_raw_value_type(value: object, expected: object, *, path: str) -> N
     origin = get_origin(expected)
     args = get_args(expected)
     if origin in (types.UnionType, Union):
-        if any(_raw_value_matches_type(value, option) for option in args):
+        for option in args:
+            try:
+                _validate_raw_value_type(value, option, path=path)
+            except ValueError:
+                continue
             return
         raise ValueError(f"{path} has an invalid type")
     if origin is Literal:
@@ -458,18 +462,41 @@ def _validate_raw_value_type(value: object, expected: object, *, path: str) -> N
     if origin is list:
         if not isinstance(value, list):
             raise ValueError(f"{path} must be a JSON array")
+        item_type = args[0] if args else object
+        for index, item in enumerate(value):
+            _validate_raw_value_type(item, item_type, path=f"{path}[{index}]")
         return
     if origin is tuple:
         if not isinstance(value, list | tuple):
             raise ValueError(f"{path} must be a JSON array")
+        if args and args[-1] is Ellipsis:
+            for index, item in enumerate(value):
+                _validate_raw_value_type(item, args[0], path=f"{path}[{index}]")
+        elif args:
+            if len(value) != len(args):
+                raise ValueError(f"{path} has an invalid array length")
+            for index, (item, item_type) in enumerate(zip(value, args, strict=True)):
+                _validate_raw_value_type(item, item_type, path=f"{path}[{index}]")
         return
     if origin in (dict, Mapping):
         if not isinstance(value, Mapping):
             raise ValueError(f"{path} must be a JSON object")
+        key_type, value_type = args if len(args) == 2 else (object, object)
+        for key, item in value.items():
+            _validate_raw_value_type(key, key_type, path=f"{path}.<key>")
+            _validate_raw_value_type(item, value_type, path=f"{path}.{key}")
         return
     if isinstance(expected, type) and is_dataclass(expected):
         if not isinstance(value, Mapping):
             raise ValueError(f"{path} must be a JSON object")
+        type_hints = get_type_hints(expected)
+        for field in fields(expected):
+            if field.name in value:
+                _validate_raw_value_type(
+                    value[field.name],
+                    type_hints[field.name],
+                    path=f"{path}.{field.name}",
+                )
         return
     if not _raw_value_matches_type(value, expected):
         raise ValueError(f"{path} has an invalid type")

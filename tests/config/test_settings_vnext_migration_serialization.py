@@ -908,7 +908,7 @@ def test_telemetry_consent_transitions_manage_operational_state() -> None:
     assert allowed_again.state.telemetry.anonymous_id == "new-id"
 
 
-def test_malformed_telemetry_sent_dates_are_ignored_and_deduplicated() -> None:
+def test_telemetry_sent_dates_are_normalized_and_deduplicated() -> None:
     serialization = _serialization()
     raw = serialization.to_dict(AppSettingsVNext())
     raw["state"]["telemetry"] = {
@@ -917,7 +917,6 @@ def test_malformed_telemetry_sent_dates_are_ignored_and_deduplicated() -> None:
             "2026-07-01",
             "bad-date",
             "2026-07-01",
-            7,
             "2026-07-02",
         ],
     }
@@ -1925,9 +1924,14 @@ def test_top_level_non_object_json_fails_without_backup_or_overwrite(
         (("intent", "osc", "chatbox_send"), "true"),
         (("state", "github_star_prompt", "clicked"), 1),
         (("intent", "translation", "concurrency_limit"), "5"),
+        (("intent", "languages", "peer_expected_languages"), [123]),
+        (("intent", "languages", "recent_source_languages"), [123]),
+        (("intent", "translation", "connection_history"), {"gemma4_26b_31b": 123}),
+        (("intent", "stt", "custom_terms"), {"ko": [123]}),
+        (("state", "telemetry", "sent_translation_success_dates_utc"), [7]),
     ],
 )
-def test_malformed_canonical_scalar_fails_without_backup_or_overwrite(
+def test_malformed_canonical_nested_value_fails_without_backup_or_overwrite(
     tmp_path: Path,
     field_path: tuple[str, ...],
     invalid_value: object,
