@@ -64,6 +64,7 @@ from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
 from puripuly_heart.domain.events import UIEvent
 
+from .wiring_local_asr_provider_runtime import LocalASRProviderRuntimeFactory
 from .wiring_managed_account import ManagedOpenRouterReleaseRuntime
 from .wiring_managed_gemma import noop_managed_gemma_release
 from .wiring_provider_runtime import (
@@ -706,11 +707,16 @@ async def _compose_runtime_pipeline(
     if http_extensions is None and settings.translation.model == TranslationModel.CUSTOM_HTTP:
         http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
         http_extensions.reload()
-    if settings.translation.model != TranslationModel.MANAGED_GEMMA and managed_gemma is not None:
+    if (
+        settings.translation.model
+        not in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
+        and managed_gemma is not None
+    ):
         await managed_gemma.deactivate()
     if settings.translation.model not in {
         TranslationModel.CUSTOM_HTTP,
         TranslationModel.MANAGED_GEMMA,
+        TranslationModel.MANAGED_GEMMA_12B,
     }:
         await managed_release.rebuild(secrets=secrets)
 
@@ -718,7 +724,10 @@ async def _compose_runtime_pipeline(
     with contextlib.suppress(Exception):
         gemma_runtime = None
         gemma_release = None
-        if settings.translation.model == TranslationModel.MANAGED_GEMMA:
+        if settings.translation.model in (
+            TranslationModel.MANAGED_GEMMA,
+            TranslationModel.MANAGED_GEMMA_12B,
+        ):
             if managed_gemma is None:
                 raise RuntimeError("managed Gemma translation runtime is unavailable")
             gemma_runtime = managed_gemma.runtime
@@ -789,6 +798,7 @@ async def _compose_runtime_pipeline(
         config_snapshot=translation_runtime_configuration.snapshot,
         runtime_logging=runtime_logging,
     )
+    osc.stage_recorder = translation_diagnostics.record_chatbox_stage
     translation_output_projection = TranslationOutputProjectionOwner(
         output_runtime=output_runtime,
         ui_messages=TranslationUiMessageQueue(ui_events),
@@ -818,13 +828,17 @@ async def _compose_runtime_pipeline(
         on_child_terminal=callbacks.child_terminal,
         on_parent_closed=callbacks.parent_closed,
         on_parent_rejected=callbacks.parent_rejected,
+        predecessor_wait_observer=translation_diagnostics.record_translation_wait,
         output=callbacks,
         config_snapshot=translation_runtime_configuration.snapshot,
     )
     resources.translation_turns = translation_turns
     await translation_turns.close_channel_ingress("self")
     await translation_turns.close_channel_ingress("peer")
-    local_asr_runtime = local_asr_factory(secrets).create(
+    asr_factory = local_asr_factory(secrets)
+    if isinstance(asr_factory, LocalASRProviderRuntimeFactory):
+        asr_factory.bind_stt_event_ingress_observer(translation_diagnostics.record_stt_ingress)
+    local_asr_runtime = asr_factory.create(
         LocalASRProviderRuntimeCallbacks(
             self_event_handler=callbacks.self_event_handler,
             peer_event_handler=callbacks.peer_event_handler,

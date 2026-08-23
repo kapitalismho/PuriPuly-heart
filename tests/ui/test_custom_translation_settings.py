@@ -127,6 +127,7 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     assert pending.provider.llm is LLMProviderName.QWEN
     assert pending.translation.fallback == fallback
     assert view._http_extension_row.visible is True
+    assert view._http_extension_host.visible is True
     assert view._translation_connection_row.visible is False
     assert view._openrouter_fallback_card.visible is False
     assert view._local_llm_connection_card.visible is False

@@ -385,6 +385,11 @@ class TranslationIntent:
     deepseek: DeepSeekTranslationIntent = field(default_factory=DeepSeekTranslationIntent)
     qwen: QwenTranslationIntent = field(default_factory=QwenTranslationIntent)
     cerebras: CerebrasTranslationIntent = field(default_factory=CerebrasTranslationIntent)
+    gpu_device_id: str = "auto"
+
+    def __post_init__(self) -> None:
+        device_id = self.gpu_device_id if isinstance(self.gpu_device_id, str) else "auto"
+        object.__setattr__(self, "gpu_device_id", device_id.strip() or "auto")
 
 
 @dataclass(frozen=True, slots=True)
@@ -656,6 +661,7 @@ class DesktopFletOverlayIntent:
     position: DesktopFletOverlayPositionIntent = field(
         default_factory=DesktopFletOverlayPositionIntent
     )
+    swap_caption_languages: bool = False
     visual: DesktopFletOverlayVisualIntent = field(default_factory=DesktopFletOverlayVisualIntent)
 
 

@@ -12,8 +12,9 @@ from pathlib import Path
 from typing import Protocol
 
 from puripuly_heart.core.local_translation.assets import (
-    GEMMA_REVISION,
+    GemmaModelSpec,
     default_gemma_install_dir,
+    e4b_gemma_spec,
 )
 from puripuly_heart.core.local_translation.prefix_cache import GemmaPrefixCache
 from puripuly_heart.core.local_translation.provisioning import ensure_gemma_installed
@@ -141,13 +142,15 @@ def build_managed_gemma_system_prompt(
 
 def _prefix_identity(
     *,
+    spec: GemmaModelSpec,
     system_prompt: str,
     source_language: str,
     target_language: str,
 ) -> str:
     payload = "\0".join(
         (
-            GEMMA_REVISION,
+            spec.model_id,
+            spec.revision,
             LLAMA_CPP_BUILD,
             LLAMA_CPP_COMMIT,
             GEMMA_PROMPT_TEMPLATE_VERSION,
@@ -179,7 +182,8 @@ class ManagedGemmaRuntimeOwner:
         shutdown_timeout_s: float = 10.0,
         prefix_cache: GemmaPrefixCache | None = None,
     ) -> None:
-        self._install_dir = (install_dir or default_gemma_install_dir()).resolve()
+        self._explicit_install_dir = None if install_dir is None else install_dir.resolve()
+        self._install_dir = (self._explicit_install_dir or default_gemma_install_dir()).resolve()
         self._runtime_paths = runtime_paths or default_gemma_runtime_paths()
         self._provisioner = provisioner
         self._process_factory = process_factory
@@ -193,6 +197,7 @@ class ManagedGemmaRuntimeOwner:
         self._transport: ManagedGemmaTransport | None = None
         self._requested_backend: GemmaBackend | None = None
         self._requested_vulkan_device: str | None = None
+        self._active_spec: GemmaModelSpec | None = None
         self._effective_backend: EffectiveGemmaBackend | None = None
         self._prefix_identity: str | None = None
         self._slot_identities: list[str | None] = [None] * GEMMA_SLOT_COUNT
@@ -229,6 +234,7 @@ class ManagedGemmaRuntimeOwner:
         system_prompt: str,
         vulkan_device: str = "Vulkan0",
         provision_kwargs: Mapping[str, object] | None = None,
+        spec: GemmaModelSpec | None = None,
     ) -> ManagedGemmaReadiness:
         task = self._register_operation()
         try:
@@ -241,6 +247,7 @@ class ManagedGemmaRuntimeOwner:
                     system_prompt=system_prompt,
                     vulkan_device=vulkan_device,
                     provision_kwargs=provision_kwargs,
+                    spec=spec,
                 )
         finally:
             self._operation_tasks.discard(task)
@@ -254,6 +261,7 @@ class ManagedGemmaRuntimeOwner:
         system_prompt: str,
         user_message: str,
         vulkan_device: str = "Vulkan0",
+        spec: GemmaModelSpec | None = None,
     ) -> ManagedGemmaResponse:
         task = self._register_operation()
         try:
@@ -266,6 +274,7 @@ class ManagedGemmaRuntimeOwner:
                     system_prompt=system_prompt,
                     vulkan_device=vulkan_device,
                     provision_kwargs=None,
+                    spec=spec,
                 )
                 transport = self._transport
                 if transport is None:
@@ -314,18 +323,24 @@ class ManagedGemmaRuntimeOwner:
         system_prompt: str,
         vulkan_device: str,
         provision_kwargs: Mapping[str, object] | None,
+        spec: GemmaModelSpec | None,
     ) -> ManagedGemmaReadiness:
         self._ensure_accepting()
         if backend not in {"cpu", "gpu"}:
             raise ValueError("managed Gemma backend must be cpu or gpu")
         if not source_language.strip() or not target_language.strip():
             raise ValueError("managed Gemma language pair must be non-empty")
+        resolved_spec = spec or self._active_spec or e4b_gemma_spec()
+        install_dir = (
+            self._explicit_install_dir or default_gemma_install_dir(resolved_spec)
+        ).resolve()
         rendered_prompt = build_managed_gemma_system_prompt(
             system_prompt=system_prompt,
             source_language=source_language,
             target_language=target_language,
         )
         identity = _prefix_identity(
+            spec=resolved_spec,
             system_prompt=rendered_prompt,
             source_language=source_language,
             target_language=target_language,
@@ -336,10 +351,14 @@ class ManagedGemmaRuntimeOwner:
             not process_alive
             or self._requested_backend != backend
             or self._requested_vulkan_device != requested_vulkan_device
+            or self._active_spec != resolved_spec
+            or self._install_dir != install_dir
         )
         if runtime_changed:
+            self._install_dir = install_dir
             kwargs = dict(provision_kwargs or {})
             kwargs.setdefault("install_dir", self._install_dir)
+            kwargs.setdefault("spec", resolved_spec)
             await self._provisioner(**kwargs)
             self._ensure_accepting()
             await self._stop_locked()
@@ -347,6 +366,7 @@ class ManagedGemmaRuntimeOwner:
                 await self._start_locked(
                     backend=backend,
                     vulkan_device=vulkan_device,
+                    spec=resolved_spec,
                 )
                 self._ensure_process_alive()
             except asyncio.CancelledError:
@@ -360,7 +380,11 @@ class ManagedGemmaRuntimeOwner:
                     "[ManagedGemma] backend_fallback requested=gpu effective=cpu reason=vulkan_start_failed",
                     logging.WARNING,
                 )
-                await self._start_locked(backend="cpu", vulkan_device=vulkan_device)
+                await self._start_locked(
+                    backend="cpu",
+                    vulkan_device=vulkan_device,
+                    spec=resolved_spec,
+                )
                 self._ensure_process_alive()
             self._ensure_accepting()
         slot_id, needs_prefix = self._assign_slot(identity)
@@ -392,7 +416,11 @@ class ManagedGemmaRuntimeOwner:
                         "[ManagedGemma] backend_fallback requested=gpu effective=cpu reason=vulkan_prefill_failed",
                         logging.WARNING,
                     )
-                    await self._start_locked(backend="cpu", vulkan_device=vulkan_device)
+                    await self._start_locked(
+                        backend="cpu",
+                        vulkan_device=vulkan_device,
+                        spec=resolved_spec,
+                    )
                     slot_id, _needs_prefix = self._assign_slot(identity)
                     self._slot_identities[slot_id] = None
                     transport = self._transport
@@ -419,6 +447,7 @@ class ManagedGemmaRuntimeOwner:
         self._ensure_process_alive()
         self._requested_backend = backend
         self._requested_vulkan_device = requested_vulkan_device
+        self._active_spec = resolved_spec
         readiness = ManagedGemmaReadiness(
             requested_backend=backend,
             effective_backend=effective,
@@ -502,7 +531,13 @@ class ManagedGemmaRuntimeOwner:
         if process is None or process.returncode is not None:
             raise ManagedGemmaRuntimeError("managed Gemma process exited before readiness")
 
-    async def _start_locked(self, *, backend: GemmaBackend, vulkan_device: str) -> None:
+    async def _start_locked(
+        self,
+        *,
+        backend: GemmaBackend,
+        vulkan_device: str,
+        spec: GemmaModelSpec,
+    ) -> None:
         executable = (
             self._runtime_paths.vulkan_server
             if backend == "gpu"
@@ -522,6 +557,7 @@ class ManagedGemmaRuntimeOwner:
             port=port,
             vulkan_device=vulkan_device,
             slot_save_path=slot_save_path,
+            spec=spec,
         )
         process = await self._process_factory(command)
         self._process = process

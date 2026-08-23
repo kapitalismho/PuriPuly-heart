@@ -260,19 +260,32 @@ class OverlayBridge:
         return asyncio.create_task(coroutine, name=f"OverlayBridge:{task_name}")
 
     async def _broadcast_json(self, payload: dict[str, Any]) -> None:
+        payload_type = str(payload.get("type"))
+        revision: int | None = None
+        block_update_ids: list[str] = []
+        if payload_type == "snapshot":
+            revision = payload.get("payload", {}).get("revision")  # type: ignore[assignment]
+            block_update_ids = self._snapshot_block_update_ids(payload)
         if not self._authenticated_connections:
+            if payload_type == "snapshot" and self.diagnostics is not None:
+                self.diagnostics.record_bridge(
+                    "snapshot_stored_unsent",
+                    revision=revision,
+                    authenticated_connections=0,
+                )
             return
 
         message = json.dumps(payload)
-        revision: int | None = None
-        block_update_ids: list[str] = []
-        if payload.get("type") == "snapshot":
-            revision = payload.get("payload", {}).get("revision")  # type: ignore[assignment]
-            block_update_ids = self._snapshot_block_update_ids(payload)
         start_time = time.perf_counter()
+        if payload_type == "snapshot" and self.diagnostics is not None:
+            self.diagnostics.record_bridge(
+                "send_start",
+                revision=revision,
+                authenticated_connections=len(self._authenticated_connections),
+            )
         self._log_broadcast_marker(
             stage="start",
-            payload_type=str(payload.get("type")),
+            payload_type=payload_type,
             revision=revision,
             block_update_ids=block_update_ids,
             authenticated_connections=len(self._authenticated_connections),
@@ -302,14 +315,23 @@ class OverlayBridge:
         for connection in stale_connections:
             self._authenticated_connections.discard(connection)
 
+        elapsed_ms = max(0, int((time.perf_counter() - start_time) * 1000))
+        if payload_type == "snapshot" and self.diagnostics is not None:
+            self.diagnostics.record_bridge(
+                "send_finish",
+                revision=revision,
+                authenticated_connections=len(self._authenticated_connections),
+                stale_connections=len(stale_connections),
+                elapsed_ms=elapsed_ms,
+            )
         self._log_broadcast_marker(
             stage="finish",
-            payload_type=str(payload.get("type")),
+            payload_type=payload_type,
             revision=revision,
             block_update_ids=block_update_ids,
             authenticated_connections=len(self._authenticated_connections),
             stale_connections=len(stale_connections),
-            elapsed_ms=max(0, int((time.perf_counter() - start_time) * 1000)),
+            elapsed_ms=elapsed_ms,
         )
 
     def _snapshot_block_update_ids(self, payload: dict[str, Any]) -> list[str]:

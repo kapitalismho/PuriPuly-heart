@@ -13,6 +13,10 @@ from puripuly_heart.app.ports.osc_control import (
     decode_control_message,
 )
 from puripuly_heart.app.ports.oscquery import OscQueryServicePort
+from puripuly_heart.app.ports.ui_models import (
+    OscControlPresentationName,
+    OscControlPresentationState,
+)
 from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.runtime.oscquery import (
@@ -38,6 +42,10 @@ class OscControlIntegrationOwner:
         state_provider: Callable[[], OscCanonicalState],
         language_state_provider: Callable[[], tuple[str, str, str, str]],
         translation_model_normalizer: Callable[[object], object],
+        ui_state_provider: (
+            Callable[[OscControlPresentationName], OscControlPresentationState] | None
+        ) = None,
+        ui_state_sink: Callable[[OscControlPresentationState], None] | None = None,
         query_service: OscQueryServicePort | None = None,
         error_sink: Callable[[str], None] | None = None,
         resync_timeout_seconds: float = 1.5,
@@ -47,6 +55,8 @@ class OscControlIntegrationOwner:
         self._application_provider = application_provider
         self._sender_provider = sender_provider
         self._state_provider = state_provider
+        self._ui_state_provider = ui_state_provider
+        self._ui_state_sink = ui_state_sink
         self._error_sink = error_sink
         self._mode: OscConnectionMode = "off"
         self._send_port = 9000
@@ -83,6 +93,7 @@ class OscControlIntegrationOwner:
             echo_suppression_provider=self._is_echo,
             canonical_state_republisher=self._publish_delta,
             canonical_state_full_republisher=self._publish_full,
+            canonical_state_projector=self._project_ui_state,
             error_sink=error_sink,
         )
         self._receiver_owner.set_packet_handlers(
@@ -330,6 +341,11 @@ class OscControlIntegrationOwner:
         if inspect.isawaitable(result):
             return await result
         return result
+
+    def _project_ui_state(self, control: OscControlPresentationName) -> None:
+        if self._ui_state_provider is None or self._ui_state_sink is None:
+            return
+        self._ui_state_sink(self._ui_state_provider(control))
 
     def _dashboard_command_matches_canonical_state(self, method_name: str, value: bool) -> bool:
         field_by_method = {

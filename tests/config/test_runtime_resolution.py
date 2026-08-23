@@ -609,6 +609,63 @@ def test_managed_gemma_resolves_distinct_local_target_without_provider_fallback(
     assert config.attempts[0].target == config.primary
 
 
+def test_local_llm_resolves_without_provider_fallback() -> None:
+    runtime_resolution = _runtime_resolution_module()
+    resolved = _resolved_module()
+
+    config = runtime_resolution.resolve_llm_config(
+        _runtime_input(
+            runtime_resolution,
+            model=runtime_resolution.TRANSLATION_MODEL_LOCAL_LLM,
+            connection=runtime_resolution.TRANSLATION_CONNECTION_OLLAMA,
+            translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
+                enabled=True,
+                model=runtime_resolution.TRANSLATION_MODEL_GEMMA4_26B_31B,
+                connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER,
+            ),
+        )
+    )
+
+    assert config.provider == runtime_resolution.PROVIDER_LOCAL_LLM
+    assert config.credential == resolved.ResolvedCredentialRequirement(
+        source=resolved.CREDENTIAL_SOURCE_NONE,
+        required=False,
+        reference=None,
+    )
+    assert config.fallback is None
+    assert len(config.attempts) == 1
+    assert config.attempts[0].target == config.primary
+
+
+def test_managed_gemma_12b_resolves_gpu_local_target_without_provider_fallback() -> None:
+    runtime_resolution = _runtime_resolution_module()
+    resolved = _resolved_module()
+
+    config = runtime_resolution.resolve_llm_config(
+        _runtime_input(
+            runtime_resolution,
+            model=runtime_resolution.TRANSLATION_MODEL_MANAGED_GEMMA_12B,
+            connection=runtime_resolution.TRANSLATION_CONNECTION_GPU,
+            translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
+                enabled=True,
+                model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
+                connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER,
+            ),
+        )
+    )
+
+    assert config.provider == runtime_resolution.PROVIDER_MANAGED_GEMMA
+    assert config.model == runtime_resolution.MANAGED_GEMMA_12B_MODEL
+    assert config.credential == resolved.ResolvedCredentialRequirement(
+        source=resolved.CREDENTIAL_SOURCE_NONE,
+        required=False,
+        reference=None,
+    )
+    assert config.provider_options == {"backend": "gpu"}
+    assert config.fallback is None
+    assert len(config.attempts) == 1
+
+
 def test_legacy_managed_gemma_provider_derives_cpu_product_intent() -> None:
     runtime_resolution = _runtime_resolution_module()
 

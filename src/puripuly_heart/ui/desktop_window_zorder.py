@@ -18,6 +18,7 @@ _SWP_ASYNCWINDOWPOS = 0x4000
 _WINDOW_TITLE_MAX_CHARS = 512
 _WS_EX_TOPMOST = 0x00000008
 _WS_EX_TRANSPARENT = 0x00000020
+WINDOWS_WINDOW_VISIBILITY_TIMEOUT_S = 2.5
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,7 +160,7 @@ class WindowsWindowZOrderPort:
         timeout_s: float = 0.5,
         poll_interval_s: float = 0.01,
         bounds_retain_s: float = 0.05,
-        visibility_timeout_s: float = 5.0,
+        visibility_timeout_s: float = WINDOWS_WINDOW_VISIBILITY_TIMEOUT_S,
         visibility_retain_s: float = 0.6,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:

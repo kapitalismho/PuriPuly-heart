@@ -21,6 +21,7 @@ def test_overlay_settings_desktop_flet_defaults_serialize_canonical_shape() -> N
     assert settings.overlay.desktop_flet.position.x is None
     assert settings.overlay.desktop_flet.position.y is None
     assert settings.overlay.desktop_flet.locked is False
+    assert settings.overlay.desktop_flet.swap_caption_languages is False
     assert settings.overlay.desktop_flet.visual.background_alpha == 0.6
 
     data = to_dict(settings)
@@ -29,6 +30,7 @@ def test_overlay_settings_desktop_flet_defaults_serialize_canonical_shape() -> N
     assert data["overlay"]["desktop_flet"] == {
         "size_preset": "medium",
         "position": {"x": None, "y": None},
+        "swap_caption_languages": False,
         "visual": {"background_alpha": 0.6},
     }
     assert "locked" not in data["overlay"]["desktop_flet"]
@@ -81,6 +83,7 @@ def test_overlay_settings_desktop_flet_legacy_locked_loads_startup_safe_and_is_n
     assert data["overlay"]["desktop_flet"] == {
         "size_preset": "large",
         "position": {"x": 320, "y": 720},
+        "swap_caption_languages": False,
         "visual": {"background_alpha": 0.45},
     }
     assert "locked" not in data["overlay"]["desktop_flet"]
@@ -111,6 +114,7 @@ def test_overlay_settings_desktop_flet_invalid_canonical_values_repair() -> None
                         "y": math.inf,
                     },
                     "locked": "yes",
+                    "swap_caption_languages": "yes",
                     "visual": {"background_alpha": True},
                 }
             }
@@ -121,6 +125,7 @@ def test_overlay_settings_desktop_flet_invalid_canonical_values_repair() -> None
     assert settings.overlay.desktop_flet.position.x is None
     assert settings.overlay.desktop_flet.position.y is None
     assert settings.overlay.desktop_flet.locked is False
+    assert settings.overlay.desktop_flet.swap_caption_languages is False
     assert settings.overlay.desktop_flet.visual.background_alpha == 0.6
 
     missing_and_non_finite = from_dict(
@@ -174,6 +179,7 @@ def test_overlay_settings_desktop_flet_legacy_bounds_and_visual_migrate_to_canon
     assert data["overlay"]["desktop_flet"] == {
         "size_preset": "large",
         "position": {"x": 320, "y": 720},
+        "swap_caption_languages": False,
         "visual": {"background_alpha": 0.45},
     }
     assert "locked" not in data["overlay"]["desktop_flet"]
@@ -242,3 +248,14 @@ def test_settings_json_allow_nan_false_with_repaired_desktop_flet_overlay_values
     )
 
     json.dumps(to_dict(settings), allow_nan=False)
+
+
+def test_overlay_settings_desktop_flet_swap_caption_languages_round_trips() -> None:
+    settings = from_dict({"overlay": {"desktop_flet": {"swap_caption_languages": True}}})
+
+    data = to_dict(settings)
+    round_tripped = from_dict(data)
+
+    assert settings.overlay.desktop_flet.swap_caption_languages is True
+    assert data["overlay"]["desktop_flet"]["swap_caption_languages"] is True
+    assert round_tripped.overlay.desktop_flet.swap_caption_languages is True

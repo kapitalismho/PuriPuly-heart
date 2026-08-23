@@ -697,6 +697,7 @@ async def test_overlay_bridge_records_disconnect_code_and_reason(
     diagnostics = OverlayDiagnosticsRecorder(
         overlay_instance_id="overlay-test",
         diagnostics_dir=tmp_path,
+        logging_mode="detailed",
     )
     bridge = OverlayBridge(
         session_token="expected-token",
@@ -719,7 +720,15 @@ async def test_overlay_bridge_records_disconnect_code_and_reason(
     finally:
         await bridge.stop()
 
-    assert list(diagnostics.bridge_events) == []
+    events = list(diagnostics.bridge_events)
+    assert [event["event"] for event in events] == [
+        "connection_authenticated",
+        "connection_closed",
+        "connection_detached",
+    ]
+    closed = events[1]
+    assert closed["code"] == 4001
+    assert closed["reason"] == "client_bye"
 
 
 @pytest.mark.asyncio
@@ -729,6 +738,7 @@ async def test_overlay_bridge_records_send_failures_and_prunes_stale_connections
     diagnostics = OverlayDiagnosticsRecorder(
         overlay_instance_id="overlay-test",
         diagnostics_dir=tmp_path,
+        logging_mode="detailed",
     )
     bridge = OverlayBridge(
         session_token="expected-token",
@@ -751,7 +761,15 @@ async def test_overlay_bridge_records_send_failures_and_prunes_stale_connections
         )
     )
 
-    assert list(diagnostics.bridge_events) == []
+    events = list(diagnostics.bridge_events)
+    assert [event["event"] for event in events] == [
+        "send_start",
+        "send_failure",
+        "send_finish",
+    ]
+    assert events[1]["removed"] is True
+    assert events[1]["exception_type"]
+    assert events[2]["stale_connections"] == 1
     assert bridge._authenticated_connections == set()
 
 
@@ -840,3 +858,41 @@ async def test_overlay_bridge_snapshot_broadcast_logs_only_in_detailed_mode(
         and "elapsed_ms=" in message
         for message in broadcast_messages
     )
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_records_snapshot_send_stages_without_payload_text() -> None:
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="bridge-stage-test",
+        logging_mode="detailed",
+    )
+    bridge = OverlayBridge(session_token="expected-token", diagnostics=recorder)
+    snapshot = OverlayPresentationSnapshot(
+        revision=1,
+        calibration=OverlayPresentationCalibration(),
+        blocks=[],
+    )
+
+    await bridge.replace_snapshot(snapshot)
+
+    unsent = list(recorder.bridge_events)
+    assert [event["event"] for event in unsent] == ["snapshot_stored_unsent"]
+    assert unsent[0]["revision"] == 1
+
+    connection = _RecordingSendConnection()
+    bridge._authenticated_connections.add(connection)  # type: ignore[arg-type]
+    await bridge.replace_snapshot(
+        OverlayPresentationSnapshot(
+            revision=2,
+            calibration=OverlayPresentationCalibration(),
+            blocks=[],
+        )
+    )
+
+    events = list(recorder.bridge_events)
+    assert [event["event"] for event in events[-2:]] == ["send_start", "send_finish"]
+    assert events[-1]["revision"] == 2
+    assert "elapsed_ms" in events[-1]
+    dumped = json.dumps(events)
+    assert "primary_text" not in dumped
+    assert "secondary_text" not in dumped

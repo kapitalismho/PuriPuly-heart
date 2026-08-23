@@ -38,6 +38,7 @@ from puripuly_heart.config.runtime_resolution import (
     PROVIDER_QWEN,
     TRANSLATION_CONNECTION_OFFICIAL_BYOK,
     TRANSLATION_MODEL_MANAGED_GEMMA,
+    TRANSLATION_MODEL_MANAGED_GEMMA_12B,
     TRANSLATION_MODEL_QWEN_35_PLUS,
     DirectProviderRuntimeIntent,
     RuntimeResolutionInput,
@@ -62,6 +63,7 @@ from puripuly_heart.config.settings import (
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.fallback_racing import LLMProviderAttempt
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
+from puripuly_heart.core.local_translation.devices import resolve_llama_vulkan_device
 from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_ENV,
@@ -220,6 +222,12 @@ def _runtime_resolution_input_from_compatibility_settings(
             connection=settings.translation.connection.value,
             concurrency_limit=settings.llm.concurrency_limit,
         )
+    elif settings.translation.model == TranslationModel.MANAGED_GEMMA_12B:
+        translation_intent = normalize_translation_runtime_intent(
+            model=TRANSLATION_MODEL_MANAGED_GEMMA_12B,
+            connection=settings.translation.connection.value,
+            concurrency_limit=settings.llm.concurrency_limit,
+        )
     elif settings.provider.llm == LLMProviderName.QWEN:
         translation_intent = normalize_translation_runtime_intent(
             model=TRANSLATION_MODEL_QWEN_35_PLUS,
@@ -295,7 +303,6 @@ def _require_openrouter_byok_api_key(secrets: SecretStore) -> str:
 def _openrouter_managed_api_key(
     secrets: SecretStore,
     credential: ResolvedCredentialRequirement,
-    settings: AppSettings,
 ) -> str | None:
     requested_secret_key = _openrouter_managed_api_key_secret_for_resolved_credential(credential)
     opposite_secret_key = _opposite_openrouter_managed_api_key_secret(requested_secret_key)
@@ -303,11 +310,6 @@ def _openrouter_managed_api_key(
     opposite_value = _normalize_secret_value(secrets.get(opposite_secret_key))
     if opposite_value is not None:
         raise ValueError("OpenRouter managed local claim conflict")
-    if (
-        credential.reference == CREDENTIAL_REF_OPENROUTER_MANAGED_QQ
-        and _normalize_secret_value(settings.managed_identity.active_managed_credential_ref) is None
-    ):
-        return None
     return requested_value
 
 
@@ -622,7 +624,7 @@ def _openrouter_provider_from_resolved_fields(
             secrets=secrets,
             credential=credential,
         )
-        managed_api_key = _openrouter_managed_api_key(secrets, credential, openrouter_settings)
+        managed_api_key = _openrouter_managed_api_key(secrets, credential)
         if force_managed_wrapper or managed_api_key is None:
             from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
 
@@ -686,9 +688,16 @@ def _provider_from_resolved_target(
         backend = target.provider_options.get("backend")
         if backend not in {"cpu", "gpu"}:
             raise ValueError("managed Gemma backend must be cpu or gpu")
+        vulkan_device = "Vulkan0"
+        if compatibility_settings is not None:
+            translation = getattr(compatibility_settings, "translation", None)
+            vulkan_device = resolve_llama_vulkan_device(
+                getattr(translation, "gpu_device_id", "auto")
+            )
         return ManagedGemmaLLMProvider(
             runtime=managed_gemma_runtime,
             backend=backend,
+            vulkan_device=vulkan_device,
             release_runtime=managed_gemma_release,
             runtime_logging=runtime_logging,
         )

@@ -11,7 +11,11 @@ from puripuly_heart.app.ports.gpu_worker import (
     GpuWorkerDevice,
     GpuWorkerTranscription,
 )
-from puripuly_heart.core.runtime.gpu_asr import GpuASRDecodeDropped
+from puripuly_heart.core.runtime.gpu_asr import (
+    GpuASRDecodeDropped,
+    GpuASRWorkDiscarded,
+    GpuASRWorkExpired,
+)
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 
@@ -206,6 +210,61 @@ async def test_decode_drop_emits_empty_final_and_keeps_session_for_new_utterance
     assert len(runtime.submissions) == 2
     assert runtime.submissions[0][1].size == 120_000
     assert runtime.submissions[1][1].size == 1600
+    await session.close()
+    await backend.close()
+
+
+async def test_work_expiry_emits_empty_final_and_keeps_session_for_new_utterance() -> None:
+    runtime = FakeSharedGpuRuntime()
+    runtime.submit_failures.append(GpuASRWorkExpired("speech_end_ttl"))
+    backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="peer",
+        model_path=Path("model.gguf"),
+        model_id="gpu-model",
+        device_id="auto",
+    )
+    session = await backend.open_session()
+    events = session.events()
+
+    await session.send_audio_f32(np.zeros(120_000, dtype=np.float32))
+    await session.on_speech_end()
+    expired = await asyncio.wait_for(anext(events), timeout=0.5)
+    await session.send_audio_f32(np.ones(1600, dtype=np.float32))
+    await session.on_speech_end()
+    recovered = await asyncio.wait_for(anext(events), timeout=0.5)
+
+    assert expired.text == ""
+    assert expired.is_final is True
+    assert recovered.text == "hello"
+    assert recovered.is_final is True
+    assert len(runtime.submissions) == 2
+    await session.close()
+    await backend.close()
+
+
+async def test_work_discard_still_fails_the_session() -> None:
+    runtime = FakeSharedGpuRuntime()
+    runtime.submit_failures.append(GpuASRWorkDiscarded("channel_disabled"))
+    backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="peer",
+        model_path=Path("model.gguf"),
+        model_id="gpu-model",
+        device_id="auto",
+    )
+    session = await backend.open_session()
+    events = session.events()
+
+    await session.send_audio_f32(np.ones(1600, dtype=np.float32))
+    await session.on_speech_end()
+    dropped = await asyncio.wait_for(anext(events), timeout=0.5)
+
+    assert dropped.text == ""
+    assert dropped.is_final is True
+    with pytest.raises(GpuASRWorkDiscarded, match="channel_disabled"):
+        await asyncio.wait_for(anext(events), timeout=0.5)
+
     await session.close()
     await backend.close()
 

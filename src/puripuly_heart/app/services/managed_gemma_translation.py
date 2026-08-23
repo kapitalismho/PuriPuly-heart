@@ -11,6 +11,7 @@ from puripuly_heart.app.ports.managed_gemma_translation import (
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr.local_stt_download_port import HuggingFaceDownloadPort
+from puripuly_heart.core.local_translation.assets import resolve_gemma_spec
 from puripuly_heart.core.local_translation.provisioning import (
     GemmaProvisioningCancelled,
     GemmaProvisioningUpdate,
@@ -112,6 +113,7 @@ class ManagedGemmaTranslationOwner:
                     progress_percent=update.percent,
                 )
 
+            spec = resolve_gemma_spec(selection.model_id)
             task = start_lifecycle_task(
                 self._task_scope,
                 self._runtime.prepare(
@@ -119,10 +121,13 @@ class ManagedGemmaTranslationOwner:
                     source_language=selection.source_language,
                     target_language=selection.target_language,
                     system_prompt=selection.system_prompt,
+                    vulkan_device=selection.vulkan_device,
+                    spec=spec,
                     provision_kwargs={
                         "downloader": self._downloader,
                         "cancel_event": cancel_event,
                         "on_status": on_status,
+                        "spec": spec,
                     },
                 ),
                 name=f"prepare-{generation}",

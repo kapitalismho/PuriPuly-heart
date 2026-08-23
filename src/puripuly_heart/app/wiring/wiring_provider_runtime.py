@@ -370,7 +370,10 @@ def compose_provider_runtime(
         if not isinstance(settings_value, AppSettings):
             raise TypeError("LLM provider rebuild settings must be AppSettings")
         secrets = create_secret_store(settings_value.secrets, config_path=config_path)
-        if settings_value.translation.model == TranslationModel.MANAGED_GEMMA:
+        if settings_value.translation.model in (
+            TranslationModel.MANAGED_GEMMA,
+            TranslationModel.MANAGED_GEMMA_12B,
+        ):
             if managed_gemma is None:
                 raise RuntimeError("managed Gemma translation runtime is unavailable")
             config = translation_runtime_configuration_provider()

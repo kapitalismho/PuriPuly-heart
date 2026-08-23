@@ -28,6 +28,8 @@ from puripuly_heart.core.osc.control_schema import (
     OSC_PARAMETER_ADDRESS_PREFIX,
     OSC_PARAMETER_DEFINITIONS,
     OSC_PARAMETER_PREFIX,
+    TRANSLATION_CONNECTION_BY_MODEL_ID,
+    TRANSLATION_MODEL_ID_BY_SELECTION,
     TRANSLATION_MODEL_ID_BY_VALUE,
     TRANSLATION_MODEL_IDS,
     OscParameterDefinition,
@@ -36,6 +38,7 @@ from puripuly_heart.core.osc.control_schema import (
     parameter_definition,
     parameter_definition_for_address,
     registry_for_parameter,
+    translation_model_id_for_selection,
 )
 
 OscConnectionMode = Literal["automatic", "manual", "off"]
@@ -76,7 +79,11 @@ class OscControlApplicationPort(Protocol):
 
     async def set_peer_asr(self, provider: str) -> object: ...
 
-    async def set_translation_model(self, model: str) -> object: ...
+    async def set_translation_model(
+        self,
+        model: str,
+        connection: str | None = None,
+    ) -> object: ...
 
     async def set_fallback(self, alias: str) -> object: ...
 
@@ -110,7 +117,9 @@ __all__ = [
     "OscParameterDefinition",
     "OscParameterType",
     "OscSenderPort",
+    "TRANSLATION_CONNECTION_BY_MODEL_ID",
     "TRANSLATION_MODEL_IDS",
+    "TRANSLATION_MODEL_ID_BY_SELECTION",
     "TRANSLATION_MODEL_ID_BY_VALUE",
     "UnknownOscControlValueError",
     "decode_control_address",
@@ -120,5 +129,6 @@ __all__ = [
     "parameter_definition",
     "parameter_definition_for_address",
     "registry_for_parameter",
+    "translation_model_id_for_selection",
     "validate_control_value",
 ]

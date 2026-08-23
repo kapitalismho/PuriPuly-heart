@@ -38,7 +38,11 @@ from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_WHITE,
     _DESKTOP_PREVIEW_BACKGROUND_ALPHA_PRESETS,
 )
-from puripuly_heart.ui.fonts import assets_dir
+from puripuly_heart.ui.fonts import (
+    FONT_FAMILY_NOTO_SANS,
+    FONT_FAMILY_NOTO_SANS_CJK_JP,
+    assets_dir,
+)
 
 
 def _manifest(**overrides: object) -> OverlayLaunchManifest:
@@ -236,6 +240,94 @@ def test_desktop_overlay_snapshot_mapping_table_matches_emitted_caption_lines() 
                 block_type,
                 line.role,
             )
+
+
+def test_desktop_overlay_swap_caption_languages_reverses_source_and_target_slots() -> None:
+    snapshot = OverlayPresentationSnapshot(
+        blocks=[
+            _block(
+                "self-finalized",
+                channel="self",
+                block_variant="finalized",
+                appearance_seq=1,
+                primary_text="korean source",
+                secondary_text="chinese target",
+                secondary_enabled=True,
+            ),
+            _block(
+                "peer-finalized",
+                channel="peer",
+                block_variant="finalized",
+                appearance_seq=2,
+                primary_text="korean translation",
+                secondary_text="chinese original",
+                secondary_enabled=True,
+            ),
+        ]
+    )
+    default_plan = desktop_overlay.build_desktop_caption_plan(snapshot)
+    swapped_plan = desktop_overlay.build_desktop_caption_plan(
+        snapshot,
+        visual_state=desktop_overlay.DesktopCaptionVisualState(swap_caption_languages=True),
+    )
+
+    default_by_id = {slot.block_id: slot for slot in default_plan.slots}
+    swapped_by_id = {slot.block_id: slot for slot in swapped_plan.slots}
+
+    assert [line.text for line in default_by_id["self-finalized"].lines] == [
+        "korean source",
+        "chinese target",
+    ]
+    assert [line.slot for line in default_by_id["self-finalized"].lines] == [
+        "primary",
+        "secondary",
+    ]
+    assert [line.text for line in swapped_by_id["self-finalized"].lines] == [
+        "chinese target",
+        "korean source",
+    ]
+    assert [line.slot for line in swapped_by_id["self-finalized"].lines] == [
+        "primary",
+        "secondary",
+    ]
+    assert [line.role for line in swapped_by_id["self-finalized"].lines] == [
+        "self_translation",
+        "self_source",
+    ]
+    assert [line.text for line in default_by_id["peer-finalized"].lines] == [
+        "korean translation",
+        "chinese original",
+    ]
+    assert [line.text for line in swapped_by_id["peer-finalized"].lines] == [
+        "chinese original",
+        "korean translation",
+    ]
+    assert [line.role for line in swapped_by_id["peer-finalized"].lines] == [
+        "peer_source_original",
+        "peer_translation",
+    ]
+
+    promoted_snapshot = OverlayPresentationSnapshot(
+        blocks=[
+            _block(
+                "peer-active",
+                channel="peer",
+                block_variant="active_peer",
+                appearance_seq=3,
+                primary_text="",
+                secondary_text="live original only",
+                secondary_enabled=True,
+            )
+        ]
+    )
+    promoted_default = desktop_overlay.build_desktop_caption_plan(promoted_snapshot)
+    promoted_swapped = desktop_overlay.build_desktop_caption_plan(
+        promoted_snapshot,
+        visual_state=desktop_overlay.DesktopCaptionVisualState(swap_caption_languages=True),
+    )
+    assert [line.text for line in promoted_default.lines] == ["live original only"]
+    assert [line.text for line in promoted_swapped.lines] == ["live original only"]
+    assert promoted_swapped.lines[0].promoted is True
 
 
 def test_desktop_overlay_snapshot_mapping_roles_secondary_promotion_and_channel_colors() -> None:
@@ -1007,7 +1099,7 @@ def test_desktop_overlay_caption_rendering_preserves_cjk_emoji_and_minimum_secon
     ]
     assert plan.primary_font_size == _DESKTOP_CAPTION_SIZE_PRESETS["small"].primary_font_size
     assert plan.secondary_font_size == _DESKTOP_CAPTION_SIZE_PRESETS["small"].secondary_font_size
-    assert {line.font_family for line in plan.lines} == {"Noto Sans CJK JP"}
+    assert {line.font_family for line in plan.lines} == {"Noto Sans CJK SC"}
 
 
 @pytest.mark.parametrize(
@@ -1136,6 +1228,28 @@ def test_desktop_overlay_caption_font_policy_uses_latin_and_jp_unified_cjk_faces
         ("Live captions stay readable tonight", "Noto Sans"),
         ("오늘도 captions are readable", "Noto Sans CJK JP"),
     ]
+
+
+def test_desktop_overlay_caption_cjk_font_follows_ui_locale() -> None:
+    snapshot = OverlayPresentationSnapshot(
+        blocks=[
+            _block(
+                "cjk-line",
+                channel="self",
+                block_variant="finalized",
+                appearance_seq=1,
+                primary_text="오늘도 captions are readable",
+            )
+        ]
+    )
+
+    ko_plan = desktop_overlay.build_desktop_caption_plan(snapshot, locale="ko")
+    ja_plan = desktop_overlay.build_desktop_caption_plan(snapshot, locale="ja")
+    zh_plan = desktop_overlay.build_desktop_caption_plan(snapshot, locale="zh-CN")
+
+    assert ko_plan.lines[0].font_family == "Noto Sans CJK KR"
+    assert ja_plan.lines[0].font_family == "Noto Sans CJK JP"
+    assert zh_plan.lines[0].font_family == "Noto Sans CJK SC"
 
 
 def test_desktop_overlay_caption_weight_uses_semibold_for_general_text() -> None:
@@ -2281,6 +2395,28 @@ def test_desktop_overlay_preview_fixtures_run_local_app_without_renderer_or_pers
 
 
 @pytest.mark.asyncio
+async def test_desktop_overlay_registers_bundled_noto_cjk_on_the_flet_page() -> None:
+    app = FakeFletApp()
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=RecordingLifecycleSink().emit,
+        locale="en",
+        window_z_order_port=RecordingWindowZOrderPort(),
+        window_process_info_provider=lambda: (4321, None),
+    )
+
+    try:
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+    finally:
+        await window.close()
+
+    assert app.page.fonts[FONT_FAMILY_NOTO_SANS] == "/fonts/NotoSansCJK-Medium.ttc"
+    assert app.page.fonts[FONT_FAMILY_NOTO_SANS_CJK_JP] == "/fonts/NotoSansCJK-Medium.ttc"
+    assert app.page.fonts["Noto Sans CJK KR"] == "/fonts/NotoSansCJK-Medium.ttc"
+    assert app.page.fonts["Noto Sans CJK SC"] == "/fonts/NotoSansCJK-Medium.ttc"
+
+
+@pytest.mark.asyncio
 async def test_default_flet_app_runner_starts_hidden_to_prevent_startup_flash(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2781,6 +2917,70 @@ async def test_desktop_overlay_native_ready_failure_reports_page_configured_phas
     assert "native readiness failed" in str(excinfo.value.__cause__)
     assert window.startup_phase == "page_configured"
     assert app.page.window.visible is False
+    await window.close()
+
+
+def test_desktop_overlay_startup_timeouts_cover_hidden_window_handshake() -> None:
+    from puripuly_heart.app.services.overlay.overlay_application import (
+        OVERLAY_STARTUP_TIMEOUT_MS,
+    )
+
+    nested_handshake_s = (
+        desktop_overlay.DESKTOP_OVERLAY_WAIT_UNTIL_READY_TIMEOUT_S
+        + 0.5
+        + (desktop_window_zorder.WINDOWS_WINDOW_VISIBILITY_TIMEOUT_S * 2)
+        + 2.0
+    )
+    assert desktop_overlay.DESKTOP_OVERLAY_RENDERER_STARTUP_TIMEOUT_S >= nested_handshake_s
+    assert OVERLAY_STARTUP_TIMEOUT_MS / 1000.0 > (
+        desktop_overlay.DESKTOP_OVERLAY_RENDERER_STARTUP_TIMEOUT_S + 1.0
+    )
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_wait_until_ready_timeout_reports_page_configured_phase() -> None:
+    app = FakeFletApp()
+
+    async def hang_ready() -> None:
+        await asyncio.Event().wait()
+
+    app.page.window.wait_until_ready_to_show = hang_ready
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=RecordingLifecycleSink().emit,
+        locale="en",
+        wait_until_ready_timeout_s=0.05,
+    )
+
+    with pytest.raises(RuntimeError, match="Flet page configuration failed") as excinfo:
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+
+    assert "native window was not ready to show" in str(excinfo.value.__cause__)
+    assert window.startup_phase == "page_configured"
+    assert app.page.window.visible is False
+    await window.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_startup_timeout_after_page_exists_reports_phase() -> None:
+    app = FakeFletApp()
+
+    async def hang_ready() -> None:
+        await asyncio.Event().wait()
+
+    app.page.window.wait_until_ready_to_show = hang_ready
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=RecordingLifecycleSink().emit,
+        locale="en",
+        startup_timeout_s=0.05,
+        wait_until_ready_timeout_s=5.0,
+    )
+
+    with pytest.raises(RuntimeError, match="startup timed out before ready"):
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+
+    assert window.startup_phase == "page_configured"
     await window.close()
 
 

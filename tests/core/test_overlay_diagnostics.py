@@ -97,3 +97,128 @@ def test_overlay_process_trace_is_monotonic_sanitized_and_included_in_failure_du
     raw_dump = recorder.dump_failure(failure_reason="startup_timeout").read_text(encoding="utf-8")
     assert '"trace_event": "bounds_confirmed"' in raw_dump
     assert "private subtitle text" not in raw_dump
+
+
+def test_overlay_presenter_bridge_translation_events_are_recorded_and_dumped(
+    tmp_path,
+) -> None:
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-stage-trace-test",
+        diagnostics_dir=tmp_path,
+        logging_mode="detailed",
+    )
+
+    presenter_event = recorder.record_presenter(
+        "snapshot_publish",
+        revision=4,
+        block_count=1,
+        text="private overlay text",
+    )
+    removal_event = recorder.record_presenter_removal(
+        entry_key="self:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    )
+    bridge_event = recorder.record_bridge(
+        "broadcast_finish",
+        revision=4,
+        elapsed_ms=12,
+        transcript="private transcript text",
+    )
+    translation_event = recorder.record_translation(
+        "overlay_emit",
+        event_kind="translation",
+        utterance_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        secondary_len=18,
+    )
+
+    assert presenter_event["category"] == "presenter"
+    assert presenter_event["revision"] == 4
+    assert removal_event["category"] == "presenter_removal"
+    assert bridge_event["category"] == "bridge"
+    assert translation_event["category"] == "translation"
+    assert "private overlay text" not in json.dumps(presenter_event)
+    assert "private transcript text" not in json.dumps(bridge_event)
+
+    raw_dump = recorder.dump_failure(failure_reason="runtime_crashed").read_text(encoding="utf-8")
+    assert '"event": "snapshot_publish"' in raw_dump
+    assert '"event": "entry_removed"' in raw_dump
+    assert '"event": "broadcast_finish"' in raw_dump
+    assert '"event": "overlay_emit"' in raw_dump
+    assert "private overlay text" not in raw_dump
+    assert "private transcript text" not in raw_dump
+
+
+def test_overlay_chatbox_stt_and_native_stages_are_dumped_without_payload_text(
+    tmp_path,
+) -> None:
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-gate0-trace-test",
+        diagnostics_dir=tmp_path,
+        logging_mode="detailed",
+    )
+    recorder.record_chatbox(
+        "page_send",
+        utterance_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        page_index=1,
+        pending_messages=1,
+        oldest_age_s=6.0,
+        text="secret chatbox page",
+    )
+    recorder.record_stt(
+        "stt_enqueue",
+        channel="self",
+        queue_depth=2,
+        oldest_age_s=1.5,
+        transcript="secret stt text",
+    )
+    ingested = recorder.ingest_native_child_line(
+        'presentation_diagnostics [{"stage":"readiness_observed","logical_revision":9,'
+        '"outcome":"timed_out","readiness_us":51000,"observed_runtime_visible":true,'
+        '"desired_visible":true,"physical_hmd_visibility":"not_observable"}]'
+    )
+
+    assert ingested is True
+    raw_dump = recorder.dump_failure(failure_reason="runtime_crashed").read_text(encoding="utf-8")
+    assert '"category": "chatbox"' in raw_dump
+    assert '"event": "page_send"' in raw_dump
+    assert '"category": "stt"' in raw_dump
+    assert '"event": "stt_enqueue"' in raw_dump
+    assert '"category": "native"' in raw_dump
+    assert '"event": "readiness_observed"' in raw_dump
+    assert '"actual_visibility": "not_queried"' in raw_dump
+    assert "secret chatbox page" not in raw_dump
+    assert "secret stt text" not in raw_dump
+
+
+def test_overlay_stage_memory_is_recorded_only_in_detailed_mode(tmp_path) -> None:
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-stage-mode-test",
+        diagnostics_dir=tmp_path,
+    )
+
+    assert recorder.record_presenter("snapshot_publish", revision=1) == {}
+    assert recorder.record_bridge("send_start", revision=1) == {}
+    assert recorder.record_translation("overlay_emit") == {}
+    assert recorder.record_chatbox("page_send") == {}
+    assert recorder.record_stt("stt_enqueue") == {}
+    assert (
+        recorder.ingest_native_child_line(
+            'presentation_diagnostics [{"stage":"readiness_observed"}]'
+        )
+        is False
+    )
+    assert list(recorder.presenter_events) == []
+    assert list(recorder.bridge_events) == []
+    assert list(recorder.translation_events) == []
+    assert list(recorder.chatbox_events) == []
+    assert list(recorder.stt_events) == []
+    assert list(recorder.native_events) == []
+
+    recorder.set_logging_mode("detailed")
+    recorder.record_presenter("snapshot_publish", revision=2)
+    recorder.record_process("overlay_trace", trace_event="bounds_confirmed")
+    assert [event["event"] for event in recorder.presenter_events] == ["snapshot_publish"]
+    assert [event["event"] for event in recorder.process_events] == ["overlay_trace"]
+
+    recorder.set_logging_mode("basic")
+    assert list(recorder.presenter_events) == []
+    assert [event["event"] for event in recorder.process_events] == ["overlay_trace"]

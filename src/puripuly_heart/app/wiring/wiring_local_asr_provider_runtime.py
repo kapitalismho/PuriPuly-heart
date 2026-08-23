@@ -47,6 +47,7 @@ class ManagedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
     on_final_transcript_suppressed: FinalTranscriptSuppressedSink | None = None
     runtime_logging: SessionRuntimeLoggingService | None = None
     fault_profile_provider: FaultProfileProvider | None = None
+    event_ingress_observer: Callable[..., object] | None = None
 
     async def create(
         self,
@@ -80,6 +81,7 @@ class ManagedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
             on_final_transcript_suppressed=self.on_final_transcript_suppressed,
             runtime_logging=self.runtime_logging,
             stt_input_fault_profile_provider=self.fault_profile_provider,
+            event_ingress_observer=self.event_ingress_observer,
         )
         if request.session_options is not None:
             await provider.reconfigure_session_options(request.session_options)
@@ -93,6 +95,14 @@ class LocalASRProviderRuntimeFactory:
     clock: Clock
     state_changed: ProviderRuntimeStateChanged | None = None
     diagnostic_sink: ProviderRuntimeDiagnosticSink | None = None
+
+    def bind_stt_event_ingress_observer(
+        self,
+        observer: Callable[..., object] | None,
+    ) -> None:
+        factory = self.provider_factory
+        if isinstance(factory, ManagedSTTProviderFactory):
+            factory.event_ingress_observer = observer
 
     def create(
         self,

@@ -82,7 +82,6 @@ def _pin_small_assets(monkeypatch):
         for name, content in contents.items()
     )
     monkeypatch.setattr(assets, "GEMMA_ASSETS", pinned)
-    monkeypatch.setattr(provisioning, "GEMMA_ASSETS", pinned)
     return contents
 
 
@@ -110,6 +109,42 @@ async def test_missing_install_downloads_pinned_files_and_promotes_atomically(
     assert updates[0].state == "downloading"
     assert updates[-1].state == "ready"
     assert updates[-1].percent == 100
+
+
+@pytest.mark.asyncio
+async def test_12b_spec_downloads_target_without_drafter(tmp_path) -> None:
+    content = b"12b-target"
+    spec = assets.GemmaModelSpec(
+        model_id="gemma-4-12b-test",
+        repo_id="example/12b",
+        revision="abc123",
+        model_filename="target.gguf",
+        draft_filename=None,
+        install_dirname="gemma-12b",
+        upstream_repo_id="example/upstream",
+        license=assets.GEMMA_LICENSE,
+        license_url=assets.GEMMA_LICENSE_URL,
+        assets=(
+            assets.GemmaAsset(
+                filename="target.gguf",
+                size_bytes=len(content),
+                sha256=hashlib.sha256(content).hexdigest(),
+            ),
+        ),
+    )
+    downloader = FakeDownloader({"target.gguf": content})
+    install_dir = tmp_path / "gemma-12b"
+
+    installed = await provisioning.ensure_gemma_installed(
+        downloader=downloader,
+        install_dir=install_dir,
+        spec=spec,
+    )
+
+    assert installed == assets.InstalledGemmaManifest.expected(spec)
+    assert [request.repo_id for request in downloader.requests] == ["example/12b"]
+    assert [request.remote_path for request in downloader.requests] == ["target.gguf"]
+    assert assets.validate_gemma_install(install_dir, spec=spec) == installed
 
 
 @pytest.mark.asyncio
@@ -269,7 +304,8 @@ async def test_progress_callback_future_is_awaited(tmp_path, monkeypatch) -> Non
 @pytest.mark.asyncio
 async def test_all_submitted_progress_failures_are_observed(tmp_path, monkeypatch) -> None:
     contents = _pin_small_assets(monkeypatch)
-    asset = provisioning.GEMMA_ASSETS[0]
+    spec = assets.e4b_gemma_spec()
+    asset = spec.assets[0]
     downloader = BurstDownloader(contents)
 
     async def fail_progress(update):
@@ -280,6 +316,7 @@ async def test_all_submitted_progress_failures_are_observed(tmp_path, monkeypatc
     with pytest.raises(BaseExceptionGroup) as caught:
         await provisioning._download_asset(
             downloader=downloader,
+            spec=spec,
             asset=asset,
             staging_dir=tmp_path / "staging",
             completed_bytes=0,
@@ -300,7 +337,8 @@ async def test_cancellation_during_progress_drain_waits_for_accepted_callback(
     monkeypatch,
 ) -> None:
     contents = _pin_small_assets(monkeypatch)
-    asset = provisioning.GEMMA_ASSETS[0]
+    spec = assets.e4b_gemma_spec()
+    asset = spec.assets[0]
     downloader = FakeDownloader(contents)
     callback_started = asyncio.Event()
     allow_callback = asyncio.Event()
@@ -314,6 +352,7 @@ async def test_cancellation_during_progress_drain_waits_for_accepted_callback(
     operation = asyncio.create_task(
         provisioning._download_asset(
             downloader=downloader,
+            spec=spec,
             asset=asset,
             staging_dir=tmp_path / "staging",
             completed_bytes=0,

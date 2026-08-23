@@ -172,7 +172,7 @@ def test_resolve_openrouter_credentials_qq_managed_blocks_standard_key() -> None
     ]
 
 
-def test_resolve_openrouter_credentials_qq_requires_active_managed_state() -> None:
+def test_resolve_openrouter_credentials_qq_key_usable_without_active_managed_ref() -> None:
     settings = AppSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     store = InMemorySecretStore()
@@ -189,7 +189,7 @@ def test_resolve_openrouter_credentials_qq_requires_active_managed_state() -> No
         request_intent="TRANS",
     )
 
-    assert resolution.api_key is None
+    assert resolution.api_key == "qq-managed-key"
     assert resolution.requires_managed_challenge is False
 
 

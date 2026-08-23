@@ -750,6 +750,8 @@ def from_legacy_app_settings(
                     cerebras=CerebrasTranslationIntent(
                         llm_model=data["cerebras"]["llm_model"],
                     ),
+                    gpu_device_id=str(data["translation"].get("gpu_device_id", "auto")).strip()
+                    or "auto",
                 ),
                 local_llm=LocalLLMIntent(
                     backend=data["local_llm"]["backend"],
@@ -830,6 +832,9 @@ def from_legacy_app_settings(
                         position=DesktopFletOverlayPositionIntent(
                             x=data["overlay"]["desktop_flet"]["position"]["x"],
                             y=data["overlay"]["desktop_flet"]["position"]["y"],
+                        ),
+                        swap_caption_languages=(
+                            data["overlay"]["desktop_flet"].get("swap_caption_languages") is True
                         ),
                         visual=DesktopFletOverlayVisualIntent(
                             background_alpha=float(
@@ -1077,6 +1082,7 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
             "model": intent.translation.fallback.model,
             "connection": intent.translation.fallback.connection,
         },
+        "gpu_device_id": intent.translation.gpu_device_id,
     }
     if (
         intent.translation.model == "custom_http"
@@ -1119,6 +1125,7 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
                 "x": intent.overlay.desktop_flet.position.x,
                 "y": intent.overlay.desktop_flet.position.y,
             },
+            "swap_caption_languages": intent.overlay.desktop_flet.swap_caption_languages,
             "visual": {
                 "background_alpha": intent.overlay.desktop_flet.visual.background_alpha,
             },
@@ -1292,7 +1299,7 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
 
 
 def _legacy_provider_llm_for_translation(model: str, connection: str) -> str:
-    if model == "managed_gemma":
+    if model in {"managed_gemma", "managed_gemma_12b"}:
         return "managed_gemma"
     if model == "local_llm":
         return "local_llm"

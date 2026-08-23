@@ -456,7 +456,8 @@ def compose_managed_account(
         current = settings.current
         if (
             current is not None
-            and current.translation.model == TranslationModel.MANAGED_GEMMA
+            and current.translation.model
+            in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
             and managed_gemma is not None
         ):
             if sync_local_translation_demand is not None:

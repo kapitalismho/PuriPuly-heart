@@ -1,8 +1,10 @@
 from pathlib import Path
 
+from puripuly_heart.core.local_translation.assets import GEMMA_12B_SPEC
 from puripuly_heart.core.local_translation.runtime_profile import (
     LLAMA_CPP_BUILD,
     LLAMA_CPP_COMMIT,
+    MANAGED_GEMMA_12B_MODEL_ALIAS,
     LlamaCppThreadProfile,
     build_gemma_server_command,
 )
@@ -28,7 +30,7 @@ def test_cpu_profile_preserves_fixed_common_and_mtp_contract(tmp_path: Path) -> 
     assert _values(command, "--load-mode") == ["mmap"]
     assert _values(command, "--threads") == ["4"]
     assert _values(command, "--threads-batch") == ["12"]
-    assert _values(command, "--ctx-size") == ["4096"]
+    assert _values(command, "--ctx-size") == ["3072"]
     assert _values(command, "--parallel") == ["2"]
     assert _values(command, "--batch-size") == ["512"]
     assert _values(command, "--ubatch-size") == ["512"]
@@ -58,6 +60,7 @@ def test_cpu_profile_preserves_fixed_common_and_mtp_contract(tmp_path: Path) -> 
     assert _values(command, "--flash-attn") == ["off"]
     assert _values(command, "--prio") == ["-1"]
     assert "--slot-save-path" not in command
+    assert "--swa-full" not in command
 
 
 def test_slot_save_path_is_opt_in(tmp_path: Path) -> None:
@@ -91,9 +94,52 @@ def test_gpu_profile_is_vulkan_full_offload_without_mtp(tmp_path: Path) -> None:
     assert _values(command, "--n-gpu-layers") == ["99"]
     assert _values(command, "--flash-attn") == ["on"]
     assert _values(command, "--prio") == ["-1"]
-    assert _values(command, "--ctx-size") == ["4096"]
+    assert _values(command, "--cache-type-k") == ["f16"]
+    assert _values(command, "--cache-type-v") == ["f16"]
+    assert _values(command, "--ctx-size") == ["3072"]
     assert _values(command, "--parallel") == ["2"]
+    assert "--swa-full" not in command
     assert not any(item.startswith("--spec-") for item in command)
+
+
+def test_gpu_12b_profile_is_vulkan_full_offload_without_mtp(tmp_path: Path) -> None:
+    command = build_gemma_server_command(
+        executable=Path("llama-server.exe"),
+        install_dir=tmp_path,
+        backend="gpu",
+        port=38193,
+        vulkan_device="Vulkan0",
+        threads_profile=CPU_PROFILE,
+        spec=GEMMA_12B_SPEC,
+    )
+
+    assert _values(command, "--model") == [str(tmp_path / GEMMA_12B_SPEC.model_filename)]
+    assert _values(command, "--alias") == [MANAGED_GEMMA_12B_MODEL_ALIAS]
+    assert _values(command, "--n-gpu-layers") == ["99"]
+    assert _values(command, "--flash-attn") == ["on"]
+    assert _values(command, "--cache-type-k") == ["q8_0"]
+    assert _values(command, "--cache-type-v") == ["q8_0"]
+    assert "--swa-full" in command
+    assert not any(item.startswith("--spec-") for item in command)
+
+
+def test_cpu_12b_profile_omits_mtp(tmp_path: Path) -> None:
+    command = build_gemma_server_command(
+        executable=Path("llama-server.exe"),
+        install_dir=tmp_path,
+        backend="cpu",
+        port=38194,
+        threads_profile=CPU_PROFILE,
+        spec=GEMMA_12B_SPEC,
+    )
+
+    assert _values(command, "--model") == [str(tmp_path / GEMMA_12B_SPEC.model_filename)]
+    assert not any(item.startswith("--spec-") for item in command)
+    assert _values(command, "--device") == ["none"]
+    assert _values(command, "--n-gpu-layers") == ["0"]
+    assert _values(command, "--cache-type-k") == ["q8_0"]
+    assert _values(command, "--cache-type-v") == ["q8_0"]
+    assert "--swa-full" in command
 
 
 def test_derive_thread_profile_applies_generalization_rule() -> None:

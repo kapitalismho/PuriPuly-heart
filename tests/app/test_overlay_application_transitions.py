@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 from typing import cast
 
 from puripuly_heart.app.services.overlay_application import (
+    OVERLAY_STARTUP_TIMEOUT_MS,
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
@@ -17,6 +19,8 @@ from puripuly_heart.app.services.peer_application import (
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.resolved import ResolvedOverlayConfig
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.overlay.presenter import OverlayPresenter
+from puripuly_heart.core.overlay.protocol import NativeFreshRenderGenerations
 from puripuly_heart.ui.overlay_peer_contract import (
     build_overlay_peer_consumer_contract_from_state,
 )
@@ -222,6 +226,18 @@ class RaisingStartTransition:
         raise RuntimeError("fallback start failed")
 
 
+class RecordingStartTransition:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.execution_state: str | None = None
+
+    async def begin_start(self, execution_factory) -> str:
+        self.calls += 1
+        execution = execution_factory()
+        self.execution_state = execution.state
+        return "started"
+
+
 def make_owner(recorder: Recorder) -> OverlayApplicationOwner:
     return OverlayApplicationOwner(
         state_provider=lambda: OverlayApplicationState(
@@ -334,11 +350,26 @@ async def test_retry_every_enable_policy_retries_configured_steamvr_after_disabl
     request = owner._generation_request()
     assert request.target == "desktop"
     assert request.fallback_reason == "steamvr_not_running"
+    assert request.startup_timeout_ms == OVERLAY_STARTUP_TIMEOUT_MS
 
     await owner.set_enabled(False)
 
     assert owner.snapshot.fallback_active is False
     assert owner.effective_target_for_start() == "steamvr"
+
+
+async def test_overlay_startup_timeout_is_shared_for_desktop_and_steamvr() -> None:
+    recorder = Recorder()
+    owner = make_owner(recorder)
+
+    owner.active_target = "steamvr"
+    steamvr_request = owner._generation_request()
+    owner.active_target = "desktop"
+    desktop_request = owner._generation_request()
+
+    assert steamvr_request.startup_timeout_ms == OVERLAY_STARTUP_TIMEOUT_MS
+    assert desktop_request.startup_timeout_ms == OVERLAY_STARTUP_TIMEOUT_MS
+    assert OVERLAY_STARTUP_TIMEOUT_MS == 15000
 
 
 async def test_fallback_task_creation_failure_terminates_real_peer_activation() -> None:
@@ -429,3 +460,110 @@ async def test_fallback_teardown_failed_terminates_real_peer_activation() -> Non
 
     harness.assert_terminal_fallback_failure()
     assert harness.overlay.fallback_owner.task is None
+
+
+async def test_watch_runtime_restarts_connected_crash_and_keeps_peer_activation() -> None:
+    recorder = Recorder()
+    owner = make_owner(recorder)
+    runtime = owner.new_runtime()
+    manager = SimpleNamespace(
+        state="failed",
+        restart_scheduled=True,
+        failure_reason="runtime_crashed",
+    )
+    runtime.attach_process_manager(manager)
+    owner.state = "connected"
+    owner._transition_owner = cast(object, FixedStartTransition("started"))
+    monitor = asyncio.get_running_loop().create_future()
+    monitor.set_result(None)
+
+    await owner.watch_runtime(manager, monitor, runtime=runtime)
+
+    assert owner.auto_restart_scheduled is True
+    assert owner.state == "starting"
+    assert owner.failure_reason is None
+    assert recorder.cancel_peer_activation_calls == 0
+
+
+async def test_watch_runtime_does_not_restart_when_shutdown_was_not_scheduled() -> None:
+    recorder = Recorder()
+    owner = make_owner(recorder)
+    runtime = owner.new_runtime()
+    manager = SimpleNamespace(
+        state="failed",
+        restart_scheduled=False,
+        failure_reason="runtime_crashed",
+    )
+    runtime.attach_process_manager(manager)
+    owner.state = "connected"
+    monitor = asyncio.get_running_loop().create_future()
+    monitor.set_result(None)
+
+    await owner.watch_runtime(manager, monitor, runtime=runtime)
+
+    assert owner.auto_restart_scheduled is False
+    assert owner.state == "failed"
+    assert owner.failure_reason == "runtime_crashed"
+
+
+async def test_watch_runtime_restart_discards_old_epoch_retry_intent() -> None:
+    recorder = Recorder()
+    owner = make_owner(recorder)
+    runtime = owner.new_runtime()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=FakeClock(_now=1.0),
+        native_retry_trigger_emission=True,
+        peer_presentation_refresh_burst=False,
+        self_presentation_refresh_burst=False,
+    )
+    presenter._native_fresh_render_generations = NativeFreshRenderGenerations(self=4)
+    await presenter._publish_if_changed(force_protocol_publish=True)
+    runtime.adopt_presenter(presenter)
+    manager = SimpleNamespace(
+        state="failed",
+        restart_scheduled=True,
+        failure_reason="runtime_crashed",
+    )
+    runtime.attach_process_manager(manager)
+    owner.state = "connected"
+    owner._transition_owner = cast(object, FixedStartTransition("started"))
+    monitor = asyncio.get_running_loop().create_future()
+    monitor.set_result(None)
+
+    await owner.watch_runtime(manager, monitor, runtime=runtime)
+
+    snapshot = presenter.snapshot()
+    assert snapshot.native_fresh_render_generations is None
+    assert snapshot.native_fresh_render_targets is None
+    assert presenter.native_retry_trigger_emission is False
+    assert owner.auto_restart_scheduled is True
+    assert owner.state == "starting"
+
+
+async def test_watch_runtime_restart_teardown_failure_fails_instead_of_staying_starting() -> None:
+    recorder = Recorder()
+    owner = make_owner(recorder)
+    runtime = owner.new_runtime()
+    manager = SimpleNamespace(
+        state="failed",
+        restart_scheduled=True,
+        failure_reason="runtime_crashed",
+    )
+    runtime.attach_process_manager(manager)
+    owner.state = "connected"
+    owner._transition_owner = cast(object, FixedStartTransition("teardown_failed"))
+    monitor = asyncio.get_running_loop().create_future()
+    monitor.set_result(None)
+
+    await owner.watch_runtime(manager, monitor, runtime=runtime)
+
+    assert owner.auto_restart_scheduled is False
+    assert owner.state == "failed"
+    assert owner.failure_reason == "runtime_crashed"
+
+    follow_up = RecordingStartTransition()
+    owner._transition_owner = cast(object, follow_up)
+    await owner.begin_start()
+    assert follow_up.calls == 1
+    assert follow_up.execution_state == "failed"

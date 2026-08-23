@@ -91,6 +91,35 @@ before release.
 
 ----
 
+Gemma 4 12B local translation model assets
+Upstream model source: https://huggingface.co/google/gemma-4-12B-it
+Manifest mirror source used by the app: https://huggingface.co/unsloth/gemma-4-12B-it-qat-GGUF
+License: Apache-2.0
+
+Gemma 4 models are released by Google under the Apache License 2.0
+(see https://www.apache.org/licenses/LICENSE-2.0 and
+https://ai.google.dev/gemma/apache_2).
+
+The managed local translation runtime downloads the pinned quantization of the
+Gemma 4 12B instruction-tuned model on demand from the pinned Hugging Face
+repository revision listed below. The application installer does not contain
+model weights. Files are verified against the pinned size and SHA-256 before
+installation; the installed-manifest records the model identity, pinned
+revision, and license fields.
+
+- Manifest mirror repo: unsloth/gemma-4-12B-it-qat-GGUF
+- Pinned revision: 980b060c40a8539ac159e0501a3e0f66a6365af3
+- Target model: gemma-4-12B-it-qat-UD-Q4_K_XL.gguf
+  - size: 6,716,356,800 bytes
+  - sha256: 90fd44e29e0d7cffeb0fd00dc73cfdab9ed0b0e95306ecf7821ea634c940c370
+
+The upstream google/gemma-4-12B-it repository is Apache-2.0. The mirror or
+converted assets referenced by the manifest may not expose complete license
+metadata, so pinned mirror provenance and license metadata must be verified
+before release.
+
+----
+
 Hugging Face Hub and Xet download runtime
 Sources: https://github.com/huggingface/huggingface_hub , https://github.com/huggingface/xet-core
 Pinned packages: huggingface-hub 1.26.0 ; hf-xet 1.5.2

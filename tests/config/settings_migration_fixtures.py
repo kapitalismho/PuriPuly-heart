@@ -141,6 +141,9 @@ CURRENT_USER_INTENT_DESTINATIONS = {
     "overlay.desktop_flet.position.x": "intent.overlay.desktop_flet.position.x",
     "overlay.desktop_flet.position.y": "intent.overlay.desktop_flet.position.y",
     "overlay.desktop_flet.size_preset": "intent.overlay.desktop_flet.size_preset",
+    "overlay.desktop_flet.swap_caption_languages": (
+        "intent.overlay.desktop_flet.swap_caption_languages"
+    ),
     "overlay.desktop_flet.visual.background_alpha": (
         "intent.overlay.desktop_flet.visual.background_alpha"
     ),
@@ -170,6 +173,7 @@ CURRENT_USER_INTENT_DESTINATIONS = {
     "system_prompt": "intent.prompts.system_prompt",
     "translation.connection": "intent.translation.connection",
     "translation.connection_history": "intent.translation.connection_history",
+    "translation.gpu_device_id": "intent.translation.gpu_device_id",
     "translation.model": "intent.translation.model",
     "ui.clipboard_auto_translate_enabled": "intent.clipboard.auto_translate_enabled",
     "ui.locale": "intent.ui.locale",
@@ -337,6 +341,7 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
             model=TranslationModel.GEMINI_37_FLASH,
             connection=TranslationConnection.OPENROUTER,
         ),
+        gpu_device_id="Vulkan1",
     )
     settings.languages.source_language = "ja"
     settings.languages.target_language = "zh-CN"
@@ -367,6 +372,7 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     settings.overlay.desktop_flet.size_preset = "large"
     settings.overlay.desktop_flet.position.x = 321
     settings.overlay.desktop_flet.position.y = 654
+    settings.overlay.desktop_flet.swap_caption_languages = True
     settings.overlay.desktop_flet.visual.background_alpha = 0.42
     settings.stt.drain_timeout_s = 3.5
     settings.stt.vad_speech_threshold = 0.3
