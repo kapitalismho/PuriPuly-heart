@@ -278,6 +278,31 @@ def test_alimeeting_parser_preserves_tier_interval_ids_and_unknown_identity(
     )
 
 
+@pytest.mark.parametrize(
+    "tier_prefix", ["F", "M", "R2001_M2205_F", "R2001_M2205_M"]
+)
+def test_alimeeting_parser_maps_train_gender_tier_prefixes(
+    tmp_path: Path, tier_prefix: str
+) -> None:
+    path = tmp_path / "R2001_M2205.TextGrid"
+    path.write_text(
+        textgrid_payload()
+        .replace('name = "N_SPK1"', f'name = "{tier_prefix}_SPK2677"')
+        .replace('name = "unresolved"', f'name = "{tier_prefix}_SPK2678"'),
+        encoding="utf-8",
+    )
+
+    parsed = parse_alimeeting_annotations(
+        "alimeeting_R2001_M2205",
+        path,
+        scored_start_sample=0,
+        scored_end_sample=16000,
+    )
+
+    assert {span.speaker_id for span in parsed.spans} == {"SPK2677", "SPK2678"}
+    assert all(span.speaker_identity_known for span in parsed.spans)
+
+
 def test_alimeeting_parser_requires_manifest_coverage_to_match_textgrid(
     tmp_path: Path,
 ) -> None:
@@ -354,6 +379,63 @@ def test_normalize_source_binds_manifest_bytes_and_applies_the_label_generator(
         normalize_source(
             {**source_row, "source_id": "bad-source"},
             {**annotation_row, "source_id": "bad-source"},
+            tmp_path,
+        )
+
+
+def test_normalize_source_accepts_declared_subframe_textgrid_tail(
+    tmp_path: Path,
+) -> None:
+    contract = load_contract()
+    ref = "alimeeting/R2001_M2205.TextGrid"
+    path = tmp_path / ref
+    path.parent.mkdir()
+    path.write_text(textgrid_payload().replace("xmax = 1", "xmax = 1.01"), encoding="utf-8")
+    file_row = {
+        "ref": ref,
+        "sha256": sha256_file(path),
+        "size_bytes": path.stat().st_size,
+    }
+    annotation_sha256 = canonical_sha256([file_row])
+    source_row = {
+        "source_id": "alimeeting_R2001_M2205",
+        "corpus": "AliMeeting",
+        "session_id": "R2001_M2205",
+        "duration_samples": 16000,
+        "sample_rate_hz": 16000,
+        "annotation_coverage_start_sample": 0,
+        "annotation_coverage_end_sample": 16000,
+        "annotation_tail_excess_samples": 160,
+        "annotation_ref": ref,
+        "waveform_sha256": "a" * 64,
+        "annotation_sha256": annotation_sha256,
+        "contract_version": contract.contract_version,
+        "contract_document_sha256": contract.document_sha256,
+    }
+    annotation_row = {
+        "source_id": "alimeeting_R2001_M2205",
+        "corpus": "AliMeeting",
+        "session_id": "R2001_M2205",
+        "coverage_start_sample": 0,
+        "coverage_end_sample": 16000,
+        "coverage_status": "waveform_bounded_timeline_annotation_tail_clipped",
+        "annotation_tail_excess_samples": 160,
+        "textgrid_timeline_end_sample": 16160,
+        "annotation_files": [file_row],
+        "annotation_sha256": annotation_sha256,
+        "contract_version": contract.contract_version,
+        "contract_document_sha256": contract.document_sha256,
+    }
+
+    normalized = normalize_source(source_row, annotation_row, tmp_path)
+
+    assert normalized.scored_end_sample == 16000
+    assert normalized.clipped_span_count == 1
+    assert normalized.intervals[-1].end_sample == 16000
+    with pytest.raises(AnnotationNormalizationError, match="tail receipt"):
+        normalize_source(
+            {**source_row, "annotation_tail_excess_samples": 159},
+            annotation_row,
             tmp_path,
         )
 

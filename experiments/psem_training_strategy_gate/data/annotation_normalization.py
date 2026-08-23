@@ -10,6 +10,9 @@ from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+from experiments.psem_training_strategy_gate.data.forced_alignment_reference import (
+    ALIMEETING_TEXTGRID_ONLY_TAIL_MAX_EXCESS_SAMPLES,
+)
 from experiments.psem_training_strategy_gate.data.label_contract import (
     CanonicalInterval,
     LabelResult,
@@ -30,7 +33,9 @@ AMI_ANNOTATION_TAIL_TOLERANCE_SAMPLES = 32000
 AMI_SEGMENT_NAME = re.compile(
     r"^(?P<meeting>[A-Za-z0-9]+)\.(?P<agent>[A-Za-z0-9]+)\.segments\.xml$"
 )
-ALIMEETING_TIER_NAME = re.compile(r"^N_(SPK\d+)$")
+ALIMEETING_TIER_NAME = re.compile(
+    r"^(?:(?P<session>R\d+_M\d+)_)?(?:N|[FM])_(?P<speaker>SPK\d+)$"
+)
 TEXTGRID_ITEM = re.compile(r"\s*item \[(\d+)\]:\s*")
 TEXTGRID_INTERVAL = re.compile(r"\s*intervals \[(\d+)\]:\s*")
 
@@ -286,11 +291,15 @@ def parse_alimeeting_annotations(
         block = lines[start:end]
         tier_name = _textgrid_value(block, "name")
         tier_match = ALIMEETING_TIER_NAME.fullmatch(tier_name)
-        if tier_match is None:
+        expected_session = source_id.removeprefix("alimeeting_")
+        if tier_match is None or tier_match.group("session") not in {
+            None,
+            expected_session,
+        }:
             speaker_id = f"unknown:{source_id}:tier:{item_match.group(1)}"
             identity_known = False
         else:
-            speaker_id = tier_match.group(1)
+            speaker_id = tier_match.group("speaker")
             identity_known = True
         interval_matches = [
             (index, match)
@@ -553,12 +562,54 @@ def normalize_source(
             raise AnnotationNormalizationError(
                 "AliMeeting annotation bundle structure mismatch"
             )
+        annotation_tail_excess = annotation_row.get("annotation_tail_excess_samples", 0)
+        source_tail_excess = source_row.get("annotation_tail_excess_samples", 0)
+        textgrid_timeline_end = annotation_row.get(
+            "textgrid_timeline_end_sample", scored_end_sample
+        )
+        tail_clipped = annotation_row.get("coverage_status") == (
+            "waveform_bounded_timeline_annotation_tail_clipped"
+        )
+        if tail_clipped:
+            if (
+                isinstance(annotation_tail_excess, bool)
+                or not isinstance(annotation_tail_excess, int)
+                or annotation_tail_excess <= 0
+                or annotation_tail_excess > ALIMEETING_TEXTGRID_ONLY_TAIL_MAX_EXCESS_SAMPLES
+                or source_tail_excess != annotation_tail_excess
+                or textgrid_timeline_end != scored_end_sample + annotation_tail_excess
+            ):
+                raise AnnotationNormalizationError("AliMeeting annotation tail receipt is invalid")
+        elif (
+            annotation_tail_excess != 0
+            or source_tail_excess != 0
+            or textgrid_timeline_end != scored_end_sample
+        ):
+            raise AnnotationNormalizationError("AliMeeting annotation tail receipt is inconsistent")
         parsed = parse_alimeeting_annotations(
             source_id,
             textgrids[0],
             scored_start_sample=scored_start_sample,
-            scored_end_sample=scored_end_sample,
+            scored_end_sample=textgrid_timeline_end,
         )
+        if tail_clipped:
+            clipped_spans = tuple(
+                AnnotationSpan(
+                    start_sample=span.start_sample,
+                    end_sample=min(span.end_sample, scored_end_sample),
+                    speaker_id=span.speaker_id,
+                    speaker_identity_known=span.speaker_identity_known,
+                    source_annotation_id=span.source_annotation_id,
+                )
+                for span in parsed.spans
+                if span.start_sample < scored_end_sample
+            )
+            clipped_count = sum(span.end_sample > scored_end_sample for span in parsed.spans)
+            parsed = ParsedAnnotations(
+                spans=clipped_spans,
+                raw_speech_span_count=parsed.raw_speech_span_count,
+                clipped_span_count=clipped_count,
+            )
     else:
         raise AnnotationNormalizationError(f"unsupported corpus: {corpus}")
     intervals = spans_to_canonical_intervals(

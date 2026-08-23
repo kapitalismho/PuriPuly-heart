@@ -557,6 +557,41 @@ def test_reference_session_uses_rttm_not_textgrid_as_activity_authority(
             )
 
 
+def test_reference_session_binds_declared_textgrid_tail_to_observed_bytes(
+    tmp_path: Path, monkeypatch
+) -> None:
+    corpus_root, reference_root, textgrid, source_row, _ = _alimeeting_fixture(
+        tmp_path, monkeypatch
+    )
+    textgrid.write_text(
+        _textgrid([("0", "1.01", "lexical")]).replace(
+            "xmax = 1\n", "xmax = 1.01\n"
+        ),
+        encoding="utf-8",
+    )
+    annotation_files = [
+        {
+            "ref": textgrid.relative_to(corpus_root).as_posix(),
+            "size_bytes": textgrid.stat().st_size,
+            "sha256": sha256_file(textgrid),
+        }
+    ]
+    source_row = {
+        **source_row,
+        "annotation_sha256": canonical_sha256(annotation_files),
+        "annotation_tail_excess_samples": 160,
+    }
+    checkout = open_reference_checkout(reference_root)
+
+    normalize_reference_session(source_row, corpus_root, checkout)
+    with pytest.raises(ReferenceNormalizationError, match="tail receipt"):
+        normalize_reference_session(
+            {**source_row, "annotation_tail_excess_samples": 0},
+            corpus_root,
+            checkout,
+        )
+
+
 def test_reference_inventory_binds_manifest_and_resolves_every_session(
     tmp_path: Path,
     monkeypatch,

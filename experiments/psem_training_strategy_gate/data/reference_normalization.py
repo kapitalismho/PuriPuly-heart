@@ -1308,6 +1308,32 @@ def normalize_reference_session(
             or scored_end_sample > duration_samples
         ):
             raise ReferenceNormalizationError("AliMeeting scored range is invalid")
+        textgrid_start_sample, textgrid_end_sample = alimeeting_textgrid_range_samples(
+            annotation_path
+        )
+        observed_tail_excess = textgrid_end_sample - scored_end_sample
+        declared_tail_excess = source_row.get("annotation_tail_excess_samples")
+        if (
+            textgrid_start_sample != scored_start_sample
+            or observed_tail_excess < 0
+            or observed_tail_excess
+            > ALIMEETING_TEXTGRID_ONLY_TAIL_MAX_EXCESS_SAMPLES
+            or (
+                observed_tail_excess == 0
+                and declared_tail_excess not in {None, 0}
+            )
+            or (
+                observed_tail_excess > 0
+                and (
+                    isinstance(declared_tail_excess, bool)
+                    or not isinstance(declared_tail_excess, int)
+                    or declared_tail_excess != observed_tail_excess
+                )
+            )
+        ):
+            raise ReferenceNormalizationError(
+                "AliMeeting TextGrid tail receipt does not match source bytes"
+            )
         meetings_path = None
         word_paths = ()
         textgrid_path = annotation_path
