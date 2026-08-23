@@ -34,7 +34,6 @@ from puripuly_heart.config.settings_vnext.schema import (
     with_telemetry_consent,
 )
 from tests.config.settings_migration_fixtures import (
-    legacy_compatibility_settings_fixture,
     maximal_v24_settings_fixture,
 )
 
@@ -48,18 +47,6 @@ PROVIDER_VERIFICATION_FIELDS = (
     "alibaba_beijing",
     "alibaba_singapore",
 )
-PROVIDER_VERIFICATION_SECRET_KEYS = {
-    "deepgram": "deepgram_api_key",
-    "soniox": "soniox_api_key",
-    "google": "google_api_key",
-    "openrouter": "openrouter_api_key",
-    "deepseek": "deepseek_api_key",
-    "cerebras": "cerebras_api_key",
-    "alibaba_beijing": "alibaba_api_key_beijing",
-    "alibaba_singapore": "alibaba_api_key_singapore",
-}
-
-
 def _load_module(name: str) -> ModuleType:
     try:
         return import_module(name)
@@ -83,19 +70,6 @@ def _facade() -> ModuleType:
     return _load_module("puripuly_heart.config.settings_vnext.facade")
 
 
-def _leaf_paths(value: object, prefix: str = "") -> set[str]:
-    if isinstance(value, dict):
-        paths: set[str] = set()
-        for key, child in value.items():
-            child_path = f"{prefix}.{key}" if prefix else str(key)
-            if isinstance(child, dict) and child:
-                paths.update(_leaf_paths(child, child_path))
-            else:
-                paths.add(child_path)
-        return paths
-    return {prefix} if prefix else set()
-
-
 def _write_json_bytes(path: Path, data: dict[str, Any]) -> bytes:
     raw_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
     path.write_bytes(raw_bytes)
@@ -107,40 +81,14 @@ def _final_dev_v30_fixture() -> dict[str, Any]:
     return json.loads(fixture_path.read_text(encoding="utf-8"))
 
 
-def test_v24_maximal_fixture_migrates_to_canonical_vnext_serialization() -> None:
+@pytest.mark.parametrize("settings_version", [25, VNEXT_SETTINGS_SCHEMA_VERSION + 100])
+def test_canonical_migration_loader_rejects_flat_shape(settings_version: int) -> None:
     migration = _migration()
-    serialization = _serialization()
+    raw = maximal_v24_settings_fixture()
+    raw["settings_version"] = settings_version
 
-    settings = migration.from_dict(maximal_v24_settings_fixture())
-    serialized = serialization.to_dict(settings)
-
-    assert isinstance(settings, AppSettingsVNext)
-    assert settings.settings_version == VNEXT_SETTINGS_SCHEMA_VERSION
-    assert set(serialized) == {"settings_version", "intent", "state"}
-    assert serialized["settings_version"] == VNEXT_SETTINGS_SCHEMA_VERSION
-    assert serialized["intent"]["translation"]["model"] == "local_llm"
-    assert serialized["intent"]["translation"]["connection"] == "ollama"
-    assert serialized["intent"]["translation"]["qwen"]["region"] == "singapore"
-    assert serialized["intent"]["translation"]["cerebras"]["llm_model"] == "gemma-4-31b"
-    assert serialized["intent"]["translation"]["openrouter_model"] == ("qwen/qwen3.5-flash-02-23")
-    assert serialized["intent"]["translation"]["openrouter_selected_source"] == "byok"
-    assert serialized["intent"]["translation"]["openrouter_selection_alias"] == (
-        "qwen35_flash_byok"
-    )
-    assert serialized["intent"]["translation"]["openrouter_provider_routing"] == "default"
-    assert serialized["intent"]["local_llm"]["base_url"] == "http://127.0.0.1:12345/v1"
-    assert serialized["intent"]["stt"]["provider"] == "deepgram"
-    assert serialized["intent"]["peer_stt"]["provider"] == "soniox"
-    assert serialized["intent"]["ui"]["locale"] == "ja"
-    assert serialized["intent"]["stt"]["low_latency_mode"] is True
-    assert serialized["intent"]["integrated_context"]["enabled"] is True
-    assert serialized["state"]["integrated_context"]["bootstrapped"] is True
-    assert serialized["state"]["peer_translation"]["eula_accepted"] is True
-    assert serialized["state"]["provider_verification"]["deepgram"]["status"] == "verified"
-    assert "ui" not in serialized["state"]
-    assert "provider" not in serialized
-    assert "openrouter" not in serialized
-    assert "api_key_verified" not in serialized
+    with pytest.raises(ValueError, match="canonical settings"):
+        migration.from_dict(raw)
 
 
 def test_peer_auto_detection_intent_roundtrips_through_legacy_compatibility_projection() -> None:
@@ -187,23 +135,6 @@ def test_v30_soniox_auto_is_backed_up_and_migrated_once(tmp_path: Path) -> None:
     assert second.migrated is False
     assert second.backup_path is None
     assert list(tmp_path.glob("*.bak")) == [first.backup_path]
-
-
-def test_high_version_legacy_shape_migrates_by_shape_not_settings_version() -> None:
-    migration = _migration()
-    serialization = _serialization()
-    raw = maximal_v24_settings_fixture()
-    raw["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION + 100
-
-    settings = migration.from_dict(raw)
-    serialized = serialization.to_dict(settings)
-
-    assert isinstance(settings, AppSettingsVNext)
-    assert settings.settings_version == VNEXT_SETTINGS_SCHEMA_VERSION
-    assert set(serialized) == {"settings_version", "intent", "state"}
-    assert serialized["settings_version"] == VNEXT_SETTINGS_SCHEMA_VERSION
-    assert serialized["intent"]["translation"]["model"] == "local_llm"
-    assert serialized["intent"]["translation"]["connection"] == "ollama"
 
 
 def test_final_dev_v30_flat_fixture_archives_then_resets_without_value_continuity(
@@ -328,21 +259,6 @@ def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
     assert migrated.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
 
 
-def test_vnext_dict_migrates_legacy_timestamp_prompt_from_legacy_shape() -> None:
-    from puripuly_heart.config.prompts import load_prompt_for_provider
-    from puripuly_heart.config.settings import LEGACY_TIMESTAMP_PROMPT
-    from puripuly_heart.config.settings_vnext import migration
-
-    raw = {
-        "settings_version": SETTINGS_SCHEMA_VERSION - 1,
-        "system_prompt": LEGACY_TIMESTAMP_PROMPT,
-    }
-
-    migrated = migration.from_dict(raw)
-
-    assert migrated.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
-
-
 def test_vnext_dict_preserves_custom_prompt_through_migration() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 
@@ -392,32 +308,6 @@ def test_vnext_dict_migrates_disabled_gemini_3_flash_fallback_to_none() -> None:
         "model": "deepseek_v4_flash",
         "connection": "official_byok",
         "selection_alias": "none",
-    }
-
-
-def test_v24_boolean_api_key_verification_migrates_every_provider_to_verified() -> None:
-    migration = _migration()
-    serialization = _serialization()
-    raw = maximal_v24_settings_fixture()
-
-    assert all(
-        raw["api_key_verified"][provider] is True for provider in PROVIDER_VERIFICATION_FIELDS
-    )
-
-    serialized = serialization.to_dict(migration.from_dict(raw))
-    provider_entries = serialized["state"]["provider_verification"]
-
-    assert provider_entries == {
-        provider: {
-            "status": "verified",
-            "provider": provider,
-            "secret_key": PROVIDER_VERIFICATION_SECRET_KEYS[provider],
-            "secret_revision": "legacy-dev-settings",
-            "secret_fingerprint": None,
-            "verifier_context": {"flow": "legacy_settings_migration"},
-            "verifier_evidence": {"source": "legacy_boolean"},
-        }
-        for provider in PROVIDER_VERIFICATION_FIELDS
     }
 
 
@@ -635,43 +525,6 @@ def test_vnext_fallback_selection_alias_is_canonical_product_intent(
     }
 
 
-@pytest.mark.parametrize(
-    ("container", "alias", "selected_source", "expected_alias"),
-    [
-        ("openrouter", "deepseek_v4_flash", "byok", "openrouter_deepseek_v4_flash"),
-        ("openrouter", "deepseek_v4_flash", "managed", "openrouter_deepseek_v4_flash"),
-        ("openrouter", "deepseek_v4_flash_china", "managed", "deepseek_v4_flash_china"),
-        ("openrouter", "qwen35_flash", "byok", "none"),
-        ("openrouter", "broken-alias", "byok", "none"),
-        ("translation", "deepseek_v4_flash_official", "byok", "deepseek_v4_flash_official"),
-        ("translation", "openrouter_gemma4_26b_a4b", "byok", "openrouter_gemma4_26b_a4b"),
-        ("translation", "cerebras_gemma4_31b", "byok", "cerebras_gemma4_31b"),
-    ],
-)
-def test_legacy_fallback_aliases_load_to_safe_vnext_fallback_intent(
-    container: str,
-    alias: str,
-    selected_source: str,
-    expected_alias: str,
-) -> None:
-    migration = _migration()
-    serialization = _serialization()
-    raw = maximal_v24_settings_fixture()
-    raw["translation"].pop("fallback", None)
-    raw["openrouter"]["selected_source"] = selected_source
-    if container == "openrouter":
-        raw["openrouter"]["fallback_selection_alias"] = alias
-    else:
-        raw["translation"]["fallback_selection_alias"] = alias
-
-    serialized = serialization.to_dict(migration.from_dict(raw))
-    fallback = serialized["intent"]["translation"]["fallback"]
-
-    assert fallback["selection_alias"] == expected_alias
-    assert "fallback_selection_alias" not in serialized["intent"]["translation"]
-    assert "openrouter_fallback_selection_alias" not in serialized["intent"]["translation"]
-
-
 def test_current_vnext_unknown_fallback_alias_falls_back_to_none() -> None:
     serialization = _serialization()
     raw = serialization.to_dict(AppSettingsVNext())
@@ -845,45 +698,6 @@ def test_missing_fallback_uses_unified_gemma_default(loader_name: str) -> None:
     assert fallback == TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_31b")
 
 
-def test_legacy_missing_fallback_uses_unified_gemma_default() -> None:
-    migration = _migration()
-    raw = maximal_v24_settings_fixture()
-    raw["translation"].pop("fallback", None)
-    raw["openrouter"].pop("fallback_selection_alias", None)
-
-    fallback = migration.from_dict(raw).intent.translation.fallback
-
-    assert fallback == TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_31b")
-
-
-def test_maximal_v24_fixture_preserves_telemetry_consent_and_identifier() -> None:
-    migration = _migration()
-    serialization = _serialization()
-
-    serialized = serialization.to_dict(migration.from_dict(maximal_v24_settings_fixture()))
-
-    assert serialized["intent"]["telemetry"] == {"consent": "allow"}
-    assert serialized["state"]["telemetry"] == {
-        "anonymous_id": "fixture-telemetry-anonymous-id",
-        "sent_translation_success_dates_utc": ("2026-07-01", "2026-07-02"),
-    }
-
-
-def test_existing_settings_upgrade_unknown_telemetry_to_allow_with_identifier() -> None:
-    migration = _migration()
-    serialization = _serialization()
-
-    existing = maximal_v24_settings_fixture()
-    existing["telemetry"] = {}
-    existing["telemetry_state"] = {}
-
-    serialized = serialization.to_dict(migration.from_dict(existing))
-
-    assert serialized["intent"]["telemetry"] == {"consent": "allow"}
-    assert serialized["state"]["telemetry"]["anonymous_id"]
-    assert serialized["state"]["telemetry"]["sent_translation_success_dates_utc"] == ()
-
-
 def test_telemetry_consent_transitions_manage_operational_state() -> None:
     base = AppSettingsVNext(
         state=PersistedOperationalState(
@@ -992,30 +806,6 @@ def test_current_vnext_evidence_bound_provider_verification_entry_survives_compa
     assert migration.to_legacy_dict(settings)["api_key_verified"]["openrouter"] is True
 
 
-def test_legacy_accepted_keys_read_without_reintroducing_legacy_write_projection() -> None:
-    migration = _migration()
-    serialization = _serialization()
-
-    settings = migration.from_dict(legacy_compatibility_settings_fixture())
-    serialized = serialization.to_dict(settings)
-
-    assert settings.intent.overlay.calibration.offset_x == 0.42
-    assert settings.intent.overlay.show_translation is False
-    assert settings.intent.overlay.show_peer_original is False
-    assert settings.intent.peer_stt.provider == "soniox"
-    serialized_paths = _leaf_paths(serialized)
-    assert {
-        "overlay_calibration.offset_x",
-        "intent.ui.overlay_enabled",
-        "state.ui.overlay_enabled",
-        "intent.ui.peer_translation_enabled",
-        "state.ui.peer_translation_enabled",
-        "peer_qwen_asr_stt.model",
-        "peer_soniox_stt.endpoint",
-        "system_prompts.legacy",
-    }.isdisjoint(serialized_paths)
-
-
 def test_current_vnext_dict_reads_and_serializes_idempotently() -> None:
     migration = _migration()
     serialization = _serialization()
@@ -1046,39 +836,6 @@ def test_canonical_settings_version_must_be_a_supported_integer() -> None:
     raw["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION + 1
     with pytest.raises(ValueError, match="unsupported canonical"):
         migration.from_dict(raw)
-
-
-@pytest.mark.parametrize(
-    ("legacy_output_device", "kind", "device_name"),
-    [
-        ("", "default_output_device", None),
-        ("Fixture Speakers", "named_output_device", "Fixture Speakers"),
-    ],
-)
-def test_legacy_output_device_migrates_to_canonical_capture_target(
-    legacy_output_device: str,
-    kind: str,
-    device_name: str | None,
-) -> None:
-    migration = _migration()
-    serialization = _serialization()
-    raw = to_dict(AppSettings())
-    raw["desktop_audio"]["output_device"] = legacy_output_device
-
-    settings = migration.from_dict(raw)
-    serialized = serialization.to_dict(settings)
-
-    assert settings.intent.desktop_audio.capture_target.kind == kind
-    assert settings.intent.desktop_audio.capture_target.device_name == device_name
-    assert serialized["intent"]["desktop_audio"]["capture_target"] == {
-        "kind": kind,
-        "device_name": device_name,
-        "process": None,
-    }
-    assert serialized["intent"]["desktop_audio"]["output_device"] == legacy_output_device
-    assert (
-        migration.to_legacy_dict(settings)["desktop_audio"]["output_device"] == legacy_output_device
-    )
 
 
 @pytest.mark.parametrize(
@@ -1923,6 +1680,10 @@ def test_top_level_non_object_json_fails_without_backup_or_overwrite(
         (("intent", "ui", "locale"), []),
         (("intent", "osc", "chatbox_send"), "true"),
         (("state", "github_star_prompt", "clicked"), 1),
+        (("intent", "translation"), []),
+        (("intent", "translation", "fallback"), []),
+        (("intent", "desktop_audio"), []),
+        (("intent", "prompts"), []),
         (("intent", "translation", "concurrency_limit"), "5"),
         (("intent", "languages", "peer_expected_languages"), [123]),
         (("intent", "languages", "recent_source_languages"), [123]),
@@ -2125,67 +1886,6 @@ def test_facade_projection_failure_returns_explicit_result_without_overwrite(
     with pytest.raises(RuntimeError, match="migration_failed:ValueError") as exc_info:
         load_settings(path)
     assert "not-an-int" not in str(exc_info.value)
-
-
-def test_raw_provider_api_key_fields_are_absent_from_vnext_serialized_output() -> None:
-    migration = _migration()
-    serialization = _serialization()
-    raw = maximal_v24_settings_fixture()
-    raw.update(
-        {
-            "google_api_key": "raw-google-secret",
-            "openrouter_api_key": "raw-openrouter-secret",
-            "deepgram_api_key": "raw-deepgram-secret",
-            "soniox_api_key": "raw-soniox-secret",
-            "local_llm_api_key": "raw-local-secret",
-            "cerebras_api_key": "raw-cerebras-secret",
-            "openrouter_managed_qq_api_key": "raw-managed-qq-secret",
-        }
-    )
-
-    serialized = serialization.to_dict(migration.from_dict(raw))
-    encoded = json.dumps(serialized, ensure_ascii=False)
-    forbidden_names = {
-        "alibaba_api_key",
-        "alibaba_api_key_beijing",
-        "alibaba_api_key_singapore",
-        "deepgram_api_key",
-        "deepseek_api_key",
-        "cerebras_api_key",
-        "google_api_key",
-        "local_llm_api_key",
-        "openrouter_api_key",
-        "openrouter_managed_api_key",
-        "openrouter_managed_qq_api_key",
-        "soniox_api_key",
-    }
-
-    assert forbidden_names.isdisjoint(
-        path.rsplit(".", maxsplit=1)[-1] for path in _leaf_paths(serialized)
-    )
-    assert "raw-google-secret" not in encoded
-    assert "raw-openrouter-secret" not in encoded
-    assert "raw-deepgram-secret" not in encoded
-    assert "raw-soniox-secret" not in encoded
-    assert "raw-local-secret" not in encoded
-    assert "raw-cerebras-secret" not in encoded
-    assert "raw-managed-qq-secret" not in encoded
-
-
-def test_secret_bearing_legacy_local_llm_extra_body_is_repaired_before_vnext_output() -> None:
-    migration = _migration()
-    serialization = _serialization()
-    raw = maximal_v24_settings_fixture()
-    raw["local_llm"]["extra_body"] = {
-        "temperature": 0.2,
-        "api_key": "raw-local-llm-secret",
-    }
-
-    serialized = serialization.to_dict(migration.from_dict(raw))
-    encoded = json.dumps(serialized, ensure_ascii=False)
-
-    assert serialized["intent"]["local_llm"]["extra_body"] == {"reasoning_effort": "none"}
-    assert "raw-local-llm-secret" not in encoded
 
 
 def test_public_settings_facade_keeps_legacy_imports_and_reads_vnext_dict() -> None:

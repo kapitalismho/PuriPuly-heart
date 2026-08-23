@@ -160,9 +160,7 @@ def normalize_persisted_dict(data: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
-    if not isinstance(data, Mapping):
-        raise ValueError("vNext settings must be a JSON object")
-    _validate_finite_json_value(data, path="settings")
+    _validate_persisted_types(data)
     default = AppSettingsVNext(settings_version=VNEXT_SETTINGS_SCHEMA_VERSION)
     compatible_data = _with_current_settings_version(
         _project_legacy_translation_fallback_fields(
@@ -181,6 +179,13 @@ def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
         merged.intent.telemetry.consent,
     )
     return with_translation_runtime_policy(ensure_telemetry_default_allow(merged))
+
+
+def _validate_persisted_types(data: Mapping[str, Any]) -> None:
+    if not isinstance(data, Mapping):
+        raise ValueError("vNext settings must be a JSON object")
+    _validate_finite_json_value(data, path="settings")
+    _validate_raw_value_type(data, AppSettingsVNext, path="settings")
 
 
 def _extract_compatible_extensions(

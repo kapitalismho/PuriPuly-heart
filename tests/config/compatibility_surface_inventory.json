@@ -403,7 +403,6 @@
       "exports": [
         {"name": "from_dict", "kind": "attribute"},
         {"name": "from_legacy_app_settings", "kind": "attribute"},
-        {"name": "is_legacy_shape_dict", "kind": "attribute"},
         {"name": "is_vnext_shape_dict", "kind": "attribute"},
         {"name": "is_vnext_settings_dict", "kind": "attribute"},
         {"name": "to_legacy_dict", "kind": "attribute"}

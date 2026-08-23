@@ -1800,9 +1800,15 @@ def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -
 
 def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
     forbidden = {
+        "_extract_unknown_legacy_values",
+        "_fallback_intent_from_legacy_raw_dict",
+        "_migrate_legacy_local_qwen_providers",
+        "_telemetry_consent_from_legacy_raw_dict",
+        "_telemetry_state_from_legacy_raw_dict",
         "allow_stable_settings_import",
         "copy_stable_secrets_to_vnext_namespace",
         "import_stable_settings_if_missing",
+        "is_legacy_shape_dict",
     }
     occurrences = {
         (path.relative_to(REPO_ROOT).as_posix(), symbol)
@@ -1814,6 +1820,42 @@ def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
     assert occurrences == set()
     assert len(KNOWN_ALLOWED_VIOLATIONS) == 31
     assert len(_dependency_violations()) == 31
+
+
+def test_r00_canonical_migration_loader_has_no_flat_ingress() -> None:
+    migration_path = SOURCE_PACKAGE_ROOT / "config" / "settings_vnext" / "migration.py"
+    tree = ast.parse(migration_path.read_text(encoding="utf-8"))
+    loader = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "from_dict"
+    )
+    referenced_names = {
+        node.id for node in ast.walk(loader) if isinstance(node, ast.Name)
+    } | {
+        node.attr for node in ast.walk(loader) if isinstance(node, ast.Attribute)
+    }
+    imported_modules = {
+        node.module
+        for node in ast.walk(loader)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    } | {
+        alias.name
+        for node in ast.walk(loader)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+
+    assert "is_vnext_settings_dict" in referenced_names
+    assert referenced_names.isdisjoint(
+        {
+            "_extract_unknown_legacy_values",
+            "_migrate_settings_dict",
+            "from_legacy_app_settings",
+            "is_legacy_shape_dict",
+        }
+    )
+    assert "puripuly_heart.config.settings" not in imported_modules
 
 
 def test_dependency_boundary_allowlist_entries_have_gate6_rationale() -> None:
