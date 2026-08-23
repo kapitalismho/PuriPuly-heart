@@ -14,6 +14,33 @@ from puripuly_heart.config.audio_host_api import (
     WINDOWS_DIRECTSOUND_HOST_API,
     WINDOWS_WASAPI_COMPATIBILITY_HOST_API,
 )
+from puripuly_heart.config.desktop_overlay_values import (
+    DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
+    DESKTOP_FLET_DEFAULT_HEIGHT,
+    DESKTOP_FLET_DEFAULT_SIZE_PRESET,
+    DESKTOP_FLET_DEFAULT_WIDTH,
+    DESKTOP_FLET_MAX_BACKGROUND_ALPHA,
+    DESKTOP_FLET_MAX_OUTLINE_WIDTH,
+    DESKTOP_FLET_MIN_BACKGROUND_ALPHA,
+    DESKTOP_FLET_MIN_HEIGHT,
+    DESKTOP_FLET_MIN_OUTLINE_WIDTH,
+    DESKTOP_FLET_MIN_WIDTH,
+    DESKTOP_FLET_SIZE_PRESET_ORDER,
+    DESKTOP_FLET_SIZE_PRESETS,
+    DesktopFletOverlayVisualSettings,
+)
+from puripuly_heart.config.desktop_overlay_values import (
+    DESKTOP_FLET_DEFAULT_TEXT_SCALE as DESKTOP_FLET_DEFAULT_TEXT_SCALE,
+)
+from puripuly_heart.config.desktop_overlay_values import (
+    DESKTOP_FLET_MAX_TEXT_SCALE as DESKTOP_FLET_MAX_TEXT_SCALE,
+)
+from puripuly_heart.config.desktop_overlay_values import (
+    DESKTOP_FLET_MIN_TEXT_SCALE as DESKTOP_FLET_MIN_TEXT_SCALE,
+)
+from puripuly_heart.config.desktop_overlay_values import (
+    DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER as DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER,
+)
 from puripuly_heart.config.llm_profiles import (
     LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH,
@@ -72,29 +99,6 @@ REFERRAL_ID_ALPHABET = frozenset("23456789ABCDEFGHJKMNPQRSTUVWXYZ")
 OVERLAY_TARGET_STEAMVR = "steamvr"
 OVERLAY_TARGET_DESKTOP = "desktop"
 OVERLAY_TARGET_VALUES = frozenset({OVERLAY_TARGET_STEAMVR, OVERLAY_TARGET_DESKTOP})
-DESKTOP_FLET_MIN_WIDTH = 480
-DESKTOP_FLET_MIN_HEIGHT = 160
-DESKTOP_FLET_DEFAULT_TEXT_SCALE = 1.0
-DESKTOP_FLET_MIN_TEXT_SCALE = 0.75
-DESKTOP_FLET_MAX_TEXT_SCALE = 1.5
-DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA = 0.6
-DESKTOP_FLET_MIN_BACKGROUND_ALPHA = 0.0
-DESKTOP_FLET_MAX_BACKGROUND_ALPHA = 1.0
-DESKTOP_FLET_MIN_OUTLINE_WIDTH = 0.5
-DESKTOP_FLET_MAX_OUTLINE_WIDTH = 8.0
-DESKTOP_FLET_SIZE_PRESET_ORDER = ("tiny", "xsmall", "small", "medium", "large", "xlarge")
-DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER = tuple(reversed(DESKTOP_FLET_SIZE_PRESET_ORDER))
-DESKTOP_FLET_DEFAULT_SIZE_PRESET = "medium"
-DESKTOP_FLET_SIZE_PRESETS: dict[str, tuple[int, int]] = {
-    "tiny": (640, 160),
-    "xsmall": (960, 240),
-    "small": (1152, 288),
-    "medium": (1344, 336),
-    "large": (1600, 400),
-    "xlarge": (1792, 448),
-}
-DESKTOP_FLET_DEFAULT_WIDTH = DESKTOP_FLET_SIZE_PRESETS[DESKTOP_FLET_DEFAULT_SIZE_PRESET][0]
-DESKTOP_FLET_DEFAULT_HEIGHT = DESKTOP_FLET_SIZE_PRESETS[DESKTOP_FLET_DEFAULT_SIZE_PRESET][1]
 DEFAULT_CUSTOM_VOCAB_TERMS: dict[str, tuple[str, ...]] = {}
 LEGACY_QWEN_DEFAULT_PROMPT = (
     "VRChat social voice chat interpretation. Use spoken, conversational language and mirror "
@@ -1150,44 +1154,6 @@ class DesktopFletOverlayPosition:
 
     def validate(self) -> None:
         self.x, self.y = _normalize_desktop_flet_position(self.x, self.y)
-
-
-@dataclass(slots=True, init=False)
-class DesktopFletOverlayVisualSettings:
-    background_alpha: float = DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA
-
-    def __init__(
-        self,
-        text_scale: object = None,
-        background_alpha: object = DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
-        outline_width: object = None,
-    ) -> None:
-        _ = (text_scale, outline_width)
-        self.background_alpha = background_alpha
-
-    def validate(self) -> None:
-        self.background_alpha = _normalize_desktop_flet_range(
-            self.background_alpha,
-            default=DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
-            minimum=DESKTOP_FLET_MIN_BACKGROUND_ALPHA,
-            maximum=DESKTOP_FLET_MAX_BACKGROUND_ALPHA,
-        )
-
-    @property
-    def text_scale(self) -> float:
-        return DESKTOP_FLET_DEFAULT_TEXT_SCALE
-
-    @text_scale.setter
-    def text_scale(self, _value: object) -> None:
-        return
-
-    @property
-    def outline_width(self) -> None:
-        return None
-
-    @outline_width.setter
-    def outline_width(self, _value: object) -> None:
-        return
 
 
 @dataclass(slots=True)

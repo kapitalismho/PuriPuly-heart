@@ -21,6 +21,11 @@ from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
 from puripuly_heart.app.wiring import create_secret_store
+from puripuly_heart.config.desktop_overlay_values import (
+    DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
+    DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER,
+    DESKTOP_FLET_SIZE_PRESET_ORDER,
+)
 from puripuly_heart.config.llm_profiles import (
     profile_for_alias,
 )
@@ -30,9 +35,6 @@ from puripuly_heart.config.overlay_calibration import (
 )
 from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.config.settings import (
-    DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
-    DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER,
-    DESKTOP_FLET_SIZE_PRESET_ORDER,
     LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
     LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS,
     MAX_CUSTOM_VOCAB_TERMS,

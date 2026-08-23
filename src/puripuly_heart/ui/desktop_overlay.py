@@ -21,10 +21,10 @@ from urllib.parse import urlsplit
 import websockets
 from websockets.exceptions import ConnectionClosed
 
-from puripuly_heart.config.settings import (
+from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA as DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
 )
-from puripuly_heart.config.settings import (
+from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_DEFAULT_HEIGHT,
     DESKTOP_FLET_DEFAULT_SIZE_PRESET,
     DESKTOP_FLET_DEFAULT_WIDTH,
@@ -37,19 +37,19 @@ from puripuly_heart.config.settings import (
     DESKTOP_FLET_MIN_TEXT_SCALE,
     DESKTOP_FLET_MIN_WIDTH,
 )
-from puripuly_heart.config.settings import (
+from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_DEFAULT_TEXT_SCALE as DESKTOP_FLET_DEFAULT_TEXT_SCALE,
 )
-from puripuly_heart.config.settings import (
+from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER as DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER,
 )
-from puripuly_heart.config.settings import (
+from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_SIZE_PRESET_ORDER as DESKTOP_FLET_SIZE_PRESET_ORDER,
 )
-from puripuly_heart.config.settings import (
+from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_SIZE_PRESETS as DESKTOP_FLET_SIZE_PRESETS,
 )
-from puripuly_heart.config.settings import (
+from puripuly_heart.config.desktop_overlay_values import (
     DesktopFletOverlayVisualSettings as DesktopFletOverlayVisualSettings,
 )
 from puripuly_heart.core.diagnostic_validation import (

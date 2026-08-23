@@ -204,6 +204,7 @@ Do not retain references across replacement unless the API explicitly allows it.
 - Canonical schema: `AppSettingsVNext`
 - Compatibility projection: `AppSettings`
 - Owner: canonical settings persistence service
+- Desktop overlay defaults, limits, presets, ordering, and visual values: `config/desktop_overlay_values.py`
 
 Contains user selections, not active runtime resources.
 

@@ -79,6 +79,7 @@ LAYER_RULES = (
     LayerRule(
         layer=SCHEMA_VALUES,
         prefixes=(
+            "puripuly_heart.config.desktop_overlay_values",
             "puripuly_heart.config.overlay_calibration",
             "puripuly_heart.config.settings_vnext.schema",
             "puripuly_heart.config.audio_host_api",
@@ -358,30 +359,6 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
             importer_layer="adapters",
             imported_layer="migration/serialization",
             reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/desktop_overlay.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="UI adapters/renderers",
-            imported_layer="migration/serialization",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/desktop_overlay_surface/contract.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="UI adapters/renderers",
-            imported_layer="migration/serialization",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/desktop_overlay_surface/renderer.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="UI adapters/renderers",
-            imported_layer="migration/serialization",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
         ),
         ImportViolation(
             rule_id="ui-adapters-avoid-provider-construction",
@@ -1713,6 +1690,14 @@ def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -
     expected_current = {entry["path"]: set(entry["symbols"]) for entry in entries}
     expected_current.pop("src/puripuly_heart/main.py")
     expected_current.pop("src/puripuly_heart/providers/llm/openrouter.py")
+    expected_current.pop("src/puripuly_heart/ui/desktop_overlay.py")
+    expected_current.pop("src/puripuly_heart/ui/desktop_overlay_surface/contract.py")
+    expected_current.pop("src/puripuly_heart/ui/desktop_overlay_surface/renderer.py")
+    expected_current["src/puripuly_heart/ui/views/settings.py"] -= {
+        "DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA",
+        "DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER",
+        "DESKTOP_FLET_SIZE_PRESET_ORDER",
+    }
     expected_current["src/puripuly_heart/app/wiring/wiring_llm_factory.py"] -= {
         "OpenRouterProviderRouting",
         "OpenRouterRoutingMode",
@@ -1758,9 +1743,43 @@ def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
     assert occurrences == set()
 
 
-def test_a03_runtime_port_boundaries_reduce_dependency_debt_to_22() -> None:
-    assert len(KNOWN_ALLOWED_VIOLATIONS) == 22
-    assert len(_dependency_violations()) == 22
+def test_a04_overlay_value_owner_reduces_dependency_debt_to_19() -> None:
+    assert len(KNOWN_ALLOWED_VIOLATIONS) == 19
+    assert len(_dependency_violations()) == 19
+
+
+def test_a04_overlay_ui_uses_the_pure_canonical_value_owner() -> None:
+    owned_paths = (
+        SOURCE_PACKAGE_ROOT / "ui" / "desktop_overlay.py",
+        SOURCE_PACKAGE_ROOT / "ui" / "desktop_overlay_surface" / "contract.py",
+        SOURCE_PACKAGE_ROOT / "ui" / "desktop_overlay_surface" / "renderer.py",
+    )
+    for path in owned_paths:
+        imported_modules = set(
+            _imported_modules(
+                _module_name_for_path(path),
+                path,
+                _internal_module_names(),
+            )
+        )
+        assert "puripuly_heart.config.settings" not in imported_modules
+        assert "puripuly_heart.config.desktop_overlay_values" in imported_modules
+
+    settings_view_path = SOURCE_PACKAGE_ROOT / "ui" / "views" / "settings.py"
+    settings_view_tree = ast.parse(settings_view_path.read_text(encoding="utf-8"))
+    imports_by_module = {
+        node.module: {alias.name for alias in node.names}
+        for node in ast.walk(settings_view_tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+    a04_symbols = {
+        "DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA",
+        "DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER",
+        "DESKTOP_FLET_SIZE_PRESET_ORDER",
+    }
+    assert a04_symbols <= imports_by_module["puripuly_heart.config.desktop_overlay_values"]
+    assert a04_symbols.isdisjoint(imports_by_module["puripuly_heart.config.settings"])
+    assert _layer_for_module("puripuly_heart.config.desktop_overlay_values") == SCHEMA_VALUES
 
 
 def test_r00_canonical_migration_loader_has_no_flat_ingress() -> None:
