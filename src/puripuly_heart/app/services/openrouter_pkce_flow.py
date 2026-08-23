@@ -155,6 +155,9 @@ class OpenRouterPkceApplicationOwner:
             )
             return False
 
+        current = self.settings.current
+        if current is None:
+            return False
         updated = materialize_provider_apply_intent(current, target.provider_intent)
         updated.provider.llm = LLMProviderName.OPENROUTER
         updated.openrouter.selection_alias = OpenRouterSelectionAlias(profile.alias)

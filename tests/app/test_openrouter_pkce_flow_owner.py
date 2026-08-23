@@ -245,13 +245,20 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
         ),
         system_prompt="PKCE prompt draft",
     )
-    settings.current.ui.locale = "ko"
     results = SettingsTransactionResultOwner()
 
     class Flow:
         api_key = "sk-or-v1-user"
+        replace_current_during_flow = True
 
         async def run_flow(self) -> OpenRouterPKCEExchangeResult:
+            if self.replace_current_during_flow:
+                latest = copy.deepcopy(settings.current)
+                assert latest is not None
+                latest.ui.locale = "ko"
+                settings.current = latest
+                settings.remember_projection(latest)
+                self.replace_current_during_flow = False
             return OpenRouterPKCEExchangeResult(
                 api_key=self.api_key,
                 user_id="user_123",

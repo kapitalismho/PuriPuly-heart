@@ -6525,7 +6525,6 @@ class SettingsView(ft.Column):
             CustomVocabularySettingsIntent(
                 source_language=source_language,
                 terms=tuple(applied_terms),
-                enabled=next_enabled,
             )
         )
 

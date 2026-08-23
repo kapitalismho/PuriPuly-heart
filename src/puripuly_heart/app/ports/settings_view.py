@@ -197,7 +197,6 @@ class PeerExpectedLanguagesIntent:
 class CustomVocabularySettingsIntent:
     source_language: str
     terms: tuple[str, ...]
-    enabled: bool
 
 
 @dataclass(frozen=True, slots=True)

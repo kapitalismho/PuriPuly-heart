@@ -78,7 +78,7 @@ def test_immediate_intents_rebase_onto_latest_settings_without_surface_displacem
     localized = materialize_immediate_settings_intent(current, LocaleSettingsIntent("ko"))
     updated = materialize_immediate_settings_intent(
         localized,
-        CustomVocabularySettingsIntent("en", ("new",), True),
+        CustomVocabularySettingsIntent("en", ("new",)),
     )
 
     assert updated.ui.locale == "ko"
@@ -87,6 +87,28 @@ def test_immediate_intents_rebase_onto_latest_settings_without_surface_displacem
     assert updated.stt.custom_terms == {"en": ["new"], "ja": ["最新"]}
     assert current.ui.locale == "en"
     assert displayed.stt.custom_terms["en"] == ["old"]
+
+
+def test_custom_vocabulary_intent_derives_enabled_from_latest_rebased_terms() -> None:
+    current = AppSettings()
+    current.stt.custom_terms = {"en": ["stale"], "ja": ["latest"]}
+    current.stt.custom_vocabulary_enabled = True
+
+    updated = materialize_immediate_settings_intent(
+        current,
+        CustomVocabularySettingsIntent("en", ()),
+    )
+
+    assert updated.stt.custom_terms == {"en": [], "ja": ["latest"]}
+    assert updated.stt.custom_vocabulary_enabled is True
+
+    no_other_terms = AppSettings()
+    no_other_terms.stt.custom_terms = {"en": ["stale"]}
+    cleared = materialize_immediate_settings_intent(
+        no_other_terms,
+        CustomVocabularySettingsIntent("en", ()),
+    )
+    assert cleared.stt.custom_vocabulary_enabled is False
 
 
 def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:

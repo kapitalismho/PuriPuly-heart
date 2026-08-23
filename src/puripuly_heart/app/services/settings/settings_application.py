@@ -365,7 +365,7 @@ def materialize_immediate_settings_intent(
         updated.languages.peer_expected_languages = list(intent.languages)
     elif isinstance(intent, CustomVocabularySettingsIntent):
         updated.stt.custom_terms[intent.source_language] = list(intent.terms)
-        updated.stt.custom_vocabulary_enabled = intent.enabled
+        updated.stt.custom_vocabulary_enabled = any(updated.stt.custom_terms.values())
     elif isinstance(intent, OverlayTargetSettingsIntent):
         updated.overlay.target = intent.target
     elif isinstance(intent, OverlayTranslationSettingsIntent):
