@@ -59,6 +59,7 @@ from puripuly_heart.app.ports.settings_view import (
     TranslationProviderEdit,
     TranslationSelectionSnapshot,
 )
+from puripuly_heart.app.ports.ui_models import OscControlPresentationState
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
@@ -3953,6 +3954,198 @@ class SettingsView(ft.Column):
         self._sync_telemetry_consent_card(settings)
         if is_control_mounted(self):
             _update_control_if_mounted(self._telemetry_consent_card)
+
+    def project_osc_control_state(self, state: OscControlPresentationState) -> None:
+        control = state.changed_control
+        if control in {"PuriPuly_Talk", "PuriPuly_Trans"}:
+            return
+
+        if control == "PuriPuly_SelfSrcLang" and self._prompt_snapshot is not None:
+            self._prompt_snapshot = replace(
+                self._prompt_snapshot,
+                source_language=state.self_source_language,
+                custom_vocabulary_enabled=state.custom_vocabulary_enabled,
+                custom_vocabulary_terms=state.custom_vocabulary_terms,
+                custom_vocabulary_other_languages_have_terms=(
+                    state.custom_vocabulary_other_languages_have_terms
+                ),
+            )
+        if control in {"PuriPuly_PeerAuto", "PuriPuly_PeerSrcLang"}:
+            if self._general_snapshot is not None:
+                self._general_snapshot = replace(
+                    self._general_snapshot,
+                    effective_peer_source_language=state.peer_source_language,
+                )
+        if control in {
+            "PuriPuly_PeerAuto",
+            "PuriPuly_SelfSrcLang",
+            "PuriPuly_SelfDstLang",
+            "PuriPuly_PeerSrcLang",
+            "PuriPuly_PeerDstLang",
+        }:
+            return
+
+        if self._provider_snapshot is not None:
+            self._provider_snapshot = self._project_osc_provider_snapshot(
+                self._provider_snapshot,
+                state,
+            )
+        if self._provider_draft is not None:
+            self._provider_draft = self._project_osc_provider_snapshot(
+                self._provider_draft,
+                state,
+            )
+            self._rebase_provider_edits_after_osc(control)
+        if self._general_snapshot is not None:
+            if control == "PuriPuly_MuteSync":
+                self._general_snapshot = replace(
+                    self._general_snapshot,
+                    vrc_mic_intercept=state.mute_sync,
+                )
+            elif control == "PuriPuly_ChatboxSource":
+                self._general_snapshot = replace(
+                    self._general_snapshot,
+                    chatbox_include_source=state.chatbox_source,
+                )
+
+        display_settings = self._build_settings_with_provider_draft()
+        if display_settings is None:
+            return
+        if control in {"PuriPuly_SelfASR", "PuriPuly_PeerASR"}:
+            self._set_unit_card_value_text(
+                self._stt_text,
+                self._stt_provider_display_label(
+                    display_settings.stt_provider,
+                    custom_mode=display_settings.custom_stt_mode,
+                ),
+            )
+            self._set_unit_card_value_text(
+                self._peer_stt_text,
+                self._stt_provider_display_label(
+                    self._effective_peer_stt_provider(display_settings),
+                    custom_mode=display_settings.custom_stt_mode,
+                ),
+            )
+            self._sync_custom_stt_card(display_settings)
+            self._update_api_visibility()
+            _update_control_if_mounted(self._stt_text)
+            _update_control_if_mounted(self._peer_stt_text)
+            _update_control_if_mounted(self._api_keys_column)
+        elif control == "PuriPuly_Translator":
+            self._set_unit_card_value_text(
+                self._llm_text,
+                self._get_llm_display_label(display_settings),
+            )
+            self._set_translation_connection_text(
+                self._get_translation_connection_display_label(display_settings)
+            )
+            self._sync_translation_connection_title(display_settings)
+            self._update_api_visibility()
+            _update_control_if_mounted(self._llm_text)
+            _update_control_if_mounted(self._translation_connection_row)
+            _update_control_if_mounted(self._api_keys_column)
+        elif control == "PuriPuly_Fallback":
+            self._sync_openrouter_fallback_card(display_settings)
+            self._update_api_visibility()
+            _update_control_if_mounted(self._openrouter_fallback_text)
+            _update_control_if_mounted(self._openrouter_fallback_helper_text)
+            _update_control_if_mounted(self._api_keys_column)
+        elif control == "PuriPuly_MuteSync":
+            self._vrc_mic_text.content.value = t(
+                "settings.vrc_mic.on" if state.mute_sync else "settings.vrc_mic.off"
+            )
+            _update_control_if_mounted(self._vrc_mic_text)
+        elif control == "PuriPuly_ChatboxSource":
+            self._chatbox_source_text.content.value = t(
+                "settings.chatbox_source.on"
+                if state.chatbox_source
+                else "settings.chatbox_source.off"
+            )
+            _update_control_if_mounted(self._chatbox_source_text)
+        elif control in {"PuriPuly_Listen", "PuriPuly_Captions"}:
+            self._sync_overlay_controls()
+
+    @staticmethod
+    def _project_osc_provider_snapshot(
+        snapshot: ProviderSettingsSnapshot,
+        state: OscControlPresentationState,
+    ) -> ProviderSettingsSnapshot:
+        control = state.changed_control
+        if control in {"PuriPuly_SelfASR", "PuriPuly_PeerASR"}:
+            if control == "PuriPuly_SelfASR":
+                return replace(
+                    snapshot,
+                    stt_provider=STTProviderName(state.self_asr_setting),
+                    custom_stt_mode=state.custom_stt_mode,
+                    custom_stt_compatibility=state.custom_stt_compatibility,
+                )
+            return replace(
+                snapshot,
+                peer_stt_provider=STTProviderName(state.peer_asr_setting),
+                custom_stt_mode=state.custom_stt_mode,
+                custom_stt_compatibility=state.custom_stt_compatibility,
+            )
+        if control == "PuriPuly_Translator":
+            translation = replace(
+                snapshot.translation,
+                model=TranslationModel(state.translation_model),
+                connection=TranslationConnection(state.translation_connection),
+                connection_history=tuple(
+                    (TranslationModel(model), TranslationConnection(connection))
+                    for model, connection in state.translation_connection_history
+                ),
+                http_extension_id=state.translation_http_extension_id,
+                previous_llm_model=(
+                    None
+                    if state.translation_previous_model is None
+                    else TranslationModel(state.translation_previous_model)
+                ),
+            )
+            return replace(
+                snapshot,
+                llm_provider=LLMProviderName(state.llm_provider),
+                translation=translation,
+                openrouter_llm_model=OpenRouterLLMModel(state.openrouter_llm_model),
+                openrouter_selected_source=OpenRouterCredentialSource(
+                    state.openrouter_selected_source
+                ),
+                openrouter_selection_alias=(
+                    None
+                    if state.openrouter_selection_alias is None
+                    else OpenRouterSelectionAlias(state.openrouter_selection_alias)
+                ),
+            )
+        if control == "PuriPuly_Fallback":
+            fallback = TranslationFallbackSnapshot(
+                enabled=state.fallback_enabled,
+                model=TranslationModel(state.fallback_model),
+                connection=TranslationConnection(state.fallback_connection),
+            )
+            return replace(
+                snapshot,
+                translation=replace(snapshot.translation, fallback=fallback),
+            )
+        return snapshot
+
+    def _rebase_provider_edits_after_osc(self, control: str) -> None:
+        draft = self._provider_draft
+        if draft is None:
+            return
+        if control in {"PuriPuly_SelfASR", "PuriPuly_PeerASR"} and (
+            SttProviderEdit in self._provider_edits
+        ):
+            self._record_provider_edit(
+                SttProviderEdit(
+                    self_provider=draft.stt_provider,
+                    peer_provider=draft.peer_stt_provider,
+                    custom_mode=draft.custom_stt_mode,
+                    custom_compatibility=draft.custom_stt_compatibility,
+                )
+            )
+        if control in {"PuriPuly_Translator", "PuriPuly_Fallback"} and (
+            TranslationProviderEdit in self._provider_edits
+        ):
+            self._record_provider_edit(TranslationProviderEdit(draft.translation))
 
     def _load_secrets(self, settings: ProviderSettingsSnapshot, config_path: Path) -> None:
         """Load secret values into fields."""

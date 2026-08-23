@@ -43,11 +43,16 @@ from puripuly_heart.app.ports.settings_view import (
     TranslationProviderEdit,
     TranslationSelectionSnapshot,
 )
+from puripuly_heart.app.ports.ui_models import (
+    OscControlPresentationName,
+    OscControlPresentationState,
+)
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
     ManualLocalASRFallbackPlan,
 )
+from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState
 from puripuly_heart.app.services.provider_runtime_apply import (
     NoopRuntimeApply,
     OverlayOscOutputRuntimeApplyAdapter,
@@ -240,6 +245,73 @@ def settings_view_surface_snapshots(
     return provider, general, prompt, overlay
 
 
+def osc_control_presentation_state(
+    settings: AppSettings,
+    *,
+    canonical_state: OscCanonicalState,
+    changed_control: OscControlPresentationName,
+    self_capture_effective: bool | None = None,
+) -> OscControlPresentationState:
+    translation = settings.translation
+    fallback = translation.fallback
+    source_language = settings.languages.source_language
+    return OscControlPresentationState(
+        changed_control=changed_control,
+        self_capture=(
+            canonical_state.self_capture
+            if self_capture_effective is None
+            else bool(self_capture_effective)
+        ),
+        peer_capture=canonical_state.peer_capture,
+        translation=canonical_state.translation,
+        captions=canonical_state.captions,
+        peer_source_mode=settings.languages.peer_source_mode,
+        mute_sync=canonical_state.mute_sync,
+        chatbox_source=canonical_state.chatbox_source,
+        self_source_language=canonical_state.self_source_language,
+        self_target_language=canonical_state.self_target_language,
+        peer_source_language=canonical_state.peer_source_language,
+        peer_target_language=canonical_state.peer_target_language,
+        self_asr=canonical_state.self_asr,
+        peer_asr=canonical_state.peer_asr,
+        self_asr_setting=settings.provider.stt.value,
+        peer_asr_setting=settings.provider.peer_stt.value,
+        custom_stt_mode=settings.custom_stt.mode,
+        custom_stt_compatibility=settings.custom_stt.compatibility,
+        custom_vocabulary_enabled=bool(settings.stt.custom_vocabulary_enabled),
+        custom_vocabulary_terms=tuple(settings.stt.custom_terms.get(source_language, ())),
+        custom_vocabulary_other_languages_have_terms=any(
+            bool(terms)
+            for language, terms in settings.stt.custom_terms.items()
+            if language != source_language
+        ),
+        llm_provider=settings.provider.llm.value,
+        openrouter_llm_model=settings.openrouter.llm_model.value,
+        openrouter_selected_source=settings.openrouter.selected_source.value,
+        openrouter_selection_alias=(
+            None
+            if settings.openrouter.selection_alias is None
+            else settings.openrouter.selection_alias.value
+        ),
+        translation_model=translation.model.value,
+        translation_connection=translation.connection.value,
+        translation_connection_history=tuple(
+            sorted(
+                (str(model), connection.value)
+                for model, connection in translation.connection_history.items()
+            )
+        ),
+        translation_http_extension_id=translation.http_extension_id,
+        translation_previous_model=(
+            None if translation.previous_llm_model is None else translation.previous_llm_model.value
+        ),
+        fallback=canonical_state.fallback,
+        fallback_enabled=bool(fallback.enabled),
+        fallback_model=fallback.model.value,
+        fallback_connection=fallback.connection.value,
+    )
+
+
 def materialize_immediate_settings_intent(
     current: AppSettings,
     intent: ImmediateSettingsIntent,
@@ -370,7 +442,12 @@ class SettingsApplicationOwner:
     failure_sink: SettingsFailureSink
     results: SettingsTransactionResultOwner = field(default_factory=SettingsTransactionResultOwner)
 
-    async def apply(self, next_settings: AppSettings) -> bool:
+    async def apply(
+        self,
+        next_settings: AppSettings,
+        *,
+        reload_settings_view: bool = True,
+    ) -> bool:
         current = self.settings.current
         if current is not None:
             self.settings.normalize_compatibility(current)
@@ -426,17 +503,34 @@ class SettingsApplicationOwner:
                 )
             installation_fallback = bool(fallback_plan.installation_fallback and fallback_channels)
         if next_settings is not self.settings.current:
-            if await self._route(next_settings):
+            if await self._route(
+                next_settings,
+                reload_settings_view=reload_settings_view,
+            ):
                 self.fallback_sink(fallback_channels, installation_fallback)
                 return True
-        await self.apply_direct(next_settings)
+        await self.apply_direct(
+            next_settings,
+            reload_settings_view=reload_settings_view,
+        )
         self.fallback_sink(fallback_channels, installation_fallback)
         return True
 
-    async def _route(self, next_settings: AppSettings) -> bool:
-        if await self._apply_combined(next_settings):
+    async def _route(
+        self,
+        next_settings: AppSettings,
+        *,
+        reload_settings_view: bool,
+    ) -> bool:
+        if await self._apply_combined(
+            next_settings,
+            reload_settings_view=reload_settings_view,
+        ):
             return True
-        if await self._apply_stt_language_audio(next_settings):
+        if await self._apply_stt_language_audio(
+            next_settings,
+            reload_settings_view=reload_settings_view,
+        ):
             return True
         if await self._apply_overlay_osc_output(next_settings):
             return True
@@ -583,6 +677,7 @@ class SettingsApplicationOwner:
         *,
         base_settings: AppSettings,
         committed_settings: AppSettings,
+        reload_settings_view: bool = True,
     ) -> None:
         self.settings.begin(legacy_snapshot=committed_settings)
         committed = False
@@ -603,14 +698,21 @@ class SettingsApplicationOwner:
             copy.deepcopy(base_settings),
             persist=False,
             strict_runtime_errors=False,
+            reload_settings_view=reload_settings_view,
         )
         self.settings.current = copy.deepcopy(base_settings)
-        self.projection.render(
-            self.settings.current,
-            preserve_custom_vocab_draft=True,
-        )
+        if reload_settings_view:
+            self.projection.render(
+                self.settings.current,
+                preserve_custom_vocab_draft=True,
+            )
 
-    async def _apply_combined(self, next_settings: AppSettings) -> bool:
+    async def _apply_combined(
+        self,
+        next_settings: AppSettings,
+        *,
+        reload_settings_view: bool,
+    ) -> bool:
         order22 = self.projection.order22_patch_base_and_values(next_settings)
         order23 = self.projection.order23_patch_base_and_values(next_settings)
         order24 = self.projection.order24_patch_base_and_values(next_settings)
@@ -679,6 +781,7 @@ class SettingsApplicationOwner:
                     next_settings,
                     strict_runtime_errors=True,
                     strict_persistence_errors=True,
+                    reload_settings_view=reload_settings_view,
                 )
             except StrictSettingsSaveFailed:
                 if committed_before_full_draft is not None:
@@ -695,7 +798,7 @@ class SettingsApplicationOwner:
             except Exception:
                 self._set_result(_ui_prompt_clipboard_state_runtime_degraded_transaction_result())
 
-        if self.settings.current is not None:
+        if reload_settings_view and self.settings.current is not None:
             self.projection.render(
                 self.settings.current,
                 preserve_custom_vocab_draft=True,
@@ -767,6 +870,7 @@ class SettingsApplicationOwner:
                 await self.compensate_failed_local_asr_settings_apply(
                     base_settings=base_settings,
                     committed_settings=committed_settings,
+                    reload_settings_view=reload_settings_view,
                 )
             except Exception:
                 self.failure_sink("Failed to compensate local ASR settings apply")

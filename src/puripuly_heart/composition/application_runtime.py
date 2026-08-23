@@ -38,7 +38,11 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
 )
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretStorePort
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
-from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
+from puripuly_heart.app.ports.ui_models import (
+    ManagedGemmaDashboardNotice,
+    OscControlPresentationName,
+    OscControlPresentationState,
+)
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
 from puripuly_heart.app.services.application_after_launch import (
@@ -117,7 +121,10 @@ from puripuly_heart.app.services.self_capture_application import (
     SelfCaptureApplicationOwner,
     SelfCaptureApplicationSettings,
 )
-from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
+from puripuly_heart.app.services.settings_application import (
+    SettingsApplicationOwner,
+    osc_control_presentation_state,
+)
 from puripuly_heart.app.services.settings_projection import SettingsProjectionOwner
 from puripuly_heart.app.services.settings_runtime_effects import (
     SettingsRuntimeEffectsAdapter,
@@ -990,6 +997,22 @@ def compose_application_runtime(
                     value.languages.peer_target_language,
                 )
 
+            def osc_ui_state(
+                control: OscControlPresentationName,
+            ) -> OscControlPresentationState:
+                value = current_settings()
+                if value is None:
+                    value = AppSettings()
+                return osc_control_presentation_state(
+                    value,
+                    canonical_state=osc_state(),
+                    changed_control=control,
+                    self_capture_effective=bool(
+                        pipeline.self_capture is not None
+                        and pipeline.self_capture.snapshot.effective_active
+                    ),
+                )
+
             vrc_mic_sync = compose_vrc_mic_sync(
                 state_provider=lambda: pipeline.vrc_mic_state,
                 gate_provider=lambda: pipeline.vrc_mic_audio_gate,
@@ -1000,11 +1023,14 @@ def compose_application_runtime(
                 error_sink=log_error,
                 settings_provider=current_settings,
                 apply_settings=lambda next_settings: require_settings_application().apply(
-                    next_settings
+                    next_settings,
+                    reload_settings_view=False,
                 ),
                 application_provider=lambda: application,
                 sender_provider=lambda: pipeline.sender,
                 osc_state_provider=osc_state,
+                ui_state_provider=osc_ui_state,
+                ui_state_sink=presentation.project_osc_control_state,
                 language_state_provider=language_state,
                 translation_model_normalizer=materialize_translation_settings,
             )

@@ -15,6 +15,7 @@ from puripuly_heart.app.ports.settings_view import (
 )
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
+    OscControlPresentationState,
     OverlayPeerPresentationState,
 )
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
@@ -304,6 +305,16 @@ class FletUiPresentationAdapter:
         set_peer_auto = getattr(dashboard, "set_peer_auto_detect_available", None)
         if callable(set_peer_auto):
             set_peer_auto(peer_auto_detect_available)
+
+    def project_osc_control_state(self, state: OscControlPresentationState) -> None:
+        dashboard = getattr(self._app, "view_dashboard", None)
+        project_dashboard = getattr(dashboard, "project_osc_control_state", None)
+        if callable(project_dashboard):
+            project_dashboard(state)
+        settings = getattr(self._app, "view_settings", None)
+        project_settings = getattr(settings, "project_osc_control_state", None)
+        if callable(project_settings):
+            project_settings(state)
 
     def render_settings(
         self,

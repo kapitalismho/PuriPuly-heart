@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import copy
+
 import pytest
 
 from puripuly_heart.app.services.osc.control_application import (
+    OscControlApplyResult,
     SettingsBackedOscControlApplication,
 )
 from puripuly_heart.config.settings import (
     AppSettings,
     DeepSeekLLMModel,
     LLMProviderName,
+    STTProviderName,
     TranslationConnection,
     TranslationModel,
     materialize_translation_settings,
@@ -46,6 +50,56 @@ async def test_translation_model_control_materializes_provider_and_connection() 
     )
     assert updated.provider.llm == LLMProviderName.OPENROUTER
     assert updated.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH
+
+
+@pytest.mark.asyncio
+async def test_managed_local_models_control_materializes_provider_and_connection() -> None:
+    current = AppSettings()
+    current.translation.connection = TranslationConnection.MANAGED
+    applied: list[AppSettings] = []
+
+    async def apply_settings(settings: object) -> object:
+        nonlocal current
+        assert isinstance(settings, AppSettings)
+        applied.append(settings)
+        current = settings
+        return settings
+
+    application = SettingsBackedOscControlApplication(
+        settings_provider=lambda: current,
+        apply_settings=apply_settings,
+        translation_model_normalizer=materialize_translation_settings,
+    )
+
+    await application.set_translation_model(
+        TranslationModel.MANAGED_GEMMA.value,
+        TranslationConnection.CPU.value,
+    )
+
+    updated = applied[0]
+    assert updated.translation.model == TranslationModel.MANAGED_GEMMA
+    assert updated.translation.connection == TranslationConnection.CPU
+    assert updated.provider.llm == LLMProviderName.MANAGED_GEMMA
+
+    await application.set_translation_model(
+        TranslationModel.MANAGED_GEMMA.value,
+        TranslationConnection.GPU.value,
+    )
+
+    updated = applied[1]
+    assert updated.translation.model == TranslationModel.MANAGED_GEMMA
+    assert updated.translation.connection == TranslationConnection.GPU
+    assert updated.provider.llm == LLMProviderName.MANAGED_GEMMA
+
+    await application.set_translation_model(
+        TranslationModel.MANAGED_GEMMA_12B.value,
+        TranslationConnection.GPU.value,
+    )
+
+    updated = applied[2]
+    assert updated.translation.model == TranslationModel.MANAGED_GEMMA_12B
+    assert updated.translation.connection == TranslationConnection.GPU
+    assert updated.provider.llm == LLMProviderName.MANAGED_GEMMA
 
 
 @pytest.mark.asyncio
@@ -118,6 +172,33 @@ async def test_settings_control_rejects_when_application_keeps_the_previous_stat
 
     assert result is False
     assert current.osc.vrc_mic_intercept is False
+
+
+@pytest.mark.asyncio
+async def test_settings_control_reports_a_committed_normalized_canonical_state() -> None:
+    current = AppSettings()
+    current.provider.stt = STTProviderName.DEEPGRAM
+
+    async def apply_settings(settings: object) -> object:
+        nonlocal current
+        assert isinstance(settings, AppSettings)
+        current = copy.deepcopy(settings)
+        current.provider.stt = STTProviderName.LOCAL_CPU_AUTO
+        return True
+
+    application = SettingsBackedOscControlApplication(
+        settings_provider=lambda: current,
+        apply_settings=apply_settings,
+        translation_model_normalizer=materialize_translation_settings,
+    )
+
+    result = await application.set_self_asr(STTProviderName.LOCAL_QWEN_GPU.value)
+
+    assert result == OscControlApplyResult(
+        applied=False,
+        canonical_state_changed=True,
+    )
+    assert current.provider.stt is STTProviderName.LOCAL_CPU_AUTO
 
 
 @pytest.mark.asyncio

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -13,6 +14,13 @@ pytest.importorskip("flet")
 from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
+from puripuly_heart.app.ports.settings_view import (
+    CustomSttEdit,
+    SystemPromptEdit,
+    TranslationProviderEdit,
+)
+from puripuly_heart.app.ports.ui_models import OscControlPresentationName
+from puripuly_heart.app.services.osc.state_publisher import state_from_settings
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.settings import (
@@ -37,6 +45,7 @@ from puripuly_heart.config.settings import (
     TranslationFallbackSettings,
     TranslationModel,
     TranslationSettings,
+    materialize_translation_settings,
     to_dict,
 )
 from puripuly_heart.ui import i18n as i18n_module
@@ -49,6 +58,7 @@ from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from puripuly_heart.ui.theme import COLOR_NEUTRAL_DARK
 from puripuly_heart.ui.views import settings as settings_view
 from tests.helpers.flet_page import attach_dummy_page
+from tests.helpers.osc_presentation import osc_control_presentation_state
 
 
 class DummySecretStore:
@@ -88,6 +98,143 @@ def _make_settings_view(
     if settings is not None:
         view._settings = settings
     return view, store
+
+
+def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    baseline = AppSettings()
+    view, _store = _make_settings_view(monkeypatch)
+    view.load_from_settings(baseline, config_path=Path("settings.json"))
+    api_visibility_updates: list[None] = []
+    monkeypatch.setattr(
+        view,
+        "_update_api_visibility",
+        lambda: api_visibility_updates.append(None),
+    )
+    assert view._provider_snapshot is not None
+    draft_translation = replace(
+        view._provider_snapshot.translation,
+        model=TranslationModel.LOCAL_LLM,
+        connection=TranslationConnection.OLLAMA,
+    )
+    view._provider_draft = replace(
+        view._provider_snapshot,
+        translation=draft_translation,
+        custom_stt_endpoint="https://draft.invalid/v1/audio/transcriptions",
+    )
+    view._record_provider_edit(TranslationProviderEdit(draft_translation))
+    view._record_provider_edit(
+        CustomSttEdit(
+            mode=view._provider_draft.custom_stt_mode,
+            compatibility=view._provider_draft.custom_stt_compatibility,
+            endpoint=view._provider_draft.custom_stt_endpoint,
+            model=view._provider_draft.custom_stt_model,
+            extra_json=view._provider_draft.custom_stt_extra_json,
+        )
+    )
+    view._prompt_editor.value = "unsaved prompt"
+    view._stage_prompt_draft("unsaved prompt")
+    view._custom_vocab_tag_editor._input_field.value = "unsubmitted vocabulary"
+    emitted: list[str] = []
+    view.on_settings_changed = lambda _settings: emitted.append("settings")
+    view.on_providers_changed = lambda: emitted.append("providers")
+    canonical = AppSettings()
+    canonical.languages.source_language = "ja"
+    canonical.languages.target_language = "fr"
+    canonical.languages.peer_source_language = "de"
+    canonical.languages.peer_target_language = "ko"
+    canonical.languages.peer_source_mode = "auto"
+    canonical.ui.peer_translation_enabled = True
+    canonical.ui.overlay_enabled = True
+    canonical.osc.vrc_mic_intercept = True
+    canonical.osc.chatbox_include_source = False
+    canonical.provider.stt = STTProviderName.SONIOX
+    canonical.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
+    canonical.translation.model = TranslationModel.GEMINI_37_FLASH
+    canonical.translation.connection = TranslationConnection.OFFICIAL_BYOK
+    materialize_translation_settings(canonical)
+    canonical.translation.fallback.enabled = True
+    canonical.translation.fallback.model = TranslationModel.DEEPSEEK_V4_FLASH
+    canonical.translation.fallback.connection = TranslationConnection.OFFICIAL_BYOK
+    canonical.stt.custom_terms = {"en": ["existing"], "ja": ["osc-term"]}
+    canonical.stt.custom_vocabulary_enabled = True
+    canonical_state = state_from_settings(
+        canonical,
+        peer_capture=True,
+        captions=True,
+    )
+
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_MuteSync",
+            settings=canonical,
+            canonical_state=canonical_state,
+        )
+    )
+
+    assert view._provider_draft is not None
+    assert view._provider_draft.translation.model == TranslationModel.LOCAL_LLM
+    assert view._provider_draft.translation.connection == TranslationConnection.OLLAMA
+
+    controls: tuple[OscControlPresentationName, ...] = (
+        "PuriPuly_Talk",
+        "PuriPuly_Trans",
+        "PuriPuly_Listen",
+        "PuriPuly_Captions",
+        "PuriPuly_PeerAuto",
+        "PuriPuly_ChatboxSource",
+        "PuriPuly_SelfSrcLang",
+        "PuriPuly_SelfDstLang",
+        "PuriPuly_PeerSrcLang",
+        "PuriPuly_PeerDstLang",
+        "PuriPuly_SelfASR",
+        "PuriPuly_PeerASR",
+        "PuriPuly_Translator",
+        "PuriPuly_Fallback",
+    )
+    for control in controls:
+        view.project_osc_control_state(
+            osc_control_presentation_state(
+                control,
+                settings=canonical,
+                canonical_state=canonical_state,
+            )
+        )
+
+    for projected in (view._provider_snapshot, view._provider_draft):
+        assert projected is not None
+        assert projected.stt_provider == STTProviderName.SONIOX
+        assert projected.peer_stt_provider == STTProviderName.LOCAL_QWEN_GPU
+        assert projected.custom_stt_mode == canonical.custom_stt.mode
+        assert projected.custom_stt_compatibility == canonical.custom_stt.compatibility
+        assert projected.llm_provider == canonical.provider.llm
+        assert projected.translation.model == TranslationModel.GEMINI_37_FLASH
+        assert projected.translation.connection == TranslationConnection.OFFICIAL_BYOK
+        assert projected.translation.fallback.enabled is True
+        assert projected.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH
+        assert projected.translation.fallback.connection == TranslationConnection.OFFICIAL_BYOK
+    assert view._provider_draft is not None
+    assert (
+        view._provider_draft.custom_stt_endpoint == "https://draft.invalid/v1/audio/transcriptions"
+    )
+    assert view._prompt_snapshot is not None
+    assert view._prompt_snapshot.source_language == "ja"
+    assert view._prompt_snapshot.custom_vocabulary_terms == ("osc-term",)
+    assert view._prompt_snapshot.custom_vocabulary_other_languages_have_terms is True
+    assert view._prompt_editor.value == "unsaved prompt"
+    assert view._provider_edits[SystemPromptEdit] == SystemPromptEdit("unsaved prompt")
+    assert view._provider_edits[CustomSttEdit].endpoint == (
+        "https://draft.invalid/v1/audio/transcriptions"
+    )
+    assert view._provider_edits[TranslationProviderEdit].selection.model == (
+        TranslationModel.GEMINI_37_FLASH
+    )
+    assert view._custom_vocab_tag_editor._input_field.value == "unsubmitted vocabulary"
+    assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
+    assert view._chatbox_source_text.content.value == t("settings.chatbox_source.off")
+    assert len(api_visibility_updates) == 4
+    assert emitted == []
 
 
 def test_cpu_auto_option_is_disabled_until_all_models_are_available(
