@@ -128,10 +128,22 @@ class LocaleSettingsIntent:
 
 
 @dataclass(frozen=True, slots=True)
-class AudioSettingsIntent:
+class AudioInputSettingsIntent:
     input_host_api: str
     input_device: str
+
+
+@dataclass(frozen=True, slots=True)
+class DesktopAudioOutputSettingsIntent:
     output_device: str
+
+
+AudioSettingsChange: TypeAlias = AudioInputSettingsIntent | DesktopAudioOutputSettingsIntent
+
+
+@dataclass(frozen=True, slots=True)
+class AudioSettingsIntent:
+    changes: tuple[AudioSettingsChange, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,19 +152,35 @@ class SelfVadSettingsIntent:
 
 
 @dataclass(frozen=True, slots=True)
-class PeerVadSettingsIntent:
+class PeerVadSpeechThresholdIntent:
     speech_threshold: float
+
+
+@dataclass(frozen=True, slots=True)
+class PeerVadHangoverIntent:
     hangover_ms: int
+
+
+@dataclass(frozen=True, slots=True)
+class PeerVadPreRollIntent:
     pre_roll_ms: int
 
 
 @dataclass(frozen=True, slots=True)
-class OscSettingsIntent:
+class OscConnectionSettingsIntent:
     connection_mode: str
     send_port: int | None
     receive_port: int
-    vrc_mic_intercept: bool
-    chatbox_include_source: bool
+
+
+@dataclass(frozen=True, slots=True)
+class VrcMicInterceptSettingsIntent:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ChatboxSourceSettingsIntent:
+    enabled: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,16 +201,28 @@ class CustomVocabularySettingsIntent:
 
 
 @dataclass(frozen=True, slots=True)
-class OverlaySelectionSettingsIntent:
+class OverlayTargetSettingsIntent:
     target: str
-    show_translation: bool
-    show_peer_original: bool
 
 
 @dataclass(frozen=True, slots=True)
-class DesktopOverlaySettingsIntent:
+class OverlayTranslationSettingsIntent:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
+class OverlayPeerOriginalSettingsIntent:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
+class DesktopOverlayBackgroundAlphaIntent:
     background_alpha: float
-    swap_caption_languages: bool
+
+
+@dataclass(frozen=True, slots=True)
+class DesktopOverlaySwapCaptionLanguagesIntent:
+    enabled: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -204,13 +244,20 @@ ImmediateSettingsIntent: TypeAlias = (
     LocaleSettingsIntent
     | AudioSettingsIntent
     | SelfVadSettingsIntent
-    | PeerVadSettingsIntent
-    | OscSettingsIntent
+    | PeerVadSpeechThresholdIntent
+    | PeerVadHangoverIntent
+    | PeerVadPreRollIntent
+    | OscConnectionSettingsIntent
+    | VrcMicInterceptSettingsIntent
+    | ChatboxSourceSettingsIntent
     | ClipboardSettingsIntent
     | PeerExpectedLanguagesIntent
     | CustomVocabularySettingsIntent
-    | OverlaySelectionSettingsIntent
-    | DesktopOverlaySettingsIntent
+    | OverlayTargetSettingsIntent
+    | OverlayTranslationSettingsIntent
+    | OverlayPeerOriginalSettingsIntent
+    | DesktopOverlayBackgroundAlphaIntent
+    | DesktopOverlaySwapCaptionLanguagesIntent
     | DesktopOverlaySizeIntent
     | DesktopOverlayPositionResetIntent
     | OverlayCalibrationSettingsIntent
@@ -218,22 +265,38 @@ ImmediateSettingsIntent: TypeAlias = (
 
 
 @dataclass(frozen=True, slots=True)
-class SttProviderEdit:
-    self_provider: STTProviderName
-    peer_provider: STTProviderName
-    custom_mode: str
-    custom_compatibility: str
+class SelfSttProviderEdit:
+    provider: STTProviderName
 
 
 @dataclass(frozen=True, slots=True)
-class ProviderGpuEdit:
-    stt_gpu_device_id: str
-    llm_gpu_device_id: str
+class PeerSttProviderEdit:
+    provider: STTProviderName
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationProviderEdit:
+class SttGpuDeviceEdit:
+    device_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class LlmGpuDeviceEdit:
+    device_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class TranslationSelectionEdit:
     selection: TranslationSelectionSnapshot
+
+
+@dataclass(frozen=True, slots=True)
+class TranslationFallbackEdit:
+    fallback: TranslationFallbackSnapshot
+
+
+@dataclass(frozen=True, slots=True)
+class TranslationHttpExtensionEdit:
+    extension_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -242,18 +305,32 @@ class QwenRegionEdit:
 
 
 @dataclass(frozen=True, slots=True)
-class LocalLlmEdit:
+class LocalLlmBaseUrlEdit:
     base_url: str
+
+
+@dataclass(frozen=True, slots=True)
+class LocalLlmModelEdit:
     model: str
+
+
+@dataclass(frozen=True, slots=True)
+class LocalLlmExtraBodyEdit:
     extra_body_json: str
 
 
 @dataclass(frozen=True, slots=True)
-class CustomSttEdit:
-    mode: str
-    compatibility: str
+class CustomSttEndpointEdit:
     endpoint: str
+
+
+@dataclass(frozen=True, slots=True)
+class CustomSttModelEdit:
     model: str
+
+
+@dataclass(frozen=True, slots=True)
+class CustomSttExtraEdit:
     extra_json: str
 
 
@@ -268,12 +345,20 @@ class SystemPromptEdit:
 
 
 ProviderSettingsEdit: TypeAlias = (
-    SttProviderEdit
-    | ProviderGpuEdit
-    | TranslationProviderEdit
+    SelfSttProviderEdit
+    | PeerSttProviderEdit
+    | SttGpuDeviceEdit
+    | LlmGpuDeviceEdit
+    | TranslationSelectionEdit
+    | TranslationFallbackEdit
+    | TranslationHttpExtensionEdit
     | QwenRegionEdit
-    | LocalLlmEdit
-    | CustomSttEdit
+    | LocalLlmBaseUrlEdit
+    | LocalLlmModelEdit
+    | LocalLlmExtraBodyEdit
+    | CustomSttEndpointEdit
+    | CustomSttModelEdit
+    | CustomSttExtraEdit
     | ManagedReferralEdit
     | SystemPromptEdit
 )
@@ -292,42 +377,61 @@ class PromptApplyIntent:
 @dataclass(frozen=True, slots=True)
 class OpenRouterPkceTarget:
     selection_alias: OpenRouterSelectionAlias
+    provider_intent: ProviderApplyIntent = ProviderApplyIntent(())
     system_prompt: str | None = None
 
 
 __all__ = [
+    "AudioInputSettingsIntent",
+    "AudioSettingsChange",
     "AudioSettingsIntent",
+    "ChatboxSourceSettingsIntent",
     "ClipboardSettingsIntent",
-    "CustomSttEdit",
+    "CustomSttEndpointEdit",
+    "CustomSttExtraEdit",
+    "CustomSttModelEdit",
     "CustomVocabularySettingsIntent",
-    "DesktopOverlaySettingsIntent",
+    "DesktopAudioOutputSettingsIntent",
+    "DesktopOverlayBackgroundAlphaIntent",
     "DesktopOverlaySizeIntent",
     "DesktopOverlayPositionResetIntent",
+    "DesktopOverlaySwapCaptionLanguagesIntent",
     "GeneralSettingsSnapshot",
     "ImmediateSettingsIntent",
-    "LocalLlmEdit",
+    "LlmGpuDeviceEdit",
+    "LocalLlmBaseUrlEdit",
+    "LocalLlmExtraBodyEdit",
+    "LocalLlmModelEdit",
     "LocaleSettingsIntent",
     "ManagedReferralEdit",
     "OpenRouterPkceTarget",
-    "OscSettingsIntent",
+    "OscConnectionSettingsIntent",
     "OverlayCalibrationSnapshot",
     "OverlayCalibrationSettingsIntent",
-    "OverlaySelectionSettingsIntent",
+    "OverlayPeerOriginalSettingsIntent",
     "OverlaySettingsSnapshot",
+    "OverlayTargetSettingsIntent",
+    "OverlayTranslationSettingsIntent",
     "PeerExpectedLanguagesIntent",
-    "PeerVadSettingsIntent",
+    "PeerSttProviderEdit",
+    "PeerVadHangoverIntent",
+    "PeerVadPreRollIntent",
+    "PeerVadSpeechThresholdIntent",
     "PromptApplyIntent",
     "PromptSettingsSnapshot",
     "ProviderApplyIntent",
-    "ProviderGpuEdit",
     "ProviderSettingsEdit",
     "ProviderSettingsSnapshot",
     "ProviderVerificationSnapshot",
     "QwenRegionEdit",
+    "SelfSttProviderEdit",
     "SelfVadSettingsIntent",
-    "SttProviderEdit",
+    "SttGpuDeviceEdit",
     "SystemPromptEdit",
     "TranslationFallbackSnapshot",
-    "TranslationProviderEdit",
+    "TranslationFallbackEdit",
     "TranslationSelectionSnapshot",
+    "TranslationSelectionEdit",
+    "TranslationHttpExtensionEdit",
+    "VrcMicInterceptSettingsIntent",
 ]

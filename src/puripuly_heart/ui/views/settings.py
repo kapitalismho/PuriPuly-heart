@@ -26,38 +26,56 @@ from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretsPort,
 )
 from puripuly_heart.app.ports.settings_view import (
+    AudioInputSettingsIntent,
     AudioSettingsIntent,
+    ChatboxSourceSettingsIntent,
     ClipboardSettingsIntent,
-    CustomSttEdit,
+    CustomSttEndpointEdit,
+    CustomSttExtraEdit,
+    CustomSttModelEdit,
     CustomVocabularySettingsIntent,
+    DesktopAudioOutputSettingsIntent,
+    DesktopOverlayBackgroundAlphaIntent,
     DesktopOverlayPositionResetIntent,
-    DesktopOverlaySettingsIntent,
     DesktopOverlaySizeIntent,
+    DesktopOverlaySwapCaptionLanguagesIntent,
     GeneralSettingsSnapshot,
     ImmediateSettingsIntent,
+    LlmGpuDeviceEdit,
     LocaleSettingsIntent,
-    LocalLlmEdit,
+    LocalLlmBaseUrlEdit,
+    LocalLlmExtraBodyEdit,
+    LocalLlmModelEdit,
+    ManagedReferralEdit,
     OpenRouterPkceTarget,
-    OscSettingsIntent,
+    OscConnectionSettingsIntent,
     OverlayCalibrationSettingsIntent,
     OverlayCalibrationSnapshot,
-    OverlaySelectionSettingsIntent,
+    OverlayPeerOriginalSettingsIntent,
     OverlaySettingsSnapshot,
+    OverlayTargetSettingsIntent,
+    OverlayTranslationSettingsIntent,
     PeerExpectedLanguagesIntent,
-    PeerVadSettingsIntent,
+    PeerSttProviderEdit,
+    PeerVadHangoverIntent,
+    PeerVadPreRollIntent,
+    PeerVadSpeechThresholdIntent,
     PromptApplyIntent,
     PromptSettingsSnapshot,
     ProviderApplyIntent,
-    ProviderGpuEdit,
     ProviderSettingsEdit,
     ProviderSettingsSnapshot,
     QwenRegionEdit,
+    SelfSttProviderEdit,
     SelfVadSettingsIntent,
-    SttProviderEdit,
+    SttGpuDeviceEdit,
     SystemPromptEdit,
+    TranslationFallbackEdit,
     TranslationFallbackSnapshot,
-    TranslationProviderEdit,
+    TranslationHttpExtensionEdit,
+    TranslationSelectionEdit,
     TranslationSelectionSnapshot,
+    VrcMicInterceptSettingsIntent,
 )
 from puripuly_heart.app.ports.ui_models import OscControlPresentationState
 from puripuly_heart.app.services.http_extension_registry import (
@@ -2687,12 +2705,7 @@ class SettingsView(ft.Column):
             return
         draft = self._ensure_provider_settings_draft()
         self._provider_draft = replace(draft, stt_gpu_device_id=value or "auto")
-        self._record_provider_edit(
-            ProviderGpuEdit(
-                stt_gpu_device_id=self._provider_draft.stt_gpu_device_id,
-                llm_gpu_device_id=self._provider_draft.translation.gpu_device_id,
-            )
-        )
+        self._record_provider_edit(SttGpuDeviceEdit(self._provider_draft.stt_gpu_device_id))
         self.has_provider_changes = True
         self._sync_gpu_device_card()
 
@@ -2702,12 +2715,7 @@ class SettingsView(ft.Column):
         draft = self._ensure_provider_settings_draft()
         translation = replace(draft.translation, gpu_device_id=value or "auto")
         self._provider_draft = replace(draft, translation=translation)
-        self._record_provider_edit(
-            ProviderGpuEdit(
-                stt_gpu_device_id=self._provider_draft.stt_gpu_device_id,
-                llm_gpu_device_id=translation.gpu_device_id,
-            )
-        )
+        self._record_provider_edit(LlmGpuDeviceEdit(translation.gpu_device_id))
         self.has_provider_changes = True
         self._sync_gpu_device_card()
 
@@ -2843,7 +2851,7 @@ class SettingsView(ft.Column):
         draft = self._ensure_provider_settings_draft()
         translation = replace(draft.translation, http_extension_id=value or "")
         self._provider_draft = replace(draft, translation=translation)
-        self._record_provider_edit(TranslationProviderEdit(translation))
+        self._record_provider_edit(TranslationHttpExtensionEdit(translation.http_extension_id))
         self.has_provider_changes = True
         self._sync_http_extension_card(self._provider_draft, force_credentials=True)
 
@@ -3319,6 +3327,10 @@ class SettingsView(ft.Column):
         if referral_id is None:
             return None
 
+        referral_changed = (
+            self._provider_snapshot is not None
+            and self._provider_snapshot.managed_referral_id != referral_id
+        )
         if self._provider_snapshot is not None:
             self._provider_snapshot = replace(
                 self._provider_snapshot,
@@ -3329,6 +3341,9 @@ class SettingsView(ft.Column):
                 self._provider_draft,
                 managed_referral_id=referral_id,
             )
+        if referral_changed:
+            self._record_provider_edit(ManagedReferralEdit(referral_id))
+            self.has_provider_changes = True
         return referral_id
 
     def _sync_managed_key_invite_progress_row(
@@ -3591,13 +3606,7 @@ class SettingsView(ft.Column):
         if current.local_llm_base_url != normalized:
             draft = self._ensure_provider_settings_draft()
             self._provider_draft = replace(draft, local_llm_base_url=normalized)
-            self._record_provider_edit(
-                LocalLlmEdit(
-                    base_url=self._provider_draft.local_llm_base_url,
-                    model=self._provider_draft.local_llm_model,
-                    extra_body_json=self._provider_draft.local_llm_extra_body_json,
-                )
-            )
+            self._record_provider_edit(LocalLlmBaseUrlEdit(self._provider_draft.local_llm_base_url))
             self.has_provider_changes = True
         _update_control_if_mounted(self._local_llm_base_url)
 
@@ -3617,13 +3626,7 @@ class SettingsView(ft.Column):
         if current.local_llm_model != model:
             draft = self._ensure_provider_settings_draft()
             self._provider_draft = replace(draft, local_llm_model=model)
-            self._record_provider_edit(
-                LocalLlmEdit(
-                    base_url=self._provider_draft.local_llm_base_url,
-                    model=self._provider_draft.local_llm_model,
-                    extra_body_json=self._provider_draft.local_llm_extra_body_json,
-                )
-            )
+            self._record_provider_edit(LocalLlmModelEdit(self._provider_draft.local_llm_model))
             self.has_provider_changes = True
         _update_control_if_mounted(self._local_llm_model)
 
@@ -3681,11 +3684,7 @@ class SettingsView(ft.Column):
             draft = self._ensure_provider_settings_draft()
             self._provider_draft = replace(draft, local_llm_extra_body_json=normalized_text)
             self._record_provider_edit(
-                LocalLlmEdit(
-                    base_url=self._provider_draft.local_llm_base_url,
-                    model=self._provider_draft.local_llm_model,
-                    extra_body_json=self._provider_draft.local_llm_extra_body_json,
-                )
+                LocalLlmExtraBodyEdit(self._provider_draft.local_llm_extra_body_json)
             )
             self.has_provider_changes = True
         self._local_llm_extra_body.value = normalized_text
@@ -3717,11 +3716,14 @@ class SettingsView(ft.Column):
             return ""
         return self._prompt_snapshot.system_prompt
 
-    def build_provider_apply_settings(self) -> ProviderApplyIntent | None:
+    def _build_provider_apply_intent(self) -> ProviderApplyIntent | None:
         self._commit_local_llm_fields_from_controls()
         if self._provider_snapshot is None:
             return None
         return ProviderApplyIntent(tuple(self._provider_edits.values()))
+
+    def build_provider_apply_settings(self) -> ProviderApplyIntent | None:
+        return self._build_provider_apply_intent()
 
     def consume_provider_apply_settings(self) -> ProviderApplyIntent | None:
         intent = self.build_provider_apply_settings()
@@ -3970,6 +3972,7 @@ class SettingsView(ft.Column):
                     state.custom_vocabulary_other_languages_have_terms
                 ),
             )
+            self._custom_vocab_tag_editor.set_terms(list(state.custom_vocabulary_terms))
         if control in {"PuriPuly_PeerAuto", "PuriPuly_PeerSrcLang"}:
             if self._general_snapshot is not None:
                 self._general_snapshot = replace(
@@ -4131,21 +4134,14 @@ class SettingsView(ft.Column):
         draft = self._provider_draft
         if draft is None:
             return
-        if control in {"PuriPuly_SelfASR", "PuriPuly_PeerASR"} and (
-            SttProviderEdit in self._provider_edits
-        ):
-            self._record_provider_edit(
-                SttProviderEdit(
-                    self_provider=draft.stt_provider,
-                    peer_provider=draft.peer_stt_provider,
-                    custom_mode=draft.custom_stt_mode,
-                    custom_compatibility=draft.custom_stt_compatibility,
-                )
-            )
-        if control in {"PuriPuly_Translator", "PuriPuly_Fallback"} and (
-            TranslationProviderEdit in self._provider_edits
-        ):
-            self._record_provider_edit(TranslationProviderEdit(draft.translation))
+        if control == "PuriPuly_SelfASR" and SelfSttProviderEdit in self._provider_edits:
+            self._record_provider_edit(SelfSttProviderEdit(draft.stt_provider))
+        if control == "PuriPuly_PeerASR" and PeerSttProviderEdit in self._provider_edits:
+            self._record_provider_edit(PeerSttProviderEdit(draft.peer_stt_provider))
+        if control == "PuriPuly_Translator" and (TranslationSelectionEdit in self._provider_edits):
+            self._record_provider_edit(TranslationSelectionEdit(draft.translation))
+        if control == "PuriPuly_Fallback" and TranslationFallbackEdit in self._provider_edits:
+            self._record_provider_edit(TranslationFallbackEdit(draft.translation.fallback))
 
     def _load_secrets(self, settings: ProviderSettingsSnapshot, config_path: Path) -> None:
         """Load secret values into fields."""
@@ -4442,14 +4438,7 @@ class SettingsView(ft.Column):
         )
         draft = self._ensure_provider_settings_draft()
         self._provider_draft = replace(draft, stt_provider=provider)
-        self._record_provider_edit(
-            SttProviderEdit(
-                self_provider=self._provider_draft.stt_provider,
-                peer_provider=self._provider_draft.peer_stt_provider,
-                custom_mode=self._provider_draft.custom_stt_mode,
-                custom_compatibility=self._provider_draft.custom_stt_compatibility,
-            )
-        )
+        self._record_provider_edit(SelfSttProviderEdit(self._provider_draft.stt_provider))
         if (
             provider == STTProviderName.LOCAL_QWEN_GPU
             and self.on_gpu_discovery_requested is not None
@@ -4528,14 +4517,7 @@ class SettingsView(ft.Column):
             return
         draft = self._ensure_provider_settings_draft()
         self._provider_draft = replace(draft, peer_stt_provider=provider)
-        self._record_provider_edit(
-            SttProviderEdit(
-                self_provider=self._provider_draft.stt_provider,
-                peer_provider=self._provider_draft.peer_stt_provider,
-                custom_mode=self._provider_draft.custom_stt_mode,
-                custom_compatibility=self._provider_draft.custom_stt_compatibility,
-            )
-        )
+        self._record_provider_edit(PeerSttProviderEdit(self._provider_draft.peer_stt_provider))
         if (
             provider == STTProviderName.LOCAL_QWEN_GPU
             and self.on_gpu_discovery_requested is not None
@@ -4806,7 +4788,7 @@ class SettingsView(ft.Column):
             previous_llm_model=previous_llm_model,
         )
         self._provider_draft = self._provider_snapshot_with_translation(draft, selection)
-        self._record_provider_edit(TranslationProviderEdit(selection))
+        self._record_provider_edit(TranslationSelectionEdit(selection))
         new_provider = self._provider_draft.llm_provider
 
         changes: list[str] = []
@@ -5008,7 +4990,7 @@ class SettingsView(ft.Column):
         draft = self._ensure_provider_settings_draft()
         translation = replace(current_settings.translation, fallback=new_value)
         self._provider_draft = replace(draft, translation=translation)
-        self._record_provider_edit(TranslationProviderEdit(translation))
+        self._record_provider_edit(TranslationFallbackEdit(translation.fallback))
         self.has_provider_changes = True
         self._update_api_visibility()
 
@@ -5110,10 +5092,14 @@ class SettingsView(ft.Column):
         profile = self._openrouter_selection_profile(settings)
         if profile is None or profile.openrouter_source != OpenRouterCredentialSource.BYOK.value:
             return
+        provider_intent = self._build_provider_apply_intent()
+        if provider_intent is None:
+            return
 
         self.on_request_openrouter_pkce(
             OpenRouterPkceTarget(
                 OpenRouterSelectionAlias(profile.alias),
+                provider_intent=provider_intent,
                 system_prompt=self._ensure_provider_prompt_value(settings, "openrouter"),
             )
         )
@@ -5179,13 +5165,7 @@ class SettingsView(ft.Column):
             draft = self._ensure_provider_settings_draft()
             self._provider_draft = replace(draft, custom_stt_endpoint=endpoint)
             self._record_provider_edit(
-                CustomSttEdit(
-                    mode=self._provider_draft.custom_stt_mode,
-                    compatibility=self._provider_draft.custom_stt_compatibility,
-                    endpoint=self._provider_draft.custom_stt_endpoint,
-                    model=self._provider_draft.custom_stt_model,
-                    extra_json=self._provider_draft.custom_stt_extra_json,
-                )
+                CustomSttEndpointEdit(self._provider_draft.custom_stt_endpoint)
             )
             self.has_provider_changes = True
         self._custom_stt_endpoint.value = endpoint
@@ -5200,15 +5180,7 @@ class SettingsView(ft.Column):
         if current.custom_stt_model != model:
             draft = self._ensure_provider_settings_draft()
             self._provider_draft = replace(draft, custom_stt_model=model)
-            self._record_provider_edit(
-                CustomSttEdit(
-                    mode=self._provider_draft.custom_stt_mode,
-                    compatibility=self._provider_draft.custom_stt_compatibility,
-                    endpoint=self._provider_draft.custom_stt_endpoint,
-                    model=self._provider_draft.custom_stt_model,
-                    extra_json=self._provider_draft.custom_stt_extra_json,
-                )
-            )
+            self._record_provider_edit(CustomSttModelEdit(self._provider_draft.custom_stt_model))
             self.has_provider_changes = True
         self._custom_stt_model.value = model
         _update_control_if_mounted(self._custom_stt_model)
@@ -5267,13 +5239,7 @@ class SettingsView(ft.Column):
             draft = self._ensure_provider_settings_draft()
             self._provider_draft = replace(draft, custom_stt_extra_json=normalized_text)
             self._record_provider_edit(
-                CustomSttEdit(
-                    mode=self._provider_draft.custom_stt_mode,
-                    compatibility=self._provider_draft.custom_stt_compatibility,
-                    endpoint=self._provider_draft.custom_stt_endpoint,
-                    model=self._provider_draft.custom_stt_model,
-                    extra_json=self._provider_draft.custom_stt_extra_json,
-                )
+                CustomSttExtraEdit(self._provider_draft.custom_stt_extra_json)
             )
             self.has_provider_changes = True
         self._custom_stt_extra.value = normalized_text
@@ -5348,7 +5314,13 @@ class SettingsView(ft.Column):
             input_device=new_device,
             output_device=new_desktop_output,
         )
-        self._emit_settings_changed(AudioSettingsIntent(new_host, new_device, new_desktop_output))
+        changes = []
+        if old_host != new_host or old_device != new_device:
+            changes.append(AudioInputSettingsIntent(new_host, new_device))
+        if old_desktop_output != new_desktop_output:
+            changes.append(DesktopAudioOutputSettingsIntent(new_desktop_output))
+        if changes:
+            self._emit_settings_changed(AudioSettingsIntent(tuple(changes)))
 
     def _on_mic_host_api_click(self, e) -> None:
         if not is_control_mounted(self):
@@ -5712,13 +5684,7 @@ class SettingsView(ft.Column):
         if self._overlay_state == "off":
             self._overlay_runtime_target = target
         self._sync_overlay_controls()
-        self._emit_settings_changed(
-            OverlaySelectionSettingsIntent(
-                target=self._overlay_snapshot.target,
-                show_translation=self._overlay_snapshot.show_translation,
-                show_peer_original=self._overlay_snapshot.show_peer_original,
-            )
-        )
+        self._emit_settings_changed(OverlayTargetSettingsIntent(self._overlay_snapshot.target))
 
     def _on_desktop_overlay_size_click(self, e) -> None:
         _ = e
@@ -5789,12 +5755,7 @@ class SettingsView(ft.Column):
             desktop_swap_caption_languages=enabled,
         )
         self._sync_desktop_overlay_main_controls()
-        self._emit_settings_changed(
-            DesktopOverlaySettingsIntent(
-                background_alpha=self._overlay_snapshot.desktop_background_alpha,
-                swap_caption_languages=enabled,
-            )
-        )
+        self._emit_settings_changed(DesktopOverlaySwapCaptionLanguagesIntent(enabled))
 
     def _on_desktop_overlay_lock_click(self, e) -> None:
         _ = e
@@ -5848,12 +5809,7 @@ class SettingsView(ft.Column):
         self._sync_desktop_overlay_main_controls()
         if is_control_mounted(self):
             self.update()
-        self._emit_settings_changed(
-            DesktopOverlaySettingsIntent(
-                background_alpha=next_alpha,
-                swap_caption_languages=self._overlay_snapshot.desktop_swap_caption_languages,
-            )
-        )
+        self._emit_settings_changed(DesktopOverlayBackgroundAlphaIntent(next_alpha))
 
     def _on_desktop_overlay_primary_action(self, e) -> None:
         _ = e
@@ -6191,11 +6147,7 @@ class SettingsView(ft.Column):
         )
         self._sync_overlay_controls()
         self._emit_settings_changed(
-            OverlaySelectionSettingsIntent(
-                target=self._overlay_snapshot.target,
-                show_translation=self._overlay_snapshot.show_translation,
-                show_peer_original=self._overlay_snapshot.show_peer_original,
-            )
+            OverlayTranslationSettingsIntent(self._overlay_snapshot.show_translation)
         )
 
     def _on_overlay_peer_original_click(self, e) -> None:
@@ -6213,11 +6165,7 @@ class SettingsView(ft.Column):
         )
         self._sync_overlay_controls()
         self._emit_settings_changed(
-            OverlaySelectionSettingsIntent(
-                target=self._overlay_snapshot.target,
-                show_translation=self._overlay_snapshot.show_translation,
-                show_peer_original=self._overlay_snapshot.show_peer_original,
-            )
+            OverlayPeerOriginalSettingsIntent(self._overlay_snapshot.show_peer_original)
         )
 
     def _handle_vad_visual_change(self, e) -> None:
@@ -6266,7 +6214,7 @@ class SettingsView(ft.Column):
         self._peer_vad_slider.label = f"{new_vad:.2f}"
         _update_control_if_mounted(self._peer_vad_field)
         _update_control_if_mounted(self._peer_vad_slider)
-        self._emit_peer_vad_settings_changed()
+        self._emit_settings_changed(PeerVadSpeechThresholdIntent(new_vad))
 
     def _on_peer_vad_threshold_change(self, e) -> None:
         if self._general_snapshot is None:
@@ -6290,7 +6238,7 @@ class SettingsView(ft.Column):
         )
         self._peer_vad_field.value = f"{new_value:.2f}"
         _update_control_if_mounted(self._peer_vad_field)
-        self._emit_peer_vad_settings_changed()
+        self._emit_settings_changed(PeerVadSpeechThresholdIntent(new_value))
 
     def _on_peer_hangover_change(self, e) -> None:
         if self._general_snapshot is None:
@@ -6313,7 +6261,7 @@ class SettingsView(ft.Column):
         )
         self._peer_hangover_field.value = str(new_value)
         _update_control_if_mounted(self._peer_hangover_field)
-        self._emit_peer_vad_settings_changed()
+        self._emit_settings_changed(PeerVadHangoverIntent(new_value))
 
     def _on_peer_pre_roll_change(self, e) -> None:
         if self._general_snapshot is None:
@@ -6336,18 +6284,7 @@ class SettingsView(ft.Column):
         )
         self._peer_pre_roll_field.value = str(new_value)
         _update_control_if_mounted(self._peer_pre_roll_field)
-        self._emit_peer_vad_settings_changed()
-
-    def _emit_peer_vad_settings_changed(self) -> None:
-        if self._general_snapshot is None:
-            return
-        self._emit_settings_changed(
-            PeerVadSettingsIntent(
-                speech_threshold=self._general_snapshot.peer_vad_speech_threshold,
-                hangover_ms=self._general_snapshot.peer_vad_hangover_ms,
-                pre_roll_ms=self._general_snapshot.peer_vad_pre_roll_ms,
-            )
-        )
+        self._emit_settings_changed(PeerVadPreRollIntent(new_value))
 
     def _on_vrc_mic_click(self, e) -> None:
         """Toggle VRC mic intercept immediately from the unit card."""
@@ -6381,7 +6318,7 @@ class SettingsView(ft.Column):
         )
         if is_control_mounted(self):
             self._vrc_mic_text.update()
-        self._emit_osc_settings_changed()
+        self._emit_settings_changed(VrcMicInterceptSettingsIntent(new_value))
 
     def _on_chatbox_source_click(self, e) -> None:
         """Open chatbox source inclusion selection modal."""
@@ -6419,7 +6356,7 @@ class SettingsView(ft.Column):
         )
         if is_control_mounted(self):
             self._chatbox_source_text.update()
-        self._emit_osc_settings_changed()
+        self._emit_settings_changed(ChatboxSourceSettingsIntent(new_value))
 
     def _on_osc_connection_click(self, e) -> None:
         _ = e
@@ -6441,8 +6378,11 @@ class SettingsView(ft.Column):
             return
         if mode not in {"automatic", "manual", "off"}:
             return
-        send_port = int(send_port)
-        receive_port = int(receive_port)
+        try:
+            send_port = int(send_port)
+            receive_port = int(receive_port)
+        except (TypeError, ValueError):
+            return
         if not 1 <= send_port <= 65535 or not 1 <= receive_port <= 65535:
             return
         self._general_snapshot = replace(
@@ -6454,18 +6394,11 @@ class SettingsView(ft.Column):
         self._sync_osc_connection_card(self._general_snapshot)
         if is_control_mounted(self):
             self._osc_connection_text.update()
-        self._emit_osc_settings_changed()
-
-    def _emit_osc_settings_changed(self) -> None:
-        if self._general_snapshot is None:
-            return
         self._emit_settings_changed(
-            OscSettingsIntent(
+            OscConnectionSettingsIntent(
                 connection_mode=self._general_snapshot.osc_connection_mode,
                 send_port=self._general_snapshot.osc_send_port,
                 receive_port=self._general_snapshot.osc_receive_port,
-                vrc_mic_intercept=self._general_snapshot.vrc_mic_intercept,
-                chatbox_include_source=self._general_snapshot.chatbox_include_source,
             )
         )
 

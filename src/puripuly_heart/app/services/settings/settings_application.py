@@ -10,38 +10,55 @@ from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyPort
 from puripuly_heart.app.ports.settings_runtime_effects import SettingsRuntimeEffectsPort
 from puripuly_heart.app.ports.settings_view import (
+    AudioInputSettingsIntent,
     AudioSettingsIntent,
+    ChatboxSourceSettingsIntent,
     ClipboardSettingsIntent,
-    CustomSttEdit,
+    CustomSttEndpointEdit,
+    CustomSttExtraEdit,
+    CustomSttModelEdit,
     CustomVocabularySettingsIntent,
+    DesktopAudioOutputSettingsIntent,
+    DesktopOverlayBackgroundAlphaIntent,
     DesktopOverlayPositionResetIntent,
-    DesktopOverlaySettingsIntent,
     DesktopOverlaySizeIntent,
+    DesktopOverlaySwapCaptionLanguagesIntent,
     GeneralSettingsSnapshot,
     ImmediateSettingsIntent,
+    LlmGpuDeviceEdit,
     LocaleSettingsIntent,
-    LocalLlmEdit,
+    LocalLlmBaseUrlEdit,
+    LocalLlmExtraBodyEdit,
+    LocalLlmModelEdit,
     ManagedReferralEdit,
-    OscSettingsIntent,
+    OscConnectionSettingsIntent,
     OverlayCalibrationSettingsIntent,
     OverlayCalibrationSnapshot,
-    OverlaySelectionSettingsIntent,
+    OverlayPeerOriginalSettingsIntent,
     OverlaySettingsSnapshot,
+    OverlayTargetSettingsIntent,
+    OverlayTranslationSettingsIntent,
     PeerExpectedLanguagesIntent,
-    PeerVadSettingsIntent,
+    PeerSttProviderEdit,
+    PeerVadHangoverIntent,
+    PeerVadPreRollIntent,
+    PeerVadSpeechThresholdIntent,
     PromptApplyIntent,
     PromptSettingsSnapshot,
     ProviderApplyIntent,
-    ProviderGpuEdit,
     ProviderSettingsSnapshot,
     ProviderVerificationSnapshot,
     QwenRegionEdit,
+    SelfSttProviderEdit,
     SelfVadSettingsIntent,
-    SttProviderEdit,
+    SttGpuDeviceEdit,
     SystemPromptEdit,
+    TranslationFallbackEdit,
     TranslationFallbackSnapshot,
-    TranslationProviderEdit,
+    TranslationHttpExtensionEdit,
+    TranslationSelectionEdit,
     TranslationSelectionSnapshot,
+    VrcMicInterceptSettingsIntent,
 )
 from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationName,
@@ -320,21 +337,28 @@ def materialize_immediate_settings_intent(
     if isinstance(intent, LocaleSettingsIntent):
         updated.ui.locale = intent.locale
     elif isinstance(intent, AudioSettingsIntent):
-        updated.audio.input_host_api = intent.input_host_api
-        updated.audio.input_device = intent.input_device
-        updated.desktop_audio.output_device = intent.output_device
+        for change in intent.changes:
+            if isinstance(change, AudioInputSettingsIntent):
+                updated.audio.input_host_api = change.input_host_api
+                updated.audio.input_device = change.input_device
+            elif isinstance(change, DesktopAudioOutputSettingsIntent):
+                updated.desktop_audio.output_device = change.output_device
     elif isinstance(intent, SelfVadSettingsIntent):
         updated.stt.vad_speech_threshold = intent.speech_threshold
-    elif isinstance(intent, PeerVadSettingsIntent):
+    elif isinstance(intent, PeerVadSpeechThresholdIntent):
         updated.desktop_audio.vad_speech_threshold = intent.speech_threshold
+    elif isinstance(intent, PeerVadHangoverIntent):
         updated.desktop_audio.vad_hangover_ms = intent.hangover_ms
+    elif isinstance(intent, PeerVadPreRollIntent):
         updated.desktop_audio.vad_pre_roll_ms = intent.pre_roll_ms
-    elif isinstance(intent, OscSettingsIntent):
+    elif isinstance(intent, OscConnectionSettingsIntent):
         updated.osc.connection_mode = intent.connection_mode
         updated.osc.send_port = intent.send_port
         updated.osc.receive_port = intent.receive_port
-        updated.osc.vrc_mic_intercept = intent.vrc_mic_intercept
-        updated.osc.chatbox_include_source = intent.chatbox_include_source
+    elif isinstance(intent, VrcMicInterceptSettingsIntent):
+        updated.osc.vrc_mic_intercept = intent.enabled
+    elif isinstance(intent, ChatboxSourceSettingsIntent):
+        updated.osc.chatbox_include_source = intent.enabled
     elif isinstance(intent, ClipboardSettingsIntent):
         updated.ui.clipboard_auto_translate_enabled = intent.enabled
     elif isinstance(intent, PeerExpectedLanguagesIntent):
@@ -342,13 +366,16 @@ def materialize_immediate_settings_intent(
     elif isinstance(intent, CustomVocabularySettingsIntent):
         updated.stt.custom_terms[intent.source_language] = list(intent.terms)
         updated.stt.custom_vocabulary_enabled = intent.enabled
-    elif isinstance(intent, OverlaySelectionSettingsIntent):
+    elif isinstance(intent, OverlayTargetSettingsIntent):
         updated.overlay.target = intent.target
-        updated.overlay.show_translation = intent.show_translation
-        updated.overlay.show_peer_original = intent.show_peer_original
-    elif isinstance(intent, DesktopOverlaySettingsIntent):
+    elif isinstance(intent, OverlayTranslationSettingsIntent):
+        updated.overlay.show_translation = intent.enabled
+    elif isinstance(intent, OverlayPeerOriginalSettingsIntent):
+        updated.overlay.show_peer_original = intent.enabled
+    elif isinstance(intent, DesktopOverlayBackgroundAlphaIntent):
         updated.overlay.desktop_flet.visual.background_alpha = intent.background_alpha
-        updated.overlay.desktop_flet.swap_caption_languages = intent.swap_caption_languages
+    elif isinstance(intent, DesktopOverlaySwapCaptionLanguagesIntent):
+        updated.overlay.desktop_flet.swap_caption_languages = intent.enabled
     elif isinstance(intent, DesktopOverlaySizeIntent):
         updated.overlay.desktop_flet.size_preset = intent.size_preset
     elif isinstance(intent, DesktopOverlayPositionResetIntent):
@@ -381,41 +408,44 @@ def materialize_provider_apply_intent(
 ) -> AppSettings:
     updated = copy.deepcopy(current)
     for edit in intent.edits:
-        if isinstance(edit, SttProviderEdit):
-            updated.provider.stt = edit.self_provider
-            updated.provider.peer_stt = edit.peer_provider
-            updated.custom_stt.mode = edit.custom_mode
-            updated.custom_stt.compatibility = edit.custom_compatibility
-        elif isinstance(edit, ProviderGpuEdit):
-            updated.stt.gpu_device_id = edit.stt_gpu_device_id
-            updated.translation.gpu_device_id = edit.llm_gpu_device_id
-        elif isinstance(edit, TranslationProviderEdit):
+        if isinstance(edit, SelfSttProviderEdit):
+            updated.provider.stt = edit.provider
+        elif isinstance(edit, PeerSttProviderEdit):
+            updated.provider.peer_stt = edit.provider
+        elif isinstance(edit, SttGpuDeviceEdit):
+            updated.stt.gpu_device_id = edit.device_id
+        elif isinstance(edit, LlmGpuDeviceEdit):
+            updated.translation.gpu_device_id = edit.device_id
+        elif isinstance(edit, TranslationSelectionEdit):
             selection = edit.selection
             updated.translation.model = selection.model
             updated.translation.connection = selection.connection
             updated.translation.connection_history = {
                 model.value: connection for model, connection in selection.connection_history
             }
-            updated.translation.fallback = TranslationFallbackSettings(
-                enabled=selection.fallback.enabled,
-                model=selection.fallback.model,
-                connection=selection.fallback.connection,
-            )
-            updated.translation.http_extension_id = selection.http_extension_id
             updated.translation.previous_llm_model = selection.previous_llm_model
-            updated.translation.gpu_device_id = selection.gpu_device_id
             materialize_translation_settings(updated)
+        elif isinstance(edit, TranslationFallbackEdit):
+            updated.translation.fallback = TranslationFallbackSettings(
+                enabled=edit.fallback.enabled,
+                model=edit.fallback.model,
+                connection=edit.fallback.connection,
+            )
+        elif isinstance(edit, TranslationHttpExtensionEdit):
+            updated.translation.http_extension_id = edit.extension_id
         elif isinstance(edit, QwenRegionEdit):
             updated.qwen.region = edit.region
-        elif isinstance(edit, LocalLlmEdit):
+        elif isinstance(edit, LocalLlmBaseUrlEdit):
             updated.local_llm.base_url = edit.base_url
+        elif isinstance(edit, LocalLlmModelEdit):
             updated.local_llm.model = edit.model
+        elif isinstance(edit, LocalLlmExtraBodyEdit):
             updated.local_llm.extra_body = json.loads(edit.extra_body_json)
-        elif isinstance(edit, CustomSttEdit):
-            updated.custom_stt.mode = edit.mode
-            updated.custom_stt.compatibility = edit.compatibility
+        elif isinstance(edit, CustomSttEndpointEdit):
             updated.custom_stt.endpoint = edit.endpoint
+        elif isinstance(edit, CustomSttModelEdit):
             updated.custom_stt.model = edit.model
+        elif isinstance(edit, CustomSttExtraEdit):
             updated.custom_stt.extra = json.loads(edit.extra_json)
         elif isinstance(edit, ManagedReferralEdit):
             updated.managed_identity.referral_id = edit.referral_id

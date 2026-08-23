@@ -15,9 +15,10 @@ from puripuly_heart.app.services.settings_application import settings_view_surfa
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 from puripuly_heart.app.ports.settings_view import (
-    CustomSttEdit,
+    CustomSttEndpointEdit,
+    ManagedReferralEdit,
     SystemPromptEdit,
-    TranslationProviderEdit,
+    TranslationSelectionEdit,
 )
 from puripuly_heart.app.ports.ui_models import OscControlPresentationName
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
@@ -123,16 +124,8 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         translation=draft_translation,
         custom_stt_endpoint="https://draft.invalid/v1/audio/transcriptions",
     )
-    view._record_provider_edit(TranslationProviderEdit(draft_translation))
-    view._record_provider_edit(
-        CustomSttEdit(
-            mode=view._provider_draft.custom_stt_mode,
-            compatibility=view._provider_draft.custom_stt_compatibility,
-            endpoint=view._provider_draft.custom_stt_endpoint,
-            model=view._provider_draft.custom_stt_model,
-            extra_json=view._provider_draft.custom_stt_extra_json,
-        )
-    )
+    view._record_provider_edit(TranslationSelectionEdit(draft_translation))
+    view._record_provider_edit(CustomSttEndpointEdit(view._provider_draft.custom_stt_endpoint))
     view._prompt_editor.value = "unsaved prompt"
     view._stage_prompt_draft("unsaved prompt")
     view._custom_vocab_tag_editor._input_field.value = "unsubmitted vocabulary"
@@ -224,17 +217,29 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
     assert view._prompt_snapshot.custom_vocabulary_other_languages_have_terms is True
     assert view._prompt_editor.value == "unsaved prompt"
     assert view._provider_edits[SystemPromptEdit] == SystemPromptEdit("unsaved prompt")
-    assert view._provider_edits[CustomSttEdit].endpoint == (
+    assert view._provider_edits[CustomSttEndpointEdit].endpoint == (
         "https://draft.invalid/v1/audio/transcriptions"
     )
-    assert view._provider_edits[TranslationProviderEdit].selection.model == (
+    assert view._provider_edits[TranslationSelectionEdit].selection.model == (
         TranslationModel.GEMINI_37_FLASH
     )
+    assert view._custom_vocab_tag_editor._terms == ["osc-term"]
     assert view._custom_vocab_tag_editor._input_field.value == "unsubmitted vocabulary"
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
     assert view._chatbox_source_text.content.value == t("settings.chatbox_source.off")
     assert len(api_visibility_updates) == 4
     assert emitted == []
+
+
+def test_settings_rejects_malformed_osc_ports_without_mutating_snapshot() -> None:
+    view = settings_view.SettingsView.__new__(settings_view.SettingsView)
+    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(AppSettings())
+    view._general_snapshot = general
+
+    view._on_osc_connection_selected("manual", "invalid", "9001")
+    view._on_osc_connection_selected("manual", "9000", object())
+
+    assert view._general_snapshot == general
 
 
 def test_cpu_auto_option_is_disabled_until_all_models_are_available(
@@ -1134,6 +1139,8 @@ def test_set_managed_key_state_updates_card_controls_and_api_section_repaint(
     assert view._managed_trial_usage_bar.percent == 64
     assert view._managed_key_referral_id == "7KQ9M2"
     assert view._managed_key_referral_id_value.value == "7KQ9M2"
+    assert view._provider_edits[ManagedReferralEdit] == ManagedReferralEdit("7KQ9M2")
+    assert view.has_provider_changes is True
     assert "api_keys_column" in updates
 
 
@@ -1449,6 +1456,7 @@ def test_set_managed_key_state_can_display_preview_referral_without_remembering(
     assert view._managed_key_referral_id == "7KQ9M2"
     assert view._managed_key_referral_id_value.value == "7KQ9M2"
     assert view._managed_key_invite_progress_row.visible is True
+    assert ManagedReferralEdit not in view._provider_edits
 
 
 def test_managed_key_invite_progress_row_appears_between_talk_together_pass_id_and_helper_text(
@@ -3467,6 +3475,9 @@ def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
 
     assert requested[0].selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
     assert requested[0].system_prompt == "G"
+    assert any(
+        isinstance(edit, TranslationSelectionEdit) for edit in requested[0].provider_intent.edits
+    )
 
 
 def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(

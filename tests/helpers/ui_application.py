@@ -23,6 +23,7 @@ from puripuly_heart.app.ports.settings_view import (
     OpenRouterPkceTarget,
     PromptApplyIntent,
     ProviderApplyIntent,
+    TranslationSelectionEdit,
 )
 from puripuly_heart.app.ports.ui_application_intents import (
     UiDiagnosticsRuntimePort,
@@ -172,8 +173,10 @@ class UiApplicationRuntimeStub:
         settings = legacy_build()
         if settings is None or settings.openrouter.selection_alias is None:
             return None
+        provider, _general, _prompt, _overlay = settings_view_surface_snapshots(settings)
         return OpenRouterPkceTarget(
             settings.openrouter.selection_alias,
+            provider_intent=ProviderApplyIntent((TranslationSelectionEdit(provider.translation),)),
             system_prompt=settings.system_prompt,
         )
 

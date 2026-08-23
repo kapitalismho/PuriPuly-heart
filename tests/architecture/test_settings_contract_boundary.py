@@ -176,6 +176,19 @@ def test_a06_settings_view_has_no_whole_settings_escape_hatch() -> None:
     assert "_provider_settings_draft" not in attributes
 
 
+def test_a06_settings_presentation_sinks_do_not_carry_whole_settings() -> None:
+    source = (
+        SOURCE_ROOT / "app" / "services" / "capture" / "peer_capture_target_application.py"
+    ).read_text(encoding="utf-8")
+
+    assert "SettingsPresentationSink = Callable[[GeneralSettingsSnapshot], None]" in source
+    assert "settings_presentation_sink(next_settings)" not in source
+    wiring_source = (SOURCE_ROOT / "app" / "wiring" / "wiring_peer_application.py").read_text(
+        encoding="utf-8"
+    )
+    assert "settings_presentation_sink: Callable[[GeneralSettingsSnapshot], None]" in wiring_source
+
+
 def test_production_settings_surface_uses_an_external_slot_provider() -> None:
     source = (SOURCE_ROOT / "ui" / "views" / "settings.py").read_text(encoding="utf-8")
     assert "SettingsApiSurfaceSlots.from_slot_provider(self)" in source

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -20,6 +19,7 @@ from puripuly_heart.app.services.secret_settings_transaction import (
     SecretSetRequest,
     SecretSettingsTransaction,
 )
+from puripuly_heart.app.services.settings_application import materialize_provider_apply_intent
 from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
@@ -155,7 +155,7 @@ class OpenRouterPkceApplicationOwner:
             )
             return False
 
-        updated = copy.deepcopy(current)
+        updated = materialize_provider_apply_intent(current, target.provider_intent)
         updated.provider.llm = LLMProviderName.OPENROUTER
         updated.openrouter.selection_alias = OpenRouterSelectionAlias(profile.alias)
         updated.openrouter.selected_source = OpenRouterCredentialSource.BYOK

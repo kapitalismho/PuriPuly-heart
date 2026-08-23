@@ -12,6 +12,7 @@ from puripuly_heart.app.ports.settings_view import (
     OverlaySettingsSnapshot,
     PromptApplyIntent,
     ProviderApplyIntent,
+    TranslationSelectionEdit,
 )
 from puripuly_heart.app.ports.ui_models import (
     GpuDeviceOption,
@@ -390,8 +391,10 @@ class UiProviderRuntimeAdapter:
         target_settings = self.build_byok_target_settings(self.settings.current)
         if target_settings is None or target_settings.openrouter.selection_alias is None:
             return None
+        provider, _general, _prompt, _overlay = settings_view_surface_snapshots(target_settings)
         return OpenRouterPkceTarget(
             target_settings.openrouter.selection_alias,
+            provider_intent=ProviderApplyIntent((TranslationSelectionEdit(provider.translation),)),
             system_prompt=target_settings.system_prompt,
         )
 

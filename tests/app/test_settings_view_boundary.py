@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
+from types import SimpleNamespace
 
 import pytest
 from puripuly_heart.app.services.settings_application import (
@@ -10,17 +11,39 @@ from puripuly_heart.app.services.settings_application import (
     settings_view_surface_snapshots,
 )
 
+from puripuly_heart.app.adapters.ui_runtime import UiProviderRuntimeAdapter
 from puripuly_heart.app.ports.settings_view import (
+    AudioInputSettingsIntent,
+    AudioSettingsIntent,
+    ChatboxSourceSettingsIntent,
+    CustomSttEndpointEdit,
     CustomVocabularySettingsIntent,
+    DesktopOverlayBackgroundAlphaIntent,
     LocaleSettingsIntent,
+    LocalLlmBaseUrlEdit,
+    OverlayTargetSettingsIntent,
+    PeerVadHangoverIntent,
     PromptApplyIntent,
     ProviderApplyIntent,
     QwenRegionEdit,
+    SelfSttProviderEdit,
+    SttGpuDeviceEdit,
     SystemPromptEdit,
-    TranslationProviderEdit,
+    TranslationSelectionEdit,
+    VrcMicInterceptSettingsIntent,
 )
-from puripuly_heart.config.provider_values import LLMProviderName, QwenRegion
-from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.provider_values import (
+    LLMProviderName,
+    OpenRouterCredentialSource,
+    OpenRouterLLMModel,
+    OpenRouterSelectionAlias,
+    QwenRegion,
+    STTProviderName,
+)
+from puripuly_heart.config.settings import (
+    AppSettings,
+    build_managed_openrouter_byok_target_settings,
+)
 from puripuly_heart.config.translation_values import (
     TranslationConnection,
     TranslationModel,
@@ -66,6 +89,58 @@ def test_immediate_intents_rebase_onto_latest_settings_without_surface_displacem
     assert displayed.stt.custom_terms["en"] == ["old"]
 
 
+def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
+    current = AppSettings()
+    current.osc.connection_mode = "manual"
+    current.osc.send_port = 9010
+    current.osc.receive_port = 9011
+    current.osc.vrc_mic_intercept = False
+    current.osc.chatbox_include_source = False
+    current.desktop_audio.vad_speech_threshold = 0.73
+    current.desktop_audio.vad_hangover_ms = 900
+    current.desktop_audio.vad_pre_roll_ms = 225
+    current.overlay.target = "steamvr"
+    current.overlay.show_translation = False
+    current.overlay.desktop_flet.visual.background_alpha = 0.62
+    current.overlay.desktop_flet.swap_caption_languages = True
+    current.desktop_audio.output_device = "latest output"
+
+    updated = materialize_immediate_settings_intent(
+        current,
+        AudioSettingsIntent((AudioInputSettingsIntent("MME", "staged microphone"),)),
+    )
+    updated = materialize_immediate_settings_intent(updated, VrcMicInterceptSettingsIntent(True))
+    updated = materialize_immediate_settings_intent(
+        updated,
+        ChatboxSourceSettingsIntent(True),
+    )
+    updated = materialize_immediate_settings_intent(updated, PeerVadHangoverIntent(1200))
+    updated = materialize_immediate_settings_intent(
+        updated,
+        OverlayTargetSettingsIntent("desktop"),
+    )
+    updated = materialize_immediate_settings_intent(
+        updated,
+        DesktopOverlayBackgroundAlphaIntent(0.4),
+    )
+
+    assert updated.osc.connection_mode == "manual"
+    assert updated.osc.send_port == 9010
+    assert updated.osc.receive_port == 9011
+    assert updated.osc.vrc_mic_intercept is True
+    assert updated.osc.chatbox_include_source is True
+    assert updated.desktop_audio.vad_speech_threshold == 0.73
+    assert updated.desktop_audio.vad_hangover_ms == 1200
+    assert updated.desktop_audio.vad_pre_roll_ms == 225
+    assert updated.overlay.target == "desktop"
+    assert updated.overlay.show_translation is False
+    assert updated.overlay.desktop_flet.visual.background_alpha == 0.4
+    assert updated.overlay.desktop_flet.swap_caption_languages is True
+    assert updated.audio.input_host_api == "MME"
+    assert updated.audio.input_device == "staged microphone"
+    assert updated.desktop_audio.output_device == "latest output"
+
+
 def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() -> None:
     displayed = AppSettings()
     provider, _general, _prompt, _overlay = settings_view_surface_snapshots(displayed)
@@ -77,12 +152,19 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
     current = AppSettings()
     current.languages.source_language = "ja"
     current.audio.input_device = "latest microphone"
+    current.translation.gpu_device_id = "latest-llm-gpu"
+    current.custom_stt.model = "latest-custom-model"
+    current.custom_stt.extra = {"latest": True}
 
     updated = materialize_provider_apply_intent(
         current,
         ProviderApplyIntent(
             (
-                TranslationProviderEdit(selection),
+                TranslationSelectionEdit(selection),
+                SelfSttProviderEdit(STTProviderName.DEEPGRAM),
+                SttGpuDeviceEdit("staged-stt-gpu"),
+                LocalLlmBaseUrlEdit("http://draft.local:11434"),
+                CustomSttEndpointEdit("https://draft.invalid/v1/audio/transcriptions"),
                 QwenRegionEdit(QwenRegion.SINGAPORE),
                 SystemPromptEdit("focused prompt"),
             )
@@ -92,6 +174,16 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
     assert updated.provider.llm == LLMProviderName.OPENROUTER
     assert updated.translation.model == TranslationModel.GEMINI_37_FLASH
     assert updated.translation.connection == TranslationConnection.OPENROUTER
+    assert updated.provider.stt == STTProviderName.DEEPGRAM
+    assert updated.provider.peer_stt == current.provider.peer_stt
+    assert updated.local_llm.base_url == "http://draft.local:11434"
+    assert updated.local_llm.model == current.local_llm.model
+    assert updated.local_llm.extra_body == current.local_llm.extra_body
+    assert updated.stt.gpu_device_id == "staged-stt-gpu"
+    assert updated.translation.gpu_device_id == "latest-llm-gpu"
+    assert updated.custom_stt.endpoint == "https://draft.invalid/v1/audio/transcriptions"
+    assert updated.custom_stt.model == "latest-custom-model"
+    assert updated.custom_stt.extra == {"latest": True}
     assert updated.qwen.region == QwenRegion.SINGAPORE
     assert updated.system_prompt == "focused prompt"
     assert updated.languages.source_language == "ja"
@@ -111,3 +203,22 @@ def test_prompt_intent_preserves_latest_languages_and_provider_selection() -> No
     assert updated.languages.source_language == "ja"
     assert updated.languages.target_language == "ko"
     assert updated.provider.llm == LLMProviderName.QWEN
+
+
+def test_managed_byok_pkce_target_carries_focused_translation_change() -> None:
+    current = AppSettings()
+    current.provider.llm = LLMProviderName.OPENROUTER
+    current.translation.connection = TranslationConnection.MANAGED
+    current.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    current.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_MANAGED
+    current.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+    adapter = UiProviderRuntimeAdapter.__new__(UiProviderRuntimeAdapter)
+    adapter.settings = SimpleNamespace(current=current)
+    adapter.build_byok_target_settings = build_managed_openrouter_byok_target_settings
+
+    target = adapter.build_managed_openrouter_byok_target()
+
+    assert target is not None
+    updated = materialize_provider_apply_intent(current, target.provider_intent)
+    assert updated.translation.connection == TranslationConnection.OPENROUTER
+    assert current.translation.connection == TranslationConnection.MANAGED

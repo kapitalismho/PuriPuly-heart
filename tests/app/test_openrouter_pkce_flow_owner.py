@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import threading
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 
@@ -17,6 +18,7 @@ from puripuly_heart.app.services.provider_settings import (
 from puripuly_heart.app.services.provider_verification_binding import (
     ProviderVerificationBindingOwner,
 )
+from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
 from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
@@ -26,7 +28,12 @@ from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
 from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
-from puripuly_heart.app.ports.settings_view import OpenRouterPkceTarget
+from puripuly_heart.app.ports.settings_view import (
+    LocalLlmBaseUrlEdit,
+    OpenRouterPkceTarget,
+    ProviderApplyIntent,
+    TranslationSelectionEdit,
+)
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.openrouter_pkce_flow import (
     OpenRouterPkceApplicationOwner,
@@ -40,6 +47,7 @@ from puripuly_heart.config.settings import (
     OpenRouterSelectionAlias,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
 )
@@ -221,8 +229,20 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
         active_secret_provider=lambda _settings, key: store.get(key),
     )
     runtime = AppliedProviderRuntime(settings)
+    provider_snapshot, _general, _prompt, _overlay = settings_view_surface_snapshots(current)
+    staged_translation = replace(
+        provider_snapshot.translation,
+        model=TranslationModel.GEMMA4,
+        connection=TranslationConnection.OPENROUTER,
+    )
     target = OpenRouterPkceTarget(
         selection_alias=OpenRouterSelectionAlias.GEMMA4_BYOK,
+        provider_intent=ProviderApplyIntent(
+            (
+                TranslationSelectionEdit(staged_translation),
+                LocalLlmBaseUrlEdit("http://staged.local:11434"),
+            )
+        ),
         system_prompt="PKCE prompt draft",
     )
     settings.current.ui.locale = "ko"
@@ -264,6 +284,9 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
     assert settings.current.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
     assert settings.current.api_key_verified.openrouter is True
     assert settings.current.system_prompt == "PKCE prompt draft"
+    assert settings.current.translation.model == TranslationModel.GEMMA4
+    assert settings.current.translation.connection == TranslationConnection.OPENROUTER
+    assert settings.current.local_llm.base_url == "http://staged.local:11434"
     assert settings.current.ui.locale == "ko"
     assert len(runtime.applied) == 1
     assert results.current is not None

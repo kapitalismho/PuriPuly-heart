@@ -13,6 +13,7 @@ from puripuly_heart.app.adapters.peer_capture_inventory import (
     WindowsLoopbackDeviceInventoryAdapter,
     WindowsProcessCaptureInventoryAdapter,
 )
+from puripuly_heart.app.ports.settings_view import GeneralSettingsSnapshot
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.peer_application import (
@@ -64,7 +65,7 @@ def compose_peer_application(
     disclosure_sink: Callable[[], None],
     superseded_sink: Callable[[], None],
     localize: Callable[[str], str],
-    settings_presentation_sink: Callable[[AppSettings], None],
+    settings_presentation_sink: Callable[[GeneralSettingsSnapshot], None],
     log_basic: Callable[..., object],
     log_detailed: Callable[..., object],
     translation_demand_sink: Callable[[], Awaitable[None]] | None = None,

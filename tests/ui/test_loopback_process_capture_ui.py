@@ -560,6 +560,43 @@ def test_settings_capture_target_refresh_preserves_unrelated_drafts() -> None:
     assert view._loopback_audio_text.content.value == "VRChat"
 
 
+@pytest.mark.asyncio
+async def test_capture_target_owner_publishes_general_snapshot_after_apply() -> None:
+    current = AppSettings()
+    next_settings = copy.deepcopy(current)
+    next_settings.desktop_audio.output_device = "Headset"
+    projections: list[AppSettings] = []
+    presented: list[object] = []
+    settings = SimpleNamespace(
+        current=current,
+        authoritative=False,
+        update_capture_target=lambda _current, _intent: next_settings,
+        remember_projection=lambda value: projections.append(value),
+    )
+
+    async def apply_capture_target(_settings: AppSettings) -> None:
+        return None
+
+    owner = PeerCaptureTargetApplicationOwner(
+        settings=settings,
+        localize=t,
+        processes=SimpleNamespace(candidates=lambda: ()),
+        devices=SimpleNamespace(names=lambda: ()),
+        runtime_effects=SimpleNamespace(apply_capture_target=apply_capture_target),
+        settings_presentation_sink=presented.append,
+        warning_reset=lambda: None,
+    )
+
+    await owner.apply("device:Headset")
+
+    assert settings.current is next_settings
+    assert settings.authoritative is True
+    assert projections == [next_settings]
+    assert len(presented) == 1
+    assert presented[0].output_device == "Headset"
+    assert not isinstance(presented[0], AppSettings)
+
+
 @pytest.mark.parametrize(
     ("initial_target", "committed_target", "committed_output"),
     [

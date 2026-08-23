@@ -9,8 +9,10 @@ from puripuly_heart.app.ports.peer_capture_target import (
     PeerCaptureTargetRuntimeEffectsPort,
     ProcessCaptureInventoryPort,
 )
+from puripuly_heart.app.ports.settings_view import GeneralSettingsSnapshot
 from puripuly_heart.app.ports.ui_models import OptionItem
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.config.settings_vnext.schema import (
@@ -21,7 +23,7 @@ from puripuly_heart.config.settings_vnext.schema import (
 from .peer_capture_target import PeerCaptureTargetResolutionService
 
 Localizer = Callable[[str], str]
-SettingsPresentationSink = Callable[[AppSettings], None]
+SettingsPresentationSink = Callable[[GeneralSettingsSnapshot], None]
 WarningReset = Callable[[], None]
 
 
@@ -140,8 +142,9 @@ class PeerCaptureTargetApplicationOwner:
         self.settings.remember_projection(next_settings)
         self.warning_reset()
         await self.runtime_effects.apply_capture_target(next_settings)
+        _provider, general, _prompt, _overlay = settings_view_surface_snapshots(next_settings)
         with contextlib.suppress(Exception):
-            self.settings_presentation_sink(next_settings)
+            self.settings_presentation_sink(general)
 
     @staticmethod
     def encode_process_option(target: ProcessCaptureTargetIntent) -> str:
