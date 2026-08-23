@@ -18,6 +18,8 @@ from puripuly_heart.core.osc.control_schema import (
     OSC_BOOLEAN_PARAMETER_NAMES,
     OSC_INTEGER_PARAMETER_NAMES,
     OSC_PARAMETER_DEFINITIONS,
+    TRANSLATION_CONNECTION_BY_MODEL_ID,
+    TRANSLATION_MODEL_ID_BY_SELECTION,
     TRANSLATION_MODEL_IDS,
 )
 
@@ -113,7 +115,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         "PuriPuly_PeerDstLang": "languages.peer_target_language",
         "PuriPuly_SelfASR": "stt.provider",
         "PuriPuly_PeerASR": "peer_stt.provider",
-        "PuriPuly_Translator": "translation.model",
+        "PuriPuly_Translator": "translation.selection",
         "PuriPuly_Fallback": "translation.fallback",
     }
     assert tuple(
@@ -133,7 +135,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         ("PuriPuly_PeerDstLang", "int", "languages.peer_target_language"),
         ("PuriPuly_SelfASR", "int", "stt.provider"),
         ("PuriPuly_PeerASR", "int", "peer_stt.provider"),
-        ("PuriPuly_Translator", "int", "translation.model"),
+        ("PuriPuly_Translator", "int", "translation.selection"),
         ("PuriPuly_Fallback", "int", "translation.fallback"),
     )
     assert dict(ASR_IDS) == {
@@ -159,7 +161,18 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         8: "local_llm",
         9: "custom_http",
         10: "managed_gemma",
-        11: "managed_gemma_12b",
+        11: "managed_gemma",
+        12: "managed_gemma_12b",
+    }
+    assert dict(TRANSLATION_CONNECTION_BY_MODEL_ID) == {
+        10: "cpu",
+        11: "gpu",
+        12: "gpu",
+    }
+    assert dict(TRANSLATION_MODEL_ID_BY_SELECTION) == {
+        ("managed_gemma", "cpu"): 10,
+        ("managed_gemma", "gpu"): 11,
+        ("managed_gemma_12b", "gpu"): 12,
     }
     assert dict(FALLBACK_IDS) == {
         0: "none",

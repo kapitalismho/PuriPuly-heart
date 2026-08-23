@@ -71,16 +71,32 @@ async def test_managed_local_models_control_materializes_provider_and_connection
         translation_model_normalizer=materialize_translation_settings,
     )
 
-    await application.set_translation_model(TranslationModel.MANAGED_GEMMA.value)
+    await application.set_translation_model(
+        TranslationModel.MANAGED_GEMMA.value,
+        TranslationConnection.CPU.value,
+    )
 
     updated = applied[0]
     assert updated.translation.model == TranslationModel.MANAGED_GEMMA
     assert updated.translation.connection == TranslationConnection.CPU
     assert updated.provider.llm == LLMProviderName.MANAGED_GEMMA
 
-    await application.set_translation_model(TranslationModel.MANAGED_GEMMA_12B.value)
+    await application.set_translation_model(
+        TranslationModel.MANAGED_GEMMA.value,
+        TranslationConnection.GPU.value,
+    )
 
     updated = applied[1]
+    assert updated.translation.model == TranslationModel.MANAGED_GEMMA
+    assert updated.translation.connection == TranslationConnection.GPU
+    assert updated.provider.llm == LLMProviderName.MANAGED_GEMMA
+
+    await application.set_translation_model(
+        TranslationModel.MANAGED_GEMMA_12B.value,
+        TranslationConnection.GPU.value,
+    )
+
+    updated = applied[2]
     assert updated.translation.model == TranslationModel.MANAGED_GEMMA_12B
     assert updated.translation.connection == TranslationConnection.GPU
     assert updated.provider.llm == LLMProviderName.MANAGED_GEMMA

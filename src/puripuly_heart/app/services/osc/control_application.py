@@ -123,12 +123,23 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
             )
         )
 
-    async def set_translation_model(self, model: str) -> object:
+    async def set_translation_model(
+        self,
+        model: str,
+        connection: str | None = None,
+    ) -> object:
         current = self.settings_provider()
-        if current is not None and _osc_translation_model_value(current.translation.model) == model:
+        if (
+            current is not None
+            and _osc_translation_model_value(current.translation.model) == model
+            and (
+                connection is None
+                or _enum_value_for_compare(current.translation.connection) == connection
+            )
+        ):
             return True
         return await self._apply_settings(
-            lambda settings: self._set_translation_model(settings, model)
+            lambda settings: self._set_translation_model(settings, model, connection)
         )
 
     async def set_fallback(self, alias: str) -> object:
@@ -200,12 +211,22 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         settings.languages.peer_source_language = peer_source
         settings.languages.peer_target_language = peer_target
 
-    def _set_translation_model(self, settings: object, model: str) -> None:
+    def _set_translation_model(
+        self,
+        settings: object,
+        model: str,
+        connection: str | None,
+    ) -> None:
         current_model = settings.translation.model
         current_value = getattr(current_model, "value", current_model)
         if model == "custom_http" and current_value != "custom_http":
             settings.translation.previous_llm_model = current_model
         settings.translation.model = _enum_value(settings.translation.model, model)
+        if connection is not None:
+            settings.translation.connection = _enum_value(
+                settings.translation.connection,
+                connection,
+            )
         self.translation_model_normalizer(settings)
 
     @staticmethod

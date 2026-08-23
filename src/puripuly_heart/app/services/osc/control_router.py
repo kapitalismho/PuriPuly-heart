@@ -11,6 +11,7 @@ from puripuly_heart.app.ports.osc_control import (
     ASR_IDS,
     FALLBACK_IDS,
     LANGUAGE_IDS,
+    TRANSLATION_CONNECTION_BY_MODEL_ID,
     TRANSLATION_MODEL_IDS,
     OscControlApplicationPort,
     OscControlCodecError,
@@ -329,7 +330,11 @@ class OscControlRouter:
         if message.name == "PuriPuly_PeerASR":
             return await app.set_peer_asr(ASR_IDS[message.value])  # type: ignore[index]
         if message.name == "PuriPuly_Translator":
-            return await app.set_translation_model(TRANSLATION_MODEL_IDS[message.value])  # type: ignore[index]
+            value = int(message.value)
+            return await app.set_translation_model(
+                TRANSLATION_MODEL_IDS[value],
+                TRANSLATION_CONNECTION_BY_MODEL_ID.get(value),
+            )
         if message.name == "PuriPuly_Fallback":
             return await app.set_fallback(FALLBACK_IDS[message.value])  # type: ignore[index]
         raise RuntimeError(f"unhandled PuriPuly OSC parameter: {message.name}")

@@ -48,8 +48,12 @@ class FakeApplication:
         self.calls.append(("peer_asr", provider))
         return None
 
-    async def set_translation_model(self, model: str) -> object:
-        self.calls.append(("model", model))
+    async def set_translation_model(
+        self,
+        model: str,
+        connection: str | None = None,
+    ) -> object:
+        self.calls.append(("model", (model, connection)))
         return None
 
     async def set_fallback(self, alias: str) -> object:
@@ -167,7 +171,7 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("languages", ("ja", "en", "en", "ko")),
         ("self_asr", "soniox"),
         ("peer_asr", "local_parakeet_v3"),
-        ("model", "gemini37_flash"),
+        ("model", ("gemini37_flash", None)),
         ("fallback", "none"),
     ]
     assert projected == [name for name, _value in packets]
@@ -181,10 +185,12 @@ async def test_router_routes_on_device_translation_model_ids() -> None:
 
     assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 10)
     assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 11)
+    assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 12)
 
     assert application.calls == [
-        ("model", "managed_gemma"),
-        ("model", "managed_gemma_12b"),
+        ("model", ("managed_gemma", "cpu")),
+        ("model", ("managed_gemma", "gpu")),
+        ("model", ("managed_gemma_12b", "gpu")),
     ]
     await router.close()
 
@@ -509,7 +515,7 @@ async def test_router_skips_a_cancelled_pending_coalesced_command() -> None:
     application.gate.set()
     assert (await first).applied is True
 
-    assert ("model", "gemini37_flash") not in application.calls
+    assert ("model", ("gemini37_flash", None)) not in application.calls
     assert projected == ["PuriPuly_SelfASR"]
     await router.close()
 
