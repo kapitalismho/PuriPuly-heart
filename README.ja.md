@@ -155,6 +155,29 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 | **Alibaba Cloud** | モデルごと100万トークン | 90日 | シンガポールリージョン基準 |
 | **Alibaba Cloud** | ¥300 | 1年 | 中国国内の学生向け |
 
+## ローカルモデル
+
+PuriPulyには、次のローカルモデルが搭載されています。さらにOpenAI互換APIにも接続できます。
+GPU推論はVulkanを使用しています。RadeonでもArcでも、ベンダーを問わず使用できます。
+
+**ASR**
+
+| モデル | 実行環境 | 量子化 |
+|---|---|---|
+| Parakeet TDT 0.6B v3 | CPU | INT8 |
+| Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
+| Qwen3-ASR 0.6B | CPU | INT8 |
+| Qwen3-ASR 1.7B | GPU | Q6_K |
+| OpenAI互換API | — | — |
+
+**LLM**
+
+| モデル | 実行環境 | 量子化 |
+|---|---|---|
+| Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| Gemma 4 12B IT QAT | GPU | UD Q4_K_XL |
+| OpenAI互換API | — | — |
+
 ---
 
 # 問題が起きたり、分かりにくいところがあれば、気軽に[Twitter/X](https://x.com/kapitalismho)でDMしてください。

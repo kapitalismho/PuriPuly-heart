@@ -156,6 +156,29 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 | **阿里云** | 每个模型 100 万 token | 90 天 | 新加坡区域为准 |
 | **阿里云** | ¥300 | 1 年 | 面向中国境内学生 |
 
+## 本地模型
+
+PuriPuly 内置了以下本地模型，还可以连接 OpenAI 兼容 API。
+GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
+
+**ASR**
+
+| 模型 | 运行环境 | 量化 |
+|---|---|---|
+| Parakeet TDT 0.6B v3 | CPU | INT8 |
+| Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
+| Qwen3-ASR 0.6B | CPU | INT8 |
+| Qwen3-ASR 1.7B | GPU | Q6_K |
+| OpenAI 兼容 API | — | — |
+
+**LLM**
+
+| 模型 | 运行环境 | 量化 |
+|---|---|---|
+| Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| Gemma 4 12B IT QAT | GPU | UD Q4_K_XL |
+| OpenAI 兼容 API | — | — |
+
 ---
 
 # 如果遇到问题或有不明确的地方，欢迎随时通过 [Twitter/X](https://x.com/kapitalismho) 发 DM 联系我。

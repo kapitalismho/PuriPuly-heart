@@ -155,6 +155,29 @@ It works in many environments, including VRChat and Discord.
 | **Alibaba Cloud** | 1M tokens per model | 90 days | Singapore region |
 | **Alibaba Cloud** | ¥300 | 1 year | Students in China |
 
+## Local Models
+
+PuriPuly comes with the following local models built in. You can also connect OpenAI-compatible APIs.
+GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Arc alike.
+
+**ASR**
+
+| Model | Runtime | Quantization |
+|---|---|---|
+| Parakeet TDT 0.6B v3 | CPU | INT8 |
+| Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
+| Qwen3-ASR 0.6B | CPU | INT8 |
+| Qwen3-ASR 1.7B | GPU | Q6_K |
+| OpenAI-compatible API | — | — |
+
+**LLM**
+
+| Model | Runtime | Quantization |
+|---|---|---|
+| Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| Gemma 4 12B IT QAT | GPU | UD Q4_K_XL |
+| OpenAI-compatible API | — | — |
+
 ---
 
 # If you run into problems or anything feels unclear, feel free to DM me on [Twitter/X](https://x.com/kapitalismho).
