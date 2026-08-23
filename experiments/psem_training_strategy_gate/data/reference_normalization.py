@@ -16,8 +16,10 @@ from types import MappingProxyType
 from typing import Any, Iterable, Mapping, Sequence
 
 from experiments.psem_training_strategy_gate.data.forced_alignment_reference import (
+    ALIMEETING_TEXTGRID_ONLY_TAIL_MAX_EXCESS_SAMPLES,
     REFERENCE_COMMIT,
     REFERENCE_REPOSITORY,
+    ForcedAlignmentReferenceError,
     ParsedRttm,
     ReferenceSpan,
     build_alimeeting_speaker_map,
@@ -47,12 +49,15 @@ SAMPLE_RATE_HZ = 16000
 MASK_CLASS = "ambiguous_nonlexical_vocalization"
 INVENTORY_PATH = Path(__file__).with_name("v2") / "nonlexical_risk_inventory.json"
 EXPECTED_INVENTORY_SHA256 = (
-    "59a4e7d289051e11ed6a0f353a3308eac33b3c7aa2238d54cf21a88ae688b66e"
+    "75922a050b22c1005c3577b1ab571a8843f61e01cabb1690719323da0aa8dbcc"
 )
 AMI_WORD_NAME = re.compile(
     r"^(?P<session>[A-Za-z0-9]+)\.(?P<agent>[A-Za-z0-9]+)\.words\.xml$"
 )
-ALIMEETING_TIER_NAME = re.compile(r"^N_(SPK[0-9]+)$")
+ALIMEETING_EVAL_TIER_NAME = re.compile(r"^N_(SPK[0-9]+)$")
+ALIMEETING_TRAIN_TIER_NAME = re.compile(
+    r"^(?:(?P<session>R[0-9]+_M[0-9]+)_)?[FM]_(?P<speaker>SPK[0-9]+)$"
+)
 TEXTGRID_ITEM = re.compile(r"\s*item \[(\d+)\]:\s*")
 TEXTGRID_INTERVAL = re.compile(r"\s*intervals \[(\d+)\]:\s*")
 MARKUP_TOKEN = re.compile(
@@ -752,15 +757,37 @@ def _textgrid_timeline(path: Path) -> tuple[Decimal, Decimal]:
     )
 
 
+def alimeeting_textgrid_range_samples(path: Path) -> tuple[int, int]:
+    start, end = _textgrid_timeline(path)
+    start_sample = timestamp_to_sample(start)
+    end_sample = timestamp_to_sample(end)
+    if start_sample < 0 or end_sample <= start_sample:
+        raise ReferenceNormalizationError(
+            f"invalid AliMeeting TextGrid timeline: {path}"
+        )
+    return start_sample, end_sample
+
+
+def _alimeeting_tier_speaker(tier_name: str, session_id: str) -> str:
+    eval_match = ALIMEETING_EVAL_TIER_NAME.fullmatch(tier_name)
+    if eval_match is not None:
+        return eval_match.group(1)
+    train_match = ALIMEETING_TRAIN_TIER_NAME.fullmatch(tier_name)
+    if train_match is None or train_match.group("session") not in {None, session_id}:
+        raise ReferenceNormalizationError(
+            f"unexpected AliMeeting TextGrid tier: {tier_name}"
+        )
+    return train_match.group("speaker")
+
+
 def alimeeting_speaker_ids(path: Path) -> tuple[str, ...]:
     speakers = []
     for _, tier_name, tier_class, _ in _textgrid_items(path):
-        match = ALIMEETING_TIER_NAME.fullmatch(tier_name)
-        if tier_class != "IntervalTier" or match is None:
+        if tier_class != "IntervalTier":
             raise ReferenceNormalizationError(
                 f"unexpected AliMeeting TextGrid tier: {tier_name}"
             )
-        speakers.append(match.group(1))
+        speakers.append(_alimeeting_tier_speaker(tier_name, path.stem))
     if len(set(speakers)) != len(speakers):
         raise ReferenceNormalizationError("AliMeeting TextGrid speaker tiers are duplicated")
     return tuple(speakers)
@@ -780,9 +807,13 @@ def parse_alimeeting_nonlexical_masks(
     if source_id != f"alimeeting_{path.stem}":
         raise ReferenceNormalizationError("AliMeeting TextGrid session identity mismatch")
     timeline_start, timeline_end = _textgrid_timeline(path)
+    timeline_start_sample = timestamp_to_sample(timeline_start)
+    timeline_end_sample = timestamp_to_sample(timeline_end)
     if (
-        timestamp_to_sample(timeline_start) != scored_start_sample
-        or timestamp_to_sample(timeline_end) != scored_end_sample
+        timeline_start_sample != scored_start_sample
+        or timeline_end_sample < scored_end_sample
+        or timeline_end_sample - scored_end_sample
+        > ALIMEETING_TEXTGRID_ONLY_TAIL_MAX_EXCESS_SAMPLES
     ):
         raise ReferenceNormalizationError(
             f"AliMeeting TextGrid timeline does not match scored range: {path}"
@@ -792,12 +823,11 @@ def parse_alimeeting_nonlexical_masks(
     marker_counts: Counter[str] = Counter()
     found_speakers: set[str] = set()
     for item_id, tier_name, tier_class, intervals in _textgrid_items(path):
-        match = ALIMEETING_TIER_NAME.fullmatch(tier_name)
-        if tier_class != "IntervalTier" or match is None:
+        if tier_class != "IntervalTier":
             raise ReferenceNormalizationError(
                 f"unexpected AliMeeting TextGrid tier: {tier_name}"
             )
-        source_speaker = match.group(1)
+        source_speaker = _alimeeting_tier_speaker(tier_name, path.stem)
         speaker_id = speaker_map.get(source_speaker)
         if speaker_id != source_speaker:
             raise ReferenceNormalizationError(
@@ -835,10 +865,17 @@ def parse_alimeeting_nonlexical_masks(
             source_annotation_id = (
                 f"{path.name}#item[{item_id}].intervals[{interval_id}]"
             )
+            start_sample = timestamp_to_sample(start_time)
+            end_sample = timestamp_to_sample(end_time)
+            if (
+                end_sample <= scored_start_sample
+                or start_sample >= scored_end_sample
+            ):
+                continue
             masks.append(
                 _clipped_mask(
-                    start_sample=timestamp_to_sample(start_time),
-                    end_sample=timestamp_to_sample(end_time),
+                    start_sample=start_sample,
+                    end_sample=end_sample,
                     scored_start_sample=scored_start_sample,
                     scored_end_sample=scored_end_sample,
                     speaker_id=speaker_id,
@@ -1184,6 +1221,28 @@ def normalize_reference_session(
         corpus=corpus,
         session_id=session_id,
     )
+    declared_reference_ref = source_row.get("reference_ref")
+    declared_reference_sha256 = source_row.get("reference_sha256")
+    reference_identity_required = (
+        source_row.get("meeting_type")
+        == "natural_meeting_train_partition"
+    )
+    if reference_identity_required or (
+        declared_reference_ref is not None
+        or declared_reference_sha256 is not None
+    ):
+        if (
+            not isinstance(declared_reference_ref, str)
+            or declared_reference_ref
+            != _stable_reference_ref(reference_path, corpus, session_id)
+            or not isinstance(declared_reference_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", declared_reference_sha256)
+            is None
+            or declared_reference_sha256 != sha256_file(reference_path)
+        ):
+            raise ReferenceNormalizationError(
+                "source reference receipt does not match pinned RTTM bytes"
+            )
     expected_audio_ref = (
         f"ami/audio/{session_id}/{session_id}.Mix-Headset.wav"
         if corpus == "AMI"
@@ -1297,10 +1356,21 @@ def normalize_reference_inventory(
     ):
         raise ReferenceNormalizationError("source manifest identities are duplicated")
     checkout = open_reference_checkout(reference_root)
-    return tuple(
+    sessions = tuple(
         normalize_reference_session(by_source[source_id], corpus_root, checkout)
         for source_id in sorted(by_source)
     )
+    try:
+        closing_provenance = validate_reference_checkout(reference_root)
+    except ForcedAlignmentReferenceError as exc:
+        raise ReferenceNormalizationError(
+            "forced-alignment checkout changed during normalization"
+        ) from exc
+    if closing_provenance != dict(checkout.provenance):
+        raise ReferenceNormalizationError(
+            "forced-alignment checkout identity changed during normalization"
+        )
+    return sessions
 
 
 def write_reference_normalization_manifest(

@@ -20,9 +20,10 @@ REFERENCE_LICENSE = "LICENSE"
 REFERENCE_README = "README.md"
 SAMPLE_RATE_HZ = 16000
 AMI_SOURCE_TAIL_MAX_EXCESS_SAMPLES = 16
+ALIMEETING_TEXTGRID_ONLY_TAIL_MAX_EXCESS_SAMPLES = 160
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 AMI_SPEAKER_PATTERN = re.compile(r"(?P<session>[A-Za-z0-9]+)\.(?P<agent>[A-Za-z0-9]+)")
-ALIMEETING_SPEAKER_PATTERN = re.compile(r"N_(SPK[0-9]+)")
+ALIMEETING_SPEAKER_PATTERN = re.compile(r"(?:N|[FM])_(SPK[0-9]+)")
 
 
 class ForcedAlignmentReferenceError(RuntimeError):

@@ -11,6 +11,7 @@ from experiments.psem_training_strategy_gate.data import reference_normalization
 from experiments.psem_training_strategy_gate.data.forced_alignment_reference import (
     REFERENCE_COMMIT,
     REFERENCE_REPOSITORY,
+    ForcedAlignmentReferenceError,
     ReferenceSpan,
     canonical_sha256,
     sha256_file,
@@ -528,6 +529,20 @@ def test_reference_session_uses_rttm_not_textgrid_as_activity_authority(
     bad_source = {**source_row, "annotation_sha256": "0" * 64}
     with pytest.raises(ReferenceNormalizationError, match="annotation receipt"):
         normalize_reference_session(bad_source, corpus_root, checkout)
+    reference_path = reference_root / "AliMeeting/Eval_Ali_far/R1.rttm"
+    train_source = {
+        **source_row,
+        "meeting_type": "natural_meeting_train_partition",
+        "reference_ref": "AliMeeting/Eval_Ali_far/R1.rttm",
+        "reference_sha256": sha256_file(reference_path),
+    }
+    normalize_reference_session(train_source, corpus_root, checkout)
+    with pytest.raises(ReferenceNormalizationError, match="source reference receipt"):
+        normalize_reference_session(
+            {**train_source, "reference_sha256": "0" * 64},
+            corpus_root,
+            checkout,
+        )
 
     for field, value in (
         ("sample_rate_hz", 16000.0),
@@ -560,3 +575,52 @@ def test_reference_inventory_binds_manifest_and_resolves_every_session(
         reference_root,
     )
     assert [session.source_id for session in sessions] == ["alimeeting_R1"]
+
+
+def test_reference_inventory_rejects_checkout_mutation_during_normalization(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    corpus_root, reference_root, _, source_row, provenance = _alimeeting_fixture(
+        tmp_path,
+        monkeypatch,
+    )
+    source_manifest = tmp_path / "source_manifest.jsonl"
+    source_manifest.write_text(
+        json.dumps(source_row, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    reference_path = reference_root / "AliMeeting/Eval_Ali_far/R1.rttm"
+    expected_sha256 = sha256_file(reference_path)
+
+    def validate_checkout(_: Path) -> dict:
+        if sha256_file(reference_path) != expected_sha256:
+            raise ForcedAlignmentReferenceError("checkout bytes changed")
+        return provenance
+
+    original_normalize = reference_normalization.normalize_reference_session
+
+    def mutate_after_normalize(*args, **kwargs):
+        session = original_normalize(*args, **kwargs)
+        reference_path.write_text("mutated\n", encoding="utf-8")
+        return session
+
+    monkeypatch.setattr(
+        reference_normalization,
+        "validate_reference_checkout",
+        validate_checkout,
+    )
+    monkeypatch.setattr(
+        reference_normalization,
+        "normalize_reference_session",
+        mutate_after_normalize,
+    )
+    with pytest.raises(
+        ReferenceNormalizationError,
+        match="changed during normalization",
+    ):
+        normalize_reference_inventory(
+            source_manifest,
+            corpus_root,
+            reference_root,
+        )

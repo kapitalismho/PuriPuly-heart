@@ -10,7 +10,9 @@ from experiments.psem_training_strategy_gate.data import provenance
 from experiments.psem_training_strategy_gate.data.provenance import (
     AMI_EXPANSION_EXCLUSIONS,
     BASELINE_AMI_MEETINGS,
+    EXPECTED_ALIMEETING_EVAL_MEETINGS,
     EXPECTED_ALIMEETING_MEETINGS,
+    EXPECTED_ALIMEETING_V2_MEETINGS,
     EXPECTED_AMI_MEETINGS,
     HISTORICAL_CONFIGS,
     REQUIRED_PRIOR_SOURCE_IDS,
@@ -113,8 +115,39 @@ def test_source_waveforms_match_the_preexisting_materialization_ledgers() -> Non
         checked.add(source_id)
     assert checked == {
         *(f"ami_{meeting_id}" for meeting_id in BASELINE_AMI_MEETINGS),
-        *(f"alimeeting_{meeting_id}" for meeting_id in EXPECTED_ALIMEETING_MEETINGS),
+        *(
+            f"alimeeting_{meeting_id}"
+            for meeting_id in EXPECTED_ALIMEETING_EVAL_MEETINGS
+        ),
     }
+
+
+def test_train_provenance_binds_selection_and_materialization_receipts() -> None:
+    sources = read_jsonl(DATA_DIR / "v2" / "source_manifest.jsonl")
+    train_rows = [
+        row
+        for row in sources
+        if row["meeting_type"] == "natural_meeting_train_partition"
+    ]
+    selection_sha256 = provenance.sha256_file(
+        DATA_DIR / "alimeeting_train_selection.json"
+    )
+    materialization_sha256 = provenance.sha256_file(
+        DATA_DIR / "alimeeting_train_materialization.json"
+    )
+    assert len(train_rows) == 17
+    assert {row["session_id"] for row in train_rows} == (
+        EXPECTED_ALIMEETING_V2_MEETINGS
+        - EXPECTED_ALIMEETING_EVAL_MEETINGS
+    )
+    assert all(
+        row["speaker_identity_scope"] == "corpus_global"
+        and row["train_selection_receipt_sha256"] == selection_sha256
+        and row["train_materialization_receipt_sha256"]
+        == materialization_sha256
+        and row["annotation_coverage_end_sample"] <= row["duration_samples"]
+        for row in train_rows
+    )
 
 
 def test_expansion_component_validation_rejects_a_missing_baseline_annotation() -> None:

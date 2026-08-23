@@ -48,8 +48,17 @@ AMI_ANNOTATION_URL = "https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_p
 ALIMEETING_SOURCE_URL = "https://www.openslr.org/119/"
 ALIMEETING_ARCHIVE_URL = "https://speech-lab-share-data.oss-cn-shanghai.aliyuncs.com/AliMeeting/openlr/Eval_Ali.tar.gz"
 ALIMEETING_ARCHIVE_SIZE_BYTES = 3673718355
+DATA_DIR = Path(__file__).parent
+ALIMEETING_TRAIN_SELECTION_PATH = DATA_DIR / "alimeeting_train_selection.json"
+ALIMEETING_TRAIN_MATERIALIZATION_PATH = (
+    DATA_DIR / "alimeeting_train_materialization.json"
+)
 SOURCE_ID_PATTERN = re.compile(r"^(ami|alimeeting)_[A-Za-z0-9_]+$")
-ALIMEETING_TIER_PATTERN = re.compile(r'^\s*name\s*=\s*"N_(SPK\d+)"\s*$')
+ALIMEETING_TIER_PATTERN = re.compile(
+    r"^(?:N_(?P<eval_speaker>SPK[0-9]+)|"
+    r"(?:(?P<session>R[0-9]+_M[0-9]+)_)?"
+    r"[FM]_(?P<train_speaker>SPK[0-9]+))$"
+)
 BASELINE_AMI_MEETINGS = frozenset(
     {
         "EN2001d", "EN2002c", "EN2006a", "EN2009d", "ES2002b",
@@ -101,12 +110,22 @@ ADDITIONAL_AMI_MEETINGS = frozenset(
     for meeting_id in component
 )
 EXPECTED_AMI_MEETINGS = BASELINE_AMI_MEETINGS | ADDITIONAL_AMI_MEETINGS
-EXPECTED_ALIMEETING_MEETINGS = frozenset(
+EXPECTED_ALIMEETING_EVAL_MEETINGS = frozenset(
     {
         "R8001_M8004", "R8003_M8001", "R8007_M8010", "R8007_M8011",
         "R8008_M8013", "R8009_M8018", "R8009_M8019", "R8009_M8020",
     }
 )
+EXPECTED_ALIMEETING_TRAIN_MEETINGS = frozenset(
+    json.loads(
+        ALIMEETING_TRAIN_SELECTION_PATH.read_text(encoding="utf-8")
+    )["selected_session_ids"]
+)
+EXPECTED_ALIMEETING_V2_MEETINGS = (
+    EXPECTED_ALIMEETING_EVAL_MEETINGS
+    | EXPECTED_ALIMEETING_TRAIN_MEETINGS
+)
+EXPECTED_ALIMEETING_MEETINGS = EXPECTED_ALIMEETING_EVAL_MEETINGS
 
 
 class ProvenanceError(RuntimeError):
@@ -646,9 +665,16 @@ def _parse_alimeeting_textgrid(path: Path) -> dict[str, Any]:
         if _textgrid_value(block, "class") != "IntervalTier":
             raise ProvenanceError(f"unsupported AliMeeting TextGrid tier class: {path}")
         tier_name = _textgrid_value(block, "name")
-        match = re.fullmatch(r"N_(SPK\d+)", tier_name)
-        if match:
-            speakers.append(match.group(1))
+        match = ALIMEETING_TIER_PATTERN.fullmatch(tier_name)
+        if match and match.group("session") in {None, path.stem}:
+            speakers.append(
+                match.group("eval_speaker")
+                or match.group("train_speaker")
+            )
+        elif match:
+            raise ProvenanceError(
+                f"AliMeeting TextGrid tier session mismatch: {path}"
+            )
         else:
             unknown_tiers.append(tier_name or "unknown")
         declared_line = next(
@@ -710,26 +736,174 @@ def _parse_alimeeting_textgrid(path: Path) -> dict[str, Any]:
 def _alimeeting_rows(
     corpus_root: Path,
     prior: dict[str, dict[str, Any]],
+    *,
+    include_train: bool = False,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     audio_root = corpus_root / "alimeeting" / "far_ch0"
-    textgrid_root = corpus_root / "alimeeting" / "Eval_Ali" / "Eval_Ali_far" / "textgrid_dir"
+    eval_textgrid_root = (
+        corpus_root
+        / "alimeeting"
+        / "Eval_Ali"
+        / "Eval_Ali_far"
+        / "textgrid_dir"
+    )
+    train_textgrid_root = (
+        corpus_root
+        / "alimeeting"
+        / "Train_Ali"
+        / "Train_Ali_far"
+        / "textgrid_dir"
+    )
+    expected_meetings = (
+        EXPECTED_ALIMEETING_V2_MEETINGS
+        if include_train
+        else EXPECTED_ALIMEETING_EVAL_MEETINGS
+    )
+    selected_by_id: dict[str, dict[str, Any]] = {}
+    materialized_by_id: dict[str, dict[str, Any]] = {}
+    component_by_session: dict[str, str] = {}
+    if include_train:
+        from experiments.psem_training_strategy_gate.data.alimeeting_train_materialization import (
+            validate_materialization_receipt,
+        )
+        from experiments.psem_training_strategy_gate.data.alimeeting_train_selection import (
+            TRAIN_ARCHIVE_SHA256,
+            TRAIN_ARCHIVE_SIZE_BYTES,
+            TRAIN_ARCHIVE_URL,
+            validate_selection_receipt,
+        )
+
+        selection = validate_selection_receipt(
+            ALIMEETING_TRAIN_SELECTION_PATH
+        )
+        materialization = validate_materialization_receipt(
+            ALIMEETING_TRAIN_MATERIALIZATION_PATH,
+            ALIMEETING_TRAIN_SELECTION_PATH,
+            corpus_root,
+        )
+        selected_by_id = {
+            row["session_id"]: row
+            for row in selection["candidate_sessions"]
+            if row["session_id"] in EXPECTED_ALIMEETING_TRAIN_MEETINGS
+        }
+        materialized_by_id = {
+            row["session_id"]: row
+            for row in materialization["materialized_sessions"]
+        }
+        component_by_session = {
+            session_id: component["component_id"]
+            for component in selection["candidate_components"]
+            if component["component_id"]
+            in selection["selected_component_ids"]
+            for session_id in component["session_ids"]
+        }
+        if (
+            set(selected_by_id) != EXPECTED_ALIMEETING_TRAIN_MEETINGS
+            or set(materialized_by_id)
+            != EXPECTED_ALIMEETING_TRAIN_MEETINGS
+            or set(component_by_session)
+            != EXPECTED_ALIMEETING_TRAIN_MEETINGS
+        ):
+            raise ProvenanceError("AliMeeting Train receipt inventory mismatch")
     source_rows = []
     annotation_rows = []
     discovered = {path.stem for path in audio_root.glob("R*_M*.wav")}
-    if discovered != EXPECTED_ALIMEETING_MEETINGS:
+    if (
+        not expected_meetings.issubset(discovered)
+        or discovered - EXPECTED_ALIMEETING_V2_MEETINGS
+    ):
         raise ProvenanceError(
-            f"AliMeeting inventory mismatch; missing={sorted(EXPECTED_ALIMEETING_MEETINGS - discovered)} "
-            f"extra={sorted(discovered - EXPECTED_ALIMEETING_MEETINGS)}"
+            f"AliMeeting inventory mismatch; missing={sorted(expected_meetings - discovered)} "
+            f"extra={sorted(discovered - EXPECTED_ALIMEETING_V2_MEETINGS)}"
         )
-    for wav_path in sorted(audio_root.glob("R*_M*.wav")):
-        meeting_id = wav_path.stem
+    for meeting_id in sorted(expected_meetings):
+        wav_path = audio_root / f"{meeting_id}.wav"
         source_id = f"alimeeting_{meeting_id}"
-        textgrid_path = textgrid_root / f"{meeting_id}.TextGrid"
+        is_train = meeting_id in EXPECTED_ALIMEETING_TRAIN_MEETINGS
+        textgrid_path = (
+            train_textgrid_root if is_train else eval_textgrid_root
+        ) / f"{meeting_id}.TextGrid"
         audio = wav_identity(wav_path)
         annotation_files = _file_rows([textgrid_path], corpus_root)
         annotation_sha256 = canonical_sha256(annotation_files)
         textgrid = _parse_alimeeting_textgrid(textgrid_path)
-        if textgrid["timeline_start_sample"] != 0 or textgrid["timeline_end_sample"] > audio["duration_samples"]:
+        if is_train:
+            selected = selected_by_id[meeting_id]
+            materialized = materialized_by_id[meeting_id]
+            coverage_end_sample = selected["scored_samples"]
+            if (
+                audio["waveform_sha256"] != materialized["waveform_sha256"]
+                or audio["waveform_size_bytes"]
+                != materialized["waveform_size_bytes"]
+                or audio["duration_samples"]
+                != selected["waveform_duration_samples"]
+                or textgrid["timeline_end_sample"]
+                != selected["textgrid_timeline_samples"]
+                or textgrid["speaker_ids"] != selected["speaker_ids"]
+                or annotation_files[0]["sha256"]
+                != materialized["annotation_file_sha256"]
+                or coverage_end_sample > audio["duration_samples"]
+            ):
+                raise ProvenanceError(
+                    f"AliMeeting Train materialization binding mismatch: {meeting_id}"
+                )
+            train_source_fields = {
+                "source_archive_sha256": TRAIN_ARCHIVE_SHA256,
+                "source_archive_member_ref": selected[
+                    "waveform_archive_member_ref"
+                ],
+                "source_archive_member_size_bytes": selected[
+                    "waveform_archive_member_size_bytes"
+                ],
+                "source_archive_member_sha256": materialized[
+                    "source_archive_member_sha256"
+                ],
+                "room_id": selected["room_id"],
+                "recording_group_id": selected["recording_group_id"],
+                "train_selection_component_id": component_by_session[
+                    meeting_id
+                ],
+                "train_selection_receipt_sha256": sha256_file(
+                    ALIMEETING_TRAIN_SELECTION_PATH
+                ),
+                "train_materialization_receipt_sha256": sha256_file(
+                    ALIMEETING_TRAIN_MATERIALIZATION_PATH
+                ),
+                "reference_ref": selected["reference_ref"],
+                "reference_sha256": selected["reference_sha256"],
+                "annotation_tail_excess_samples": selected[
+                    "annotation_tail_excess_samples"
+                ],
+            }
+            meeting_type = "natural_meeting_train_partition"
+            corpus_version = "M2MeT Train_Ali"
+            archive_url = TRAIN_ARCHIVE_URL
+            archive_size_bytes = TRAIN_ARCHIVE_SIZE_BYTES
+            annotation_version = "M2MeT Train_Ali"
+            speaker_identity_source = (
+                "F_SPKxxxx or M_SPKxxxx participant tier names"
+            )
+            coverage_status = (
+                "waveform_bounded_timeline_annotation_tail_clipped"
+                if selected["annotation_tail_excess_samples"]
+                else "textgrid_bounded_timeline_trailing_audio_unscored"
+            )
+        else:
+            coverage_end_sample = textgrid["timeline_end_sample"]
+            train_source_fields = {}
+            meeting_type = "natural_meeting_eval_partition"
+            corpus_version = "M2MeT Eval_Ali"
+            archive_url = ALIMEETING_ARCHIVE_URL
+            archive_size_bytes = ALIMEETING_ARCHIVE_SIZE_BYTES
+            annotation_version = "M2MeT Eval_Ali"
+            speaker_identity_source = "N_SPKxxxx tier names"
+            coverage_status = (
+                "textgrid_bounded_timeline_trailing_audio_unscored"
+            )
+        if (
+            textgrid["timeline_start_sample"] != 0
+            or coverage_end_sample > audio["duration_samples"]
+        ):
             raise ProvenanceError(f"AliMeeting TextGrid bounds exceed source waveform: {meeting_id}")
         prior_fields = _prior_fields(source_id, prior)
         source_rows.append(
@@ -739,8 +913,8 @@ def _alimeeting_rows(
                 "corpus": "AliMeeting",
                 "session_id": meeting_id,
                 "meeting_series": None,
-                "meeting_type": "natural_meeting_eval_partition",
-                "corpus_version": "M2MeT Eval_Ali",
+                "meeting_type": meeting_type,
+                "corpus_version": corpus_version,
                 "speaker_ids": textgrid["speaker_ids"],
                 "unknown_speaker_agents": textgrid["unknown_speaker_tiers"],
                 "unknown_speaker_count": len(textgrid["unknown_speaker_tiers"]),
@@ -749,10 +923,15 @@ def _alimeeting_rows(
                     if not textgrid["unknown_speaker_tiers"]
                     else "partially_or_fully_unknown"
                 ),
+                **(
+                    {"speaker_identity_scope": "corpus_global"}
+                    if include_train
+                    else {}
+                ),
                 "audio_ref": wav_path.relative_to(corpus_root).as_posix(),
                 "audio_source_url": ALIMEETING_SOURCE_URL,
-                "source_archive_url": ALIMEETING_ARCHIVE_URL,
-                "source_archive_size_bytes": ALIMEETING_ARCHIVE_SIZE_BYTES,
+                "source_archive_url": archive_url,
+                "source_archive_size_bytes": archive_size_bytes,
                 "recording_recipe": "far-field array channel 0 materialized as 16 kHz mono PCM16",
                 "license_id": "CC-BY-SA-4.0",
                 "use_authorization": "public_research_under_source_license",
@@ -760,9 +939,10 @@ def _alimeeting_rows(
                 "annotation_ref": textgrid_path.relative_to(corpus_root).as_posix(),
                 "annotation_sha256": annotation_sha256,
                 "annotation_coverage_start_sample": textgrid["timeline_start_sample"],
-                "annotation_coverage_end_sample": textgrid["timeline_end_sample"],
+                "annotation_coverage_end_sample": coverage_end_sample,
                 **audio,
                 **prior_fields,
+                **train_source_fields,
             }
         )
         annotation_rows.append(
@@ -772,15 +952,33 @@ def _alimeeting_rows(
                 "corpus": "AliMeeting",
                 "session_id": meeting_id,
                 "annotation_format": "Praat TextGrid participant IntervalTiers",
-                "annotation_version": "M2MeT Eval_Ali",
+                "annotation_version": annotation_version,
                 "annotation_source_url": ALIMEETING_SOURCE_URL,
                 "annotation_files": annotation_files,
                 "annotation_sha256": annotation_sha256,
                 "coverage_start_sample": 0,
-                "coverage_end_sample": textgrid["timeline_end_sample"],
-                "coverage_status": "textgrid_bounded_timeline_trailing_audio_unscored",
-                "speaker_identity_source": "N_SPKxxxx tier names",
+                "coverage_end_sample": coverage_end_sample,
+                "coverage_status": coverage_status,
+                "speaker_identity_source": speaker_identity_source,
                 "interval_count": textgrid["interval_count"],
+                **(
+                    {
+                        "textgrid_timeline_end_sample": textgrid[
+                            "timeline_end_sample"
+                        ],
+                        "annotation_tail_excess_samples": selected_by_id[
+                            meeting_id
+                        ]["annotation_tail_excess_samples"],
+                        "train_selection_receipt_sha256": sha256_file(
+                            ALIMEETING_TRAIN_SELECTION_PATH
+                        ),
+                        "train_materialization_receipt_sha256": sha256_file(
+                            ALIMEETING_TRAIN_MATERIALIZATION_PATH
+                        ),
+                    }
+                    if is_train
+                    else {}
+                ),
             }
         )
     return source_rows, annotation_rows
@@ -789,10 +987,16 @@ def _alimeeting_rows(
 def build_provenance(
     repo_root: Path,
     corpus_root: Path,
+    *,
+    include_alimeeting_train: bool = False,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     prior = collect_prior_exposure(repo_root)
     ami_sources, ami_annotations = _ami_rows(corpus_root, prior)
-    ali_sources, ali_annotations = _alimeeting_rows(corpus_root, prior)
+    ali_sources, ali_annotations = _alimeeting_rows(
+        corpus_root,
+        prior,
+        include_train=include_alimeeting_train,
+    )
     source_rows = sorted([*ami_sources, *ali_sources], key=lambda row: row["source_id"])
     annotation_rows = sorted(
         [*ami_annotations, *ali_annotations], key=lambda row: row["source_id"]
@@ -841,8 +1045,18 @@ def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     path.write_text(payload, encoding="utf-8", newline="\n")
 
 
-def write_provenance(repo_root: Path, corpus_root: Path, output_dir: Path) -> None:
-    source_rows, annotation_rows, prior_rows = build_provenance(repo_root, corpus_root)
+def write_provenance(
+    repo_root: Path,
+    corpus_root: Path,
+    output_dir: Path,
+    *,
+    include_alimeeting_train: bool = False,
+) -> None:
+    source_rows, annotation_rows, prior_rows = build_provenance(
+        repo_root,
+        corpus_root,
+        include_alimeeting_train=include_alimeeting_train,
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     write_jsonl(output_dir / "source_manifest.jsonl", source_rows)
     write_jsonl(output_dir / "annotation_manifest.jsonl", annotation_rows)
@@ -854,8 +1068,14 @@ def main() -> None:
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--corpus-root", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--include-alimeeting-train", action="store_true")
     args = parser.parse_args()
-    write_provenance(args.repo_root.resolve(), args.corpus_root.resolve(), args.output_dir.resolve())
+    write_provenance(
+        args.repo_root.resolve(),
+        args.corpus_root.resolve(),
+        args.output_dir.resolve(),
+        include_alimeeting_train=args.include_alimeeting_train,
+    )
 
 
 if __name__ == "__main__":
