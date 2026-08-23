@@ -64,10 +64,11 @@ def test_state_publisher_full_snapshot_republishes_after_discovery() -> None:
         (TranslationModel.GEMMA4_31B, TranslationConnection.CEREBRAS, 1),
         (TranslationModel.CUSTOM_HTTP, TranslationConnection.CUSTOM_HTTP, 9),
         (TranslationModel.MANAGED_GEMMA, TranslationConnection.CPU, 10),
-        (TranslationModel.MANAGED_GEMMA_12B, TranslationConnection.GPU, 11),
+        (TranslationModel.MANAGED_GEMMA, TranslationConnection.GPU, 11),
+        (TranslationModel.MANAGED_GEMMA_12B, TranslationConnection.GPU, 12),
     ],
 )
-def test_state_publisher_uses_product_level_translation_model_ids(
+def test_state_publisher_uses_translation_selection_ids(
     model: TranslationModel,
     connection: TranslationConnection,
     expected_id: int,

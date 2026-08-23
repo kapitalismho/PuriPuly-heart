@@ -1,20 +1,35 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 from collections.abc import Callable
 from dataclasses import dataclass
 
 import pytest
 
-from puripuly_heart.app.ports.osc_control import OSC_PARAMETER_DEFINITIONS
+from puripuly_heart.app.ports.osc_control import ASR_ID_BY_PROVIDER, OSC_PARAMETER_DEFINITIONS
 from puripuly_heart.app.ports.oscquery import (
     OscQueryAdvertisement,
     OscQueryServiceInfo,
 )
+from puripuly_heart.app.ports.ui_models import (
+    OscControlPresentationName,
+    OscControlPresentationState,
+)
 from puripuly_heart.app.services.osc import control_runtime as control_runtime_module
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
-from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState
-from puripuly_heart.config.settings import AppSettings, materialize_translation_settings
+from puripuly_heart.app.services.osc.presentation_state import (
+    presentation_state_from_settings,
+)
+from puripuly_heart.app.services.osc.state_publisher import (
+    OscCanonicalState,
+    state_from_settings,
+)
+from puripuly_heart.config.settings import (
+    AppSettings,
+    STTProviderName,
+    materialize_translation_settings,
+)
 
 
 class FakeSender:
@@ -241,6 +256,160 @@ def _integration(
         query_service=service,
         resync_timeout_seconds=resync_timeout_seconds,
     )
+
+
+@pytest.mark.asyncio
+async def test_in_process_complete_control_matrix_projects_final_canonical_state() -> None:
+    current = [AppSettings()]
+    runtime = {
+        "self_capture": False,
+        "peer_capture": False,
+        "translation": False,
+    }
+    runtime_calls: list[tuple[str, bool]] = []
+    settings_apply_calls: list[AppSettings] = []
+    projected: list[OscControlPresentationState] = []
+
+    class CanonicalDashboardApplication:
+        async def set_stt_enabled(self, enabled: bool) -> None:
+            runtime["self_capture"] = enabled
+            runtime_calls.append(("self_capture", enabled))
+
+        async def set_peer_translation_enabled(self, enabled: bool) -> None:
+            runtime["peer_capture"] = enabled
+            runtime_calls.append(("peer_capture", enabled))
+
+        async def set_translation_enabled(self, enabled: bool) -> None:
+            runtime["translation"] = enabled
+            runtime_calls.append(("translation", enabled))
+
+        async def set_overlay_enabled(self, enabled: bool) -> None:
+            current[0].ui.overlay_enabled = enabled
+            runtime_calls.append(("captions", enabled))
+
+    async def apply_settings(value: object) -> None:
+        assert isinstance(value, AppSettings)
+        current[0] = value
+        settings_apply_calls.append(value)
+
+    def canonical_state() -> OscCanonicalState:
+        return state_from_settings(
+            current[0],
+            self_capture=runtime["self_capture"],
+            peer_capture=runtime["peer_capture"],
+            translation=runtime["translation"],
+            captions=current[0].ui.overlay_enabled,
+        )
+
+    def presentation_state(
+        control: OscControlPresentationName,
+    ) -> OscControlPresentationState:
+        return presentation_state_from_settings(
+            current[0],
+            canonical_state=canonical_state(),
+            changed_control=control,
+        )
+
+    receiver_owner = FakeReceiverOwner()
+    sender = FakeSender()
+    application = CanonicalDashboardApplication()
+    integration = OscControlIntegrationOwner(
+        receiver_owner=receiver_owner,
+        settings_provider=lambda: current[0],
+        apply_settings=apply_settings,
+        application_provider=lambda: application,
+        sender_provider=lambda: sender,
+        state_provider=canonical_state,
+        language_state_provider=lambda: (
+            current[0].languages.source_language,
+            current[0].languages.target_language,
+            current[0].languages.peer_source_language,
+            current[0].languages.peer_target_language,
+        ),
+        translation_model_normalizer=materialize_translation_settings,
+        ui_state_provider=presentation_state,
+        ui_state_sink=projected.append,
+        query_service=FakeService(None),
+    )
+    packets: list[tuple[OscControlPresentationName, bool | int]] = [
+        ("PuriPuly_Talk", True),
+        ("PuriPuly_Listen", True),
+        ("PuriPuly_Trans", True),
+        ("PuriPuly_Captions", True),
+        ("PuriPuly_PeerAuto", True),
+        ("PuriPuly_MuteSync", True),
+        ("PuriPuly_ChatboxSource", True),
+        ("PuriPuly_SelfSrcLang", 16),
+        ("PuriPuly_SelfDstLang", 11),
+        ("PuriPuly_PeerSrcLang", 5),
+        ("PuriPuly_PeerDstLang", 7),
+        ("PuriPuly_SelfASR", 7),
+        ("PuriPuly_PeerASR", 4),
+        ("PuriPuly_Translator", 5),
+        ("PuriPuly_Fallback", 1),
+    ]
+
+    for name, value in packets:
+        result = await integration.router.dispatch_packet(
+            f"/avatar/parameters/{name}",
+            value,
+        )
+
+        assert result.applied is True
+        assert projected[-1] == presentation_state(name)
+
+    assert [state.changed_control for state in projected] == [name for name, _value in packets]
+    assert len(runtime_calls) == 4
+    assert len(settings_apply_calls) == 11
+    assert sender.messages == []
+    await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_normalized_asr_rejection_projects_the_committed_canonical_fallback() -> None:
+    current = [AppSettings()]
+    current[0].provider.stt = STTProviderName.DEEPGRAM
+    projected: list[OscControlPresentationState] = []
+
+    async def apply_settings(value: object) -> None:
+        assert isinstance(value, AppSettings)
+        normalized = copy.deepcopy(value)
+        normalized.provider.stt = STTProviderName.LOCAL_CPU_AUTO
+        current[0] = normalized
+
+    def canonical_state() -> OscCanonicalState:
+        return state_from_settings(current[0])
+
+    integration = OscControlIntegrationOwner(
+        receiver_owner=FakeReceiverOwner(),
+        settings_provider=lambda: current[0],
+        apply_settings=apply_settings,
+        application_provider=lambda: None,
+        sender_provider=lambda: FakeSender(),
+        state_provider=canonical_state,
+        language_state_provider=lambda: ("ko", "en", "en", "ko"),
+        translation_model_normalizer=materialize_translation_settings,
+        ui_state_provider=lambda control: presentation_state_from_settings(
+            current[0],
+            canonical_state=canonical_state(),
+            changed_control=control,
+        ),
+        ui_state_sink=projected.append,
+        query_service=FakeService(None),
+    )
+
+    result = await integration.router.dispatch_packet(
+        "/avatar/parameters/PuriPuly_SelfASR",
+        ASR_ID_BY_PROVIDER[STTProviderName.LOCAL_QWEN_GPU.value],
+    )
+
+    assert result.applied is False
+    assert result.error == "application_rejected"
+    assert current[0].provider.stt is STTProviderName.LOCAL_CPU_AUTO
+    assert len(projected) == 1
+    assert projected[0].changed_control == "PuriPuly_SelfASR"
+    assert projected[0].self_asr_setting == STTProviderName.LOCAL_CPU_AUTO.value
+    await integration.close()
 
 
 @pytest.mark.asyncio
@@ -1018,8 +1187,8 @@ async def test_off_transition_drains_an_admitted_dashboard_command() -> None:
         asyncio.gather(dispatch_task, off_task),
         timeout=1,
     )
-    assert result.applied is True
-    assert result.error is None
+    assert result.applied is False
+    assert result.error == "router_disabled"
     assert application.completed is True
     assert integration.connection_mode == "off"
     assert len(sender.messages) == 16

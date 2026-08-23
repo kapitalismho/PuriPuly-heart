@@ -7,6 +7,7 @@ import pytest
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.ui.event_bridge import UIEventBridge
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from tests.helpers.osc_presentation import osc_control_presentation_state
 
 
 def test_presentation_adapter_exposes_only_named_destinations_and_events() -> None:
@@ -274,6 +275,34 @@ def test_presentation_adapter_owns_ui_event_bridge_composition() -> None:
     )
 
     assert isinstance(bridge, UIEventBridge)
+
+
+def test_presentation_adapter_projects_one_snapshot_to_both_ui_surfaces() -> None:
+    events: list[tuple[str, object]] = []
+    dashboard = SimpleNamespace(
+        project_osc_control_state=lambda state: events.append(("dashboard", state))
+    )
+    settings = SimpleNamespace(
+        project_osc_control_state=lambda state: events.append(("settings", state)),
+        load_from_settings=lambda *_args, **_kwargs: events.append(("full-load", None)),
+    )
+    adapter = FletUiPresentationAdapter(
+        SimpleNamespace(
+            view_dashboard=dashboard,
+            view_settings=settings,
+        )
+    )
+    state = osc_control_presentation_state(
+        "PuriPuly_MuteSync",
+        mute_sync=True,
+    )
+
+    adapter.project_osc_control_state(state)
+
+    assert events == [
+        ("dashboard", state),
+        ("settings", state),
+    ]
 
 
 def test_presentation_adapter_preserves_missing_optional_history_destination() -> None:

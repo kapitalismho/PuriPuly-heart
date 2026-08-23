@@ -7,6 +7,7 @@ from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
     ManagedGemmaNoticeAction,
+    OscControlPresentationState,
 )
 from puripuly_heart.core.language import get_all_language_options
 from puripuly_heart.ui.components.display_card import DisplayCard
@@ -526,6 +527,50 @@ class DashboardView(ft.Column):
         self._peer_source_mode = peer_source_mode
         self._update_input_font()
         self._refresh_language_card()
+
+    def project_osc_control_state(self, state: OscControlPresentationState) -> None:
+        control = state.changed_control
+        if control == "PuriPuly_Talk":
+            if self._stt_is_starting:
+                self._sync_stt_button_state()
+            else:
+                self.set_stt_enabled(state.self_capture)
+        elif control == "PuriPuly_Trans":
+            self.set_translation_enabled(state.translation)
+        elif control in {
+            "PuriPuly_PeerAuto",
+            "PuriPuly_SelfSrcLang",
+            "PuriPuly_SelfDstLang",
+            "PuriPuly_PeerSrcLang",
+            "PuriPuly_PeerDstLang",
+        }:
+            self.set_languages_from_codes(
+                state.self_source_language,
+                state.self_target_language,
+                state.peer_source_language,
+                state.peer_target_language,
+                state.peer_source_mode,
+            )
+        elif control == "PuriPuly_PeerASR":
+            self.set_peer_auto_detect_available(state.peer_asr in {"soniox", "local_qwen_gpu"})
+        elif control in {"PuriPuly_Listen", "PuriPuly_Captions"}:
+            capture = capture_presentation_from_contract(self._overlay_peer_contract)
+            if control == "PuriPuly_Listen":
+                if capture.peer.starting or capture.peer.warning:
+                    self._capture_controls.apply_peer_capture_state(
+                        enabled=capture.peer.enabled,
+                        starting=capture.peer.starting,
+                        warning=capture.peer.warning,
+                    )
+                else:
+                    self._capture_controls.apply_peer_capture_state(enabled=state.peer_capture)
+            elif capture.overlay.warning:
+                self._capture_controls.apply_overlay_state(
+                    enabled=capture.overlay.enabled,
+                    warning=True,
+                )
+            else:
+                self._capture_controls.apply_overlay_state(enabled=state.captions)
 
     def set_peer_auto_detect_available(self, available: bool) -> None:
         self._peer_auto_detect_available = bool(available)

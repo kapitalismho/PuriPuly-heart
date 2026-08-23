@@ -5,18 +5,20 @@ import contextlib
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from puripuly_heart.app.ports.osc_control import (
     ASR_IDS,
     FALLBACK_IDS,
     LANGUAGE_IDS,
+    TRANSLATION_CONNECTION_BY_MODEL_ID,
     TRANSLATION_MODEL_IDS,
     OscControlApplicationPort,
     OscControlCodecError,
     OscControlMessage,
     decode_control_message,
 )
+from puripuly_heart.app.ports.ui_models import OscControlPresentationName
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 
 logger = logging.getLogger(__name__)
@@ -60,6 +62,7 @@ class OscControlRouter:
         echo_suppression_provider: Callable[[OscControlMessage], bool] | None = None,
         canonical_state_republisher: Callable[[], object] | None = None,
         canonical_state_full_republisher: Callable[[], object] | None = None,
+        canonical_state_projector: Callable[[OscControlPresentationName], object] | None = None,
         error_sink: Callable[[str], None] | None = None,
     ) -> None:
         self._application = application
@@ -68,6 +71,7 @@ class OscControlRouter:
         self._echo_suppression_provider = echo_suppression_provider
         self._canonical_state_republisher = canonical_state_republisher
         self._canonical_state_full_republisher = canonical_state_full_republisher
+        self._canonical_state_projector = canonical_state_projector
         self._language_values = (
             language_state_provider()
             if language_state_provider is not None
@@ -203,9 +207,13 @@ class OscControlRouter:
                         key=lambda item: item[1].sequence,
                     )
                     del self._pending[name]
+                if current.future.cancelled():
+                    current = None
+                    continue
                 result = await self._apply_serialized(
                     current.message,
                     generation=current.generation,
+                    cancelled=current.future.cancelled,
                 )
                 if not current.future.done():
                     current.future.set_result(result)
@@ -222,13 +230,19 @@ class OscControlRouter:
         message: OscControlMessage,
         *,
         generation: int,
+        cancelled: Callable[[], bool] | None = None,
     ) -> OscDispatchResult:
         if not self._is_generation_current(generation):
             return OscDispatchResult(False, message.name, error=self._generation_error())
+        if cancelled is not None and cancelled():
+            return OscDispatchResult(False, message.name, error="cancelled")
+        invocation_task: asyncio.Task[Any] | None = None
         try:
             async with self._serial_lock:
                 if not self._is_generation_current(generation):
                     return OscDispatchResult(False, message.name, error=self._generation_error())
+                if cancelled is not None and cancelled():
+                    return OscDispatchResult(False, message.name, error="cancelled")
                 invocation_task = asyncio.current_task()
                 if invocation_task is not None:
                     self._active_invocation_tasks.add(invocation_task)
@@ -241,11 +255,32 @@ class OscControlRouter:
             self._republish_canonical_state()
             self._report_error(f"{message.name}: {type(exc).__name__}")
             return OscDispatchResult(False, message.name, error=type(exc).__name__)
+        if self._closed:
+            return OscDispatchResult(False, message.name, error="router_closed")
+        if (cancelled is not None and cancelled()) or (
+            invocation_task is not None and invocation_task.cancelling()
+        ):
+            return OscDispatchResult(False, message.name, error="cancelled")
+        if not self._is_generation_current(generation):
+            return OscDispatchResult(False, message.name, error=self._generation_error())
         if _application_result_rejected(result):
             self._republish_canonical_state()
+            if (
+                _application_result_changed_canonical_state(result)
+                and self._is_generation_current(generation)
+                and not (cancelled is not None and cancelled())
+            ):
+                self._project_canonical_state(cast(OscControlPresentationName, message.name))
             self._report_error(f"{message.name}: application_rejected")
             return OscDispatchResult(False, message.name, error="application_rejected")
         self._publish_canonical_delta()
+        if (cancelled is not None and cancelled()) or (
+            invocation_task is not None and invocation_task.cancelling()
+        ):
+            return OscDispatchResult(False, message.name, error="cancelled")
+        if not self._is_generation_current(generation):
+            return OscDispatchResult(False, message.name, error=self._generation_error())
+        self._project_canonical_state(cast(OscControlPresentationName, message.name))
         return OscDispatchResult(True, message.name, error=None if result is None else None)
 
     async def _invoke(self, message: OscControlMessage) -> object:
@@ -295,7 +330,11 @@ class OscControlRouter:
         if message.name == "PuriPuly_PeerASR":
             return await app.set_peer_asr(ASR_IDS[message.value])  # type: ignore[index]
         if message.name == "PuriPuly_Translator":
-            return await app.set_translation_model(TRANSLATION_MODEL_IDS[message.value])  # type: ignore[index]
+            value = int(message.value)
+            return await app.set_translation_model(
+                TRANSLATION_MODEL_IDS[value],
+                TRANSLATION_CONNECTION_BY_MODEL_ID.get(value),
+            )
         if message.name == "PuriPuly_Fallback":
             return await app.set_fallback(FALLBACK_IDS[message.value])  # type: ignore[index]
         raise RuntimeError(f"unhandled PuriPuly OSC parameter: {message.name}")
@@ -325,6 +364,13 @@ class OscControlRouter:
             return
         with contextlib.suppress(Exception):
             callback()
+
+    def _project_canonical_state(self, control: OscControlPresentationName) -> None:
+        callback = self._canonical_state_projector
+        if callback is None:
+            return
+        with contextlib.suppress(Exception):
+            callback(control)
 
     def _is_generation_current(self, generation: int) -> bool:
         return not self._closed and self._ingress_enabled and generation == self._generation
@@ -373,6 +419,10 @@ def _application_result_rejected(result: object) -> bool:
     if not isinstance(status, str):
         return False
     return "degraded" in status or "failed" in status
+
+
+def _application_result_changed_canonical_state(result: object) -> bool:
+    return getattr(result, "canonical_state_changed", False) is True
 
 
 __all__ = ["OscControlRouter", "OscDispatchResult"]

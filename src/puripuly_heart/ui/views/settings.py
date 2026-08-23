@@ -17,6 +17,7 @@ import flet as ft
 from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
+from puripuly_heart.app.ports.ui_models import OscControlPresentationState
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
@@ -3877,6 +3878,133 @@ class SettingsView(ft.Column):
         self._sync_telemetry_consent_card(settings)
         if is_control_mounted(self):
             _update_control_if_mounted(self._telemetry_consent_card)
+
+    def project_osc_control_state(self, state: OscControlPresentationState) -> None:
+        if self._settings is None:
+            return
+        control = state.changed_control
+        if control in {"PuriPuly_Talk", "PuriPuly_Trans"}:
+            return
+        self._apply_osc_control_state(self._settings, state)
+        if self._provider_settings_draft is not None:
+            self._apply_osc_control_state(self._provider_settings_draft, state)
+        if control in {
+            "PuriPuly_PeerAuto",
+            "PuriPuly_SelfSrcLang",
+            "PuriPuly_SelfDstLang",
+            "PuriPuly_PeerSrcLang",
+            "PuriPuly_PeerDstLang",
+        }:
+            return
+        display_settings = self._build_settings_with_provider_draft()
+        if display_settings is None:
+            return
+        if control in {"PuriPuly_SelfASR", "PuriPuly_PeerASR"}:
+            self._set_unit_card_value_text(
+                self._stt_text,
+                self._stt_provider_display_label(
+                    display_settings.provider.stt,
+                    custom_mode=display_settings.custom_stt.mode,
+                ),
+            )
+            self._set_unit_card_value_text(
+                self._peer_stt_text,
+                self._stt_provider_display_label(
+                    self._effective_peer_stt_provider(display_settings),
+                    custom_mode=display_settings.custom_stt.mode,
+                ),
+            )
+            self._sync_custom_stt_card(display_settings)
+            self._update_api_visibility()
+            _update_control_if_mounted(self._stt_text)
+            _update_control_if_mounted(self._peer_stt_text)
+            _update_control_if_mounted(self._api_keys_column)
+        elif control == "PuriPuly_Translator":
+            self._set_unit_card_value_text(
+                self._llm_text,
+                self._get_llm_display_label(display_settings),
+            )
+            self._set_translation_connection_text(
+                self._get_translation_connection_display_label(display_settings)
+            )
+            self._sync_translation_connection_title(display_settings)
+            self._update_api_visibility()
+            _update_control_if_mounted(self._llm_text)
+            _update_control_if_mounted(self._translation_connection_row)
+            _update_control_if_mounted(self._api_keys_column)
+        elif control == "PuriPuly_Fallback":
+            self._sync_openrouter_fallback_card(display_settings)
+            self._update_api_visibility()
+            _update_control_if_mounted(self._openrouter_fallback_text)
+            _update_control_if_mounted(self._openrouter_fallback_helper_text)
+            _update_control_if_mounted(self._api_keys_column)
+        elif control == "PuriPuly_MuteSync":
+            self._vrc_mic_text.content.value = t(
+                "settings.vrc_mic.on" if state.mute_sync else "settings.vrc_mic.off"
+            )
+            _update_control_if_mounted(self._vrc_mic_text)
+        elif control == "PuriPuly_ChatboxSource":
+            self._chatbox_source_text.content.value = t(
+                "settings.chatbox_source.on"
+                if state.chatbox_source
+                else "settings.chatbox_source.off"
+            )
+            _update_control_if_mounted(self._chatbox_source_text)
+        elif control in {"PuriPuly_Listen", "PuriPuly_Captions"}:
+            self._sync_overlay_controls()
+
+    @staticmethod
+    def _apply_osc_control_state(
+        settings: AppSettings,
+        state: OscControlPresentationState,
+    ) -> None:
+        control = state.changed_control
+        if control == "PuriPuly_SelfSrcLang":
+            settings.languages.source_language = state.self_source_language
+        elif control == "PuriPuly_SelfDstLang":
+            settings.languages.target_language = state.self_target_language
+        elif control == "PuriPuly_PeerSrcLang":
+            settings.languages.peer_source_language = state.peer_source_language
+        elif control == "PuriPuly_PeerDstLang":
+            settings.languages.peer_target_language = state.peer_target_language
+        elif control == "PuriPuly_PeerAuto":
+            settings.languages.peer_source_mode = state.peer_source_mode
+        elif control == "PuriPuly_Listen":
+            settings.ui.peer_translation_enabled = state.peer_capture
+        elif control == "PuriPuly_Captions":
+            settings.ui.overlay_enabled = state.captions
+        elif control == "PuriPuly_MuteSync":
+            settings.osc.vrc_mic_intercept = state.mute_sync
+        elif control == "PuriPuly_ChatboxSource":
+            settings.osc.chatbox_include_source = state.chatbox_source
+        elif control in {"PuriPuly_SelfASR", "PuriPuly_PeerASR"}:
+            if control == "PuriPuly_SelfASR":
+                settings.provider.stt = STTProviderName(state.self_asr_setting)
+            else:
+                settings.provider.peer_stt = STTProviderName(state.peer_asr_setting)
+            settings.custom_stt.mode = state.custom_stt_mode
+            settings.custom_stt.compatibility = state.custom_stt_compatibility
+        elif control == "PuriPuly_Translator":
+            settings.provider.llm = LLMProviderName(state.llm_provider)
+            settings.translation.model = TranslationModel(state.translation_model)
+            settings.translation.connection = TranslationConnection(state.translation_connection)
+            settings.translation.connection_history = {
+                model: TranslationConnection(connection)
+                for model, connection in state.translation_connection_history
+            }
+            settings.translation.http_extension_id = state.translation_http_extension_id
+            settings.translation.previous_llm_model = (
+                None
+                if state.translation_previous_model is None
+                else TranslationModel(state.translation_previous_model)
+            )
+            materialize_translation_settings(settings)
+        elif control == "PuriPuly_Fallback":
+            settings.translation.fallback.enabled = state.fallback_enabled
+            settings.translation.fallback.model = TranslationModel(state.fallback_model)
+            settings.translation.fallback.connection = TranslationConnection(
+                state.fallback_connection
+            )
 
     def _load_secrets(self, settings: AppSettings, config_path: Path) -> None:
         """Load secret values into fields."""

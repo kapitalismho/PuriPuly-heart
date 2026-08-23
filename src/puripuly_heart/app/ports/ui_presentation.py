@@ -5,6 +5,7 @@ from typing import Any, Protocol
 
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
+    OscControlPresentationState,
     OverlayPeerPresentationState,
 )
 from puripuly_heart.core.runtime.output import UIEventBridgePort
@@ -96,6 +97,8 @@ class UiPresentationPort(Protocol):
         recent_target_languages: list[str],
         peer_auto_detect_available: bool,
     ) -> None: ...
+
+    def project_osc_control_state(self, state: OscControlPresentationState) -> None: ...
 
     def render_settings(
         self,
