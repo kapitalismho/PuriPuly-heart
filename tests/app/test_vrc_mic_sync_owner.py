@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
 import pytest
 
 from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
-from puripuly_heart.core.osc.receiver import VrcMicState
+from puripuly_heart.core.osc.receiver_contract import VrcMicState
 
 
 class RecordingGate:
@@ -26,9 +26,10 @@ class RecordingGate:
 
 
 class RecordingReceiver:
-    def __init__(self, **_kwargs: object) -> None:
+    def __init__(self, **kwargs: object) -> None:
         self.started = False
         self.stopped = False
+        self.effective_port = int(kwargs.get("port", 9001))
 
     async def start(self) -> None:
         self.started = True
@@ -154,24 +155,70 @@ async def test_owner_contains_receiver_start_oserror_and_reports_endpoint() -> N
 
 
 @pytest.mark.asyncio
-async def test_owner_close_preserves_failing_legacy_receiver_for_retry() -> None:
+async def test_owner_rebuilds_callbacks_after_a_failed_stop() -> None:
     gate = RecordingGate()
-    owner, _, _ = _owner(state=None, gate=gate)
+    callbacks: list[Callable[[str, tuple[object, ...]], object]] = []
+    receivers: list[RecordingReceiver] = []
+    control_packets: list[tuple[str, tuple[object, ...]]] = []
 
-    class FailingReceiver:
+    class FailOnceStopReceiver(RecordingReceiver):
+        def __init__(self, **kwargs: object) -> None:
+            super().__init__(**kwargs)
+            self.stop_calls = 0
+
         def stop(self) -> None:
-            raise RuntimeError("stop failed")
+            self.stop_calls += 1
+            if self.stop_calls == 1:
+                raise RuntimeError("stop failed")
+            self.stopped = True
 
-    receiver = FailingReceiver()
-    owner.receiver = receiver
+    def receiver_factory(**kwargs: object) -> RecordingReceiver:
+        callback = kwargs["control_packet_handler"]
+        assert callable(callback)
+        callbacks.append(callback)
+        receiver = (
+            FailOnceStopReceiver(**kwargs)
+            if not receivers
+            else RecordingReceiver(**kwargs)
+        )
+        receivers.append(receiver)
+        return receiver
 
-    with pytest.raises(RuntimeError, match="stop failed"):
-        await owner.close()
+    owner, errors, diagnostics = _owner(
+        state=VrcMicState(),
+        gate=gate,
+        receiver_factory=receiver_factory,
+    )
+    owner.set_packet_handlers(
+        control_packet_handler=lambda address, values: control_packets.append(
+            (address, values)
+        )
+    )
 
-    assert owner.receiver is receiver
-    assert owner.last_enabled is False
-    assert gate.enabled == [False]
-    assert gate.active == [False]
+    await owner.configure(enabled=True)
+    await owner.configure_control(
+        active=True,
+        host="127.0.0.1",
+        port=9021,
+        force_restart=True,
+    )
+
+    assert len(receivers) == 2
+    first = receivers[0]
+    assert isinstance(first, FailOnceStopReceiver)
+    assert first.stop_calls == 2
+    assert callbacks[0]("/stale", (1,)) is False
+    callbacks[1]("/current", (2,))
+    assert control_packets == [("/current", (2,))]
+    assert owner.receiver is receivers[1]
+    assert owner.effective_port == 9021
+    assert errors == []
+    assert [event for event, _metadata in diagnostics] == [
+        "vrc_mic_receiver_stop_failed",
+        "vrc_mic_receiver_late_packet_dropped",
+    ]
+
+    await owner.close()
 
 
 @pytest.mark.asyncio

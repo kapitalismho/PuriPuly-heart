@@ -30,6 +30,7 @@ class FakeOscReceiver:
         self.transport = FakeTransport()
         self.start_calls = 0
         self.stop_calls = 0
+        self.effective_port = 9001
 
     async def start(self) -> None:
         self.start_calls += 1
@@ -41,7 +42,10 @@ class FakeOscReceiver:
 
 def test_receiver_runtimes_expose_lifecycle_inventory() -> None:
     osc_runtime = OscReceiverRuntime(receiver_factory=FakeOscReceiver)
-    vrc_runtime = VrcMicReceiverRuntime(state=VrcMicState())
+    vrc_runtime = VrcMicReceiverRuntime(
+        state=VrcMicState(),
+        receiver_factory=lambda **_kwargs: FakeOscReceiver(),
+    )
 
     osc_snapshot = osc_runtime.lifecycle_owner_snapshot()
     vrc_snapshot = vrc_runtime.lifecycle_owner_snapshot()
@@ -72,6 +76,100 @@ async def test_osc_receiver_runtime_start_stop_close_socket_and_is_idempotent() 
 
     await runtime.close()
     assert receiver.stop_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_osc_receiver_runtime_awaits_async_stop() -> None:
+    class AsyncStopReceiver(FakeOscReceiver):
+        async def stop(self) -> None:
+            await asyncio.sleep(0)
+            self.stop_calls += 1
+            self.transport.close()
+
+    receiver = AsyncStopReceiver()
+    runtime = OscReceiverRuntime(receiver_factory=lambda: receiver)
+
+    await runtime.start()
+    await runtime.stop()
+
+    assert receiver.stop_calls == 1
+    assert receiver.transport.closed is True
+    assert runtime.receiver is None
+
+
+@pytest.mark.asyncio
+async def test_osc_receiver_runtime_cleans_partial_start_before_reraising() -> None:
+    diagnostics: list[tuple[str, dict[str, object]]] = []
+
+    class PartialStartReceiver(FakeOscReceiver):
+        async def start(self) -> None:
+            self.start_calls += 1
+            raise OSError("port busy")
+
+    receiver = PartialStartReceiver()
+    runtime = OscReceiverRuntime(
+        receiver_factory=lambda: receiver,
+        diagnostics_sink=lambda event, metadata: diagnostics.append((event, dict(metadata))),
+    )
+
+    with pytest.raises(OSError, match="port busy"):
+        await runtime.start()
+
+    assert receiver.start_calls == 1
+    assert receiver.stop_calls == 1
+    assert receiver.transport.closed is True
+    assert runtime.receiver is None
+    assert diagnostics == [("osc_receiver_start_failed", {"error_type": "OSError"})]
+
+
+@pytest.mark.asyncio
+async def test_osc_receiver_runtime_reports_factory_and_start_cleanup_failures() -> None:
+    factory_diagnostics: list[tuple[str, dict[str, object]]] = []
+
+    def failing_factory() -> FakeOscReceiver:
+        raise RuntimeError("factory failed")
+
+    factory_runtime = OscReceiverRuntime(
+        receiver_factory=failing_factory,
+        diagnostics_sink=lambda event, metadata: factory_diagnostics.append(
+            (event, dict(metadata))
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="factory failed"):
+        await factory_runtime.start()
+
+    assert factory_diagnostics == [
+        ("osc_receiver_start_failed", {"error_type": "RuntimeError"})
+    ]
+
+    cleanup_diagnostics: list[tuple[str, dict[str, object]]] = []
+
+    class CleanupFailingReceiver(FakeOscReceiver):
+        async def start(self) -> None:
+            raise OSError("start failed")
+
+        def stop(self) -> None:
+            self.stop_calls += 1
+            raise RuntimeError("cleanup failed")
+
+    receiver = CleanupFailingReceiver()
+    cleanup_runtime = OscReceiverRuntime(
+        receiver_factory=lambda: receiver,
+        diagnostics_sink=lambda event, metadata: cleanup_diagnostics.append(
+            (event, dict(metadata))
+        ),
+    )
+
+    with pytest.raises(OSError, match="start failed"):
+        await cleanup_runtime.start()
+
+    assert receiver.stop_calls == 1
+    assert cleanup_runtime.receiver is None
+    assert cleanup_diagnostics == [
+        ("osc_receiver_start_cleanup_failed", {"error_type": "RuntimeError"}),
+        ("osc_receiver_start_failed", {"error_type": "OSError"}),
+    ]
 
 
 @pytest.mark.asyncio
@@ -327,5 +425,5 @@ async def test_vrc_mic_receiver_runtime_composes_osc_receiver_owner_for_start_st
     assert first_receiver is receivers[0]
     assert second_receiver is receivers[1]
     assert len(osc_owners) == 1
-    assert events == ["osc-start", ("osc-stop", False), "osc-start", "osc-close"]
+    assert events == ["osc-start", ("osc-stop", True), "osc-start", "osc-close"]
     assert runtime.receiver is None

@@ -2,32 +2,24 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import inspect
 import logging
 from collections.abc import Callable, Mapping
-from typing import Any, Protocol, TypeVar
+from typing import Protocol, TypeVar
 
-from puripuly_heart.core.osc.receiver import (
+from puripuly_heart.core.osc.receiver_contract import (
     VRC_OSC_RECEIVER_HOST,
     VRC_OSC_RECEIVER_PORT,
+    OscReceiverPort,
     VrcMicState,
-    VrcOscReceiver,
+    VrcOscReceiverFactory,
 )
 
 logger = logging.getLogger(__name__)
 
-_ReceiverT = TypeVar("_ReceiverT", bound="OscReceiverProtocol")
+_ReceiverT = TypeVar("_ReceiverT", bound=OscReceiverPort)
 ReceiverDiagnosticsSink = Callable[[str, Mapping[str, object]], None]
 
-
-class OscReceiverProtocol(Protocol):
-    async def start(self) -> None: ...
-
-    def stop(self) -> object: ...
-
-
 OscReceiverFactory = Callable[[], _ReceiverT]
-VrcOscReceiverFactory = Callable[..., OscReceiverProtocol]
 ReceiverRuntimeStateChanged = Callable[[object], None]
 
 
@@ -100,11 +92,20 @@ class OscReceiverRuntime:
             if self._receiver is not None:
                 return self._receiver
 
-            receiver = self._receiver_factory()
             self._generation += 1
+            receiver: _ReceiverT | None = None
             try:
+                receiver = self._receiver_factory()
                 await receiver.start()
-            except Exception as exc:
+            except BaseException as exc:
+                if receiver is not None:
+                    try:
+                        await _call_stop(receiver)
+                    except BaseException as cleanup_exc:
+                        self._emit(
+                            "osc_receiver_start_cleanup_failed",
+                            {"error_type": type(cleanup_exc).__name__},
+                        )
                 self._emit(
                     "osc_receiver_start_failed",
                     {"error_type": type(exc).__name__},
@@ -160,7 +161,14 @@ class OscReceiverRuntime:
                 self._state_changed(self)
 
 
-OscReceiverRuntimeFactory = Callable[..., OscReceiverRuntime]
+class OscReceiverRuntimeFactory(Protocol):
+    def __call__(
+        self,
+        *,
+        receiver_factory: OscReceiverFactory[OscReceiverPort],
+        diagnostics_sink: ReceiverDiagnosticsSink | None,
+        state_changed: ReceiverRuntimeStateChanged | None,
+    ) -> OscReceiverRuntime: ...
 
 
 class VrcMicReceiverRuntime:
@@ -178,20 +186,20 @@ class VrcMicReceiverRuntime:
         host: str = VRC_OSC_RECEIVER_HOST,
         port: int = VRC_OSC_RECEIVER_PORT,
         mute_delay_s: float = 0.4,
-        receiver_factory: VrcOscReceiverFactory | None = None,
+        receiver_factory: VrcOscReceiverFactory,
         osc_runtime_factory: OscReceiverRuntimeFactory | None = None,
         cancel_timeout_s: float = 2.0,
         diagnostics_sink: ReceiverDiagnosticsSink | None = None,
         state_changed: ReceiverRuntimeStateChanged | None = None,
-        control_packet_handler: Callable[[str, tuple[Any, ...]], object] | None = None,
-        avatar_change_handler: Callable[[tuple[Any, ...]], object] | None = None,
-        packet_handler: Callable[[str, tuple[Any, ...]], object] | None = None,
+        control_packet_handler: Callable[[str, tuple[object, ...]], object] | None = None,
+        avatar_change_handler: Callable[[tuple[object, ...]], object] | None = None,
+        packet_handler: Callable[[str, tuple[object, ...]], object] | None = None,
     ) -> None:
         self._state = state
         self._host = host
         self._port = port
         self._mute_delay_s = mute_delay_s
-        self._receiver_factory = receiver_factory or _default_vrc_receiver_factory
+        self._receiver_factory = receiver_factory
         self._cancel_timeout_s = max(0.0, float(cancel_timeout_s))
         self._diagnostics_sink = diagnostics_sink
         self._state_changed = state_changed
@@ -217,21 +225,20 @@ class VrcMicReceiverRuntime:
         return "VrcMicReceiverRuntime"
 
     @property
-    def receiver(self) -> OscReceiverProtocol | None:
+    def receiver(self) -> OscReceiverPort | None:
         return self._osc_runtime.receiver
 
     @property
     def effective_port(self) -> int:
         receiver = self.receiver
-        value = getattr(receiver, "effective_port", self._port)
-        return int(value)
+        return receiver.effective_port if receiver is not None else self._port
 
     @property
     def mute_task(self) -> asyncio.Task[None] | None:
         return self._mute_task
 
     def configure_endpoint(self, host: str, port: int) -> None:
-        if self.receiver is not None:
+        if self.receiver is not None and self._active_generation is not None:
             raise RuntimeError("cannot change OSC receiver endpoint while running")
         if not host:
             raise ValueError("OSC receiver host must be non-empty")
@@ -261,13 +268,27 @@ class VrcMicReceiverRuntime:
             "late_callback_rule": self.late_callback_rule,
         }
 
-    async def start(self) -> OscReceiverProtocol:
+    async def start(self) -> OscReceiverPort:
         async with self._lock:
             if self._closing or self._closed:
                 state = "closing" if self._closing else "closed"
                 raise RuntimeError(f"{self.owner_name} is {state} to new receiver work")
             if self.receiver is not None and self._active_generation is not None:
                 return self.receiver
+            if self.receiver is not None:
+                try:
+                    await self._osc_runtime.stop(strict_runtime_errors=True)
+                except Exception as exc:
+                    self._emit(
+                        "vrc_mic_receiver_restart_cleanup_failed",
+                        {
+                            "host": self._host,
+                            "port": self._port,
+                            "error_type": type(exc).__name__,
+                        },
+                    )
+                    self._notify_state_changed()
+                    raise
 
             self._generation += 1
             generation = self._generation
@@ -338,7 +359,7 @@ class VrcMicReceiverRuntime:
     def handle_control_packet(
         self,
         address: str,
-        values: tuple[Any, ...],
+        values: tuple[object, ...],
         *,
         generation: int | None = None,
     ) -> object:
@@ -349,7 +370,7 @@ class VrcMicReceiverRuntime:
 
     def handle_avatar_change_packet(
         self,
-        values: tuple[Any, ...],
+        values: tuple[object, ...],
         *,
         generation: int | None = None,
     ) -> object:
@@ -361,7 +382,7 @@ class VrcMicReceiverRuntime:
     def handle_packet(
         self,
         address: str,
-        values: tuple[Any, ...],
+        values: tuple[object, ...],
         *,
         generation: int | None = None,
     ) -> object:
@@ -388,7 +409,7 @@ class VrcMicReceiverRuntime:
             and self._generation == generation
         )
 
-    def _build_receiver(self, generation: int) -> OscReceiverProtocol:
+    def _build_receiver(self, generation: int) -> OscReceiverPort:
         return self._receiver_factory(
             state=self._state,
             host=self._host,
@@ -432,7 +453,7 @@ class VrcMicReceiverRuntime:
             ),
         )
 
-    def _build_receiver_for_osc_runtime(self) -> OscReceiverProtocol:
+    def _build_receiver_for_osc_runtime(self) -> OscReceiverPort:
         generation = self._pending_receiver_generation
         if generation is None:
             generation = self._generation
@@ -456,7 +477,7 @@ class VrcMicReceiverRuntime:
                 if terminal:
                     await self._osc_runtime.close()
                 else:
-                    await self._osc_runtime.stop(strict_runtime_errors=strict_runtime_errors)
+                    await self._osc_runtime.stop(strict_runtime_errors=True)
             except Exception as exc:
                 stop_failure = exc
                 self._emit(
@@ -501,7 +522,7 @@ class VrcMicReceiverRuntime:
 
     async def _cancel_tasks_bounded(
         self,
-        tasks: tuple[asyncio.Task[Any], ...],
+        tasks: tuple[asyncio.Task[None], ...],
         *,
         terminal: bool,
     ) -> list[Exception]:
@@ -515,7 +536,7 @@ class VrcMicReceiverRuntime:
         done, pending = await asyncio.wait(pending_tasks, timeout=self._cancel_timeout_s)
         for completed in done:
             _observe_task_exception(completed)
-            self._mute_tasks.discard(completed)  # type: ignore[arg-type]
+            self._mute_tasks.discard(completed)
         if pending:
             for task in pending:
                 task.cancel()
@@ -547,20 +568,13 @@ class VrcMicReceiverRuntime:
                 self._state_changed(self)
 
 
-def _default_vrc_receiver_factory(**kwargs: object) -> VrcOscReceiver:
-    return VrcOscReceiver(**kwargs)  # type: ignore[arg-type]
-
-
-async def _call_stop(receiver: object) -> None:
-    stop = getattr(receiver, "stop", None)
-    if not callable(stop):
-        return
-    result = stop()
-    if inspect.isawaitable(result):
+async def _call_stop(receiver: OscReceiverPort) -> None:
+    result = receiver.stop()
+    if result is not None:
         await result
 
 
-def _observe_task_exception(task: asyncio.Task[Any]) -> None:
+def _observe_task_exception(task: asyncio.Task[None]) -> None:
     if task.cancelled():
         return
     try:

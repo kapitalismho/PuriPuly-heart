@@ -4,6 +4,7 @@ import logging
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import Enum
 from types import MappingProxyType
 from typing import Final, Literal, Protocol
 
@@ -36,6 +37,15 @@ PROVIDER_OBSERVATION_OUTCOMES: Final[tuple[ProviderObservationOutcome, ...]] = (
 )
 
 ConversationRecordChannel = Literal["self"]
+
+
+class SessionLoggingMode(str, Enum):
+    BASIC = "basic"
+    DETAILED = "detailed"
+
+
+class RealtimeLogSink(Protocol):
+    def append_log(self, line: str) -> None: ...
 
 
 def _freeze_fields(
@@ -179,6 +189,8 @@ __all__ = [
     "ProviderObservationPort",
     "ProviderObservationOutcome",
     "ProviderObservationSink",
+    "RealtimeLogSink",
     "RuntimeLogEvent",
     "RuntimeLogSink",
+    "SessionLoggingMode",
 ]

@@ -56,7 +56,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnLifecycleOwner,
 )
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
-from puripuly_heart.core.osc.receiver import VrcMicState
+from puripuly_heart.core.osc.receiver_contract import VrcMicState
 from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
 from puripuly_heart.core.runtime.output import OutputRuntime
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner

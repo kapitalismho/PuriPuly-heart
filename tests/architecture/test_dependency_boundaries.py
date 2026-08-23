@@ -248,6 +248,7 @@ LAYER_RULES = (
             "puripuly_heart.core.osc.control_schema",
             "puripuly_heart.core.osc.control_codec",
             "puripuly_heart.core.osc.oscquery_contract",
+            "puripuly_heart.core.osc.receiver_contract",
         ),
         forbidden_layers=frozenset(
             {
@@ -357,22 +358,6 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
             importer_layer="adapters",
             imported_layer="migration/serialization",
             reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
-        ),
-        ImportViolation(
-            rule_id="runtime-owners-use-ports",
-            importer="src/puripuly_heart/core/runtime/logging.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="runtime owners",
-            imported_layer="adapters",
-            reason="runtime owners must coordinate through domain events, resolved DTOs, lifecycle/message/observability protocols, not app wiring, Flet UI, provider config parsing, or concrete adapters",
-        ),
-        ImportViolation(
-            rule_id="runtime-owners-use-ports",
-            importer="src/puripuly_heart/core/runtime/receiver.py",
-            imported="puripuly_heart.core.osc.receiver",
-            importer_layer="runtime owners",
-            imported_layer="adapters",
-            reason="runtime owners must coordinate through domain events, resolved DTOs, lifecycle/message/observability protocols, not app wiring, Flet UI, provider config parsing, or concrete adapters",
         ),
         ImportViolation(
             rule_id="ui-adapters-avoid-provider-construction",
@@ -1121,6 +1106,10 @@ def test_concrete_osc_modules_classify_as_adapters() -> None:
     assert _layer_for_module("puripuly_heart.core.osc.udp_sender") == ADAPTERS
 
 
+def test_osc_receiver_contract_classifies_as_service_port() -> None:
+    assert _layer_for_module("puripuly_heart.core.osc.receiver_contract") == SERVICE_PORTS
+
+
 def test_overlay_calibration_value_object_has_config_schema_ownership() -> None:
     assert _layer_for_module("puripuly_heart.config.overlay_calibration") == SCHEMA_VALUES
     assert _layer_for_module("puripuly_heart.ui.overlay_calibration") == UI_ADAPTERS_RENDERERS
@@ -1388,7 +1377,7 @@ def test_application_composition_has_no_concrete_osc_import_violations() -> None
     )
 
 
-def test_current_runtime_owner_imports_are_allowlist_synchronization_only() -> None:
+def test_a03_runtime_owner_adapter_imports_are_retired() -> None:
     runtime_owner_rule = _rule_for_layer(RUNTIME_OWNERS)
     inherited_runtime_owner_violations = {
         ImportViolation(
@@ -1409,8 +1398,8 @@ def test_current_runtime_owner_imports_are_allowlist_synchronization_only() -> N
         ),
     }
 
-    assert inherited_runtime_owner_violations <= _dependency_violations()
-    assert inherited_runtime_owner_violations <= KNOWN_ALLOWED_VIOLATIONS
+    assert inherited_runtime_owner_violations.isdisjoint(_dependency_violations())
+    assert inherited_runtime_owner_violations.isdisjoint(KNOWN_ALLOWED_VIOLATIONS)
 
 
 def test_gate1_existing_replacement_private_shims_are_removed() -> None:
@@ -1769,9 +1758,9 @@ def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
     assert occurrences == set()
 
 
-def test_a02_openrouter_settings_boundary_reduces_dependency_debt_to_24() -> None:
-    assert len(KNOWN_ALLOWED_VIOLATIONS) == 24
-    assert len(_dependency_violations()) == 24
+def test_a03_runtime_port_boundaries_reduce_dependency_debt_to_22() -> None:
+    assert len(KNOWN_ALLOWED_VIOLATIONS) == 22
+    assert len(_dependency_violations()) == 22
 
 
 def test_r00_canonical_migration_loader_has_no_flat_ingress() -> None:
