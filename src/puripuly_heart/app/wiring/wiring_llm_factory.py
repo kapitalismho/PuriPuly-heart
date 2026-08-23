@@ -65,6 +65,7 @@ from puripuly_heart.core.llm.fallback_racing import LLMProviderAttempt
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
 from puripuly_heart.core.local_translation.devices import resolve_llama_vulkan_device
 from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_ENV,
     OPENROUTER_BYOK_API_KEY_SECRET,
@@ -72,7 +73,6 @@ from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     load_managed_openrouter_user_identifier,
 )
-from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.domain.models import Translation
@@ -528,7 +528,7 @@ def _openrouter_provider_from_resolved_config(
     secrets: SecretStore,
     managed_release_service: object | None,
     managed_delegate_ready: Callable[[], object] | None,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     compatibility_settings: AppSettings | None,
     force_managed_wrapper: bool = False,
     include_selection_alias: bool = True,
@@ -551,7 +551,7 @@ def _openrouter_provider_from_resolved_target(
     secrets: SecretStore,
     managed_release_service: object | None,
     managed_delegate_ready: Callable[[], object] | None,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     compatibility_settings: AppSettings | None,
     force_managed_wrapper: bool = False,
     include_selection_alias: bool = True,
@@ -584,7 +584,7 @@ def _openrouter_provider_from_resolved_fields(
     secrets: SecretStore,
     managed_release_service: object | None,
     managed_delegate_ready: Callable[[], object] | None,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     compatibility_settings: AppSettings | None,
     force_managed_wrapper: bool = False,
     include_selection_alias: bool = True,
@@ -674,7 +674,7 @@ def _provider_from_resolved_target(
     secrets: SecretStore,
     managed_release_service: object | None,
     managed_delegate_ready: Callable[[], object] | None,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     compatibility_settings: AppSettings | None,
     managed_gemma_runtime: ManagedGemmaRuntimeOwner | None,
     managed_gemma_release: Callable[[], Awaitable[None]] | None,
@@ -759,7 +759,6 @@ def _provider_from_resolved_target(
             model=target.model,
             extra_body=_resolved_option_mapping(target.provider_options, "extra_body"),
             api_key=api_key,
-            runtime_logging=runtime_logging,
         )
 
     raise ValueError(f"Unsupported LLM provider: {target.provider}")
@@ -771,7 +770,7 @@ def _base_llm_provider_from_resolved_config(
     secrets: SecretStore,
     managed_release_service: object | None,
     managed_delegate_ready: Callable[[], object] | None,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     compatibility_settings: AppSettings | None,
     managed_gemma_runtime: ManagedGemmaRuntimeOwner | None,
     managed_gemma_release: Callable[[], Awaitable[None]] | None,
@@ -814,7 +813,7 @@ def create_llm_provider_from_resolved_config(
     secrets: SecretStore,
     managed_release_service: object | None = None,
     managed_delegate_ready: Callable[[], object] | None = None,
-    runtime_logging: SessionRuntimeLoggingService | None = None,
+    runtime_logging: ProviderObservationPort | None = None,
     compatibility_settings: AppSettings | None = None,
     managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
     managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
@@ -891,7 +890,7 @@ def create_llm_provider(
     secrets: SecretStore,
     managed_release_service: object | None = None,
     managed_delegate_ready: Callable[[], object] | None = None,
-    runtime_logging: SessionRuntimeLoggingService | None = None,
+    runtime_logging: ProviderObservationPort | None = None,
     managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
     managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
 ) -> LLMProvider:

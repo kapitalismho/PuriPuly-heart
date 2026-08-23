@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from puripuly_heart.app import wiring_llm_factory as _llm_factory
@@ -12,11 +12,15 @@ from puripuly_heart.app.adapters.sync_secret_store import (
 )
 from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
 from puripuly_heart.app.ports.secret_store import SecretStorePort
+from puripuly_heart.config.resolved import ResolvedLLMConfig
 from puripuly_heart.config.runtime_resolution import resolve_llm_config
+from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
     HuggingFaceXetDownloadAdapter,
 )
+from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter_credentials import load_managed_openrouter_user_identifier
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
@@ -38,6 +42,7 @@ from puripuly_heart.core.runtime.self_capture import (
     SelfCaptureVadFactory,
 )
 from puripuly_heart.core.self_capture import SelfCaptureAdmissionPort
+from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 from .wiring_composition import (
@@ -187,19 +192,54 @@ _cerebras_api_key_for_resolved_credential = _llm_factory._cerebras_api_key_for_r
 _qwen_api_key_for_resolved_credential = _llm_factory._qwen_api_key_for_resolved_credential
 
 
-def create_llm_provider_from_resolved_config(*args, **kwargs):
+def create_llm_provider_from_resolved_config(
+    config: ResolvedLLMConfig,
+    *,
+    secrets: SecretStore,
+    managed_release_service: object | None = None,
+    managed_delegate_ready: Callable[[], object] | None = None,
+    runtime_logging: ProviderObservationPort | None = None,
+    compatibility_settings: _llm_factory.AppSettings | None = None,
+    managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
+    managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
+    qwen_low_latency_mode: bool = True,
+) -> LLMProvider:
     _llm_factory.load_managed_openrouter_user_identifier = load_managed_openrouter_user_identifier
-    return _llm_factory.create_llm_provider_from_resolved_config(*args, **kwargs)
+    return _llm_factory.create_llm_provider_from_resolved_config(
+        config,
+        secrets=secrets,
+        managed_release_service=managed_release_service,
+        managed_delegate_ready=managed_delegate_ready,
+        runtime_logging=runtime_logging,
+        compatibility_settings=compatibility_settings,
+        managed_gemma_runtime=managed_gemma_runtime,
+        managed_gemma_release=managed_gemma_release,
+        qwen_low_latency_mode=qwen_low_latency_mode,
+    )
 
 
-def create_llm_provider(settings, **kwargs):
+def create_llm_provider(
+    settings: _llm_factory.AppSettings,
+    *,
+    secrets: SecretStore,
+    managed_release_service: object | None = None,
+    managed_delegate_ready: Callable[[], object] | None = None,
+    runtime_logging: ProviderObservationPort | None = None,
+    managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
+    managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
+) -> LLMProvider:
     runtime_input = _llm_factory._runtime_resolution_input_from_compatibility_settings(settings)
     resolved = resolve_llm_config(runtime_input)
     return create_llm_provider_from_resolved_config(
         resolved,
+        secrets=secrets,
+        managed_release_service=managed_release_service,
+        managed_delegate_ready=managed_delegate_ready,
+        runtime_logging=runtime_logging,
         compatibility_settings=settings,
+        managed_gemma_runtime=managed_gemma_runtime,
+        managed_gemma_release=managed_gemma_release,
         qwen_low_latency_mode=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
-        **kwargs,
     )
 
 

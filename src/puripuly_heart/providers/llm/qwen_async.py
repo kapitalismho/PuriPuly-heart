@@ -10,7 +10,7 @@ from uuid import UUID
 import httpx
 
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
-from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
@@ -20,7 +20,7 @@ _QWEN_PROBE_MODEL = "qwen3.5-plus"
 
 def _log_basic_request(
     *,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     text: str,
     source_language: str,
@@ -41,7 +41,7 @@ def _log_basic_request(
 
 
 def _log_basic_response(
-    *, runtime_logging: SessionRuntimeLoggingService | None, operation: str, text: str
+    *, runtime_logging: ProviderObservationPort | None, operation: str, text: str
 ) -> None:
     message = "[Basic][LLM] Qwen response [%s]: %r" % (operation, text)
     if runtime_logging is not None:
@@ -52,7 +52,7 @@ def _log_basic_response(
 
 def _log_basic_request_failure(
     *,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     status: int,
     message: str,
@@ -154,7 +154,7 @@ class AsyncQwenLLMProvider:
     base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     model: str = "qwen3.5-plus"
     timeout: float = 30.0
-    runtime_logging: SessionRuntimeLoggingService | None = None
+    runtime_logging: ProviderObservationPort | None = None
     client: AsyncQwenClient | None = None
     _internal_client: AsyncQwenClient | None = field(init=False, default=None, repr=False)
 
@@ -236,7 +236,7 @@ class HttpxQwenClient:
     model: str
     base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     timeout: float = 30.0
-    runtime_logging: SessionRuntimeLoggingService | None = None
+    runtime_logging: ProviderObservationPort | None = None
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _client_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
 

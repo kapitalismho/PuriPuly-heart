@@ -376,58 +376,10 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
         ),
         ImportViolation(
             rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/deepseek.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="providers",
-            imported_layer="adapters",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/gemini.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="providers",
-            imported_layer="adapters",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/local_openai.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="providers",
-            imported_layer="adapters",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
             importer="src/puripuly_heart/providers/llm/openrouter.py",
             imported="puripuly_heart.config.settings",
             importer_layer="providers",
             imported_layer="migration/serialization",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/openrouter.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="providers",
-            imported_layer="adapters",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/qwen.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="providers",
-            imported_layer="adapters",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/qwen_async.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="providers",
-            imported_layer="adapters",
             reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
         ),
         ImportViolation(
@@ -1818,8 +1770,11 @@ def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
     }
 
     assert occurrences == set()
-    assert len(KNOWN_ALLOWED_VIOLATIONS) == 31
-    assert len(_dependency_violations()) == 31
+
+
+def test_a01_provider_observation_boundary_reduces_dependency_debt_to_25() -> None:
+    assert len(KNOWN_ALLOWED_VIOLATIONS) == 25
+    assert len(_dependency_violations()) == 25
 
 
 def test_r00_canonical_migration_loader_has_no_flat_ingress() -> None:

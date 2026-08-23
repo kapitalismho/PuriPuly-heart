@@ -37,6 +37,7 @@ from puripuly_heart.core.orchestrator.context import ContextResolver
 from puripuly_heart.core.orchestrator.peer_translation_channel import (
     PeerTranslationChannelOwner,
 )
+from puripuly_heart.core.orchestrator.ports import TranslationRuntimeLoggingPort
 from puripuly_heart.core.orchestrator.self_translation_channel import (
     SelfTranslationChannelOwner,
 )
@@ -481,7 +482,7 @@ class RuntimePipelineHandle:
 class RuntimePipelineLauncher:
     config_path: Path
     clock: Clock
-    runtime_logging: object
+    runtime_logging: TranslationRuntimeLoggingPort
     managed_release: ManagedOpenRouterReleaseRuntime
     managed_delegate_ready: Callable[[], None]
     local_asr_factory: Callable[
@@ -603,7 +604,7 @@ async def compose_runtime_pipeline(
     settings: AppSettings,
     config_path: Path,
     clock: Clock,
-    runtime_logging: object,
+    runtime_logging: TranslationRuntimeLoggingPort,
     managed_release: ManagedOpenRouterReleaseRuntime,
     managed_delegate_ready: Callable[[], None],
     local_asr_factory: Callable[
@@ -674,7 +675,7 @@ async def _compose_runtime_pipeline(
     settings: AppSettings,
     config_path: Path,
     clock: Clock,
-    runtime_logging: object,
+    runtime_logging: TranslationRuntimeLoggingPort,
     managed_release: ManagedOpenRouterReleaseRuntime,
     managed_delegate_ready: Callable[[], None],
     managed_gemma: ManagedGemmaTranslationOwner | None,

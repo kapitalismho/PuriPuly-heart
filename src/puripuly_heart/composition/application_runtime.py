@@ -1619,7 +1619,7 @@ def compose_application_runtime(
         gpu_recovery=recover_gpu,
         managed_release=managed_release,
         managed_delegate_ready=managed_delegate_ready,
-        runtime_logging=runtime_logging.service,
+        runtime_logging=runtime_logging,
         translation_needs_key_sink=(presentation.set_dashboard_translation_needs_key),
         usage_refresh=refresh_managed_usage,
         failure_sink=log_error,
@@ -1717,7 +1717,7 @@ def compose_application_runtime(
     pipeline_launcher = RuntimePipelineLauncher(
         config_path=config_path,
         clock=clock,
-        runtime_logging=runtime_logging.service,
+        runtime_logging=runtime_logging,
         managed_release=managed_account.release,
         managed_delegate_ready=managed_delegate_ready,
         local_asr_factory=build_local_asr_factory,

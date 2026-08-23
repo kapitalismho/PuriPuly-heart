@@ -8,6 +8,7 @@ from puripuly_heart.core.http_extensions import (
     HttpExtensionRegistry,
 )
 from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackend
 from puripuly_heart.providers.extensions.http_extension_backend import (
@@ -22,7 +23,7 @@ def create_translation_backend(
     http_extensions: HttpExtensionRegistry,
     managed_release_service: object | None = None,
     managed_delegate_ready: Callable[[], object] | None = None,
-    runtime_logging: object | None = None,
+    runtime_logging: ProviderObservationPort | None = None,
     managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
     managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
 ) -> TranslationBackend:

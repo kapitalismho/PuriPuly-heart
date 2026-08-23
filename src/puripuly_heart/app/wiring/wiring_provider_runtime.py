@@ -28,6 +28,7 @@ from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
 )
@@ -296,7 +297,7 @@ def compose_provider_runtime(
     gpu_recovery: Callable[[AppSettings, ProviderRuntimeApplyPlan], Awaitable[None]],
     managed_release: Callable[[], ManagedOpenRouterReleaseRuntime],
     managed_delegate_ready: Callable[[], None],
-    runtime_logging: object,
+    runtime_logging: ProviderObservationPort,
     translation_needs_key_sink: Callable[[bool], None],
     usage_refresh: Callable[[], Awaitable[None]],
     failure_sink: Callable[[str], None],

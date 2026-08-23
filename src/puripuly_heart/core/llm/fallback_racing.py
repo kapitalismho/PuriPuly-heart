@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from puripuly_heart.core.llm.provider import LLMProvider
-from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.domain.models import Translation
 
@@ -61,7 +61,7 @@ class FallbackRacingLLMProvider(LLMProvider):
     attempts: tuple[LLMProviderAttempt, ...] = ()
     clock: Callable[[], float] = time.monotonic
     sleeper: Callable[[float], Awaitable[None]] | None = None
-    runtime_logging: SessionRuntimeLoggingService | None = None
+    runtime_logging: ProviderObservationPort | None = None
     _inflight_tasks: set[asyncio.Task[object]] = field(
         init=False,
         default_factory=set,

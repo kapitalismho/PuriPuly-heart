@@ -2,11 +2,21 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import get_type_hints
 
 import pytest
 
 from puripuly_heart.app.wiring import wiring_translation_backend as wiring_module
+from puripuly_heart.app.wiring.root import (
+    create_llm_provider as create_exported_llm_provider,
+)
+from puripuly_heart.app.wiring.root import (
+    create_llm_provider_from_resolved_config as create_exported_llm_provider_from_resolved_config,
+)
+from puripuly_heart.app.wiring.wiring_llm_factory import create_llm_provider
+from puripuly_heart.app.wiring.wiring_provider_runtime import compose_provider_runtime
 from puripuly_heart.app.wiring.wiring_provider_runtime_policy import build_llm_provider_signature
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import compose_runtime_pipeline
 from puripuly_heart.app.wiring.wiring_translation_backend import create_translation_backend
 from puripuly_heart.config.settings import (
     AppSettings,
@@ -15,6 +25,8 @@ from puripuly_heart.config.settings import (
     TranslationSettings,
 )
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
+from puripuly_heart.core.observability import ProviderObservationPort
+from puripuly_heart.core.orchestrator.ports import TranslationRuntimeLoggingPort
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.translation_backend import LlmTranslationBackend
 from puripuly_heart.providers.extensions.http_extension_backend import (
@@ -114,6 +126,26 @@ def test_llm_factory_path_remains_delegated(monkeypatch: pytest.MonkeyPatch) -> 
     assert isinstance(result, LlmTranslationBackend)
     assert result.provider is expected
     assert calls == [settings]
+
+
+def test_provider_observation_capability_is_typed_through_production_composition() -> None:
+    provider_observation = ProviderObservationPort | None
+
+    assert get_type_hints(create_llm_provider)["runtime_logging"] == provider_observation
+    assert (
+        get_type_hints(create_exported_llm_provider)["runtime_logging"]
+        == provider_observation
+    )
+    assert (
+        get_type_hints(create_exported_llm_provider_from_resolved_config)["runtime_logging"]
+        == provider_observation
+    )
+    assert get_type_hints(create_translation_backend)["runtime_logging"] == provider_observation
+    assert get_type_hints(compose_provider_runtime)["runtime_logging"] is ProviderObservationPort
+    assert (
+        get_type_hints(compose_runtime_pipeline)["runtime_logging"]
+        is TranslationRuntimeLoggingPort
+    )
 
 
 def test_custom_http_definition_fingerprint_rebuilds_runtime_signature(tmp_path: Path) -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -146,6 +147,10 @@ class ProviderObservationSink(Protocol):
     ) -> None: ...
 
 
+class ProviderObservationPort(Protocol):
+    def emit_basic(self, message: str, *, level: int = logging.INFO) -> None: ...
+
+
 class ConversationRecordSink(Protocol):
     async def record_conversation(self, record: ConversationRecord) -> None: ...
 
@@ -171,6 +176,7 @@ __all__ = [
     "PersistedDiagnosticRecord",
     "PersistedDiagnosticStore",
     "ProviderObservationEvent",
+    "ProviderObservationPort",
     "ProviderObservationOutcome",
     "ProviderObservationSink",
     "RuntimeLogEvent",
