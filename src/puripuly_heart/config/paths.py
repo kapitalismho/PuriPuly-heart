@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 
 STABLE_APP_DIR_NAME = "puripuly-heart"
-VNEXT_APP_DIR_NAME = "puripuly-heart-vnext"
 APP_DIR_NAME = STABLE_APP_DIR_NAME
 SETTINGS_FILENAME = "settings.json"
 VAD_MODEL_FILENAME = "silero_vad.onnx"
@@ -31,14 +30,6 @@ def user_config_dir(*, app_dir_name: str = APP_DIR_NAME) -> Path:
 
 def default_settings_path() -> Path:
     return user_config_dir() / SETTINGS_FILENAME
-
-
-def stable_settings_path() -> Path:
-    return user_config_dir(app_dir_name=STABLE_APP_DIR_NAME) / SETTINGS_FILENAME
-
-
-def vnext_settings_path() -> Path:
-    return user_config_dir(app_dir_name=VNEXT_APP_DIR_NAME) / SETTINGS_FILENAME
 
 
 def default_vad_model_path() -> Path:

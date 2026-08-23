@@ -362,7 +362,6 @@ def compose_application_runtime(
     *,
     presentation: UiPresentationPort,
     config_path: Path,
-    allow_stable_settings_import: bool = False,
     runtime_logging_sinks: RuntimeLoggingSinks | None = None,
     vrchat_osc_presence: VrchatOscPresencePort | None = None,
     local_asr_evidence_sink: (
@@ -1803,8 +1802,6 @@ def compose_application_runtime(
             settings=settings,
             settings_loader=lambda: load_application_settings(
                 settings=settings,
-                config_path=config_path,
-                allow_stable_settings_import=allow_stable_settings_import,
             ),
             provisioning=require_provisioning(),
             gpu_state=gpu_state,
@@ -1974,8 +1971,6 @@ def compose_application_runtime(
                 config_path=config_path,
                 settings_loader=lambda: load_application_settings(
                     settings=settings,
-                    config_path=config_path,
-                    allow_stable_settings_import=allow_stable_settings_import,
                 ),
                 runtime_initializer=initialize_local_asr_evidence,
                 components_provider=lambda: pipeline.current,

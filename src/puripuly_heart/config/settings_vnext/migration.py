@@ -630,6 +630,7 @@ def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
         raise ValueError("settings must be a JSON object")
     if is_vnext_settings_dict(data):
         _validate_vnext_top_level_shape(data)
+        _validate_supported_vnext_version(data)
         return with_translation_runtime_policy(
             serialization.from_dict(_prepare_vnext_migration_dict(data))
         )
@@ -1025,6 +1026,14 @@ def _validate_vnext_top_level_shape(data: Mapping[str, Any]) -> None:
             raise ValueError(f"vNext settings missing required top-level {section!r} object")
         if not isinstance(data[section], Mapping):
             raise ValueError(f"vNext settings top-level {section!r} must be a JSON object")
+
+
+def _validate_supported_vnext_version(data: Mapping[str, Any]) -> None:
+    version = data.get("settings_version")
+    if type(version) is not int or version < 1:
+        raise ValueError("canonical settings_version must be a positive integer")
+    if version > VNEXT_SETTINGS_SCHEMA_VERSION:
+        raise ValueError(f"unsupported canonical settings_version: {version}")
 
 
 def _provider_verification_state(

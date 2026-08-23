@@ -42,7 +42,6 @@ class UiApplicationFactoryPort(Protocol):
         *,
         presentation: UiPresentationPort,
         config_path: Path,
-        allow_stable_settings_import: bool = False,
         runtime_logging_sinks: object | None = None,
         vrchat_osc_presence: VrchatOscPresencePort | None = None,
     ) -> UiApplicationPort: ...

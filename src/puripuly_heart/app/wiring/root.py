@@ -76,7 +76,6 @@ from .wiring_managed_auth_factory import (
 from .wiring_overlay_factory import resolve_overlay_config
 from .wiring_secrets_factory import (
     SECRETS_PASSPHRASE_ENV,
-    copy_stable_secrets_to_vnext_namespace,
     create_secret_store,
     require_secret,
     require_secret_any,
@@ -261,7 +260,6 @@ __all__ = (
     "create_self_capture_vad_adapter",
     "create_self_capture_vad_sink_adapter",
     "create_sync_secret_store_adapter",
-    "copy_stable_secrets_to_vnext_namespace",
     "create_stt_backend",
     "create_stt_backend_from_resolved_config",
     "require_secret",

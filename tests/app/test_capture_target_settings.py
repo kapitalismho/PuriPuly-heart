@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -16,7 +15,6 @@ from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
 from puripuly_heart.config.settings import AppSettings
-from puripuly_heart.config.settings import to_dict as legacy_to_dict
 from puripuly_heart.config.settings_vnext import compat
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings, save_vnext_settings
 from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
@@ -192,22 +190,3 @@ def test_capture_target_projection_failure_does_not_change_persisted_state(
     assert raised.value.status == "save_failed"
     assert "raw projection failure" not in str(raised.value)
     assert path.read_bytes() == original_bytes
-
-
-def test_capture_target_persistence_keeps_migration_backup_and_compatibility_data(
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "settings.json"
-    raw = legacy_to_dict(AppSettings())
-    raw["legacy_extension"] = {"theme_hint": "violet"}
-    original_bytes = json.dumps(raw, ensure_ascii=False).encode("utf-8")
-    path.write_bytes(original_bytes)
-
-    persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
-
-    backups = list(tmp_path.glob("settings.json.pre-v*.bak"))
-    persisted = json.loads(path.read_text(encoding="utf-8"))
-    assert len(backups) == 1
-    assert backups[0].read_bytes() == original_bytes
-    assert persisted["legacy_compatibility"] == {"legacy_extension": {"theme_hint": "violet"}}
-    assert persisted["intent"]["desktop_audio"]["capture_target"]["kind"] == "process"

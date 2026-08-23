@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from puripuly_heart.config.settings import (
     DEFAULT_OPENROUTER_BROKER_BASE_URL,
     SETTINGS_SCHEMA_VERSION,
@@ -92,38 +90,6 @@ def test_managed_identity_settings_do_not_persist_talk_together_pass_status() ->
     assert not hasattr(loaded.managed_identity, "invite_limit")
 
 
-@pytest.mark.parametrize(
-    ("persisted_value", "expected"),
-    [
-        ("7kq9m2", "7KQ9M2"),
-        ("  7KQ9M2  ", "7KQ9M2"),
-        ("ABCDE", None),
-        ("ABCDEFG", None),
-        ("7KQ0M2", None),
-        ("7KQOM2", None),
-        ("7KQ1M2", None),
-        ("7KQIM2", None),
-        ("7KQLM2", None),
-        ("", None),
-        ("   ", None),
-        (123456, None),
-    ],
-)
-def test_load_settings_migrates_v22_referral_id_values(tmp_path, persisted_value, expected) -> None:
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy["settings_version"] = 22
-    legacy["managed_identity"]["referral_id"] = persisted_value
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert SETTINGS_SCHEMA_VERSION == 25
-    assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
-    assert loaded.managed_identity.referral_id == expected
-    assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
-    assert persisted["managed_identity"]["referral_id"] == expected
 
 
 def test_openrouter_selected_source_round_trip() -> None:

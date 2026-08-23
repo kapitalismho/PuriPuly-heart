@@ -165,7 +165,6 @@ class TranslatorApp:
         config_path,
         application_factory: UiApplicationFactoryPort,
         debug_ui_preview: bool = False,
-        allow_stable_settings_import: bool = False,
         runtime_logging_sinks=None,
         vrchat_osc_presence=None,
     ):
@@ -174,7 +173,6 @@ class TranslatorApp:
         application = application_factory(
             presentation=self._presentation_adapter,
             config_path=config_path,
-            allow_stable_settings_import=allow_stable_settings_import,
             runtime_logging_sinks=runtime_logging_sinks,
             vrchat_osc_presence=vrchat_osc_presence,
         )
@@ -2032,7 +2030,6 @@ async def main_gui(
     config_path,
     application_factory: UiApplicationFactoryPort,
     debug_ui_preview: bool = False,
-    allow_stable_settings_import: bool = False,
     runtime_logging_sinks=None,
     vrchat_osc_presence=None,
 ):
@@ -2041,7 +2038,6 @@ async def main_gui(
         config_path=config_path,
         application_factory=application_factory,
         debug_ui_preview=debug_ui_preview,
-        allow_stable_settings_import=allow_stable_settings_import,
         runtime_logging_sinks=runtime_logging_sinks,
         vrchat_osc_presence=vrchat_osc_presence,
     )

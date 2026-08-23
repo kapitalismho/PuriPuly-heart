@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -1275,9 +1276,9 @@ def test_canonical_settings_persistence_composition_uses_only_public_settings_ty
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
-    assert imports["puripuly_heart.config.settings"] == {
-        "AppSettings",
-        "new_settings_for_first_run",
+    assert imports["puripuly_heart.config.settings"] == {"AppSettings"}
+    assert imports["puripuly_heart.config.settings_vnext.defaults"] == {
+        "new_settings_for_first_run"
     }
     assert imports["puripuly_heart.config.settings_vnext.schema"] == {
         "AppSettingsVNext",
@@ -1316,7 +1317,6 @@ def test_capture_target_compatibility_service_delegates_to_settings_owner() -> N
 def test_settings_persistence_calls_are_confined_to_owner_mechanics() -> None:
     allowed_paths = {
         "app/adapters/settings_vnext_canonical_persistence.py",
-        "config/profile_bootstrap.py",
         "config/settings_vnext/compat.py",
         "config/settings_vnext/facade.py",
     }
@@ -1352,18 +1352,7 @@ def test_settings_persistence_calls_are_confined_to_owner_mechanics() -> None:
         for node in ast.walk(main_tree)
     )
 
-    owner_path = SOURCE_PACKAGE_ROOT / "app" / "services" / "canonical_settings_persistence.py"
-    owner_tree = ast.parse(owner_path.read_text(encoding="utf-8"))
-    assert (
-        sum(
-            1
-            for node in ast.walk(owner_tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "import_stable_settings_if_missing"
-        )
-        == 1
-    )
+    assert not (SOURCE_PACKAGE_ROOT / "config" / "profile_bootstrap.py").exists()
 
 
 def test_internal_source_imports_canonical_overlay_calibration_not_ui_facade() -> None:
@@ -1755,6 +1744,76 @@ def test_dependency_boundary_allowlist_matches_current_violations() -> None:
         "Stale allowlist entries:\n"
         f"{_format_violations(stale)}"
     )
+
+
+def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -> None:
+    census_path = REPO_ROOT / "tests" / "architecture" / "settings_legacy_reachability_r00.json"
+    census = json.loads(census_path.read_text(encoding="utf-8"))
+    entries = census["entries"]
+    assert census["baseline_sha"] == "a4aeacccf17194bbf607266f037d16e680234eef"
+    assert len(entries) == 39
+    assert len({entry["path"] for entry in entries}) == 39
+    assert all(entry["symbols"] and entry["classifications"] and entry["owners"] for entry in entries)
+    assert {
+        classification
+        for entry in entries
+        for classification in entry["classifications"]
+    } <= {
+        "flat persistence ingress",
+        "runtime AppSettings projection/mutation",
+        "pure enum/constant/value misplaced in settings.py",
+        "first-run/default policy",
+        "test-only compatibility",
+        "proven external compatibility",
+    }
+    assert {owner for entry in entries for owner in entry["owners"]} <= {
+        "R00",
+        "A02",
+        "A04",
+        "A06",
+        "A07",
+        "A08",
+        "A09",
+        "A10",
+    }
+
+    expected_current = {entry["path"]: set(entry["symbols"]) for entry in entries}
+    expected_current.pop("src/puripuly_heart/main.py")
+    expected_current["src/puripuly_heart/app/services/canonical_settings_persistence.py"] = {
+        "AppSettings"
+    }
+    actual_current: dict[str, set[str]] = {}
+    for source_path in SOURCE_PACKAGE_ROOT.rglob("*.py"):
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        symbols = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom)
+            and node.module == "puripuly_heart.config.settings"
+            for alias in node.names
+        }
+        if symbols:
+            actual_current[_relative_repo_path(source_path)] = symbols
+
+    assert actual_current == expected_current
+
+
+def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
+    forbidden = {
+        "allow_stable_settings_import",
+        "copy_stable_secrets_to_vnext_namespace",
+        "import_stable_settings_if_missing",
+    }
+    occurrences = {
+        (path.relative_to(REPO_ROOT).as_posix(), symbol)
+        for path in SOURCE_PACKAGE_ROOT.rglob("*.py")
+        for symbol in forbidden
+        if symbol in path.read_text(encoding="utf-8")
+    }
+
+    assert occurrences == set()
+    assert len(KNOWN_ALLOWED_VIOLATIONS) == 31
+    assert len(_dependency_violations()) == 31
 
 
 def test_dependency_boundary_allowlist_entries_have_gate6_rationale() -> None:

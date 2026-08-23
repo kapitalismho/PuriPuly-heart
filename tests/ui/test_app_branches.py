@@ -476,12 +476,10 @@ def _construction_application_factory(
     *,
     presentation,
     config_path,
-    allow_stable_settings_import=False,
     runtime_logging_sinks=None,
     vrchat_osc_presence=None,
 ):
     _ = (
-        allow_stable_settings_import,
         runtime_logging_sinks,
         vrchat_osc_presence,
     )
@@ -652,12 +650,10 @@ async def test_main_gui_constructs_the_real_application_and_presentation_boundar
         *,
         presentation,
         config_path,
-        allow_stable_settings_import=False,
         runtime_logging_sinks=None,
         vrchat_osc_presence=None,
     ):
         _ = (
-            allow_stable_settings_import,
             runtime_logging_sinks,
             vrchat_osc_presence,
         )
@@ -1285,12 +1281,10 @@ def test_translator_app_keeps_debug_ui_preview_out_of_controller(
         *,
         presentation,
         config_path,
-        allow_stable_settings_import=False,
         runtime_logging_sinks=None,
         vrchat_osc_presence=None,
     ):
         _ = (
-            allow_stable_settings_import,
             runtime_logging_sinks,
             vrchat_osc_presence,
         )
@@ -1427,12 +1421,10 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
         *,
         presentation,
         config_path,
-        allow_stable_settings_import=False,
         runtime_logging_sinks=None,
         vrchat_osc_presence=None,
     ):
         _ = (
-            allow_stable_settings_import,
             runtime_logging_sinks,
             vrchat_osc_presence,
         )
@@ -1553,7 +1545,6 @@ def _make_fake_main_gui_app(seen: dict[str, object]) -> type:
             config_path,
             application_factory,
             debug_ui_preview=False,
-            allow_stable_settings_import=False,
             runtime_logging_sinks=None,
             vrchat_osc_presence=None,
         ):
@@ -1562,7 +1553,6 @@ def _make_fake_main_gui_app(seen: dict[str, object]) -> type:
             self.page = incoming_page
             _ = (
                 application_factory,
-                allow_stable_settings_import,
                 runtime_logging_sinks,
                 vrchat_osc_presence,
             )
@@ -4411,7 +4401,6 @@ async def test_main_gui_registers_awaited_idempotent_page_lifecycle_handler(
         config_path,
         application_factory,
         debug_ui_preview=False,
-        allow_stable_settings_import=False,
         runtime_logging_sinks=None,
         vrchat_osc_presence=None,
     ) -> None:
@@ -4419,7 +4408,6 @@ async def test_main_gui_registers_awaited_idempotent_page_lifecycle_handler(
             config_path,
             application_factory,
             debug_ui_preview,
-            allow_stable_settings_import,
             runtime_logging_sinks,
             vrchat_osc_presence,
         )

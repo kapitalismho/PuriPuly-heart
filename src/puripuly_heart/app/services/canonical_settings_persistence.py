@@ -26,8 +26,8 @@ from puripuly_heart.app.services.provider_runtime_apply import (
 from puripuly_heart.app.services.settings_mutation_legacy import (
     _apply_settings_path_patch,
 )
-from puripuly_heart.config.profile_bootstrap import import_stable_settings_if_missing
-from puripuly_heart.config.settings import AppSettings, new_settings_for_first_run
+from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.defaults import new_settings_for_first_run
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     CaptureTargetIntent,
@@ -216,9 +216,6 @@ class SettingsOwnerStartResult:
     settings: AppSettings
     migrated: bool
     backup_path: Path | None
-    stable_source_path: Path | None = None
-    stable_source_settings: AppSettingsVNext | None = None
-    imported_settings: AppSettingsVNext | None = None
 
 
 @dataclass(slots=True)
@@ -237,30 +234,13 @@ class SettingsOwner:
     _rollback_pending: bool = False
     _mutation_depth: int = 0
 
-    def start(self, *, allow_stable_settings_import: bool = False) -> SettingsOwnerStartResult:
-        stable_source_path: Path | None = None
-        stable_source_settings: AppSettingsVNext | None = None
-        imported_settings: AppSettingsVNext | None = None
-        if not self.path.exists() and allow_stable_settings_import:
-            imported = import_stable_settings_if_missing(self.path)
-            if imported.error is not None:
-                raise RuntimeError(
-                    "failed to import stable settings into vNext profile: "
-                    f"{imported.error.message}"
-                )
-            if imported.imported and imported.settings is not None:
-                stable_source_path = imported.source_path
-                stable_source_settings = imported.source_settings
-                imported_settings = imported.settings
+    def start(self) -> SettingsOwnerStartResult:
         if not self.path.exists():
-            settings = new_settings_for_first_run()
-            self.canonical = self.persistence.project(
-                settings,
-                canonical=None,
-                authoritative=False,
-            )
+            self.canonical = new_settings_for_first_run()
             self.persistence.persist(self.path, self.canonical)
-            self.current = self.persistence.compatibility_projection(self.canonical)
+            loaded = self.persistence.load_active(self.path)
+            self.canonical = loaded.canonical_settings
+            self.current = loaded.compatibility_settings
             return SettingsOwnerStartResult(
                 settings=self.current,
                 migrated=False,
@@ -273,9 +253,6 @@ class SettingsOwner:
             settings=self.current,
             migrated=loaded.migrated,
             backup_path=loaded.backup_path,
-            stable_source_path=stable_source_path,
-            stable_source_settings=stable_source_settings,
-            imported_settings=imported_settings,
         )
 
     def persist(self) -> None:
