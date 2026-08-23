@@ -49,6 +49,40 @@ async def test_translation_model_control_materializes_provider_and_connection() 
 
 
 @pytest.mark.asyncio
+async def test_managed_local_models_control_materializes_provider_and_connection() -> None:
+    current = AppSettings()
+    current.translation.connection = TranslationConnection.MANAGED
+    applied: list[AppSettings] = []
+
+    async def apply_settings(settings: object) -> object:
+        nonlocal current
+        assert isinstance(settings, AppSettings)
+        applied.append(settings)
+        current = settings
+        return settings
+
+    application = SettingsBackedOscControlApplication(
+        settings_provider=lambda: current,
+        apply_settings=apply_settings,
+        translation_model_normalizer=materialize_translation_settings,
+    )
+
+    await application.set_translation_model(TranslationModel.MANAGED_GEMMA.value)
+
+    updated = applied[0]
+    assert updated.translation.model == TranslationModel.MANAGED_GEMMA
+    assert updated.translation.connection == TranslationConnection.CPU
+    assert updated.provider.llm == LLMProviderName.MANAGED_GEMMA
+
+    await application.set_translation_model(TranslationModel.MANAGED_GEMMA_12B.value)
+
+    updated = applied[1]
+    assert updated.translation.model == TranslationModel.MANAGED_GEMMA_12B
+    assert updated.translation.connection == TranslationConnection.GPU
+    assert updated.provider.llm == LLMProviderName.MANAGED_GEMMA
+
+
+@pytest.mark.asyncio
 async def test_custom_http_control_preserves_the_previous_llm_selection() -> None:
     current = AppSettings()
     current.translation.model = TranslationModel.DEEPSEEK_V4_FLASH

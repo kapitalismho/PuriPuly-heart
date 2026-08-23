@@ -93,6 +93,8 @@ TRANSLATION_MODEL_IDS: Final[Mapping[int, str]] = MappingProxyType(
         7: "qwen35_plus",
         8: "local_llm",
         9: "custom_http",
+        10: "managed_gemma",
+        11: "managed_gemma_12b",
     }
 )
 

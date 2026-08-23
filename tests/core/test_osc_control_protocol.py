@@ -42,6 +42,13 @@ def test_osc_abi_registries_are_explicit_and_cover_current_languages() -> None:
     assert len(LANGUAGE_IDS) == len(set(LANGUAGE_IDS.values()))
 
 
+def test_translation_model_publish_ids_cover_every_product_model() -> None:
+    from puripuly_heart.app.ports.osc_control import TRANSLATION_MODEL_ID_BY_VALUE
+    from puripuly_heart.config.settings import TranslationModel
+
+    assert {model.value for model in TranslationModel} <= set(TRANSLATION_MODEL_ID_BY_VALUE)
+
+
 def test_codec_validates_absolute_boolean_and_integer_controls() -> None:
     bool_message = decode_control_message("/avatar/parameters/PuriPuly_Talk", True)
     integer_message = decode_control_message("/avatar/parameters/PuriPuly_SelfASR", 5)
@@ -151,6 +158,8 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         7: "qwen35_plus",
         8: "local_llm",
         9: "custom_http",
+        10: "managed_gemma",
+        11: "managed_gemma_12b",
     }
     assert dict(FALLBACK_IDS) == {
         0: "none",

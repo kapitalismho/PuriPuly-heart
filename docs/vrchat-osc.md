@@ -97,10 +97,13 @@
 | 7 | Qwen 3.5 Plus |
 | 8 | OpenAI-compatible API |
 | 9 | Custom HTTP API |
+| 10 | Gemma 4 E4B (On-device) |
+| 11 | Gemma 4 12B (On-device) |
 
 - Used by: `PuriPuly_Translator`
 - Gemma 4 31B on a Cerebras connection is published as ID `1`; select the connection in PuriPuly.
 - ID `9` selects the currently configured custom HTTP API and does not select an individual extension.
+- IDs `10` and `11` select the on-device models managed by PuriPuly; download them in PuriPuly before use.
 
 ### Fallback IDs
 

@@ -170,6 +170,21 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
 
 
 @pytest.mark.asyncio
+async def test_router_routes_on_device_translation_model_ids() -> None:
+    application = FakeApplication()
+    router = OscControlRouter(application)
+
+    assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 10)
+    assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 11)
+
+    assert application.calls == [
+        ("model", "managed_gemma"),
+        ("model", "managed_gemma_12b"),
+    ]
+    await router.close()
+
+
+@pytest.mark.asyncio
 async def test_router_coalesces_superseded_expensive_controls() -> None:
     application = FakeApplication()
     router = OscControlRouter(application)
