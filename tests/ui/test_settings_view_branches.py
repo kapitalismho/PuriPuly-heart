@@ -223,75 +223,38 @@ def test_cpu_auto_option_is_disabled_until_all_models_are_available(
     assert view._peer_stt_option_item(STTProviderName.LOCAL_CPU_AUTO).disabled is False
 
 
-def test_telemetry_card_loads_state_and_modal_allow_decline(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_telemetry_card_loads_state_and_toggles_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     view, _store = _make_settings_view(monkeypatch)
-    page = attach_dummy_page(monkeypatch, view)
+    attach_dummy_page(monkeypatch, view)
     settings = AppSettings()
-    calls: list[str] = []
-    opened: list[tuple[str, list[object], str]] = []
-
-    class CapturingModal:
-        def __init__(self, page_arg, title, options, on_select, *, show_description=False):
-            assert page_arg is page
-            assert title == t("settings.telemetry.modal.title")
-            assert show_description is True
-            self.options = options
-            self.on_select = on_select
-
-        def open(self, current: str) -> None:
-            opened.append((current, list(self.options), current))
-
-    monkeypatch.setattr(settings_view, "SettingsModal", CapturingModal)
-    view.on_telemetry_consent_change = calls.append
+    settings.telemetry_state.last_sent_date_utc = "2026-07-03"
+    calls: list[bool] = []
+    view.on_telemetry_enabled_change = calls.append
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
-    assert view._telemetry_consent_text.content.value == t("settings.telemetry.state.on")
-    view._on_telemetry_consent_click(None)
-    assert opened[0][0] == "allow"
-    assert getattr(view, "_telemetry_consent_card") is not None
-
-    captured_select = []
-
-    class SelectingModal(CapturingModal):
-        def __init__(self, page_arg, title, options, on_select, *, show_description=False):
-            super().__init__(page_arg, title, options, on_select, show_description=show_description)
-            captured_select.append(on_select)
-
-    monkeypatch.setattr(settings_view, "SettingsModal", SelectingModal)
-    view._on_telemetry_consent_click(None)
-    captured_select[-1]("allow")
-    assert calls[-1] == "allow"
-    assert view._settings.telemetry.consent == "allow"
-    assert view._settings.telemetry_state.anonymous_id
-    assert view._telemetry_consent_text.content.value == t("settings.telemetry.state.on")
-    view._settings.telemetry_state.sent_translation_success_dates_utc = ["2026-07-03"]
-    captured_select[-1]("decline")
-    assert calls[-1] == "decline"
-    assert view._settings.telemetry.consent == "decline"
+    assert view._telemetry_enabled_text.content.value == t("settings.telemetry.state.on")
+    view._on_telemetry_enabled_click(None)
+    assert calls[-1] is False
+    assert view._settings.telemetry.enabled is False
     assert view._settings.telemetry_state.anonymous_id is None
-    assert view._settings.telemetry_state.sent_translation_success_dates_utc == []
+    assert view._settings.telemetry_state.last_sent_date_utc is None
+
+    view._on_telemetry_enabled_click(None)
+    assert calls[-1] is True
+    assert view._settings.telemetry.enabled is True
+    assert view._settings.telemetry_state.anonymous_id
 
 
 def test_telemetry_card_uses_callback_instead_of_send(monkeypatch: pytest.MonkeyPatch) -> None:
     view, _store = _make_settings_view(monkeypatch)
     attach_dummy_page(monkeypatch, view)
     view.load_from_settings(AppSettings(), config_path=Path("settings.json"))
-    calls: list[str] = []
-    view.on_telemetry_consent_change = calls.append
+    calls: list[bool] = []
+    view.on_telemetry_enabled_change = calls.append
 
-    monkeypatch.setattr(
-        settings_view,
-        "SettingsModal",
-        lambda _page, _title, _options, on_select, **_kwargs: SimpleNamespace(
-            open=lambda _current: on_select("allow")
-        ),
-    )
+    view._on_telemetry_enabled_click(None)
 
-    view._on_telemetry_consent_click(None)
-
-    assert calls == ["allow"]
+    assert calls == [False]
     assert not hasattr(view, "telemetry_client")
 
 

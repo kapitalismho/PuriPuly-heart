@@ -52,7 +52,7 @@ G14_OWNED_VIEW_SINKS = (
 )
 G15_GENERAL_INTENT_FIELDS = (
     "start_microphone_test",
-    "telemetry_consent_change",
+    "telemetry_enabled_change",
     "list_loopback_capture_options",
     "list_loopback_process_options",
     "list_loopback_device_options",
@@ -76,7 +76,7 @@ G15_OVERLAY_INTENT_FIELDS = (
 G15_OWNED_VIEW_CALLBACKS = (
     "on_prompt_apply_settings",
     "on_start_microphone_test",
-    "on_telemetry_consent_change",
+    "on_telemetry_enabled_change",
     "on_list_loopback_capture_options",
     "on_list_loopback_process_options",
     "on_list_loopback_device_options",

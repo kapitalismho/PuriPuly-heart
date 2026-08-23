@@ -119,9 +119,9 @@ class UiApplicationRuntimeStub:
         prompt = getattr(self._backend, "dashboard_managed_auth_prompt_kind", None)
         return str(prompt()) if callable(prompt) else "discord"
 
-    async def apply_telemetry_consent(self, consent: str) -> object | None:
-        apply = getattr(self._backend, "apply_telemetry_consent", None)
-        return await apply(consent) if callable(apply) else None
+    async def apply_telemetry_enabled(self, enabled: bool) -> object | None:
+        apply = getattr(self._backend, "apply_telemetry_enabled", None)
+        return await apply(enabled) if callable(apply) else None
 
     def reopen_openrouter_pkce_authorization_url(self) -> object:
         reopen = getattr(

@@ -213,7 +213,7 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     )
     general = SettingsGeneralIntents(
         start_microphone_test=make("start_microphone_test"),
-        telemetry_consent_change=make("telemetry_consent_change"),
+        telemetry_enabled_change=make("telemetry_enabled_change"),
         list_loopback_capture_options=make("list_loopback_capture_options"),
         list_loopback_process_options=make("list_loopback_process_options"),
         list_loopback_device_options=make("list_loopback_device_options"),
@@ -254,7 +254,7 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     assert view.on_local_llm_secret_changed is provider.local_llm_secret_changed
     assert view.on_gpu_discovery_requested is provider.gpu_discovery_requested
     assert view.on_start_microphone_test is general.start_microphone_test
-    assert view.on_telemetry_consent_change is general.telemetry_consent_change
+    assert view.on_telemetry_enabled_change is general.telemetry_enabled_change
     assert view.on_list_loopback_capture_options is general.list_loopback_capture_options
     assert view.on_list_loopback_process_options is general.list_loopback_process_options
     assert view.on_list_loopback_device_options is general.list_loopback_device_options
@@ -307,7 +307,7 @@ def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
         ),
         general=SettingsGeneralIntents(
             start_microphone_test=lambda *_a, **_k: None,
-            telemetry_consent_change=lambda *_a, **_k: None,
+            telemetry_enabled_change=lambda *_a, **_k: None,
             list_loopback_capture_options=lambda *_a, **_k: None,
             list_loopback_process_options=lambda *_a, **_k: None,
             list_loopback_device_options=lambda *_a, **_k: None,
@@ -378,7 +378,7 @@ def test_general_surface_preserves_the_accepted_row_order_and_spacing() -> None:
     assert surface.clipboard_row.content.controls == [
         slots.clipboard_auto_translate,
         slots.vrchat_mic_intercept,
-        slots.telemetry_consent,
+        slots.telemetry_enabled,
     ]
     for row in surface.rows:
         assert row.visible is True

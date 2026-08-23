@@ -22,7 +22,7 @@ from puripuly_heart.config.settings_vnext import compat, serialization
 from puripuly_heart.config.settings_vnext.schema import (
     VNEXT_SETTINGS_SCHEMA_VERSION,
     AppSettingsVNext,
-    with_telemetry_consent,
+    with_telemetry_enabled,
 )
 
 LOCAL_PROVIDER_VALUES = (
@@ -74,7 +74,7 @@ def test_target_schema_29_local_qwen_migration_is_backed_up_and_idempotent(
 ) -> None:
     path = tmp_path / "settings.json"
     raw = serialization.to_dict(AppSettingsVNext())
-    assert VNEXT_SETTINGS_SCHEMA_VERSION == 36
+    assert VNEXT_SETTINGS_SCHEMA_VERSION == 37
     raw["settings_version"] = 29
     raw["intent"]["stt"]["provider"] = self_provider
     raw["intent"]["stt"].pop("gpu_device_id")
@@ -150,9 +150,9 @@ def test_current_manual_qwen_selection_and_shared_gpu_device_remain_stable(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "settings.json"
-    default = with_telemetry_consent(
+    default = with_telemetry_enabled(
         AppSettingsVNext(),
-        "allow",
+        True,
         identifier_factory=lambda: "manual-qwen-test-id",
     )
     manual_qwen = replace(

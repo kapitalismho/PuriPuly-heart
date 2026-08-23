@@ -40,6 +40,7 @@ SCHEMA_OR_SINGLETON_SAME_AS_DEFAULT_PATHS = frozenset(
         "openrouter.routing_mode",
         "overlay.calibration.anchor",
         "settings_version",
+        "telemetry.enabled",
     }
 )
 
@@ -84,7 +85,8 @@ def test_final_dev_v30_fixture_has_an_explicit_destination_for_every_persisted_p
             "state.managed_connection.pending_delivery_ack_delivery_id"
         ),
         "telemetry.identifier": "state.telemetry.anonymous_id",
-        "telemetry.sent_utc_dates": "state.telemetry.sent_translation_success_dates_utc",
+        "telemetry.consent": "intent.telemetry.enabled",
+        "telemetry.sent_utc_dates": "state.telemetry.last_sent_date_utc",
         "translation.fallback_selection_alias": "intent.translation.fallback.selection_alias",
     }
     classified_paths = set(V24_MIGRATION_CLASSIFICATION) | set(v30_destinations)

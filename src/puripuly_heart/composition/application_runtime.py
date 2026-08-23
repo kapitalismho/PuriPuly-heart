@@ -211,7 +211,7 @@ from puripuly_heart.config.settings import (
     TranslationModel,
     build_managed_openrouter_byok_target_settings,
     materialize_translation_settings,
-    with_telemetry_consent,
+    with_telemetry_enabled,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.clipboard.watcher import create_clipboard_watcher
@@ -1919,7 +1919,7 @@ def compose_application_runtime(
             projection=require_projection(),
             application=settings_owner,
             merge_provider_settings=merge_provider_settings,
-            telemetry_consent_settings=with_telemetry_consent,
+            telemetry_enabled_settings=with_telemetry_enabled,
         ),
         provider=UiProviderRuntimeAdapter(
             settings=settings,

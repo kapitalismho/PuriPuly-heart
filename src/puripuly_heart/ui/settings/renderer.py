@@ -121,7 +121,7 @@ def compose_settings_general_surface(
     clipboard_row = compose_settings_triple_row(
         slots.clipboard_auto_translate,
         slots.vrchat_mic_intercept,
-        slots.telemetry_consent,
+        slots.telemetry_enabled,
     )
     return SettingsGeneralSurfaceRegions(
         rows=(primary_row, audio_row, vad_row, clipboard_row),

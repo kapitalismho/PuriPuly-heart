@@ -94,7 +94,7 @@ def test_settings_roundtrip(tmp_path):
     shared_prompt = load_prompt_for_provider("gemini")
     expected.system_prompt = shared_prompt
     expected.system_prompts = {}
-    expected.telemetry.consent = "allow"
+    expected.telemetry.enabled = True
     expected.telemetry_state.anonymous_id = loaded.telemetry_state.anonymous_id
     expected.translation.fallback = TranslationFallbackSettings(
         enabled=True,

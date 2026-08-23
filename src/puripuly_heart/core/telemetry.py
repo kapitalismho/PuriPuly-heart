@@ -59,21 +59,15 @@ class TranslationSuccessTelemetryService:
         persist_sent_date: TelemetryPersistSentDate,
     ) -> TranslationSuccessTelemetryResult:
         active_date_utc = self._active_date_utc()
-        consent = getattr(settings.telemetry, "consent", "unknown")
+        enabled = settings.telemetry.enabled
         identifier = settings.telemetry_state.anonymous_id
-        sent_dates = set(settings.telemetry_state.sent_translation_success_dates_utc)
+        last_sent_date_utc = settings.telemetry_state.last_sent_date_utc
 
-        if consent == "decline":
+        if not enabled:
             return self._result(
-                "skipped_consent",
+                "skipped_disabled",
                 active_date_utc=active_date_utc,
-                reason="consent_declined",
-            )
-        if consent not in {"allow", "unknown"}:
-            return self._result(
-                "skipped_consent",
-                active_date_utc=active_date_utc,
-                reason="consent_not_allow",
+                reason="reporting_disabled",
             )
         if not identifier:
             return self._result(
@@ -81,7 +75,7 @@ class TranslationSuccessTelemetryService:
                 active_date_utc=active_date_utc,
                 reason="missing_identifier",
             )
-        if active_date_utc in sent_dates:
+        if active_date_utc == last_sent_date_utc:
             return self._result(
                 "skipped_already_sent",
                 active_date_utc=active_date_utc,
@@ -113,9 +107,7 @@ class TranslationSuccessTelemetryService:
             )
 
         updated = copy.deepcopy(settings)
-        updated.telemetry_state.sent_translation_success_dates_utc = sorted(
-            {*updated.telemetry_state.sent_translation_success_dates_utc, active_date_utc}
-        )
+        updated.telemetry_state.last_sent_date_utc = active_date_utc
         updated.validate()
         persisted = await persist_sent_date(updated)
         return self._result(

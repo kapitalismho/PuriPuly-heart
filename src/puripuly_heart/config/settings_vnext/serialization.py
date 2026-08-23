@@ -10,9 +10,8 @@ from puripuly_heart.config.settings_vnext.schema import (
     DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
     VNEXT_SETTINGS_SCHEMA_VERSION,
     AppSettingsVNext,
-    ensure_telemetry_default_allow,
     is_safe_compatibility_extension_key,
-    with_telemetry_consent,
+    with_telemetry_enabled,
     with_translation_runtime_policy,
 )
 
@@ -118,7 +117,9 @@ def to_dict(settings: AppSettingsVNext) -> dict[str, Any]:
 
     if not isinstance(settings, AppSettingsVNext):
         raise TypeError("vNext settings serializer requires AppSettingsVNext")
-    normalized = with_translation_runtime_policy(settings)
+    normalized = with_translation_runtime_policy(
+        with_telemetry_enabled(settings, settings.intent.telemetry.enabled)
+    )
     data = asdict(normalized)
     persisted = {
         "settings_version": VNEXT_SETTINGS_SCHEMA_VERSION,
@@ -168,11 +169,11 @@ def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
         merged,
         compatibility_extensions=_extract_compatible_extensions(data, default),
     )
-    merged = with_telemetry_consent(
+    merged = with_telemetry_enabled(
         merged,
-        merged.intent.telemetry.consent,
+        merged.intent.telemetry.enabled,
     )
-    return with_translation_runtime_policy(ensure_telemetry_default_allow(merged))
+    return with_translation_runtime_policy(merged)
 
 
 def _extract_compatible_extensions(

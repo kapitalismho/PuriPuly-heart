@@ -218,7 +218,7 @@ class UiSettingsRuntimeAdapter:
     projection: SettingsProjectionOwner
     application: SettingsApplicationOwner
     merge_provider_settings: Callable[[object], object]
-    telemetry_consent_settings: Callable[[object, str], object]
+    telemetry_enabled_settings: Callable[[object, bool], object]
 
     async def on_dashboard_language_change(
         self,
@@ -262,11 +262,11 @@ class UiSettingsRuntimeAdapter:
     async def apply_settings(self, settings: object) -> object:
         return await self.application.apply(settings)
 
-    async def apply_telemetry_consent(self, consent: str) -> object | None:
+    async def apply_telemetry_enabled(self, enabled: bool) -> object | None:
         settings = self.settings.current
         if settings is None:
             return None
-        await self.application.apply(self.telemetry_consent_settings(settings, consent))
+        await self.application.apply(self.telemetry_enabled_settings(settings, enabled))
         return self.settings.current
 
 

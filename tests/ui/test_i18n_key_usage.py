@@ -61,11 +61,28 @@ OVERLAY_FAILURE_I18N_KEYS = frozenset(
     }
 )
 
+PRESERVED_TELEMETRY_I18N_KEYS = frozenset(
+    {
+        "debug_preview.telemetry_consent",
+        "settings.telemetry.modal.title",
+        "settings.telemetry.option.allow",
+        "settings.telemetry.option.allow.description",
+        "settings.telemetry.option.decline",
+        "telemetry.consent.allow",
+        "telemetry.consent.body",
+        "telemetry.consent.decline",
+        "telemetry.consent.excludes",
+        "telemetry.consent.title",
+    }
+)
+
 # Desktop-overlay copy seeds product-standard keys before every key is referenced
 # in runtime code.
 # Keep this exact, temporary allowlist narrow so typo or stale seeded keys still fail.
 TEMPORARILY_ALLOWED_UNREFERENCED_I18N_KEYS = frozenset(
-    SHIPPING_DESKTOP_OVERLAY_I18N_KEYS | DESKTOP_OVERLAY_RECOVERY_I18N_KEYS
+    SHIPPING_DESKTOP_OVERLAY_I18N_KEYS
+    | DESKTOP_OVERLAY_RECOVERY_I18N_KEYS
+    | PRESERVED_TELEMETRY_I18N_KEYS
 )
 
 
