@@ -360,14 +360,6 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
             imported_layer="migration/serialization",
             reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
         ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/views/settings.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="UI adapters/renderers",
-            imported_layer="migration/serialization",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
         *(
             ImportViolation(
                 rule_id="adapters-avoid-ui-and-migration-internals",
@@ -514,12 +506,6 @@ KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT: frozenset[SettingsRuntimeConfinementVio
             "src/puripuly_heart/composition/application_runtime.py",
             "AppSettings",
             "The production composition root uses the AppSettings compatibility DTO only to connect focused owners while SettingsOwner exclusively owns load, normalization, migration, backup, and persistence.",
-        ),
-        SettingsRuntimeConfinementViolation(
-            "legacy-settings-api-import",
-            "src/puripuly_heart/ui/views/settings.py",
-            "AppSettings",
-            "SettingsView remains a UI editor for the public AppSettings compatibility model while controller/app services own persistence; replacing the view draft model is deferred UI-rendering work, not active runtime resolution.",
         ),
         SettingsRuntimeConfinementViolation(
             "legacy-settings-api-import",
@@ -1655,12 +1641,10 @@ def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -
     assert census["baseline_sha"] == "a4aeacccf17194bbf607266f037d16e680234eef"
     assert len(entries) == 39
     assert len({entry["path"] for entry in entries}) == 39
-    assert all(entry["symbols"] and entry["classifications"] and entry["owners"] for entry in entries)
-    assert {
-        classification
-        for entry in entries
-        for classification in entry["classifications"]
-    } <= {
+    assert all(
+        entry["symbols"] and entry["classifications"] and entry["owners"] for entry in entries
+    )
+    assert {classification for entry in entries for classification in entry["classifications"]} <= {
         "flat persistence ingress",
         "runtime AppSettings projection/mutation",
         "pure enum/constant/value misplaced in settings.py",
@@ -1685,11 +1669,7 @@ def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -
     expected_current.pop("src/puripuly_heart/ui/desktop_overlay.py")
     expected_current.pop("src/puripuly_heart/ui/desktop_overlay_surface/contract.py")
     expected_current.pop("src/puripuly_heart/ui/desktop_overlay_surface/renderer.py")
-    expected_current["src/puripuly_heart/ui/views/settings.py"] -= {
-        "DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA",
-        "DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER",
-        "DESKTOP_FLET_SIZE_PRESET_ORDER",
-    }
+    expected_current.pop("src/puripuly_heart/ui/views/settings.py")
     expected_current["src/puripuly_heart/app/wiring/wiring_llm_factory.py"] -= {
         "OpenRouterProviderRouting",
         "OpenRouterRoutingMode",
@@ -1697,14 +1677,19 @@ def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -
     expected_current["src/puripuly_heart/app/services/canonical_settings_persistence.py"] = {
         "AppSettings"
     }
+    expected_current["src/puripuly_heart/app/services/settings/settings_application.py"] = {
+        "AppSettings",
+        "TranslationFallbackSettings",
+        "materialize_translation_settings",
+    }
+    expected_current["src/puripuly_heart/app/services/openrouter_pkce_flow.py"] = {"AppSettings"}
     actual_current: dict[str, set[str]] = {}
     for source_path in SOURCE_PACKAGE_ROOT.rglob("*.py"):
         tree = ast.parse(source_path.read_text(encoding="utf-8"))
         symbols = {
             alias.name
             for node in ast.walk(tree)
-            if isinstance(node, ast.ImportFrom)
-            and node.module == "puripuly_heart.config.settings"
+            if isinstance(node, ast.ImportFrom) and node.module == "puripuly_heart.config.settings"
             for alias in node.names
         }
         if symbols:
@@ -1735,9 +1720,11 @@ def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
     assert occurrences == set()
 
 
-def test_a05_settings_secret_port_reduces_dependency_debt_to_18() -> None:
-    assert len(KNOWN_ALLOWED_VIOLATIONS) == 18
-    assert len(_dependency_violations()) == 18
+def test_a06_settings_view_boundary_reduces_dependency_debt_to_17() -> None:
+    assert len(KNOWN_ALLOWED_VIOLATIONS) == 17
+    assert len(_dependency_violations()) == 17
+    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 2
+    assert len(_settings_runtime_confinement_violations()) == 2
 
 
 def test_a04_overlay_ui_uses_the_pure_canonical_value_owner() -> None:
@@ -1770,7 +1757,7 @@ def test_a04_overlay_ui_uses_the_pure_canonical_value_owner() -> None:
         "DESKTOP_FLET_SIZE_PRESET_ORDER",
     }
     assert a04_symbols <= imports_by_module["puripuly_heart.config.desktop_overlay_values"]
-    assert a04_symbols.isdisjoint(imports_by_module["puripuly_heart.config.settings"])
+    assert a04_symbols.isdisjoint(imports_by_module.get("puripuly_heart.config.settings", set()))
     assert _layer_for_module("puripuly_heart.config.desktop_overlay_values") == SCHEMA_VALUES
 
 
@@ -1803,9 +1790,9 @@ def test_a05_settings_view_uses_composed_typed_secret_ports() -> None:
         "SettingsSecretsPort",
     } <= imported_secret_port_symbols
 
-    composition_source = (
-        SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py"
-    ).read_text(encoding="utf-8")
+    composition_source = (SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py").read_text(
+        encoding="utf-8"
+    )
     assert "settings_secrets=SettingsSecretsOwner(" in composition_source
     assert "secret_store_factory=create_settings_secret_store" in composition_source
 
@@ -1814,13 +1801,9 @@ def test_r00_canonical_migration_loader_has_no_flat_ingress() -> None:
     migration_path = SOURCE_PACKAGE_ROOT / "config" / "settings_vnext" / "migration.py"
     tree = ast.parse(migration_path.read_text(encoding="utf-8"))
     loader = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "from_dict"
+        node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "from_dict"
     )
-    referenced_names = {
-        node.id for node in ast.walk(loader) if isinstance(node, ast.Name)
-    } | {
+    referenced_names = {node.id for node in ast.walk(loader) if isinstance(node, ast.Name)} | {
         node.attr for node in ast.walk(loader) if isinstance(node, ast.Attribute)
     }
     imported_modules = {

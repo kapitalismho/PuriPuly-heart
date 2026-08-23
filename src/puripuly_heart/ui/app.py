@@ -14,6 +14,11 @@ from puripuly_heart.core.discord_oauth_loopback import (
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.ports.settings_view import (
+    ImmediateSettingsIntent,
+    OpenRouterPkceTarget,
+    PromptApplyIntent,
+)
 from puripuly_heart.app.ports.ui_application import (
     UiApplicationFactoryPort,
     UiApplicationPort,
@@ -934,7 +939,8 @@ class TranslatorApp:
             return
 
         async def _task() -> None:
-            settings = await self.application.apply_telemetry_consent(consent)
+            await self.application.apply_telemetry_consent(consent)
+            settings = self.application.settings_general_snapshot()
             sync_telemetry = getattr(self.view_settings, "sync_telemetry_settings", None)
             if callable(sync_telemetry) and settings is not None:
                 sync_telemetry(settings)
@@ -1017,7 +1023,7 @@ class TranslatorApp:
                     self.view_settings.has_provider_changes = False
 
                     async def _task():
-                        await self.application.apply_providers(pending_settings)
+                        await self.application.apply_provider_intent(pending_settings)
 
                     self._queue_settings_mutation_task(_task)
             elif getattr(self.view_settings, "has_pending_prompt_changes", False):
@@ -1025,12 +1031,7 @@ class TranslatorApp:
                 if pending_settings is not None:
 
                     async def _task():
-                        merged_settings = (
-                            self.application.merge_settings_tab_apply_with_current_languages(
-                                pending_settings
-                            )
-                        )
-                        await self.application.apply_settings(merged_settings)
+                        await self.application.apply_prompt_intent(pending_settings)
 
                     self._queue_settings_mutation_task(_task)
 
@@ -1197,7 +1198,7 @@ class TranslatorApp:
         self._run_page_task(_task)
 
     def _refresh_settings_desktop_overlay_state(self) -> None:
-        settings = self.application.compatibility_settings()
+        settings = self.application.settings_overlay_snapshot()
         view_settings = getattr(self, "view_settings", None)
         sync_settings = getattr(view_settings, "sync_desktop_overlay_settings", None)
         if settings is not None and callable(sync_settings):
@@ -1403,14 +1404,9 @@ class TranslatorApp:
 
         self._queue_settings_mutation_task(_task)
 
-    def _on_settings_changed(self, settings) -> None:
-        captured_change = self.application.capture_settings_view_change(settings)
-
+    def _on_settings_changed(self, intent: ImmediateSettingsIntent) -> None:
         async def _task():
-            next_settings = self.application.merge_settings_view_change_with_current(
-                captured_change
-            )
-            await self.application.apply_settings(next_settings)
+            await self.application.apply_settings_intent(intent)
             self._sync_microphone_test_dialog_if_inactive()
 
         self._queue_settings_mutation_task(_task)
@@ -1459,12 +1455,9 @@ class TranslatorApp:
             return
         self._close_microphone_test_dialog()
 
-    def _on_prompt_apply_settings(self, settings) -> None:
+    def _on_prompt_apply_settings(self, intent: PromptApplyIntent) -> None:
         async def _task():
-            merged_settings = self.application.merge_settings_tab_apply_with_current_languages(
-                settings
-            )
-            await self.application.apply_settings(merged_settings)
+            await self.application.apply_prompt_intent(intent)
 
         self._queue_settings_mutation_task(_task)
 
@@ -1492,7 +1485,7 @@ class TranslatorApp:
             self._queue_settings_mutation_task(_runtime_only_task)
             return
 
-        pending_settings = None
+        pending_intent = None
         consume_provider_apply_settings = getattr(
             view_settings,
             "consume_provider_apply_settings",
@@ -1503,14 +1496,14 @@ class TranslatorApp:
             "has_provider_changes",
             False,
         ):
-            pending_settings = consume_provider_apply_settings()
+            pending_intent = consume_provider_apply_settings()
             view_settings.has_provider_changes = False
 
         async def _task():
-            if pending_settings is None:
+            if pending_intent is None:
                 await self.application.apply_providers()
             else:
-                await self.application.apply_providers(pending_settings)
+                await self.application.apply_provider_intent(pending_intent)
 
         self._queue_settings_mutation_task(_task)
 
@@ -1533,7 +1526,7 @@ class TranslatorApp:
 
     def _on_request_openrouter_pkce(
         self,
-        target_settings: object,
+        target: OpenRouterPkceTarget,
         *,
         launch_source: str = "settings",
     ) -> None:
@@ -1551,7 +1544,7 @@ class TranslatorApp:
         async def _task() -> None:
             try:
                 ok = await self.application.connect_openrouter_via_pkce(
-                    target_settings=target_settings,
+                    target=target,
                     launch_source=launch_source,
                 )
                 if ok:
@@ -1839,25 +1832,25 @@ class TranslatorApp:
         self._discord_managed_auth_task_handle = None
         self._close_discord_managed_auth_dialog()
 
-    def _build_managed_openrouter_byok_target_settings(self) -> object | None:
-        return self.application.build_managed_openrouter_byok_target_settings()
+    def _build_managed_openrouter_byok_target(self) -> OpenRouterPkceTarget | None:
+        return self.application.build_managed_openrouter_byok_target()
 
-    def _build_founder_letter_target_settings(self) -> object | None:
-        return self._build_managed_openrouter_byok_target_settings()
+    def _build_founder_letter_target(self) -> OpenRouterPkceTarget | None:
+        return self._build_managed_openrouter_byok_target()
 
     def _on_discord_managed_auth_byok(self) -> None:
-        target_settings = self._build_managed_openrouter_byok_target_settings()
-        if target_settings is None:
+        target = self._build_managed_openrouter_byok_target()
+        if target is None:
             self._show_snackbar(t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)
             return
-        self._on_request_openrouter_pkce(target_settings, launch_source="discord_auth")
+        self._on_request_openrouter_pkce(target, launch_source="discord_auth")
 
     def _on_founder_letter_connect(self) -> None:
-        target_settings = self._build_founder_letter_target_settings()
-        if target_settings is None:
+        target = self._build_founder_letter_target()
+        if target is None:
             self._show_snackbar(t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)
             return
-        self._on_request_openrouter_pkce(target_settings, launch_source="letter")
+        self._on_request_openrouter_pkce(target, launch_source="letter")
 
     def _on_founder_letter_contact(self) -> None:
         webbrowser.open(FOUNDER_CONTACT_URL)

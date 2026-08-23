@@ -14,6 +14,11 @@ import flet as ft
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 import puripuly_heart.ui.app as app_module
+from puripuly_heart.app.ports.settings_view import (
+    GeneralSettingsSnapshot,
+    OverlaySettingsSnapshot,
+    PromptApplyIntent,
+)
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
@@ -200,9 +205,9 @@ class TelemetryController:
 
 class TelemetrySettingsView:
     def __init__(self) -> None:
-        self.synced: list[AppSettings] = []
+        self.synced: list[GeneralSettingsSnapshot] = []
 
-    def sync_telemetry_settings(self, settings: AppSettings) -> None:
+    def sync_telemetry_settings(self, settings: GeneralSettingsSnapshot) -> None:
         self.synced.append(settings)
 
 
@@ -262,7 +267,7 @@ def test_telemetry_consent_choice_persists_and_syncs_settings_view() -> None:
     assert app.controller.settings.telemetry_state.sent_translation_success_dates_utc == [
         "2026-07-01"
     ]
-    assert app.view_settings.synced[-1] is app.controller.settings
+    assert app.view_settings.synced[-1].telemetry_consent == "allow"
 
     app._on_telemetry_consent_change("decline")
     asyncio.run(page.tasks.pop(0)())
@@ -394,7 +399,7 @@ class ConstructionDummySettingsView(ft.Container):
         self.overlay_peer_contract = None
         self.has_provider_changes = False
         self.has_pending_prompt_changes = False
-        self.synced_desktop_settings: list[AppSettings] = []
+        self.synced_desktop_settings: list[OverlaySettingsSnapshot] = []
 
     def bind_settings_intents(self, *, surface, provider, general, prompt, overlay) -> None:
         self.on_settings_changed = surface.settings_changed
@@ -432,7 +437,7 @@ class ConstructionDummySettingsView(ft.Container):
     def set_overlay_runtime_state(self, *_args, **_kwargs) -> None:
         return None
 
-    def sync_desktop_overlay_settings(self, settings: AppSettings) -> None:
+    def sync_desktop_overlay_settings(self, settings: OverlaySettingsSnapshot) -> None:
         self.synced_desktop_settings.append(settings)
 
     def set_overlay_peer_contract(self, contract) -> None:
@@ -784,11 +789,11 @@ async def test_desktop_gui_state_actions_refresh_settings_view_after_runtime_upd
 
     synced_settings = app.view_settings.synced_desktop_settings
     assert len(synced_settings) == 3
-    assert synced_settings[0].overlay.desktop_flet.locked is True
-    assert synced_settings[1].overlay.desktop_flet.size_preset == "xlarge"
-    assert synced_settings[2].overlay.desktop_flet.position.x is None
-    assert synced_settings[2].overlay.desktop_flet.position.y is None
-    assert synced_settings[2].overlay.desktop_flet.locked is False
+    assert synced_settings[1].desktop_size_preset == "xlarge"
+    assert synced_settings[2].desktop_size_preset == "xlarge"
+    assert app.controller.settings.overlay.desktop_flet.position.x is None
+    assert app.controller.settings.overlay.desktop_flet.position.y is None
+    assert app.controller.settings.overlay.desktop_flet.locked is False
 
 
 def test_translator_app_does_not_mount_debug_preview_by_default(
@@ -1977,9 +1982,9 @@ def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -
             lambda: build_managed_openrouter_byok_target_settings(settings)
         ),
     )
-    pkce_calls: list[tuple[AppSettings, str]] = []
-    app._on_request_openrouter_pkce = lambda target_settings, *, launch_source="settings": (
-        pkce_calls.append((target_settings, launch_source))
+    pkce_calls: list[tuple[object, str]] = []
+    app._on_request_openrouter_pkce = lambda target, *, launch_source="settings": (
+        pkce_calls.append((target, launch_source))
     )
     app._show_snackbar = lambda *_args, **_kwargs: pytest.fail(
         "managed Discord auth BYOK should build a valid OpenRouter target"
@@ -1988,13 +1993,9 @@ def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -
     app._on_discord_managed_auth_byok()
 
     assert len(pkce_calls) == 1
-    target_settings, launch_source = pkce_calls[0]
+    target, launch_source = pkce_calls[0]
     assert launch_source == "discord_auth"
-    assert target_settings is not settings
-    assert target_settings.provider.llm is LLMProviderName.OPENROUTER
-    assert target_settings.openrouter.selected_source is OpenRouterCredentialSource.BYOK
-    assert target_settings.openrouter.selection_alias is OpenRouterSelectionAlias.QWEN35_FLASH_BYOK
-    assert target_settings.openrouter.llm_model is OpenRouterLLMModel.QWEN_35_FLASH_02_23
+    assert target.selection_alias is OpenRouterSelectionAlias.QWEN35_FLASH_BYOK
     assert settings.openrouter.selected_source is OpenRouterCredentialSource.MANAGED
 
 
@@ -2020,20 +2021,10 @@ def test_discord_managed_auth_byok_clears_managed_china_translation_state() -> N
         ),
     )
 
-    target_settings = app._build_managed_openrouter_byok_target_settings()
+    target = app._build_managed_openrouter_byok_target()
 
-    assert target_settings is not None
-    assert target_settings.openrouter.selected_source is OpenRouterCredentialSource.BYOK
-    assert (
-        target_settings.openrouter.selection_alias
-        is OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK
-    )
-    assert target_settings.openrouter.provider_routing is OpenRouterProviderRouting.DEFAULT
-    assert target_settings.translation.connection is TranslationConnection.OPENROUTER
-    assert (
-        target_settings.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value]
-        is TranslationConnection.OPENROUTER
-    )
+    assert target is not None
+    assert target.selection_alias is OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK
 
 
 @pytest.mark.asyncio
@@ -2813,7 +2804,7 @@ async def test_on_nav_change_merges_current_languages_into_prompt_only_apply() -
     assert app.content_area.content is app.view_dashboard
     assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
-    assert events == [("merge", pending_settings), ("apply", merged_settings)]
+    assert events == [("apply", pending_settings)]
 
 
 @pytest.mark.asyncio
@@ -3048,8 +3039,8 @@ async def test_on_nav_change_applies_pending_prompt_changes_when_leaving_setting
     assert app.content_area.content is app.view_dashboard
     assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
-    assert merge_calls == [pending_settings]
-    assert seen == [merged_settings]
+    assert merge_calls == []
+    assert seen == [pending_settings]
 
 
 @pytest.mark.asyncio
@@ -3076,28 +3067,23 @@ async def test_on_prompt_apply_settings_merges_current_languages_before_apply_se
 
     assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
-    assert events == [("merge", pending_settings), ("apply", merged_settings)]
+    assert events == [("apply", pending_settings)]
 
 
 @pytest.mark.asyncio
 async def test_prompt_apply_keeps_dashboard_target_for_next_request() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    pending_settings = AppSettings()
-    pending_settings.languages.target_language = "en"
-    merged_settings = AppSettings()
-    merged_settings.languages.target_language = "ja"
+    pending_settings = PromptApplyIntent("new prompt")
+    current_settings = AppSettings()
+    current_settings.languages.target_language = "ja"
     applied_targets: list[str] = []
-
-    def fake_merge_settings(settings: AppSettings) -> AppSettings:
-        assert settings is pending_settings
-        return merged_settings
 
     async def fake_apply_settings(settings: AppSettings) -> None:
         applied_targets.append(settings.languages.target_language)
 
     app.controller = SimpleNamespace(
-        merge_settings_tab_apply_with_current_languages=fake_merge_settings,
+        settings=current_settings,
         apply_settings=fake_apply_settings,
     )
 
@@ -3105,7 +3091,6 @@ async def test_prompt_apply_keeps_dashboard_target_for_next_request() -> None:
 
     assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
-    assert pending_settings.languages.target_language == "en"
     assert applied_targets == ["ja"]
 
 
@@ -3143,7 +3128,7 @@ async def test_on_settings_changed_captures_patch_before_queued_apply() -> None:
 
     assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
-    assert seen == [merged_settings]
+    assert seen == [raw_settings]
 
 
 @pytest.mark.asyncio
@@ -3634,8 +3619,7 @@ async def test_queue_orders_generic_settings_change_before_prompt_apply() -> Non
 
     assert events == [
         ("apply", raw_settings),
-        ("merge", pending_settings),
-        ("apply", merged_settings),
+        ("apply", pending_settings),
     ]
 
 

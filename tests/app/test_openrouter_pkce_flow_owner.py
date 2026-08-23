@@ -26,6 +26,7 @@ from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
 from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
+from puripuly_heart.app.ports.settings_view import OpenRouterPkceTarget
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.openrouter_pkce_flow import (
     OpenRouterPkceApplicationOwner,
@@ -220,8 +221,11 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
         active_secret_provider=lambda _settings, key: store.get(key),
     )
     runtime = AppliedProviderRuntime(settings)
-    target = copy.deepcopy(current)
-    target.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
+    target = OpenRouterPkceTarget(
+        selection_alias=OpenRouterSelectionAlias.GEMMA4_BYOK,
+        system_prompt="PKCE prompt draft",
+    )
+    settings.current.ui.locale = "ko"
     results = SettingsTransactionResultOwner()
 
     class Flow:
@@ -251,7 +255,7 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
         results=results,
     )
 
-    assert await owner.connect(target_settings=target, launch_source="settings") is True
+    assert await owner.connect(target=target, launch_source="settings") is True
     assert store.values["openrouter_api_key"] == "sk-or-v1-user"
     assert settings.current is not None
     assert settings.current.provider.llm == LLMProviderName.OPENROUTER
@@ -259,6 +263,8 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
     assert settings.current.openrouter.selected_source == OpenRouterCredentialSource.BYOK
     assert settings.current.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
     assert settings.current.api_key_verified.openrouter is True
+    assert settings.current.system_prompt == "PKCE prompt draft"
+    assert settings.current.ui.locale == "ko"
     assert len(runtime.applied) == 1
     assert results.current is not None
     assert results.current.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
@@ -267,7 +273,7 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
 
     runtime.cancel = True
     with pytest.raises(asyncio.CancelledError):
-        await owner.connect(target_settings=target, launch_source="settings")
+        await owner.connect(target=target, launch_source="settings")
 
     assert settings.mutation_depth == 0
     assert settings.rollback_pending is False
@@ -288,7 +294,7 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
         persist(path, canonical)
 
     persistence.persist = blocked_persist
-    task = asyncio.create_task(owner.connect(target_settings=target, launch_source="settings"))
+    task = asyncio.create_task(owner.connect(target=target, launch_source="settings"))
     assert await asyncio.to_thread(persist_entered.wait, 5)
     task.cancel()
     await asyncio.sleep(0)

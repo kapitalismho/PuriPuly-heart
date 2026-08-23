@@ -5,11 +5,24 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
+from puripuly_heart.app.services.settings_application import (
+    materialize_immediate_settings_intent,
+    materialize_prompt_apply_intent,
+    materialize_provider_apply_intent,
+    settings_view_surface_snapshots,
+)
+
 from puripuly_heart.app.ports.application_runtime_logging import (
     ApplicationRuntimeLoggingPort,
 )
 from puripuly_heart.app.ports.application_runtime_shutdown import (
     ApplicationRuntimeShutdownPort,
+)
+from puripuly_heart.app.ports.settings_view import (
+    ImmediateSettingsIntent,
+    OpenRouterPkceTarget,
+    PromptApplyIntent,
+    ProviderApplyIntent,
 )
 from puripuly_heart.app.ports.ui_application_intents import (
     UiDiagnosticsRuntimePort,
@@ -86,6 +99,83 @@ class UiApplicationRuntimeStub:
     def merge_settings_view_change_with_current(self, captured: object) -> object:
         merge = getattr(self._backend, "merge_settings_view_change_with_current", None)
         return merge(captured) if callable(merge) else captured
+
+    def _compatibility_settings(self):
+        return getattr(self._backend, "settings", None)
+
+    def general_snapshot(self):
+        settings = self._compatibility_settings()
+        return None if settings is None else settings_view_surface_snapshots(settings)[1]
+
+    def overlay_snapshot(self):
+        settings = self._compatibility_settings()
+        return None if settings is None else settings_view_surface_snapshots(settings)[3]
+
+    async def apply_settings_intent(self, intent: ImmediateSettingsIntent) -> object:
+        apply_intent = getattr(self._backend, "apply_settings_intent", None)
+        if callable(apply_intent):
+            return await apply_intent(intent)
+        apply_settings = getattr(self._backend, "apply_settings")
+        current = self._compatibility_settings()
+        pending = (
+            materialize_immediate_settings_intent(current, intent)
+            if current is not None and not isinstance(intent, str)
+            else intent
+        )
+        return await apply_settings(pending)
+
+    async def apply_prompt_intent(self, intent: PromptApplyIntent) -> object:
+        apply_intent = getattr(self._backend, "apply_prompt_intent", None)
+        if callable(apply_intent):
+            return await apply_intent(intent)
+        apply_settings = getattr(self._backend, "apply_settings")
+        current = self._compatibility_settings()
+        pending = (
+            materialize_prompt_apply_intent(current, intent)
+            if current is not None and isinstance(intent, PromptApplyIntent)
+            else intent
+        )
+        return await apply_settings(pending)
+
+    def materialize_provider_intent(self, intent: ProviderApplyIntent) -> object:
+        materialize = getattr(self._backend, "materialize_provider_intent", None)
+        if callable(materialize):
+            return materialize(intent)
+        current = self._compatibility_settings()
+        if current is not None and isinstance(intent, ProviderApplyIntent):
+            return materialize_provider_apply_intent(current, intent)
+        return intent
+
+    async def connect_openrouter_via_pkce(
+        self,
+        *,
+        target: OpenRouterPkceTarget,
+        launch_source: str,
+    ) -> bool:
+        connect = getattr(self._backend, "connect_openrouter_via_pkce")
+        try:
+            return bool(await connect(target=target, launch_source=launch_source))
+        except TypeError:
+            return bool(await connect(target_settings=target, launch_source=launch_source))
+
+    def build_managed_openrouter_byok_target(self) -> OpenRouterPkceTarget | None:
+        build = getattr(self._backend, "build_managed_openrouter_byok_target", None)
+        if callable(build):
+            return build()
+        legacy_build = getattr(
+            self._backend,
+            "build_managed_openrouter_byok_target_settings",
+            None,
+        )
+        if not callable(legacy_build):
+            return None
+        settings = legacy_build()
+        if settings is None or settings.openrouter.selection_alias is None:
+            return None
+        return OpenRouterPkceTarget(
+            settings.openrouter.selection_alias,
+            system_prompt=settings.system_prompt,
+        )
 
     def refresh_settings_projection(
         self,

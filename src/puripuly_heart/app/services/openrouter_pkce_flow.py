@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
 from puripuly_heart.app.ports.secret_store import SecretStorePort
+from puripuly_heart.app.ports.settings_view import OpenRouterPkceTarget
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.provider_runtime_apply import (
     ProviderRuntimeApplyAdapter,
@@ -23,13 +24,13 @@ from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
 from puripuly_heart.config.llm_profiles import profile_for_alias
-from puripuly_heart.config.settings import (
-    AppSettings,
+from puripuly_heart.config.provider_values import (
     LLMProviderName,
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
 )
+from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_APPLIED,
@@ -121,15 +122,13 @@ class OpenRouterPkceApplicationOwner:
     async def connect(
         self,
         *,
-        target_settings: AppSettings,
+        target: OpenRouterPkceTarget,
         launch_source: str,
     ) -> bool:
         current = self.settings.current
         if current is None:
             return False
-        selection_alias = target_settings.openrouter.selection_alias
-        if selection_alias is None:
-            raise ValueError("PKCE connection requires a BYOK OpenRouter alias")
+        selection_alias = target.selection_alias
         profile = profile_for_alias(selection_alias.value)
         if profile.openrouter_source != OpenRouterCredentialSource.BYOK.value:
             raise ValueError("PKCE connection requires a BYOK OpenRouter alias")
@@ -156,12 +155,15 @@ class OpenRouterPkceApplicationOwner:
             )
             return False
 
-        updated = copy.deepcopy(target_settings)
+        updated = copy.deepcopy(current)
         updated.provider.llm = LLMProviderName.OPENROUTER
         updated.openrouter.selection_alias = OpenRouterSelectionAlias(profile.alias)
         updated.openrouter.selected_source = OpenRouterCredentialSource.BYOK
         updated.openrouter.llm_model = OpenRouterLLMModel(profile.openrouter_model)
         updated.api_key_verified.openrouter = True
+        if target.system_prompt is not None:
+            updated.system_prompt = target.system_prompt
+            updated.system_prompts = {}
         plan = self.provider_runtime.build_plan(
             updated,
             force_rebuild_llm=True,

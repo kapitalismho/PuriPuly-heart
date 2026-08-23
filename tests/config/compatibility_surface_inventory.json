@@ -1179,12 +1179,14 @@
       "surface": "vNext schema, resolved DTO, and runtime resolution modules",
       "classification": "internal_schema_and_runtime_resolution_contracts",
       "modules": [
+        "puripuly_heart.config.provider_values",
         "puripuly_heart.config.resolved",
         "puripuly_heart.config.runtime_resolution",
         "puripuly_heart.config.settings_vnext.defaults",
-        "puripuly_heart.config.settings_vnext.schema"
+        "puripuly_heart.config.settings_vnext.schema",
+        "puripuly_heart.config.translation_values"
       ],
-      "rationale": "These modules are schema values, resolved DTOs, and runtime-resolution contracts used inside the vNext architecture. They are not legacy implementation owners and are not external compatibility facades."
+      "rationale": "These modules are pure settings values, schema values, resolved DTOs, and runtime-resolution contracts used inside the vNext architecture. They are not legacy implementation owners and are not external compatibility facades."
     },
     {
       "surface": "core lifecycle, observability, error-message, telemetry, and metadata contract modules",

@@ -16,6 +16,7 @@ from puripuly_heart.app.adapters.peer_capture_target_resolver import (
 from puripuly_heart.app.services.peer_capture_target_application import (
     PeerCaptureTargetApplicationOwner,
 )
+from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
 
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import AppSettings
@@ -544,12 +545,14 @@ def test_settings_capture_target_refresh_preserves_unrelated_drafts() -> None:
     view.on_loopback_capture_summary = lambda: "VRChat"
     saved = AppSettings()
     saved.desktop_audio.output_device = "Saved device"
+    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(saved)
+    provider_before = view._provider_snapshot
+    provider_draft_before = view._provider_draft
 
-    view.refresh_loopback_capture_target(saved)
+    view.refresh_loopback_capture_target(general)
 
-    assert view._settings is baseline_settings
-    assert view._provider_settings_draft is provider_draft
-    assert view._provider_settings_draft.system_prompt == "provider draft"
+    assert view._provider_snapshot == provider_before
+    assert view._provider_draft == provider_draft_before
     assert view.has_provider_changes is True
     assert view.has_pending_prompt_changes is True
     assert view._desktop_overlay_pending_size_preset == "large"
@@ -610,17 +613,18 @@ def test_settings_capture_target_rebase_updates_all_retained_apply_sources(
     committed = AppSettings()
     committed.desktop_audio.output_device = committed_output
     committed.desktop_audio.runtime_capture_target = committed_target
+    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(committed)
+    provider_before = view._provider_snapshot
+    provider_draft_before = view._provider_draft
+    prompt_before = view._prompt_snapshot
 
-    view.refresh_loopback_capture_target(committed)
-    view.refresh_loopback_capture_target(committed)
+    view.refresh_loopback_capture_target(general)
+    view.refresh_loopback_capture_target(general)
 
-    for rebased in (retained, draft):
-        assert rebased.desktop_audio.output_device == committed_output
-        assert rebased.desktop_audio.runtime_capture_target == committed_target
-    assert retained.stt.vad_speech_threshold == 0.31
-    assert draft.stt.vad_speech_threshold == 0.73
-    assert retained.system_prompt == "retained prompt"
-    assert draft.system_prompt == "draft prompt"
+    assert view._general_snapshot.output_device == committed_output
+    assert view._provider_snapshot == provider_before
+    assert view._provider_draft == provider_draft_before
+    assert view._prompt_snapshot == prompt_before
     assert view.has_provider_changes is True
     assert view.has_pending_prompt_changes is True
 

@@ -2,12 +2,47 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyPort
 from puripuly_heart.app.ports.settings_runtime_effects import SettingsRuntimeEffectsPort
+from puripuly_heart.app.ports.settings_view import (
+    AudioSettingsIntent,
+    ClipboardSettingsIntent,
+    CustomSttEdit,
+    CustomVocabularySettingsIntent,
+    DesktopOverlayPositionResetIntent,
+    DesktopOverlaySettingsIntent,
+    DesktopOverlaySizeIntent,
+    GeneralSettingsSnapshot,
+    ImmediateSettingsIntent,
+    LocaleSettingsIntent,
+    LocalLlmEdit,
+    ManagedReferralEdit,
+    OscSettingsIntent,
+    OverlayCalibrationSettingsIntent,
+    OverlayCalibrationSnapshot,
+    OverlaySelectionSettingsIntent,
+    OverlaySettingsSnapshot,
+    PeerExpectedLanguagesIntent,
+    PeerVadSettingsIntent,
+    PromptApplyIntent,
+    PromptSettingsSnapshot,
+    ProviderApplyIntent,
+    ProviderGpuEdit,
+    ProviderSettingsSnapshot,
+    ProviderVerificationSnapshot,
+    QwenRegionEdit,
+    SelfVadSettingsIntent,
+    SttProviderEdit,
+    SystemPromptEdit,
+    TranslationFallbackSnapshot,
+    TranslationProviderEdit,
+    TranslationSelectionSnapshot,
+)
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
@@ -27,7 +62,11 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     _ui_prompt_clipboard_state_runtime_degraded_transaction_result,
     _ui_prompt_clipboard_state_save_failed_transaction_result,
 )
-from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings import (
+    AppSettings,
+    TranslationFallbackSettings,
+    materialize_translation_settings,
+)
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
@@ -77,6 +116,241 @@ def _settings_mutation_committed(result: TransactionResult) -> bool:
 def _copy_runtime_only_ui_state(source: AppSettings, target: AppSettings) -> None:
     target.ui.overlay_enabled = bool(source.ui.overlay_enabled)
     target.ui.peer_translation_enabled = bool(source.ui.peer_translation_enabled)
+
+
+def _active_prompt_key(settings: AppSettings) -> str:
+    provider = settings.provider.llm.value
+    if provider in {"gemini", "openrouter", "deepseek", "local_llm", "managed_gemma"}:
+        return provider
+    return "qwen"
+
+
+def settings_view_surface_snapshots(
+    settings: AppSettings,
+) -> tuple[
+    ProviderSettingsSnapshot,
+    GeneralSettingsSnapshot,
+    PromptSettingsSnapshot,
+    OverlaySettingsSnapshot,
+]:
+    translation = settings.translation
+    provider = ProviderSettingsSnapshot(
+        stt_provider=settings.provider.stt,
+        peer_stt_provider=settings.provider.peer_stt,
+        llm_provider=settings.provider.llm,
+        translation=TranslationSelectionSnapshot(
+            model=translation.model,
+            connection=translation.connection,
+            connection_history=tuple(
+                (model, connection)
+                for model in type(translation.model)
+                if (connection := translation.connection_history.get(model.value)) is not None
+            ),
+            fallback=TranslationFallbackSnapshot(
+                enabled=translation.fallback.enabled,
+                model=translation.fallback.model,
+                connection=translation.fallback.connection,
+            ),
+            http_extension_id=translation.http_extension_id,
+            previous_llm_model=translation.previous_llm_model,
+            gpu_device_id=translation.gpu_device_id,
+        ),
+        stt_gpu_device_id=settings.stt.gpu_device_id,
+        qwen_region=settings.qwen.region,
+        local_llm_base_url=settings.local_llm.base_url,
+        local_llm_model=settings.local_llm.model,
+        local_llm_extra_body_json=json.dumps(
+            settings.local_llm.extra_body,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        custom_stt_mode=settings.custom_stt.mode,
+        custom_stt_compatibility=settings.custom_stt.compatibility,
+        custom_stt_endpoint=settings.custom_stt.endpoint,
+        custom_stt_model=settings.custom_stt.model,
+        custom_stt_extra_json=json.dumps(
+            settings.custom_stt.extra,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        openrouter_llm_model=settings.openrouter.llm_model,
+        openrouter_selected_source=settings.openrouter.selected_source,
+        openrouter_selection_alias=settings.openrouter.selection_alias,
+        verified=ProviderVerificationSnapshot(
+            deepgram=settings.api_key_verified.deepgram,
+            soniox=settings.api_key_verified.soniox,
+            google=settings.api_key_verified.google,
+            openrouter=settings.api_key_verified.openrouter,
+            deepseek=settings.api_key_verified.deepseek,
+            alibaba_beijing=settings.api_key_verified.alibaba_beijing,
+            alibaba_singapore=settings.api_key_verified.alibaba_singapore,
+            cerebras=settings.api_key_verified.cerebras,
+        ),
+        managed_referral_id=settings.managed_identity.referral_id,
+    )
+    general = GeneralSettingsSnapshot(
+        locale=settings.ui.locale,
+        effective_peer_source_language=settings.languages.effective_peer_source,
+        input_host_api=settings.audio.input_host_api,
+        input_device=settings.audio.input_device,
+        output_device=settings.desktop_audio.output_device,
+        self_vad_speech_threshold=settings.stt.vad_speech_threshold,
+        peer_vad_speech_threshold=settings.desktop_audio.vad_speech_threshold,
+        peer_vad_hangover_ms=settings.desktop_audio.vad_hangover_ms,
+        peer_vad_pre_roll_ms=settings.desktop_audio.vad_pre_roll_ms,
+        osc_connection_mode=settings.osc.connection_mode,
+        osc_port=settings.osc.port,
+        osc_send_port=settings.osc.send_port,
+        osc_receive_port=settings.osc.receive_port,
+        vrc_mic_intercept=settings.osc.vrc_mic_intercept,
+        chatbox_include_source=settings.osc.chatbox_include_source,
+        clipboard_auto_translate_enabled=settings.ui.clipboard_auto_translate_enabled,
+        telemetry_consent=settings.telemetry.consent,
+        peer_expected_languages=tuple(settings.languages.peer_expected_languages),
+    )
+    source_language = settings.languages.source_language
+    prompt = PromptSettingsSnapshot(
+        active_provider_key=_active_prompt_key(settings),
+        source_language=source_language,
+        system_prompt=settings.system_prompt,
+        custom_vocabulary_enabled=settings.stt.custom_vocabulary_enabled,
+        custom_vocabulary_terms=tuple(settings.stt.custom_terms.get(source_language, ())),
+        custom_vocabulary_other_languages_have_terms=any(
+            bool(terms)
+            for language, terms in settings.stt.custom_terms.items()
+            if language != source_language
+        ),
+    )
+    calibration = settings.overlay.calibration
+    overlay = OverlaySettingsSnapshot(
+        target=settings.overlay.target,
+        show_translation=settings.overlay.show_translation,
+        show_peer_original=settings.overlay.show_peer_original,
+        desktop_size_preset=settings.overlay.desktop_flet.size_preset,
+        desktop_background_alpha=settings.overlay.desktop_flet.visual.background_alpha,
+        desktop_swap_caption_languages=settings.overlay.desktop_flet.swap_caption_languages,
+        calibration=OverlayCalibrationSnapshot(
+            anchor=calibration.anchor,
+            distance=calibration.distance,
+            offset_x=calibration.offset_x,
+            offset_y=calibration.offset_y,
+            text_scale=calibration.text_scale,
+        ),
+    )
+    return provider, general, prompt, overlay
+
+
+def materialize_immediate_settings_intent(
+    current: AppSettings,
+    intent: ImmediateSettingsIntent,
+) -> AppSettings:
+    updated = copy.deepcopy(current)
+    if isinstance(intent, LocaleSettingsIntent):
+        updated.ui.locale = intent.locale
+    elif isinstance(intent, AudioSettingsIntent):
+        updated.audio.input_host_api = intent.input_host_api
+        updated.audio.input_device = intent.input_device
+        updated.desktop_audio.output_device = intent.output_device
+    elif isinstance(intent, SelfVadSettingsIntent):
+        updated.stt.vad_speech_threshold = intent.speech_threshold
+    elif isinstance(intent, PeerVadSettingsIntent):
+        updated.desktop_audio.vad_speech_threshold = intent.speech_threshold
+        updated.desktop_audio.vad_hangover_ms = intent.hangover_ms
+        updated.desktop_audio.vad_pre_roll_ms = intent.pre_roll_ms
+    elif isinstance(intent, OscSettingsIntent):
+        updated.osc.connection_mode = intent.connection_mode
+        updated.osc.send_port = intent.send_port
+        updated.osc.receive_port = intent.receive_port
+        updated.osc.vrc_mic_intercept = intent.vrc_mic_intercept
+        updated.osc.chatbox_include_source = intent.chatbox_include_source
+    elif isinstance(intent, ClipboardSettingsIntent):
+        updated.ui.clipboard_auto_translate_enabled = intent.enabled
+    elif isinstance(intent, PeerExpectedLanguagesIntent):
+        updated.languages.peer_expected_languages = list(intent.languages)
+    elif isinstance(intent, CustomVocabularySettingsIntent):
+        updated.stt.custom_terms[intent.source_language] = list(intent.terms)
+        updated.stt.custom_vocabulary_enabled = intent.enabled
+    elif isinstance(intent, OverlaySelectionSettingsIntent):
+        updated.overlay.target = intent.target
+        updated.overlay.show_translation = intent.show_translation
+        updated.overlay.show_peer_original = intent.show_peer_original
+    elif isinstance(intent, DesktopOverlaySettingsIntent):
+        updated.overlay.desktop_flet.visual.background_alpha = intent.background_alpha
+        updated.overlay.desktop_flet.swap_caption_languages = intent.swap_caption_languages
+    elif isinstance(intent, DesktopOverlaySizeIntent):
+        updated.overlay.desktop_flet.size_preset = intent.size_preset
+    elif isinstance(intent, DesktopOverlayPositionResetIntent):
+        updated.overlay.desktop_flet.position.x = None
+        updated.overlay.desktop_flet.position.y = None
+        updated.overlay.desktop_flet.locked = False
+    elif isinstance(intent, OverlayCalibrationSettingsIntent):
+        calibration = intent.calibration
+        updated.overlay.calibration.anchor = calibration.anchor
+        updated.overlay.calibration.distance = calibration.distance
+        updated.overlay.calibration.offset_x = calibration.offset_x
+        updated.overlay.calibration.offset_y = calibration.offset_y
+        updated.overlay.calibration.text_scale = calibration.text_scale
+    return updated
+
+
+def materialize_prompt_apply_intent(
+    current: AppSettings,
+    intent: PromptApplyIntent,
+) -> AppSettings:
+    updated = copy.deepcopy(current)
+    updated.system_prompt = intent.value
+    updated.system_prompts = {}
+    return updated
+
+
+def materialize_provider_apply_intent(
+    current: AppSettings,
+    intent: ProviderApplyIntent,
+) -> AppSettings:
+    updated = copy.deepcopy(current)
+    for edit in intent.edits:
+        if isinstance(edit, SttProviderEdit):
+            updated.provider.stt = edit.self_provider
+            updated.provider.peer_stt = edit.peer_provider
+            updated.custom_stt.mode = edit.custom_mode
+            updated.custom_stt.compatibility = edit.custom_compatibility
+        elif isinstance(edit, ProviderGpuEdit):
+            updated.stt.gpu_device_id = edit.stt_gpu_device_id
+            updated.translation.gpu_device_id = edit.llm_gpu_device_id
+        elif isinstance(edit, TranslationProviderEdit):
+            selection = edit.selection
+            updated.translation.model = selection.model
+            updated.translation.connection = selection.connection
+            updated.translation.connection_history = {
+                model.value: connection for model, connection in selection.connection_history
+            }
+            updated.translation.fallback = TranslationFallbackSettings(
+                enabled=selection.fallback.enabled,
+                model=selection.fallback.model,
+                connection=selection.fallback.connection,
+            )
+            updated.translation.http_extension_id = selection.http_extension_id
+            updated.translation.previous_llm_model = selection.previous_llm_model
+            updated.translation.gpu_device_id = selection.gpu_device_id
+            materialize_translation_settings(updated)
+        elif isinstance(edit, QwenRegionEdit):
+            updated.qwen.region = edit.region
+        elif isinstance(edit, LocalLlmEdit):
+            updated.local_llm.base_url = edit.base_url
+            updated.local_llm.model = edit.model
+            updated.local_llm.extra_body = json.loads(edit.extra_body_json)
+        elif isinstance(edit, CustomSttEdit):
+            updated.custom_stt.mode = edit.mode
+            updated.custom_stt.compatibility = edit.compatibility
+            updated.custom_stt.endpoint = edit.endpoint
+            updated.custom_stt.model = edit.model
+            updated.custom_stt.extra = json.loads(edit.extra_json)
+        elif isinstance(edit, ManagedReferralEdit):
+            updated.managed_identity.referral_id = edit.referral_id
+        elif isinstance(edit, SystemPromptEdit):
+            updated.system_prompt = edit.value
+            updated.system_prompts = {}
+    return updated
 
 
 @dataclass(slots=True)

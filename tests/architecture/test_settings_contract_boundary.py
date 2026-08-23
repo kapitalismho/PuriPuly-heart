@@ -161,6 +161,21 @@ def test_settings_state_sink_protocol_covers_every_settings_view_push() -> None:
         assert callable(getattr(SettingsView, name, None)), name
 
 
+def test_a06_settings_view_has_no_whole_settings_escape_hatch() -> None:
+    path = SOURCE_ROOT / "ui" / "views" / "settings.py"
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    imported = _imported_modules(path)
+    names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+    attributes = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+
+    assert "puripuly_heart.config.settings" not in imported
+    assert "AppSettings" not in names
+    assert "SettingsSnapshot" not in names
+    assert "_settings" not in attributes
+    assert "_provider_settings_draft" not in attributes
+
+
 def test_production_settings_surface_uses_an_external_slot_provider() -> None:
     source = (SOURCE_ROOT / "ui" / "views" / "settings.py").read_text(encoding="utf-8")
     assert "SettingsApiSurfaceSlots.from_slot_provider(self)" in source

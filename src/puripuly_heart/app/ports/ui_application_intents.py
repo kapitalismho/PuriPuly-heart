@@ -4,6 +4,14 @@ from collections.abc import Callable
 from typing import Protocol
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.ports.settings_view import (
+    GeneralSettingsSnapshot,
+    ImmediateSettingsIntent,
+    OpenRouterPkceTarget,
+    OverlaySettingsSnapshot,
+    PromptApplyIntent,
+    ProviderApplyIntent,
+)
 from puripuly_heart.app.ports.ui_models import (
     GpuNoticeAction,
     ManagedGemmaNoticeAction,
@@ -68,6 +76,16 @@ class UiSettingsRuntimePort(Protocol):
 
     async def apply_telemetry_consent(self, consent: str) -> object | None: ...
 
+    async def apply_settings_intent(self, intent: ImmediateSettingsIntent) -> object: ...
+
+    async def apply_prompt_intent(self, intent: PromptApplyIntent) -> object: ...
+
+    def materialize_provider_intent(self, intent: ProviderApplyIntent) -> object: ...
+
+    def overlay_snapshot(self) -> OverlaySettingsSnapshot | None: ...
+
+    def general_snapshot(self) -> GeneralSettingsSnapshot | None: ...
+
 
 class UiProviderRuntimePort(Protocol):
     async def apply_providers(
@@ -86,13 +104,13 @@ class UiProviderRuntimePort(Protocol):
     async def connect_openrouter_via_pkce(
         self,
         *,
-        target_settings: object,
+        target: OpenRouterPkceTarget,
         launch_source: str,
     ) -> bool: ...
 
     def reopen_openrouter_pkce_authorization_url(self) -> object: ...
 
-    def build_managed_openrouter_byok_target_settings(self) -> object | None: ...
+    def build_managed_openrouter_byok_target(self) -> OpenRouterPkceTarget | None: ...
 
     async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]: ...
 
