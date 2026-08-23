@@ -118,13 +118,13 @@ describe('broker persistence retention model', () => {
       'POST /v1/trial/challenge',
       '203.0.113.1',
       'install-retention-old',
-      '2026-04-01T00:00:00.000Z',
+      '2026-04-01 00:00:00',
     );
     insertRequestEvent.run(
       'POST /v1/trial/challenge',
       '203.0.113.2',
       'install-retention-new',
-      '2026-04-17T00:00:00.000Z',
+      '2026-04-17 00:00:00',
     );
 
     const insertIssueSuccess = env.__db.prepare(
@@ -156,7 +156,7 @@ describe('broker persistence retention model', () => {
       'TLSv1.3',
       'TLS_AES_128_GCM_SHA256',
       'low',
-      '2026-03-31T00:00:00.000Z',
+      '2026-03-31 00:00:00',
     );
     insertIssueSuccess.run(
       'install-retention-new',
@@ -170,7 +170,7 @@ describe('broker persistence retention model', () => {
       'TLSv1.3',
       'TLS_AES_128_GCM_SHA256',
       'low',
-      '2026-04-17T00:00:00.000Z',
+      '2026-04-17 00:00:00',
     );
 
     const insertRuntimeAudit = env.__db.prepare(
@@ -181,13 +181,13 @@ describe('broker persistence retention model', () => {
       'brake_transition',
       'global_threshold',
       '{"old":true}',
-      '2026-04-01T00:00:00.000Z',
+      '2026-04-01 00:00:00',
     );
     insertRuntimeAudit.run(
       'brake_transition',
       'global_threshold',
       '{"new":true}',
-      '2026-04-17T00:00:00.000Z',
+      '2026-04-17 00:00:00',
     );
 
     const result = await applyAbuseMonitoringRetention(

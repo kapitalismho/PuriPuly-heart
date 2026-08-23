@@ -119,7 +119,6 @@ export interface StoredAbuseControls {
     enabled: boolean;
     hourUtc: number;
     minuteUtc: number;
-    includeZeroActivity: boolean;
   };
 }
 
@@ -255,9 +254,8 @@ export const TEST_DEFAULT_ABUSE_CONTROLS: StoredAbuseControls = {
   },
   dailyReport: {
     enabled: true,
-    hourUtc: 13,
-    minuteUtc: 0,
-    includeZeroActivity: false,
+    hourUtc: 0,
+    minuteUtc: 5,
   },
 };
 

@@ -27,8 +27,11 @@ describe('managed key delivery ACK foundation', () => {
   it('orders migration 0012 after telemetry 0011 and creates delivery ACK schema', () => {
     const env = createTestBrokerEnv();
 
-    expect(BROKER_MIGRATION_FILENAMES.at(-2)).toBe('0011_add_telemetry_active_days.sql');
-    expect(BROKER_MIGRATION_FILENAMES.at(-1)).toBe('0012_add_managed_key_delivery_ack.sql');
+    expect(BROKER_MIGRATION_FILENAMES.at(-3)).toBe('0011_add_telemetry_active_days.sql');
+    expect(BROKER_MIGRATION_FILENAMES.at(-2)).toBe('0012_add_managed_key_delivery_ack.sql');
+    expect(BROKER_MIGRATION_FILENAMES.at(-1)).toBe(
+      '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
+    );
 
     env.__db
       .prepare(
@@ -324,6 +327,134 @@ describe('managed key delivery ACK foundation', () => {
     expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_discord_ack'")).toBe(1);
   });
 
+  it('rolls Discord ownership back when issue-success persistence fails', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
+    let rejectIssueSuccess = true;
+    const env = createTestBrokerEnv({
+      beforeRun: ({ sql }) => {
+        if (
+          rejectIssueSuccess &&
+          sql.includes('INSERT INTO broker_issue_success_events')
+        ) {
+          throw new Error('issue-success persistence unavailable');
+        }
+      },
+    });
+    insertDiscordDeliveryPendingOwner(env, {
+      installationId: 'discord-install-retry-ack',
+      discordUserRef: 'ph-discord-user-v1_retry_ack',
+      managedCredentialRef: 'hash_discord_retry_ack',
+    });
+    const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef: 'ph-discord-user-v1_retry_ack',
+      installationId: 'discord-install-retry-ack',
+      managedCredentialRef: 'hash_discord_retry_ack',
+      createdAt: new Date('2026-07-05T00:00:00.000Z'),
+      expiresAt: new Date('2026-07-05T00:15:00.000Z'),
+    });
+
+    const failed = await postAck(env, {
+      delivery_id: delivery.deliveryId,
+      managed_credential_ref: 'hash_discord_retry_ack',
+      delivery_ack_token: delivery.deliveryAckToken,
+    });
+
+    expect(failed.status).toBe(409);
+    expect(selectDiscordEntitlement(env, 'hash_discord_retry_ack')).toMatchObject({
+      status: 'pending_release',
+      discord_issue_status: 'delivery_pending',
+      discord_issue_delivered_at: null,
+    });
+    expect(
+      selectDiscordIdentityStatus(
+        env,
+        'ph-discord-user-v1_retry_ack',
+        'discord-install-retry-ack',
+      ),
+    ).toBe('issuing');
+    expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_discord_retry_ack'")).toBe(0);
+
+    rejectIssueSuccess = false;
+    const retried = await postAck(env, {
+      delivery_id: delivery.deliveryId,
+      managed_credential_ref: 'hash_discord_retry_ack',
+      delivery_ack_token: delivery.deliveryAckToken,
+    });
+
+    expect(retried.status).toBe(200);
+    await expect(retried.json()).resolves.toEqual({ ok: true, status: 'acknowledged' });
+    expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_discord_retry_ack'")).toBe(1);
+  });
+
+  it('reconciles a finalized Discord owner before stale ACK cleanup', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
+    let rejectAckLedgerUpdate = true;
+    const env = createTestBrokerEnv({
+      beforeRun: ({ sql }) => {
+        if (
+          rejectAckLedgerUpdate &&
+          sql.includes('UPDATE managed_key_deliveries') &&
+          sql.includes("SET status = 'acknowledged'")
+        ) {
+          throw new Error('ACK ledger persistence unavailable');
+        }
+      },
+    });
+    insertDiscordDeliveryPendingOwner(env, {
+      installationId: 'discord-install-ledger-repair',
+      discordUserRef: 'ph-discord-user-v1_ledger_repair',
+      managedCredentialRef: 'hash_discord_ledger_repair',
+    });
+    const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef: 'ph-discord-user-v1_ledger_repair',
+      installationId: 'discord-install-ledger-repair',
+      managedCredentialRef: 'hash_discord_ledger_repair',
+      createdAt: new Date('2026-07-05T00:00:00.000Z'),
+      expiresAt: new Date('2026-07-05T00:15:00.000Z'),
+    });
+
+    const failed = await postAck(env, {
+      delivery_id: delivery.deliveryId,
+      managed_credential_ref: 'hash_discord_ledger_repair',
+      delivery_ack_token: delivery.deliveryAckToken,
+    });
+
+    expect(failed.status).toBe(500);
+    expect(selectDiscordEntitlement(env, 'hash_discord_ledger_repair')).toMatchObject({
+      status: 'active',
+      discord_issue_status: 'active',
+      discord_issue_delivered_at: '2026-07-05T00:01:00.000Z',
+    });
+    expect(
+      env.__db
+        .prepare('SELECT status FROM managed_key_deliveries WHERE delivery_id = ?')
+        .get(delivery.deliveryId),
+    ).toEqual({ status: 'pending' });
+    expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_discord_ledger_repair'")).toBe(1);
+
+    rejectAckLedgerUpdate = false;
+    const result = await reconcileStaleManagedKeyDeliveries(
+      env,
+      new Date('2026-07-05T00:16:00.000Z'),
+    );
+
+    expect(result).toEqual({ expired: 0, cleanupRequired: 0 });
+    expect(cleanupManagedChildKey).not.toHaveBeenCalled();
+    expect(
+      env.__db
+        .prepare('SELECT status FROM managed_key_deliveries WHERE delivery_id = ?')
+        .get(delivery.deliveryId),
+    ).toEqual({ status: 'acknowledged' });
+    expect(selectDiscordEntitlement(env, 'hash_discord_ledger_repair')).toMatchObject({
+      status: 'active',
+      discord_issue_status: 'active',
+    });
+  });
+
   it('finalizes QQ delivery only after a valid ACK and keeps duplicate ACK idempotent', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
@@ -372,6 +503,127 @@ describe('managed key delivery ACK foundation', () => {
     expect(duplicate.status).toBe(200);
     await expect(duplicate.json()).resolves.toEqual({ ok: true, status: 'already_acknowledged' });
     expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_qq_ack'")).toBe(1);
+  });
+
+  it('keeps QQ acknowledgement pending until issue-success recording is durable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
+    let rejectIssueSuccess = true;
+    const env = createTestBrokerEnv({
+      beforeRun: ({ sql }) => {
+        if (
+          rejectIssueSuccess &&
+          sql.includes('INSERT INTO broker_issue_success_events')
+        ) {
+          throw new Error('issue-success persistence unavailable');
+        }
+      },
+    });
+    insertQqDeliveryPendingOwner(env, {
+      qqSubjectRef: 'ph-qq-subject-v1_retry_ack',
+      issueRef: 'qq-issue-retry-ack',
+      managedCredentialRef: 'hash_qq_retry_ack',
+    });
+    const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'qq',
+      subjectRef: 'ph-qq-subject-v1_retry_ack',
+      managedCredentialRef: 'hash_qq_retry_ack',
+      createdAt: new Date('2026-07-05T00:00:00.000Z'),
+      expiresAt: new Date('2026-07-05T00:15:00.000Z'),
+    });
+
+    const failed = await postAck(env, {
+      delivery_id: delivery.deliveryId,
+      managed_credential_ref: 'hash_qq_retry_ack',
+      delivery_ack_token: delivery.deliveryAckToken,
+    });
+
+    expect(failed.status).toBe(409);
+    expect(
+      env.__db
+        .prepare('SELECT status FROM managed_key_deliveries WHERE delivery_id = ?')
+        .get(delivery.deliveryId),
+    ).toEqual({ status: 'pending' });
+    expect(selectQqEntitlement(env, 'hash_qq_retry_ack')).toMatchObject({
+      status: 'delivery_pending',
+      delivered_at: null,
+    });
+    expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_qq_retry_ack'")).toBe(0);
+
+    rejectIssueSuccess = false;
+    const retried = await postAck(env, {
+      delivery_id: delivery.deliveryId,
+      managed_credential_ref: 'hash_qq_retry_ack',
+      delivery_ack_token: delivery.deliveryAckToken,
+    });
+
+    expect(retried.status).toBe(200);
+    await expect(retried.json()).resolves.toEqual({ ok: true, status: 'acknowledged' });
+    expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_qq_retry_ack'")).toBe(1);
+  });
+
+  it('reconciles a finalized QQ owner before stale ACK cleanup', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
+    let rejectAckLedgerUpdate = true;
+    const env = createTestBrokerEnv({
+      beforeRun: ({ sql }) => {
+        if (
+          rejectAckLedgerUpdate &&
+          sql.includes('UPDATE managed_key_deliveries') &&
+          sql.includes("SET status = 'acknowledged'")
+        ) {
+          throw new Error('ACK ledger persistence unavailable');
+        }
+      },
+    });
+    insertQqDeliveryPendingOwner(env, {
+      qqSubjectRef: 'ph-qq-subject-v1_ledger_repair',
+      issueRef: 'qq-issue-ledger-repair',
+      managedCredentialRef: 'hash_qq_ledger_repair',
+    });
+    const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'qq',
+      subjectRef: 'ph-qq-subject-v1_ledger_repair',
+      managedCredentialRef: 'hash_qq_ledger_repair',
+      createdAt: new Date('2026-07-05T00:00:00.000Z'),
+      expiresAt: new Date('2026-07-05T00:15:00.000Z'),
+    });
+
+    const failed = await postAck(env, {
+      delivery_id: delivery.deliveryId,
+      managed_credential_ref: 'hash_qq_ledger_repair',
+      delivery_ack_token: delivery.deliveryAckToken,
+    });
+
+    expect(failed.status).toBe(500);
+    expect(selectQqEntitlement(env, 'hash_qq_ledger_repair')).toMatchObject({
+      status: 'active',
+      delivered_at: '2026-07-05T00:01:00.000Z',
+    });
+    expect(
+      env.__db
+        .prepare('SELECT status FROM managed_key_deliveries WHERE delivery_id = ?')
+        .get(delivery.deliveryId),
+    ).toEqual({ status: 'pending' });
+    expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_qq_ledger_repair'")).toBe(1);
+
+    rejectAckLedgerUpdate = false;
+    const result = await reconcileStaleManagedKeyDeliveries(
+      env,
+      new Date('2026-07-05T00:16:00.000Z'),
+    );
+
+    expect(result).toEqual({ expired: 0, cleanupRequired: 0 });
+    expect(cleanupManagedChildKey).not.toHaveBeenCalled();
+    expect(
+      env.__db
+        .prepare('SELECT status FROM managed_key_deliveries WHERE delivery_id = ?')
+        .get(delivery.deliveryId),
+    ).toEqual({ status: 'acknowledged' });
+    expect(selectQqEntitlement(env, 'hash_qq_ledger_repair')).toMatchObject({
+      status: 'active',
+    });
   });
 
   it('stale cleanup releases Discord reservation identity on success and marks it cleanup_required on failure', async () => {

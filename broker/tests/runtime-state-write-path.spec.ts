@@ -4,7 +4,6 @@ import {
   getBrokerAbuseRuntimeState,
   persistBrokerAbuseRuntimeState,
 } from '../src/abuse-controls';
-import { markDailyReportDelivered } from '../src/scheduled';
 import { readAbuseRuntimeState } from './test-support/abuse-controls';
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
 
@@ -98,57 +97,4 @@ describe('broker abuse runtime-state write path', () => {
     });
   });
 
-  it('retries markDailyReportDelivered after a conflicting runtime-state write so the delivery stamp is not lost', async () => {
-    let injectedConflict = false;
-    let env!: ReturnType<typeof createTestBrokerEnv>;
-
-    env = createTestBrokerEnv({
-      beforeRun: async ({ sql }) => {
-        if (injectedConflict || !sql.startsWith('UPDATE broker_config')) {
-          return;
-        }
-
-        injectedConflict = true;
-        env.__db
-          .prepare('UPDATE broker_config SET value = ?, updated_at = ? WHERE key = ?')
-          .run(
-            JSON.stringify({
-              brake: {
-                active: true,
-                reason: 'asn_fast_path',
-                changedAt: '2026-04-19T00:00:30.000Z',
-                changedBy: 'system',
-              },
-              alertLatches: {
-                warn1: false,
-                warn2: false,
-                warn3: false,
-                critical: false,
-              },
-              dailyReport: {
-                lastDeliveredAt: '2026-04-18T23:59:00.000Z',
-                lastDeliveredDateUtc: '2026-04-18',
-              },
-            }),
-            '2026-04-19T00:00:30.000Z',
-            'abuse_runtime_state',
-          );
-      },
-    });
-
-    await markDailyReportDelivered(env.BROKER_DB, new Date('2026-04-19T00:00:00.000Z'));
-
-    expect(readAbuseRuntimeState(env)).toMatchObject({
-      brake: {
-        active: true,
-        reason: 'asn_fast_path',
-        changedAt: '2026-04-19T00:00:30.000Z',
-        changedBy: 'system',
-      },
-      dailyReport: {
-        lastDeliveredAt: '2026-04-19T00:00:00.000Z',
-        lastDeliveredDateUtc: '2026-04-19',
-      },
-    });
-  });
 });

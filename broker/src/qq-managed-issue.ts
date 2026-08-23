@@ -560,12 +560,27 @@ export async function finalizeQqManagedKeyDeliveryAck(
     }
   }
   if (!(await hasQqIssueSuccessRecord(c.env.BROKER_DB, input.managedCredentialRef))) {
-    await runQqIssueSuccessMonitoring(c, {
-      qqSubjectRef: entitlement.qq_subject_ref,
-      managedCredentialRef: input.managedCredentialRef,
-      observedAt: deliveredAt,
-      now: input.acknowledgedAt,
-    });
+    try {
+      await runQqIssueSuccessMonitoring(c, {
+        qqSubjectRef: entitlement.qq_subject_ref,
+        managedCredentialRef: input.managedCredentialRef,
+        observedAt: deliveredAt,
+        now: input.acknowledgedAt,
+      });
+    } catch (error) {
+      const reverted = await c.env.BROKER_DB.prepare(
+        `UPDATE qq_managed_entitlements
+            SET status = 'delivery_pending', delivered_at = NULL, updated_at = ?
+          WHERE managed_credential_ref = ?
+            AND status = 'active'`,
+      )
+        .bind(input.acknowledgedAt.toISOString(), input.managedCredentialRef)
+        .run();
+      if (Number(reverted.meta.changes ?? 0) !== 1) {
+        throw new Error('QQ delivery ACK monitoring rollback failed');
+      }
+      throw error;
+    }
   }
 }
 
@@ -894,20 +909,38 @@ async function runQqIssueSuccessMonitoring(
       observedAt: input.observedAt,
       network,
     });
+  } catch (error) {
+    logQqIssueSuccessMonitoringFailure(input, 'record', error);
+    throw error;
+  }
+
+  try {
     const monitoringResult = await evaluateImmediateAbuseState(
       c.env.BROKER_DB,
       input.now,
     );
     await deliverImmediateMonitoringSideEffects(c.env, monitoringResult);
   } catch (error) {
-    console.error('qq_issue_success_monitoring_failed', {
-      issue_source: ISSUE_SOURCE,
-      subject_ref: input.qqSubjectRef,
-      managed_credential_ref: input.managedCredentialRef,
-      error_name: safeErrorName(error),
-      broker_timestamp: new Date().toISOString(),
-    });
+    logQqIssueSuccessMonitoringFailure(input, 'evaluate_or_deliver', error);
   }
+}
+
+function logQqIssueSuccessMonitoringFailure(
+  input: {
+    qqSubjectRef: string;
+    managedCredentialRef: string;
+  },
+  stage: 'record' | 'evaluate_or_deliver',
+  error: unknown,
+): void {
+  console.error('qq_issue_success_monitoring_failed', {
+    issue_source: ISSUE_SOURCE,
+    subject_ref: input.qqSubjectRef,
+    managed_credential_ref: input.managedCredentialRef,
+    stage,
+    error_name: safeErrorName(error),
+    broker_timestamp: new Date().toISOString(),
+  });
 }
 
 async function deriveOptionalOpenRouterUserId(input: {

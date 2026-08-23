@@ -1,494 +1,631 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { applyAbuseMonitoringRetention } from '../src/abuse-monitoring';
 import {
-  buildDailyHeartbeatPacket,
+  buildDailySummaryPacket,
   handleScheduled,
+  resolveDailyReportWindow,
   runDailyReport,
 } from '../src/scheduled';
 import {
-  readAbuseRuntimeState,
+  applyTelemetryActiveDayRetention,
+  recordTelemetryActiveDay,
+} from '../src/telemetry';
+import {
   updateAbuseControls,
+  updateAbuseRuntimeState,
 } from './test-support/abuse-controls';
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
-import { recordTelemetryActiveDay } from '../src/telemetry';
 
-describe('broker daily heartbeat', () => {
+describe('PuriPuly daily summary v2', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
-  it('emits the daily report even when the last 24 hours were quiet', async () => {
+  it('emits the quiet completed-day contract without legacy security or cohort fields', async () => {
     const env = createTestBrokerEnv();
-    updateAbuseControls(env, (controls) => {
-      controls.dailyReport.enabled = true;
-      controls.dailyReport.hourUtc = 0;
-      controls.dailyReport.minuteUtc = 0;
-      controls.dailyReport.includeZeroActivity = false;
-    });
-
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    const sent = await runDailyReport(env, new Date('2026-04-19T00:00:00.000Z'));
+    const sent = await runDailyReport(env, new Date('2026-04-20T00:05:00.000Z'));
 
-    expect(sent.ok).toBe(true);
-    expect(sent.payload.summary.issue_success_24h).toBe(0);
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock).toHaveBeenCalledWith(
-      env.DISCORD_DAILY_REPORT_WEBHOOK_URL,
+    expect(sent.payload).toEqual({
+      schema_version: 'puripuly_daily_summary.v2',
+      report_date_utc: '2026-04-19',
+      window_start: '2026-04-19T00:00:00.000Z',
+      window_end: '2026-04-20T00:00:00.000Z',
+      summary: {
+        keys_delivered_total: 0,
+        keys_delivered_discord: 0,
+        keys_delivered_qq: 0,
+        translated_dau: 0,
+        translated_wau: 0,
+        translated_mau: 0,
+        first_observed_translators: 0,
+        returning_translators: 0,
+      },
+    });
+    expect(sent.sent).toBe(true);
+    expect(readDailySummaryDeliveries(env)).toEqual([
       expect.objectContaining({
-        method: 'POST',
+        report_date_utc: '2026-04-19',
+        status: 'delivered',
+        attempted_at: '2026-04-20T00:05:00.000Z',
+        delivered_at: '2026-04-20T00:05:00.000Z',
       }),
-    );
+    ]);
+    expect(fetchMock).toHaveBeenCalledOnce();
 
-    const init = (
+    const request = (
       fetchMock.mock.calls as unknown as Array<[
         string | URL,
         RequestInit | undefined,
       ]>
     )[0]?.[1];
-
-    if (!init) {
-      throw new Error('expected fetch request init');
+    if (!request) {
+      throw new Error('expected daily summary request');
     }
-
-    const body = JSON.parse(String(init.body)) as {
-      content?: string;
-      embeds: Array<{ title: string; fields: Array<{ name: string }> }>;
+    const body = JSON.parse(String(request.body)) as {
+      content: string;
+      embeds: Array<{
+        title: string;
+        description: string;
+        fields: Array<{ name: string; value: string }>;
+      }>;
     };
-
-    expect(body.embeds[0]?.title).toContain('daily heartbeat');
-    expect(body.content).toContain('broker_daily_heartbeat.v1');
-    expect(body.content).not.toContain('estimated_monthly_exposure_usd');
-    expect(body.content).not.toContain('monthly_cap_usd');
-    expect(body.content).not.toContain('remaining_budget_usd');
-    expect(body.embeds[0]?.fields.map((field) => field.name)).not.toContain(
-      'Budget summary',
+    const serialized = JSON.stringify(body);
+    expect(body.embeds[0]?.title).toBe('PuriPuly daily summary — 2026-04-19 UTC');
+    expect(body.embeds[0]?.description).toBe(
+      '2026-04-19T00:00:00.000Z ≤ observed_at < 2026-04-20T00:00:00.000Z',
     );
-    expect(body.embeds[0]?.fields.map((field) => field.name)).toContain(
-      'Translation usage',
-    );
-    expect(sent.payload.summary.translation_usage).toEqual({
-      active_users_24h: 0,
-      active_users_7d: 0,
-      active_users_30d: 0,
-      dau_mau_stickiness_pct: null,
-      first_active_users_24h: 0,
-      returning_active_users_24h: 0,
-      retention: {
-        d1: {
-          cohort_date_utc: '2026-04-18',
-          eligible_users: 0,
-          retained_users: 0,
-          retention_pct: null,
-        },
-        d7: {
-          cohort_date_utc: '2026-04-12',
-          eligible_users: 0,
-          retained_users: 0,
-          retention_pct: null,
-        },
-        d30: {
-          cohort_date_utc: '2026-03-20',
-          eligible_users: 0,
-          retained_users: 0,
-          retention_pct: null,
-        },
+    expect(body.embeds[0]?.fields).toEqual([
+      {
+        name: 'Managed key issuance',
+        value: 'keys_delivered=0\ndiscord=0\nqq=0',
+        inline: true,
       },
-    });
-    expect(readAbuseRuntimeState(env).dailyReport).toEqual({
-      lastDeliveredAt: '2026-04-19T00:00:00.000Z',
-      lastDeliveredDateUtc: '2026-04-19',
-    });
+      {
+        name: 'Translation usage',
+        value: 'dau=0\nwau=0\nmau=0\nfirst_observed=0\nreturning=0',
+        inline: true,
+      },
+    ]);
+    for (const removed of [
+      'broker_daily_heartbeat.v1',
+      'challenge_24h',
+      'verify_24h',
+      'highest_alert_level_24h',
+      'brake_triggered_24h',
+      'manual_revocations_24h',
+      'top_asns',
+      'cloud_asn_share_24h',
+      'dau_mau_stickiness_pct',
+      'retention',
+    ]) {
+      expect(serialized).not.toContain(removed);
+    }
   });
 
-  it('waits until the configured UTC schedule and sends only once per date', async () => {
+  it('waits until 00:05 UTC and delivers each completed report date once', async () => {
     const env = createTestBrokerEnv();
-    updateAbuseControls(env, (controls) => {
-      controls.dailyReport.enabled = true;
-      controls.dailyReport.hourUtc = 1;
-      controls.dailyReport.minuteUtc = 30;
-    });
-
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
-
     const executionCtx = {
       waitUntil() {},
       passThroughOnException() {},
     };
 
     await handleScheduled(
-      {
-        cron: '* * * * *',
-        scheduledTime: Date.parse('2026-04-19T01:29:00.000Z'),
-      },
+      { scheduledTime: Date.parse('2026-04-20T00:04:00.000Z') },
       env,
       executionCtx,
     );
-    expect(fetchMock).not.toHaveBeenCalled();
-
     await handleScheduled(
-      {
-        cron: '* * * * *',
-        scheduledTime: Date.parse('2026-04-19T01:30:00.000Z'),
-      },
+      { scheduledTime: Date.parse('2026-04-20T00:05:00.000Z') },
       env,
       executionCtx,
     );
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
     await handleScheduled(
-      {
-        cron: '* * * * *',
-        scheduledTime: Date.parse('2026-04-19T01:45:00.000Z'),
-      },
+      { scheduledTime: Date.parse('2026-04-20T23:59:00.000Z') },
       env,
       executionCtx,
     );
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(readAbuseRuntimeState(env).dailyReport.lastDeliveredDateUtc).toBe(
+    await handleScheduled(
+      { scheduledTime: Date.parse('2026-04-21T00:05:00.000Z') },
+      env,
+      executionCtx,
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(readDailySummaryDeliveries(env).map((row) => row.report_date_utc)).toEqual([
       '2026-04-19',
-    );
+      '2026-04-20',
+    ]);
   });
 
-  it('exports a scheduled handler from the worker entrypoint', async () => {
-    const worker = await import('../src/index');
-
-    expect(worker.default.scheduled).toBeTypeOf('function');
-    expect(worker.default.fetch).toBeTypeOf('function');
-    expect(worker.default.request).toBeTypeOf('function');
-  });
-
-  it('computes cloud_asn_share_24h from the full 24h issue population rather than the top-5 subset', async () => {
+  it('ignores a legacy v1 execution-date stamp for the first v2 report', async () => {
     const env = createTestBrokerEnv();
-    updateAbuseControls(env, (controls) => {
-      controls.dailyReport.enabled = true;
-      controls.dailyReport.hourUtc = 0;
-      controls.dailyReport.minuteUtc = 0;
-      controls.asnClassifications = [
-        {
-          asn: 65535,
-          kind: 'cloud_or_vps',
-          displayName: 'Cloud Tail ASN',
-        },
-      ];
-    });
-
-    for (const [index, asn] of [64501, 64502, 64503, 64504, 64505, 65535].entries()) {
-      insertIssueSuccessEvent(env, {
-        installationId: `daily-cloud-share-${index}`,
-        managedCredentialRef: `daily-cloud-share-managed-${index}`,
-        asn,
-        observedAt: `2026-04-18T0${index}:00:00.000Z`,
-      });
-    }
-
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
-
-    const sent = await runDailyReport(env, new Date('2026-04-19T00:00:00.000Z'));
-
-    expect(sent.payload.summary.top_asns).toHaveLength(5);
-    expect(sent.payload.summary.cloud_asn_share_24h).toBe(17);
-  });
-
-  it('counts QQ nullable-installation issue successes in the daily heartbeat without raw identity', async () => {
-    const env = createTestBrokerEnv();
-    updateAbuseControls(env, (controls) => {
-      controls.dailyReport.enabled = true;
-      controls.dailyReport.hourUtc = 0;
-      controls.dailyReport.minuteUtc = 0;
+    updateAbuseRuntimeState(env, (state) => {
+      state.dailyReport.lastDeliveredAt = '2026-04-19T13:00:00.000Z';
+      state.dailyReport.lastDeliveredDateUtc = '2026-04-19';
     });
 
+    await handleScheduled(
+      { scheduledTime: Date.parse('2026-04-20T00:05:00.000Z') },
+      env,
+      {},
+    );
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(readDailySummaryDeliveries(env)).toEqual([
+      expect.objectContaining({
+        report_date_utc: '2026-04-19',
+        status: 'delivered',
+      }),
+    ]);
+  });
+
+  it('uses one report-date lease across overlapping cron executions', async () => {
+    const env = createTestBrokerEnv();
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const scheduledTime = Date.parse('2026-04-20T00:05:00.000Z');
+
+    await Promise.all([
+      handleScheduled({ scheduledTime }, env, {}),
+      handleScheduled({ scheduledTime }, env, {}),
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(readDailySummaryDeliveries(env)).toHaveLength(1);
+    expect(readDailySummaryDeliveries(env)[0]).toMatchObject({
+      report_date_utc: '2026-04-19',
+      status: 'delivered',
+    });
+  });
+
+  it('recovers an expired report-date lease after an interrupted attempt', async () => {
+    const env = createTestBrokerEnv();
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    env.__db
+      .prepare(
+        `INSERT INTO broker_daily_summary_deliveries (
+            report_date_utc,
+            status,
+            lease_token,
+            lease_expires_at,
+            attempted_at,
+            delivered_at
+          ) VALUES (?, 'pending', ?, ?, ?, NULL)`,
+      )
+      .run(
+        '2026-04-19',
+        '00000000-0000-0000-0000-000000000000',
+        '2026-04-20T00:04:59.999Z',
+        '2026-04-20T00:00:00.000Z',
+      );
+
+    const result = await runDailyReport(
+      env,
+      new Date('2026-04-20T00:05:00.000Z'),
+    );
+
+    expect(result.sent).toBe(true);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(readDailySummaryDeliveries(env)[0]).toMatchObject({
+      report_date_utc: '2026-04-19',
+      status: 'delivered',
+      attempted_at: '2026-04-20T00:05:00.000Z',
+    });
+  });
+
+  it('preserves a failed report across midnight and catches up completed dates in order', async () => {
+    const env = createTestBrokerEnv();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const scheduledTime = Date.parse('2026-04-20T23:59:00.000Z');
     insertIssueSuccessEvent(env, {
-      installationId: 'daily-source-aware-discord',
-      managedCredentialRef: 'daily-source-aware-discord-managed',
-      asn: 64570,
-      observedAt: '2026-06-09T23:00:00.000Z',
+      source: 'discord',
+      label: 'failed-report-midnight-delivery',
+      observedAt: '2026-04-19 18:00:00',
+    });
+
+    await expect(handleScheduled({ scheduledTime }, env, {})).rejects.toThrow(
+      'discord webhook failed: 503',
+    );
+    expect(readDailySummaryDeliveries(env)).toEqual([
+      expect.objectContaining({
+        report_date_utc: '2026-04-19',
+        status: 'pending',
+        attempted_at: '2026-04-20T23:59:00.000Z',
+        lease_expires_at: '2026-04-20T23:59:00.000Z',
+      }),
+    ]);
+    await recordActiveDay(env, 'late-received-report-day', '2026-04-19');
+
+    await handleScheduled(
+      { scheduledTime: Date.parse('2026-04-21T00:04:00.000Z') },
+      env,
+      {},
+    );
+    expect(
+      env.__db
+        .prepare(
+          `SELECT COUNT(*) AS count
+             FROM broker_issue_success_events
+            WHERE managed_credential_ref = ?`,
+        )
+        .get('managed-failed-report-midnight-delivery'),
+    ).toEqual({ count: 1 });
+
+    await handleScheduled(
+      { scheduledTime: Date.parse('2026-04-21T00:05:00.000Z') },
+      env,
+      {},
+    );
+    await handleScheduled(
+      { scheduledTime: Date.parse('2026-04-21T00:06:00.000Z') },
+      env,
+      {},
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const sentBodies = fetchMock.mock.calls.map((call) =>
+      JSON.parse(String((call[1] as RequestInit).body)) as { content: string },
+    );
+    const sentPackets = sentBodies.map((body) =>
+      JSON.parse(body.content.slice('```json\n'.length, -'\n```'.length)) as {
+        report_date_utc: string;
+        window_start: string;
+        window_end: string;
+        summary: { translated_dau: number };
+      },
+    );
+    expect(
+      sentPackets.map(({ report_date_utc, window_start, window_end }) => ({
+        report_date_utc,
+        window_start,
+        window_end,
+      })),
+    ).toEqual([
+      {
+        report_date_utc: '2026-04-19',
+        window_start: '2026-04-19T00:00:00.000Z',
+        window_end: '2026-04-20T00:00:00.000Z',
+      },
+      {
+        report_date_utc: '2026-04-19',
+        window_start: '2026-04-19T00:00:00.000Z',
+        window_end: '2026-04-20T00:00:00.000Z',
+      },
+      {
+        report_date_utc: '2026-04-20',
+        window_start: '2026-04-20T00:00:00.000Z',
+        window_end: '2026-04-21T00:00:00.000Z',
+      },
+    ]);
+    expect(sentPackets.map((packet) => packet.summary.translated_dau)).toEqual([0, 1, 0]);
+    expect(readDailySummaryDeliveries(env)).toEqual([
+      expect.objectContaining({
+        report_date_utc: '2026-04-19',
+        status: 'delivered',
+      }),
+      expect.objectContaining({
+        report_date_utc: '2026-04-20',
+        status: 'delivered',
+      }),
+    ]);
+  });
+
+  it('runs retention during a persistent webhook failure without deleting the pending report window', async () => {
+    const env = createTestBrokerEnv();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+    insertIssueSuccessEvent(env, {
+      source: 'discord',
+      label: 'retention-during-report-failure',
+      observedAt: '2026-04-20 12:00:00',
     });
     env.__db
       .prepare(
-        `INSERT INTO broker_issue_success_events (
-            issue_source,
+        `INSERT INTO broker_request_events (
+            endpoint,
+            ip,
             installation_id,
-            subject_ref,
-            managed_credential_ref,
-            ip_hash,
-            ip_prefix_hash,
-            asn,
-            country,
-            http_protocol,
-            tls_version,
-            tls_cipher,
-            risk_label,
             observed_at
-          ) VALUES ('qq', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?)`,
       )
       .run(
-        'ph-qq-subject-v1_daily-safe-subject',
-        'daily-source-aware-qq-managed',
-        'ip-hash-daily-qq',
-        'ip-prefix-daily-qq',
-        64571,
-        'CN',
-        'HTTP/2',
-        'TLSv1.3',
-        'TLS_AES_128_GCM_SHA256',
-        'low',
-        '2026-06-09T23:10:00.000Z',
+        'POST /v1/trial/challenge',
+        '203.0.113.10',
+        'retention-during-report-failure',
+        '2025-01-01 12:00:00',
       );
+    env.__db
+      .prepare(
+        `INSERT INTO broker_abuse_runtime_audit (
+            event_kind,
+            reason,
+            payload_json,
+            created_at
+          ) VALUES (?, ?, ?, ?)`,
+      )
+      .run('state_observation', null, '{}', '2025-01-01 12:00:00');
+    await recordActiveDay(env, 'retention-during-report-failure', '2025-01-01');
 
-    const packet = await buildDailyHeartbeatPacket(
-      env.BROKER_DB,
-      new Date('2026-06-10T00:00:00.000Z'),
-    );
+    await expect(
+      handleScheduled(
+        { scheduledTime: Date.parse('2026-04-21T00:05:00.000Z') },
+        env,
+        {},
+      ),
+    ).rejects.toThrow('discord webhook failed: 503');
 
-    expect(packet.summary.issue_success_24h).toBe(2);
-    expect(packet.summary.top_asns).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          asn: 64571,
-          count: 1,
-        }),
-      ]),
-    );
-    expect(JSON.stringify(packet)).not.toContain('qq_identity');
-    expect(JSON.stringify(packet)).not.toContain('credential');
+    expect(
+      env.__db.prepare('SELECT COUNT(*) AS count FROM broker_request_events').get(),
+    ).toEqual({ count: 0 });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT COUNT(*) AS count
+             FROM broker_abuse_runtime_audit
+            WHERE created_at = ?`,
+        )
+        .get('2025-01-01 12:00:00'),
+    ).toEqual({ count: 0 });
+    expect(
+      env.__db.prepare('SELECT COUNT(*) AS count FROM telemetry_active_days').get(),
+    ).toEqual({ count: 0 });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT COUNT(*) AS count
+             FROM broker_issue_success_events
+            WHERE managed_credential_ref = ?`,
+        )
+        .get('managed-retention-during-report-failure'),
+    ).toEqual({ count: 1 });
+    expect(readDailySummaryDeliveries(env)).toEqual([
+      expect.objectContaining({
+        report_date_utc: '2026-04-20',
+        status: 'pending',
+      }),
+    ]);
   });
 
-  it('adds aggregate Translation usage metrics without subject_ref disclosure', async () => {
+  it('retains the whole completed day before a tuned minimum-retention report', async () => {
     const env = createTestBrokerEnv();
-
-    insertTelemetryActiveDay(env, 'subject-new-today', '2026-04-19');
-    await recordTelemetryActiveDay(env.BROKER_DB, {
-      subjectRef: validTelemetrySubjectRef('subject-new-today'),
-      activeDateUtc: '2026-04-19',
-      receivedAt: '2026-04-19T12:00:00.000Z',
-    });
-    insertTelemetryActiveDay(env, 'subject-returning-today', '2026-04-01');
-    insertTelemetryActiveDay(env, 'subject-returning-today', '2026-04-19');
-    insertTelemetryActiveDay(env, 'subject-week-only', '2026-04-15');
-    insertTelemetryActiveDay(env, 'subject-month-only', '2026-03-25');
-    insertTelemetryActiveDay(env, 'subject-outside-month', '2026-03-19');
-    insertTelemetryActiveDay(env, 'subject-d1-retained', '2026-04-18');
-    insertTelemetryActiveDay(env, 'subject-d1-retained', '2026-04-19');
-    insertTelemetryActiveDay(env, 'subject-d1-missed', '2026-04-18');
-    insertTelemetryActiveDay(env, 'subject-d7-retained', '2026-04-12');
-    insertTelemetryActiveDay(env, 'subject-d7-retained', '2026-04-19');
-    insertTelemetryActiveDay(env, 'subject-d7-missed', '2026-04-12');
-    insertTelemetryActiveDay(env, 'subject-d30-retained', '2026-03-20');
-    insertTelemetryActiveDay(env, 'subject-d30-retained', '2026-04-19');
-    insertTelemetryActiveDay(env, 'subject-d30-missed', '2026-03-20');
-
-    const packet = await buildDailyHeartbeatPacket(
-      env.BROKER_DB,
-      new Date('2026-04-19T22:00:00.000Z'),
-    );
-
-    expect(packet.summary.translation_usage).toEqual({
-      active_users_24h: 5,
-      active_users_7d: 7,
-      active_users_30d: 9,
-      dau_mau_stickiness_pct: 56,
-      first_active_users_24h: 1,
-      returning_active_users_24h: 4,
-      retention: {
-        d1: {
-          cohort_date_utc: '2026-04-18',
-          eligible_users: 2,
-          retained_users: 1,
-          retention_pct: 50,
-        },
-        d7: {
-          cohort_date_utc: '2026-04-12',
-          eligible_users: 2,
-          retained_users: 1,
-          retention_pct: 50,
-        },
-        d30: {
-          cohort_date_utc: '2026-03-20',
-          eligible_users: 2,
-          retained_users: 1,
-          retention_pct: 50,
-        },
-      },
-    });
-    expect(packet.summary.challenge_24h).toBe(0);
-    expect(packet.summary.verify_24h).toBe(0);
-    expect(packet.summary.issue_success_24h).toBe(0);
-    expect(packet.summary.highest_alert_level_24h).toBeNull();
-    expect(packet.summary.brake_triggered_24h).toBe(false);
-    expect(packet.summary.top_asns).toEqual([]);
-    expect(packet.summary.cloud_asn_share_24h).toBe(0);
-    expect(packet.summary.manual_revocations_24h).toBe(0);
-    expect(JSON.stringify(packet)).not.toContain('subject-new-today');
-    expect(JSON.stringify(packet)).not.toContain('subject_ref');
-  });
-
-  it('omits monthly budget exposure from daily heartbeat payloads after retention cleanup', async () => {
-    const env = createTestBrokerEnv();
-    updateAbuseControls(env, (controls) => {
-      controls.dailyReport.enabled = true;
-      controls.dailyReport.hourUtc = 0;
-      controls.dailyReport.minuteUtc = 0;
-      controls.retention.issueSuccessDays = 3;
-    });
-
-    insertIssueSuccessEvent(env, {
-      installationId: 'daily-monthly-exposure-prior-month',
-      managedCredentialRef: 'daily-monthly-exposure-managed-prior-month',
-      asn: 64501,
-      observedAt: '2026-03-31T23:00:00.000Z',
-    });
-    insertIssueSuccessEvent(env, {
-      installationId: 'daily-monthly-exposure-current-month-early',
-      managedCredentialRef: 'daily-monthly-exposure-managed-current-month-early',
-      asn: 64502,
-      observedAt: '2026-04-02T10:00:00.000Z',
-    });
-    insertIssueSuccessEvent(env, {
-      installationId: 'daily-monthly-exposure-current-month-late',
-      managedCredentialRef: 'daily-monthly-exposure-managed-current-month-late',
-      asn: 64503,
-      observedAt: '2026-04-17T12:00:00.000Z',
-    });
-
-    const retentionResult = await applyAbuseMonitoringRetention(
-      env.BROKER_DB,
-      new Date('2026-04-18T00:00:00.000Z'),
-    );
-
-    expect(retentionResult.issueSuccessDeleted).toBe(2);
-
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
-
-    const sent = await runDailyReport(env, new Date('2026-04-18T12:00:00.000Z'));
-
-    expect(sent.payload.summary.issue_success_24h).toBe(1);
-    expect(sent.payload.summary).not.toHaveProperty('estimated_monthly_exposure_usd');
-    expect(sent.payload.summary).not.toHaveProperty('monthly_cap_usd');
-    expect(sent.payload.summary).not.toHaveProperty('remaining_budget_usd');
-  });
-
-  it('derives highest_alert_level_24h from actual rolling threshold state at the report-window boundary', async () => {
-    const env = createTestBrokerEnv();
     updateAbuseControls(env, (controls) => {
-      controls.immediateAlerts.warn1 = 10;
-      controls.immediateAlerts.warn2 = 25;
-      controls.immediateAlerts.warn3 = 50;
-      controls.immediateAlerts.critical = 70;
+      controls.retention.issueSuccessDays = 1;
+    });
+    insertIssueSuccessEvent(env, {
+      source: 'discord',
+      label: 'retained-midnight-delivery',
+      observedAt: '2026-04-19T00:00:00.000Z',
     });
 
-    for (let index = 0; index < 11; index += 1) {
-      insertIssueSuccessEvent(env, {
-        installationId: `daily-highest-alert-prewindow-${index}`,
-        managedCredentialRef: `daily-highest-alert-prewindow-managed-${index}`,
-        asn: 64510 + index,
-        observedAt: `2026-04-17T23:${String(index * 5).padStart(2, '0')}:00.000Z`,
-      });
-    }
-
-    const packet = await buildDailyHeartbeatPacket(
-      env.BROKER_DB,
-      new Date('2026-04-19T00:00:00.000Z'),
+    await handleScheduled(
+      { scheduledTime: Date.parse('2026-04-20T00:05:00.000Z') },
+      env,
+      {},
     );
 
-    expect(packet.summary.issue_success_24h).toBe(0);
-    expect(packet.summary.highest_alert_level_24h).toBe('warn1');
+    const request = (
+      fetchMock.mock.calls as unknown as Array<[
+        string | URL,
+        RequestInit | undefined,
+      ]>
+    )[0]?.[1];
+    const body = JSON.parse(String(request?.body)) as { content: string };
+    expect(body.content).toContain('"keys_delivered_total":1');
+    expect(
+      env.__db
+        .prepare(
+          `SELECT COUNT(*) AS count
+             FROM broker_issue_success_events
+            WHERE managed_credential_ref = ?`,
+        )
+        .get('managed-retained-midnight-delivery'),
+    ).toEqual({ count: 1 });
   });
 
-  it('does not report a critical fast-path alert when the exact ASN share stays below threshold but rounds to 70%', async () => {
+  it('anchors retries to one fixed completed-day window', async () => {
     const env = createTestBrokerEnv();
-    updateAbuseControls(env, (controls) => {
-      controls.immediateAlerts.warn1 = 100;
-      controls.immediateAlerts.warn2 = 200;
-      controls.immediateAlerts.warn3 = 300;
-      controls.immediateAlerts.critical = 400;
-      controls.asnFastPath.enabled = true;
-      controls.asnFastPath.minIssueSuccess1h = 20;
-      controls.asnFastPath.minTopAsnSharePct = 70;
-      controls.asnClassifications = [
-        {
-          asn: 24940,
-          kind: 'cloud_or_vps',
-          displayName: 'Hetzner',
-        },
-      ];
-    });
 
-    for (let index = 0; index < 14; index += 1) {
-      insertIssueSuccessEvent(env, {
-        installationId: `daily-rounded-cloud-${index}`,
-        managedCredentialRef: `daily-rounded-cloud-managed-${index}`,
-        asn: 24940,
-        observedAt: `2026-04-18T23:${String(index).padStart(2, '0')}:00.000Z`,
-      });
-    }
-
-    for (let index = 0; index < 7; index += 1) {
-      insertIssueSuccessEvent(env, {
-        installationId: `daily-rounded-other-${index}`,
-        managedCredentialRef: `daily-rounded-other-managed-${index}`,
-        asn: 64520 + index,
-        observedAt: `2026-04-18T23:${String(index + 14).padStart(2, '0')}:00.000Z`,
-      });
-    }
-
-    for (let index = 14; index < 16; index += 1) {
-      insertIssueSuccessEvent(env, {
-        installationId: `daily-rounded-cloud-${index}`,
-        managedCredentialRef: `daily-rounded-cloud-managed-${index}`,
-        asn: 24940,
-        observedAt: `2026-04-18T23:${String(index + 7).padStart(2, '0')}:00.000Z`,
-      });
-    }
-
-    const packet = await buildDailyHeartbeatPacket(
+    const early = await buildDailySummaryPacket(
       env.BROKER_DB,
-      new Date('2026-04-19T00:00:00.000Z'),
+      new Date('2026-04-20T00:05:00.000Z'),
+    );
+    const late = await buildDailySummaryPacket(
+      env.BROKER_DB,
+      new Date('2026-04-20T23:59:59.999Z'),
     );
 
-    expect(packet.summary.issue_success_24h).toBe(23);
-    expect(packet.summary.highest_alert_level_24h).toBeNull();
+    expect(early).toEqual(late);
+    expect(resolveDailyReportWindow(new Date('2026-04-20T12:00:00.000Z'))).toEqual({
+      reportDateUtc: '2026-04-19',
+      windowStart: '2026-04-19T00:00:00.000Z',
+      windowEnd: '2026-04-20T00:00:00.000Z',
+    });
+  });
+
+  it('uses a half-open key-delivery window and source-aware totals', async () => {
+    const env = createTestBrokerEnv();
+    insertIssueSuccessEvent(env, {
+      source: 'discord',
+      label: 'prior-boundary',
+      observedAt: '2026-04-18T23:59:59.999Z',
+    });
+    insertIssueSuccessEvent(env, {
+      source: 'discord',
+      label: 'discord-start',
+      observedAt: '2026-04-19T00:00:00.000Z',
+    });
+    insertIssueSuccessEvent(env, {
+      source: 'discord',
+      label: 'discord-end-minus-one',
+      observedAt: '2026-04-19T23:59:59.999Z',
+    });
+    insertIssueSuccessEvent(env, {
+      source: 'qq',
+      label: 'qq-middle',
+      observedAt: '2026-04-19T12:00:00.000Z',
+    });
+    insertIssueSuccessEvent(env, {
+      source: 'qq',
+      label: 'qq-legacy-sql-timestamp',
+      observedAt: '2026-04-19 18:00:00',
+    });
+    insertIssueSuccessEvent(env, {
+      source: 'qq',
+      label: 'qq-middle-duplicate',
+      managedCredentialRef: 'managed-qq-middle',
+      observedAt: '2026-04-19T12:00:00.001Z',
+    });
+    insertIssueSuccessEvent(env, {
+      source: 'qq',
+      label: 'next-boundary',
+      observedAt: '2026-04-20T00:00:00.000Z',
+    });
+
+    const packet = await buildDailySummaryPacket(
+      env.BROKER_DB,
+      new Date('2026-04-20T00:05:00.000Z'),
+    );
+
+    expect(packet.summary).toMatchObject({
+      keys_delivered_total: 4,
+      keys_delivered_discord: 2,
+      keys_delivered_qq: 2,
+    });
+    expect(packet.summary.keys_delivered_total).toBe(
+      packet.summary.keys_delivered_discord + packet.summary.keys_delivered_qq,
+    );
+    const serialized = JSON.stringify(packet);
+    expect(serialized).not.toContain('discord-start');
+    expect(serialized).not.toContain('qq-middle');
+    expect(serialized).not.toContain('credential');
+  });
+
+  it('calculates completed-day DAU, WAU, MAU, and durable first/returning classes', async () => {
+    const env = createTestBrokerEnv();
+    await recordActiveDay(env, 'new-on-report-date', '2026-04-19');
+    await recordActiveDay(env, 'new-on-report-date', '2026-04-19');
+    await recordActiveDay(env, 'returning-on-report-date', '2026-04-01');
+    await recordActiveDay(env, 'returning-on-report-date', '2026-04-19');
+    await recordActiveDay(env, 'weekly-only', '2026-04-13');
+    await recordActiveDay(env, 'monthly-only', '2026-03-21');
+    await recordActiveDay(env, 'outside-month', '2026-03-20');
+    await recordActiveDay(env, 'future-date', '2026-04-20');
+
+    const packet = await buildDailySummaryPacket(
+      env.BROKER_DB,
+      new Date('2026-04-20T00:05:00.000Z'),
+    );
+
+    expect(packet.summary).toMatchObject({
+      translated_dau: 2,
+      translated_wau: 3,
+      translated_mau: 4,
+      first_observed_translators: 1,
+      returning_translators: 1,
+    });
+    const activeDayCount = env.__db
+      .prepare(
+        `SELECT COUNT(*) AS count
+           FROM telemetry_active_days
+          WHERE subject_ref = ?
+            AND active_date_utc = ?`,
+      )
+      .get(validTelemetrySubjectRef('new-on-report-date'), '2026-04-19') as {
+      count: number;
+    };
+    expect(activeDayCount.count).toBe(1);
+  });
+
+  it('keeps first-observed meaning after active-day retention deletes history', async () => {
+    const env = createTestBrokerEnv();
+    const subjectRef = validTelemetrySubjectRef('retention-independent');
+    await recordActiveDay(env, 'retention-independent', '2025-01-01');
+    await recordActiveDay(env, 'retention-independent', '2026-04-19');
+
+    await applyTelemetryActiveDayRetention(
+      env.BROKER_DB,
+      new Date('2026-04-20T00:05:00.000Z'),
+    );
+
+    const historicalDay = env.__db
+      .prepare(
+        'SELECT COUNT(*) AS count FROM telemetry_active_days WHERE active_date_utc = ?',
+      )
+      .get('2025-01-01') as { count: number };
+    const subject = env.__db
+      .prepare(
+        `SELECT first_active_date_utc, last_active_date_utc
+           FROM telemetry_subjects
+          WHERE subject_ref = ?`,
+      )
+      .get(subjectRef) as {
+      first_active_date_utc: string;
+      last_active_date_utc: string;
+    };
+    const packet = await buildDailySummaryPacket(
+      env.BROKER_DB,
+      new Date('2026-04-20T00:05:00.000Z'),
+    );
+
+    expect(historicalDay.count).toBe(0);
+    expect(subject).toEqual({
+      first_active_date_utc: '2025-01-01',
+      last_active_date_utc: '2026-04-19',
+    });
+    expect(packet.summary.first_observed_translators).toBe(0);
+    expect(packet.summary.returning_translators).toBe(1);
   });
 });
 
 function insertIssueSuccessEvent(
   env: ReturnType<typeof createTestBrokerEnv>,
   input: {
-    installationId: string;
-    managedCredentialRef: string;
-    asn: number;
+    source: 'discord' | 'qq';
+    label: string;
+    managedCredentialRef?: string;
     observedAt: string;
   },
 ): void {
-  env.__db
-    .prepare(
-      `INSERT INTO installations (
-          installation_id,
-          device_public_key,
-          hardware_hash,
-          hardware_hash_salt_version,
-          app_version,
-          challenge,
-          challenge_expires_at,
-          challenge_salt_version,
-          created_at,
-          last_seen_at
-        ) VALUES (?, ?, NULL, NULL, ?, NULL, NULL, NULL, ?, ?)`,
-    )
-    .run(
-      input.installationId,
-      `device-public-key-${input.installationId}`,
-      '1.2.3',
-      input.observedAt,
-      input.observedAt,
-    );
-
+  if (input.source === 'discord') {
+    env.__db
+      .prepare(
+        `INSERT INTO installations (
+            installation_id,
+            device_public_key,
+            app_version,
+            created_at,
+            last_seen_at
+          ) VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.label,
+        `device-public-key-${input.label}`,
+        '1.2.3',
+        input.observedAt,
+        input.observedAt,
+      );
+  }
+  const subjectRef =
+    input.source === 'discord'
+      ? input.label
+      : `ph-qq-subject-v1_${input.label}`;
   env.__db
     .prepare(
       `INSERT INTO broker_issue_success_events (
@@ -496,53 +633,55 @@ function insertIssueSuccessEvent(
           installation_id,
           subject_ref,
           managed_credential_ref,
-          ip_hash,
-          ip_prefix_hash,
-          asn,
-          country,
-          http_protocol,
-          tls_version,
-          tls_cipher,
-          risk_label,
           observed_at
-        ) VALUES ('discord', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?)`,
     )
     .run(
-      input.installationId,
-      input.installationId,
-      input.managedCredentialRef,
-      `ip-hash-${input.installationId}`,
-      `ip-prefix-${input.installationId}`,
-      input.asn,
-      'US',
-      'HTTP/2',
-      'TLSv1.3',
-      'TLS_AES_128_GCM_SHA256',
-      'low',
+      input.source,
+      input.source === 'discord' ? input.label : null,
+      subjectRef,
+      input.managedCredentialRef ?? `managed-${input.label}`,
       input.observedAt,
     );
 }
 
-function insertTelemetryActiveDay(
+function readDailySummaryDeliveries(
   env: ReturnType<typeof createTestBrokerEnv>,
-  subjectRef: string,
-  activeDateUtc: string,
-): void {
-  env.__db
+): Array<{
+  report_date_utc: string;
+  status: string;
+  lease_token: string;
+  lease_expires_at: string;
+  attempted_at: string;
+  delivered_at: string | null;
+}> {
+  return env.__db
     .prepare(
-      `INSERT INTO telemetry_active_days (
-          subject_ref,
-          active_date_utc,
-          first_received_at,
-          last_received_at
-        ) VALUES (?, ?, ?, ?)`,
+      `SELECT report_date_utc, status, lease_token, lease_expires_at,
+              attempted_at, delivered_at
+         FROM broker_daily_summary_deliveries
+        ORDER BY report_date_utc`,
     )
-    .run(
-      validTelemetrySubjectRef(subjectRef),
-      activeDateUtc,
-      `${activeDateUtc}T00:00:00.000Z`,
-      `${activeDateUtc}T00:00:00.000Z`,
-    );
+    .all() as Array<{
+    report_date_utc: string;
+    status: string;
+    lease_token: string;
+    lease_expires_at: string;
+    attempted_at: string;
+    delivered_at: string | null;
+  }>;
+}
+
+async function recordActiveDay(
+  env: ReturnType<typeof createTestBrokerEnv>,
+  label: string,
+  activeDateUtc: string,
+): Promise<void> {
+  await recordTelemetryActiveDay(env.BROKER_DB, {
+    subjectRef: validTelemetrySubjectRef(label),
+    activeDateUtc,
+    receivedAt: `${activeDateUtc}T12:00:00.000Z`,
+  });
 }
 
 function validTelemetrySubjectRef(label: string): string {
@@ -550,6 +689,5 @@ function validTelemetrySubjectRef(label: string): string {
   for (const character of label) {
     hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
   }
-
   return `ph-telemetry-subject-v1_${hash.toString(16).padStart(64, '0')}`;
 }

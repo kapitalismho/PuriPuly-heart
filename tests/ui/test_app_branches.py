@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+from datetime import datetime as real_datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -194,8 +195,8 @@ class TelemetryController:
         await self.apply_settings(with_telemetry_enabled(self.settings, enabled))
         return self.settings
 
-    async def record_telemetry_translation_success_day(self) -> None:
-        self.telemetry_success_recorded = True
+    async def record_telemetry_translation_success_day(self, active_date_utc: str) -> None:
+        self.telemetry_success_recorded = active_date_utc
 
 
 class TelemetrySettingsView:
@@ -266,17 +267,26 @@ def test_telemetry_setting_action_does_not_send() -> None:
     assert not hasattr(app, "telemetry_client")
 
 
-def test_telemetry_translation_success_uses_app_settings_mutation_queue() -> None:
+def test_telemetry_translation_success_captures_date_before_settings_mutation_queue(
+    monkeypatch,
+) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     page = DummyPage()
     app.page = page
     app.controller = TelemetryController(AppSettings())
 
+    class CapturedDateTime:
+        @classmethod
+        def now(cls, timezone):
+            _ = timezone
+            return real_datetime.fromisoformat("2026-07-03T23:59:59+00:00")
+
+    monkeypatch.setattr(app_module, "datetime", CapturedDateTime)
     app.on_telemetry_translation_success()
 
     assert len(page.tasks) == 1
     asyncio.run(page.tasks.pop(0)())
-    assert app.controller.telemetry_success_recorded is True
+    assert app.controller.telemetry_success_recorded == "2026-07-03"
 
 
 class ConstructionDummyController:

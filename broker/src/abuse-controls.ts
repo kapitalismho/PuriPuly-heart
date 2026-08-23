@@ -1243,7 +1243,7 @@ function validateRetentionConfig(
 
   return {
     requestEventsDays: value.requestEventsDays,
-    issueSuccessDays: value.issueSuccessDays,
+    issueSuccessDays: Math.max(2, value.issueSuccessDays),
     runtimeAuditDays: value.runtimeAuditDays,
     referralSkippedDays: value.referralSkippedDays,
     referralFailedDays: value.referralFailedDays,
@@ -1349,8 +1349,7 @@ function validateDailyReportConfig(
   if (
     !isBoolean(value.enabled) ||
     !isIntegerInRange(value.hourUtc, 0, 23) ||
-    !isIntegerInRange(value.minuteUtc, 0, 59) ||
-    !isBoolean(value.includeZeroActivity)
+    !isIntegerInRange(value.minuteUtc, 0, 59)
   ) {
     return null;
   }
@@ -1359,7 +1358,6 @@ function validateDailyReportConfig(
     enabled: value.enabled,
     hourUtc: value.hourUtc,
     minuteUtc: value.minuteUtc,
-    includeZeroActivity: value.includeZeroActivity,
   };
 }
 

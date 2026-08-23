@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
 from typing import Protocol
 
 from puripuly_heart.config.settings import AppSettings
@@ -45,20 +44,18 @@ class TranslationSuccessTelemetryService:
         self,
         client: TranslationSuccessTelemetryClientPort | None,
         *,
-        utc_date_provider: Callable[[], date] | None = None,
         diagnostics_sink: TelemetryDiagnosticsSink | None = None,
     ) -> None:
         self._client = client
-        self._utc_date_provider = utc_date_provider or _current_utc_date
         self._diagnostics_sink = diagnostics_sink
 
     async def record_translation_success_day(
         self,
         settings: AppSettings,
         *,
+        active_date_utc: str,
         persist_sent_date: TelemetryPersistSentDate,
     ) -> TranslationSuccessTelemetryResult:
-        active_date_utc = self._active_date_utc()
         enabled = settings.telemetry.enabled
         identifier = settings.telemetry_state.anonymous_id
         last_sent_date_utc = settings.telemetry_state.last_sent_date_utc
@@ -117,9 +114,6 @@ class TranslationSuccessTelemetryService:
             active_date_utc=active_date_utc,
         )
 
-    def _active_date_utc(self) -> str:
-        return self._utc_date_provider().strftime("%Y-%m-%d")
-
     def _result(
         self,
         status: str,
@@ -146,10 +140,6 @@ class TranslationSuccessTelemetryService:
             active_date_utc=active_date_utc,
             diagnostics=safe_diagnostics,
         )
-
-
-def _current_utc_date() -> date:
-    return datetime.now(timezone.utc).date()
 
 
 __all__ = [

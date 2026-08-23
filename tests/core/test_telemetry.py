@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import date
-
 import pytest
 
 from puripuly_heart.config.settings import AppSettings, with_telemetry_enabled
@@ -31,10 +29,6 @@ class PersistRecorder:
         return self.result
 
 
-def _date_provider() -> date:
-    return date(2026, 7, 3)
-
-
 def _enabled_settings(identifier: str = "anon-id") -> AppSettings:
     settings = AppSettings()
     settings.telemetry_state.anonymous_id = identifier
@@ -50,11 +44,12 @@ async def test_disabled_reporting_skips_without_client_call() -> None:
     events: list[tuple[str, dict[str, object]]] = []
     service = TranslationSuccessTelemetryService(
         client,
-        utc_date_provider=_date_provider,
         diagnostics_sink=lambda event, metadata: events.append((event, dict(metadata))),
     )
 
-    result = await service.record_translation_success_day(settings, persist_sent_date=persist)
+    result = await service.record_translation_success_day(
+        settings, active_date_utc="2026-07-03", persist_sent_date=persist
+    )
 
     assert result.status == "skipped_disabled"
     assert result.attempted_send is False
@@ -69,9 +64,11 @@ async def test_enabled_missing_identifier_skips_without_client_call() -> None:
     settings.telemetry_state.anonymous_id = None
     client = FakeTelemetryClient()
     persist = PersistRecorder()
-    service = TranslationSuccessTelemetryService(client, utc_date_provider=_date_provider)
+    service = TranslationSuccessTelemetryService(client)
 
-    result = await service.record_translation_success_day(settings, persist_sent_date=persist)
+    result = await service.record_translation_success_day(
+        settings, active_date_utc="2026-07-03", persist_sent_date=persist
+    )
 
     assert result.status == "skipped_missing_identifier"
     assert client.calls == []
@@ -84,9 +81,11 @@ async def test_already_sent_date_skips_without_client_call() -> None:
     settings.telemetry_state.last_sent_date_utc = "2026-07-03"
     client = FakeTelemetryClient()
     persist = PersistRecorder()
-    service = TranslationSuccessTelemetryService(client, utc_date_provider=_date_provider)
+    service = TranslationSuccessTelemetryService(client)
 
-    result = await service.record_translation_success_day(settings, persist_sent_date=persist)
+    result = await service.record_translation_success_day(
+        settings, active_date_utc="2026-07-03", persist_sent_date=persist
+    )
 
     assert result.status == "skipped_already_sent"
     assert client.calls == []
@@ -94,13 +93,15 @@ async def test_already_sent_date_skips_without_client_call() -> None:
 
 
 @pytest.mark.asyncio
-async def test_success_sends_once_and_persists_current_utc_date() -> None:
+async def test_success_sends_once_and_persists_captured_utc_date() -> None:
     settings = _enabled_settings()
     client = FakeTelemetryClient(result=True)
     persist = PersistRecorder()
-    service = TranslationSuccessTelemetryService(client, utc_date_provider=_date_provider)
+    service = TranslationSuccessTelemetryService(client)
 
-    result = await service.record_translation_success_day(settings, persist_sent_date=persist)
+    result = await service.record_translation_success_day(
+        settings, active_date_utc="2026-07-03", persist_sent_date=persist
+    )
 
     assert result.status == "sent"
     assert result.attempted_send is True
@@ -116,9 +117,11 @@ async def test_failed_send_does_not_persist_or_mark_date() -> None:
     settings = _enabled_settings()
     client = FakeTelemetryClient(result=False)
     persist = PersistRecorder()
-    service = TranslationSuccessTelemetryService(client, utc_date_provider=_date_provider)
+    service = TranslationSuccessTelemetryService(client)
 
-    result = await service.record_translation_success_day(settings, persist_sent_date=persist)
+    result = await service.record_translation_success_day(
+        settings, active_date_utc="2026-07-03", persist_sent_date=persist
+    )
 
     assert result.status == "send_failed"
     assert result.attempted_send is True
@@ -132,9 +135,11 @@ async def test_client_exception_returns_safe_diagnostics_without_persisting() ->
     settings = _enabled_settings()
     client = FakeTelemetryClient(exc=RuntimeError("secret payload should not appear"))
     persist = PersistRecorder()
-    service = TranslationSuccessTelemetryService(client, utc_date_provider=_date_provider)
+    service = TranslationSuccessTelemetryService(client)
 
-    result = await service.record_translation_success_day(settings, persist_sent_date=persist)
+    result = await service.record_translation_success_day(
+        settings, active_date_utc="2026-07-03", persist_sent_date=persist
+    )
 
     assert result.status == "send_failed"
     assert result.diagnostics == {
@@ -150,9 +155,11 @@ async def test_successful_send_with_failed_persistence_does_not_report_persisted
     settings = _enabled_settings()
     client = FakeTelemetryClient(result=True)
     persist = PersistRecorder(result=False)
-    service = TranslationSuccessTelemetryService(client, utc_date_provider=_date_provider)
+    service = TranslationSuccessTelemetryService(client)
 
-    result = await service.record_translation_success_day(settings, persist_sent_date=persist)
+    result = await service.record_translation_success_day(
+        settings, active_date_utc="2026-07-03", persist_sent_date=persist
+    )
 
     assert result.status == "persist_failed"
     assert result.attempted_send is True

@@ -297,6 +297,19 @@ describe('broker abuse-controls runtime config validation', () => {
     });
   });
 
+  it('normalizes issue-success retention to the completed-day report minimum', async () => {
+    const env = createTestBrokerEnv();
+    updateAbuseControls(env, (controls) => {
+      controls.trialChallenge.maxRequests = 17;
+      controls.retention.issueSuccessDays = 1;
+    });
+
+    const controls = await getBrokerAbuseControlsConfig(env.BROKER_DB);
+
+    expect(controls.trialChallenge.maxRequests).toBe(17);
+    expect(controls.retention.issueSuccessDays).toBe(2);
+  });
+
   it('falls back to default abuse controls when immediate-alert thresholds are not strictly increasing', async () => {
     const env = createTestBrokerEnv();
     updateAbuseControls(env, (controls) => {

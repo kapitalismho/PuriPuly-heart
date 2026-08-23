@@ -399,6 +399,7 @@ class UiEngagementRuntimeAdapter:
 
     async def record_telemetry_translation_success_day(
         self,
+        active_date_utc: str,
     ) -> TranslationSuccessTelemetryResult:
         settings = self.settings.current
         if settings is None:
@@ -410,6 +411,7 @@ class UiEngagementRuntimeAdapter:
 
         return await self.telemetry.record_translation_success_day(
             settings,
+            active_date_utc=active_date_utc,
             persist_sent_date=persist,
         )
 

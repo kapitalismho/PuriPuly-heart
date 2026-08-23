@@ -534,8 +534,8 @@ class UiApplicationBoundary:
     def schedule_github_star_prompt_translation_success_observed(self) -> None:
         self._engagement.schedule_github_star_prompt_translation_success_observed()
 
-    async def record_telemetry_translation_success_day(self) -> None:
-        await self._engagement.record_telemetry_translation_success_day()
+    async def record_telemetry_translation_success_day(self, active_date_utc: str) -> None:
+        await self._engagement.record_telemetry_translation_success_day(active_date_utc)
 
     def should_show_github_star_prompt(self) -> bool:
         return bool(self._engagement.should_show_github_star_prompt())

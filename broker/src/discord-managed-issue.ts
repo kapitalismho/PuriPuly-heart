@@ -2166,13 +2166,24 @@ export async function finalizeDiscordManagedKeyDeliveryAck(
     .run();
 
   if (!(await hasIssueSuccessRecord(c.env.BROKER_DB, input.managedCredentialRef))) {
-    await runDiscordIssueSuccessMonitoring(c, {
-      installationId: entitlement.installation_id,
-      managedCredentialRef: input.managedCredentialRef,
-      issuedAt: deliveredAt,
-      now: input.acknowledgedAt,
-      sensitiveValues: [],
-    });
+    try {
+      await runDiscordIssueSuccessMonitoring(c, {
+        installationId: entitlement.installation_id,
+        managedCredentialRef: input.managedCredentialRef,
+        issuedAt: deliveredAt,
+        now: input.acknowledgedAt,
+        sensitiveValues: [],
+      });
+    } catch (error) {
+      await rollbackDiscordManagedKeyDeliveryAck(c.env.BROKER_DB, {
+        installationId: entitlement.installation_id,
+        discordUserRef: entitlement.discord_user_ref,
+        managedCredentialRef: input.managedCredentialRef,
+        deliveredAt,
+        rolledBackAt: input.acknowledgedAt.toISOString(),
+      });
+      throw error;
+    }
   }
   const referralReservation = await resolveReservedIssueReferralForAck(c.env.BROKER_DB, {
     referredDiscordUserRef: entitlement.discord_user_ref,
@@ -2193,6 +2204,53 @@ export async function finalizeDiscordManagedKeyDeliveryAck(
     nowIso: deliveredAt,
   });
   return referralBonusApplied ? { referralBonusApplied } : {};
+}
+
+async function rollbackDiscordManagedKeyDeliveryAck(
+  db: D1Database,
+  input: {
+    installationId: string;
+    discordUserRef: string;
+    managedCredentialRef: string;
+    deliveredAt: string;
+    rolledBackAt: string;
+  },
+): Promise<void> {
+  const results = await db.batch([
+    db
+      .prepare(
+        `DELETE FROM broker_issue_success_events
+          WHERE issue_source = 'discord'
+            AND installation_id = ?
+            AND managed_credential_ref = ?
+            AND observed_at = ?`,
+      )
+      .bind(input.installationId, input.managedCredentialRef, input.deliveredAt),
+    db
+      .prepare(
+        `UPDATE openrouter_entitlements
+            SET status = 'pending_release',
+                discord_issue_status = 'delivery_pending',
+                discord_issue_delivered_at = NULL
+          WHERE installation_id = ?
+            AND managed_credential_ref = ?
+            AND status = 'active'
+            AND discord_issue_status = 'active'`,
+      )
+      .bind(input.installationId, input.managedCredentialRef),
+    db
+      .prepare(
+        `UPDATE discord_identities
+            SET status = 'issuing', updated_at = ?
+          WHERE discord_user_ref = ?
+            AND entitlement_installation_id = ?
+            AND status = 'active'`,
+      )
+      .bind(input.rolledBackAt, input.discordUserRef, input.installationId),
+  ]);
+  if (Number(results[1]?.meta.changes ?? 0) !== 1) {
+    throw new Error('Discord delivery ACK monitoring rollback failed');
+  }
 }
 
 async function getInstallation(

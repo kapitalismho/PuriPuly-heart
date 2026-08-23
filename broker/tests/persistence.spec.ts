@@ -17,6 +17,11 @@ import {
 } from './test-support/migrations';
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
 
+const DAILY_SUMMARY_V2_FINALIZER = new URL(
+  '../deploy/finalize-daily-summary-v2.sql',
+  import.meta.url,
+);
+
 describe('broker persistent state model', () => {
   it('defines the D1 table contract, runtime config keys, and minimal release-session state', async () => {
     const contract = await import('../src/contract');
@@ -498,6 +503,44 @@ describe('broker persistent state model', () => {
             'observed_at',
           ],
         },
+        telemetrySubjects: {
+          name: 'telemetry_subjects',
+          purpose:
+            'durable first-observed and last-active date bounds for anonymous subjects',
+          primaryKey: 'subject_ref',
+          columns: ['subject_ref', 'first_active_date_utc', 'last_active_date_utc'],
+          indexed: ['last_active_date_utc'],
+          rawTelemetryIdentifierStorage: false,
+          joinedToManagedIdentity: false,
+        },
+        telemetryActiveDays: {
+          name: 'telemetry_active_days',
+          purpose: 'retained anonymous active dates for completed-day usage aggregation',
+          primaryKey: ['subject_ref', 'active_date_utc'],
+          columns: [
+            'subject_ref',
+            'active_date_utc',
+            'first_received_at',
+            'last_received_at',
+          ],
+          indexed: ['active_date_utc', 'last_received_at'],
+          rawTelemetryIdentifierStorage: false,
+          joinedToManagedIdentity: false,
+        },
+        brokerDailySummaryDeliveries: {
+          name: 'broker_daily_summary_deliveries',
+          purpose: 'v2 completed-day delivery leases and durable delivery outcomes',
+          primaryKey: 'report_date_utc',
+          columns: [
+            'report_date_utc',
+            'status',
+            'lease_token',
+            'lease_expires_at',
+            'attempted_at',
+            'delivered_at',
+          ],
+          indexed: ['status + report_date_utc + lease_expires_at'],
+        },
         brokerAbuseRuntimeAudit: {
           name: 'broker_abuse_runtime_audit',
           purpose:
@@ -600,6 +643,7 @@ describe('broker persistent state model', () => {
       '0010_source_aware_issue_success_events.sql',
       '0011_add_telemetry_active_days.sql',
       '0012_add_managed_key_delivery_ack.sql',
+      '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
     ]);
     expect(existsSync(FIRST_BROKER_MIGRATION)).toBe(true);
     expect(existsSync(LATEST_BROKER_MIGRATION)).toBe(true);
@@ -646,6 +690,13 @@ describe('broker persistent state model', () => {
     );
     const managedKeyDeliveryAckMigration = readBrokerMigrationSql(
       '0012_add_managed_key_delivery_ack.sql',
+    );
+    const dailySummaryV2Migration = readBrokerMigrationSql(
+      '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
+    );
+    const dailySummaryV2Finalizer = readFileSync(
+      DAILY_SUMMARY_V2_FINALIZER,
+      'utf8',
     );
 
     expect(migration).toContain('CREATE TABLE broker_config');
@@ -831,6 +882,25 @@ describe('broker persistent state model', () => {
     expect(telemetryActiveDaysMigration).toContain('POST /v1/telemetry/translation-success-day');
     expect(telemetryActiveDaysMigration).not.toContain('telemetry_identifier');
     expect(telemetryActiveDaysMigration).not.toContain('translation_text');
+    expect(dailySummaryV2Migration).toContain('CREATE TABLE telemetry_subjects');
+    expect(dailySummaryV2Migration).toContain('MIN(active_date_utc)');
+    expect(dailySummaryV2Migration).toContain('MAX(active_date_utc)');
+    expect(dailySummaryV2Migration).toContain(
+      'CREATE TRIGGER telemetry_active_days_sync_subject_after_insert',
+    );
+    expect(dailySummaryV2Migration).toContain(
+      'CREATE TABLE broker_daily_summary_deliveries',
+    );
+    expect(dailySummaryV2Migration).toContain("'$.dailyReport.hourUtc'");
+    expect(dailySummaryV2Migration).toContain("'$.dailyReport.minuteUtc'");
+    expect(dailySummaryV2Migration).not.toContain(
+      "'$.dailyReport.includeZeroActivity'",
+    );
+    expect(dailySummaryV2Finalizer).toContain(
+      "'$.dailyReport.includeZeroActivity'",
+    );
+    expect(dailySummaryV2Migration).toContain("'$.retention.issueSuccessDays'");
+    expect(dailySummaryV2Migration).not.toContain('telemetry_identifier');
     expect(managedKeyDeliveryAckMigration).toContain('CREATE TABLE managed_key_deliveries');
     expect(managedKeyDeliveryAckMigration).toContain(
       "discord_issue_status TEXT CHECK(discord_issue_status IS NULL OR discord_issue_status IN ('issuing', 'delivery_pending', 'active', 'failed', 'cleanup_required'))",

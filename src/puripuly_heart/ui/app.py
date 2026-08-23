@@ -5,6 +5,7 @@ import json
 import logging
 import tempfile
 import webbrowser
+from datetime import datetime, timezone
 from pathlib import Path
 
 import flet as ft
@@ -1989,8 +1990,10 @@ class TranslatorApp:
         self.application.schedule_github_star_prompt_translation_success_observed()
 
     def on_telemetry_translation_success(self) -> None:
+        active_date_utc = datetime.now(timezone.utc).date().isoformat()
+
         async def _task() -> None:
-            await self.application.record_telemetry_translation_success_day()
+            await self.application.record_telemetry_translation_success_day(active_date_utc)
 
         self._queue_settings_mutation_task(_task)
 

@@ -435,6 +435,7 @@ export async function deliverImmediateMonitoringSideEffects(
 export async function applyAbuseMonitoringRetention(
   db: D1Database,
   now: Date,
+  options: { preserveIssueSuccessFrom?: string } = {},
 ): Promise<{
   requestEventsDeleted: number;
   issueSuccessDeleted: number;
@@ -450,12 +451,17 @@ export async function applyAbuseMonitoringRetention(
       now.getTime() - controls.retention.requestEventsDays * 24 * 60 * 60_000,
     ).toISOString(),
   });
-  const issueSuccessDeleted = await deleteRowsOlderThan({
+  const configuredIssueSuccessCutoff = resolveIssueSuccessRetentionCutoff(
+    now,
+    controls.retention.issueSuccessDays,
+  );
+  const issueSuccessDeleted = await deleteIssueSuccessRowsOlderThan(
     db,
-    table: 'broker_issue_success_events',
-    column: 'observed_at',
-    cutoffIso: resolveIssueSuccessRetentionCutoff(now, controls.retention.issueSuccessDays),
-  });
+    options.preserveIssueSuccessFrom &&
+      options.preserveIssueSuccessFrom < configuredIssueSuccessCutoff
+      ? options.preserveIssueSuccessFrom
+      : configuredIssueSuccessCutoff,
+  );
   const runtimeAuditDeleted = await deleteRowsOlderThan({
     db,
     table: 'broker_abuse_runtime_audit',
@@ -811,8 +817,26 @@ async function deleteRowsOlderThan(input: {
   cutoffIso: string;
 }): Promise<number> {
   const result = await input.db
-    .prepare(`DELETE FROM ${input.table} WHERE ${input.column} < ?`)
+    .prepare(
+      `DELETE FROM ${input.table}
+        WHERE julianday(${input.column}) < julianday(?)`,
+    )
     .bind(input.cutoffIso)
+    .run();
+
+  return Number(result.meta.changes ?? 0);
+}
+
+async function deleteIssueSuccessRowsOlderThan(
+  db: D1Database,
+  cutoffIso: string,
+): Promise<number> {
+  const result = await db
+    .prepare(
+      `DELETE FROM broker_issue_success_events
+        WHERE julianday(observed_at) < julianday(?)`,
+    )
+    .bind(cutoffIso)
     .run();
 
   return Number(result.meta.changes ?? 0);

@@ -370,7 +370,7 @@ describe('QQ auth assertion route', () => {
     },
   );
 
-  it('keeps activation deliverable when post-activation monitoring persistence fails and logs only bounded diagnostics', async () => {
+  it('does not expose a QQ key when durable issue-success recording fails', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW_ISO));
 
@@ -383,8 +383,12 @@ describe('QQ auth assertion route', () => {
       },
     });
     const credential = await signQqCredential(env.QQ_AUTH_HMAC_PSK, qqIdentity);
+    const qqSubjectRef = await deriveExpectedQqSubjectRef(
+      env.QQ_AUTH_HMAC_PSK,
+      qqIdentity,
+    );
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    mockOpenRouterManagementApi();
+    const openRouter = mockOpenRouterManagementApi();
 
     const response = await postQqAssertion(env, {
       qq_identity: qqIdentity,
@@ -392,23 +396,15 @@ describe('QQ auth assertion route', () => {
       asserted_at: '2026-06-05T12:03:00Z',
     });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(500);
     const payload = (await response.json()) as Record<string, unknown>;
-    expect(payload).toEqual(
-      expect.objectContaining({
-        ok: true,
-        status: 'issued',
-        openrouter_api_key: 'or-qq-managed-child-key-test-1',
-        managed_credential_ref: 'hash_qq_managed_child_test_1',
-      }),
-    );
-    expect(readQqManagedEntitlement(env, payload.qq_subject_ref as string)).toEqual(
-      expect.objectContaining({
-        status: 'active',
-        managed_credential_ref: 'hash_qq_managed_child_test_1',
-      }),
-    );
+    expect(payload).not.toHaveProperty('openrouter_api_key');
+    expect(payload).not.toHaveProperty('managed_credential_ref');
+    expect(readQqManagedEntitlement(env, qqSubjectRef)).toBeNull();
     expect(listIssueSuccessEvents(env)).toHaveLength(0);
+    expect(
+      openRouter.openRouterCleanupCalls.map(({ init }) => init?.method),
+    ).toEqual(['PATCH', 'DELETE']);
     expect(stringifyConsoleCalls(consoleErrorSpy)).not.toContain(qqIdentity);
     expect(stringifyConsoleCalls(consoleErrorSpy)).not.toContain(credential);
   });
