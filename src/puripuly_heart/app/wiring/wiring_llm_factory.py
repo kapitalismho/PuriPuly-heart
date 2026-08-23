@@ -53,8 +53,6 @@ from puripuly_heart.config.settings import (
     LLMProviderName,
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
-    OpenRouterProviderRouting,
-    OpenRouterRoutingMode,
     OpenRouterSelectionAlias,
     QwenRegion,
     TranslationConnection,
@@ -72,6 +70,10 @@ from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_MANAGED_API_KEY_SECRET,
     OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     load_managed_openrouter_user_identifier,
+)
+from puripuly_heart.core.openrouter_routing import (
+    OpenRouterProviderRouting,
+    OpenRouterRoutingMode,
 )
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY

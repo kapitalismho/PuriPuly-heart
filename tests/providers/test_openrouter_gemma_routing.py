@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from puripuly_heart.config.settings import OpenRouterProviderRouting
+from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 from puripuly_heart.providers.llm.openrouter import (
     HttpxOpenRouterClient,
     _build_provider_preferences,
