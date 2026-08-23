@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly <3" width="128" />
+  <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — VRChat 实时双向语音翻译工具" width="128" />
 </p>
 
-<h1 align="center">PuriPuly <3</h1>
+<h1 align="center">PuriPuly — VRChat 实时双向语音翻译工具</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.4.0-blue" alt="Version" />
@@ -10,8 +10,6 @@
   <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
-
-<p align="center">LLM-based two-way translator for VRChat</p>
 
 <h2 align="center">
   <a href="README.md">🇺🇸 English</a> ·
@@ -23,7 +21,7 @@
 
 ---
 
-## Demo
+## 演示
 
 ![PuriPuly（Deepgram + Qwen 3.5 Plus）与 VRCT（Google Web Speech + Google Translate）的翻译对比。PuriPuly 语音识别：“집에굴러다니는게손잡이빠진것까지합치면열개는넘을걸.”，翻译：“（家里散落的伞，加上那把没把手的，估计都超过十把了呢。）” | VRCT 语音识别：“집에 굴러다니는게 손잡이 빠진 것까지 합치면 10개는 넘을 걸”，翻译：“房子周围肯定有超过 10 个，包括那些没有把手的。”](docs/images/demo/ko-cn_screenshot.png)
 
@@ -49,40 +47,45 @@
 
 所以，我做了这个。
 
+## PuriPuly 是什么？
+
+PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译器。
+我们追求通过 LLM 实现自然的翻译。
+超越生硬的翻译，让真正的人与人之间的交流成为可能。
+可用于 VRChat、Discord 等多种环境。
+
 - **基于大语言模型的本地化** — 俚语、口语，乃至敬语与平语，都能自然转换
 - **记忆上下文** — 结合语境，保持自然流畅的对话节奏
 - **双向语音翻译** — 同时翻译对方的语音，支持 VR 字幕浮层
 - **从 Discord 开始** — 无需复杂配置，立即可用
+- **最强本地全栈** — 从 Parakeet 到 Gemma 4 E4B，只搭载当前最高效的模型。
 
 ## 常见问题
 
 - **翻译质量如何？**
-→ 当对方与您都使用本翻译器时，足以支持最深入的对话。定量来说，以 Gemma 4 为例，比 DeepL 好 6 倍。详情请参阅下方"翻译比较"一节。
+→ 人与人之间最深入的交流也能轻松顺畅地进行。此外，它大幅超越了传统的商业翻译服务。详情请参阅下方“翻译比较”一节。
 
 - **从说话到翻译完成需要多长时间？**
-→ 以 Gemma 4 加云端 STT 服务为基准，延迟通常在 1 秒中后段。
+→ 在最佳环境下，延迟约为 1 秒左右。以对方说话结束的时刻为基准。
 
 - **使用需要付费吗？**
-→ 是的，但要稍后才付。新用户会获得免费额度。即使额度用完，价格依然非常便宜——1 美元可使用数千次。
+→ 是的，但要稍后才付。新用户会获得免费额度。即使额度用完，价格依然非常便宜——1 美元可翻译数千次。此外，使用本地模型还可以完全免费使用。
 
 - **必须申请 API 密钥吗？**
 → 是的，但同样是稍后再说。一开始只需安装并通过 Discord 验证即可使用。
 
-- **翻译对方语音的功能完成度如何？**
-→ 在噪音较少的 1 对 1 环境下效果最好。三人对话也可能可用，但无法保证体验。若在 VRChat 中使用，请通过 Earmuff 功能控制环境。
+- **语音识别速度慢**
+→ 使用本地 ASR 时，若计算资源不足，处理时间可能会变长。此时建议切换为云端 STT 服务。
 
-- **语音识别不准 / 速度慢**
-→ 如果您正在使用本地 Qwen ASR，建议改用云端 STT 服务。如果您是 Intel 用户，请将 PuriPuly 设置为仅固定分配到 P-core。
-
-- **语音和对话内容如何处理？**
-→ 语音和对话内容会保存在本地，不会发送到 Puripuly 服务器。此外，不会记录他人的语音、转写或翻译结果。但 STT 服务和翻译提供商可能会处理数据。
+- **个人数据如何处理？**
+→ 语音和对话内容不会发送到 Puripuly 服务器。此外，所有代码均在当前代码库中公开，您可以直接验证网络行为。
 
 ### [📥 下载](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
 
 ---
 
 ## 翻译比较
-![翻译质量基准测试图表。展示了使用 Gemba MQM 框架（评审模型：Gemini 3.1 Pro Preview）对 216 个韩语到英语、日语、中文简体多轮对话样本进行评估的单句平均错误惩罚分（越低越好）。各模型得分：Gemini 3.1 Flash-lite 0.573、Gemini 3 Flash 0.596、Gemma 4 26B A4B 0.813、Qwen 3.5 Plus 0.958、DeepSeek V4 Flash 1.025、Gemma 4 26B A4B (no-context) 1.265、DeepSeek V4 Flash (no-context) 1.647、Qwen 3.5 Flash 2.198、DeepL 4.963、DeepL (no-context) 5.717、Google Translation Basic 5.998。](docs/images/performance/1.png)
+![翻译质量基准测试图表。按模型排列的每句平均错误惩罚（越低越好）排行榜：第 1 名 Gemma 4 31B (0.353)，第 2 名 Gemma 4 26B A4B (0.387)，第 3 名 DeepSeek V4 Flash 0731 (0.571)，第 4 名 Gemma 4 E4B QAT Q4 (1.577)，第 5 名 Papago (2.699)，第 6 名 Gemini 3.5 Live Translate (2.991)，第 7 名 MiLMMT 46-4B (3.087)，第 8 名 DeepL (3.914)，第 9 名 Google Cloud Translation Basic (5.731)。](docs/images/performance/1.png)
 
 - 我们使用微软的 Gemba MQM 框架进行实验。
 - 为贴近真实对话环境，采用了多轮对话设置。
@@ -94,50 +97,52 @@
 
 #### 推荐模型
 
-| LLM \ ASR | Qwen ASR (本地) | Qwen ASR (云端) | Soniox | Deepgram |
+| LLM \ ASR | 本地 ASR | Soniox | Qwen ASR (云端) | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B + 31B** | 14,380 次 | 2,920 次 | 3,710 次 | 1,180 次 |
-| **DeepSeek V4 Flash** | 19,410 次 | 3,080 次 | 3,980 次 | 1,210 次 |
+| **Gemma 4 E4B (本地)** | 无限制 | 5,000 次 | 3,660 次 | 1,290 次 |
+| **Gemma 4 26B A4B + 31B** | 13,940 次 | 3,680 次 | 2,900 次 | 1,180 次 |
+| **DeepSeek V4 Flash** | 11,620 次 | 3,500 次 | 2,780 次 | 1,160 次 |
 
 #### 其他模型
 
-| LLM \ ASR | Qwen ASR (本地) | Qwen ASR (云端) | Soniox | Deepgram |
+| LLM \ ASR | 本地 ASR | Soniox | Qwen ASR (云端) | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B** | 14,380 次 | 2,920 次 | 3,710 次 | 1,180 次 |
-| **Gemma 4 31B (OpenRouter)** | 13,700 次 | 2,780 次 | 3,530 次 | 1,120 次 |
-| **Gemma 4 31B (Cerebras)** | 920 次 | 730 次 | 770 次 | 540 次 |
-| **Gemini 3 Flash** | 1,710 次 | 1,170 次 | 1,280 次 | 740 次 |
-| **Gemini 3.1 Flash-Lite** | 3,430 次 | 1,770 次 | 2,030 次 | 940 次 |
-| **Qwen 3.5 Plus** | 7,460 次 | 2,460 次 | — | — |
-| **Local LLMs** | 无限制 | 3,660 次 | 5,000 次 | 1,290 次 |
+| **Gemma 4 12B (本地)** | 无限制 | 5,000 次 | 3,660 次 | 1,290 次 |
+| **Gemma 4 26B A4B** | 14,380 次 | 3,710 次 | 2,920 次 | 1,180 次 |
+| **Gemma 4 31B (OpenRouter)** | 10,940 次 | 3,430 次 | 2,740 次 | 1,150 次 |
+| **Gemma 4 31B (Cerebras)** | 920 次 | 770 次 | 730 次 | 540 次 |
+| **Gemini 3.7 Flash** | 1,160 次 | 940 次 | 880 次 | 610 次 |
+| **Gemini 3.1 Flash-Lite** | 3,430 次 | 2,030 次 | 1,770 次 | 940 次 |
+| **Qwen 3.5 Plus** | 7,460 次 | — | 2,460 次 | — |
 
 ### 每次发言成本
 
 #### 推荐模型
 
-| LLM \ ASR | Qwen ASR (本地) | Qwen ASR (云端) | Soniox | Deepgram |
+| LLM \ ASR | 本地 ASR | Soniox | Qwen ASR (云端) | Deepgram |
 |---|---|---|---|---|
+| **Gemma 4 E4B (本地)** | 0 元 | ~0.001 元 | ~0.002 元 | ~0.006 元 |
 | **Gemma 4 26B A4B + 31B** | ~0.0005 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
-| **DeepSeek V4 Flash** | ~0.0004 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
+| **DeepSeek V4 Flash** | ~0.0006 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
 
 #### 其他模型
 
-| LLM \ ASR | Qwen ASR (本地) | Qwen ASR (云端) | Soniox | Deepgram |
+| LLM \ ASR | 本地 ASR | Soniox | Qwen ASR (云端) | Deepgram |
 |---|---|---|---|---|
+| **Gemma 4 12B (本地)** | 0 元 | ~0.001 元 | ~0.002 元 | ~0.006 元 |
 | **Gemma 4 26B A4B** | ~0.0005 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
-| **Gemma 4 31B (OpenRouter)** | ~0.0005 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
-| **Gemma 4 31B (Cerebras)** | ~0.008 元 | ~0.010 元 | ~0.009 元 | ~0.013 元 |
-| **Gemini 3 Flash** | ~0.004 元 | ~0.006 元 | ~0.006 元 | ~0.010 元 |
+| **Gemma 4 31B (OpenRouter)** | ~0.0007 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
+| **Gemma 4 31B (Cerebras)** | ~0.008 元 | ~0.009 元 | ~0.010 元 | ~0.013 元 |
+| **Gemini 3.7 Flash** | ~0.006 元 | ~0.008 元 | ~0.008 元 | ~0.012 元 |
 | **Gemini 3.1 Flash-Lite** | ~0.002 元 | ~0.004 元 | ~0.004 元 | ~0.008 元 |
-| **Qwen 3.5 Plus** | ~0.001 元 | ~0.003 元 | — | — |
-| **Local LLMs** | 0 元 | ~0.002 元 | ~0.001 元 | ~0.006 元 |
+| **Qwen 3.5 Plus** | ~0.001 元 | — | ~0.003 元 | — |
 
 *   *(假设输入 900 token + 输出 12 token) × 每次发言平均 LLM 调用次数 1.2 次*
 *   *每 1 美元可用次数以「每次发言成本」表中四舍五入前的计算值为准*
 *   *所有费用与可用次数均为近似计算*
 *   *DeepSeek 假设缓存命中率为 70%*
 *   *Qwen API 计费以北京区域为准*
-*   *资费标准截至：2026 年 5 月 25 日 / 启用快速响应模式*
+*   *资费标准截至：2026 年 8 月 21 日*
 *   *1 美元 ≈ 7.2 元人民币*
 
 ### 免费额度
@@ -145,10 +150,33 @@
 | 服务 | 免费额度 | 期限 | 备注 |
 |--------|------------|------|------|
 | **Deepgram** | $200 | 无限制 | - |
-| **Google AI Studio** | $10 | 1 年 | 面向 Gemini 订阅者每月发放 |
 | **阿里云** | 每个模型 100 万 token | 90 天 | 新加坡区域为准 |
 | **阿里云** | ¥300 | 1 年 | 面向中国境内学生 |
-| **Cerebras** | 每天 100 万 token | 无限制 | 每分钟调用限制 5 次 |
+
+---
+
+## 本地模型
+
+PuriPuly 内置了以下本地模型，还可以连接 OpenAI 兼容 API。
+GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
+
+**ASR**
+
+| 模型 | 运行环境 | 量化 |
+|---|---|---|
+| Parakeet TDT 0.6B v3 | CPU | INT8 |
+| Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
+| Qwen3-ASR 0.6B | CPU | INT8 |
+| Qwen3-ASR 1.7B | GPU | Q6_K |
+| OpenAI 兼容 API | — | — |
+
+**LLM**
+
+| 模型 | 运行环境 | 量化 |
+|---|---|---|
+| Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| Gemma 4 12B IT QAT | GPU | UD Q4_K_XL |
+| OpenAI 兼容 API | — | — |
 
 ---
 
@@ -407,6 +435,10 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 
 参见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
 
+## 路线图
+
+后续工作在 [PuriPuly 项目看板](https://github.com/users/kapitalismho/projects/2)中公开跟踪。
+
 ---
 
 ## 开发
@@ -540,7 +572,7 @@ VRChat OSC 控制请参阅 [`docs/vrchat-osc.md`](docs/vrchat-osc.md)。
 
 ## Special Thanks
 
-SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299
+SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
 
 ---
 
