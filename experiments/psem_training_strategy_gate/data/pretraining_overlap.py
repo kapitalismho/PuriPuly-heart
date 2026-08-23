@@ -6,6 +6,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
 
+from experiments.psem_training_strategy_gate.data.dataset_context import (
+    resolve_dataset_context,
+)
 from experiments.psem_training_strategy_gate.data.identity_components import (
     build_identity_graph,
 )
@@ -168,6 +171,7 @@ def build_pretraining_overlap_audit(
     source_registry_path: Path,
     identity_graph_path: Path | None = None,
 ) -> dict[str, Any]:
+    context = resolve_dataset_context(data_dir)
     registry = _load_json(registry_path)
     source_registry = _load_json(source_registry_path)
     registry_sha256 = sha256_file(registry_path)
@@ -215,8 +219,13 @@ def build_pretraining_overlap_audit(
     return {
         "schema_version": 1,
         "artifact_role": "wavlm_pretraining_overlap_audit",
-        "authority_ref": AUTHORITY_REF,
-        "authority_pin": AUTHORITY_PIN,
+        "authority_ref": context.authority_ref,
+        "authority_pin": context.authority_pin,
+        **(
+            {"contract_version": context.label_contract.contract_version}
+            if context.is_v2
+            else {}
+        ),
         "audit_status": "complete_for_documented_checkpoint_provenance",
         "checkpoint": {
             "model_id": MODEL_ID,

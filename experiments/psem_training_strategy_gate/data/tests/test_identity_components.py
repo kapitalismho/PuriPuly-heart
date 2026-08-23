@@ -91,7 +91,34 @@ def _source_row(
     }
 
 
-def _topology_row(source: dict[str, object]) -> dict[str, object]:
+def _normalization_row(source: dict[str, object]) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "source_id": source["source_id"],
+        "corpus": source["corpus"],
+        "session_id": source["session_id"],
+        "contract_version": source["contract_version"],
+        "contract_document_sha256": source["contract_document_sha256"],
+        "source_waveform_sha256": source["waveform_sha256"],
+        "annotation_sha256": source["annotation_sha256"],
+        "scored_start_sample": 0,
+        "scored_end_sample": 16000,
+        "exposure": {
+            "scored_samples": 16000,
+            "ambiguous_samples": 0,
+            "unknown_identity_samples": 0,
+            "stable_singleton_samples": 16000,
+            "ongoing_overlap_samples": 0,
+        },
+        "label_result_sha256": canonical_sha256(
+            {"source_id": source["source_id"], "label_result": "fixture"}
+        ),
+    }
+
+
+def _topology_row(
+    source: dict[str, object], normalization: dict[str, object]
+) -> dict[str, object]:
     contract = load_contract()
     return {
         "schema_version": 1,
@@ -103,6 +130,10 @@ def _topology_row(source: dict[str, object]) -> dict[str, object]:
         "contract_document_sha256": contract.document_sha256,
         "source_waveform_sha256": source["waveform_sha256"],
         "annotation_sha256": source["annotation_sha256"],
+        "normalization_row_sha256": canonical_sha256(normalization),
+        "label_result_sha256": normalization["label_result_sha256"],
+        "scored_start_sample": 0,
+        "scored_end_sample": 16000,
         "scored_samples": 16000,
         "ambiguous_samples": 0,
         "unknown_identity_samples": 0,
@@ -133,6 +164,7 @@ def _topology_row(source: dict[str, object]) -> dict[str, object]:
 
 def _write_bundle(data_dir: Path, rows: list[dict[str, object]]) -> None:
     ordered = sorted(rows, key=lambda row: str(row["source_id"]))
+    normalization_rows = [_normalization_row(row) for row in ordered]
     write_jsonl(data_dir / "source_manifest.jsonl", ordered)
     write_jsonl(
         data_dir / "annotation_manifest.jsonl",
@@ -140,7 +172,7 @@ def _write_bundle(data_dir: Path, rows: list[dict[str, object]]) -> None:
     )
     write_jsonl(
         data_dir / "normalization_manifest.jsonl",
-        ({"source_id": row["source_id"]} for row in ordered),
+        normalization_rows,
     )
     write_jsonl(
         data_dir / "prior_exposure_manifest.jsonl",
@@ -173,7 +205,10 @@ def _write_bundle(data_dir: Path, rows: list[dict[str, object]]) -> None:
             if row["selection_exposed"]
         ),
     )
-    topology_rows = [_topology_row(row) for row in ordered]
+    topology_rows = [
+        _topology_row(source, normalization)
+        for source, normalization in zip(ordered, normalization_rows, strict=True)
+    ]
     write_jsonl(data_dir / "topology_manifest.jsonl", topology_rows)
     contract = load_contract()
     calibration_path = data_dir / "annotation_calibration.json"

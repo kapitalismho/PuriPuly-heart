@@ -12,6 +12,9 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any, Iterable
 
+from experiments.psem_training_strategy_gate.data.dataset_context import (
+    resolve_dataset_context,
+)
 from experiments.psem_training_strategy_gate.data.identity_components import (
     IdentityGraphError,
     validate_split_assignment,
@@ -22,8 +25,7 @@ from experiments.psem_training_strategy_gate.data.provenance import (
     sha256_file,
 )
 from experiments.psem_training_strategy_gate.data.split_feasibility import (
-    AUTHORITY_PIN,
-    AUTHORITY_REF,
+    CORPUS_BALANCE_REQUIREMENTS,
     NEGATIVE_EXPOSURE_REQUIREMENTS,
     NO_MODEL_FIELDS,
     ROLE_REQUIREMENTS,
@@ -49,6 +51,7 @@ SEARCH_SEED = 770076
 EVAL_FRONTIER_PER_VIEW = 64
 DEV_PERMUTATIONS_PER_EVAL = 24
 MAX_EVAL_SUBSETS = 2_000_000
+V2_DP_FRONTIER_PER_VIEW = 16
 PLANNING_TARGET_HOURS = {TRAIN_ROLE: 24, DEV_ROLE: 6, EVAL_ROLE: 10}
 
 
@@ -74,6 +77,7 @@ class ComponentStats:
     source_scored_samples: tuple[tuple[str, int], ...]
     speaker_association_samples: tuple[tuple[str, int], ...]
     corpus_scored_samples: tuple[tuple[str, int], ...]
+    corpus_source_counts: tuple[tuple[str, int], ...]
 
     def topology(self) -> dict[str, int]:
         return dict(self.topology_counts)
@@ -97,6 +101,7 @@ class Aggregate:
     component_scored_samples: tuple[tuple[str, int], ...]
     speaker_association_samples: tuple[tuple[str, int], ...]
     corpus_scored_samples: tuple[tuple[str, int], ...]
+    corpus_source_counts: tuple[tuple[str, int], ...]
 
     def topology(self) -> dict[str, int]:
         return dict(self.topology_counts)
@@ -176,10 +181,12 @@ def _build_components(
         }
         speaker_samples: dict[str, int] = {}
         corpus_samples: dict[str, int] = {}
+        corpus_source_counts: dict[str, int] = {}
         for source, topology in zip(sources, topologies, strict=True):
             samples = _require_int(topology.get("scored_samples"), "scored_samples")
             corpus = str(source["corpus"])
             corpus_samples[corpus] = corpus_samples.get(corpus, 0) + samples
+            corpus_source_counts[corpus] = corpus_source_counts.get(corpus, 0) + 1
             for speaker_id in source["speaker_ids"]:
                 key = _qualified_speaker(corpus, speaker_id)
                 speaker_samples[key] = speaker_samples.get(key, 0) + samples
@@ -229,6 +236,7 @@ def _build_components(
                 source_scored_samples=tuple(sorted(source_samples.items())),
                 speaker_association_samples=tuple(sorted(speaker_samples.items())),
                 corpus_scored_samples=tuple(sorted(corpus_samples.items())),
+                corpus_source_counts=tuple(sorted(corpus_source_counts.items())),
             )
         )
     ordered = sorted(result, key=lambda component: component.component_id)
@@ -273,20 +281,55 @@ def _aggregate(components: list[ComponentStats], indices: Iterable[int]) -> Aggr
         ),
         speaker_association_samples=_sum_pairs(selected, "speaker_association_samples"),
         corpus_scored_samples=_sum_pairs(selected, "corpus_scored_samples"),
+        corpus_source_counts=_sum_pairs(selected, "corpus_source_counts"),
     )
 
 
-def _role_minimum_passes(role: str, aggregate: Aggregate) -> bool:
+def _corpus_balance_passes(role: str, aggregate: Aggregate) -> bool:
+    requirement = CORPUS_BALANCE_REQUIREMENTS[role]
+    samples = dict(aggregate.corpus_scored_samples)
+    source_counts = dict(aggregate.corpus_source_counts)
+    maximum = requirement["maximum_corpus_scored_share"]
+    return (
+        all(
+            source_counts.get(corpus, 0) >= required
+            for corpus, required in requirement["minimum_corpus_source_counts"].items()
+        )
+        and all(
+            samples.get(corpus, 0) >= required
+            for corpus, required in requirement["minimum_corpus_scored_samples"].items()
+        )
+        and max(samples.values(), default=0) * maximum["denominator"]
+        <= aggregate.scored_samples * maximum["numerator"]
+    )
+
+
+def _role_minimum_passes(
+    role: str,
+    aggregate: Aggregate,
+    *,
+    require_corpus_balance: bool = False,
+) -> bool:
     requirement = ROLE_REQUIREMENTS[role]
     return (
         aggregate.scored_samples
         >= requirement["scored_hours"] * 3600 * SAMPLE_RATE_HZ
         and len(aggregate.source_ids) >= requirement["independent_meetings"]
+        and (not require_corpus_balance or _corpus_balance_passes(role, aggregate))
     )
 
 
-def _eval_and_complement_pass(eval_aggregate: Aggregate, complement: Aggregate) -> bool:
-    if not _role_minimum_passes(EVAL_ROLE, eval_aggregate):
+def _eval_and_complement_pass(
+    eval_aggregate: Aggregate,
+    complement: Aggregate,
+    *,
+    require_corpus_balance: bool = False,
+) -> bool:
+    if not _role_minimum_passes(
+        EVAL_ROLE,
+        eval_aggregate,
+        require_corpus_balance=require_corpus_balance,
+    ):
         return False
     if (
         eval_aggregate.stable_singleton_samples
@@ -305,6 +348,18 @@ def _eval_and_complement_pass(eval_aggregate: Aggregate, complement: Aggregate) 
         eval_topology[topology] >= requirement["eval"]
         and complement_topology[topology] >= requirement["train_dev"]
         for topology, requirement in TOPOLOGY_REQUIREMENTS.items()
+    )
+
+
+def _train_dev_combined_minimum_passes(aggregate: Aggregate) -> bool:
+    return (
+        aggregate.scored_samples
+        >= (ROLE_REQUIREMENTS[TRAIN_ROLE]["scored_hours"] + ROLE_REQUIREMENTS[DEV_ROLE]["scored_hours"])
+        * 3600
+        * SAMPLE_RATE_HZ
+        and len(aggregate.source_ids)
+        >= ROLE_REQUIREMENTS[TRAIN_ROLE]["independent_meetings"]
+        + ROLE_REQUIREMENTS[DEV_ROLE]["independent_meetings"]
     )
 
 
@@ -406,8 +461,153 @@ def _push_frontier(
             heapq.heapreplace(heap, item)
 
 
+def _v2_eval_view_ranks(aggregate: Aggregate) -> tuple[tuple[Any, ...], ...]:
+    samples = dict(aggregate.corpus_scored_samples)
+    source_counts = dict(aggregate.corpus_source_counts)
+    target = PLANNING_TARGET_HOURS[EVAL_ROLE] * 3600 * SAMPLE_RATE_HZ
+    distance = abs(aggregate.scored_samples - target)
+    ami_samples = samples.get("AMI", 0)
+    ali_samples = samples.get("AliMeeting", 0)
+    minimum_samples = min(ami_samples, ali_samples)
+    minimum_sources = min(source_counts.get("AMI", 0), source_counts.get("AliMeeting", 0))
+    dominance = max(
+        (_ratio(value, aggregate.scored_samples) for value in samples.values()),
+        default=Fraction(0, 1),
+    )
+    common = (
+        minimum_sources,
+        minimum_samples,
+        -dominance,
+        len(aggregate.source_ids),
+        len(aggregate.speaker_ids),
+        -distance,
+    )
+    return (
+        *(_eval_view_ranks(aggregate)),
+        common,
+        (minimum_samples, minimum_sources, -dominance, -distance),
+        (-dominance, minimum_samples, minimum_sources, -distance),
+        (-abs(ali_samples - 3 * 3600 * SAMPLE_RATE_HZ), *common),
+        (-abs(ali_samples - 5 * 3600 * SAMPLE_RATE_HZ), *common),
+    )
+
+
+def _prune_v2_dp_masks(
+    masks: set[int],
+    components: list[ComponentStats],
+) -> set[int]:
+    heaps: list[list[tuple[tuple[Any, ...], int]]] = [
+        [] for _ in _v2_eval_view_ranks(_aggregate([], []))
+    ]
+    for mask in masks:
+        aggregate = _aggregate(components, _mask_indices(mask, len(components)))
+        for heap, rank in zip(heaps, _v2_eval_view_ranks(aggregate), strict=True):
+            item = (rank, mask)
+            if len(heap) < V2_DP_FRONTIER_PER_VIEW:
+                heapq.heappush(heap, item)
+            elif item > heap[0]:
+                heapq.heapreplace(heap, item)
+    return {mask for heap in heaps for _, mask in heap}
+
+
+def _enumerate_eval_frontier_v2(
+    components: list[ComponentStats],
+) -> tuple[set[int], dict[str, Any]]:
+    all_indices = set(range(len(components)))
+    eligible_global = [index for index, component in enumerate(components) if component.eval_eligible]
+    total = _aggregate(components, all_indices)
+    upper_bounds = _integer_topology_upper_bounds(total)
+    global_upper_bound = min(bound for bound, _ in upper_bounds.values())
+    limiting = sorted(
+        topology for topology, (bound, _) in upper_bounds.items() if bound == global_upper_bound
+    )
+    limiting_topology = limiting[0]
+    target_counts = upper_bounds[limiting_topology][1]
+    maximum_target = max(target_counts)
+    states: dict[int, set[int]] = {0: {0}}
+    generated = 0
+    for index in eligible_global:
+        value = components[index].topology()[limiting_topology]
+        updated = {count: set(masks) for count, masks in states.items()}
+        for count, masks in states.items():
+            next_count = count + value
+            if next_count > maximum_target:
+                continue
+            candidates = updated.setdefault(next_count, set())
+            candidates.update(mask | (1 << index) for mask in masks)
+            generated += len(masks)
+        states = {
+            count: (
+                _prune_v2_dp_masks(masks, components)
+                if len(masks) > V2_DP_FRONTIER_PER_VIEW * 10
+                else masks
+            )
+            for count, masks in updated.items()
+        }
+    candidates = {
+        mask for target in target_counts for mask in states.get(target, set())
+    }
+    heaps: list[list[tuple[tuple[Any, ...], int]]] = [
+        [] for _ in _v2_eval_view_ranks(_aggregate([], []))
+    ]
+    feasible = 0
+    for mask in sorted(candidates):
+        eval_indices = set(_mask_indices(mask, len(components)))
+        eval_aggregate = _aggregate(components, eval_indices)
+        complement = _aggregate(components, all_indices - eval_indices)
+        if not _eval_and_complement_pass(
+            eval_aggregate,
+            complement,
+            require_corpus_balance=True,
+        ):
+            continue
+        if not _train_dev_combined_minimum_passes(complement):
+            continue
+        if _topology_slack(eval_aggregate, complement) != global_upper_bound:
+            continue
+        feasible += 1
+        for heap, rank in zip(heaps, _v2_eval_view_ranks(eval_aggregate), strict=True):
+            item = (rank, mask)
+            if len(heap) < EVAL_FRONTIER_PER_VIEW:
+                heapq.heappush(heap, item)
+            elif item > heap[0]:
+                heapq.heapreplace(heap, item)
+    frontier = {mask for heap in heaps for _, mask in heap}
+    if not frontier:
+        raise SplitAssignmentError(
+            "bounded corpus-balanced EVAL search found no integer-bound assignment"
+        )
+    return frontier, {
+        "algorithm": "corpus-balanced-integer-bound-dp-frontier-seeded-dev-prefix",
+        "algorithm_version": "2",
+        "integer_topology_upper_bounds": {
+            topology: {
+                "numerator": bound.numerator,
+                "denominator": bound.denominator,
+                "decimal": round(float(bound), 8),
+                "optimal_eval_counts": list(counts),
+            }
+            for topology, (bound, counts) in sorted(upper_bounds.items())
+        },
+        "global_upper_bound": _fraction_record(global_upper_bound),
+        "limiting_topology": limiting_topology,
+        "limiting_topologies": limiting,
+        "target_eval_counts": list(target_counts),
+        "generated_dynamic_programming_candidates": generated,
+        "retained_exact_count_candidates": len(candidates),
+        "upper_bound_feasible_subsets": feasible,
+        "frontier_assignment_count": len(frontier),
+        "dynamic_programming_frontier_per_view": V2_DP_FRONTIER_PER_VIEW,
+        "eval_enumeration_complete": False,
+        "search_complete_for_chosen_primary_optimum": True,
+        "upper_bound_achieved": True,
+    }
+
+
 def _enumerate_eval_frontier(
     components: list[ComponentStats],
+    *,
+    require_corpus_balance: bool = False,
 ) -> tuple[set[int], dict[str, Any]]:
     all_indices = set(range(len(components)))
     eligible_global = [index for index, component in enumerate(components) if component.eval_eligible]
@@ -443,17 +643,13 @@ def _enumerate_eval_frontier(
             eval_indices = set(_mask_indices(global_mask, len(components)))
             eval_aggregate = _aggregate(components, eval_indices)
             complement = _aggregate(components, all_indices - eval_indices)
-            if not _eval_and_complement_pass(eval_aggregate, complement):
-                return
-            if (
-                complement.scored_samples
-                < (ROLE_REQUIREMENTS[TRAIN_ROLE]["scored_hours"] + ROLE_REQUIREMENTS[DEV_ROLE]["scored_hours"])
-                * 3600
-                * SAMPLE_RATE_HZ
-                or len(complement.source_ids)
-                < ROLE_REQUIREMENTS[TRAIN_ROLE]["independent_meetings"]
-                + ROLE_REQUIREMENTS[DEV_ROLE]["independent_meetings"]
+            if not _eval_and_complement_pass(
+                eval_aggregate,
+                complement,
+                require_corpus_balance=require_corpus_balance,
             ):
+                return
+            if not _train_dev_combined_minimum_passes(complement):
                 return
             slack = _topology_slack(eval_aggregate, complement)
             if slack != global_upper_bound:
@@ -586,8 +782,14 @@ def _assignment_score(
 
 def _search_assignment(
     components: list[ComponentStats],
+    *,
+    require_corpus_balance: bool = False,
 ) -> tuple[dict[str, set[int]], dict[str, Any], tuple[Any, ...]]:
-    frontier, eval_search = _enumerate_eval_frontier(components)
+    frontier, eval_search = (
+        _enumerate_eval_frontier_v2(components)
+        if require_corpus_balance
+        else _enumerate_eval_frontier(components)
+    )
     all_indices = set(range(len(components)))
     best: tuple[tuple[Any, ...], str, dict[str, set[int]], dict[str, Aggregate]] | None = None
     complete_candidates = 0
@@ -613,10 +815,18 @@ def _search_assignment(
                 train_indices = remaining - dev_indices
                 dev_aggregate = _aggregate(components, dev_indices)
                 train_aggregate = _aggregate(components, train_indices)
-                if not _role_minimum_passes(DEV_ROLE, dev_aggregate):
+                if not _role_minimum_passes(
+                    DEV_ROLE,
+                    dev_aggregate,
+                    require_corpus_balance=require_corpus_balance,
+                ):
                     continue
                 if not _role_minimum_passes(TRAIN_ROLE, train_aggregate):
                     break
+                if require_corpus_balance and not _corpus_balance_passes(
+                    TRAIN_ROLE, train_aggregate
+                ):
+                    continue
                 complete_candidates += 1
                 summaries = {
                     TRAIN_ROLE: train_aggregate,
@@ -659,7 +869,12 @@ def _fraction_record(value: Fraction) -> dict[str, Any]:
     }
 
 
-def _role_summary(role: str, aggregate: Aggregate) -> dict[str, Any]:
+def _role_summary(
+    role: str,
+    aggregate: Aggregate,
+    *,
+    include_corpus_balance: bool = False,
+) -> dict[str, Any]:
     topology = aggregate.topology()
     return {
         "role": role,
@@ -679,6 +894,18 @@ def _role_summary(role: str, aggregate: Aggregate) -> dict[str, Any]:
         "primary_topology_counts": topology,
         "known_speaker_count": len(aggregate.speaker_ids),
         "corpora": list(aggregate.corpora),
+        **(
+            {
+                "corpus_source_counts": dict(aggregate.corpus_source_counts),
+                "corpus_scored_samples": dict(aggregate.corpus_scored_samples),
+                "corpus_scored_hours": {
+                    corpus: round(samples / SAMPLE_RATE_HZ / 3600, 6)
+                    for corpus, samples in aggregate.corpus_scored_samples
+                },
+            }
+            if include_corpus_balance
+            else {}
+        ),
         "acoustic_groups": list(aggregate.acoustic_groups),
         "masked_transition_fraction": round(
             float(_ratio(aggregate.masked_transitions, aggregate.actual_transitions)), 8
@@ -731,7 +958,11 @@ def _role_summary(role: str, aggregate: Aggregate) -> dict[str, Any]:
     }
 
 
-def _hard_gate_results(summaries: dict[str, Aggregate]) -> list[dict[str, Any]]:
+def _hard_gate_results(
+    summaries: dict[str, Aggregate],
+    *,
+    include_corpus_balance: bool = False,
+) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     for role in OFFICIAL_ROLES:
         aggregate = summaries[role]
@@ -753,6 +984,47 @@ def _hard_gate_results(summaries: dict[str, Aggregate]) -> list[dict[str, Any]]:
                 },
             ]
         )
+        if include_corpus_balance:
+            balance = CORPUS_BALANCE_REQUIREMENTS[role]
+            corpus_samples = dict(aggregate.corpus_scored_samples)
+            corpus_source_counts = dict(aggregate.corpus_source_counts)
+            for corpus, required in balance["minimum_corpus_source_counts"].items():
+                observed = corpus_source_counts.get(corpus, 0)
+                results.append(
+                    {
+                        "id": f"{role}.corpus_source_counts.{corpus}",
+                        "observed": observed,
+                        "required": required,
+                        "passed": observed >= required,
+                    }
+                )
+            for corpus, required in balance["minimum_corpus_scored_samples"].items():
+                observed = corpus_samples.get(corpus, 0)
+                results.append(
+                    {
+                        "id": f"{role}.corpus_scored_samples.{corpus}",
+                        "observed": observed,
+                        "required": required,
+                        "passed": observed >= required,
+                    }
+                )
+            maximum = balance["maximum_corpus_scored_share"]
+            maximum_samples = max(corpus_samples.values(), default=0)
+            results.append(
+                {
+                    "id": f"{role}.maximum_corpus_scored_share",
+                    "observed": {
+                        "numerator": maximum_samples,
+                        "denominator": aggregate.scored_samples,
+                        "decimal": round(
+                            float(_ratio(maximum_samples, aggregate.scored_samples)), 8
+                        ),
+                    },
+                    "required_maximum": maximum,
+                    "passed": maximum_samples * maximum["denominator"]
+                    <= aggregate.scored_samples * maximum["numerator"],
+                }
+            )
     train_dev = Aggregate(
         component_ids=tuple(
             sorted(summaries[TRAIN_ROLE].component_ids + summaries[DEV_ROLE].component_ids)
@@ -783,6 +1055,7 @@ def _hard_gate_results(summaries: dict[str, Aggregate]) -> list[dict[str, Any]]:
         component_scored_samples=(),
         speaker_association_samples=(),
         corpus_scored_samples=(),
+        corpus_source_counts=(),
     )
     for topology, requirement in TOPOLOGY_REQUIREMENTS.items():
         for label, aggregate, key in (
@@ -818,12 +1091,96 @@ def _hard_gate_results(summaries: dict[str, Aggregate]) -> list[dict[str, Any]]:
     return results
 
 
+def _identity_spans_roles(
+    identities_by_source: dict[str, Iterable[str]],
+    source_assignments: dict[str, str],
+) -> bool:
+    roles_by_identity: dict[str, set[str]] = {}
+    for source_id, identities in identities_by_source.items():
+        for identity in identities:
+            roles_by_identity.setdefault(identity, set()).add(
+                source_assignments[source_id]
+            )
+    return any(len(roles) > 1 for roles in roles_by_identity.values())
+
+
+def _build_leakage_audit(
+    graph: dict[str, Any],
+    overlap_rows: list[dict[str, Any]],
+    source_by_id: dict[str, dict[str, Any]],
+    source_assignments: dict[str, str],
+) -> dict[str, bool]:
+    components = graph.get("components")
+    nodes = graph.get("nodes")
+    if not isinstance(components, list) or not isinstance(nodes, list):
+        raise SplitAssignmentError("identity graph leakage inventory is invalid")
+    component_may_span_roles = any(
+        len({source_assignments[source_id] for source_id in component["source_ids"]})
+        > 1
+        for component in components
+    )
+    meeting_session_may_span_roles = _identity_spans_roles(
+        {
+            source_id: (
+                f"{source['corpus']}:{source['session_id']}",
+            )
+            for source_id, source in source_by_id.items()
+        },
+        source_assignments,
+    )
+    waveform_may_span_roles = _identity_spans_roles(
+        {
+            source_id: (source["waveform_sha256"],)
+            for source_id, source in source_by_id.items()
+        },
+        source_assignments,
+    )
+    known_speaker_may_span_roles = _identity_spans_roles(
+        {
+            node["source_id"]: tuple(
+                f"{identity['axis']}:{identity['value']}"
+                for identity in node["known_identities"]
+            )
+            for node in nodes
+        },
+        source_assignments,
+    )
+    prior_selection_exposed_component_in_eval = any(
+        component.get("eval_forbidden") is True
+        and any(
+            source_assignments[source_id] == EVAL_ROLE
+            for source_id in component["source_ids"]
+        )
+        for component in components
+    )
+    exact_known_wavlm_pretraining_overlap_in_eval = any(
+        row.get("classification") == "exact_session_overlap_known"
+        and source_assignments[row["source_id"]] == EVAL_ROLE
+        for row in overlap_rows
+    )
+    result = {
+        "exact_source_coverage": set(source_assignments) == set(source_by_id),
+        "component_may_span_roles": component_may_span_roles,
+        "meeting_session_may_span_roles": meeting_session_may_span_roles,
+        "waveform_may_span_roles": waveform_may_span_roles,
+        "known_speaker_may_span_roles": known_speaker_may_span_roles,
+        "prior_selection_exposed_component_in_eval": prior_selection_exposed_component_in_eval,
+        "exact_known_wavlm_pretraining_overlap_in_eval": exact_known_wavlm_pretraining_overlap_in_eval,
+    }
+    if result["exact_source_coverage"] is not True or any(
+        value for key, value in result.items() if key != "exact_source_coverage"
+    ):
+        raise SplitAssignmentError("computed split leakage audit failed")
+    return result
+
+
 def _build_split_manifest_uncached(
     data_dir: Path,
     registry_path: Path,
     source_registry_path: Path,
     input_fingerprint: str,
 ) -> dict[str, Any]:
+    context = resolve_dataset_context(data_dir)
     feasibility = build_split_feasibility(data_dir, registry_path, source_registry_path)
     if feasibility["blocking_lower_bounds"]:
         raise SplitAssignmentError("aggregate lower bounds block component assignment search")
@@ -833,7 +1190,10 @@ def _build_split_manifest_uncached(
     if not isinstance(overlap_rows, list):
         raise SplitAssignmentError("pretraining overlap source inventory is invalid")
     components = _build_components(data_dir, graph, overlap_rows)
-    assignments, search, score = _search_assignment(components)
+    assignments, search, score = _search_assignment(
+        components,
+        require_corpus_balance=context.is_v2,
+    )
     summaries = {
         role: _aggregate(components, indices) for role, indices in assignments.items()
     }
@@ -854,7 +1214,7 @@ def _build_split_manifest_uncached(
         for source_id in source_assignments
     ):
         raise SplitAssignmentError("chosen EVAL contains forbidden pretraining overlap")
-    gates = _hard_gate_results(summaries)
+    gates = _hard_gate_results(summaries, include_corpus_balance=context.is_v2)
     if not gates or any(result["passed"] is not True for result in gates):
         raise SplitAssignmentError("chosen assignment does not pass every role-specific hard gate")
     topology_slack = score[0]
@@ -871,6 +1231,18 @@ def _build_split_manifest_uncached(
     ]
     source_rows = _load_jsonl(data_dir / "source_manifest.jsonl")
     source_by_id = {row["source_id"]: row for row in source_rows}
+    normalization_by_id = {
+        row["source_id"]: row
+        for row in _load_jsonl(data_dir / "normalization_manifest.jsonl")
+    }
+    if set(normalization_by_id) != set(source_by_id):
+        raise SplitAssignmentError("normalization source coverage is invalid")
+    leakage_audit = _build_leakage_audit(
+        graph,
+        overlap_rows,
+        source_by_id,
+        source_assignments,
+    )
     source_assignment_rows = [
         {
             "source_id": source_id,
@@ -882,6 +1254,15 @@ def _build_split_manifest_uncached(
             "role": source_assignments[source_id],
             "waveform_sha256": source_by_id[source_id]["waveform_sha256"],
             "annotation_sha256": source_by_id[source_id]["annotation_sha256"],
+            **(
+                {
+                    "reference_sha256": normalization_by_id[source_id][
+                        "reference_sha256"
+                    ]
+                }
+                if context.is_v2
+                else {}
+            ),
         }
         for source_id in sorted(source_assignments)
     ]
@@ -892,8 +1273,8 @@ def _build_split_manifest_uncached(
     return {
         "schema_version": 1,
         "artifact_role": "psem_component_split_assignment",
-        "authority_ref": AUTHORITY_REF,
-        "authority_pin": AUTHORITY_PIN,
+        "authority_ref": context.authority_ref,
+        "authority_pin": context.authority_pin,
         "contract_version": _load_json(data_dir / "topology_census.json")["contract_version"],
         "natural_data_only": True,
         "official_roles": list(OFFICIAL_ROLES),
@@ -935,19 +1316,16 @@ def _build_split_manifest_uncached(
         "assignment_sha256": canonical_sha256(assignment_payload),
         "assignments": assignment_payload,
         "role_summaries": {
-            role: _role_summary(role, summaries[role]) for role in OFFICIAL_ROLES
+            role: _role_summary(
+                role,
+                summaries[role],
+                include_corpus_balance=context.is_v2,
+            )
+            for role in OFFICIAL_ROLES
         },
         "hard_gate_results": gates,
         "hard_gate_status": "pass",
-        "leakage_audit": {
-            "exact_source_coverage": len(source_assignments) == len(source_rows),
-            "component_may_span_roles": False,
-            "meeting_session_may_span_roles": False,
-            "waveform_may_span_roles": False,
-            "known_speaker_may_span_roles": False,
-            "prior_selection_exposed_component_in_eval": False,
-            "exact_known_wavlm_pretraining_overlap_in_eval": False,
-        },
+        "leakage_audit": leakage_audit,
         "objective_result": {
             "minimum_normalized_topology_slack": _fraction_record(topology_slack),
             "integer_global_upper_bound_achieved": search["upper_bound_achieved"],
@@ -969,10 +1347,9 @@ def _input_fingerprint(
     registry_path: Path,
     source_registry_path: Path,
 ) -> str:
-    names = (
+    context = resolve_dataset_context(data_dir)
+    data_names = (
         "operational_label_contract.json",
-        "annotation_calibration.json",
-        "ANNOTATION_CALIBRATION.md",
         "source_manifest.jsonl",
         "prior_exposure_manifest.jsonl",
         "annotation_manifest.jsonl",
@@ -984,9 +1361,19 @@ def _input_fingerprint(
     )
     return canonical_sha256(
         {
-            "data": {name: sha256_file(data_dir / name) for name in names},
+            "data": {
+                **{name: sha256_file(data_dir / name) for name in data_names},
+                "annotation_calibration.json": sha256_file(
+                    context.calibration_dir / "annotation_calibration.json"
+                ),
+                "ANNOTATION_CALIBRATION.md": sha256_file(
+                    context.calibration_dir / "ANNOTATION_CALIBRATION.md"
+                ),
+            },
             "historical_prior_exposure_configs": {
-                relative_path: sha256_file(data_dir.parents[2] / relative_path)
+                relative_path: sha256_file(
+                    context.calibration_dir.parents[2] / relative_path
+                )
                 for relative_path in HISTORICAL_CONFIGS.values()
             },
             "registry": sha256_file(registry_path),

@@ -5,6 +5,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from experiments.psem_training_strategy_gate.data.dataset_context import (
+    resolve_dataset_context,
+)
 from experiments.psem_training_strategy_gate.data.identity_components import (
     build_identity_graph,
 )
@@ -49,6 +52,32 @@ NO_MODEL_FIELDS = (
     "official_model_training_performed",
 )
 NATURAL_CORPORA = frozenset({"AMI", "AliMeeting"})
+CORPUS_BALANCE_REQUIREMENTS = {
+    "PSEM-STRATEGY-TRAIN": {
+        "minimum_corpus_source_counts": {"AMI": 1, "AliMeeting": 1},
+        "minimum_corpus_scored_samples": {
+            "AMI": 1,
+            "AliMeeting": 5 * 3600 * SAMPLE_RATE_HZ,
+        },
+        "maximum_corpus_scored_share": {"numerator": 4, "denominator": 5},
+    },
+    "PSEM-STRATEGY-DEV": {
+        "minimum_corpus_source_counts": {"AMI": 2, "AliMeeting": 2},
+        "minimum_corpus_scored_samples": {
+            "AMI": 3600 * SAMPLE_RATE_HZ,
+            "AliMeeting": 3600 * SAMPLE_RATE_HZ,
+        },
+        "maximum_corpus_scored_share": {"numerator": 3, "denominator": 4},
+    },
+    "PSEM-STRATEGY-EVAL": {
+        "minimum_corpus_source_counts": {"AMI": 4, "AliMeeting": 4},
+        "minimum_corpus_scored_samples": {
+            "AMI": 2 * 3600 * SAMPLE_RATE_HZ,
+            "AliMeeting": 2 * 3600 * SAMPLE_RATE_HZ,
+        },
+        "maximum_corpus_scored_share": {"numerator": 7, "denominator": 10},
+    },
+}
 
 
 class SplitFeasibilityError(RuntimeError):
@@ -167,6 +196,7 @@ def build_split_feasibility(
     registry_path: Path,
     source_registry_path: Path,
 ) -> dict[str, Any]:
+    context = resolve_dataset_context(data_dir)
     census = _load_json(data_dir / "topology_census.json")
     source_rows = _load_jsonl(data_dir / "source_manifest.jsonl")
     _validate_natural_sources(source_rows)
@@ -238,8 +268,13 @@ def build_split_feasibility(
     return {
         "schema_version": 1,
         "artifact_role": "psem_split_feasibility",
-        "authority_ref": AUTHORITY_REF,
-        "authority_pin": AUTHORITY_PIN,
+        "authority_ref": context.authority_ref,
+        "authority_pin": context.authority_pin,
+        **(
+            {"contract_version": context.label_contract.contract_version}
+            if context.is_v2
+            else {}
+        ),
         "search_status": search_status,
         "valid_assignment_exists": False if blocking_lower_bounds else None,
         "assignment_manifest_emitted": False,
@@ -257,6 +292,11 @@ def build_split_feasibility(
             "roles": ROLE_REQUIREMENTS,
             "topologies": TOPOLOGY_REQUIREMENTS,
             "negative_exposure": NEGATIVE_EXPOSURE_REQUIREMENTS,
+            **(
+                {"corpus_balance": CORPUS_BALANCE_REQUIREMENTS}
+                if context.is_v2
+                else {}
+            ),
             "combined_lower_bounds": requirements,
         },
         "observed": {

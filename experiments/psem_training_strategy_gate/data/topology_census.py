@@ -8,11 +8,14 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from experiments.psem_training_strategy_gate.data.annotation_normalization import (
-    NormalizedSession,
     normalize_inventory,
 )
+from experiments.psem_training_strategy_gate.data.dataset_context import (
+    DatasetContextError,
+    resolve_dataset_context,
+)
 from experiments.psem_training_strategy_gate.data.label_contract import (
-    CONTRACT_PATH,
+    CONTRACT_PATH_BY_VERSION,
     LabelContract,
     load_contract,
 )
@@ -24,6 +27,9 @@ from experiments.psem_training_strategy_gate.data.provenance import (
     sha256_file,
     wav_identity,
     write_jsonl,
+)
+from experiments.psem_training_strategy_gate.data.reference_normalization import (
+    normalize_reference_inventory,
 )
 
 FROZEN_CALIBRATION_SHA256 = "1f10fc1980bd1a108753ef6afb45f455618df04014ad6b58dcf6e880ba01f4b1"
@@ -98,9 +104,10 @@ def _load_json_object(path: Path) -> dict[str, Any]:
     return value
 
 
-def _validate_contract_precedence() -> None:
+def _validate_contract_precedence(contract: LabelContract) -> None:
+    contract_path = CONTRACT_PATH_BY_VERSION[contract.contract_version]
     try:
-        raw = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+        raw = json.loads(contract_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise TopologyCensusError("operational label contract is unreadable") from exc
     if raw.get("official_primary_topology_precedence") != list(
@@ -109,12 +116,15 @@ def _validate_contract_precedence() -> None:
         raise TopologyCensusError(
             "census topology precedence does not match the frozen contract"
         )
-    if raw.get("status") != "frozen_after_annotation_only_calibration":
-        raise TopologyCensusError("topology census requires the frozen contract")
+    if (
+        raw.get("contract_version") != contract.contract_version
+        or raw.get("status") != contract.status
+    ):
+        raise TopologyCensusError("topology census contract identity is invalid")
 
 
 def _validate_normalization_manifest(
-    sessions: Sequence[NormalizedSession], data_dir: Path
+    sessions: Sequence[Any], data_dir: Path
 ) -> list[dict[str, Any]]:
     observed_rows = _load_jsonl_objects(data_dir / "normalization_manifest.jsonl")
     expected_rows = [
@@ -133,8 +143,23 @@ def _validate_calibrated_inventory(
     source_ids: Sequence[str],
     contract: LabelContract,
 ) -> None:
-    calibration_path = data_dir / "annotation_calibration.json"
+    try:
+        context = resolve_dataset_context(data_dir)
+    except DatasetContextError as exc:
+        raise TopologyCensusError("dataset context is invalid") from exc
+    calibration_path = context.calibration_dir / "annotation_calibration.json"
     calibration = _load_json_object(calibration_path)
+    calibrated_contract = load_contract(version="psem-handoff-v0")
+    constant_fields = (
+        "sample_rate_hz",
+        "reliable_solo_min_duration_ms",
+        "annotation_boundary_jitter_ms",
+        "gap_topology_min_duration_ms",
+        "overlap_topology_min_duration_ms",
+        "local_continuity_max_gap_ms",
+        "short_backchannel_min_duration_ms",
+        "short_backchannel_max_duration_ms",
+    )
     input_policy = calibration.get("input_policy")
     calibrated_scope_valid = (
         FROZEN_CALIBRATION_SOURCE_IDS.issubset(source_ids)
@@ -150,11 +175,16 @@ def _validate_calibrated_inventory(
     if (
         calibration.get("artifact_role") != "annotation_only_calibration"
         or sha256_file(calibration_path) != FROZEN_CALIBRATION_SHA256
-        or sha256_file(data_dir / "ANNOTATION_CALIBRATION.md")
+        or sha256_file(context.calibration_dir / "ANNOTATION_CALIBRATION.md")
         != FROZEN_CALIBRATION_MARKDOWN_SHA256
-        or calibration.get("contract_version") != contract.contract_version
-        or calibration.get("contract_document_sha256") != contract.document_sha256
-        or calibration.get("contract_status") != contract.status
+        or calibration.get("contract_version") != calibrated_contract.contract_version
+        or calibration.get("contract_document_sha256")
+        != calibrated_contract.document_sha256
+        or calibration.get("contract_status") != calibrated_contract.status
+        or any(
+            getattr(contract, field) != getattr(calibrated_contract, field)
+            for field in constant_fields
+        )
         or not isinstance(input_policy, dict)
         or not calibrated_scope_valid
         or any(
@@ -209,9 +239,7 @@ def validate_waveform_inventory(data_dir: Path, corpus_root: Path) -> None:
             )
 
 
-def _micro_diagnostics(
-    session: NormalizedSession, contract: LabelContract
-) -> dict[str, int]:
+def _micro_diagnostics(session: Any, contract: LabelContract) -> dict[str, int]:
     micro_gap_count = 0
     micro_gap_samples = 0
     micro_overlap_count = 0
@@ -249,7 +277,7 @@ def _micro_diagnostics(
     }
 
 
-def _mask_diagnostics(session: NormalizedSession) -> dict[str, Any]:
+def _mask_diagnostics(session: Any) -> dict[str, Any]:
     actual_transition_count = 0
     masked_transition_count = 0
     masked_transition_reasons: Counter[str] = Counter()
@@ -278,9 +306,7 @@ def _mask_diagnostics(session: NormalizedSession) -> dict[str, Any]:
     }
 
 
-def build_topology_row(
-    session: NormalizedSession, contract: LabelContract
-) -> dict[str, Any]:
+def build_topology_row(session: Any, contract: LabelContract) -> dict[str, Any]:
     if (
         session.labels.contract_version != contract.contract_version
         or session.labels.contract_document_sha256 != contract.document_sha256
@@ -342,7 +368,9 @@ def build_topology_row(
         "contract_version": contract.contract_version,
         "contract_document_sha256": contract.document_sha256,
         "source_waveform_sha256": session.source_waveform_sha256,
-        "annotation_sha256": session.annotation_sha256,
+        "annotation_sha256": normalization_row.get(
+            "source_annotation_sha256", normalization_row.get("annotation_sha256")
+        ),
         "normalization_row_sha256": canonical_sha256(normalization_row),
         "label_result_sha256": normalization_row["label_result_sha256"],
         "topology_episodes_sha256": canonical_sha256(
@@ -494,51 +522,57 @@ def _lower_bound_audit(overall: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_topology_census(
-    sessions: Sequence[NormalizedSession],
+    sessions: Sequence[Any],
     data_dir: Path,
     topology_manifest_sha256: str,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not sessions:
         raise TopologyCensusError("topology census requires normalized sessions")
-    _validate_contract_precedence()
-    contract = load_contract()
+    try:
+        context = resolve_dataset_context(data_dir)
+    except DatasetContextError as exc:
+        raise TopologyCensusError("dataset context is invalid") from exc
+    contract = context.label_contract
+    _validate_contract_precedence(contract)
     source_ids = [session.source_id for session in sessions]
     if len(set(source_ids)) != len(source_ids):
         raise TopologyCensusError("census source identities must be unique")
     _validate_normalization_manifest(sessions, data_dir)
     _validate_calibrated_inventory(data_dir, source_ids, contract)
     return _build_topology_census_from_validated_sessions(
-        sessions, data_dir, topology_manifest_sha256
+        sessions, data_dir, topology_manifest_sha256, contract
     )
 
 
 def _build_topology_census_from_validated_sessions(
-    sessions: Sequence[NormalizedSession],
+    sessions: Sequence[Any],
     data_dir: Path,
     topology_manifest_sha256: str,
+    contract: LabelContract | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    contract = load_contract()
+    context = resolve_dataset_context(data_dir)
+    active_contract = contract or context.label_contract
     source_ids = [session.source_id for session in sessions]
     rows = [
-        build_topology_row(session, contract)
+        build_topology_row(session, active_contract)
         for session in sorted(sessions, key=lambda session: session.source_id)
     ]
-    overall = _aggregate(rows, contract.sample_rate_hz)
+    overall = _aggregate(rows, active_contract.sample_rate_hz)
     corpora = sorted({row["corpus"] for row in rows})
     census = {
         "schema_version": 1,
         "artifact_role": "natural_topology_census",
-        "authority_ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/77",
-        "authority_pin": "5778025c8aca1ea1cb7cd8fc41645b520ca1f9f749155b5f5daada32e940b559",
-        "contract_version": contract.contract_version,
-        "contract_document_sha256": contract.document_sha256,
-        "contract_status": contract.status,
+        "authority_ref": context.authority_ref,
+        "authority_pin": context.authority_pin,
+        "contract_version": active_contract.contract_version,
+        "contract_document_sha256": active_contract.document_sha256,
+        "contract_status": active_contract.status,
         "input_manifests": {
             "annotation_calibration_sha256": sha256_file(
-                data_dir / "annotation_calibration.json"
+                context.calibration_dir / "annotation_calibration.json"
             ),
             "annotation_calibration_markdown_sha256": sha256_file(
-                data_dir / "ANNOTATION_CALIBRATION.md"
+                context.calibration_dir / "ANNOTATION_CALIBRATION.md"
             ),
             "source_manifest_sha256": sha256_file(data_dir / "source_manifest.jsonl"),
             "annotation_manifest_sha256": sha256_file(
@@ -570,7 +604,7 @@ def _build_topology_census_from_validated_sessions(
         "by_corpus": {
             corpus: _aggregate(
                 [row for row in rows if row["corpus"] == corpus],
-                contract.sample_rate_hz,
+                active_contract.sample_rate_hz,
             )
             for corpus in corpora
         },
@@ -633,6 +667,23 @@ def render_data_census(
         _validate_split_render_binding(
             census, rows, split_manifest, split_manifest_sha256
         )
+    split_summary = None
+    if split_manifest is not None:
+        source_count = len(split_manifest["assignments"]["sources"])
+        component_count = len(split_manifest["assignments"]["components"])
+        gate_count = len(split_manifest["hard_gate_results"])
+        if census["contract_version"] == "psem-handoff-v1":
+            split_summary = (
+                f"The identity graph and pinned WavLM overlap audit cover all {source_count} "
+                f"sources in {component_count} components. `split_manifest.json` assigns every "
+                "component exactly once in EVAL, then DEV, then TRAIN order. The split reaches "
+                "the integer global upper bound for minimum normalized topology slack and passes "
+                f"all {gate_count} role-specific hard gates. Dataset freeze "
+                "`PSEM-STRATEGY-DATA-v2` will bind these artifacts at the final freeze checkpoint; "
+                "final preflight is recorded separately."
+            )
+        else:
+            split_summary = "The identity graph and pinned WavLM overlap audit cover all 76 sources in 42 components. `split_manifest.json` assigns every component exactly once in EVAL, then DEV, then TRAIN order. The split reaches the integer global upper bound for minimum normalized topology slack and passes all 22 role-specific hard gates. Dataset freeze `PSEM-STRATEGY-DATA-v1` is bound in `dataset_freeze.json`; final preflight is recorded separately."
     lines = [
         (
             "# Natural topology census and component split"
@@ -649,7 +700,7 @@ def render_data_census(
         f"Contract: `{census['contract_version']}` (`{census['contract_status']}`)",
         "",
         (
-            "The identity graph and pinned WavLM overlap audit cover all 76 sources in 42 components. `split_manifest.json` assigns every component exactly once in EVAL, then DEV, then TRAIN order. The split reaches the integer global upper bound for minimum normalized topology slack and passes all 22 role-specific hard gates. Dataset freeze `PSEM-STRATEGY-DATA-v1` is bound in `dataset_freeze.json`; final preflight is recorded separately."
+            split_summary
             if split_selected
             else "Split roles remain unassigned until the identity graph and pretrained-checkpoint overlap audit are complete. Component counts are therefore pending and the raw-pool lower-bound audit is not split feasibility evidence."
         ),
@@ -825,11 +876,23 @@ def write_topology_census(
     manifest_path: Path,
     census_path: Path,
     markdown_path: Path,
+    reference_root: Path | None = None,
 ) -> None:
     validate_waveform_inventory(data_dir, corpus_root)
-    sessions = normalize_inventory(data_dir, corpus_root)
-    contract = load_contract()
-    _validate_contract_precedence()
+    try:
+        context = resolve_dataset_context(data_dir)
+    except DatasetContextError as exc:
+        raise TopologyCensusError("dataset context is invalid") from exc
+    if context.is_v2:
+        if reference_root is None:
+            raise TopologyCensusError("v2 topology census requires the reference checkout")
+        sessions = normalize_reference_inventory(
+            data_dir / "source_manifest.jsonl", corpus_root, reference_root
+        )
+    else:
+        sessions = normalize_inventory(data_dir, corpus_root)
+    contract = context.label_contract
+    _validate_contract_precedence(contract)
     _validate_normalization_manifest(sessions, data_dir)
     rows = [
         build_topology_row(session, contract)
@@ -872,6 +935,7 @@ def main() -> None:
     parser.add_argument("--manifest-output", type=Path, required=True)
     parser.add_argument("--census-output", type=Path, required=True)
     parser.add_argument("--markdown-output", type=Path, required=True)
+    parser.add_argument("--reference-root", type=Path)
     args = parser.parse_args()
     write_topology_census(
         args.data_dir.resolve(),
@@ -879,6 +943,7 @@ def main() -> None:
         args.manifest_output.resolve(),
         args.census_output.resolve(),
         args.markdown_output.resolve(),
+        args.reference_root.resolve() if args.reference_root is not None else None,
     )
 
 

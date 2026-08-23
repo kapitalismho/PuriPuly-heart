@@ -7,8 +7,19 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any, Iterable
 
+from experiments.psem_training_strategy_gate.data.dataset_context import (
+    DatasetContextError,
+    resolve_dataset_context,
+)
+from experiments.psem_training_strategy_gate.data.forced_alignment_reference import (
+    REFERENCE_COMMIT,
+    REFERENCE_REPOSITORY,
+)
 from experiments.psem_training_strategy_gate.data.label_contract import load_contract
 from experiments.psem_training_strategy_gate.data.provenance import (
+    EXPECTED_ALIMEETING_V2_MEETINGS,
+    EXPECTED_AMI_MEETINGS,
+    REQUIRED_PRIOR_SOURCE_IDS,
     ProvenanceError,
     canonical_sha256,
     collect_prior_exposure,
@@ -40,6 +51,21 @@ NO_MODEL_FIELDS = (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SUPPORTED_SPEAKER_IDENTITY_STATUSES = frozenset(
     {"known", "known_corpus_speaker_ids", "partially_or_fully_unknown"}
+)
+EXPECTED_V2_SOURCE_IDS = frozenset(
+    [*(f"ami_{meeting_id}" for meeting_id in EXPECTED_AMI_MEETINGS)]
+    + [
+        *(f"alimeeting_{meeting_id}" for meeting_id in EXPECTED_ALIMEETING_V2_MEETINGS)
+    ]
+)
+REFERENCE_RECEIPT_ARTIFACTS = frozenset(
+    {
+        "REFERENCE_MIGRATION.md",
+        "reference_integrity_report.json",
+        "reference_migration.jsonl",
+        "reference_migration_summary.json",
+        "reference_provenance.json",
+    }
 )
 
 
@@ -215,8 +241,28 @@ def _validate_calibration(
     contract_sha: str,
     contract_status: str,
 ) -> None:
+    try:
+        context = resolve_dataset_context(data_dir)
+        calibration_dir = context.calibration_dir
+        active_contract = context.label_contract
+    except DatasetContextError:
+        calibration_dir = data_dir
+        active_contract = load_contract(version=contract_version)
+    calibrated_contract = load_contract(version="psem-handoff-v0")
+    constant_fields = (
+        "sample_rate_hz",
+        "reliable_solo_min_duration_ms",
+        "annotation_boundary_jitter_ms",
+        "gap_topology_min_duration_ms",
+        "overlap_topology_min_duration_ms",
+        "local_continuity_max_gap_ms",
+        "short_backchannel_min_duration_ms",
+        "short_backchannel_max_duration_ms",
+    )
     input_policy = calibration.get("input_policy")
-    calibration_sha256 = sha256_file(data_dir / "annotation_calibration.json")
+    calibration_sha256 = sha256_file(
+        calibration_dir / "annotation_calibration.json"
+    )
     calibrated_scope_valid = (
         FROZEN_CALIBRATION_SOURCE_IDS.issubset(source_ids)
         and canonical_sha256(sorted(FROZEN_CALIBRATION_SOURCE_IDS))
@@ -225,13 +271,21 @@ def _validate_calibration(
     if (
         calibration.get("artifact_role") != "annotation_only_calibration"
         or calibration_sha256 != FROZEN_CALIBRATION_SHA256
-        or sha256_file(data_dir / "ANNOTATION_CALIBRATION.md")
+        or sha256_file(calibration_dir / "ANNOTATION_CALIBRATION.md")
         != FROZEN_CALIBRATION_MARKDOWN_SHA256
         or calibration.get("authority_ref") != AUTHORITY_REF
         or calibration.get("authority_pin") != AUTHORITY_PIN
-        or calibration.get("contract_version") != contract_version
-        or calibration.get("contract_document_sha256") != contract_sha
-        or calibration.get("contract_status") != contract_status
+        or calibration.get("contract_version") != calibrated_contract.contract_version
+        or calibration.get("contract_document_sha256")
+        != calibrated_contract.document_sha256
+        or calibration.get("contract_status") != calibrated_contract.status
+        or contract_version != active_contract.contract_version
+        or contract_sha != active_contract.document_sha256
+        or contract_status != active_contract.status
+        or any(
+            getattr(active_contract, field) != getattr(calibrated_contract, field)
+            for field in constant_fields
+        )
         or not isinstance(input_policy, dict)
         or not calibrated_scope_valid
         or any(
@@ -247,17 +301,59 @@ def _validate_calibration(
         raise IdentityGraphError("annotation calibration binding mismatch")
 
 
+def _topology_row_matches_normalization(
+    source: dict[str, Any],
+    normalization: dict[str, Any],
+    topology: dict[str, Any],
+    identity_fields: dict[str, Any],
+) -> bool:
+    start = normalization.get("scored_start_sample")
+    end = normalization.get("scored_end_sample")
+    exposure = normalization.get("exposure")
+    if (
+        not isinstance(start, int)
+        or isinstance(start, bool)
+        or not isinstance(end, int)
+        or isinstance(end, bool)
+        or end <= start
+        or not isinstance(exposure, dict)
+    ):
+        return False
+    return not (
+        any(topology.get(field) != value for field, value in identity_fields.items())
+        or topology.get("corpus") != source["corpus"]
+        or topology.get("session_id") != source["session_id"]
+        or topology.get("source_waveform_sha256") != source["waveform_sha256"]
+        or topology.get("annotation_sha256") != source["annotation_sha256"]
+        or topology.get("normalization_row_sha256") != canonical_sha256(normalization)
+        or topology.get("label_result_sha256") != normalization.get("label_result_sha256")
+        or topology.get("scored_start_sample") != start
+        or topology.get("scored_end_sample") != end
+        or topology.get("scored_samples") != end - start
+        or topology.get("ambiguous_samples") != exposure.get("ambiguous_samples")
+        or topology.get("unknown_identity_samples")
+        != exposure.get("unknown_identity_samples")
+        or topology.get("stable_singleton_samples")
+        != exposure.get("stable_singleton_samples")
+        or topology.get("ongoing_overlap_samples")
+        != exposure.get("ongoing_overlap_samples")
+    )
+
+
 def _validate_topology_census(
     data_dir: Path,
     source_rows: list[dict[str, Any]],
+    normalization_rows: list[dict[str, Any]],
     topology_rows: list[dict[str, Any]],
     census: dict[str, Any],
     contract_version: str,
     contract_sha: str,
     contract_status: str,
 ) -> None:
+    context = resolve_dataset_context(data_dir)
     source_ids = [row["source_id"] for row in source_rows]
     source_by_id = {row["source_id"]: row for row in source_rows}
+    normalization_by_id = {row.get("source_id"): row for row in normalization_rows}
     topology_by_id = {row.get("source_id"): row for row in topology_rows}
     topology_identity_fields = {
         "artifact_role": "natural_topology_census_row",
@@ -268,15 +364,16 @@ def _validate_topology_census(
     }
     if (
         len(topology_by_id) != len(topology_rows)
+        or len(normalization_by_id) != len(normalization_rows)
         or set(topology_by_id) != set(source_by_id)
+        or set(normalization_by_id) != set(source_by_id)
         or any(
-            any(row.get(field) != value for field, value in topology_identity_fields.items())
-            or row.get("corpus") != source_by_id[source_id]["corpus"]
-            or row.get("session_id") != source_by_id[source_id]["session_id"]
-            or row.get("source_waveform_sha256")
-            != source_by_id[source_id]["waveform_sha256"]
-            or row.get("annotation_sha256")
-            != source_by_id[source_id]["annotation_sha256"]
+            not _topology_row_matches_normalization(
+                source_by_id[source_id],
+                normalization_by_id[source_id],
+                row,
+                topology_identity_fields,
+            )
             for source_id, row in topology_by_id.items()
         )
     ):
@@ -293,10 +390,10 @@ def _validate_topology_census(
             data_dir / "normalization_manifest.jsonl"
         ),
         "annotation_calibration_sha256": sha256_file(
-            data_dir / "annotation_calibration.json"
+            context.calibration_dir / "annotation_calibration.json"
         ),
         "annotation_calibration_markdown_sha256": sha256_file(
-            data_dir / "ANNOTATION_CALIBRATION.md"
+            context.calibration_dir / "ANNOTATION_CALIBRATION.md"
         ),
         "source_ids_sha256": canonical_sha256(sorted(source_ids)),
     }
@@ -310,8 +407,8 @@ def _validate_topology_census(
     }
     if (
         census.get("artifact_role") != "natural_topology_census"
-        or census.get("authority_ref") != AUTHORITY_REF
-        or census.get("authority_pin") != AUTHORITY_PIN
+        or census.get("authority_ref") != context.authority_ref
+        or census.get("authority_pin") != context.authority_pin
         or census.get("contract_version") != contract_version
         or census.get("contract_document_sha256") != contract_sha
         or census.get("contract_status") != contract_status
@@ -325,7 +422,7 @@ def _validate_topology_census(
         or any(census_model_policy.get(field) is not False for field in NO_MODEL_FIELDS)
     ):
         raise IdentityGraphError("accepted topology census binding mismatch")
-    sample_rate_hz = load_contract().sample_rate_hz
+    sample_rate_hz = context.label_contract.sample_rate_hz
     expected_overall = _aggregate(topology_rows, sample_rate_hz)
     expected_by_corpus = {
         corpus: _aggregate(
@@ -344,28 +441,146 @@ def _validate_topology_census(
         raise IdentityGraphError("topology census aggregate mismatch")
 
 
+def _validate_v2_reference_package(
+    data_dir: Path,
+    source_rows: list[dict[str, Any]],
+    normalization_rows: list[dict[str, Any]],
+) -> None:
+    context = resolve_dataset_context(data_dir)
+    receipt = _load_json_object(data_dir / "reference_artifact_receipt.json")
+    provenance = _load_json_object(data_dir / "reference_provenance.json")
+    integrity = _load_json_object(data_dir / "reference_integrity_report.json")
+    summary = _load_json_object(data_dir / "reference_migration_summary.json")
+    migration_rows = _load_jsonl_objects(data_dir / "reference_migration.jsonl")
+    artifact_sha256 = receipt.get("artifact_sha256")
+    checks = integrity.get("checks")
+    references = provenance.get("references")
+    if (
+        receipt.get("artifact_role") != "reference_migration_artifact_receipt"
+        or receipt.get("source_count") != len(EXPECTED_V2_SOURCE_IDS)
+        or not isinstance(artifact_sha256, dict)
+        or set(artifact_sha256) != REFERENCE_RECEIPT_ARTIFACTS
+        or any(
+            not _sha256_string(expected)
+            or sha256_file(data_dir / name) != expected
+            for name, expected in artifact_sha256.items()
+        )
+        or receipt.get("artifact_set_sha256") != canonical_sha256(artifact_sha256)
+        or integrity.get("status") != "pass"
+        or integrity.get("source_count") != len(EXPECTED_V2_SOURCE_IDS)
+        or integrity.get("reference_count") != len(EXPECTED_V2_SOURCE_IDS)
+        or not isinstance(checks, dict)
+        or not checks
+        or any(value is not True for value in checks.values())
+        or provenance.get("source_count") != len(EXPECTED_V2_SOURCE_IDS)
+        or provenance.get("reference_repository") != REFERENCE_REPOSITORY
+        or provenance.get("reference_commit") != REFERENCE_COMMIT
+        or not isinstance(references, list)
+        or len(references) != len(EXPECTED_V2_SOURCE_IDS)
+        or summary.get("overall", {}).get("session_count")
+        != len(EXPECTED_V2_SOURCE_IDS)
+        or len(migration_rows) != len(EXPECTED_V2_SOURCE_IDS)
+        or summary.get("session_manifest_sha256") != canonical_sha256(migration_rows)
+        or provenance.get("migration_session_manifest_sha256")
+        != canonical_sha256(migration_rows)
+        or integrity.get("migration_session_manifest_sha256")
+        != canonical_sha256(migration_rows)
+        or integrity.get("migration_summary_sha256") != canonical_sha256(summary)
+        or integrity.get("reference_provenance_sha256")
+        != canonical_sha256(provenance)
+        or integrity.get("reference_inventory_sha256")
+        != provenance.get("reference_inventory_sha256")
+        or provenance.get("reference_inventory_sha256") != canonical_sha256(references)
+    ):
+        raise IdentityGraphError("v2 reference artifact package binding mismatch")
+    source_by_id = {row.get("source_id"): row for row in source_rows}
+    normalization_by_id = {row.get("source_id"): row for row in normalization_rows}
+    reference_by_id = {row.get("source_id"): row for row in references}
+    migration_by_id = {row.get("source_id"): row for row in migration_rows}
+    if (
+        len(source_by_id) != len(source_rows)
+        or len(normalization_by_id) != len(normalization_rows)
+        or len(reference_by_id) != len(references)
+        or len(migration_by_id) != len(migration_rows)
+        or set(source_by_id) != EXPECTED_V2_SOURCE_IDS
+        or set(normalization_by_id) != EXPECTED_V2_SOURCE_IDS
+        or set(reference_by_id) != EXPECTED_V2_SOURCE_IDS
+        or set(migration_by_id) != EXPECTED_V2_SOURCE_IDS
+    ):
+        raise IdentityGraphError("v2 reference source coverage mismatch")
+    for source_id in sorted(EXPECTED_V2_SOURCE_IDS):
+        source = source_by_id[source_id]
+        normalization = normalization_by_id[source_id]
+        reference = reference_by_id[source_id]
+        migration = migration_by_id[source_id]
+        if (
+            normalization.get("contract_version")
+            != context.label_contract.contract_version
+            or normalization.get("contract_document_sha256")
+            != context.label_contract.document_sha256
+            or normalization.get("reference_repository") != REFERENCE_REPOSITORY
+            or normalization.get("reference_commit") != REFERENCE_COMMIT
+            or normalization.get("source_record_sha256") != canonical_sha256(source)
+            or reference.get("source_record_sha256") != canonical_sha256(source)
+            or any(
+                normalization.get(field) != reference.get(field)
+                for field in (
+                    "reference_ref",
+                    "reference_sha256",
+                    "source_waveform_sha256",
+                    "source_annotation_sha256",
+                    "canonical_intervals_sha256",
+                    "label_result_sha256",
+                    "speaker_mapping_sha256",
+                    "reference_metadata_sha256",
+                )
+            )
+            or migration.get("reference_ref") != normalization.get("reference_ref")
+            or migration.get("reference_sha256")
+            != normalization.get("reference_sha256")
+            or migration.get("source_waveform_sha256")
+            != normalization.get("source_waveform_sha256")
+            or migration.get("source_annotation_sha256")
+            != normalization.get("source_annotation_sha256")
+        ):
+            raise IdentityGraphError(
+                f"v2 reference identity mismatch for {source_id}"
+            )
+
+
 def _validate_inputs(
     data_dir: Path,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     source_path = data_dir / "source_manifest.jsonl"
     prior_path = data_dir / "prior_exposure_manifest.jsonl"
+    normalization_path = data_dir / "normalization_manifest.jsonl"
     topology_path = data_dir / "topology_manifest.jsonl"
     census_path = data_dir / "topology_census.json"
     source_rows = _load_jsonl_objects(source_path)
     prior_rows = _load_jsonl_objects(prior_path, allow_empty=True)
+    normalization_rows = _load_jsonl_objects(normalization_path)
     topology_rows = _load_jsonl_objects(topology_path)
     census = _load_json_object(census_path)
-    calibration = _load_json_object(data_dir / "annotation_calibration.json")
-    contract = load_contract()
+    try:
+        context = resolve_dataset_context(data_dir)
+    except DatasetContextError as exc:
+        raise IdentityGraphError("dataset context is invalid") from exc
+    calibration = _load_json_object(
+        context.calibration_dir / "annotation_calibration.json"
+    )
+    source_contract = context.source_contract
+    contract = context.label_contract
     for row in source_rows:
         _validate_source_row(
             row,
-            contract.contract_version,
-            contract.document_sha256,
+            source_contract.contract_version,
+            source_contract.document_sha256,
         )
     source_ids = [row["source_id"] for row in source_rows]
     if len(set(source_ids)) != len(source_ids):
         raise IdentityGraphError("source manifest identities must be unique")
+    if context.is_v2:
+        _validate_v2_reference_package(data_dir, source_rows, normalization_rows)
     source_by_id = {row["source_id"]: row for row in source_rows}
     _validate_calibration(
         data_dir,
@@ -378,6 +593,7 @@ def _validate_inputs(
     _validate_topology_census(
         data_dir,
         source_rows,
+        normalization_rows,
         topology_rows,
         census,
         contract.contract_version,
@@ -394,9 +610,16 @@ def _validate_inputs(
         reconstructed_prior = collect_prior_exposure(REPO_ROOT)
     except (OSError, json.JSONDecodeError, ProvenanceError) as exc:
         raise IdentityGraphError("historical prior exposure cannot be reconstructed") from exc
-    reconstructed_source_ids = set(reconstructed_prior).intersection(source_by_id)
-    if not reconstructed_source_ids.issubset(exposed_ids):
-        raise IdentityGraphError("historical prior exposure is missing from inventory")
+    if context.is_v2:
+        reconstructed_source_ids = set(reconstructed_prior)
+        if reconstructed_source_ids != REQUIRED_PRIOR_SOURCE_IDS:
+            raise IdentityGraphError("historical prior exposure scope mismatch")
+        if reconstructed_source_ids != exposed_ids:
+            raise IdentityGraphError("historical prior exposure is missing from inventory")
+    else:
+        reconstructed_source_ids = set(reconstructed_prior).intersection(source_by_id)
+        if not reconstructed_source_ids.issubset(exposed_ids):
+            raise IdentityGraphError("historical prior exposure is missing from inventory")
     compared_fields = (
         "corpus",
         "session_id",
@@ -511,6 +734,7 @@ def _known_identities(row: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def build_identity_graph(data_dir: Path) -> dict[str, Any]:
+    context = resolve_dataset_context(data_dir)
     source_rows, prior_rows, census = _validate_inputs(data_dir)
     source_ids = [row["source_id"] for row in source_rows]
     components = _Components(source_ids)
@@ -614,12 +838,12 @@ def build_identity_graph(data_dir: Path) -> dict[str, Any]:
     unknown_sources = [
         row["source_id"] for row in source_rows if row["unknown_speaker_count"]
     ]
-    contract = load_contract()
+    contract = context.label_contract
     return {
         "schema_version": 1,
         "artifact_role": "identity_component_graph",
-        "authority_ref": AUTHORITY_REF,
-        "authority_pin": AUTHORITY_PIN,
+        "authority_ref": context.authority_ref,
+        "authority_pin": context.authority_pin,
         "contract_version": contract.contract_version,
         "contract_document_sha256": contract.document_sha256,
         "input_artifacts": {
@@ -634,6 +858,21 @@ def build_identity_graph(data_dir: Path) -> dict[str, Any]:
             ),
             "topology_census_sha256": sha256_file(
                 data_dir / "topology_census.json"
+            ),
+            **(
+                {
+                    "reference_artifact_receipt_sha256": sha256_file(
+                        data_dir / "reference_artifact_receipt.json"
+                    ),
+                    "reference_integrity_report_sha256": sha256_file(
+                        data_dir / "reference_integrity_report.json"
+                    ),
+                    "reference_provenance_sha256": sha256_file(
+                        data_dir / "reference_provenance.json"
+                    ),
+                }
+                if context.is_v2
+                else {}
             ),
             "source_ids_sha256": canonical_sha256(sorted(source_ids)),
             "census_annotation_calibration_sha256": census["input_manifests"][
