@@ -36,6 +36,7 @@ from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineStartCallbacks,
 )
+from puripuly_heart.app.ports.settings_secrets import SettingsSecretStorePort
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
 from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
@@ -122,6 +123,7 @@ from puripuly_heart.app.services.settings_runtime_effects import (
     SettingsRuntimeEffectsAdapter,
     SettingsRuntimeEffectsState,
 )
+from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
 from puripuly_heart.app.wiring import (
@@ -406,6 +408,12 @@ def compose_application_runtime(
 
     def current_settings() -> AppSettings | None:
         return settings.current
+
+    def create_settings_secret_store() -> SettingsSecretStorePort:
+        value = current_settings()
+        if value is None:
+            raise RuntimeError("Settings are not loaded")
+        return create_secret_store(value.secrets, config_path=config_path)
 
     def canonical_settings(value: AppSettings) -> AppSettingsVNext:
         return settings.project(value, authoritative=settings.authoritative)
@@ -1946,6 +1954,9 @@ def compose_application_runtime(
         ),
         runtime_shutdown=runtime_shutdown,
         runtime_logging=runtime_logging,
+        settings_secrets=SettingsSecretsOwner(
+            secret_store_factory=create_settings_secret_store,
+        ),
         osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
         http_extension_registry=HttpExtensionRegistryService(
             http_extensions,

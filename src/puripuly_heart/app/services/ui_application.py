@@ -13,6 +13,7 @@ from puripuly_heart.app.ports.application_runtime_logging import (
 from puripuly_heart.app.ports.application_runtime_shutdown import (
     ApplicationRuntimeShutdownPort,
 )
+from puripuly_heart.app.ports.settings_secrets import SettingsSecretsPort
 from puripuly_heart.app.ports.ui_application import UiApplicationState
 from puripuly_heart.app.ports.ui_application_intents import (
     UiDiagnosticsRuntimePort,
@@ -143,6 +144,7 @@ class UiApplicationBoundary:
         state: UiApplicationStatePort,
         runtime_shutdown: ApplicationRuntimeShutdownPort,
         runtime_logging: ApplicationRuntimeLoggingPort,
+        settings_secrets: SettingsSecretsPort,
         osc_state_publisher: Callable[[], object] | None = None,
         http_extension_registry: object | None = None,
     ) -> None:
@@ -157,6 +159,7 @@ class UiApplicationBoundary:
         self._engagement = engagement
         self._diagnostics = diagnostics
         self._runtime_logging = runtime_logging
+        self._settings_secrets = settings_secrets
         self._http_extension_registry = http_extension_registry
         self._runtime_shutdown = runtime_shutdown
         self._state_owner = state
@@ -198,6 +201,9 @@ class UiApplicationBoundary:
 
     def http_extension_registry(self) -> object | None:
         return self._http_extension_registry
+
+    def settings_secrets(self) -> SettingsSecretsPort:
+        return self._settings_secrets
 
     def state(self) -> UiApplicationState:
         return self._state_owner.snapshot()

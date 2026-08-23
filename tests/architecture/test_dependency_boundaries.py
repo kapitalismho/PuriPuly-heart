@@ -363,14 +363,6 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
         ImportViolation(
             rule_id="ui-adapters-avoid-provider-construction",
             importer="src/puripuly_heart/ui/views/settings.py",
-            imported="puripuly_heart.app.wiring",
-            importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/views/settings.py",
             imported="puripuly_heart.config.settings",
             importer_layer="UI adapters/renderers",
             imported_layer="migration/serialization",
@@ -1743,9 +1735,9 @@ def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
     assert occurrences == set()
 
 
-def test_a04_overlay_value_owner_reduces_dependency_debt_to_19() -> None:
-    assert len(KNOWN_ALLOWED_VIOLATIONS) == 19
-    assert len(_dependency_violations()) == 19
+def test_a05_settings_secret_port_reduces_dependency_debt_to_18() -> None:
+    assert len(KNOWN_ALLOWED_VIOLATIONS) == 18
+    assert len(_dependency_violations()) == 18
 
 
 def test_a04_overlay_ui_uses_the_pure_canonical_value_owner() -> None:
@@ -1780,6 +1772,42 @@ def test_a04_overlay_ui_uses_the_pure_canonical_value_owner() -> None:
     assert a04_symbols <= imports_by_module["puripuly_heart.config.desktop_overlay_values"]
     assert a04_symbols.isdisjoint(imports_by_module["puripuly_heart.config.settings"])
     assert _layer_for_module("puripuly_heart.config.desktop_overlay_values") == SCHEMA_VALUES
+
+
+def test_a05_settings_view_uses_composed_typed_secret_ports() -> None:
+    settings_view_path = SOURCE_PACKAGE_ROOT / "ui" / "views" / "settings.py"
+    settings_view_source = settings_view_path.read_text(encoding="utf-8")
+    settings_view_tree = ast.parse(settings_view_source)
+    imported_modules = set(
+        _imported_modules(
+            _module_name_for_path(settings_view_path),
+            settings_view_path,
+            _internal_module_names(),
+        )
+    )
+    imported_secret_port_symbols = {
+        alias.name
+        for node in ast.walk(settings_view_tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "puripuly_heart.app.ports.settings_secrets"
+        for alias in node.names
+    }
+
+    assert "puripuly_heart.app.wiring" not in imported_modules
+    assert "create_secret_store" not in settings_view_source
+    assert "SecretStore" not in settings_view_source
+    assert {
+        "SettingsSecretKey",
+        "SettingsSecretMutation",
+        "SettingsSecretSnapshot",
+        "SettingsSecretsPort",
+    } <= imported_secret_port_symbols
+
+    composition_source = (
+        SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py"
+    ).read_text(encoding="utf-8")
+    assert "settings_secrets=SettingsSecretsOwner(" in composition_source
+    assert "secret_store_factory=create_settings_secret_store" in composition_source
 
 
 def test_r00_canonical_migration_loader_has_no_flat_ingress() -> None:

@@ -12,6 +12,7 @@ pytest.importorskip("flet")
 
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
+from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.settings import (
     LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
@@ -54,8 +55,13 @@ class DummySecretStore:
         self.values = dict(values or {})
         self.set_calls: list[tuple[str, str]] = []
         self.delete_calls: list[str] = []
+        self.get_calls: list[str] = []
+        self.get_failure_key: str | None = None
 
     def get(self, key: str) -> str | None:
+        self.get_calls.append(key)
+        if key == self.get_failure_key:
+            raise OSError("unavailable")
         return self.values.get(key)
 
     def set(self, key: str, value: str) -> None:
@@ -76,8 +82,8 @@ def _make_settings_view(
     monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
     store = store or DummySecretStore()
-    monkeypatch.setattr(settings_view, "create_secret_store", lambda *_args, **_kwargs: store)
     view = settings_view.SettingsView()
+    view._settings_secrets = SettingsSecretsOwner(secret_store_factory=lambda: store)
     if settings is not None:
         view._settings = settings
     return view, store
@@ -489,24 +495,6 @@ def _container_text_size(control: ft.Container) -> int | None:
     return control.content.size
 
 
-def test_load_secret_value_prefers_existing_value() -> None:
-    store = DummySecretStore({"new_key": "new", "old_key": "old"})
-
-    value = settings_view._load_secret_value(store, "new_key", legacy_keys=("old_key",))
-
-    assert value == "new"
-    assert store.set_calls == []
-
-
-def test_load_secret_value_migrates_legacy_value() -> None:
-    store = DummySecretStore({"old_key": "legacy"})
-
-    value = settings_view._load_secret_value(store, "new_key", legacy_keys=("old_key",))
-
-    assert value == "legacy"
-    assert store.set_calls == [("new_key", "legacy")]
-
-
 def test_peer_language_card_removed_from_general_tab(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -633,11 +621,11 @@ def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
 
-    def raise_store(*_args, **_kwargs):
+    def raise_store():
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(settings_view, "create_secret_store", raise_store)
     view = settings_view.SettingsView()
+    view._settings_secrets = SettingsSecretsOwner(secret_store_factory=raise_store)
     view.runtime_log_basic = lambda message, *, level=logging.INFO: basic_messages.append(message)
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
@@ -645,6 +633,34 @@ def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch) -> Non
     assert view._deepgram_key.value == ""
     assert view._soniox_key.value == ""
     assert basic_messages == ["Failed to load secrets: boom"]
+
+
+def test_load_secrets_projects_the_same_prefix_before_read_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    store = DummySecretStore(
+        {
+            "google_api_key": "google-secret",
+            "openrouter_api_key": "openrouter-secret",
+            "deepseek_api_key": "deepseek-secret",
+            "cerebras_api_key": "cerebras-secret",
+        }
+    )
+    store.get_failure_key = "deepgram_api_key"
+    view, _ = _make_settings_view(monkeypatch, store)
+    view._deepgram_key.value = "unchanged-deepgram"
+    view._soniox_key.value = "unchanged-soniox"
+
+    with pytest.raises(OSError, match="unavailable"):
+        view._load_secrets(settings, Path("settings.json"))
+
+    assert view._google_key.value == "google-secret"
+    assert view._openrouter_key.value == "openrouter-secret"
+    assert view._deepseek_key.value == "deepseek-secret"
+    assert view._cerebras_key.value == "cerebras-secret"
+    assert view._deepgram_key.value == "unchanged-deepgram"
+    assert view._soniox_key.value == "unchanged-soniox"
 
 
 def test_restore_api_key_icons_sets_idle_success_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -3323,6 +3339,9 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
 
     view, _ = _make_settings_view(monkeypatch, store)
     view.load_from_settings(initial, config_path=Path("settings.json"))
+    store.values["alibaba_api_key"] = "unrelated-legacy-secret"
+    store.get_calls.clear()
+    store.set_calls.clear()
     view._custom_vocab_tag_editor._input_field.value = "VRChat"  # noqa: SLF001
     view._google_key.value = "typed-google-draft"
 
@@ -3346,6 +3365,12 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
     assert view._llm_text.content.value == view._get_llm_display_label(updated)
     assert view.has_provider_changes is False
     assert view.has_pending_prompt_changes is False
+    assert store.get_calls == [
+        "openrouter_api_key",
+        "deepseek_api_key",
+        "cerebras_api_key",
+    ]
+    assert store.set_calls == []
 
 
 def test_hidden_legacy_deepseek_china_fallback_displays_safe_current_value(

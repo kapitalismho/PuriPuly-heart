@@ -30,6 +30,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownDiagnostic,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
+from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
 
@@ -58,6 +59,17 @@ class ApplicationRuntimeLoggingStub:
         if callable(sink):
             sink(message, level=level)
         return exception is not None
+
+
+class EmptySettingsSecretStore:
+    def get(self, _key: str) -> str | None:
+        return None
+
+    def set(self, _key: str, _value: str) -> None:
+        return None
+
+    def delete(self, _key: str) -> None:
+        return None
 
 
 class UiApplicationRuntimeStub:
@@ -399,5 +411,8 @@ def compose_test_ui_application_boundary(
         ),
         runtime_shutdown=runtime_shutdown or ApplicationRuntimeShutdownStub(backend),
         runtime_logging=logging_port,
+        settings_secrets=SettingsSecretsOwner(
+            secret_store_factory=EmptySettingsSecretStore,
+        ),
         osc_state_publisher=osc_state_publisher,
     )

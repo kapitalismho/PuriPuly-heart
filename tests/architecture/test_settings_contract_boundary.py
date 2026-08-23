@@ -32,6 +32,7 @@ G14_PROVIDER_INTENT_FIELDS = (
     "secret_cleared",
     "local_llm_secret_changed",
     "gpu_discovery_requested",
+    "settings_secrets",
     "custom_stt_secret_changed",
 )
 G14_OWNED_VIEW_CALLBACKS = (

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.ports.settings_secrets import SettingsSecretsPort
 from puripuly_heart.app.ports.ui_models import (
     GpuNoticeAction,
     ManagedGemmaNoticeAction,
@@ -53,6 +54,8 @@ class UiApplicationPort(Protocol):
     def effective_osc_ports(self) -> tuple[int | None, int | None]: ...
 
     def http_extension_registry(self) -> object | None: ...
+
+    def settings_secrets(self) -> SettingsSecretsPort: ...
 
     def compatibility_settings(self) -> Any | None: ...
 

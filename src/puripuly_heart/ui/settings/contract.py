@@ -7,6 +7,7 @@ from typing import Protocol, TypeAlias
 
 import flet as ft
 
+from puripuly_heart.app.ports.settings_secrets import SettingsSecretsPort
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 
 SettingsSnapshot: TypeAlias = object
@@ -29,6 +30,7 @@ class SettingsProviderIntents:
     secret_cleared: Callable[[str], None]
     local_llm_secret_changed: Callable[[], None]
     gpu_discovery_requested: Callable[[], object]
+    settings_secrets: SettingsSecretsPort
     custom_stt_secret_changed: Callable[[], None] | None = None
 
 

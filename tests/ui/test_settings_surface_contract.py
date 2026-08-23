@@ -7,6 +7,7 @@ import pytest
 
 pytest.importorskip("flet")
 
+from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
 from puripuly_heart.ui.settings.contract import (
     SettingsApiSurfaceSlots,
@@ -183,11 +184,6 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
         settings_view_module.SettingsView, "_refresh_microphones", lambda self: None
     )
     monkeypatch.setattr(settings_view_module.SettingsView, "update", lambda self: None)
-    monkeypatch.setattr(
-        settings_view_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: None,
-    )
     view = settings_view_module.SettingsView()
 
     def make(tag: str):
@@ -210,6 +206,7 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
         secret_cleared=make("secret_cleared"),
         local_llm_secret_changed=make("local_llm_secret_changed"),
         gpu_discovery_requested=make("gpu_discovery_requested"),
+        settings_secrets=SettingsSecretsOwner(secret_store_factory=lambda: None),
     )
     general = SettingsGeneralIntents(
         start_microphone_test=make("start_microphone_test"),
@@ -253,6 +250,7 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     assert view.on_secret_cleared is provider.secret_cleared
     assert view.on_local_llm_secret_changed is provider.local_llm_secret_changed
     assert view.on_gpu_discovery_requested is provider.gpu_discovery_requested
+    assert view._settings_secrets is provider.settings_secrets
     assert view.on_start_microphone_test is general.start_microphone_test
     assert view.on_telemetry_consent_change is general.telemetry_consent_change
     assert view.on_list_loopback_capture_options is general.list_loopback_capture_options
@@ -281,11 +279,6 @@ def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
         settings_view_module.SettingsView, "_refresh_microphones", lambda self: None
     )
     monkeypatch.setattr(settings_view_module.SettingsView, "update", lambda self: None)
-    monkeypatch.setattr(
-        settings_view_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: None,
-    )
     view = settings_view_module.SettingsView()
     existing_basic = view.runtime_log_basic
     existing_detailed = view.runtime_log_detailed
@@ -304,6 +297,7 @@ def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
             secret_cleared=lambda *_a, **_k: None,
             local_llm_secret_changed=lambda *_a, **_k: None,
             gpu_discovery_requested=lambda *_a, **_k: None,
+            settings_secrets=SettingsSecretsOwner(secret_store_factory=lambda: None),
         ),
         general=SettingsGeneralIntents(
             start_microphone_test=lambda *_a, **_k: None,

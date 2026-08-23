@@ -260,6 +260,7 @@ class TranslatorApp:
                 local_llm_secret_changed=self._on_local_llm_secret_changed,
                 custom_stt_secret_changed=self._on_custom_stt_secret_changed,
                 gpu_discovery_requested=self._on_gpu_discovery_requested,
+                settings_secrets=self.application.settings_secrets(),
             ),
             general=SettingsGeneralIntents(
                 start_microphone_test=self._on_start_microphone_test,

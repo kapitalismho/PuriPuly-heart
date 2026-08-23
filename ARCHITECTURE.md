@@ -142,6 +142,7 @@ managed authentication
 | Overlay         | `OverlaySink`, overlay protocol                      | Desktop overlay, native VR overlay       |
 | GPU worker      | `GpuWorkerClientPort`, `GpuWorkerProcessFactoryPort` | Native worker process adapter            |
 | Secrets         | `SecretStore`                                        | Keyring, encrypted file, memory          |
+| Settings secrets | `SettingsSecretsPort`                               | Typed settings projection and mutation owner over the configured secret store |
 | Shutdown        | Runtime shutdown ports                               | Application shutdown adapter             |
 | OSC control ABI | Stable parameter schema and codec contract           | Control schema and codec                |
 | OSC integration | `OscControlApplicationPort`, `OscQueryServicePort`    | OSC control adapter, OSCQuery adapter   |

@@ -17,10 +17,16 @@ import flet as ft
 from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
+from puripuly_heart.app.ports.settings_secrets import (
+    SettingsSecretKey,
+    SettingsSecretLoadResult,
+    SettingsSecretMutation,
+    SettingsSecretSnapshot,
+    SettingsSecretsPort,
+)
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
-from puripuly_heart.app.wiring import create_secret_store
 from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
     DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER,
@@ -374,20 +380,6 @@ def _make_overlay_anchor_dropdown(value: str, on_change) -> ft.Dropdown:
     )
 
 
-def _load_secret_value(store, key: str, *, legacy_keys: tuple[str, ...] = ()) -> str:
-    """Load secret value with legacy key fallback."""
-    value = store.get(key) or ""
-    if value or not legacy_keys:
-        return value
-    for legacy_key in legacy_keys:
-        legacy_value = store.get(legacy_key) or ""
-        if legacy_value:
-            with contextlib.suppress(Exception):
-                store.set(key, legacy_value)
-            return legacy_value
-    return ""
-
-
 def _weighted_len(text: str) -> int:
     return sum(2 if ord(char) >= _CJK_START else 1 for char in text)
 
@@ -463,6 +455,7 @@ class SettingsView(ft.Column):
         self.show_snackbar: Callable[[str, str], None] | None = None
         self.runtime_log_basic: Callable[..., None] | None = None
         self.runtime_log_detailed: Callable[..., None] | None = None
+        self._settings_secrets: SettingsSecretsPort | None = None
 
         self._http_extensions = (
             http_extension_registry
@@ -582,6 +575,7 @@ class SettingsView(ft.Column):
         self.on_local_llm_secret_changed = provider.local_llm_secret_changed
         self.on_custom_stt_secret_changed = provider.custom_stt_secret_changed
         self.on_gpu_discovery_requested = provider.gpu_discovery_requested
+        self._settings_secrets = provider.settings_secrets
         self.on_start_microphone_test = general.start_microphone_test
         self.on_telemetry_consent_change = general.telemetry_consent_change
         self.on_list_loopback_capture_options = general.list_loopback_capture_options
@@ -3861,15 +3855,26 @@ class SettingsView(ft.Column):
         self._sync_custom_vocabulary_editor_from_settings()
         self._sync_prompt_tab_copy()
 
-        try:
-            store = create_secret_store(settings.secrets, config_path=config_path)
-        except Exception as exc:
-            self._emit_runtime_basic(f"Failed to load secrets: {exc}", level=logging.WARNING)
-        else:
-            self._openrouter_key.value = store.get("openrouter_api_key") or ""
-            self._deepseek_key.value = store.get("deepseek_api_key") or ""
-            self._cerebras_key.value = store.get("cerebras_api_key") or ""
-            self._restore_api_key_icons(settings)
+        result = (
+            self._settings_secrets.load_openrouter_pkce()
+            if self._settings_secrets is not None
+            else None
+        )
+        if result is not None:
+            if result.error_message is not None:
+                self._emit_runtime_basic(result.error_message, level=logging.WARNING)
+            snapshot = result.snapshot
+            if snapshot is not None:
+                if snapshot.openrouter_api_key is not None:
+                    self._openrouter_key.value = snapshot.openrouter_api_key
+                if snapshot.deepseek_api_key is not None:
+                    self._deepseek_key.value = snapshot.deepseek_api_key
+                if snapshot.cerebras_api_key is not None:
+                    self._cerebras_key.value = snapshot.cerebras_api_key
+            if result.read_error is not None:
+                raise result.read_error
+            if snapshot is not None:
+                self._restore_api_key_icons(settings)
 
         if is_control_mounted(self):
             self.update()
@@ -3882,34 +3887,50 @@ class SettingsView(ft.Column):
 
     def _load_secrets(self, settings: AppSettings, config_path: Path) -> None:
         """Load secret values into fields."""
-        try:
-            store = create_secret_store(settings.secrets, config_path=config_path)
-        except Exception as exc:
-            self._emit_runtime_basic(f"Failed to load secrets: {exc}", level=logging.WARNING)
+        _ = config_path
+        result = self._load_secret_snapshot()
+        if result is None or result.snapshot is None:
             return
+        snapshot = result.snapshot
 
-        self._google_key.value = store.get("google_api_key") or ""
-        self._openrouter_key.value = store.get("openrouter_api_key") or ""
-        self._deepseek_key.value = store.get("deepseek_api_key") or ""
-        self._cerebras_key.value = store.get("cerebras_api_key") or ""
-        self._deepgram_key.value = store.get("deepgram_api_key") or ""
-        self._soniox_key.value = store.get("soniox_api_key") or ""
-        self._local_llm_api_key.value = store.get("local_llm_api_key") or ""
-        self._custom_stt_api_key.value = store.get("custom_stt_api_key") or ""
+        if snapshot.google_api_key is not None:
+            self._google_key.value = snapshot.google_api_key
+        if snapshot.openrouter_api_key is not None:
+            self._openrouter_key.value = snapshot.openrouter_api_key
+        if snapshot.deepseek_api_key is not None:
+            self._deepseek_key.value = snapshot.deepseek_api_key
+        if snapshot.cerebras_api_key is not None:
+            self._cerebras_key.value = snapshot.cerebras_api_key
+        if snapshot.deepgram_api_key is not None:
+            self._deepgram_key.value = snapshot.deepgram_api_key
+        if snapshot.soniox_api_key is not None:
+            self._soniox_key.value = snapshot.soniox_api_key
+        if snapshot.local_llm_api_key is not None:
+            self._local_llm_api_key.value = snapshot.local_llm_api_key
+        if snapshot.custom_stt_api_key is not None:
+            self._custom_stt_api_key.value = snapshot.custom_stt_api_key
+        if (
+            snapshot.alibaba_api_key_beijing is not None
+            and snapshot.alibaba_api_key_singapore is not None
+        ):
+            self._alibaba_key_beijing.value = snapshot.alibaba_api_key_beijing
+            self._alibaba_key_singapore.value = snapshot.alibaba_api_key_singapore
 
-        # Alibaba keys with legacy fallback
-        beijing_key = _load_secret_value(
-            store, "alibaba_api_key_beijing", legacy_keys=("alibaba_api_key",)
-        )
-        singapore_key = _load_secret_value(
-            store, "alibaba_api_key_singapore", legacy_keys=("alibaba_api_key",)
-        )
-
-        self._alibaba_key_beijing.value = beijing_key
-        self._alibaba_key_singapore.value = singapore_key
+        if result.read_error is not None:
+            raise result.read_error
 
         # Restore verification status icons from saved settings
         self._restore_api_key_icons(settings)
+
+    def _load_secret_snapshot(
+        self,
+    ) -> SettingsSecretLoadResult[SettingsSecretSnapshot] | None:
+        if self._settings_secrets is None:
+            return None
+        result = self._settings_secrets.load()
+        if result.error_message is not None:
+            self._emit_runtime_basic(result.error_message, level=logging.WARNING)
+        return result
 
     def _restore_api_key_icons(self, settings: AppSettings) -> None:
         """Restore API key field icons based on saved verification status."""
@@ -4703,22 +4724,23 @@ class SettingsView(ft.Column):
         self.on_request_openrouter_pkce(target)
 
     def _write_secret_value(self, key: str, value: str) -> bool:
-        if not self._settings or not self._config_path:
+        if not self._settings or not self._config_path or self._settings_secrets is None:
             return False
 
         try:
-            store = create_secret_store(self._settings.secrets, config_path=self._config_path)
-            if value:
-                store.set(key, value)
-            else:
-                store.delete(key)
-            return True
-        except Exception as exc:
+            secret_key = SettingsSecretKey(key)
+        except ValueError:
+            return False
+        result = self._settings_secrets.mutate(
+            SettingsSecretMutation(key=secret_key, value=value)
+        )
+        if not result.succeeded:
             self._emit_runtime_basic(
-                f"Failed to update secret {key}: {type(exc).__name__}",
+                f"Failed to update secret {key}: {result.error_type or 'unknown'}",
                 level=logging.WARNING,
             )
             return False
+        return True
 
     def _sync_custom_stt_card(self, settings: AppSettings | None = None) -> None:
         if getattr(self, "_custom_stt_connection_card", None) is None:
