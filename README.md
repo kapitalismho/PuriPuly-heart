@@ -63,25 +63,22 @@ It works in many environments, including VRChat and Discord.
 ## Q&A
 
 - **How good is the translation quality?**
-→ When both you and the other person use this translator, you can have even the deepest kinds of conversations. Quantitatively, with Gemma 4 it scored 6× better than DeepL. See the 'Translation Comparison' section below for details.
+→ You can comfortably have even the deepest conversations people can share. It also outperforms traditional commercial translation services by a wide margin. See the 'Translation Comparison' section below for details.
 
 - **How long does it take from speaking to getting a translation?**
-→ With Gemma 4 and a cloud STT service, latency is typically in the mid-to-late 1-second range.
+→ Under optimal conditions, latency is around 1 second, measured from when the speaker finishes talking.
 
 - **Does it cost money to use?**
-→ Yes, but only later. New users get a free usage allowance, and even after that the pricing is very cheap; you can use it thousands of times for $1.
+→ Yes, but only later. New users get a free usage allowance, and even after that the pricing is very cheap; you can translate thousands of times for $1. You can also use it for free by running local models.
 
 - **Do I need to get an API key?**
 → Yes, but again, only later. At first, just install and authenticate via Discord to start using it.
 
-- **How polished is the feature for translating the other person's voice?**
-→ It works best for one-on-one conversations in low-noise environments. Up to three people may be okay, but usability is not guaranteed. When using it in VRChat, use Earmuff to control the environment.
+- **Voice recognition is slow.**
+→ When using local ASR, processing times can be slow if compute resources are limited. In this case, we recommend switching to a cloud STT service.
 
-- **Voice recognition is poor / slow.**
-→ If you're using local Qwen ASR, we recommend switching to a cloud STT service. If you're on Intel, configure PuriPuly so it's pinned to P-cores only.
-
-- **How are voice and conversation contents handled?**
-→ Voice and conversation contents are stored locally and are not sent to Puripuly servers. Other people's voices, transcripts, and translation results are never recorded. That said, the STT service and translation provider may process the data.
+- **How is personal data handled?**
+→ Voice and conversation contents are never sent to Puripuly servers. In addition, all source code is publicly available in this repository, so you can verify its network behavior directly.
 
 ### [📥 Download](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
 
@@ -154,6 +151,8 @@ It works in many environments, including VRChat and Discord.
 | **Deepgram** | $200 | None | - |
 | **Alibaba Cloud** | 1M tokens per model | 90 days | Singapore region |
 | **Alibaba Cloud** | ¥300 | 1 year | Students in China |
+
+---
 
 ## Local Models
 
@@ -582,7 +581,7 @@ VRChat OSC controls are documented in [`docs/vrchat-osc.md`](docs/vrchat-osc.md)
 
 ## Special Thanks
 
-SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299
+SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
 
 ---
 

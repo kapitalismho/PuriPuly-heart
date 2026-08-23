@@ -109,6 +109,7 @@ def test_about_view_special_thanks_names_render_in_requested_order(
         "EA_PE",
         "Ephedrine",
         "~ eri ~",
+        "梅雨Shiro",
     ]
     rendered_names = [
         value for value in _collect_text_values(view.controls[2]) if value in expected_names
@@ -134,6 +135,7 @@ def test_about_view_special_thanks_names_render_from_i18n(
         "about.special_thanks.name.ea_pe": "localized:EA_PE",
         "about.special_thanks.name.ephedrine": "localized:Ephedrine",
         "about.special_thanks.name.eri": "localized:~ eri ~",
+        "about.special_thanks.name.tsuyu_shiro": "localized:梅雨Shiro",
     }
 
     monkeypatch.setattr(
@@ -165,6 +167,7 @@ def test_about_view_special_thanks_name_keys_exist_in_locale_bundles(locale: str
         "about.special_thanks.name.ephedrine": "Ephedrine",
         "about.special_thanks.name.eri": "~ eri ~",
         "about.special_thanks.name.fzcfweasdferttgg_png": "fzcfweasdferttgg-png",
+        "about.special_thanks.name.tsuyu_shiro": "梅雨Shiro",
     }
 
     bundle = i18n_module._load_bundle(locale)
