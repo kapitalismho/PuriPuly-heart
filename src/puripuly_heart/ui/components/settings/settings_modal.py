@@ -305,11 +305,6 @@ class SettingsModal:
                 text_align=ft.TextAlign.CENTER,
             )
 
-        # Cards grow to fit multi-line descriptions instead of clipping them.
-        card_height = 110
-        if self._show_description and option.description and "\n" in option.description:
-            card_height = 140
-
         return ft.Container(
             content=content,
             bgcolor=bg_color,
@@ -320,7 +315,7 @@ class SettingsModal:
             on_click=None if option.disabled else lambda e, val=option.value: self._select(val),
             on_hover=None if option.disabled else self._on_item_hover,
             animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
-            height=card_height,
+            height=110,
         )
 
     def _build_loading_placeholder(self) -> ft.Control:

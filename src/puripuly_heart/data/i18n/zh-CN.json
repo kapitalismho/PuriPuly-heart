@@ -85,7 +85,7 @@
   "settings.translation_model.gemma4.description": "",
   "settings.translation_model.managed_gemma_cpu.description": "建议在 8 核 DDR5 或更高配置的系统上使用",
   "settings.translation_model.managed_gemma_gpu.description": "需要 3 GB 空闲显存。",
-  "settings.translation_model.managed_gemma_12b.description": "非常吃配置。\n需要 7.5 GB 空闲显存。",
+  "settings.translation_model.managed_gemma_12b.description": "非常吃配置，需要 7.5 GB 空闲显存。",
   "settings.translation_model.gemma4_26b_31b.description": "适合大多数情况",
   "settings.translation_model.deepseek_v4_flash.description": "擅长中文",
   "settings.translation_model.gemini37_flash.description": "",
