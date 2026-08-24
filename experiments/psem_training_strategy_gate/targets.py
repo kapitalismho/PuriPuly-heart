@@ -156,7 +156,10 @@ def _relation_pairs(
         right = left + 1
         left_interval = interval_indices[left]
         right_interval = interval_indices[right]
-        if not _reliable_solo(labels, left_interval) or not _reliable_solo(labels, right_interval):
+        if not all(
+            _reliable_solo(labels, interval_index)
+            for interval_index in range(left_interval, right_interval + 1)
+        ):
             continue
         target = int(cell_speakers[left][0] != cell_speakers[right][0])
         key = (left, right, ADJACENT_SOLO_FAMILY)
@@ -176,7 +179,7 @@ def _relation_pairs(
         overlap_samples = transition.get("overlap_samples")
         if isinstance(gap_samples, int) and gap_samples > 0 and overlap_samples == 0:
             family = SILENCE_GAP_FAMILY
-        elif isinstance(overlap_samples, int) and overlap_samples > 0 and gap_samples == 0:
+        elif isinstance(overlap_samples, int) and overlap_samples > 0:
             family = OVERLAP_BRIDGE_FAMILY
         else:
             continue

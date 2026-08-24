@@ -82,6 +82,12 @@ class WavLMCellEncoder(torch.nn.Module):
             "conv_kernel": list(config.conv_kernel),
             "conv_stride": list(config.conv_stride),
             "do_stable_layer_norm": config.do_stable_layer_norm,
+            "apply_spec_augment": config.apply_spec_augment,
+            "mask_time_prob": config.mask_time_prob,
+            "feat_proj_dropout": config.feat_proj_dropout,
+            "hidden_dropout": config.hidden_dropout,
+            "attention_dropout": config.attention_dropout,
+            "layerdrop": config.layerdrop,
             "output_frames": int(
                 self.wavlm._get_feat_extract_output_lengths(torch.tensor([WINDOW_SAMPLES]))[0]
             ),
@@ -93,6 +99,12 @@ class WavLMCellEncoder(torch.nn.Module):
             "conv_kernel": [10, 3, 3, 3, 3, 2, 2],
             "conv_stride": [5, 2, 2, 2, 2, 2, 2],
             "do_stable_layer_norm": False,
+            "apply_spec_augment": True,
+            "mask_time_prob": 0.05,
+            "feat_proj_dropout": 0.1,
+            "hidden_dropout": 0.1,
+            "attention_dropout": 0.1,
+            "layerdrop": 0.05,
             "output_frames": WAVLM_FRAME_COUNT,
         }
         if observed != expected:
@@ -110,19 +122,15 @@ class WavLMCellEncoder(torch.nn.Module):
 
     def train(self, mode: bool = True):
         super().train(mode)
-        if not any(parameter.requires_grad for parameter in self.wavlm.parameters()):
-            self.wavlm.eval()
+        self.wavlm.eval()
         return self
 
     def forward(self, waveform: torch.Tensor) -> torch.Tensor:
-        mean = waveform.mean(dim=1, keepdim=True)
-        variance = waveform.var(dim=1, keepdim=True, unbiased=False)
-        normalized = (waveform - mean) / torch.sqrt(variance + 1e-7)
         if any(parameter.requires_grad for parameter in self.wavlm.parameters()):
-            hidden = self.wavlm(normalized).last_hidden_state
+            hidden = self.wavlm(waveform).last_hidden_state
         else:
             with torch.no_grad():
-                hidden = self.wavlm(normalized).last_hidden_state
+                hidden = self.wavlm(waveform).last_hidden_state
         if hidden.shape[1:] != (WAVLM_FRAME_COUNT, self.output_dimension):
             raise ModelContractError("WavLM emitted an unexpected hidden-state geometry")
         return _pool_source_aligned(

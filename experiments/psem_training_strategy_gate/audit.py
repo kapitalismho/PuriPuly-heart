@@ -66,11 +66,13 @@ from experiments.psem_training_strategy_gate.sampling import (
     HARD_NEGATIVE_FAMILIES,
     HARD_NEGATIVE_TOPOLOGY_FAMILY,
     MAXIMUM_EPOCHS,
+    OFFICIAL_EFFECTIVE_BATCH_SIZE,
     POSITIVE_FAMILIES,
     POSITIVE_TOPOLOGY_FAMILY,
     SAMPLING_COUNTS,
     TRAIN_ROLE,
     WINDOWS_PER_EPOCH,
+    BatchValidityAccumulator,
     RuntimeSession,
     iter_rows,
     load_runtime_sessions,
@@ -235,11 +237,23 @@ def prepare_runtime_manifests(
                 int(count) > 0
                 for counts in summary["target_class_counts"].values()
                 for count in counts.values()
-            ),
-            expected="finite positive weights and nonzero support for every enabled class",
+            )
+            and summary["effective_batch_size"] == OFFICIAL_EFFECTIVE_BATCH_SIZE
+            and all(int(count) > 0 for count in summary["minimum_valid_counts_per_batch"].values()),
+            expected={
+                "loss_support": "finite positive weights and nonzero support for every enabled class",
+                "effective_batch_size": OFFICIAL_EFFECTIVE_BATCH_SIZE,
+                "minimum_valid_counts_per_batch": {
+                    "handoff": ">0",
+                    "state": ">0",
+                    "relation": ">0",
+                },
+            },
             observed={
                 "loss_weights": summary["loss_weights"],
                 "target_class_counts": summary["target_class_counts"],
+                "effective_batch_size": summary["effective_batch_size"],
+                "minimum_valid_counts_per_batch": summary["minimum_valid_counts_per_batch"],
             },
         ),
     ]
@@ -568,6 +582,16 @@ def _metric_contract_audit() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         scored_source_samples=57_600_000,
         score_thresholds=shared_score_thresholds((nearest_candidates,)),
     )
+    replacement_candidates = [
+        CandidateEvent("s", 0, 16000, 1.0),
+        CandidateEvent("s", 1600, 17600, 0.99),
+    ]
+    replacement = full_threshold_curve(
+        replacement_candidates,
+        [ReferenceEvent("s", 1600, "near"), ReferenceEvent("s", 4800, "outside")],
+        scored_source_samples=57_600_000,
+        score_thresholds=shared_score_thresholds((replacement_candidates,)),
+    )
     collar_results = {}
     for collar_ms in (100, 250, 500):
         radius = collar_ms * 16
@@ -689,11 +713,22 @@ def _metric_contract_audit() -> tuple[list[dict[str, Any]], dict[str, Any]]:
                     "reference_source_sample": 1600,
                     "absolute_distance_samples": 1600,
                 },
+            ]
+            and replacement["rows"][0]["matches"]["100"]
+            == [
+                {
+                    "prediction_source_id": "s",
+                    "prediction_source_sample": 1600,
+                    "reference_source_id": "s",
+                    "reference_source_sample": 1600,
+                    "absolute_distance_samples": 0,
+                }
             ],
             expected={
                 "one_prediction_two_references": 1,
                 "two_predictions_one_reference": 1,
                 "nearest_remap_assignments": [[1600, 0], [3200, 1600]],
+                "nearest_replacement_assignment": [[1600, 1600]],
             },
             observed={
                 "one_prediction_two_references": one_to_two["rows"][-1]["metrics"]["100"][
@@ -705,6 +740,10 @@ def _metric_contract_audit() -> tuple[list[dict[str, Any]], dict[str, Any]]:
                 "nearest_remap_assignments": [
                     [row["prediction_source_sample"], row["reference_source_sample"]]
                     for row in nearest["rows"][0]["matches"]["100"]
+                ],
+                "nearest_replacement_assignment": [
+                    [row["prediction_source_sample"], row["reference_source_sample"]]
+                    for row in replacement["rows"][0]["matches"]["100"]
                 ],
             },
         ),
@@ -826,6 +865,7 @@ def _metric_contract_audit() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         "unsnapped_curve": unsnapped,
         "collar_canaries": collar_results,
         "nearest_remap": nearest,
+        "nearest_replacement": replacement,
         "shared_thresholds": list(shared_thresholds),
         "shared_output_curves": shared_curves,
         "equal_score_curve": equal_score,
@@ -887,11 +927,13 @@ def run_runtime_audits(
     topology_families: Counter[str] = Counter()
     sampled_sources: set[str] = set()
     validated_row_count = 0
+    batch_validity = BatchValidityAccumulator(OFFICIAL_EFFECTIVE_BATCH_SIZE)
     for prepared_row in iter_rows(sampling_path):
         source_id = prepared_row.get("source_id")
         if source_id not in sessions:
             raise AuditContractError("prepared sampling manifest contains a non-TRAIN source")
-        target_for_row(prepared_row, sessions[str(source_id)])
+        target = target_for_row(prepared_row, sessions[str(source_id)])
+        batch_validity.add(target)
         sampling_roles[str(prepared_row.get("sampling_role"))] += 1
         topology_families[str(prepared_row.get("topology_family"))] += 1
         sampled_sources.add(str(source_id))
@@ -904,6 +946,7 @@ def run_runtime_audits(
         for family in AUGMENTATION_FAMILIES:
             augmentation_enabled[family] += int(decision[family]["enabled"])
         validated_row_count += 1
+    minimum_valid_counts_per_batch = batch_validity.finish()
     expected_augmentation = {
         "schema_version": 1,
         "artifact_role": "psem_augmentation_manifest",
@@ -925,6 +968,8 @@ def run_runtime_audits(
         or dict(sorted(sampling_roles.items())) != summary.get("sampling_role_counts")
         or dict(sorted(topology_families.items())) != summary.get("topology_family_counts")
         or len(sampled_sources) != summary.get("source_count")
+        or summary.get("effective_batch_size") != OFFICIAL_EFFECTIVE_BATCH_SIZE
+        or summary.get("minimum_valid_counts_per_batch") != minimum_valid_counts_per_batch
         or augmentation_manifest != expected_augmentation
         or not isinstance(augmentation_checks, list)
         or tuple(check.get("id") for check in augmentation_checks if isinstance(check, Mapping))
@@ -1096,6 +1141,12 @@ def run_runtime_audits(
                     "conv_kernel": list(config.conv_kernel),
                     "conv_stride": list(config.conv_stride),
                     "do_stable_layer_norm": config.do_stable_layer_norm,
+                    "apply_spec_augment": config.apply_spec_augment,
+                    "mask_time_prob": config.mask_time_prob,
+                    "feat_proj_dropout": config.feat_proj_dropout,
+                    "hidden_dropout": config.hidden_dropout,
+                    "attention_dropout": config.attention_dropout,
+                    "layerdrop": config.layerdrop,
                     "output_frames": int(
                         model.encoder.wavlm._get_feat_extract_output_lengths(
                             torch.tensor([arm_augmented_waveform.numel()])
@@ -1108,6 +1159,10 @@ def run_runtime_audits(
                     if name.startswith("encoder.wavlm.") and parameter.requires_grad
                 ],
                 "initial_parameter_sha256": initial_wavlm_sha256,
+                "execution_mode": "eval_with_gradients"
+                if arm == "FINETUNE-WAVLM"
+                else "eval_without_gradients",
+                "wavlm_training": model.encoder.wavlm.training,
             }
         elif isinstance(model.encoder, ScratchCellEncoder):
             frontend = model.encoder.frontend
@@ -1268,6 +1323,12 @@ def run_runtime_audits(
             == graph_rows["FINETUNE-WAVLM"]["encoder"]["config"]
             and graph_rows["FROZEN-WAVLM"]["encoder"]["initial_parameter_sha256"]
             == graph_rows["FINETUNE-WAVLM"]["encoder"]["initial_parameter_sha256"]
+            and graph_rows["FROZEN-WAVLM"]["encoder"]["execution_mode"]
+            == "eval_without_gradients"
+            and graph_rows["FINETUNE-WAVLM"]["encoder"]["execution_mode"]
+            == "eval_with_gradients"
+            and graph_rows["FROZEN-WAVLM"]["encoder"]["wavlm_training"] is False
+            and graph_rows["FINETUNE-WAVLM"]["encoder"]["wavlm_training"] is False
             and projection_sha256["FROZEN-WAVLM"] == projection_sha256["FINETUNE-WAVLM"],
             expected={
                 "model_id": WAVLM_MODEL_ID,
@@ -1279,9 +1340,20 @@ def run_runtime_audits(
                     "conv_kernel": [10, 3, 3, 3, 3, 2, 2],
                     "conv_stride": [5, 2, 2, 2, 2, 2, 2],
                     "do_stable_layer_norm": False,
+                    "apply_spec_augment": True,
+                    "mask_time_prob": 0.05,
+                    "feat_proj_dropout": 0.1,
+                    "hidden_dropout": 0.1,
+                    "attention_dropout": 0.1,
+                    "layerdrop": 0.05,
                     "output_frames": 149,
                 },
                 "initial_wavlm_parameters_shared": True,
+                "execution_modes": {
+                    "FROZEN-WAVLM": "eval_without_gradients",
+                    "FINETUNE-WAVLM": "eval_with_gradients",
+                },
+                "wavlm_training": False,
                 "pretrained_projection_initialization_shared": True,
             },
             observed={
@@ -1291,6 +1363,10 @@ def run_runtime_audits(
                     graph_rows["FROZEN-WAVLM"]["encoder"]["initial_parameter_sha256"]
                     == graph_rows["FINETUNE-WAVLM"]["encoder"]["initial_parameter_sha256"]
                 ),
+                "execution_modes": {
+                    arm: graph_rows[arm]["encoder"]["execution_mode"]
+                    for arm in ("FROZEN-WAVLM", "FINETUNE-WAVLM")
+                },
                 "pretrained_projection_initialization_shared": (
                     projection_sha256["FROZEN-WAVLM"] == projection_sha256["FINETUNE-WAVLM"]
                 ),

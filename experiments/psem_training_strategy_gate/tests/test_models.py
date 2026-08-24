@@ -17,6 +17,8 @@ from experiments.psem_training_strategy_gate.losses import (
 from experiments.psem_training_strategy_gate.models import (
     CELL_DIMENSION,
     SCRATCH_DILATIONS,
+    WAVLM_FRAME_COUNT,
+    WavLMCellEncoder,
     build_model,
     optimizer_groups,
     parameter_inventory,
@@ -84,6 +86,40 @@ def test_finetune_whitelist_is_exact_by_parameter_name() -> None:
     assert not wavlm_parameter_allowed("encoder.wavlm.encoder.layers.7.attention.q_proj.weight")
     assert not wavlm_parameter_allowed("encoder.wavlm.feature_projection.projection.weight")
     assert not wavlm_parameter_allowed("encoder.wavlm.feature_extractor.conv_layers.0.conv.weight")
+
+
+def test_wavlm_encoder_receives_the_shared_waveform_without_normalization() -> None:
+    class Recorder(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.weight = torch.nn.Parameter(torch.ones(()), requires_grad=False)
+            self.seen = None
+
+        def forward(self, waveform: torch.Tensor):
+            self.seen = waveform.detach().clone()
+            return type(
+                "Output",
+                (),
+                {"last_hidden_state": torch.zeros(waveform.shape[0], WAVLM_FRAME_COUNT, 768)},
+            )()
+
+    encoder = WavLMCellEncoder.__new__(WavLMCellEncoder)
+    torch.nn.Module.__init__(encoder)
+    encoder.wavlm = Recorder()
+    waveform = torch.linspace(-0.2, 0.8, 48000).unsqueeze(0)
+    encoder(waveform)
+    assert torch.equal(encoder.wavlm.seen, waveform)
+
+
+def test_wavlm_internal_stochastic_paths_remain_disabled_during_finetuning() -> None:
+    encoder = WavLMCellEncoder.__new__(WavLMCellEncoder)
+    torch.nn.Module.__init__(encoder)
+    encoder.wavlm = torch.nn.Sequential(torch.nn.Dropout(0.5), torch.nn.Linear(2, 2))
+    encoder.wavlm[1].weight.requires_grad = True
+    encoder.train()
+    assert encoder.training is True
+    assert encoder.wavlm.training is False
+    assert all(module.training is False for module in encoder.wavlm.modules())
 
 
 def test_shared_loss_uses_direct_state_and_relation_paths() -> None:

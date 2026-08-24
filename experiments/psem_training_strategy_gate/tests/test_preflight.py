@@ -78,7 +78,7 @@ def test_scientific_contract_controls_are_exact_and_full_document_pinned() -> No
         "4b4f6a9dfbdf3c9c0c7ce85b210cc1a405d309b8d88b829d9655e0005642e1d0"
     )
     assert check["expected"]["config_canonical_sha256"] == (
-        "16c8422f3582f0308a78e734ca5e6166ab317319ae5e6b376395c84ba4f5595b"
+        "3faf132c4df56e77651583fe3de292d52e14bab2fa2e5b2a2e177235c5fb28d2"
     )
 
 
@@ -245,4 +245,21 @@ def test_material_guard_revalidates_current_external_state(
     current = _receipt(output, ready=False)
     monkeypatch.setattr(preflight_module, "build_preflight", lambda *args, **kwargs: current)
     with pytest.raises(ExperimentPreflightError, match="current preflight revalidation failed"):
+        require_passing_preflight(path)
+
+
+def test_material_guard_rejects_changed_passing_external_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "output"
+    receipt = _receipt(output)
+    path = _write_receipt(output, receipt)
+    current = _receipt(output)
+    current["checks"][0]["observed"] = "changed"
+    payload = dict(current)
+    payload.pop("payload_sha256")
+    current["payload_sha256"] = canonical_sha256(payload)
+    monkeypatch.setattr(preflight_module, "build_preflight", lambda *args, **kwargs: current)
+    with pytest.raises(ExperimentPreflightError, match="receipt is stale"):
         require_passing_preflight(path)

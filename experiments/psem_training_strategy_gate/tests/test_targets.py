@@ -78,6 +78,21 @@ def test_overlap_return_is_negative_and_overlap_takeover_is_positive() -> None:
     )
 
 
+@pytest.mark.parametrize(("speaker", "target"), [("A", 0), ("B", 1)])
+def test_overlap_then_short_gap_keeps_relation_supervision(speaker: str, target: int) -> None:
+    labels = _labels(
+        CanonicalInterval(0, 32000, ("A",)),
+        CanonicalInterval(32000, 35200, ("A", "B")),
+        CanonicalInterval(35200, 38400, ()),
+        CanonicalInterval(38400, 80000, (speaker,)),
+    )
+    targets = build_window_targets("mixed", labels, 38400)
+    assert any(
+        pair.family == OVERLAP_BRIDGE_FAMILY and pair.target == target
+        for pair in targets.relation_pairs
+    )
+
+
 def test_long_gap_masks_handoff_and_relation_at_resolution() -> None:
     labels = _labels(
         CanonicalInterval(0, 32000, ("A",)),
@@ -141,6 +156,21 @@ def test_complex_overlap_and_ambiguous_boundaries_are_masked() -> None:
     )
     assert build_window_targets("complex", complex_labels, 32000).handoff_mask is False
     assert build_window_targets("ambiguous", ambiguous_labels, 32000).handoff_mask is False
+
+
+def test_subcell_ambiguous_span_masks_adjacent_relation() -> None:
+    labels = _labels(
+        CanonicalInterval(0, 32000, ("A",)),
+        CanonicalInterval(32000, 32800, ("A",), ambiguous=True),
+        CanonicalInterval(32800, 100000, ("B",)),
+    )
+    targets = build_window_targets("ambiguous-subcell", labels, 35200)
+    assert not any(
+        pair.left_cell == 17
+        and pair.right_cell == 18
+        and pair.family == ADJACENT_SOLO_FAMILY
+        for pair in targets.relation_pairs
+    )
 
 
 def test_relation_mask_class_masks_handoff_and_relation_cells() -> None:

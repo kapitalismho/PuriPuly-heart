@@ -37,6 +37,33 @@ a run, and passes only when all eight runtime receipts match the current contrac
 label generator, source registry, and Git commit. Training commands must consume a current
 passing receipt and never infer readiness from file presence alone.
 
+Official fitting uses the frozen manifest order with an effective batch size of four. Every
+manifest batch has nonzero handoff, state, and relation supervision. Checkpoint selection uses
+DEV event average precision at the middle required matching collar, ±250 ms, with DEV total
+loss as the tie-break. EVAL remains sealed throughout fitting.
+
+Run the exact matrix in the required order, or use the guarded all-runs command:
+
+```powershell
+uv run --project experiments\speaker_representation_scd\environment --frozen python -m experiments.psem_training_strategy_gate.run train --arm FROZEN-WAVLM --seed 7301
+uv run --project experiments\speaker_representation_scd\environment --frozen python -m experiments.psem_training_strategy_gate.run train --arm FROZEN-WAVLM --seed 7302
+uv run --project experiments\speaker_representation_scd\environment --frozen python -m experiments.psem_training_strategy_gate.run train --arm FINETUNE-WAVLM --seed 7301
+uv run --project experiments\speaker_representation_scd\environment --frozen python -m experiments.psem_training_strategy_gate.run train --arm FINETUNE-WAVLM --seed 7302
+uv run --project experiments\speaker_representation_scd\environment --frozen python -m experiments.psem_training_strategy_gate.run train --arm SCRATCH-PSEM --seed 7301
+uv run --project experiments\speaker_representation_scd\environment --frozen python -m experiments.psem_training_strategy_gate.run train --arm SCRATCH-PSEM --seed 7302
+```
+
+```powershell
+uv run --project experiments\speaker_representation_scd\environment --frozen python -m experiments.psem_training_strategy_gate.run train-all
+```
+
+Each invocation revalidates the persisted passing preflight before writing. The first run freezes
+the exact device, software, host, and thread environment for the complete matrix. Deterministic
+two-slot progress and best-model checkpoints preserve a valid resume boundary across interrupted
+writes. Every completed prefix is reverified before the next run, and commands refuse to skip an
+arm or seed. Re-run the same command after interruption to resume. `training-status` is read-only
+and reports the sealed EVAL state and exact six-run progress.
+
 The final report must retain the frozen-data limitation: the common AMI/AliMeeting temporal
 activity references are the commit-pinned forced alignments released by Horiguchi et al.
 (ASRU 2025); this project does not independently establish their acoustic boundary accuracy.

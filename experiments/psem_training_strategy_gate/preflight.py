@@ -51,7 +51,7 @@ EXPECTED_CONTRACT_CANONICAL_SHA256 = (
     "4b4f6a9dfbdf3c9c0c7ce85b210cc1a405d309b8d88b829d9655e0005642e1d0"
 )
 EXPECTED_CONFIG_CANONICAL_SHA256 = (
-    "16c8422f3582f0308a78e734ca5e6166ab317319ae5e6b376395c84ba4f5595b"
+    "3faf132c4df56e77651583fe3de292d52e14bab2fa2e5b2a2e177235c5fb28d2"
 )
 EXPECTED_DATASET_FREEZE_SHA256 = "bc7e63bb201c2a33a9b2d69b2364fed8f03839278098f0bd175d6833b330a41e"
 EXPECTED_DATASET_PREFLIGHT_SHA256 = (
@@ -689,7 +689,7 @@ def _runtime_receipt_valid(
         )
         check_artifact = load_json(check_artifact_path) if check_artifact_path is not None else None
         validation_context: dict[str, Any] = {}
-        if receipt_name in {"gradient_canary", "weight_update_canary"}:
+        if receipt_name in {"model_graphs", "gradient_canary", "weight_update_canary"}:
             parameter_artifact = load_json(output_root / "audits" / "parameter_inventory.json")
             validation_context["parameter_inventory"] = parameter_artifact
         if receipt_name == "arm_comparability":
@@ -755,12 +755,27 @@ def _runtime_receipt_valid(
             sampling_path = output_root / "manifests" / "sampling_manifest.jsonl"
             sampling_sha256 = sha256_file(sampling_path)
             if receipt_name == "sampling_manifest":
-                with sampling_path.open("r", encoding="utf-8") as handle:
-                    sampling_row_count = sum(1 for _ in handle)
+                if corpus_root is None or reference_root is None:
+                    raise RuntimeEvidenceError("sampling validation roots are unavailable")
+                from experiments.psem_training_strategy_gate.sampling import (
+                    TRAIN_ROLE,
+                    load_runtime_sessions,
+                    validate_sampling_manifest,
+                )
+
+                sessions = load_runtime_sessions(
+                    corpus_root,
+                    reference_root,
+                    roles=(TRAIN_ROLE,),
+                )
+                observed_sampling = validate_sampling_manifest(sampling_path, sessions)
                 semantic_checks_valid = (
                     semantic_checks_valid
                     and check_artifact.get("manifest_sha256") == sampling_sha256
-                    and check_artifact.get("row_count") == sampling_row_count
+                    and all(
+                        check_artifact.get(field) == value
+                        for field, value in observed_sampling.items()
+                    )
                 )
             else:
                 semantic_checks_valid = (
@@ -1108,6 +1123,16 @@ def require_passing_preflight(path: Path) -> dict[str, Any]:
         raise ExperimentPreflightError(
             "material work is blocked because current preflight revalidation failed"
         ) from exc
-    if current["binding"] != receipt["binding"] or current["paths"] != receipt["paths"]:
+    stable_current = {
+        key: value
+        for key, value in current.items()
+        if key not in {"generated_at", "payload_sha256"}
+    }
+    stable_receipt = {
+        key: value
+        for key, value in receipt.items()
+        if key not in {"generated_at", "payload_sha256"}
+    }
+    if stable_current != stable_receipt:
         raise ExperimentPreflightError("experiment preflight receipt is stale")
     return receipt

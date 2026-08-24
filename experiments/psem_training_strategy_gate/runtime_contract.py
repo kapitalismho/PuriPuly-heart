@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import re
+from pathlib import Path
 from typing import Any, Mapping
 
 SAMPLING_CHECK_IDS = (
@@ -140,23 +141,254 @@ _EXPECTED_COMMON_HEAD = {
     "handoff_head_linear_shapes": [[1024, 256], [256, 1]],
     "state_head_shape": [256, 3],
     "relation_head_linear_shapes": [[512, 256], [256, 1]],
-    "implementation_sha256": "b28fb3890db13b0042a233ae62cb7b02cec03860b432d83cdbf1a0fdc76dd56c",
+    "implementation_sha256": "2907e18540d2d09e6d5d06d5d30d877cc6e10542d2eac481215fb1197bbb4a14",
 }
 _EXPECTED_COMMON_HEAD_SHA256 = "1ca79b3c766dbb522ee20b187b5bb0ae32df2b4093135b161dbfe3b3dd8a6fef"
 _EXPECTED_INITIAL_WAVLM_SHA256 = "46b0182d148229e2d12d427b30c7d665507f692bcc9785a69eb4767dd3208e81"
+_EXPECTED_WAVLM_CONFIG = {
+    "model_type": "wavlm",
+    "hidden_size": 768,
+    "num_hidden_layers": 12,
+    "conv_kernel": [10, 3, 3, 3, 3, 2, 2],
+    "conv_stride": [5, 2, 2, 2, 2, 2, 2],
+    "do_stable_layer_norm": False,
+    "apply_spec_augment": True,
+    "mask_time_prob": 0.05,
+    "feat_proj_dropout": 0.1,
+    "hidden_dropout": 0.1,
+    "attention_dropout": 0.1,
+    "layerdrop": 0.05,
+    "output_frames": 149,
+}
 _EXPECTED_LOSS_CONTRACT = {
     "class_weights": {
         "handoff_positive": 2.783557848476163,
-        "relation_classes": [0.08260454167422078, 1.9173954583257793],
+        "relation_classes": [0.0706411802779254, 1.9293588197220746],
         "state_classes": [0.8617251996399268, 0.35532956672843413, 1.782945233631639],
     },
     "coefficients": {"handoff": 1.0, "relation": 0.5, "state": 0.5},
-    "implementation_sha256": "f0f7bc310a230aea5adc36bb74f49beba5042119ce40dd52541836137ab3ad96",
+    "implementation_sha256": "775614a3b1bc53a5cfe882ec8d4ba1bcaaf20f96f8fd7b47198a6872cf3c5cbb",
 }
 
 
 class RuntimeEvidenceError(RuntimeError):
     pass
+
+
+def _model_graph_complete(
+    artifact: Mapping[str, Any],
+    validation_context: Mapping[str, Any] | None,
+) -> bool:
+    if set(artifact) != {
+        "schema_version",
+        "artifact_role",
+        "canary_source_id",
+        "canary_boundary_sample",
+        "arms",
+        "checks",
+    }:
+        return False
+    if (
+        not isinstance(artifact.get("canary_source_id"), str)
+        or not artifact["canary_source_id"]
+        or not isinstance(artifact.get("canary_boundary_sample"), int)
+        or isinstance(artifact["canary_boundary_sample"], bool)
+        or artifact["canary_boundary_sample"] < 0
+        or artifact["canary_boundary_sample"] % 1600
+    ):
+        return False
+    arms = artifact.get("arms")
+    if not isinstance(arms, Mapping) or set(arms) != set(_ARMS):
+        return False
+    parameter_arms = None
+    if validation_context is not None and "parameter_inventory" in validation_context:
+        parameter_artifact = validation_context["parameter_inventory"]
+        if not isinstance(parameter_artifact, Mapping):
+            return False
+        parameter_arms = _parameter_inventory_arms(parameter_artifact)
+        if parameter_arms is None:
+            return False
+    expected_graph_keys = {
+        "input",
+        "encoder",
+        "projection",
+        "cell_output_shape",
+        "handoff_output_shape",
+        "state_output_shape",
+        "common_head",
+        "losses",
+        "optimizer",
+    }
+    for arm, values in arms.items():
+        if not isinstance(values, Mapping) or set(values) != expected_graph_keys:
+            return False
+        if values["input"] != {
+            "kind": "raw_waveform",
+            "sample_rate_hz": 16000,
+            "samples": 48000,
+            "upstream_transform": "psem-waveform-augmentation-v1",
+            "cached_feature_inputs": [],
+        }:
+            return False
+        expected_projection_input = 320 if arm == "SCRATCH-PSEM" else 768
+        if values["projection"] != {
+            "input_dimension": expected_projection_input,
+            "output_dimension": 256,
+            "normalization_shape": [256],
+        }:
+            return False
+        if (
+            values["cell_output_shape"] != [1, 30, 256]
+            or values["handoff_output_shape"] != [1]
+            or values["state_output_shape"] != [1, 30, 3]
+            or values["common_head"] != _EXPECTED_COMMON_HEAD
+            or values["losses"] != _EXPECTED_LOSS_CONTRACT
+        ):
+            return False
+        if parameter_arms is not None and values["optimizer"] != parameter_arms[arm]["optimizer"]:
+            return False
+        encoder = values["encoder"]
+        if not isinstance(encoder, Mapping):
+            return False
+        if arm != "SCRATCH-PSEM":
+            if set(encoder) != {
+                "type",
+                "model_id",
+                "revision",
+                "local_model_root",
+                "config",
+                "trainable_parameter_names",
+                "initial_parameter_sha256",
+                "execution_mode",
+                "wavlm_training",
+            }:
+                return False
+            root = Path(str(encoder.get("local_model_root", "")))
+            if (
+                encoder.get("type") != "WavLMCellEncoder"
+                or encoder.get("model_id") != "wavlm-base-plus"
+                or encoder.get("revision") != "4c66d4806a428f2e922ccfa1a962776e232d487b"
+                or not root.is_absolute()
+                or root.name != encoder["revision"]
+                or root.parent.name != encoder["model_id"]
+                or encoder.get("config") != _EXPECTED_WAVLM_CONFIG
+                or encoder.get("initial_parameter_sha256") != _EXPECTED_INITIAL_WAVLM_SHA256
+                or encoder.get("wavlm_training") is not False
+                or encoder.get("execution_mode")
+                != (
+                    "eval_with_gradients"
+                    if arm == "FINETUNE-WAVLM"
+                    else "eval_without_gradients"
+                )
+                or not isinstance(encoder.get("trainable_parameter_names"), list)
+            ):
+                return False
+            if parameter_arms is not None:
+                expected_names = [
+                    row["name"]
+                    for row in parameter_arms[arm]["parameters"]
+                    if row["trainable"] and row["name"].startswith("encoder.wavlm.")
+                ]
+                if encoder["trainable_parameter_names"] != expected_names:
+                    return False
+        else:
+            expected_blocks = [
+                {
+                    "width": 320,
+                    "expansion": 2,
+                    "kernel": 5,
+                    "dilation": dilation,
+                    "groups": 640,
+                }
+                for dilation in [1, 2, 4, 8, 16, 1, 2, 4]
+            ]
+            if (
+                set(encoder)
+                != {
+                    "type",
+                    "frontend",
+                    "stem",
+                    "blocks",
+                    "final_normalization_channels",
+                    "pretrained_artifacts",
+                    "implementation_sha256",
+                }
+                or encoder.get("type") != "ScratchCellEncoder"
+                or encoder.get("frontend")
+                != {
+                    "sample_rate_hz": 16000,
+                    "n_fft": 400,
+                    "win_length": 400,
+                    "hop_length": 160,
+                    "center": False,
+                    "power": 2.0,
+                    "mel_bins": 64,
+                    "mel_norm": "slaney",
+                    "mel_scale": "slaney",
+                }
+                or encoder.get("stem")
+                != {"input_channels": 64, "output_channels": 320, "kernel": 5}
+                or encoder.get("blocks") != expected_blocks
+                or encoder.get("final_normalization_channels") != 320
+                or encoder.get("pretrained_artifacts") != []
+                or encoder.get("implementation_sha256")
+                != _EXPECTED_COMMON_HEAD["implementation_sha256"]
+            ):
+                return False
+    return True
+
+
+def _sampling_summary_complete(artifact: Mapping[str, Any]) -> bool:
+    expected_families = {
+        "clean_direct_different_speaker_handoff",
+        "silence_gap_different_speaker_handoff",
+        "overlap_takeover",
+        "stable_singleton_continuation",
+        "same_speaker_silence_gap_resume",
+        "overlap_return",
+        "overlap_continuation",
+        "silence_continuation",
+        "source_time_uniform",
+    }
+    pool_counts = artifact.get("pool_counts")
+    return (
+        set(artifact)
+        == {
+            "schema_version",
+            "artifact_role",
+            "manifest_path",
+            "manifest_sha256",
+            "row_count",
+            "epoch_count",
+            "windows_per_epoch",
+            "effective_batch_size",
+            "minimum_valid_counts_per_batch",
+            "sampling_role_counts",
+            "topology_family_counts",
+            "pool_counts",
+            "source_count",
+            "arms",
+            "seeds",
+            "shared_center_and_augmentation_manifest",
+            "topology_family_mapping",
+            "eval_source_count",
+            "loss_weights",
+            "target_class_counts",
+            "checks",
+        }
+        and isinstance(artifact.get("manifest_path"), str)
+        and Path(artifact["manifest_path"]).is_absolute()
+        and _sha256(artifact.get("manifest_sha256"))
+        and artifact.get("epoch_count") == 20
+        and artifact.get("windows_per_epoch") == 4096
+        and isinstance(pool_counts, Mapping)
+        and set(pool_counts) == expected_families
+        and all(
+            isinstance(value, int) and not isinstance(value, bool) and value > 0
+            for value in pool_counts.values()
+        )
+        and set(artifact.get("topology_family_counts", {})) == expected_families
+    )
 
 
 def _canonical_sha256(value: Any) -> str:
@@ -527,8 +759,14 @@ def _semantic_pass(
         if check_id == "sampling.loss_weights_complete":
             weights = artifact.get("loss_weights")
             counts = artifact.get("target_class_counts")
+            batch_counts = artifact.get("minimum_valid_counts_per_batch")
             return (
                 isinstance(weights, Mapping)
+                and set(weights) == {"handoff_positive", "state_classes", "relation_classes"}
+                and isinstance(weights.get("state_classes"), list)
+                and len(weights["state_classes"]) == 3
+                and isinstance(weights.get("relation_classes"), list)
+                and len(weights["relation_classes"]) == 2
                 and all(
                     isinstance(value, (int, float))
                     and not isinstance(value, bool)
@@ -541,12 +779,21 @@ def _semantic_pass(
                     )
                 )
                 and isinstance(counts, Mapping)
+                and set(counts) == {"handoff", "state", "relation"}
+                and all(isinstance(counts.get(key), Mapping) for key in counts)
+                and set(counts["handoff"]) == {"0", "1"}
+                and set(counts["state"]) == {"0", "1", "2"}
+                and set(counts["relation"]) == {"0", "1"}
                 and all(
                     isinstance(count, int) and not isinstance(count, bool) and count > 0
                     for values in counts.values()
                     if isinstance(values, Mapping)
                     for count in values.values()
                 )
+                and artifact.get("effective_batch_size") == 4
+                and isinstance(batch_counts, Mapping)
+                and set(batch_counts) == {"handoff", "state", "relation"}
+                and all(_strict_positive_int(value) for value in batch_counts.values())
             )
     if receipt_name == "augmentation_manifest":
         if check_id == "augmentation.recipe_exact":
@@ -589,10 +836,21 @@ def _semantic_pass(
             return False
         if check_id == "metric.one_to_one":
             rows = details.get("nearest_remap", {}).get("rows", [])
-            return bool(rows) and [
-                [match.get("prediction_source_sample"), match.get("reference_source_sample")]
-                for match in rows[0].get("matches", {}).get("100", [])
-            ] == [[1600, 0], [3200, 1600]]
+            replacement_rows = details.get("nearest_replacement", {}).get("rows", [])
+            return (
+                bool(rows)
+                and bool(replacement_rows)
+                and [
+                    [match.get("prediction_source_sample"), match.get("reference_source_sample")]
+                    for match in rows[0].get("matches", {}).get("100", [])
+                ]
+                == [[1600, 0], [3200, 1600]]
+                and [
+                    [match.get("prediction_source_sample"), match.get("reference_source_sample")]
+                    for match in replacement_rows[0].get("matches", {}).get("100", [])
+                ]
+                == [[1600, 1600]]
+            )
         if check_id == "metric.collar_boundaries":
             return details.get("collar_canaries") == {
                 str(collar): {
@@ -878,6 +1136,8 @@ def runtime_artifact_checks(
         raise RuntimeEvidenceError("runtime evidence artifact role differs from its contract")
     if artifact.get("schema_version") != 1:
         raise RuntimeEvidenceError("runtime evidence schema version differs from its contract")
+    if receipt_name == "sampling_manifest" and not _sampling_summary_complete(artifact):
+        raise RuntimeEvidenceError("sampling summary schema differs from the frozen manifest")
     if receipt_name in {
         "model_graphs",
         "parameter_inventory",
@@ -888,6 +1148,10 @@ def runtime_artifact_checks(
         arms = artifact.get("arms")
         if not isinstance(arms, Mapping) or set(arms) != set(_ARMS):
             raise RuntimeEvidenceError("runtime evidence arm inventory differs from its contract")
+    if receipt_name == "model_graphs" and not _model_graph_complete(
+        artifact, validation_context
+    ):
+        raise RuntimeEvidenceError("model graph differs from the exact constructed models")
     if receipt_name == "parameter_inventory" and _parameter_inventory_arms(artifact) is None:
         raise RuntimeEvidenceError("parameter inventory differs from the exact constructed models")
     if receipt_name == "gradient_canary" and not _gradient_artifact_complete(

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import random
+from itertools import combinations, permutations
+
 import pytest
 
 from experiments.psem_training_strategy_gate.evaluator import (
@@ -7,6 +10,7 @@ from experiments.psem_training_strategy_gate.evaluator import (
     MetricContractError,
     PredictionScore,
     ReferenceEvent,
+    event_average_precision,
     eventize,
     full_threshold_curve,
     shared_score_thresholds,
@@ -26,6 +30,17 @@ def test_eventizer_keeps_earlier_plateau_peak_and_suppresses_within_200ms() -> N
         )
     )
     assert [(row.boundary_sample, row.score) for row in events] == [(0, 0.9), (4800, 0.8)]
+
+
+def test_eventizer_excludes_masked_centers_without_turning_them_into_negatives() -> None:
+    events = eventize(
+        (
+            PredictionScore("s", 0, 16000, 0.2),
+            PredictionScore("s", 1600, 17600, 0.99, False),
+            PredictionScore("s", 3200, 19200, 0.3),
+        )
+    )
+    assert [(row.boundary_sample, row.score) for row in events] == [(3200, 0.3), (0, 0.2)]
 
 
 def test_matching_is_maximum_cardinality_before_nearest_preference() -> None:
@@ -60,6 +75,69 @@ def test_matching_is_maximum_cardinality_before_nearest_preference() -> None:
             "absolute_distance_samples": 1600,
         },
     ]
+
+
+def test_matching_replaces_a_farther_match_when_cardinality_is_unchanged() -> None:
+    candidates = (
+        CandidateEvent("s", 0, 16000, 1.0),
+        CandidateEvent("s", 1600, 17600, 0.99),
+    )
+    curve = full_threshold_curve(
+        candidates,
+        (
+            ReferenceEvent("s", 1600, "near"),
+            ReferenceEvent("s", 4800, "outside"),
+        ),
+        scored_source_samples=57_600_000,
+        score_thresholds=shared_score_thresholds((candidates,)),
+    )
+    assert curve["rows"][0]["matches"]["100"] == [
+        {
+            "prediction_source_id": "s",
+            "prediction_source_sample": 1600,
+            "reference_source_id": "s",
+            "reference_source_sample": 1600,
+            "absolute_distance_samples": 0,
+        }
+    ]
+
+
+def test_matching_reaches_bruteforce_cardinality_and_nearest_distance() -> None:
+    generator = random.Random(76)
+    for _ in range(80):
+        prediction_samples = sorted(generator.sample(range(0, 12 * 1600, 1600), 5))
+        reference_samples = sorted(generator.sample(range(0, 12 * 1600), 4))
+        candidates = tuple(
+            CandidateEvent("s", sample, sample + 16000, 1.0 - index / 10)
+            for index, sample in enumerate(prediction_samples)
+        )
+        references = tuple(ReferenceEvent("s", sample, "handoff") for sample in reference_samples)
+        best_cardinality = 0
+        best_distance = 0
+        for cardinality in range(1, min(len(candidates), len(references)) + 1):
+            distances = []
+            for prediction_ids in combinations(range(len(candidates)), cardinality):
+                for reference_ids in permutations(range(len(references)), cardinality):
+                    values = [
+                        abs(prediction_samples[prediction_id] - reference_samples[reference_id])
+                        for prediction_id, reference_id in zip(
+                            prediction_ids, reference_ids, strict=True
+                        )
+                    ]
+                    if all(value <= 1600 for value in values):
+                        distances.append(sum(values))
+            if distances:
+                best_cardinality = cardinality
+                best_distance = min(distances)
+        curve = full_threshold_curve(
+            candidates,
+            references,
+            scored_source_samples=57_600_000,
+            score_thresholds=shared_score_thresholds((candidates,)),
+        )
+        matches = curve["rows"][0]["matches"]["100"]
+        assert len(matches) == best_cardinality
+        assert sum(row["absolute_distance_samples"] for row in matches) == best_distance
 
 
 def test_full_curve_has_every_unique_threshold_and_no_fe_ceiling() -> None:
@@ -215,3 +293,69 @@ def test_eventizer_requires_contiguous_grid_and_equal_scores_are_atomic() -> Non
         score_thresholds=(0.1, 0.9),
     )
     assert curve["rows"][1]["prediction_count"] == 2
+
+
+def test_checkpoint_event_average_precision_matches_full_curve() -> None:
+    scores = [
+        PredictionScore("session", sample, sample + 16000, score)
+        for sample, score in (
+            (32000, 0.1),
+            (33600, 0.9),
+            (35200, 0.1),
+            (36800, 0.1),
+            (38400, 0.8),
+            (40000, 0.1),
+        )
+    ]
+    candidates = eventize(scores)
+    references = [
+        ReferenceEvent("session", 33600, "direct"),
+        ReferenceEvent("session", 38600, "gap"),
+    ]
+    thresholds = shared_score_thresholds((candidates,))
+    curve = full_threshold_curve(
+        candidates,
+        references,
+        scored_source_samples=16000 * 60,
+        score_thresholds=thresholds,
+    )
+    summary = event_average_precision(candidates, references, collar_ms=250)
+    assert (
+        summary["event_average_precision"] == curve["summaries"]["250"]["event_average_precision"]
+    )
+    assert summary["threshold_count"] == len(thresholds)
+
+
+def test_checkpoint_event_average_precision_matches_full_curve_randomized() -> None:
+    generator = random.Random(7301)
+    for case in range(40):
+        candidate_samples = sorted(generator.sample(range(0, 40 * 1600, 1600), 8))
+        score_order = generator.sample(range(1, 9), 8)
+        candidates = tuple(
+            CandidateEvent(
+                "session",
+                sample,
+                sample + 16000,
+                (score_order[index] + case / 1000) / 10,
+            )
+            for index, sample in enumerate(candidate_samples)
+        )
+        references = tuple(
+            ReferenceEvent("session", sample, "handoff")
+            for sample in sorted(generator.sample(range(0, 40 * 1600), 6))
+        )
+        thresholds = shared_score_thresholds((candidates,))
+        curve = full_threshold_curve(
+            candidates,
+            references,
+            scored_source_samples=16000 * 60,
+            score_thresholds=thresholds,
+        )
+        for collar in (100, 250, 500):
+            summary = event_average_precision(candidates, references, collar_ms=collar)
+            assert summary["event_average_precision"] == pytest.approx(
+                curve["summaries"][str(collar)]["event_average_precision"]
+            )
+            assert summary["maximum_f1"] == pytest.approx(
+                curve["summaries"][str(collar)]["max_f1"]["f1"]
+            )

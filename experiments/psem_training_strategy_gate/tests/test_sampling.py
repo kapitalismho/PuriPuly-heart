@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -20,6 +21,7 @@ from experiments.psem_training_strategy_gate.sampling import (
     POSITIVE_TOPOLOGY_FAMILY,
     SAMPLING_COUNTS,
     WINDOWS_PER_EPOCH,
+    BatchValidityAccumulator,
     CandidateCenter,
     RuntimeSession,
     SamplingContractError,
@@ -151,3 +153,34 @@ def test_waveform_loader_uses_recomputed_bound_window(monkeypatch, tmp_path: Pat
     waveform = load_waveform_window(row, session, tmp_path)
     assert waveform.shape == (48000,)
     assert calls == [(tmp_path / "session.wav", 3200, 48000)]
+
+
+def test_batch_validity_accumulator_proves_each_enabled_loss_per_official_batch() -> None:
+    session, row = _bound_session_and_row()
+    target = target_for_row(row, session)
+    accumulator = BatchValidityAccumulator(4)
+    for _ in range(4):
+        accumulator.add(target)
+    minimum = accumulator.finish()
+    assert minimum["handoff"] == 4
+    assert minimum["state"] == 120
+    assert minimum["relation"] > 0
+
+    unsupported = replace(
+        target,
+        handoff_mask=False,
+        state_mask=(False,) * 30,
+        relation_pairs=(),
+    )
+    unsupported_accumulator = BatchValidityAccumulator(4)
+    for _ in range(4):
+        unsupported_accumulator.add(unsupported)
+    assert unsupported_accumulator.finish() == {"handoff": 0, "relation": 0, "state": 0}
+
+
+def test_batch_validity_accumulator_rejects_partial_batches() -> None:
+    session, row = _bound_session_and_row()
+    accumulator = BatchValidityAccumulator(4)
+    accumulator.add(target_for_row(row, session))
+    with pytest.raises(SamplingContractError, match="complete official batches"):
+        accumulator.finish()

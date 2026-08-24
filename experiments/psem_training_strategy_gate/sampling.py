@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -39,6 +39,7 @@ DEV_ROLE = "PSEM-STRATEGY-DEV"
 EVAL_ROLE = "PSEM-STRATEGY-EVAL"
 MAXIMUM_EPOCHS = 20
 WINDOWS_PER_EPOCH = 4096
+OFFICIAL_EFFECTIVE_BATCH_SIZE = 4
 POSITIVE_FAMILIES = (
     "clean_direct_different_speaker_handoff",
     "silence_gap_different_speaker_handoff",
@@ -75,6 +76,32 @@ SAMPLING_COUNTS = {
 
 class SamplingContractError(RuntimeError):
     pass
+
+
+@dataclass(slots=True)
+class BatchValidityAccumulator:
+    batch_size: int
+    rows_in_batch: int = 0
+    current: dict[str, int] = field(
+        default_factory=lambda: {"handoff": 0, "state": 0, "relation": 0}
+    )
+    minimum: dict[str, int] = field(default_factory=dict)
+
+    def add(self, target: WindowTargets) -> None:
+        self.current["handoff"] += int(target.handoff_mask)
+        self.current["state"] += sum(int(value) for value in target.state_mask)
+        self.current["relation"] += len(target.relation_pairs)
+        self.rows_in_batch += 1
+        if self.rows_in_batch == self.batch_size:
+            for key, value in self.current.items():
+                self.minimum[key] = min(self.minimum.get(key, value), value)
+            self.rows_in_batch = 0
+            self.current = {"handoff": 0, "state": 0, "relation": 0}
+
+    def finish(self) -> dict[str, int]:
+        if self.batch_size <= 0 or self.rows_in_batch or set(self.minimum) != set(self.current):
+            raise SamplingContractError("sampling rows do not form complete official batches")
+        return dict(sorted(self.minimum.items()))
 
 
 @dataclass(frozen=True, slots=True)
@@ -333,6 +360,7 @@ def materialize_sampling_manifest(
     relation_counts: Counter[int] = Counter()
     role_counts: Counter[str] = Counter()
     family_counts: Counter[str] = Counter()
+    batch_validity = BatchValidityAccumulator(OFFICIAL_EFFECTIVE_BATCH_SIZE)
     temporary = output_path.with_name(f".{output_path.name}.{os.getpid()}.tmp")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with temporary.open("w", encoding="utf-8", newline="\n") as handle:
@@ -392,6 +420,7 @@ def materialize_sampling_manifest(
                     if mask
                 )
                 relation_counts.update(pair.target for pair in target.relation_pairs)
+                batch_validity.add(target)
     temporary.replace(output_path)
     if role_counts != Counter(
         {role: count * MAXIMUM_EPOCHS for role, count in SAMPLING_COUNTS.items()}
@@ -402,12 +431,15 @@ def materialize_sampling_manifest(
         state_classes=_class_weights(state_counts, 3),
         relation_classes=_class_weights(relation_counts, 2),
     )
+    minimum_valid_counts_per_batch = batch_validity.finish()
     return {
         "manifest_path": str(output_path.resolve()),
         "manifest_sha256": _sha256_file(output_path),
         "row_count": sum(role_counts.values()),
         "epoch_count": MAXIMUM_EPOCHS,
         "windows_per_epoch": WINDOWS_PER_EPOCH,
+        "effective_batch_size": OFFICIAL_EFFECTIVE_BATCH_SIZE,
+        "minimum_valid_counts_per_batch": minimum_valid_counts_per_batch,
         "sampling_role_counts": dict(sorted(role_counts.items())),
         "topology_family_counts": dict(sorted(family_counts.items())),
         "pool_counts": {family: len(values) for family, values in sorted(pools.items())},
@@ -449,6 +481,128 @@ def load_sampling_rows(path: Path) -> list[Mapping[str, Any]]:
         ) != augmentation_decision(str(row.get("row_id", ""))):
             raise SamplingContractError("sampling manifest row is not canonical")
     return rows
+
+
+def validate_sampling_manifest(
+    path: Path,
+    sessions: Mapping[str, RuntimeSession],
+) -> dict[str, Any]:
+    rows = load_sampling_rows(path)
+    if len(rows) != MAXIMUM_EPOCHS * WINDOWS_PER_EPOCH:
+        raise SamplingContractError("sampling manifest row count differs from the frozen budget")
+    pools = candidate_pools(sessions)
+    epoch_plans = {epoch: epoch_plan(pools, epoch) for epoch in range(1, MAXIMUM_EPOCHS + 1)}
+    role_counts: Counter[str] = Counter()
+    family_counts: Counter[str] = Counter()
+    handoff_counts: Counter[int] = Counter()
+    state_counts: Counter[int] = Counter()
+    relation_counts: Counter[int] = Counter()
+    sources = set()
+    batch_validity = BatchValidityAccumulator(OFFICIAL_EFFECTIVE_BATCH_SIZE)
+    expected_keys = {
+        "schema_version",
+        "artifact_role",
+        "row_id",
+        "epoch",
+        "epoch_index",
+        "source_id",
+        "source_waveform_sha256",
+        "boundary_sample",
+        "window_start_sample",
+        "window_end_sample",
+        "observed_frontier_sample",
+        "sampling_role",
+        "topology_family",
+        "target_sha256",
+        "unsnapped_handoff_event_samples",
+        "augmentation",
+    }
+    for absolute_index, row in enumerate(rows):
+        epoch = absolute_index // WINDOWS_PER_EPOCH + 1
+        epoch_index = absolute_index % WINDOWS_PER_EPOCH
+        row_id = f"epoch-{epoch:02d}-window-{epoch_index:04d}"
+        expected_role, expected_candidate = epoch_plans[epoch][epoch_index]
+        source_id = row.get("source_id")
+        session = sessions.get(str(source_id))
+        if (
+            set(row) != expected_keys
+            or row.get("schema_version") != 1
+            or row.get("artifact_role") != "psem_training_window"
+            or row.get("row_id") != row_id
+            or row.get("epoch") != epoch
+            or row.get("epoch_index") != epoch_index
+            or row.get("sampling_role") != expected_role
+            or row.get("topology_family") != expected_candidate.family
+            or row.get("source_id") != expected_candidate.source_id
+            or row.get("boundary_sample") != expected_candidate.boundary_sample
+            or session is None
+            or session.role != TRAIN_ROLE
+            or row.get("source_waveform_sha256") != session.waveform_sha256
+        ):
+            raise SamplingContractError("sampling manifest row identity is invalid")
+        target = target_for_row(row, session)
+        role = row.get("sampling_role")
+        family = row.get("topology_family")
+        if (
+            (role == "handoff_positive" and (not target.handoff_mask or target.handoff_target != 1))
+            or (
+                role == "topology_hard_negative"
+                and (not target.handoff_mask or target.handoff_target != 0)
+            )
+            or (role == "source_time_uniform" and family != "source_time_uniform")
+            or (role == "handoff_positive" and family not in POSITIVE_FAMILIES)
+            or (role == "topology_hard_negative" and family not in HARD_NEGATIVE_FAMILIES)
+            or role not in {"handoff_positive", "topology_hard_negative", "source_time_uniform"}
+        ):
+            raise SamplingContractError("sampling manifest row role or target is invalid")
+        batch_validity.add(target)
+        role_counts[str(role)] += 1
+        family_counts[str(family)] += 1
+        sources.add(str(source_id))
+        if target.handoff_mask:
+            handoff_counts[target.handoff_target] += 1
+        state_counts.update(
+            state
+            for state, mask in zip(target.state_targets, target.state_mask, strict=True)
+            if mask
+        )
+        relation_counts.update(pair.target for pair in target.relation_pairs)
+    weights = LossWeights(
+        handoff_positive=handoff_counts[0] / handoff_counts[1],
+        state_classes=_class_weights(state_counts, 3),
+        relation_classes=_class_weights(relation_counts, 2),
+    )
+    return {
+        "manifest_path": str(path.resolve()),
+        "manifest_sha256": _sha256_file(path),
+        "row_count": len(rows),
+        "epoch_count": MAXIMUM_EPOCHS,
+        "windows_per_epoch": WINDOWS_PER_EPOCH,
+        "effective_batch_size": OFFICIAL_EFFECTIVE_BATCH_SIZE,
+        "minimum_valid_counts_per_batch": batch_validity.finish(),
+        "sampling_role_counts": dict(sorted(role_counts.items())),
+        "topology_family_counts": dict(sorted(family_counts.items())),
+        "pool_counts": {family: len(values) for family, values in sorted(pools.items())},
+        "source_count": len(sources),
+        "arms": ["FROZEN-WAVLM", "FINETUNE-WAVLM", "SCRATCH-PSEM"],
+        "seeds": [7301, 7302],
+        "shared_center_and_augmentation_manifest": True,
+        "topology_family_mapping": {
+            "handoff_positive": dict(sorted(POSITIVE_TOPOLOGY_FAMILY.items())),
+            "topology_hard_negative": dict(sorted(HARD_NEGATIVE_TOPOLOGY_FAMILY.items())),
+        },
+        "eval_source_count": 0,
+        "loss_weights": {
+            "handoff_positive": weights.handoff_positive,
+            "state_classes": list(weights.state_classes),
+            "relation_classes": list(weights.relation_classes),
+        },
+        "target_class_counts": {
+            "handoff": {str(key): value for key, value in sorted(handoff_counts.items())},
+            "state": {str(key): value for key, value in sorted(state_counts.items())},
+            "relation": {str(key): value for key, value in sorted(relation_counts.items())},
+        },
+    }
 
 
 def load_waveform_window(

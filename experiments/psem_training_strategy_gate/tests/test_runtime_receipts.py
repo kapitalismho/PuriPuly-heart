@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 
@@ -31,6 +32,85 @@ def _check_rows(receipt_name: str) -> list[dict]:
         {"id": check_id, "passed": True, "expected": None, "observed": None}
         for check_id in RUNTIME_CHECK_IDS[receipt_name]
     ]
+
+
+def _sampling_artifact() -> dict:
+    topology_families = {
+        "clean_direct_different_speaker_handoff",
+        "silence_gap_different_speaker_handoff",
+        "overlap_takeover",
+        "stable_singleton_continuation",
+        "same_speaker_silence_gap_resume",
+        "overlap_return",
+        "overlap_continuation",
+        "silence_continuation",
+        "source_time_uniform",
+    }
+    return {
+        "schema_version": 1,
+        "artifact_role": "psem_sampling_summary",
+        "manifest_path": str((Path.cwd() / "sampling_manifest.jsonl").resolve()),
+        "row_count": 81_920,
+        "manifest_sha256": "a" * 64,
+        "epoch_count": 20,
+        "windows_per_epoch": 4096,
+        "eval_source_count": 0,
+        "source_count": 64,
+        "sampling_role_counts": {
+            "handoff_positive": 20_480,
+            "source_time_uniform": 40_960,
+            "topology_hard_negative": 20_480,
+        },
+        "topology_family_counts": {name: 1 for name in topology_families},
+        "pool_counts": {name: 1 for name in topology_families},
+        "topology_family_mapping": {
+            "handoff_positive": {
+                "clean_direct_different_speaker_handoff": "clean_direct_different_speaker_handoff",
+                "micro_gap_different_speaker_handoff": "silence_gap_different_speaker_handoff",
+                "micro_overlap_takeover": "overlap_takeover",
+                "overlap_gap_takeover": "overlap_takeover",
+                "overlap_takeover": "overlap_takeover",
+                "silence_gap_different_speaker_handoff": "silence_gap_different_speaker_handoff",
+            },
+            "topology_hard_negative": {
+                "micro_gap_same_speaker_resume": "same_speaker_silence_gap_resume",
+                "micro_overlap_return": "overlap_return",
+                "overlap_gap_return": "overlap_return",
+                "overlap_return": "overlap_return",
+                "same_speaker_silence_gap_resume": "same_speaker_silence_gap_resume",
+            },
+        },
+        "shared_center_and_augmentation_manifest": True,
+        "arms": ["FROZEN-WAVLM", "FINETUNE-WAVLM", "SCRATCH-PSEM"],
+        "seeds": [7301, 7302],
+        "loss_weights": {
+            "handoff_positive": 1.0,
+            "state_classes": [1.0, 1.0, 1.0],
+            "relation_classes": [1.0, 1.0],
+        },
+        "target_class_counts": {
+            "handoff": {"0": 1, "1": 1},
+            "state": {"0": 1, "1": 1, "2": 1},
+            "relation": {"0": 1, "1": 1},
+        },
+        "effective_batch_size": 4,
+        "minimum_valid_counts_per_batch": {"handoff": 1, "state": 120, "relation": 9},
+        "checks": _check_rows("sampling_manifest"),
+    }
+
+
+def test_sampling_receipt_requires_positive_support_in_every_official_batch() -> None:
+    artifact = _sampling_artifact()
+    assert all(row["passed"] for row in runtime_artifact_checks("sampling_manifest", artifact))
+    for field, value in (
+        ("effective_batch_size", 8),
+        ("minimum_valid_counts_per_batch", {"handoff": 1, "state": 120, "relation": 0}),
+        ("minimum_valid_counts_per_batch", {"handoff": 1, "state": 120}),
+    ):
+        forged = deepcopy(artifact)
+        forged[field] = value
+        with pytest.raises(RuntimeEvidenceError, match="contradicts artifact semantics"):
+            runtime_artifact_checks("sampling_manifest", forged)
 
 
 def _inventory_row(name: str, trainable: bool, optimizer_group: str | None, numel: int) -> dict:
@@ -487,67 +567,100 @@ def test_model_graph_requires_exact_shared_head_dimensions() -> None:
     common_head = deepcopy(runtime_contract_module._EXPECTED_COMMON_HEAD)
     shared_losses = deepcopy(runtime_contract_module._EXPECTED_LOSS_CONTRACT)
     frozen_encoder = {
+        "type": "WavLMCellEncoder",
         "model_id": "wavlm-base-plus",
         "revision": "4c66d4806a428f2e922ccfa1a962776e232d487b",
-        "config": {"hidden_size": 768},
-        "initial_parameter_sha256": "b" * 64,
+        "local_model_root": str(
+            (Path.cwd() / "wavlm-base-plus" / "4c66d4806a428f2e922ccfa1a962776e232d487b").resolve()
+        ),
+        "config": deepcopy(runtime_contract_module._EXPECTED_WAVLM_CONFIG),
+        "initial_parameter_sha256": runtime_contract_module._EXPECTED_INITIAL_WAVLM_SHA256,
         "trainable_parameter_names": [],
+        "execution_mode": "eval_without_gradients",
+        "wavlm_training": False,
     }
     fine_encoder = {
         **deepcopy(frozen_encoder),
         "trainable_parameter_names": ["encoder.wavlm.encoder.layers.8.weight"],
+        "execution_mode": "eval_with_gradients",
     }
     scratch_encoder = {
         "type": "ScratchCellEncoder",
         "pretrained_artifacts": [],
-        "frontend": {"mel_bins": 64},
-        "blocks": [{"dilation": value} for value in [1, 2, 4, 8, 16, 1, 2, 4]],
+        "frontend": {
+            "sample_rate_hz": 16000,
+            "n_fft": 400,
+            "win_length": 400,
+            "hop_length": 160,
+            "center": False,
+            "power": 2.0,
+            "mel_bins": 64,
+            "mel_norm": "slaney",
+            "mel_scale": "slaney",
+        },
+        "stem": {"input_channels": 64, "output_channels": 320, "kernel": 5},
+        "blocks": [
+            {"width": 320, "expansion": 2, "kernel": 5, "dilation": value, "groups": 640}
+            for value in [1, 2, 4, 8, 16, 1, 2, 4]
+        ],
+        "final_normalization_channels": 320,
+        "implementation_sha256": common_head["implementation_sha256"],
     }
     input_contract = {
         "kind": "raw_waveform",
         "sample_rate_hz": 16000,
         "samples": 48000,
+        "upstream_transform": "psem-waveform-augmentation-v1",
         "cached_feature_inputs": [],
+    }
+    shared = {
+        "input": input_contract,
+        "cell_output_shape": [1, 30, 256],
+        "handoff_output_shape": [1],
+        "state_output_shape": [1, 30, 3],
+        "common_head": common_head,
+        "losses": shared_losses,
+        "optimizer": {},
     }
     artifact = {
         "schema_version": 1,
         "artifact_role": "psem_model_graphs",
+        "canary_source_id": "source",
+        "canary_boundary_sample": 1600,
         "arms": {
             "FROZEN-WAVLM": {
-                "input": input_contract,
+                **deepcopy(shared),
                 "encoder": frozen_encoder,
-                "cell_output_shape": [1, 30, 256],
-                "handoff_output_shape": [1],
-                "state_output_shape": [1, 30, 3],
-                "common_head": common_head,
-                "losses": shared_losses,
+                "projection": {"input_dimension": 768, "output_dimension": 256, "normalization_shape": [256]},
             },
             "FINETUNE-WAVLM": {
-                "input": input_contract,
+                **deepcopy(shared),
                 "encoder": fine_encoder,
-                "cell_output_shape": [1, 30, 256],
-                "handoff_output_shape": [1],
-                "state_output_shape": [1, 30, 3],
-                "common_head": common_head,
-                "losses": shared_losses,
+                "projection": {"input_dimension": 768, "output_dimension": 256, "normalization_shape": [256]},
             },
             "SCRATCH-PSEM": {
-                "input": input_contract,
+                **deepcopy(shared),
                 "encoder": scratch_encoder,
-                "cell_output_shape": [1, 30, 256],
-                "handoff_output_shape": [1],
-                "state_output_shape": [1, 30, 3],
-                "common_head": common_head,
-                "losses": shared_losses,
+                "projection": {"input_dimension": 320, "output_dimension": 256, "normalization_shape": [256]},
             },
         },
         "checks": _check_rows("model_graphs"),
     }
     assert all(row["passed"] for row in runtime_artifact_checks("model_graphs", artifact))
+    sparse = deepcopy(artifact)
+    sparse["arms"]["FROZEN-WAVLM"]["encoder"]["config"] = {}
+    sparse["arms"]["FINETUNE-WAVLM"]["encoder"]["config"] = {}
+    with pytest.raises(RuntimeEvidenceError, match="model graph"):
+        runtime_artifact_checks("model_graphs", sparse)
+    invalid_hash = deepcopy(artifact)
+    invalid_hash["arms"]["FROZEN-WAVLM"]["encoder"]["initial_parameter_sha256"] = "0" * 64
+    invalid_hash["arms"]["FINETUNE-WAVLM"]["encoder"]["initial_parameter_sha256"] = "0" * 64
+    with pytest.raises(RuntimeEvidenceError, match="model graph"):
+        runtime_artifact_checks("model_graphs", invalid_hash)
     forged = deepcopy(artifact)
     for values in forged["arms"].values():
         values["common_head"]["temporal"]["hidden_size"] = 1
-    with pytest.raises(RuntimeEvidenceError, match="contradicts artifact semantics"):
+    with pytest.raises(RuntimeEvidenceError, match="model graph"):
         runtime_artifact_checks("model_graphs", forged)
     for field, value in (
         ("handoff_output_shape", [99]),
@@ -556,7 +669,7 @@ def test_model_graph_requires_exact_shared_head_dimensions() -> None:
         forged_shapes = deepcopy(artifact)
         for values in forged_shapes["arms"].values():
             values[field] = value
-        with pytest.raises(RuntimeEvidenceError, match="contradicts artifact semantics"):
+        with pytest.raises(RuntimeEvidenceError, match="model graph"):
             runtime_artifact_checks("model_graphs", forged_shapes)
     for field, value in (
         ("coefficients", {"handoff": 99.0, "relation": 0.5, "state": 0.5}),
@@ -565,7 +678,7 @@ def test_model_graph_requires_exact_shared_head_dimensions() -> None:
         forged_losses = deepcopy(artifact)
         for values in forged_losses["arms"].values():
             values["losses"][field] = value
-        with pytest.raises(RuntimeEvidenceError, match="contradicts artifact semantics"):
+        with pytest.raises(RuntimeEvidenceError, match="model graph"):
             runtime_artifact_checks("model_graphs", forged_losses)
 
 

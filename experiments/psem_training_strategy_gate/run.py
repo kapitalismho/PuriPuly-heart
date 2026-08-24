@@ -60,6 +60,18 @@ def main(argv: list[str] | None = None) -> int:
     _add_path_arguments(prepare)
     audit = commands.add_parser("audit")
     _add_path_arguments(audit)
+    train = commands.add_parser("train")
+    _add_path_arguments(train)
+    train.add_argument(
+        "--arm",
+        required=True,
+        choices=("FROZEN-WAVLM", "FINETUNE-WAVLM", "SCRATCH-PSEM"),
+    )
+    train.add_argument("--seed", required=True, type=int, choices=(7301, 7302))
+    train_all = commands.add_parser("train-all")
+    _add_path_arguments(train_all)
+    status = commands.add_parser("training-status")
+    _add_path_arguments(status)
     args = parser.parse_args(argv)
     paths = resolve_paths(
         cache_root=args.cache_root,
@@ -67,11 +79,15 @@ def main(argv: list[str] | None = None) -> int:
         reference_root=args.reference_root,
         output_root=args.output_root,
     )
-    if args.command in {"prepare", "audit"}:
-        errors = _runtime_path_error(paths, require_cache=args.command == "audit")
+    if args.command in {"prepare", "audit", "train", "train-all"}:
+        errors = _runtime_path_error(
+            paths,
+            require_cache=args.command in {"audit", "train", "train-all"},
+        )
         if errors:
             print(json.dumps({"status": "fail", "errors": errors}, sort_keys=True))
             return 2
+    if args.command in {"prepare", "audit"}:
         if args.command == "prepare":
             from experiments.psem_training_strategy_gate.audit import prepare_runtime_manifests
 
@@ -92,6 +108,44 @@ def main(argv: list[str] | None = None) -> int:
         summary = _receipt_summary(receipts)
         print(json.dumps(summary, ensure_ascii=False, sort_keys=True))
         return 0 if summary["status"] == "pass" else 2
+    if args.command in {"train", "train-all"}:
+        from experiments.psem_training_strategy_gate.training import (
+            TrainingContractError,
+            train_all_official_runs,
+            train_official_run,
+        )
+
+        try:
+            if args.command == "train":
+                result = [train_official_run(paths, args.arm, args.seed)]
+            else:
+                result = train_all_official_runs(paths)
+        except TrainingContractError as error:
+            print(json.dumps({"status": "fail", "error": str(error)}, sort_keys=True))
+            return 2
+        print(
+            json.dumps(
+                {
+                    "status": "pass",
+                    "completed_runs": [value["run_id"] for value in result],
+                },
+                sort_keys=True,
+            )
+        )
+        return 0
+    if args.command == "training-status":
+        from experiments.psem_training_strategy_gate.training import (
+            TrainingContractError,
+            training_status,
+        )
+
+        try:
+            result = training_status(paths)
+        except TrainingContractError as error:
+            print(json.dumps({"status": "fail", "error": str(error)}, sort_keys=True))
+            return 2
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        return 0
     receipt = build_preflight(
         paths,
         verify_source_bytes=not args.skip_source_byte_hashes,
