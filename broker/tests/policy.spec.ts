@@ -8,11 +8,9 @@ describe('managed trial policy', () => {
       provider: 'OpenRouter',
       models: [
         'google/gemma-4-26b-a4b-it',
-        'qwen/qwen3.5-flash-02-23',
+        'google/gemma-4-31b-it',
         'deepseek/deepseek-v4-flash-0731',
-        'deepseek/deepseek-v4-flash-0423',
         'deepseek/deepseek-v4-flash',
-        'google/gemini-2.5-flash-lite',
       ],
     });
     expect(MANAGED_TRIAL_POLICY.managedPath).toBe(
