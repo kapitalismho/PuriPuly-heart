@@ -124,7 +124,12 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         translation=draft_translation,
         custom_stt_endpoint="https://draft.invalid/v1/audio/transcriptions",
     )
-    view._record_provider_edit(TranslationSelectionEdit(draft_translation))
+    view._record_provider_edit(
+        TranslationSelectionEdit(
+            draft_translation,
+            ((draft_translation.model, draft_translation.connection),),
+        )
+    )
     view._record_provider_edit(CustomSttEndpointEdit(view._provider_draft.custom_stt_endpoint))
     view._prompt_editor.value = "unsaved prompt"
     view._stage_prompt_draft("unsaved prompt")

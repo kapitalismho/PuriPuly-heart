@@ -286,6 +286,7 @@ class LlmGpuDeviceEdit:
 @dataclass(frozen=True, slots=True)
 class TranslationSelectionEdit:
     selection: TranslationSelectionSnapshot
+    history_updates: tuple[tuple[TranslationModel, TranslationConnection], ...]
 
 
 @dataclass(frozen=True, slots=True)

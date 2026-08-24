@@ -420,9 +420,8 @@ def materialize_provider_apply_intent(
             selection = edit.selection
             updated.translation.model = selection.model
             updated.translation.connection = selection.connection
-            updated.translation.connection_history = {
-                model.value: connection for model, connection in selection.connection_history
-            }
+            for model, connection in edit.history_updates:
+                updated.translation.connection_history[model.value] = connection
             updated.translation.previous_llm_model = selection.previous_llm_model
             materialize_translation_settings(updated)
         elif isinstance(edit, TranslationFallbackEdit):

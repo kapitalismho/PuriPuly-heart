@@ -165,6 +165,10 @@ def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
 
 def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() -> None:
     displayed = AppSettings()
+    displayed.translation.connection_history = {
+        TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
+        TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA,
+    }
     provider, _general, _prompt, _overlay = settings_view_surface_snapshots(displayed)
     selection = replace(
         provider.translation,
@@ -175,6 +179,10 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
     current.languages.source_language = "ja"
     current.audio.input_device = "latest microphone"
     current.translation.gpu_device_id = "latest-llm-gpu"
+    current.translation.connection_history = {
+        TranslationModel.GEMMA4.value: TranslationConnection.OPENROUTER,
+        TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
+    }
     current.custom_stt.model = "latest-custom-model"
     current.custom_stt.extra = {"latest": True}
 
@@ -182,7 +190,10 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
         current,
         ProviderApplyIntent(
             (
-                TranslationSelectionEdit(selection),
+                TranslationSelectionEdit(
+                    selection,
+                    ((TranslationModel.GEMINI_37_FLASH, TranslationConnection.OPENROUTER),),
+                ),
                 SelfSttProviderEdit(STTProviderName.DEEPGRAM),
                 SttGpuDeviceEdit("staged-stt-gpu"),
                 LocalLlmBaseUrlEdit("http://draft.local:11434"),
@@ -196,6 +207,15 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
     assert updated.provider.llm == LLMProviderName.OPENROUTER
     assert updated.translation.model == TranslationModel.GEMINI_37_FLASH
     assert updated.translation.connection == TranslationConnection.OPENROUTER
+    assert updated.translation.connection_history[TranslationModel.GEMMA4.value] == (
+        TranslationConnection.OPENROUTER
+    )
+    assert updated.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value] == (
+        TranslationConnection.OFFICIAL_BYOK
+    )
+    assert updated.translation.connection_history[TranslationModel.GEMINI_37_FLASH.value] == (
+        TranslationConnection.OPENROUTER
+    )
     assert updated.provider.stt == STTProviderName.DEEPGRAM
     assert updated.provider.peer_stt == current.provider.peer_stt
     assert updated.local_llm.base_url == "http://draft.local:11434"

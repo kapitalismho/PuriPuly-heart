@@ -94,9 +94,7 @@ def test_openrouter_pkce_load_reads_only_its_previous_secret_surface() -> None:
         }
     )
 
-    result = SettingsSecretsOwner(
-        secret_store_factory=lambda: store
-    ).load_openrouter_pkce()
+    result = SettingsSecretsOwner(secret_store_factory=lambda: store).load_openrouter_pkce()
 
     assert result.read_error is None
     assert result.snapshot is not None
@@ -143,9 +141,7 @@ def test_openrouter_pkce_load_returns_its_sequential_prefix_on_read_failure() ->
     store.get_failure_key = "deepseek_api_key"
     store.failure = failure
 
-    result = SettingsSecretsOwner(
-        secret_store_factory=lambda: store
-    ).load_openrouter_pkce()
+    result = SettingsSecretsOwner(secret_store_factory=lambda: store).load_openrouter_pkce()
 
     assert result.snapshot is not None
     assert result.snapshot.openrouter_api_key == "openrouter-secret"
@@ -163,9 +159,7 @@ def test_settings_secret_mutation_owns_set_delete_and_failure_results() -> None:
         value="value",
     )
     written = owner.mutate(mutation)
-    deleted = owner.mutate(
-        SettingsSecretMutation(key=SettingsSecretKey.GOOGLE_API_KEY, value="")
-    )
+    deleted = owner.mutate(SettingsSecretMutation(key=SettingsSecretKey.GOOGLE_API_KEY, value=""))
 
     assert written.succeeded is True
     assert written.error_type is None

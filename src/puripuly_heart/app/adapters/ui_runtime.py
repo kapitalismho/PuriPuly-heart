@@ -394,7 +394,19 @@ class UiProviderRuntimeAdapter:
         provider, _general, _prompt, _overlay = settings_view_surface_snapshots(target_settings)
         return OpenRouterPkceTarget(
             target_settings.openrouter.selection_alias,
-            provider_intent=ProviderApplyIntent((TranslationSelectionEdit(provider.translation),)),
+            provider_intent=ProviderApplyIntent(
+                (
+                    TranslationSelectionEdit(
+                        provider.translation,
+                        (
+                            (
+                                provider.translation.model,
+                                provider.translation.connection,
+                            ),
+                        ),
+                    ),
+                )
+            ),
             system_prompt=target_settings.system_prompt,
         )
 

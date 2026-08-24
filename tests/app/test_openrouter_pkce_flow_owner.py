@@ -239,7 +239,10 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
         selection_alias=OpenRouterSelectionAlias.GEMMA4_BYOK,
         provider_intent=ProviderApplyIntent(
             (
-                TranslationSelectionEdit(staged_translation),
+                TranslationSelectionEdit(
+                    staged_translation,
+                    ((staged_translation.model, staged_translation.connection),),
+                ),
                 LocalLlmBaseUrlEdit("http://staged.local:11434"),
             )
         ),

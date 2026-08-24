@@ -4139,7 +4139,12 @@ class SettingsView(ft.Column):
         if control == "PuriPuly_PeerASR" and PeerSttProviderEdit in self._provider_edits:
             self._record_provider_edit(PeerSttProviderEdit(draft.peer_stt_provider))
         if control == "PuriPuly_Translator" and (TranslationSelectionEdit in self._provider_edits):
-            self._record_provider_edit(TranslationSelectionEdit(draft.translation))
+            self._record_provider_edit(
+                TranslationSelectionEdit(
+                    draft.translation,
+                    ((draft.translation.model, draft.translation.connection),),
+                )
+            )
         if control == "PuriPuly_Fallback" and TranslationFallbackEdit in self._provider_edits:
             self._record_provider_edit(TranslationFallbackEdit(draft.translation.fallback))
 
@@ -4788,7 +4793,7 @@ class SettingsView(ft.Column):
             previous_llm_model=previous_llm_model,
         )
         self._provider_draft = self._provider_snapshot_with_translation(draft, selection)
-        self._record_provider_edit(TranslationSelectionEdit(selection))
+        self._record_provider_edit(TranslationSelectionEdit(selection, ((model, connection),)))
         new_provider = self._provider_draft.llm_provider
 
         changes: list[str] = []

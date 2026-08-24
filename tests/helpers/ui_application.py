@@ -176,7 +176,19 @@ class UiApplicationRuntimeStub:
         provider, _general, _prompt, _overlay = settings_view_surface_snapshots(settings)
         return OpenRouterPkceTarget(
             settings.openrouter.selection_alias,
-            provider_intent=ProviderApplyIntent((TranslationSelectionEdit(provider.translation),)),
+            provider_intent=ProviderApplyIntent(
+                (
+                    TranslationSelectionEdit(
+                        provider.translation,
+                        (
+                            (
+                                provider.translation.model,
+                                provider.translation.connection,
+                            ),
+                        ),
+                    ),
+                )
+            ),
             system_prompt=settings.system_prompt,
         )
 
