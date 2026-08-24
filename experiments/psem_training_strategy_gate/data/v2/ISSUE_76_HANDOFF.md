@@ -15,11 +15,11 @@ Use only:
 
 - label contract: `psem-handoff-v1`
 - dataset freeze: `PSEM-STRATEGY-DATA-v2`
-- accepted freeze commit: `fc2d7cc74932aef265649238245b78318c0af2c1`
-- freeze file SHA-256: `7cfbec9f12981bddd6f66c284cbb6547b53c52137fbcdc52380d6cec5de0433b`
-- freeze payload SHA-256: `583c955e6d3a3f1ad2fcdd9156a42718bcf98288bbec4edbda5a661f9bbc9d86`
-- preflight file SHA-256: `ded73bb9658b302441f1fd4a424746bb7e82e1e67f5aa94af66196a7e72a7d0a`
-- preflight payload SHA-256: `f55a8dc80d2de95864c4caf305a8de11f1d08fe0fa174b3aa5e1f3dd923e8802`
+- freeze artifact commit: `2fbd021598cbb75891d1e0505f66791d164fa47e`
+- freeze file SHA-256: `080f008af0f3ca089cc44f89fc4a1a33b12ee9345090661955f215e069fb2bf0`
+- freeze payload SHA-256: `76e2840d5cbd8f56b7cc65dadc2c40daf26df8020fa065fb1d43514d0ae9b747`
+- preflight file SHA-256: `844b52454d91f30106ac14ecbd325d1e11eb4b0b3e2db53e053af88d9f906ebe`
+- preflight payload SHA-256: `d2ff76399281c7e9428ea715318ee7683348daa2120d918bb5696a5996f3a195`
 
 The freeze contains 93 sources across 57 leakage-safe identity components: 68 AMI meetings, 8 AliMeeting Eval meetings, and a deterministic 17-meeting AliMeeting Train tranche. TRAIN/DEV/EVAL contain both corpora and pass all 37 data, topology, corpus-balance, leakage, prior-exposure, and exact pretraining-overlap gates. The exact 59-check final preflight passes with zero failures and `ready_for_issue_76=true`.
 

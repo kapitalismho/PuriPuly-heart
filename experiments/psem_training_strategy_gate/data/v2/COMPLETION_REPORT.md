@@ -2,7 +2,7 @@
 
 ## Result
 
-The issue #86 dataset freeze checkpoint is accepted at local commit `fc2d7cc74932aef265649238245b78318c0af2c1` for the dataset prerequisite to issue #76.
+The issue #86 dataset freeze artifact is recorded at local commit `2fbd021598cbb75891d1e0505f66791d164fa47e` for the dataset prerequisite to issue #76.
 
 - authority: `https://github.com/kapitalismho/PuriPuly-heart/issues/86`
 - pinned authority SHA-256: `90078d66026f1374b065a5b9022788c40fac076cd4cf307df87b5027ea3fcb63`
@@ -11,10 +11,10 @@ The accepted package is:
 
 - label contract: `psem-handoff-v1`
 - dataset freeze: `PSEM-STRATEGY-DATA-v2`
-- freeze file SHA-256: `7cfbec9f12981bddd6f66c284cbb6547b53c52137fbcdc52380d6cec5de0433b`
-- freeze payload SHA-256: `583c955e6d3a3f1ad2fcdd9156a42718bcf98288bbec4edbda5a661f9bbc9d86`
-- preflight file SHA-256: `ded73bb9658b302441f1fd4a424746bb7e82e1e67f5aa94af66196a7e72a7d0a`
-- preflight payload SHA-256: `f55a8dc80d2de95864c4caf305a8de11f1d08fe0fa174b3aa5e1f3dd923e8802`
+- freeze file SHA-256: `080f008af0f3ca089cc44f89fc4a1a33b12ee9345090661955f215e069fb2bf0`
+- freeze payload SHA-256: `76e2840d5cbd8f56b7cc65dadc2c40daf26df8020fa065fb1d43514d0ae9b747`
+- preflight file SHA-256: `844b52454d91f30106ac14ecbd325d1e11eb4b0b3e2db53e053af88d9f906ebe`
+- preflight payload SHA-256: `d2ff76399281c7e9428ea715318ee7683348daa2120d918bb5696a5996f3a195`
 
 SHA-256 values are integrity receipts for files, contracts, and bound identities. They are not model-selection evidence. AliMeeting Train objectives 1–3 produced one optimum, so the salted SHA-256 tie-break was not exercised.
 
@@ -38,7 +38,7 @@ The split contains 57 identity components and assigns:
 
 All 37 natural-data, topology, corpus-balance, leakage, prior-exposure, and exact WavLM-overlap gates pass. The final preflight contains the exact 59 required checks, with 59 passing, zero failing, and `ready_for_issue_76=true`.
 
-The freeze binds 20 local dataset artifacts, two inherited calibration artifacts, 27 repository code/config inputs, all 93 source/reference identities, the split and evaluator contracts, and the exact passing preflight result through an acyclic freeze-core binding.
+The freeze binds 20 local dataset artifacts, two inherited calibration artifacts, 29 repository code/config inputs including `pyproject.toml` and `uv.lock`, all 93 source/reference identities, the split and evaluator contracts, and the exact passing preflight result through an acyclic freeze-core binding.
 
 ## Scope and limitations
 
