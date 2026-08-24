@@ -3490,6 +3490,24 @@ class SettingsView(ft.Column):
     def _record_provider_edit(self, edit: ProviderSettingsEdit) -> None:
         self._provider_edits[type(edit)] = edit
 
+    def _translation_selection_edit(
+        self,
+        selection: TranslationSelectionSnapshot,
+    ) -> TranslationSelectionEdit:
+        committed_history = (
+            {}
+            if self._provider_snapshot is None
+            else dict(self._provider_snapshot.translation.connection_history)
+        )
+        return TranslationSelectionEdit(
+            selection,
+            tuple(
+                (model, connection)
+                for model, connection in selection.connection_history
+                if committed_history.get(model) != connection
+            ),
+        )
+
     def _stt_provider_display_label(
         self,
         provider: STTProviderName,
@@ -4139,12 +4157,7 @@ class SettingsView(ft.Column):
         if control == "PuriPuly_PeerASR" and PeerSttProviderEdit in self._provider_edits:
             self._record_provider_edit(PeerSttProviderEdit(draft.peer_stt_provider))
         if control == "PuriPuly_Translator" and (TranslationSelectionEdit in self._provider_edits):
-            self._record_provider_edit(
-                TranslationSelectionEdit(
-                    draft.translation,
-                    ((draft.translation.model, draft.translation.connection),),
-                )
-            )
+            self._record_provider_edit(self._translation_selection_edit(draft.translation))
         if control == "PuriPuly_Fallback" and TranslationFallbackEdit in self._provider_edits:
             self._record_provider_edit(TranslationFallbackEdit(draft.translation.fallback))
 
@@ -4793,7 +4806,7 @@ class SettingsView(ft.Column):
             previous_llm_model=previous_llm_model,
         )
         self._provider_draft = self._provider_snapshot_with_translation(draft, selection)
-        self._record_provider_edit(TranslationSelectionEdit(selection, ((model, connection),)))
+        self._record_provider_edit(self._translation_selection_edit(selection))
         new_provider = self._provider_draft.llm_provider
 
         changes: list[str] = []

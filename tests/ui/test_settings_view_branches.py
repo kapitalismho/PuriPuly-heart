@@ -2661,6 +2661,42 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
     assert view.has_provider_changes is True
 
 
+def test_translation_selection_preserves_all_staged_history_and_unrelated_latest_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMMA4,
+        connection=TranslationConnection.MANAGED,
+        connection_history={
+            TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
+            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA,
+            TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
+        },
+    )
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+
+    view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
+    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
+    view._on_translation_connection_selected(TranslationConnection.OFFICIAL_BYOK.value)
+    settings.translation.connection_history[TranslationModel.GEMINI_37_FLASH.value] = (
+        TranslationConnection.OPENROUTER
+    )
+
+    pending = view.build_provider_apply_settings()
+
+    assert pending is not None
+    assert pending.translation.connection_history[TranslationModel.GEMMA4.value] == (
+        TranslationConnection.OPENROUTER
+    )
+    assert pending.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value] == (
+        TranslationConnection.OFFICIAL_BYOK
+    )
+    assert pending.translation.connection_history[TranslationModel.GEMINI_37_FLASH.value] == (
+        TranslationConnection.OPENROUTER
+    )
+
+
 def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
