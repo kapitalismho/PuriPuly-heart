@@ -54,6 +54,7 @@ ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS: Final[tuple[str, ...]] = (
     "provider.peer_stt",
     "languages.source_language",
     "languages.target_language",
+    "languages.secondary_target_language",
     "languages.peer_source_language",
     "languages.peer_target_language",
     "languages.peer_source_mode",

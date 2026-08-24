@@ -66,6 +66,14 @@ def project_translation_runtime_settings(
     return TranslationRuntimeSettingsValues(
         source_language=settings.languages.source_language,
         target_language=settings.languages.target_language,
+        self_target_languages=tuple(
+            language
+            for language in (
+                settings.languages.target_language,
+                settings.languages.secondary_target_language,
+            )
+            if language
+        ),
         peer_source_language=settings.languages.peer_source_language,
         peer_target_language=settings.languages.peer_target_language,
         system_prompt=settings.system_prompt,

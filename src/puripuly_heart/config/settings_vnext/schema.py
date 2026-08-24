@@ -461,6 +461,7 @@ class PeerSTTIntent:
 class LanguageIntent:
     source_language: str = "ko"
     target_language: str = "en"
+    secondary_target_language: str = ""
     peer_source_language: str = "en"
     peer_target_language: str = "ko"
     peer_source_mode: str = "manual"
@@ -469,6 +470,20 @@ class LanguageIntent:
     recent_target_languages: list[str] = field(default_factory=lambda: ["en", "zh-CN", "ja"])
 
     def __post_init__(self) -> None:
+        target_language = (
+            self.target_language.strip() if isinstance(self.target_language, str) else ""
+        )
+        if not target_language:
+            raise ValueError("target_language must be non-empty")
+        secondary_target_language = (
+            self.secondary_target_language.strip()
+            if isinstance(self.secondary_target_language, str)
+            else ""
+        )
+        if secondary_target_language == target_language:
+            secondary_target_language = ""
+        object.__setattr__(self, "target_language", target_language)
+        object.__setattr__(self, "secondary_target_language", secondary_target_language)
         mode = self.peer_source_mode if isinstance(self.peer_source_mode, str) else "manual"
         mode = mode.strip()
         object.__setattr__(

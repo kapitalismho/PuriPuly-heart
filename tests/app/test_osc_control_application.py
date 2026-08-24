@@ -270,6 +270,66 @@ async def test_set_languages_applies_when_any_value_differs() -> None:
 
 
 @pytest.mark.asyncio
+async def test_primary_osc_target_change_clears_an_equal_secondary_target() -> None:
+    current = AppSettings()
+    current.languages.target_language = "en"
+    current.languages.secondary_target_language = "fr"
+
+    async def apply_settings(settings: object) -> object:
+        nonlocal current
+        assert isinstance(settings, AppSettings)
+        current = copy.deepcopy(settings)
+        return True
+
+    application = SettingsBackedOscControlApplication(
+        settings_provider=lambda: current,
+        apply_settings=apply_settings,
+        translation_model_normalizer=materialize_translation_settings,
+    )
+
+    result = await application.set_languages(
+        self_source="ko",
+        self_target="fr",
+        peer_source="en",
+        peer_target="ko",
+    )
+
+    assert result is True
+    assert current.languages.target_language == "fr"
+    assert current.languages.secondary_target_language == ""
+
+
+@pytest.mark.asyncio
+async def test_primary_osc_target_change_preserves_a_distinct_secondary_target() -> None:
+    current = AppSettings()
+    current.languages.target_language = "en"
+    current.languages.secondary_target_language = "ja"
+
+    async def apply_settings(settings: object) -> object:
+        nonlocal current
+        assert isinstance(settings, AppSettings)
+        current = copy.deepcopy(settings)
+        return True
+
+    application = SettingsBackedOscControlApplication(
+        settings_provider=lambda: current,
+        apply_settings=apply_settings,
+        translation_model_normalizer=materialize_translation_settings,
+    )
+
+    result = await application.set_languages(
+        self_source="ko",
+        self_target="fr",
+        peer_source="en",
+        peer_target="ko",
+    )
+
+    assert result is True
+    assert current.languages.target_language == "fr"
+    assert current.languages.secondary_target_language == "ja"
+
+
+@pytest.mark.asyncio
 async def test_asr_controls_skip_apply_when_provider_matches() -> None:
     current = AppSettings()
     current.provider.stt = type(current.provider.stt)("deepgram")

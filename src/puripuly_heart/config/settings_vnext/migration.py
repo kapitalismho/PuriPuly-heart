@@ -795,6 +795,9 @@ def from_legacy_app_settings(
                 languages=LanguageIntent(
                     source_language=data["languages"]["source_language"],
                     target_language=data["languages"]["target_language"],
+                    secondary_target_language=data["languages"].get(
+                        "secondary_target_language", ""
+                    ),
                     peer_source_language=data["languages"]["peer_source_language"],
                     peer_target_language=data["languages"]["peer_target_language"],
                     peer_source_mode=(
@@ -1094,6 +1097,7 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
     data["languages"] = {
         "source_language": intent.languages.source_language,
         "target_language": intent.languages.target_language,
+        "secondary_target_language": intent.languages.secondary_target_language,
         "peer_source_language": intent.languages.peer_source_language,
         "peer_target_language": intent.languages.peer_target_language,
         "peer_source_mode": intent.languages.peer_source_mode,

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 class TranslationRuntimeSettingsValues:
     source_language: str
     target_language: str
+    self_target_languages: tuple[str, ...]
     peer_source_language: str
     peer_target_language: str
     system_prompt: str

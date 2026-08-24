@@ -1254,6 +1254,11 @@ def compose_application_runtime(
             configuration = config_owner.snapshot().value
             merged.languages.source_language = configuration.source_language
             merged.languages.target_language = configuration.target_language
+            merged.languages.secondary_target_language = (
+                configuration.self_target_languages[1]
+                if len(configuration.self_target_languages) > 1
+                else ""
+            )
             merged.languages.peer_source_language = configuration.peer_source_language
             merged.languages.peer_target_language = configuration.peer_target_language
         if (
