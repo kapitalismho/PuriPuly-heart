@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "puripuly-heart"
-version = "2.3.3"
+version = "2.5.0"
 description = "LLM-based real-time translator for VRChat"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -19,13 +19,13 @@ dependencies = [
   "janus>=2.0",
   "cryptography==46.0.7",
   "python-osc==1.10.2",
+  "zeroconf>=0.148.0,<1.0.0",
   "PyAudioWPatch; platform_system == 'Windows'",
   "proc-tap==1.1.1; platform_system == 'Windows' and platform_python_implementation == 'CPython' and python_version == '3.12' and platform_machine == 'AMD64'",
   "psutil>=5.9; platform_system == 'Windows' and platform_python_implementation == 'CPython' and python_version == '3.12' and platform_machine == 'AMD64'",
   "sounddevice==0.5.5",
   "onnxruntime==1.28.0",
   "google-genai>=2.16.0,<3.0.0",
-  "grpcio==1.82.1",
   "dashscope==1.26.4",
   "websockets>=16.1.1,<17.0.0",
   "deepgram-sdk>=5.3.4,<6.0.0",
@@ -64,6 +64,7 @@ build = [
 testpaths = ["tests"]
 addopts = "-q -s"
 asyncio_mode = "auto"
+pythonpath = ["."]
 
 [tool.black]
 line-length = 100
