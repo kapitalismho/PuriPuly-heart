@@ -3035,11 +3035,7 @@ class SettingsView(ft.Column):
 
     def _telemetry_enabled_display_label(self, settings: AppSettings | None) -> str:
         enabled = bool(getattr(getattr(settings, "telemetry", None), "enabled", True))
-        return t(
-            "settings.telemetry.state.on"
-            if enabled
-            else "settings.telemetry.state.off"
-        )
+        return t("settings.telemetry.state.on" if enabled else "settings.telemetry.state.off")
 
     def _sync_telemetry_enabled_card(self, settings: AppSettings | None = None) -> None:
         if settings is None:

@@ -289,7 +289,9 @@ def _legacy_telemetry_enabled(value: object, *, missing: bool = False) -> bool:
 
 
 def _latest_telemetry_sent_date(value: object) -> str | None:
-    candidates = (value,) if isinstance(value, str) else value if isinstance(value, list | tuple) else ()
+    candidates = (
+        (value,) if isinstance(value, str) else value if isinstance(value, list | tuple) else ()
+    )
     normalized: set[str] = set()
     for candidate in candidates:
         if not isinstance(candidate, str):

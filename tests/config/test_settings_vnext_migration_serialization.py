@@ -921,9 +921,7 @@ def test_v36_telemetry_states_migrate_once_to_boolean_without_legacy_surfaces(
     serialization = _serialization()
     raw = serialization.to_dict(AppSettingsVNext())
     raw["settings_version"] = 36
-    raw["intent"]["telemetry"] = (
-        {} if legacy_consent is None else {"consent": legacy_consent}
-    )
+    raw["intent"]["telemetry"] = {} if legacy_consent is None else {"consent": legacy_consent}
     raw["state"]["telemetry"] = {
         "anonymous_id": "existing-id",
         "sent_translation_success_dates_utc": ["2026-07-01", "2026-07-03"],
@@ -1013,9 +1011,7 @@ def test_direct_settings_serialization_enforces_telemetry_state_lifecycle() -> N
     legacy.telemetry.enabled = False
     disabled_canonical = migration.from_legacy_app_settings(legacy)
     enabled_without_id = AppSettingsVNext(
-        state=PersistedOperationalState(
-            telemetry=TelemetryOperationalState(anonymous_id=None)
-        )
+        state=PersistedOperationalState(telemetry=TelemetryOperationalState(anonymous_id=None))
     )
     disabled_with_id = AppSettingsVNext(
         intent=replace(AppSettingsVNext().intent, telemetry=TelemetryIntent(enabled=False))
