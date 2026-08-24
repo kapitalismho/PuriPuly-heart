@@ -4,6 +4,8 @@ import asyncio
 import logging
 import time
 from collections import deque
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Protocol, cast
 from uuid import UUID
@@ -180,7 +182,9 @@ class TranslationOutputProjectionOwner:
     _latest_visible_self_turn: tuple[int, int] | None = None
     _latest_visible_self_revision: int = 0
     _latest_presented_primary_self_turn: tuple[int, int] | None = None
+    _latest_visible_self_parent_utterance_id: UUID | None = None
     _self_publish_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+    _self_surface_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
     def __post_init__(self) -> None:
         if self.self_turn_tombstone_capacity < 1:
@@ -440,6 +444,17 @@ class TranslationOutputProjectionOwner:
             channel=transcript.channel,
             is_final=True,
         )
+
+    @asynccontextmanager
+    async def self_transcript_presentation(
+        self,
+        *,
+        parent_utterance_id: UUID,
+    ) -> AsyncIterator[None]:
+        async with self._self_publish_lock:
+            async with self._self_surface_lock:
+                self._latest_visible_self_parent_utterance_id = parent_utterance_id
+                yield
 
     async def project_peer_source_only(
         self,
@@ -894,6 +909,12 @@ class TranslationOutputProjectionOwner:
             if snapshot.turn_generation != self._active_self_turn_generation:
                 self._emit_self_stale_snapshot(snapshot)
                 return None
+            if (
+                self._latest_visible_self_parent_utterance_id is not None
+                and snapshot.parent_utterance_id != self._latest_visible_self_parent_utterance_id
+            ):
+                self._emit_self_stale_snapshot(snapshot)
+                return None
             latest = self._latest_visible_self_turn
             if latest is not None and turn_key < latest:
                 self._emit_self_stale_snapshot(snapshot)
@@ -1006,31 +1027,44 @@ class TranslationOutputProjectionOwner:
             )
             return result
 
-    async def claim_self_primary_presentation(
+    @asynccontextmanager
+    async def self_primary_presentation(
         self,
         *,
+        parent_utterance_id: UUID,
         target_index: int,
         turn_generation: int | None,
         turn_order: int | None,
-    ) -> bool:
+    ) -> AsyncIterator[bool]:
         if target_index != 0 or turn_generation is None or turn_order is None:
-            return False
+            yield False
+            return
         turn_key = (turn_generation, turn_order)
         async with self._self_publish_lock:
-            if turn_generation != self._active_self_turn_generation:
-                return False
-            if (
-                self._latest_visible_self_turn is not None
-                and turn_key < self._latest_visible_self_turn
-            ):
-                return False
-            if (
-                self._latest_presented_primary_self_turn is not None
-                and turn_key < self._latest_presented_primary_self_turn
-            ):
-                return False
-            self._latest_presented_primary_self_turn = turn_key
-            return True
+            async with self._self_surface_lock:
+                if turn_generation != self._active_self_turn_generation:
+                    yield False
+                    return
+                if (
+                    self._latest_visible_self_parent_utterance_id is not None
+                    and parent_utterance_id != self._latest_visible_self_parent_utterance_id
+                ):
+                    yield False
+                    return
+                if (
+                    self._latest_visible_self_turn is not None
+                    and turn_key < self._latest_visible_self_turn
+                ):
+                    yield False
+                    return
+                if (
+                    self._latest_presented_primary_self_turn is not None
+                    and turn_key < self._latest_presented_primary_self_turn
+                ):
+                    yield False
+                    return
+                self._latest_presented_primary_self_turn = turn_key
+                yield True
 
     def _emit_self_stale_snapshot(self, snapshot: SelfTranslationTurnSnapshot) -> None:
         target_languages = tuple(
@@ -1170,7 +1204,6 @@ class TranslationOutputProjectionOwner:
         deny_peer_chatbox_attempt = self.chatbox_is_denied(channel)
         dual_target_self = channel == "self" and len(configuration.self_target_languages) == 2
         self_update = _SelfProjectionUpdate(True)
-        present_self_result = True
         if dual_target_self:
             self_update = await self._record_self_submission(submission)
             if not self_update.accepted:
@@ -1178,14 +1211,6 @@ class TranslationOutputProjectionOwner:
                     True,
                     record_runtime_translation=False,
                 )
-            if submission.outcome in {"translated", "failed"}:
-                present_self_result = await self.claim_self_primary_presentation(
-                    target_index=submission.target_index,
-                    turn_generation=submission.turn_generation,
-                    turn_order=submission.turn_order,
-                )
-            else:
-                present_self_result = False
 
         if submission.outcome == "source_only":
             if channel == "peer":
@@ -1222,13 +1247,19 @@ class TranslationOutputProjectionOwner:
 
         if submission.outcome == "failed":
             if dual_target_self:
-                if present_self_result:
-                    await self.close_overlay_utterance(
-                        utterance_id=utterance_id,
-                        channel=channel,
-                        is_final=False,
-                        finalize_latency=True,
-                    )
+                async with self.self_primary_presentation(
+                    parent_utterance_id=submission.parent_utterance_id,
+                    target_index=submission.target_index,
+                    turn_generation=submission.turn_generation,
+                    turn_order=submission.turn_order,
+                ) as present_self_result:
+                    if present_self_result:
+                        await self.close_overlay_utterance(
+                            utterance_id=utterance_id,
+                            channel=channel,
+                            is_final=False,
+                            finalize_latency=True,
+                        )
                 return TranslationResultProjectionReceipt(True)
             if submission.failure_code == "stale_provider_completion":
                 if channel == "peer":
@@ -1320,7 +1351,7 @@ class TranslationOutputProjectionOwner:
                 is_final=True,
                 finalize_latency=not (publish_to_chatbox or deny_peer_chatbox_attempt),
             )
-        if channel != "self" or present_self_result:
+        if channel != "self":
             await self.publish_ui(
                 TranslationUiMessage(
                     event_type=UIEventType.TRANSLATION_DONE,
@@ -1329,7 +1360,51 @@ class TranslationOutputProjectionOwner:
                     source=submission.source,
                 )
             )
-        if channel == "self" and present_self_result:
+        elif dual_target_self:
+            async with self.self_primary_presentation(
+                parent_utterance_id=submission.parent_utterance_id,
+                target_index=submission.target_index,
+                turn_generation=submission.turn_generation,
+                turn_order=submission.turn_order,
+            ) as present_self_result:
+                if present_self_result:
+                    await self.publish_ui(
+                        TranslationUiMessage(
+                            event_type=UIEventType.TRANSLATION_DONE,
+                            utterance_id=utterance_id,
+                            payload=translation,
+                            source=submission.source,
+                        )
+                    )
+                    await self.emit_translation(
+                        TranslationOverlayProjection(
+                            translation=translation,
+                            source_language=self._language_or_fallback(
+                                translation.source_language,
+                                source_language,
+                            ),
+                            target_language=self._language_or_fallback(
+                                translation.target_language,
+                                target_language,
+                            ),
+                            applied_context_mode=submission.applied_context_mode,
+                        )
+                    )
+                    await self.close_overlay_utterance(
+                        utterance_id=utterance_id,
+                        channel=channel,
+                        is_final=True,
+                        finalize_latency=not publish_to_chatbox,
+                    )
+        else:
+            await self.publish_ui(
+                TranslationUiMessage(
+                    event_type=UIEventType.TRANSLATION_DONE,
+                    utterance_id=utterance_id,
+                    payload=translation,
+                    source=submission.source,
+                )
+            )
             await self.emit_translation(
                 TranslationOverlayProjection(
                     translation=translation,

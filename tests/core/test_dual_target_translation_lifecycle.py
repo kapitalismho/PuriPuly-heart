@@ -282,6 +282,61 @@ async def test_end_to_end_secondary_first_publishes_progressive_parent_snapshots
 
 
 @pytest.mark.asyncio
+async def test_newer_transcript_visibility_suppresses_older_primary_latest_surfaces() -> None:
+    provider = TargetControlledProvider()
+    osc = RecordingOsc()
+    overlay = RecordingOverlay()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=osc,
+        overlay_sink=overlay,
+        source_language="en",
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+
+    try:
+        older_parent_id = await harness.self_owner.submit_text("older source")
+        await asyncio.wait_for(provider.started.get(), timeout=1)
+        await asyncio.wait_for(provider.started.get(), timeout=1)
+        newer_parent_id = await harness.self_owner.submit_text("newer source")
+        await asyncio.wait_for(provider.started.get(), timeout=1)
+        await asyncio.wait_for(provider.started.get(), timeout=1)
+
+        provider.releases[("older source", "zh-CN")].set()
+        for _ in range(100):
+            older_bundle = harness.self_runtime.utterances.get(older_parent_id)
+            if older_bundle is not None and older_bundle.translation is not None:
+                break
+            await asyncio.sleep(0)
+
+        ui_events = []
+        while not harness.ui_events.empty():
+            ui_events.append(harness.ui_events.get_nowait())
+        assert [
+            event.utterance_id for event in ui_events if event.type == UIEventType.TRANSCRIPT_FINAL
+        ] == [older_parent_id, newer_parent_id]
+        assert not any(event.type == UIEventType.TRANSLATION_DONE for event in ui_events)
+        assert not any(event.type == UIEventType.OSC_SENT for event in ui_events)
+        assert osc.messages == []
+        assert [event.type for event in overlay.events] == [
+            "self_transcript_final",
+            "self_transcript_final",
+        ]
+        assert [event.utterance_id for event in overlay.events] == [
+            older_parent_id,
+            newer_parent_id,
+        ]
+        assert harness.self_runtime.utterances[older_parent_id].translation is not None
+    finally:
+        for release in provider.releases.values():
+            release.set()
+        await harness.translation_turns.wait_for_idle()
+        await harness.translation_turns.close()
+
+
+@pytest.mark.asyncio
 async def test_dual_target_observability_distinguishes_parent_latency_milestones() -> None:
     provider = TargetControlledProvider()
     osc = RecordingOsc()

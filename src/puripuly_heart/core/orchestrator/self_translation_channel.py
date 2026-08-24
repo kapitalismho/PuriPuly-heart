@@ -322,7 +322,12 @@ class SelfTranslationChannelOwner:
             self.runtime.remember_source(child.utterance_id, child.source)
             return
         if child.utterance_id != child.parent_utterance_id:
-            await self._handle_transcript(child.transcript, is_final=True, source=child.source)
+            await self._handle_transcript(
+                child.transcript,
+                is_final=True,
+                source=child.source,
+                parent_utterance_id=child.parent_utterance_id,
+            )
 
     async def on_parent_admitted(
         self,
@@ -431,18 +436,27 @@ class SelfTranslationChannelOwner:
         if outcome != "cancelled":
             return
         if len(child.config_snapshot.value.self_target_languages) == 2:
-            if not await self.output_projection.claim_self_primary_presentation(
+            async with self.output_projection.self_primary_presentation(
+                parent_utterance_id=child.parent_utterance_id,
                 target_index=child.target_index,
                 turn_generation=child.turn_generation,
                 turn_order=child.turn_order,
-            ):
-                return
-        finalized = await self.output_projection.close_overlay_utterance(
-            utterance_id=child.utterance_id,
-            channel="self",
-            is_final=False,
-            finalize_latency=False,
-        )
+            ) as present_self_result:
+                if not present_self_result:
+                    return
+                finalized = await self.output_projection.close_overlay_utterance(
+                    utterance_id=child.utterance_id,
+                    channel="self",
+                    is_final=False,
+                    finalize_latency=False,
+                )
+        else:
+            finalized = await self.output_projection.close_overlay_utterance(
+                utterance_id=child.utterance_id,
+                channel="self",
+                is_final=False,
+                finalize_latency=False,
+            )
         if finalized:
             self._clear_runtime_latency_bookkeeping(child.utterance_id)
 
@@ -518,37 +532,41 @@ class SelfTranslationChannelOwner:
         *,
         is_final: bool,
         source: str | None,
+        parent_utterance_id: UUID | None = None,
     ) -> None:
         if transcript.channel != "self":
             raise ValueError("Self translation owner received a non-Self transcript")
         self.runtime.get_or_create_bundle(transcript.utterance_id).with_transcript(transcript)
         self.runtime.remember_source(transcript.utterance_id, source)
-        await self.output_projection.publish_ui(
-            TranslationUiMessage(
-                event_type=(
-                    UIEventType.TRANSCRIPT_FINAL if is_final else UIEventType.TRANSCRIPT_PARTIAL
-                ),
-                utterance_id=transcript.utterance_id,
-                payload=transcript,
-                source=source,
-            )
-        )
-        if not is_final:
-            return
         configuration = self.config_snapshot().value
-        finalized = await self.output_projection.project_self_final_transcript(
-            transcript=transcript,
-            source_language=self.translation_requests.source_language_for(
-                "self",
-                configuration,
-            ),
-            target_language=self.translation_requests.target_language_for(
-                "self",
-                configuration,
-            ),
-            translation_will_follow=self._overlay_translation_will_follow(configuration),
-        )
-        if finalized:
+        async with self.output_projection.self_transcript_presentation(
+            parent_utterance_id=parent_utterance_id or transcript.utterance_id,
+        ):
+            await self.output_projection.publish_ui(
+                TranslationUiMessage(
+                    event_type=(
+                        UIEventType.TRANSCRIPT_FINAL if is_final else UIEventType.TRANSCRIPT_PARTIAL
+                    ),
+                    utterance_id=transcript.utterance_id,
+                    payload=transcript,
+                    source=source,
+                )
+            )
+            if not is_final:
+                return
+            finalized = await self.output_projection.project_self_final_transcript(
+                transcript=transcript,
+                source_language=self.translation_requests.source_language_for(
+                    "self",
+                    configuration,
+                ),
+                target_language=self.translation_requests.target_language_for(
+                    "self",
+                    configuration,
+                ),
+                translation_will_follow=self._overlay_translation_will_follow(configuration),
+            )
+        if is_final and finalized:
             self._clear_runtime_latency_bookkeeping(transcript.utterance_id)
 
     async def _ensure_translation(
