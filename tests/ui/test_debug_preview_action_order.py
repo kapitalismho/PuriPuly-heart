@@ -7,7 +7,6 @@ BASELINE_ACTION_KEYS: tuple[str, ...] = (
     "brake_notice",
     "revoked_notice",
     "github_star_snackbar",
-    "telemetry_consent",
     "founder_letter",
     "pkce_failure",
     "discord_auth",

@@ -5,6 +5,7 @@ import json
 import logging
 import tempfile
 import webbrowser
+from datetime import datetime, timezone
 from pathlib import Path
 
 import flet as ft
@@ -38,7 +39,6 @@ from puripuly_heart.ui.components.local_qwen_hallucination_dialog import (
 from puripuly_heart.ui.components.microphone_test_dialog import MicrophoneTestDialog
 from puripuly_heart.ui.components.peer_translation_eula_dialog import PeerTranslationEulaDialog
 from puripuly_heart.ui.components.qq_managed_auth_dialog import QqManagedAuthDialog
-from puripuly_heart.ui.components.telemetry_consent_dialog import TelemetryConsentDialog
 from puripuly_heart.ui.components.title_bar import TitleBar
 from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
@@ -204,7 +204,6 @@ class TranslatorApp:
         self._launch_high_priority_snackbar = None
         self._github_star_prompt_shown_this_launch = False
         self._microphone_test_dialog: MicrophoneTestDialog | None = None
-        self._telemetry_consent_dialog: TelemetryConsentDialog | None = None
         self._foundation_preview_dialog: ft.AlertDialog | None = None
         self._foundation_adapter = FletFoundationAdapter(
             self.application,
@@ -265,7 +264,7 @@ class TranslatorApp:
             ),
             general=SettingsGeneralIntents(
                 start_microphone_test=self._on_start_microphone_test,
-                telemetry_consent_change=self._on_telemetry_consent_change,
+                telemetry_enabled_change=self._on_telemetry_enabled_change,
                 list_loopback_capture_options=(
                     lambda: self.application.list_loopback_capture_options()
                 ),
@@ -504,7 +503,6 @@ class TranslatorApp:
             on_audio_fault_clear=self._preview_audio_fault_clear,
             on_gpu_state_cycle=self._cycle_debug_preview_gpu_state,
             on_github_star_snackbar=self._preview_github_star_snackbar,
-            on_telemetry_consent=self._preview_telemetry_consent,
             on_stt_loading_button_cycle=self._cycle_debug_preview_stt_loading_button,
             on_foundation_primitives=self._preview_foundation_primitives,
             on_http_extension_form=self._preview_http_extension_form,
@@ -769,15 +767,6 @@ class TranslatorApp:
         snackbar = self._build_github_star_prompt_snackbar(_open_repository)
         self.page.show_dialog(snackbar)
 
-    def _preview_telemetry_consent(self) -> None:
-        dialog = TelemetryConsentDialog(
-            self.page,
-            on_allow=self._debug_preview_noop,
-            on_decline=self._debug_preview_noop,
-        )
-        self._telemetry_consent_dialog = dialog
-        dialog.open()
-
     def _preview_brake_notice(self) -> None:
         self._show_snackbar(t("managed_release.brake"), ft.Colors.ORANGE_700)
 
@@ -927,15 +916,12 @@ class TranslatorApp:
         self._peer_translation_eula_dialog = dialog
         dialog.open()
 
-    def maybe_show_telemetry_consent_dialog(self) -> bool:
-        return False
-
-    def _on_telemetry_consent_change(self, consent: str) -> None:
-        if consent not in {"allow", "decline"}:
+    def _on_telemetry_enabled_change(self, enabled: bool) -> None:
+        if not isinstance(enabled, bool):
             return
 
         async def _task() -> None:
-            settings = await self.application.apply_telemetry_consent(consent)
+            settings = await self.application.apply_telemetry_enabled(enabled)
             sync_telemetry = getattr(self.view_settings, "sync_telemetry_settings", None)
             if callable(sync_telemetry) and settings is not None:
                 sync_telemetry(settings)
@@ -2004,8 +1990,10 @@ class TranslatorApp:
         self.application.schedule_github_star_prompt_translation_success_observed()
 
     def on_telemetry_translation_success(self) -> None:
+        active_date_utc = datetime.now(timezone.utc).date().isoformat()
+
         async def _task() -> None:
-            await self.application.record_telemetry_translation_success_day()
+            await self.application.record_telemetry_translation_success_day(active_date_utc)
 
         self._queue_settings_mutation_task(_task)
 

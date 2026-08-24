@@ -35,7 +35,7 @@ class SettingsProviderIntents:
 @dataclass(frozen=True, slots=True)
 class SettingsGeneralIntents:
     start_microphone_test: Callable[[], None]
-    telemetry_consent_change: Callable[[str], None]
+    telemetry_enabled_change: Callable[[bool], None]
     list_loopback_capture_options: Callable[[], object]
     list_loopback_process_options: Callable[[], object]
     list_loopback_device_options: Callable[[], object]
@@ -216,7 +216,7 @@ class SettingsGeneralSurfaceSlots:
     peer_vad: ft.Control
     clipboard_auto_translate: ft.Control
     vrchat_mic_intercept: ft.Control
-    telemetry_consent: ft.Control
+    telemetry_enabled: ft.Control
 
 
 @dataclass(frozen=True, slots=True)

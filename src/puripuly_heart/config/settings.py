@@ -4,6 +4,7 @@ import copy
 import json
 import locale
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
@@ -62,7 +63,6 @@ LEGACY_LOW_LATENCY_VAD_HANGOVER_MS = 600
 DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS = 500
 MAX_CUSTOM_VOCAB_TERMS = 100
 DEFAULT_OPENROUTER_BROKER_BASE_URL = "https://puripuly-heart-broker.kapitalismho.workers.dev"
-TELEMETRY_CONSENT_VALUES = frozenset({"unknown", "allow", "decline"})
 REFERRAL_ID_LENGTH = 6
 REFERRAL_ID_ALPHABET = frozenset("23456789ABCDEFGHJKMNPQRSTUVWXYZ")
 OVERLAY_TARGET_STEAMVR = "steamvr"
@@ -1340,12 +1340,10 @@ class ManagedIdentitySettings:
                 raise ValueError(f"managed {key} must be a string or None")
 
 
-def _parse_telemetry_consent(value: object) -> str:
-    if isinstance(value, str):
-        normalized = value.strip()
-        if normalized in TELEMETRY_CONSENT_VALUES:
-            return normalized
-    return "unknown"
+def _parse_telemetry_enabled(value: object) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError("telemetry enabled must be a boolean")
+    return value
 
 
 def _normalize_telemetry_identifier(value: object) -> str | None:
@@ -1355,7 +1353,7 @@ def _normalize_telemetry_identifier(value: object) -> str | None:
     return normalized or None
 
 
-def _normalize_telemetry_sent_dates(value: object) -> list[str]:
+def _normalize_telemetry_sent_date(value: object) -> str | None:
     if isinstance(value, str):
         candidates: tuple[object, ...] = (value,)
     elif isinstance(value, (list, tuple, set, frozenset)):
@@ -1374,27 +1372,43 @@ def _normalize_telemetry_sent_dates(value: object) -> list[str]:
         date_text = parsed.strftime("%Y-%m-%d")
         if date_text not in normalized:
             normalized.append(date_text)
-    return normalized
+    return max(normalized, default=None)
+
+
+def _telemetry_enabled_from_dict(data: Mapping[str, object]) -> bool:
+    telemetry_value = data.get("telemetry")
+    if "telemetry" not in data:
+        return True
+    if not isinstance(telemetry_value, Mapping):
+        return False
+    if telemetry_value.get("consent") == "decline":
+        return False
+    enabled = telemetry_value.get("enabled")
+    if isinstance(enabled, bool):
+        return enabled
+    if "enabled" in telemetry_value:
+        return False
+    if "consent" not in telemetry_value:
+        return True
+    return telemetry_value.get("consent") in {"allow", "unknown"}
 
 
 @dataclass(slots=True)
 class TelemetrySettings:
-    consent: str = "unknown"
+    enabled: bool = True
 
     def validate(self) -> None:
-        self.consent = _parse_telemetry_consent(self.consent)
+        self.enabled = _parse_telemetry_enabled(self.enabled)
 
 
 @dataclass(slots=True)
 class TelemetryStateSettings:
-    anonymous_id: str | None = None
-    sent_translation_success_dates_utc: list[str] = field(default_factory=list)
+    anonymous_id: str | None = field(default_factory=new_anonymous_telemetry_identifier)
+    last_sent_date_utc: str | None = None
 
     def validate(self) -> None:
         self.anonymous_id = _normalize_telemetry_identifier(self.anonymous_id)
-        self.sent_translation_success_dates_utc = _normalize_telemetry_sent_dates(
-            self.sent_translation_success_dates_utc
-        )
+        self.last_sent_date_utc = _normalize_telemetry_sent_date(self.last_sent_date_utc)
 
 
 @dataclass(slots=True)
@@ -1933,11 +1947,11 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
                 settings.ui.github_star_prompt_eligible_launch_count
             ),
         },
-        "telemetry": {"consent": _parse_telemetry_consent(settings.telemetry.consent)},
+        "telemetry": {"enabled": _parse_telemetry_enabled(settings.telemetry.enabled)},
         "telemetry_state": {
             "anonymous_id": _normalize_telemetry_identifier(settings.telemetry_state.anonymous_id),
-            "sent_translation_success_dates_utc": _normalize_telemetry_sent_dates(
-                settings.telemetry_state.sent_translation_success_dates_utc
+            "last_sent_date_utc": _normalize_telemetry_sent_date(
+                settings.telemetry_state.last_sent_date_utc
             ),
         },
         "api_key_verified": {
@@ -1994,19 +2008,18 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
     return _enum_to_value(data)  # type: ignore[return-value]
 
 
-def with_telemetry_consent(
+def with_telemetry_enabled(
     settings: AppSettings,
-    consent: str,
+    enabled: bool,
     *,
     identifier_factory: object = new_anonymous_telemetry_identifier,
 ) -> AppSettings:
     updated = copy.deepcopy(settings)
-    normalized_consent = _parse_telemetry_consent(consent)
-    updated.telemetry.consent = normalized_consent
-    if normalized_consent == "decline":
+    updated.telemetry.enabled = _parse_telemetry_enabled(enabled)
+    if not enabled:
         updated.telemetry_state.anonymous_id = None
-        updated.telemetry_state.sent_translation_success_dates_utc = []
-    elif normalized_consent == "allow":
+        updated.telemetry_state.last_sent_date_utc = None
+    else:
         factory = (
             identifier_factory
             if callable(identifier_factory)
@@ -2015,29 +2028,11 @@ def with_telemetry_consent(
         updated.telemetry_state.anonymous_id = _normalize_telemetry_identifier(
             updated.telemetry_state.anonymous_id
         ) or str(factory())
-        updated.telemetry_state.sent_translation_success_dates_utc = (
-            _normalize_telemetry_sent_dates(
-                updated.telemetry_state.sent_translation_success_dates_utc
-            )
+        updated.telemetry_state.last_sent_date_utc = _normalize_telemetry_sent_date(
+            updated.telemetry_state.last_sent_date_utc
         )
     updated.validate()
     return updated
-
-
-def ensure_telemetry_default_allow(
-    settings: AppSettings,
-    *,
-    identifier_factory: object = new_anonymous_telemetry_identifier,
-) -> AppSettings:
-    """Map unknown consent to allow and mint an anonymous id when needed."""
-    consent = _parse_telemetry_consent(settings.telemetry.consent)
-    if consent == "decline":
-        return settings
-    if consent == "allow" and _normalize_telemetry_identifier(
-        settings.telemetry_state.anonymous_id
-    ):
-        return settings
-    return with_telemetry_consent(settings, "allow", identifier_factory=identifier_factory)
 
 
 def _parse_custom_stt_settings(value: object) -> CustomSTTSettings:
@@ -3227,7 +3222,7 @@ def new_settings_for_first_run(system_locale: str | None = None) -> AppSettings:
             connection=TranslationConnection.OPENROUTER,
         )
     ensure_prompt_defaults(settings)
-    settings = with_telemetry_consent(settings, "allow")
+    settings = with_telemetry_enabled(settings, True)
     settings.validate()
     return settings
 
@@ -4307,7 +4302,6 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
     local_llm_raw = data.get("local_llm") if isinstance(data.get("local_llm"), dict) else {}
     qwen_asr_raw = data.get("qwen_asr_stt") if isinstance(data.get("qwen_asr_stt"), dict) else {}
     openrouter_raw = data.get("openrouter") if isinstance(data.get("openrouter"), dict) else {}
-    telemetry_raw = data.get("telemetry") if isinstance(data.get("telemetry"), dict) else {}
     telemetry_state_raw = (
         data.get("telemetry_state") if isinstance(data.get("telemetry_state"), dict) else {}
     )
@@ -4637,13 +4631,14 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
                 managed_identity_data.get("pending_delivery_ack_expires_at")
             ),
         ),
-        telemetry=TelemetrySettings(
-            consent=_parse_telemetry_consent(telemetry_raw.get("consent")),
-        ),
+        telemetry=TelemetrySettings(enabled=_telemetry_enabled_from_dict(data)),
         telemetry_state=TelemetryStateSettings(
             anonymous_id=_normalize_telemetry_identifier(telemetry_state_raw.get("anonymous_id")),
-            sent_translation_success_dates_utc=_normalize_telemetry_sent_dates(
-                telemetry_state_raw.get("sent_translation_success_dates_utc")
+            last_sent_date_utc=_normalize_telemetry_sent_date(
+                telemetry_state_raw.get(
+                    "last_sent_date_utc",
+                    telemetry_state_raw.get("sent_translation_success_dates_utc"),
+                )
             ),
         ),
         system_prompt=legacy_system_prompt,
@@ -4678,7 +4673,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
     materialize_translation_settings(settings)
 
     ensure_prompt_defaults(settings)
-    settings = ensure_telemetry_default_allow(settings)
+    settings = with_telemetry_enabled(settings, settings.telemetry.enabled)
     settings.validate()
     return settings
 

@@ -25,6 +25,10 @@ const FOURTH_MIGRATION = new URL(
   '../migrations/0003_add_abuse_runtime_state_and_issue_success_events.sql',
   import.meta.url,
 );
+const DAILY_SUMMARY_V2_FINALIZER = new URL(
+  '../deploy/finalize-daily-summary-v2.sql',
+  import.meta.url,
+);
 
 const FIRST_MIGRATION_SQL = readFileSync(FIRST_MIGRATION, 'utf8');
 
@@ -61,8 +65,40 @@ describe('broker migration behavior', () => {
         'fingerprint_salt',
       ]);
       expect(rows.map(({ value }) => JSON.parse(value))).toEqual([
-        TEST_DEFAULT_ABUSE_CONTROLS,
-        TEST_DEFAULT_ABUSE_RUNTIME_STATE,
+        {
+          ...TEST_DEFAULT_ABUSE_CONTROLS,
+          immediateAlerts: {
+            warn1: 10,
+            warn2: 25,
+            warn3: 50,
+            critical: 70,
+            ...TEST_DEFAULT_ABUSE_CONTROLS.immediateAlerts,
+          },
+          asnFastPath: {
+            enabled: true,
+            minIssueSuccess1h: 20,
+            minTopAsnSharePct: 70,
+          },
+          asnClassifications: [],
+          retention: {
+            requestEventsDays: 30,
+            ...TEST_DEFAULT_ABUSE_CONTROLS.retention,
+          },
+          dailyReport: {
+            ...TEST_DEFAULT_ABUSE_CONTROLS.dailyReport,
+            includeZeroActivity: false,
+          },
+        },
+        {
+          ...TEST_DEFAULT_ABUSE_RUNTIME_STATE,
+          alertLatches: {
+            warn1: false,
+            warn2: false,
+            warn3: false,
+            critical: false,
+            ...TEST_DEFAULT_ABUSE_RUNTIME_STATE.alertLatches,
+          },
+        },
         {
           current: {
             version: 1,
@@ -588,9 +624,15 @@ describe('broker migration behavior', () => {
       const runtimeStateRow = db
         .prepare('SELECT value FROM broker_config WHERE key = ?')
         .get('abuse_runtime_state') as { value: string };
-      expect(JSON.parse(runtimeStateRow.value)).toEqual(
-        TEST_DEFAULT_ABUSE_RUNTIME_STATE,
-      );
+      expect(JSON.parse(runtimeStateRow.value)).toEqual({
+        ...TEST_DEFAULT_ABUSE_RUNTIME_STATE,
+        alertLatches: {
+          warn1: false,
+          warn2: false,
+          warn3: false,
+          critical: false,
+        },
+      });
 
       const issueEventColumns = db
         .prepare("SELECT name FROM pragma_table_info('broker_issue_success_events') ORDER BY cid")
@@ -682,27 +724,30 @@ describe('broker migration behavior', () => {
       const migratedRow = db
         .prepare('SELECT value FROM broker_config WHERE key = ?')
         .get('abuse_controls') as { value: string };
-      const {
-        discordAuthStartIp: _discordAuthStartIp,
-        discordAuthStartInstallation: _discordAuthStartInstallation,
-        discordOpenrouterIssueIp: _discordOpenrouterIssueIp,
-        discordOpenrouterIssueInstallation: _discordOpenrouterIssueInstallation,
-        pendingDiscordOAuthSessions: _pendingDiscordOAuthSessions,
-        qqAuthAssertIp: _qqAuthAssertIp,
-        telemetryTranslationSuccessDayIp: _telemetryTranslationSuccessDayIp,
-        referralAttempts: _referralAttempts,
-        retention: defaultRetention,
-        ...defaultsThrough0003
-      } = TEST_DEFAULT_ABUSE_CONTROLS;
-      const {
-        referralSkippedDays: _referralSkippedDays,
-        referralFailedDays: _referralFailedDays,
-        ...retentionThrough0003
-      } = defaultRetention;
-
-      expect(JSON.parse(migratedRow.value)).toEqual({
-        ...defaultsThrough0003,
-        retention: retentionThrough0003,
+      expect(JSON.parse(migratedRow.value)).toMatchObject({
+        immediateAlerts: {
+          warn1: 10,
+          warn2: 25,
+          warn3: 50,
+          critical: 70,
+        },
+        asnFastPath: {
+          enabled: true,
+          minIssueSuccess1h: 20,
+          minTopAsnSharePct: 70,
+        },
+        asnClassifications: [],
+        dailyReport: {
+          enabled: true,
+          hourUtc: 13,
+          minuteUtc: 0,
+          includeZeroActivity: false,
+        },
+        retention: {
+          requestEventsDays: 30,
+          issueSuccessDays: 30,
+          runtimeAuditDays: 90,
+        },
         ...tunedLegacyControls,
       });
     } finally {
@@ -749,6 +794,188 @@ describe('broker migration behavior', () => {
         ...tunedControls,
         telemetryTranslationSuccessDayIp:
           TEST_DEFAULT_ABUSE_CONTROLS.telemetryTranslationSuccessDayIp,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('backfills durable telemetry subjects and normalizes the v2 daily schedule', () => {
+    const db = new DatabaseSync(':memory:');
+
+    try {
+      applyBrokerMigrations(db, {
+        through: '0012_add_managed_key_delivery_ack.sql',
+      });
+      const firstSubject = `ph-telemetry-subject-v1_${'a'.repeat(64)}`;
+      const secondSubject = `ph-telemetry-subject-v1_${'b'.repeat(64)}`;
+      const insertActiveDay = db.prepare(
+        `INSERT INTO telemetry_active_days (
+            subject_ref,
+            active_date_utc,
+            first_received_at,
+            last_received_at
+          ) VALUES (?, ?, ?, ?)`,
+      );
+      insertActiveDay.run(
+        firstSubject,
+        '2026-04-01',
+        '2026-04-01T00:00:00.000Z',
+        '2026-04-01T00:00:00.000Z',
+      );
+      insertActiveDay.run(
+        firstSubject,
+        '2026-04-19',
+        '2026-04-19T00:00:00.000Z',
+        '2026-04-19T00:00:00.000Z',
+      );
+      insertActiveDay.run(
+        secondSubject,
+        '2026-04-10',
+        '2026-04-10T00:00:00.000Z',
+        '2026-04-10T00:00:00.000Z',
+      );
+      const rowBefore = db
+        .prepare('SELECT value FROM broker_config WHERE key = ?')
+        .get('abuse_controls') as { value: string };
+      const tunedControls = JSON.parse(rowBefore.value) as Record<string, any>;
+      tunedControls.trialChallenge.maxRequests = 17;
+      tunedControls.retention.issueSuccessDays = 1;
+      tunedControls.dailyReport = {
+        enabled: true,
+        hourUtc: 9,
+        minuteUtc: 30,
+        includeZeroActivity: true,
+      };
+      db.prepare('UPDATE broker_config SET value = ?, updated_at = ? WHERE key = ?').run(
+        JSON.stringify(tunedControls),
+        '2026-04-20T00:00:00.000Z',
+        'abuse_controls',
+      );
+
+      applyBrokerMigrations(db, {
+        after: '0012_add_managed_key_delivery_ack.sql',
+        through: '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
+      });
+
+      expect(
+        db
+          .prepare(
+            `SELECT subject_ref, first_active_date_utc, last_active_date_utc
+               FROM telemetry_subjects
+              ORDER BY subject_ref`,
+          )
+          .all(),
+      ).toEqual([
+        {
+          subject_ref: firstSubject,
+          first_active_date_utc: '2026-04-01',
+          last_active_date_utc: '2026-04-19',
+        },
+        {
+          subject_ref: secondSubject,
+          first_active_date_utc: '2026-04-10',
+          last_active_date_utc: '2026-04-10',
+        },
+      ]);
+      expect(
+        db.prepare('SELECT COUNT(*) AS count FROM telemetry_active_days').get(),
+      ).toEqual({ count: 3 });
+      const postMigrationSubject = `ph-telemetry-subject-v1_${'c'.repeat(64)}`;
+      insertActiveDay.run(
+        firstSubject,
+        '2026-03-31',
+        '2026-03-31T00:00:00.000Z',
+        '2026-03-31T00:00:00.000Z',
+      );
+      insertActiveDay.run(
+        postMigrationSubject,
+        '2026-04-20',
+        '2026-04-20T00:00:00.000Z',
+        '2026-04-20T00:00:00.000Z',
+      );
+      expect(
+        db
+          .prepare(
+            `SELECT subject_ref, first_active_date_utc, last_active_date_utc
+               FROM telemetry_subjects
+              WHERE subject_ref IN (?, ?)
+              ORDER BY subject_ref`,
+          )
+          .all(firstSubject, postMigrationSubject),
+      ).toEqual([
+        {
+          subject_ref: firstSubject,
+          first_active_date_utc: '2026-03-31',
+          last_active_date_utc: '2026-04-19',
+        },
+        {
+          subject_ref: postMigrationSubject,
+          first_active_date_utc: '2026-04-20',
+          last_active_date_utc: '2026-04-20',
+        },
+      ]);
+      expect(
+        db.prepare('SELECT COUNT(*) AS count FROM broker_daily_summary_deliveries').get(),
+      ).toEqual({ count: 0 });
+      expect(() =>
+        db
+          .prepare(
+            `INSERT INTO broker_daily_summary_deliveries (
+                report_date_utc,
+                status,
+                lease_token,
+                lease_expires_at,
+                attempted_at,
+                delivered_at
+              ) VALUES (?, 'pending', ?, ?, ?, NULL)`,
+          )
+          .run(
+            '2026-04-19',
+            'not-a-valid-lease-token',
+            '2026-04-20T00:15:00.000Z',
+            '2026-04-20T00:00:00.000Z',
+          ),
+      ).toThrow();
+      expect(() =>
+        db
+          .prepare(
+            `INSERT INTO broker_daily_summary_deliveries (
+                report_date_utc,
+                status,
+                lease_token,
+                lease_expires_at,
+                attempted_at,
+                delivered_at
+              ) VALUES (?, 'pending', ?, ?, ?, NULL)`,
+          )
+          .run(
+            '2026-04-19',
+            '00000000-0000-0000-0000-000000000000',
+            '2026-04-20T00:15:00.001Z',
+            '2026-04-20T00:00:00.000Z',
+          ),
+      ).toThrow();
+      const migratedRow = db
+        .prepare('SELECT value FROM broker_config WHERE key = ?')
+        .get('abuse_controls') as { value: string };
+      const migratedControls = JSON.parse(migratedRow.value) as Record<string, any>;
+      expect(migratedControls.trialChallenge.maxRequests).toBe(17);
+      expect(migratedControls.retention.issueSuccessDays).toBe(2);
+      expect(migratedControls.dailyReport).toEqual({
+        enabled: true,
+        hourUtc: 0,
+        minuteUtc: 5,
+        includeZeroActivity: true,
+      });
+      db.exec(readFileSync(DAILY_SUMMARY_V2_FINALIZER, 'utf8'));
+      const finalizedRow = db
+        .prepare('SELECT value FROM broker_config WHERE key = ?')
+        .get('abuse_controls') as { value: string };
+      expect(JSON.parse(finalizedRow.value).dailyReport).toEqual({
+        enabled: true,
+        hourUtc: 0,
+        minuteUtc: 5,
       });
     } finally {
       db.close();
@@ -1305,6 +1532,68 @@ describe('broker migration behavior', () => {
 
       expect(insertedRow.id).toBe(101);
       expect(sequenceRow.seq).toBe(101);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('adds warning, brake, and enforcement-retention controls without breaking the previous Worker shape', () => {
+    const db = new DatabaseSync(':memory:');
+
+    try {
+      applyBrokerMigrations(db, {
+        through: '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
+      });
+      const controlsRow = db
+        .prepare("SELECT value FROM broker_config WHERE key = 'abuse_controls'")
+        .get() as { value: string };
+      const controls = JSON.parse(controlsRow.value) as Record<string, any>;
+      controls.immediateAlerts.warn1 = 12;
+      controls.immediateAlerts.critical = 80;
+      db.prepare("UPDATE broker_config SET value = ? WHERE key = 'abuse_controls'").run(
+        JSON.stringify(controls),
+      );
+      const runtimeRow = db
+        .prepare("SELECT value FROM broker_config WHERE key = 'abuse_runtime_state'")
+        .get() as { value: string };
+      const runtime = JSON.parse(runtimeRow.value) as Record<string, any>;
+      runtime.alertLatches.warn2 = true;
+      db.prepare(
+        "UPDATE broker_config SET value = ? WHERE key = 'abuse_runtime_state'",
+      ).run(JSON.stringify(runtime));
+
+      applyBrokerMigrations(db, {
+        after: '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
+        through: '0014_simplify_abuse_incidents.sql',
+      });
+
+      const migratedControls = JSON.parse(
+        (db
+          .prepare("SELECT value FROM broker_config WHERE key = 'abuse_controls'")
+          .get() as { value: string }).value,
+      ) as Record<string, any>;
+      const migratedRuntime = JSON.parse(
+        (db
+          .prepare("SELECT value FROM broker_config WHERE key = 'abuse_runtime_state'")
+          .get() as { value: string }).value,
+      ) as Record<string, any>;
+      expect(migratedControls.immediateAlerts).toMatchObject({
+        warning: 12,
+        brake: 80,
+        warn1: 12,
+        critical: 80,
+      });
+      expect(migratedControls.retention.requestEventSafetyMarginDays).toBe(1);
+      expect(migratedRuntime.alertLatches).toMatchObject({
+        warning: true,
+        warningObservedAt: null,
+        warn2: true,
+      });
+      expect(
+        db
+          .prepare("SELECT COUNT(*) AS count FROM pragma_table_info('qq_managed_entitlements') WHERE name = 'child_key_creation_started_at'")
+          .get(),
+      ).toEqual({ count: 1 });
     } finally {
       db.close();
     }

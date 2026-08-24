@@ -119,9 +119,9 @@ class UiApplicationRuntimeStub:
         prompt = getattr(self._backend, "dashboard_managed_auth_prompt_kind", None)
         return str(prompt()) if callable(prompt) else "discord"
 
-    async def apply_telemetry_consent(self, consent: str) -> object | None:
-        apply = getattr(self._backend, "apply_telemetry_consent", None)
-        return await apply(consent) if callable(apply) else None
+    async def apply_telemetry_enabled(self, enabled: bool) -> object | None:
+        apply = getattr(self._backend, "apply_telemetry_enabled", None)
+        return await apply(enabled) if callable(apply) else None
 
     def reopen_openrouter_pkce_authorization_url(self) -> object:
         reopen = getattr(
@@ -136,14 +136,14 @@ class UiApplicationRuntimeStub:
         if callable(clear):
             clear(provider)
 
-    async def record_telemetry_translation_success_day(self) -> None:
+    async def record_telemetry_translation_success_day(self, active_date_utc: str) -> None:
         record = getattr(
             self._backend,
             "record_telemetry_translation_success_day",
             None,
         )
         if callable(record):
-            await record()
+            await record(active_date_utc)
 
     def should_show_github_star_prompt(self) -> bool:
         should_show = getattr(self._backend, "should_show_github_star_prompt", None)

@@ -29,26 +29,12 @@ export interface BrokerPendingDiscordOAuthSessionsConfig {
 }
 
 export interface BrokerImmediateAlertsConfig {
-  warn1: number;
-  warn2: number;
-  warn3: number;
-  critical: number;
-}
-
-export interface BrokerAsnFastPathConfig {
-  enabled: boolean;
-  minIssueSuccess1h: number;
-  minTopAsnSharePct: number;
-}
-
-export interface BrokerAsnClassificationEntry {
-  asn: number;
-  kind: 'cloud_or_vps';
-  displayName?: string;
+  warning: number;
+  brake: number;
 }
 
 export interface BrokerAbuseRetentionConfig {
-  requestEventsDays: number;
+  requestEventSafetyMarginDays: number;
   issueSuccessDays: number;
   runtimeAuditDays: number;
   referralSkippedDays: number;
@@ -80,7 +66,6 @@ export interface BrokerDailyReportConfig {
   enabled: boolean;
   hourUtc: number;
   minuteUtc: number;
-  includeZeroActivity: boolean;
 }
 
 export interface BrokerAbuseControlsConfigValue {
@@ -97,8 +82,6 @@ export interface BrokerAbuseControlsConfigValue {
   pendingDiscordOAuthSessions: BrokerPendingDiscordOAuthSessionsConfig;
   newActiveEntitlementsPerDay: BrokerDailyIssuanceCapConfig;
   immediateAlerts: BrokerImmediateAlertsConfig;
-  asnFastPath: BrokerAsnFastPathConfig;
-  asnClassifications: BrokerAsnClassificationEntry[];
   retention: BrokerAbuseRetentionConfig;
   referralAttempts: BrokerReferralAttemptControlsConfig;
   dailyReport: BrokerDailyReportConfig;
@@ -177,19 +160,11 @@ export const DEFAULT_BROKER_ABUSE_CONTROLS: BrokerAbuseControlsConfigValue = {
     windowDays: 1,
   },
   immediateAlerts: {
-    warn1: 10,
-    warn2: 25,
-    warn3: 50,
-    critical: 70,
+    warning: 10,
+    brake: 70,
   },
-  asnFastPath: {
-    enabled: true,
-    minIssueSuccess1h: 20,
-    minTopAsnSharePct: 70,
-  },
-  asnClassifications: [],
   retention: {
-    requestEventsDays: 30,
+    requestEventSafetyMarginDays: 1,
     issueSuccessDays: 30,
     runtimeAuditDays: 90,
     referralSkippedDays: 7,
@@ -217,9 +192,8 @@ export const DEFAULT_BROKER_ABUSE_CONTROLS: BrokerAbuseControlsConfigValue = {
   },
   dailyReport: {
     enabled: true,
-    hourUtc: 13,
-    minuteUtc: 0,
-    includeZeroActivity: false,
+    hourUtc: 0,
+    minuteUtc: 5,
   },
 };
 
@@ -231,10 +205,8 @@ export interface BrokerAbuseRuntimeBrakeState {
 }
 
 export interface BrokerAbuseRuntimeAlertLatches {
-  warn1: boolean;
-  warn2: boolean;
-  warn3: boolean;
-  critical: boolean;
+  warning: boolean;
+  warningObservedAt: string | null;
 }
 
 export interface BrokerAbuseRuntimeDailyReportState {
@@ -256,10 +228,8 @@ export const DEFAULT_BROKER_ABUSE_RUNTIME_STATE: BrokerAbuseRuntimeStateValue = 
     changedBy: null,
   },
   alertLatches: {
-    warn1: false,
-    warn2: false,
-    warn3: false,
-    critical: false,
+    warning: false,
+    warningObservedAt: null,
   },
   dailyReport: {
     lastDeliveredAt: null,
@@ -366,7 +336,7 @@ export const MANAGED_KEY_DELIVERY_STATUS_VALUES = [
 export const QQ_MANAGED_ENTITLEMENT_STALE_ISSUING_POLICY = {
   ttlMinutes: 15,
   withoutManagedCredentialRef:
-    'eligible for same-subject release/reclaim by a later valid request after TTL',
+    'eligible for same-subject release/reclaim by a later valid request after TTL only when child-key creation never started',
   withManagedCredentialRef:
     'cleanup/remediation candidate; must not be silently overwritten',
 } as const;
@@ -521,6 +491,21 @@ export interface TelemetryActiveDayRecord {
   last_received_at: string;
 }
 
+export interface TelemetrySubjectRecord {
+  subject_ref: string;
+  first_active_date_utc: string;
+  last_active_date_utc: string;
+}
+
+export interface BrokerDailySummaryDeliveryRecord {
+  report_date_utc: string;
+  status: 'pending' | 'delivered';
+  lease_token: string;
+  lease_expires_at: string;
+  attempted_at: string;
+  delivered_at: string | null;
+}
+
 export interface QqAuthAssertionRecord {
   qq_subject_ref: string;
   credential_hash: string;
@@ -539,6 +524,7 @@ export interface QqManagedEntitlementRecord {
   issued_at: string | null;
   expires_at: string | null;
   delivered_at: string | null;
+  child_key_creation_started_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -902,6 +888,7 @@ export const BROKER_PERSISTENCE_MODEL = {
         'delivered_at',
         'created_at',
         'updated_at',
+        'child_key_creation_started_at',
       ],
       unique: ['issue_ref'],
       partialUniqueIndexes: [
@@ -919,7 +906,7 @@ export const BROKER_PERSISTENCE_MODEL = {
           'requires managed_credential_ref, issued_at, and expires_at; delivered_at remains null until ACK succeeds',
         cleanup_required: 'requires managed_credential_ref',
         issuing:
-          'may be stale-reclaimed only when managed_credential_ref is NULL; issuing with a credential ref requires cleanup/remediation',
+          'may be stale-reclaimed only when managed_credential_ref and child_key_creation_started_at are NULL; any started child-key creation requires manual remediation or cleanup',
         revoked: 'blocks automatic reissue',
       },
       staleIssuingPolicy: QQ_MANAGED_ENTITLEMENT_STALE_ISSUING_POLICY,
@@ -957,7 +944,7 @@ export const BROKER_PERSISTENCE_MODEL = {
       rawAckTokenStorage: false,
       rawOpenRouterKeyStorage: false,
       stalePendingCleanup:
-        'pending rows remain pending after expired ACK attempts until cleanup owner marks expired or cleanup_required',
+        'expired rows are claimed exclusively; abandoned claims recover only after the scheduled invocation limit, and terminal owner/ledger transitions are atomic',
     },
     brokerRequestEvents: {
       name: 'broker_request_events',
@@ -973,7 +960,7 @@ export const BROKER_PERSISTENCE_MODEL = {
       },
     brokerIssueSuccessEvents: {
       name: 'broker_issue_success_events',
-      purpose: ['issue success alerting', 'daily reporting', 'asn-based heuristics'],
+      purpose: ['issuance spike detection', 'daily reporting'],
       issueSources: ['discord', 'qq'],
       sourceAwareSubjectModel: {
         discord: {
@@ -1014,6 +1001,43 @@ export const BROKER_PERSISTENCE_MODEL = {
         'asn + observed_at',
         'observed_at',
       ],
+    },
+    telemetrySubjects: {
+      name: 'telemetry_subjects',
+      purpose: 'durable first-observed and last-active date bounds for anonymous subjects',
+      primaryKey: 'subject_ref',
+      columns: ['subject_ref', 'first_active_date_utc', 'last_active_date_utc'],
+      indexed: ['last_active_date_utc'],
+      rawTelemetryIdentifierStorage: false,
+      joinedToManagedIdentity: false,
+    },
+    telemetryActiveDays: {
+      name: 'telemetry_active_days',
+      purpose: 'retained anonymous active dates for completed-day usage aggregation',
+      primaryKey: ['subject_ref', 'active_date_utc'],
+      columns: [
+        'subject_ref',
+        'active_date_utc',
+        'first_received_at',
+        'last_received_at',
+      ],
+      indexed: ['active_date_utc', 'last_received_at'],
+      rawTelemetryIdentifierStorage: false,
+      joinedToManagedIdentity: false,
+    },
+    brokerDailySummaryDeliveries: {
+      name: 'broker_daily_summary_deliveries',
+      purpose: 'v2 completed-day delivery leases and durable delivery outcomes',
+      primaryKey: 'report_date_utc',
+      columns: [
+        'report_date_utc',
+        'status',
+        'lease_token',
+        'lease_expires_at',
+        'attempted_at',
+        'delivered_at',
+      ],
+      indexed: ['status + report_date_utc + lease_expires_at'],
     },
     brokerAbuseRuntimeAudit: {
       name: 'broker_abuse_runtime_audit',

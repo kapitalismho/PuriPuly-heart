@@ -56,7 +56,7 @@ from puripuly_heart.config.settings import (
     materialize_translation_settings,
     normalize_owned_referral_id,
     supported_translation_connections,
-    with_telemetry_consent,
+    with_telemetry_enabled,
 )
 from puripuly_heart.core.http_extensions import http_extension_secret_key
 from puripuly_heart.core.language import get_stt_compatibility_warning
@@ -451,7 +451,7 @@ class SettingsView(ft.Column):
         self.on_view_logs: Callable[[], None] | None = None
         self.on_start_microphone_test: Callable[[], None] | None = None
         self.on_gpu_discovery_requested: Callable[[], object] | None = None
-        self.on_telemetry_consent_change: Callable[[str], None] | None = None
+        self.on_telemetry_enabled_change: Callable[[bool], None] | None = None
         self.on_list_loopback_capture_options: Callable[[], object] | None = None
         self.on_list_loopback_process_options: Callable[[], object] | None = None
         self.on_list_loopback_device_options: Callable[[], object] | None = None
@@ -582,7 +582,7 @@ class SettingsView(ft.Column):
         self.on_custom_stt_secret_changed = provider.custom_stt_secret_changed
         self.on_gpu_discovery_requested = provider.gpu_discovery_requested
         self.on_start_microphone_test = general.start_microphone_test
-        self.on_telemetry_consent_change = general.telemetry_consent_change
+        self.on_telemetry_enabled_change = general.telemetry_enabled_change
         self.on_list_loopback_capture_options = general.list_loopback_capture_options
         self.on_list_loopback_process_options = general.list_loopback_process_options
         self.on_list_loopback_device_options = general.list_loopback_device_options
@@ -735,7 +735,7 @@ class SettingsView(ft.Column):
             self._desktop_overlay_view_logs_action,
             self._translation_connection_text,
             self._openrouter_fallback_text,
-            self._telemetry_consent_text,
+            self._telemetry_enabled_text,
             self._http_extension_text,
             self._http_extension_path_text,
         )
@@ -1465,19 +1465,19 @@ class SettingsView(ft.Column):
             value=self._clipboard_auto_translate_text,
         )
 
-        self._telemetry_consent_text = self._build_clickable_text(
+        self._telemetry_enabled_text = self._build_clickable_text(
             t("settings.telemetry.state.off"),
-            self._on_telemetry_consent_click,
+            self._on_telemetry_enabled_click,
         )
-        self._telemetry_consent_title = ft.Text(
+        self._telemetry_enabled_title = ft.Text(
             t("settings.telemetry.title"),
             size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        self._telemetry_consent_card = self._wrap_unit_card(
-            title=self._telemetry_consent_title,
-            value=self._telemetry_consent_text,
+        self._telemetry_enabled_card = self._wrap_unit_card(
+            title=self._telemetry_enabled_title,
+            value=self._telemetry_enabled_text,
         )
 
         self._vrc_mic_text = self._build_clickable_text(
@@ -1634,7 +1634,7 @@ class SettingsView(ft.Column):
                 peer_vad=self._peer_vad_card,
                 clipboard_auto_translate=clipboard_auto_translate_card,
                 vrchat_mic_intercept=vrc_mic_card,
-                telemetry_consent=self._telemetry_consent_card,
+                telemetry_enabled=self._telemetry_enabled_card,
             ),
             placeholder_factory=lambda: self._vrchat_osc_card,
         )
@@ -3033,20 +3033,16 @@ class SettingsView(ft.Column):
             return t("settings.fallback.none.description")
         return t("settings.fallback.active_helper")
 
-    def _telemetry_consent_display_label(self, settings: AppSettings | None) -> str:
-        consent = getattr(getattr(settings, "telemetry", None), "consent", "unknown")
-        return t(
-            "settings.telemetry.state.on"
-            if consent != "decline"
-            else "settings.telemetry.state.off"
-        )
+    def _telemetry_enabled_display_label(self, settings: AppSettings | None) -> str:
+        enabled = bool(getattr(getattr(settings, "telemetry", None), "enabled", True))
+        return t("settings.telemetry.state.on" if enabled else "settings.telemetry.state.off")
 
-    def _sync_telemetry_consent_card(self, settings: AppSettings | None = None) -> None:
+    def _sync_telemetry_enabled_card(self, settings: AppSettings | None = None) -> None:
         if settings is None:
             settings = self._settings
         self._set_unit_card_value_text(
-            self._telemetry_consent_text,
-            self._telemetry_consent_display_label(settings),
+            self._telemetry_enabled_text,
+            self._telemetry_enabled_display_label(settings),
         )
 
     def _set_openrouter_fallback_text(self, text: str) -> None:
@@ -3796,7 +3792,7 @@ class SettingsView(ft.Column):
             if settings.ui.clipboard_auto_translate_enabled
             else "settings.clipboard_auto_translate.off"
         )
-        self._sync_telemetry_consent_card(settings)
+        self._sync_telemetry_enabled_card(settings)
         # Prompt
         provider_name = self._active_prompt_key()
         self._prompt_editor.set_provider(provider_name)
@@ -3875,9 +3871,9 @@ class SettingsView(ft.Column):
 
     def sync_telemetry_settings(self, settings: AppSettings) -> None:
         self._settings = settings
-        self._sync_telemetry_consent_card(settings)
+        self._sync_telemetry_enabled_card(settings)
         if is_control_mounted(self):
-            _update_control_if_mounted(self._telemetry_consent_card)
+            _update_control_if_mounted(self._telemetry_enabled_card)
 
     def project_osc_control_state(self, state: OscControlPresentationState) -> None:
         if self._settings is None:
@@ -6062,40 +6058,17 @@ class SettingsView(ft.Column):
             self._clipboard_auto_translate_text.update()
         self._emit_settings_changed()
 
-    def _on_telemetry_consent_click(self, e) -> None:
+    def _on_telemetry_enabled_click(self, e) -> None:
         _ = e
         if not is_control_mounted(self) or not self._settings:
             return
 
-        def _select(value: str) -> None:
-            if value not in {"allow", "decline"} or self._settings is None:
-                return
-            updated = with_telemetry_consent(self._settings, value)
-            self._settings = updated
-            self._sync_telemetry_consent_card(updated)
-            if self.on_telemetry_consent_change is not None:
-                self.on_telemetry_consent_change(value)
-
-        options = [
-            OptionItem(
-                "allow",
-                t("settings.telemetry.option.allow"),
-                t("settings.telemetry.option.allow.description"),
-            ),
-            OptionItem(
-                "decline",
-                t("settings.telemetry.option.decline"),
-                "",
-            ),
-        ]
-        modal = SettingsModal(
-            self.page,
-            t("settings.telemetry.modal.title"),
-            options,
-            _select,
-            show_description=True,
-        )
-        modal.open("decline" if self._settings.telemetry.consent == "decline" else "allow")
+        enabled = not self._settings.telemetry.enabled
+        updated = with_telemetry_enabled(self._settings, enabled)
+        self._settings = updated
+        self._sync_telemetry_enabled_card(updated)
+        if self.on_telemetry_enabled_change is not None:
+            self.on_telemetry_enabled_change(enabled)
 
     def _on_prompt_change(self, value: str) -> None:
         self._stage_prompt_draft(value)
@@ -6310,7 +6283,7 @@ class SettingsView(ft.Column):
         self._osc_connection_title.value = t("settings.osc.connection.title")
         self._chatbox_source_title.value = t("settings.chatbox_include_source")
         self._clipboard_auto_translate_title.value = t("settings.clipboard_auto_translate")
-        self._telemetry_consent_title.value = t("settings.telemetry.title")
+        self._telemetry_enabled_title.value = t("settings.telemetry.title")
         self._peer_provider_title.value = t("settings.section.peer_stt")
         self._dashboard_language_redirect_text.value = t("settings.dashboard_language_redirect")
         self._peer_stt_label.value = t("settings.peer_stt_provider")
@@ -6420,7 +6393,7 @@ class SettingsView(ft.Column):
                 if display_settings.ui.clipboard_auto_translate_enabled
                 else "settings.clipboard_auto_translate.off"
             )
-            self._sync_telemetry_consent_card(display_settings)
+            self._sync_telemetry_enabled_card(display_settings)
             self._set_unit_card_value_text(
                 self._microphone_test_text,
                 t("settings.microphone_test.action"),

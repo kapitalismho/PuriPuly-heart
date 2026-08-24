@@ -56,7 +56,7 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "apply_overlay_calibration",
         "apply_providers",
         "apply_settings",
-        "apply_telemetry_consent",
+        "apply_telemetry_enabled",
         "begin_overlay_calibration",
         "cancel_discord_managed_auth",
         "cancel_overlay_calibration",
@@ -461,8 +461,8 @@ class UiApplicationBoundary:
     def dashboard_managed_auth_prompt_kind(self) -> str:
         return str(self._managed.dashboard_managed_auth_prompt_kind())
 
-    async def apply_telemetry_consent(self, consent: str) -> Any | None:
-        return await self._settings.apply_telemetry_consent(consent)
+    async def apply_telemetry_enabled(self, enabled: bool) -> Any | None:
+        return await self._settings.apply_telemetry_enabled(enabled)
 
     async def accept_peer_translation_eula_and_enable(self) -> object:
         settings = self.compatibility_settings()
@@ -534,8 +534,8 @@ class UiApplicationBoundary:
     def schedule_github_star_prompt_translation_success_observed(self) -> None:
         self._engagement.schedule_github_star_prompt_translation_success_observed()
 
-    async def record_telemetry_translation_success_day(self) -> None:
-        await self._engagement.record_telemetry_translation_success_day()
+    async def record_telemetry_translation_success_day(self, active_date_utc: str) -> None:
+        await self._engagement.record_telemetry_translation_success_day(active_date_utc)
 
     def should_show_github_star_prompt(self) -> bool:
         return bool(self._engagement.should_show_github_star_prompt())

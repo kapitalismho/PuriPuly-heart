@@ -35,6 +35,14 @@ describe('telemetry active-day ingest', () => {
       'first_received_at',
       'last_received_at',
     ]);
+    const subjectColumns = env.__db
+      .prepare("SELECT name FROM pragma_table_info('telemetry_subjects') ORDER BY cid")
+      .all() as Array<{ name: string }>;
+    expect(subjectColumns.map(({ name }) => name)).toEqual([
+      'subject_ref',
+      'first_active_date_utc',
+      'last_active_date_utc',
+    ]);
 
     const subjectRef = await deriveTelemetrySubjectRef(
       env.TELEMETRY_SUBJECT_HMAC_SECRET,
@@ -60,6 +68,17 @@ describe('telemetry active-day ingest', () => {
       first: '2026-07-02T00:00:00.000Z',
       last: '2026-07-02T00:01:00.000Z',
     });
+    expect(
+      env.__db
+        .prepare(
+          'SELECT subject_ref, first_active_date_utc, last_active_date_utc FROM telemetry_subjects',
+        )
+        .get(),
+    ).toEqual({
+      subject_ref: subjectRef,
+      first_active_date_utc: '2026-07-02',
+      last_active_date_utc: '2026-07-02',
+    });
 
     expect(() =>
       env.__db
@@ -81,6 +100,36 @@ describe('telemetry active-day ingest', () => {
           '2026-07-03T00:00:00.000Z',
         ),
     ).toThrow(/constraint/i);
+  });
+
+  it('updates durable subject bounds atomically with active-day rows', async () => {
+    let env!: ReturnType<typeof createTestBrokerEnv>;
+    env = createTestBrokerEnv({
+      beforeRun: ({ sql }) => {
+        if (sql.includes('INSERT INTO telemetry_active_days')) {
+          throw new Error('injected active-day failure');
+        }
+      },
+    });
+    const subjectRef = await deriveTelemetrySubjectRef(
+      env.TELEMETRY_SUBJECT_HMAC_SECRET,
+      VALID_IDENTIFIER,
+    );
+
+    await expect(
+      recordTelemetryActiveDay(env.BROKER_DB, {
+        subjectRef,
+        activeDateUtc: '2026-07-02',
+        receivedAt: '2026-07-02T00:00:00.000Z',
+      }),
+    ).rejects.toThrow('injected active-day failure');
+
+    expect(
+      env.__db.prepare('SELECT COUNT(*) AS count FROM telemetry_subjects').get(),
+    ).toEqual({ count: 0 });
+    expect(
+      env.__db.prepare('SELECT COUNT(*) AS count FROM telemetry_active_days').get(),
+    ).toEqual({ count: 0 });
   });
 
   it('accepts valid payloads, stores HMAC subject_ref, and collapses duplicates', async () => {

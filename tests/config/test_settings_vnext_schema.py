@@ -90,7 +90,7 @@ def test_vnext_schema_represents_current_intent_and_state_leaves() -> None:
         "intent.desktop_audio.vad_pre_roll_ms",
         "intent.desktop_audio.vad_speech_threshold",
         "intent.integrated_context.enabled",
-        "intent.telemetry.consent",
+        "intent.telemetry.enabled",
         "intent.languages.peer_source_language",
         "intent.languages.peer_target_language",
         "intent.languages.peer_source_mode",
@@ -176,7 +176,7 @@ def test_vnext_schema_represents_current_intent_and_state_leaves() -> None:
         "state.github_star_prompt.translation_success_observed",
         "state.integrated_context.bootstrapped",
         "state.telemetry.anonymous_id",
-        "state.telemetry.sent_translation_success_dates_utc",
+        "state.telemetry.last_sent_date_utc",
         "state.managed_connection.active_managed_credential_ref",
         "state.managed_connection.active_managed_expires_at",
         "state.managed_connection.founder_letter_seen_credential_ref",
@@ -226,10 +226,9 @@ def test_telemetry_schema_defaults_keep_intent_and_operational_state_separate() 
 
     settings = schema.AppSettingsVNext()
 
-    assert settings.intent.telemetry.consent == "unknown"
-    assert settings.state.telemetry.anonymous_id is None
-    assert settings.state.telemetry.sent_translation_success_dates_utc == ()
-    assert schema.TELEMETRY_CONSENT_VALUES == frozenset({"unknown", "allow", "decline"})
+    assert settings.intent.telemetry.enabled is True
+    assert settings.state.telemetry.anonymous_id
+    assert settings.state.telemetry.last_sent_date_utc is None
 
 
 def test_vnext_schema_default_tree_excludes_raw_provider_api_key_fields() -> None:
