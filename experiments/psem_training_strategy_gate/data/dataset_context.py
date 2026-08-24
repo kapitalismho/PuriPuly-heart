@@ -6,6 +6,7 @@ from pathlib import Path
 
 from experiments.psem_training_strategy_gate.data.label_contract import (
     LabelContract,
+    LabelContractError,
     load_contract,
 )
 
@@ -52,14 +53,17 @@ def _contract_version(path: Path, *, default: str | None = None) -> str:
 
 def resolve_dataset_context(data_dir: Path) -> DatasetContext:
     resolved = data_dir.resolve()
-    source_contract = load_contract(
-        version=_contract_version(resolved / "source_manifest.jsonl", default="psem-handoff-v0")
-    )
-    label_contract = load_contract(
-        version=_contract_version(
-            resolved / "normalization_manifest.jsonl", default="psem-handoff-v0"
+    try:
+        source_contract = load_contract(
+            version=_contract_version(resolved / "source_manifest.jsonl", default="psem-handoff-v0")
         )
-    )
+        label_contract = load_contract(
+            version=_contract_version(
+                resolved / "normalization_manifest.jsonl", default="psem-handoff-v0"
+            )
+        )
+    except LabelContractError as exc:
+        raise DatasetContextError("dataset contract version is unsupported") from exc
     combination = (
         source_contract.contract_version,
         label_contract.contract_version,
