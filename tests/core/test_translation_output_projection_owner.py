@@ -25,8 +25,13 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 )
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime.output import OutputRuntime
+from puripuly_heart.core.runtime_logging import SessionLoggingMode
 from puripuly_heart.domain.events import UIEvent, UIEventType
 from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
+from tests.core.test_translation_owner_branch_coverage import (
+    _make_runtime_logging_capture,
+    _runtime_log_messages,
+)
 
 
 @dataclass(slots=True)
@@ -427,6 +432,9 @@ async def test_lifecycle_generation_retirement_rejects_output_without_new_admiss
         self_target_languages=("zh-CN", "ja"),
     )
     owner, chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
+    owner.diagnostics.runtime_logging = runtime_logging
     retired = self_children(config_owner, turn_generation=0, turn_order=3)
     assert owner.admit_self_turn(retired)
 
@@ -439,6 +447,15 @@ async def test_lifecycle_generation_retirement_rejects_output_without_new_admiss
     assert chatbox.messages == []
     assert owner.self_turn_aggregate_count == 0
     assert owner.self_turn_tombstone_count == 1
+    stale = next(
+        message
+        for message in _runtime_log_messages(log_stream)
+        if "translation_result_suppressed_stale_turn" in message
+    )
+    assert "turn_generation=0" in stale
+    assert "target_indexes=(0,)" in stale
+    assert "target_languages=('zh-CN',)" in stale
+    assert "revision=0" in stale
 
 
 @pytest.mark.asyncio

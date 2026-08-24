@@ -391,6 +391,28 @@ class SelfTranslationChannelOwner:
         if child.channel != "self":
             raise ValueError("Self translation owner received a non-Self child")
         self.runtime.translation_tasks[child.utterance_id] = task
+        if len(child.config_snapshot.value.self_target_languages) == 2:
+            presentation_revision = self.output_projection.self_turn_presentation_revision(child)
+            self.diagnostics.emit(
+                RuntimeDiagnostic(
+                    message=(
+                        "[Detailed][Translation] translation_target_started "
+                        "parent_utterance_id=%s turn_generation=%s turn_order=%s "
+                        "target_index=%s target_language=%s presentation_revision=%s "
+                        "precomputed=%s"
+                    ),
+                    args=(
+                        child.parent_utterance_id,
+                        child.turn_generation,
+                        child.turn_order,
+                        child.target_index,
+                        child.target_language,
+                        presentation_revision,
+                        child.precomputed_translation is not None,
+                    ),
+                    detailed=True,
+                )
+            )
 
     async def on_child_terminal(
         self,
