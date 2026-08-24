@@ -1,28 +1,20 @@
+import { getBrokerAbuseControlsConfig } from './abuse-controls';
 import {
-  classifyAsn,
-  getBrokerAbuseControlsConfig,
-  getBrokerAbuseRuntimeState,
-  persistBrokerAbuseRuntimeState,
-} from './abuse-controls';
-import {
-  calculateSharePercentage,
   applyAbuseMonitoringRetention,
-  resolveBrakeReason,
-  resolveCurrentAlertLevel,
+  deliverManagedCleanupIncident,
 } from './abuse-monitoring';
 import type { BrokerBindings } from './contract';
+import { sendDailyReport, type DailyReportPayload } from './discord-alerts';
 import {
+  acknowledgeManagedKeyDeliveryCleanupClaim,
+  claimStaleManagedKeyDeliveryCleanup,
   listStalePendingManagedKeyDeliveries,
-  markManagedKeyDeliveryCleanupRequired,
+  markManagedKeyDeliveryAcknowledged,
+  STALE_DELIVERY_CLEANUP_CLAIM_REASON,
 } from './managed-key-delivery';
 import { cleanupManagedChildKey } from './openrouter-management';
-import {
-  sendDailyReport,
-  type DailyReportPayload,
-} from './discord-alerts';
 import type {
   BrokerAbuseControlsConfigValue,
-  BrokerAbuseRuntimeStateValue,
   ManagedKeyDeliveryRecord,
 } from './persistence';
 import {
@@ -34,34 +26,12 @@ import {
   getTelemetryUsageDailyMetrics,
 } from './telemetry';
 
-type AlertLevel = 'warn1' | 'warn2' | 'warn3' | 'critical';
+const DAILY_REPORT_LEASE_MS = 15 * 60_000;
+const ONE_DAY_MS = 24 * 60 * 60_000;
 
-const DAILY_HEARTBEAT_SCHEMA_VERSION = 'broker_daily_heartbeat.v1';
-const DAILY_REPORT_WINDOW_MS = 24 * 60 * 60_000;
-const ROLLING_ALERT_WINDOW_MS = 60 * 60_000;
-const DAILY_REPORT_PERSIST_MAX_ATTEMPTS = 3;
-
-interface CountRow {
+interface SourceCountRow {
+  issue_source: 'discord' | 'qq';
   count: number;
-}
-
-interface EndpointCountRow {
-  endpoint: string;
-  count: number;
-}
-
-interface AsnCountRow {
-  asn: number | null;
-  count: number;
-}
-
-interface AuditRow {
-  event_kind: string;
-}
-
-interface IssueSuccessSeverityRow {
-  asn: number | null;
-  observed_at: string;
 }
 
 interface ScheduledControllerLike {
@@ -74,32 +44,105 @@ interface ExecutionContextLike {
   passThroughOnException?(): void;
 }
 
+export interface DailyReportWindow {
+  reportDateUtc: string;
+  windowStart: string;
+  windowEnd: string;
+}
+
+interface DailyReportDeliveryClaim {
+  reportDateUtc: string;
+  leaseToken: string;
+}
+
+interface DailyReportDeliveryRow {
+  report_date_utc: string;
+  status: 'pending' | 'delivered';
+}
+
 export async function handleScheduled(
   controller: ScheduledControllerLike,
-  env: Pick<BrokerBindings, 'BROKER_DB' | 'DISCORD_DAILY_REPORT_WEBHOOK_URL' | 'OPENROUTER_MANAGEMENT_API_KEY'>,
+  env: Pick<
+    BrokerBindings,
+    | 'BROKER_DB'
+    | 'DISCORD_DAILY_REPORT_WEBHOOK_URL'
+    | 'DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL'
+    | 'OPENROUTER_MANAGEMENT_API_KEY'
+  >,
   _ctx: ExecutionContextLike,
 ): Promise<void> {
   const now = new Date(controller.scheduledTime);
+  const failures: unknown[] = [];
 
-  await applyAbuseMonitoringRetention(env.BROKER_DB, now);
-  await reconcileStaleManagedKeyDeliveries(env, now);
-  await reconcileStaleReferralRewards(env.BROKER_DB, { nowIso: now.toISOString() });
-  await applyReferralRewardRetention(env.BROKER_DB, now);
+  await runScheduledPhase(failures, () =>
+    reconcileStaleManagedKeyDeliveries(env, now),
+  );
+  await runScheduledPhase(failures, () =>
+    reconcileStaleReferralRewards(env.BROKER_DB, { nowIso: now.toISOString() }),
+  );
+  await runScheduledPhase(failures, () =>
+    applyReferralRewardRetention(env.BROKER_DB, now),
+  );
 
-  const controls = await getBrokerAbuseControlsConfig(env.BROKER_DB);
-  const runtimeState = await getBrokerAbuseRuntimeState(env.BROKER_DB);
-
-  if (!shouldSendDailyReport(runtimeState, controls.dailyReport, now)) {
-    await applyTelemetryActiveDayRetention(env.BROKER_DB, now);
-    return;
+  let controls: BrokerAbuseControlsConfigValue | null = null;
+  try {
+    controls = await getBrokerAbuseControlsConfig(env.BROKER_DB);
+  } catch (error) {
+    failures.push(error);
   }
 
-  await runDailyReport(env, now, controls);
-  await applyTelemetryActiveDayRetention(env.BROKER_DB, now);
+  if (controls && isDailyReportScheduleDue(controls.dailyReport, now)) {
+    await runScheduledPhase(failures, () => runDailyReport(env, now));
+  }
+
+  await runScheduledPhase(failures, () => applyScheduledRetention(env.BROKER_DB, now));
+  throwFirstScheduledFailure(failures);
+}
+
+async function applyScheduledRetention(db: D1Database, now: Date): Promise<void> {
+  const failures: unknown[] = [];
+  let preserveIssueSuccessFrom: string | null = null;
+  await runScheduledPhase(failures, async () => {
+    preserveIssueSuccessFrom = await resolveIssueSuccessPreservationStart(db, now);
+  });
+  const preservationStart = preserveIssueSuccessFrom;
+  if (preservationStart !== null) {
+    await runScheduledPhase(failures, () =>
+      applyAbuseMonitoringRetention(db, now, {
+        preserveIssueSuccessFrom: preservationStart,
+      }),
+    );
+  }
+  await runScheduledPhase(failures, () =>
+    applyTelemetryActiveDayRetention(db, now),
+  );
+  throwFirstScheduledFailure(failures);
+}
+
+async function runScheduledPhase(
+  failures: unknown[],
+  phase: () => Promise<unknown>,
+): Promise<void> {
+  try {
+    await phase();
+  } catch (error) {
+    failures.push(error);
+  }
+}
+
+function throwFirstScheduledFailure(failures: unknown[]): void {
+  if (failures.length > 0) {
+    throw failures[0];
+  }
 }
 
 export async function reconcileStaleManagedKeyDeliveries(
-  env: Pick<BrokerBindings, 'BROKER_DB' | 'OPENROUTER_MANAGEMENT_API_KEY'>,
+  env: Pick<
+    BrokerBindings,
+    | 'BROKER_DB'
+    | 'OPENROUTER_MANAGEMENT_API_KEY'
+    | 'DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL'
+  >,
   now: Date,
 ): Promise<{ expired: number; cleanupRequired: number }> {
   let expired = 0;
@@ -110,125 +153,401 @@ export async function reconcileStaleManagedKeyDeliveries(
   });
   const nowIso = now.toISOString();
   for (const delivery of staleDeliveries) {
+    if (await isManagedKeyDeliveryFinalized(env.BROKER_DB, delivery)) {
+      const repaired =
+        delivery.status === 'pending'
+          ? (
+              await markManagedKeyDeliveryAcknowledged(env.BROKER_DB, {
+                deliveryId: delivery.delivery_id,
+                acknowledgedAt: now,
+              })
+            ).ok
+          : await acknowledgeManagedKeyDeliveryCleanupClaim(env.BROKER_DB, {
+              deliveryId: delivery.delivery_id,
+              acknowledgedAt: nowIso,
+              expectedClaimedAt: delivery.failed_at,
+            });
+      if (!repaired) {
+        throw new Error('failed to reconcile finalized managed key delivery');
+      }
+      continue;
+    }
+    const claimed = await claimStaleManagedKeyDeliveryCleanup(env.BROKER_DB, {
+      delivery,
+      claimedAt: nowIso,
+    });
+    if (!claimed) {
+      continue;
+    }
+    if (await isManagedKeyDeliveryFinalized(env.BROKER_DB, delivery)) {
+      const repaired = await acknowledgeManagedKeyDeliveryCleanupClaim(
+        env.BROKER_DB,
+        {
+          deliveryId: delivery.delivery_id,
+          acknowledgedAt: nowIso,
+          expectedClaimedAt: nowIso,
+        },
+      );
+      if (!repaired) {
+        throw new Error('failed to reconcile claimed finalized managed key delivery');
+      }
+      continue;
+    }
     const cleanup = await cleanupManagedChildKey({
       managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY,
       keyHash: delivery.managed_credential_ref,
     });
     if (!cleanup.ok) {
-      await markManagedKeyDeliveryCleanupRequired(env.BROKER_DB, {
-        deliveryId: delivery.delivery_id,
-        failedAt: nowIso,
-        failureReason: 'managed_child_key_cleanup_failed',
-      });
-      await markDeliveryOwnerCleanupRequired(env.BROKER_DB, delivery, nowIso);
-      cleanupRequired += 1;
+      let transition: Awaited<ReturnType<typeof markDeliveryCleanupRequired>>;
+      try {
+        transition = await markDeliveryCleanupRequired(
+          env.BROKER_DB,
+          delivery,
+          nowIso,
+        );
+      } catch (error) {
+        await deliverManagedCleanupIncident(env, {
+          issueSource: delivery.issue_source,
+          managedCredentialRef: delivery.managed_credential_ref,
+          phase: 'stale_delivery',
+          cleanupRequiredRecorded: false,
+          occurredAt: nowIso,
+        });
+        throw error;
+      }
+      if (transition.incidentRecorded) {
+        await deliverManagedCleanupIncident(env, {
+          issueSource: delivery.issue_source,
+          managedCredentialRef: delivery.managed_credential_ref,
+          phase: 'stale_delivery',
+          cleanupRequiredRecorded: transition.ownerRecorded,
+          occurredAt: nowIso,
+        });
+      }
+      cleanupRequired += transition.incidentRecorded ? 1 : 0;
       continue;
     }
-    await markDeliveryOwnerExpired(env.BROKER_DB, delivery, nowIso);
-    await env.BROKER_DB.prepare(
-      `UPDATE managed_key_deliveries
-          SET status = 'expired', failed_at = ?, failure_reason = 'ack_expired_child_key_cleaned'
-        WHERE delivery_id = ?
-          AND status = 'pending'`,
-    )
-      .bind(nowIso, delivery.delivery_id)
-      .run();
-    expired += 1;
+    const completed = await completeDeliveryCleanup(
+      env.BROKER_DB,
+      delivery,
+      nowIso,
+    );
+    expired += completed ? 1 : 0;
   }
   return { expired, cleanupRequired };
 }
 
-async function markDeliveryOwnerExpired(
+async function completeDeliveryCleanup(
   db: D1Database,
   delivery: ManagedKeyDeliveryRecord,
   nowIso: string,
-): Promise<void> {
+): Promise<boolean> {
   if (delivery.issue_source === 'discord') {
-    await db
-      .prepare(
+    const results = await db.batch([
+      db.prepare(
         `DELETE FROM openrouter_entitlements
           WHERE managed_credential_ref = ?
-            AND status = 'pending_release'
-            AND discord_issue_status = 'delivery_pending'`,
-      )
-      .bind(delivery.managed_credential_ref)
-      .run();
-    await db
-      .prepare(
+            AND status IN ('pending_release', 'active')
+            AND discord_issue_status IN ('delivery_pending', 'active')
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        delivery.managed_credential_ref,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
         `DELETE FROM discord_identities
           WHERE discord_user_ref = ?
             AND entitlement_installation_id = ?
-            AND status = 'issuing'`,
-      )
-      .bind(delivery.subject_ref ?? '', delivery.installation_id ?? '')
-      .run();
-    await db
-      .prepare(
+            AND status IN ('issuing', 'active')
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        delivery.subject_ref ?? '',
+        delivery.installation_id ?? '',
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
         `UPDATE referral_rewards
             SET referred_bonus_status = 'failed', referrer_bonus_status = 'failed', failure_reason = 'issue_delivery_failed', updated_at = ?
           WHERE referred_managed_credential_ref IS NULL
             AND referred_bonus_status = 'reserved'
-            AND referred_installation_id = ?`,
-      )
-      .bind(nowIso, delivery.installation_id ?? '')
-      .run();
-    return;
+            AND referred_installation_id = ?
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        nowIso,
+        delivery.installation_id ?? '',
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
+        `UPDATE managed_key_deliveries
+            SET failed_at = ?, failure_reason = 'ack_expired_child_key_cleaned'
+          WHERE delivery_id = ?
+            AND status = 'expired'
+            AND failure_reason = ?
+            AND failed_at = ?`,
+      ).bind(
+        nowIso,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+    ]);
+    return Number(results.at(-1)?.meta.changes ?? 0) === 1;
   }
   if (delivery.issue_source === 'qq') {
-    await db
-      .prepare(
+    const results = await db.batch([
+      db.prepare(
         `DELETE FROM qq_managed_entitlements
           WHERE managed_credential_ref = ?
-            AND status = 'delivery_pending'`,
-      )
-      .bind(delivery.managed_credential_ref)
-      .run();
+            AND status IN ('delivery_pending', 'active')
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        delivery.managed_credential_ref,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
+        `UPDATE managed_key_deliveries
+            SET failed_at = ?, failure_reason = 'ack_expired_child_key_cleaned'
+          WHERE delivery_id = ?
+            AND status = 'expired'
+            AND failure_reason = ?
+            AND failed_at = ?`,
+      ).bind(
+        nowIso,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+    ]);
+    return Number(results.at(-1)?.meta.changes ?? 0) === 1;
   }
+  return false;
 }
 
-async function markDeliveryOwnerCleanupRequired(
+async function markDeliveryCleanupRequired(
   db: D1Database,
   delivery: ManagedKeyDeliveryRecord,
   nowIso: string,
-): Promise<void> {
+): Promise<{ incidentRecorded: boolean; ownerRecorded: boolean }> {
   if (delivery.issue_source === 'discord') {
-    await db
-      .prepare(
+    const results = await db.batch([
+      db.prepare(
         `UPDATE openrouter_entitlements
-            SET discord_issue_status = 'cleanup_required', discord_issue_delivered_at = NULL
+            SET status = 'pending_release',
+                discord_issue_status = 'cleanup_required',
+                discord_issue_delivered_at = NULL
           WHERE managed_credential_ref = ?
-            AND status = 'pending_release'
-            AND discord_issue_status = 'delivery_pending'`,
-      )
-      .bind(delivery.managed_credential_ref)
-      .run();
-    await db
-      .prepare(
+            AND status IN ('pending_release', 'active')
+            AND discord_issue_status IN ('delivery_pending', 'active')
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        delivery.managed_credential_ref,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
         `UPDATE discord_identities
             SET status = 'cleanup_required', updated_at = ?
           WHERE discord_user_ref = ?
             AND entitlement_installation_id = ?
-            AND status = 'issuing'`,
-      )
-      .bind(nowIso, delivery.subject_ref ?? '', delivery.installation_id ?? '')
-      .run();
-    return;
+            AND status IN ('issuing', 'active')
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        nowIso,
+        delivery.subject_ref ?? '',
+        delivery.installation_id ?? '',
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
+        `UPDATE managed_key_deliveries
+            SET status = 'cleanup_required',
+                failed_at = ?,
+                failure_reason = 'managed_child_key_cleanup_failed'
+          WHERE delivery_id = ?
+            AND status = 'expired'
+            AND failure_reason = ?
+            AND failed_at = ?`,
+      ).bind(
+        nowIso,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+    ]);
+    return {
+      incidentRecorded: Number(results[2]?.meta.changes ?? 0) === 1,
+      ownerRecorded:
+        Number(results[0]?.meta.changes ?? 0) === 1 &&
+        Number(results[1]?.meta.changes ?? 0) === 1,
+    };
   }
   if (delivery.issue_source === 'qq') {
-    await db
-      .prepare(
+    const results = await db.batch([
+      db.prepare(
         `UPDATE qq_managed_entitlements
             SET status = 'cleanup_required', delivered_at = NULL, updated_at = ?
           WHERE managed_credential_ref = ?
-            AND status = 'delivery_pending'`,
-      )
-      .bind(nowIso, delivery.managed_credential_ref)
-      .run();
+            AND status IN ('delivery_pending', 'active')
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        nowIso,
+        delivery.managed_credential_ref,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
+        `UPDATE managed_key_deliveries
+            SET status = 'cleanup_required',
+                failed_at = ?,
+                failure_reason = 'managed_child_key_cleanup_failed'
+          WHERE delivery_id = ?
+            AND status = 'expired'
+            AND failure_reason = ?
+            AND failed_at = ?`,
+      ).bind(
+        nowIso,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+    ]);
+    return {
+      incidentRecorded: Number(results[1]?.meta.changes ?? 0) === 1,
+      ownerRecorded: Number(results[0]?.meta.changes ?? 0) === 1,
+    };
   }
+  return { incidentRecorded: false, ownerRecorded: false };
 }
 
-export function shouldSendDailyReport(
-  runtimeState: BrokerAbuseRuntimeStateValue,
+async function isManagedKeyDeliveryFinalized(
+  db: D1Database,
+  delivery: ManagedKeyDeliveryRecord,
+): Promise<boolean> {
+  if (delivery.issue_source === 'discord') {
+    const row = await db
+      .prepare(
+        `SELECT 1 AS finalized
+           FROM openrouter_entitlements AS entitlement
+           JOIN discord_identities AS identity
+             ON identity.entitlement_installation_id = entitlement.installation_id
+            AND identity.discord_user_ref = entitlement.discord_user_ref
+          WHERE entitlement.managed_credential_ref = ?
+            AND entitlement.status = 'active'
+            AND entitlement.discord_issue_status = 'active'
+            AND entitlement.discord_issue_delivered_at IS NOT NULL
+            AND identity.status = 'active'
+            AND EXISTS (
+              SELECT 1
+                FROM broker_issue_success_events AS event
+               WHERE event.issue_source = 'discord'
+                 AND event.managed_credential_ref = entitlement.managed_credential_ref
+            )
+          LIMIT 1`,
+      )
+      .bind(delivery.managed_credential_ref)
+      .first<{ finalized: number }>();
+    return Number(row?.finalized ?? 0) === 1;
+  }
+
+  const row = await db
+    .prepare(
+      `SELECT 1 AS finalized
+         FROM qq_managed_entitlements AS entitlement
+        WHERE entitlement.managed_credential_ref = ?
+          AND entitlement.status = 'active'
+          AND entitlement.delivered_at IS NOT NULL
+          AND EXISTS (
+            SELECT 1
+              FROM broker_issue_success_events AS event
+             WHERE event.issue_source = 'qq'
+               AND event.managed_credential_ref = entitlement.managed_credential_ref
+          )
+        LIMIT 1`,
+    )
+    .bind(delivery.managed_credential_ref)
+    .first<{ finalized: number }>();
+  return Number(row?.finalized ?? 0) === 1;
+}
+
+export function resolveDailyReportWindow(now: Date): DailyReportWindow {
+  const windowEndDate = startOfUtcDate(now);
+  const windowStartDate = new Date(windowEndDate.getTime() - ONE_DAY_MS);
+  return resolveDailyReportWindowForDate(windowStartDate.toISOString().slice(0, 10));
+}
+
+export function resolveDailyReportWindowForDate(
+  reportDateUtc: string,
+): DailyReportWindow {
+  const windowStartDate = new Date(`${reportDateUtc}T00:00:00.000Z`);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(reportDateUtc) ||
+    Number.isNaN(windowStartDate.getTime()) ||
+    windowStartDate.toISOString().slice(0, 10) !== reportDateUtc
+  ) {
+    throw new Error('daily report date must be a valid UTC calendar date');
+  }
+  const windowEndDate = new Date(windowStartDate.getTime() + ONE_DAY_MS);
+  return {
+    reportDateUtc,
+    windowStart: windowStartDate.toISOString(),
+    windowEnd: windowEndDate.toISOString(),
+  };
+}
+
+function isDailyReportScheduleDue(
   config: BrokerAbuseControlsConfigValue['dailyReport'],
   now: Date,
 ): boolean {
@@ -243,345 +562,220 @@ export function shouldSendDailyReport(
     return false;
   }
 
-  return runtimeState.dailyReport.lastDeliveredDateUtc !== now.toISOString().slice(0, 10);
+  return true;
 }
 
 export async function runDailyReport(
   env: Pick<BrokerBindings, 'BROKER_DB' | 'DISCORD_DAILY_REPORT_WEBHOOK_URL'>,
   now: Date,
-  controls?: BrokerAbuseControlsConfigValue,
-): Promise<{
-  ok: true;
-  payload: DailyReportPayload;
-}> {
-  const effectiveControls =
-    controls ?? (await getBrokerAbuseControlsConfig(env.BROKER_DB));
-  const payload = await buildDailyHeartbeatPacket(
+): Promise<{ ok: true; payload: DailyReportPayload; sent: boolean }> {
+  const reportDateUtc = await resolveNextDailyReportDate(env.BROKER_DB, now);
+  const payload = await buildDailySummaryPacketForDate(
     env.BROKER_DB,
-    now,
-    effectiveControls,
+    reportDateUtc,
   );
+  const claim = await claimDailyReportDelivery(
+    env.BROKER_DB,
+    payload.report_date_utc,
+    now,
+  );
+  if (!claim) {
+    return { ok: true, payload, sent: false };
+  }
 
-  await sendDailyReport(env.DISCORD_DAILY_REPORT_WEBHOOK_URL, payload);
-  await markDailyReportDelivered(env.BROKER_DB, now);
+  try {
+    await sendDailyReport(env.DISCORD_DAILY_REPORT_WEBHOOK_URL, payload);
+  } catch (error) {
+    await releaseDailyReportDelivery(env.BROKER_DB, claim, now);
+    throw error;
+  }
+  await completeDailyReportDelivery(env.BROKER_DB, claim, now);
 
-  return {
-    ok: true,
-    payload,
-  };
+  return { ok: true, payload, sent: true };
 }
 
-export async function buildDailyHeartbeatPacket(
+export async function buildDailySummaryPacket(
   db: BrokerBindings['BROKER_DB'],
   now: Date,
-  controls?: BrokerAbuseControlsConfigValue,
 ): Promise<DailyReportPayload> {
-  const effectiveControls = controls ?? (await getBrokerAbuseControlsConfig(db));
-  const nowIso = now.toISOString();
-  const windowStart24h = new Date(now.getTime() - DAILY_REPORT_WINDOW_MS).toISOString();
+  const window = resolveDailyReportWindow(now);
+  return buildDailySummaryPacketForWindow(db, window);
+}
 
-  const [
-    requestCountsResult,
-    issueCountRow,
-    asnCountResult,
-    issueSeverityResult,
-    auditResult,
-    manualRevocationCountRow,
-    translationUsage,
-  ] =
-    await Promise.all([
-      db
-        .prepare(
-          `SELECT endpoint, COUNT(*) AS count
-             FROM broker_request_events
-            WHERE observed_at >= ?
-              AND observed_at <= ?
-            GROUP BY endpoint`,
-        )
-        .bind(windowStart24h, nowIso)
-        .all<EndpointCountRow>(),
-      db
-        .prepare(
-          `SELECT COUNT(*) AS count
-             FROM broker_issue_success_events
-            WHERE observed_at >= ?
-              AND observed_at <= ?`,
-        )
-        .bind(windowStart24h, nowIso)
-        .first<CountRow>(),
-      db
-        .prepare(
-          `SELECT asn, COUNT(*) AS count
-             FROM broker_issue_success_events
-            WHERE observed_at >= ?
-              AND observed_at <= ?
-              AND asn IS NOT NULL
-            GROUP BY asn
-            ORDER BY count DESC, asn ASC`,
-        )
-        .bind(windowStart24h, nowIso)
-        .all<AsnCountRow>(),
-      db
-        .prepare(
-          `SELECT asn, observed_at
-             FROM broker_issue_success_events
-            WHERE observed_at >= ?
-              AND observed_at <= ?
-            ORDER BY observed_at ASC`,
-        )
-        .bind(
-          new Date(now.getTime() - DAILY_REPORT_WINDOW_MS - ROLLING_ALERT_WINDOW_MS).toISOString(),
-          nowIso,
-        )
-        .all<IssueSuccessSeverityRow>(),
-      db
-        .prepare(
-          `SELECT event_kind
-             FROM broker_abuse_runtime_audit
-            WHERE created_at >= ?
-              AND created_at <= ?
-              AND event_kind IN ('immediate_alert_levels_emitted', 'brake_transition')`,
-        )
-        .bind(windowStart24h, nowIso)
-        .all<AuditRow>(),
-      db
-        .prepare(
-          `SELECT COUNT(*) AS count
-             FROM broker_abuse_subject_hooks
-            WHERE hook_kind = 'revocation'
-              AND created_at >= ?
-              AND created_at <= ?`,
-        )
-        .bind(windowStart24h, nowIso)
-        .first<CountRow>(),
-      getTelemetryUsageDailyMetrics(db, now),
-    ]);
+async function buildDailySummaryPacketForDate(
+  db: BrokerBindings['BROKER_DB'],
+  reportDateUtc: string,
+): Promise<DailyReportPayload> {
+  return buildDailySummaryPacketForWindow(
+    db,
+    resolveDailyReportWindowForDate(reportDateUtc),
+  );
+}
 
-  const issueSuccess24h = Number(issueCountRow?.count ?? 0);
-  const requestCounts = Object.fromEntries(
-    requestCountsResult.results.map((row: EndpointCountRow) => [
-      row.endpoint,
-      Number(row.count),
-    ]),
-  ) as Record<string, number>;
-  const allAsnCounts = asnCountResult.results.map((row: AsnCountRow) => {
-    const count = Number(row.count);
-    const classification = effectiveControls.asnClassifications.find(
-      (entry) => entry.asn === row.asn,
-    );
+async function buildDailySummaryPacketForWindow(
+  db: BrokerBindings['BROKER_DB'],
+  window: DailyReportWindow,
+): Promise<DailyReportPayload> {
+  const [sourceCountsResult, translationUsage] = await Promise.all([
+    db
+      .prepare(
+        `SELECT issue_source,
+                COUNT(DISTINCT CASE
+                  WHEN managed_credential_ref IS NULL THEN 'legacy-event:' || id
+                  ELSE 'managed-credential:' || managed_credential_ref
+                END) AS count
+           FROM broker_issue_success_events
+          WHERE julianday(observed_at) >= julianday(?)
+            AND julianday(observed_at) < julianday(?)
+          GROUP BY issue_source`,
+      )
+      .bind(window.windowStart, window.windowEnd)
+      .all<SourceCountRow>(),
+    getTelemetryUsageDailyMetrics(db, window.reportDateUtc),
+  ]);
+  const sourceCounts = Object.fromEntries(
+    sourceCountsResult.results.map((row) => [row.issue_source, Number(row.count)]),
+  ) as Partial<Record<SourceCountRow['issue_source'], number>>;
+  const keysDeliveredDiscord = sourceCounts.discord ?? 0;
+  const keysDeliveredQq = sourceCounts.qq ?? 0;
 
-    return {
-      asn: Number(row.asn),
-      count,
-      share: issueSuccess24h === 0 ? 0 : Math.round((count / issueSuccess24h) * 100),
-      kind: classifyAsn(row.asn, effectiveControls),
-      display_name: classification?.displayName ?? null,
-    };
-  });
-  const topAsns: DailyReportPayload['summary']['top_asns'] = allAsnCounts.slice(0, 5);
-  const cloudAsnIssueCount = allAsnCounts
-    .filter(
-      (entry: DailyReportPayload['summary']['top_asns'][number]) =>
-        entry.kind === 'cloud_or_vps',
-    )
-    .reduce(
-      (sum: number, entry: DailyReportPayload['summary']['top_asns'][number]) =>
-        sum + entry.count,
-      0,
-    );
   return {
-    schema_version: DAILY_HEARTBEAT_SCHEMA_VERSION,
-    generated_at: nowIso,
-    window_start_24h: windowStart24h,
-    window_end_24h: nowIso,
+    schema_version: 'puripuly_daily_summary.v2',
+    report_date_utc: window.reportDateUtc,
+    window_start: window.windowStart,
+    window_end: window.windowEnd,
     summary: {
-      challenge_24h: requestCounts['POST /v1/trial/challenge'] ?? 0,
-      verify_24h: requestCounts['POST /v1/trial/challenge/verify'] ?? 0,
-      issue_success_24h: issueSuccess24h,
-      highest_alert_level_24h: resolveHighestAlertLevelFromIssueEvents({
-        rows: issueSeverityResult.results,
-        now,
-        controls: effectiveControls,
-      }),
-      brake_triggered_24h: auditResult.results.some(
-        (row: AuditRow) => row.event_kind === 'brake_transition',
-      ),
-      top_asns: topAsns,
-      cloud_asn_share_24h:
-        issueSuccess24h === 0 ? 0 : Math.round((cloudAsnIssueCount / issueSuccess24h) * 100),
-      manual_revocations_24h: Number(manualRevocationCountRow?.count ?? 0),
-      translation_usage: translationUsage,
+      keys_delivered_total: keysDeliveredDiscord + keysDeliveredQq,
+      keys_delivered_discord: keysDeliveredDiscord,
+      keys_delivered_qq: keysDeliveredQq,
+      ...translationUsage,
     },
   };
 }
 
-export async function markDailyReportDelivered(
+async function resolveNextDailyReportDate(
   db: BrokerBindings['BROKER_DB'],
   now: Date,
+): Promise<string> {
+  const latestCompletedDateUtc = resolveDailyReportWindow(now).reportDateUtc;
+  const rows = await db
+    .prepare(
+      `SELECT report_date_utc, status
+         FROM broker_daily_summary_deliveries
+        WHERE report_date_utc <= ?
+        ORDER BY report_date_utc`,
+    )
+    .bind(latestCompletedDateUtc)
+    .all<DailyReportDeliveryRow>();
+  const pendingDateUtc = rows.results.find(
+    (row) => row.status === 'pending',
+  )?.report_date_utc;
+  const lastDeliveredDateUtc = rows.results
+    .filter((row) => row.status === 'delivered')
+    .at(-1)?.report_date_utc;
+  const nextAfterDeliveredUtc = lastDeliveredDateUtc
+    ? addUtcDays(lastDeliveredDateUtc, 1)
+    : null;
+  const candidates = [pendingDateUtc, nextAfterDeliveredUtc]
+    .filter((value): value is string => Boolean(value))
+    .filter((value) => value <= latestCompletedDateUtc)
+    .sort();
+  return candidates[0] ?? latestCompletedDateUtc;
+}
+
+async function resolveIssueSuccessPreservationStart(
+  db: BrokerBindings['BROKER_DB'],
+  now: Date,
+): Promise<string> {
+  const reportDateUtc = await resolveNextDailyReportDate(db, now);
+  return resolveDailyReportWindowForDate(reportDateUtc).windowStart;
+}
+
+async function claimDailyReportDelivery(
+  db: BrokerBindings['BROKER_DB'],
+  reportDateUtc: string,
+  now: Date,
+): Promise<DailyReportDeliveryClaim | null> {
+  const leaseToken = crypto.randomUUID();
+  const attemptedAt = now.toISOString();
+  const leaseExpiresAt = new Date(
+    now.getTime() + DAILY_REPORT_LEASE_MS,
+  ).toISOString();
+  const result = await db
+    .prepare(
+      `INSERT INTO broker_daily_summary_deliveries (
+          report_date_utc,
+          status,
+          lease_token,
+          lease_expires_at,
+          attempted_at,
+          delivered_at
+        ) VALUES (?, 'pending', ?, ?, ?, NULL)
+        ON CONFLICT(report_date_utc) DO UPDATE SET
+          status = 'pending',
+          lease_token = excluded.lease_token,
+          lease_expires_at = excluded.lease_expires_at,
+          attempted_at = excluded.attempted_at,
+          delivered_at = NULL
+        WHERE broker_daily_summary_deliveries.status = 'pending'
+          AND broker_daily_summary_deliveries.lease_expires_at <= excluded.attempted_at`,
+    )
+    .bind(reportDateUtc, leaseToken, leaseExpiresAt, attemptedAt)
+    .run();
+
+  if (Number(result.meta?.changes ?? 0) !== 1) {
+    return null;
+  }
+
+  return { reportDateUtc, leaseToken };
+}
+
+async function releaseDailyReportDelivery(
+  db: BrokerBindings['BROKER_DB'],
+  claim: DailyReportDeliveryClaim,
+  now: Date,
 ): Promise<void> {
-  const deliveredAt = now.toISOString();
-  const deliveredDateUtc = deliveredAt.slice(0, 10);
-  let runtimeState = await getBrokerAbuseRuntimeState(db);
+  await db
+    .prepare(
+      `UPDATE broker_daily_summary_deliveries
+          SET lease_expires_at = ?
+        WHERE report_date_utc = ?
+          AND status = 'pending'
+          AND lease_token = ?`,
+    )
+    .bind(now.toISOString(), claim.reportDateUtc, claim.leaseToken)
+    .run();
+}
 
-  for (let attempt = 0; attempt < DAILY_REPORT_PERSIST_MAX_ATTEMPTS; attempt += 1) {
-    if (
-      runtimeState.dailyReport.lastDeliveredAt === deliveredAt &&
-      runtimeState.dailyReport.lastDeliveredDateUtc === deliveredDateUtc
-    ) {
-      return;
-    }
+async function completeDailyReportDelivery(
+  db: BrokerBindings['BROKER_DB'],
+  claim: DailyReportDeliveryClaim,
+  now: Date,
+): Promise<void> {
+  const result = await db
+    .prepare(
+      `UPDATE broker_daily_summary_deliveries
+          SET status = 'delivered', delivered_at = ?
+        WHERE report_date_utc = ?
+          AND status = 'pending'
+          AND lease_token = ?`,
+    )
+    .bind(now.toISOString(), claim.reportDateUtc, claim.leaseToken)
+    .run();
 
-    const nextRuntimeState = structuredClone(runtimeState);
-    nextRuntimeState.dailyReport = {
-      lastDeliveredAt: deliveredAt,
-      lastDeliveredDateUtc: deliveredDateUtc,
-    };
-
-    if (await persistBrokerAbuseRuntimeState(db, runtimeState, nextRuntimeState)) {
-      return;
-    }
-
-    runtimeState = await getBrokerAbuseRuntimeState(db);
+  if (Number(result.meta?.changes ?? 0) !== 1) {
+    throw new Error('failed to persist daily summary delivery outcome');
   }
+}
 
-  if (
-    runtimeState.dailyReport.lastDeliveredAt === deliveredAt &&
-    runtimeState.dailyReport.lastDeliveredDateUtc === deliveredDateUtc
-  ) {
-    return;
-  }
-
-  throw new Error(
-    'failed to persist daily report delivery stamp after runtime-state write conflict',
+function startOfUtcDate(date: Date): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
   );
 }
 
-function resolveHighestAlertLevelFromIssueEvents(input: {
-  rows: IssueSuccessSeverityRow[];
-  now: Date;
-  controls: BrokerAbuseControlsConfigValue;
-}): AlertLevel | null {
-  const windowStartMs = input.now.getTime() - DAILY_REPORT_WINDOW_MS;
-  const windowEndMs = input.now.getTime();
-  const priority: Record<AlertLevel, number> = {
-    warn1: 1,
-    warn2: 2,
-    warn3: 3,
-    critical: 4,
-  };
-
-  let highest: AlertLevel | null = null;
-  const windowRows = input.rows
-    .map((row) => ({
-      ...row,
-      observedAtMs: new Date(row.observed_at).getTime(),
-    }))
-    .sort((left, right) => left.observedAtMs - right.observedAtMs);
-  const evaluationTimesMs = new Set<number>([windowStartMs]);
-
-  for (const row of windowRows) {
-    if (row.observedAtMs >= windowStartMs && row.observedAtMs <= windowEndMs) {
-      evaluationTimesMs.add(row.observedAtMs);
-    }
-
-    const windowExitMs = row.observedAtMs + ROLLING_ALERT_WINDOW_MS + 1;
-    if (windowExitMs >= windowStartMs && windowExitMs <= windowEndMs) {
-      evaluationTimesMs.add(windowExitMs);
-    }
-  }
-
-  const sortedEvaluationTimesMs = [...evaluationTimesMs].sort((left, right) => left - right);
-  const asnCounts = new Map<number, number>();
-  let enterIndex = 0;
-  let exitIndex = 0;
-  let issueSuccess1h = 0;
-
-  for (const evaluationTimeMs of sortedEvaluationTimesMs) {
-    while (
-      enterIndex < windowRows.length &&
-      windowRows[enterIndex]!.observedAtMs <= evaluationTimeMs
-    ) {
-      issueSuccess1h += 1;
-      incrementAsnCount(asnCounts, windowRows[enterIndex]!.asn);
-      enterIndex += 1;
-    }
-
-    const rollingWindowStartMs = evaluationTimeMs - ROLLING_ALERT_WINDOW_MS;
-    while (
-      exitIndex < enterIndex &&
-      windowRows[exitIndex]!.observedAtMs < rollingWindowStartMs
-    ) {
-      issueSuccess1h -= 1;
-      decrementAsnCount(asnCounts, windowRows[exitIndex]!.asn);
-      exitIndex += 1;
-    }
-
-    const baseAlertLevel = resolveCurrentAlertLevel(
-      issueSuccess1h,
-      input.controls.immediateAlerts,
-    );
-    const topAsn = resolveTopAsn(asnCounts);
-    const topAsnSharePct = calculateSharePercentage(
-      topAsn?.count ?? 0,
-      issueSuccess1h,
-    );
-    const effectiveAlertLevel =
-      resolveBrakeReason({
-        issueSuccess1h,
-        topAsnSharePct,
-        topAsnKind: classifyAsn(topAsn?.asn ?? null, input.controls),
-        controls: input.controls,
-      }) !== null
-        ? 'critical'
-        : baseAlertLevel;
-
-    if (
-      effectiveAlertLevel !== null &&
-      (highest === null || priority[effectiveAlertLevel] > priority[highest])
-    ) {
-      highest = effectiveAlertLevel;
-    }
-  }
-
-  return highest;
-}
-
-function incrementAsnCount(counts: Map<number, number>, asn: number | null): void {
-  if (asn === null) {
-    return;
-  }
-
-  counts.set(asn, (counts.get(asn) ?? 0) + 1);
-}
-
-function decrementAsnCount(counts: Map<number, number>, asn: number | null): void {
-  if (asn === null) {
-    return;
-  }
-
-  const nextCount = (counts.get(asn) ?? 0) - 1;
-  if (nextCount <= 0) {
-    counts.delete(asn);
-    return;
-  }
-
-  counts.set(asn, nextCount);
-}
-
-function resolveTopAsn(
-  counts: Map<number, number>,
-): { asn: number; count: number } | null {
-  let topAsn: { asn: number; count: number } | null = null;
-
-  for (const [asn, count] of counts.entries()) {
-    if (
-      topAsn === null ||
-      count > topAsn.count ||
-      (count === topAsn.count && asn < topAsn.asn)
-    ) {
-      topAsn = { asn, count };
-    }
-  }
-
-  return topAsn;
+function addUtcDays(dateUtc: string, days: number): string {
+  const date = new Date(`${dateUtc}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }

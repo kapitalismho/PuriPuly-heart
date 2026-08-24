@@ -23,7 +23,6 @@ const POSITIVE_ROUTING_PROBE_MODELS = MANAGED_ALLOWLIST_MODELS.filter(
 );
 const EMPTY_CONTENT_ALLOWED_POSITIVE_ROUTING_MODELS = new Set([
   'deepseek/deepseek-v4-flash-0731',
-  'deepseek/deepseek-v4-flash-0423',
   'deepseek/deepseek-v4-flash',
 ]);
 const BOOTSTRAP_PLACEHOLDER = '__BOOTSTRAP_REQUIRED__';
@@ -95,7 +94,7 @@ describe('broker deploy smoke helpers', () => {
             ],
           },
         },
-        'qwen/qwen3.5-flash-02-23',
+        'google/gemma-4-31b-it',
       ),
     ).not.toThrow();
   });
@@ -132,14 +131,14 @@ describe('broker deploy smoke helpers', () => {
     ).toThrow(/must differ from the managed allowlisted models/i);
     expect(() =>
       normalizeDisallowedModel(
-        'qwen/qwen3.5-flash-02-23',
+        'google/gemma-4-31b-it',
         MANAGED_ALLOWLIST_MODELS,
         true,
       ),
     ).toThrow(/must differ from the managed allowlisted models/i);
     expect(() =>
       normalizeDisallowedModel(
-        'google/gemini-2.5-flash-lite',
+        'google/gemma-4-31b-it',
         MANAGED_ALLOWLIST_MODELS,
         true,
       ),
@@ -147,13 +146,6 @@ describe('broker deploy smoke helpers', () => {
     expect(() =>
       normalizeDisallowedModel(
         'deepseek/deepseek-v4-flash-0731',
-        MANAGED_ALLOWLIST_MODELS,
-        true,
-      ),
-    ).toThrow(/must differ from the managed allowlisted models/i);
-    expect(() =>
-      normalizeDisallowedModel(
-        'deepseek/deepseek-v4-flash-0423',
         MANAGED_ALLOWLIST_MODELS,
         true,
       ),
@@ -169,11 +161,9 @@ describe('broker deploy smoke helpers', () => {
 
   it('keeps the positive routing probes pinned to the managed secondary models', () => {
     expect(POSITIVE_ROUTING_PROBE_MODELS).toEqual([
-      'qwen/qwen3.5-flash-02-23',
+      'google/gemma-4-31b-it',
       'deepseek/deepseek-v4-flash-0731',
-      'deepseek/deepseek-v4-flash-0423',
       'deepseek/deepseek-v4-flash',
-      'google/gemini-2.5-flash-lite',
     ]);
     expect(MANAGED_ALLOWLIST_MODELS).toEqual(MANAGED_TRIAL_ALLOWED_MODELS);
   });
@@ -280,13 +270,13 @@ describe('broker deploy smoke helpers', () => {
             },
           },
         },
-        'qwen/qwen3.5-flash-02-23',
+        'google/gemma-4-31b-it',
       );
     } catch (error) {
       failureMessage = readErrorMessage(error);
     }
 
-    expect(failureMessage).toContain('qwen/qwen3.5-flash-02-23');
+    expect(failureMessage).toContain('google/gemma-4-31b-it');
     expect(failureMessage).toContain('502');
     expect(failureMessage).toContain('response body redacted');
     expectFailureMessageExcludesSensitiveSentinels(failureMessage);

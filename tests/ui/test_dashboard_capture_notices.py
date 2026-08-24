@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import pytest
 
+from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
 from puripuly_heart.ui.dashboard import capture_notices
 from puripuly_heart.ui.dashboard.capture_notices import (
     GPU_NOTICE_KEYS,
     LOCAL_ASR_NOTICE_KEYS,
+    MANAGED_GEMMA_NOTICE_KEYS,
     gpu_capture_action_label,
     gpu_capture_notice,
     local_asr_capture_notice,
+    managed_gemma_action_label,
+    managed_gemma_capture_notice,
 )
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice
 
@@ -105,3 +109,22 @@ def test_gpu_install_progress_renders_percent() -> None:
 def test_gpu_action_label_is_localized_only_when_an_action_exists() -> None:
     assert gpu_capture_action_label(None) is None
     assert gpu_capture_action_label("repair") == "i18n:dashboard.gpu_action.repair"
+
+
+@pytest.mark.parametrize("status", sorted(MANAGED_GEMMA_NOTICE_KEYS))
+def test_every_managed_gemma_status_renders_text_and_tone(status: str) -> None:
+    notice = managed_gemma_capture_notice(
+        ManagedGemmaDashboardNotice(status=status, progress_percent=42)
+    )
+
+    assert notice is not None
+    assert notice.tone in {"info", "warning", "error"}
+    if status == "downloading":
+        assert notice.text == ("i18n:dashboard.managed_gemma_notice.downloading:percent=42")
+    else:
+        assert notice.text == f"i18n:{MANAGED_GEMMA_NOTICE_KEYS[status]}"
+
+
+def test_managed_gemma_notice_actions_are_localized() -> None:
+    assert managed_gemma_action_label(None) is None
+    assert managed_gemma_action_label("cancel") == ("i18n:dashboard.managed_gemma_action.cancel")

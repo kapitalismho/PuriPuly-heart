@@ -20,7 +20,6 @@ from puripuly_heart.ui.settings.contract import (
     SettingsSurfaceIntents,
 )
 from puripuly_heart.ui.settings.renderer import (
-    SETTINGS_API_GPU_PLACEHOLDER_COUNT,
     SETTINGS_ROW_SPACING,
     compose_settings_api_surface,
     compose_settings_general_surface,
@@ -53,7 +52,10 @@ class _SlotProvider:
                 "translation_connection",
                 "translation_fallback",
                 "gpu_device",
+                "gpu_llm",
+                "gpu_refresh",
                 "local_llm_connection",
+                "custom_stt_connection",
                 "managed_key",
                 "peer_expected_language",
                 "api_keys",
@@ -78,8 +80,17 @@ class _SlotProvider:
     def gpu_device_control(self) -> ft.Control:
         return self.controls["gpu_device"]
 
+    def gpu_llm_control(self) -> ft.Control:
+        return self.controls["gpu_llm"]
+
+    def gpu_refresh_control(self) -> ft.Control:
+        return self.controls["gpu_refresh"]
+
     def local_llm_connection_control(self) -> ft.Control:
         return self.controls["local_llm_connection"]
+
+    def custom_stt_connection_control(self) -> ft.Control:
+        return self.controls["custom_stt_connection"]
 
     def managed_key_control(self) -> ft.Control:
         return self.controls["managed_key"]
@@ -128,6 +139,7 @@ def test_settings_api_surface_preserves_the_accepted_row_order() -> None:
         surface.translation_connection_row,
         surface.gpu_device_row,
         provider.controls["local_llm_connection"],
+        provider.controls["custom_stt_connection"],
         provider.controls["managed_key"],
         provider.controls["peer_expected_language"],
         provider.controls["api_keys"],
@@ -137,7 +149,7 @@ def test_settings_api_surface_preserves_the_accepted_row_order() -> None:
 def test_settings_api_surface_places_every_slot_in_the_accepted_position() -> None:
     surface, provider, placeholders = _compose()
 
-    assert len(placeholders) == 1 + SETTINGS_API_GPU_PLACEHOLDER_COUNT
+    assert len(placeholders) == 1
     assert surface.provider_controls.controls == [
         provider.controls["self_stt"],
         provider.controls["peer_stt"],
@@ -150,7 +162,8 @@ def test_settings_api_surface_places_every_slot_in_the_accepted_position() -> No
     ]
     assert surface.gpu_device_controls.controls == [
         provider.controls["gpu_device"],
-        *surface.gpu_device_placeholders,
+        provider.controls["gpu_llm"],
+        provider.controls["gpu_refresh"],
     ]
 
 
@@ -200,7 +213,7 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     )
     general = SettingsGeneralIntents(
         start_microphone_test=make("start_microphone_test"),
-        telemetry_consent_change=make("telemetry_consent_change"),
+        telemetry_enabled_change=make("telemetry_enabled_change"),
         list_loopback_capture_options=make("list_loopback_capture_options"),
         list_loopback_process_options=make("list_loopback_process_options"),
         list_loopback_device_options=make("list_loopback_device_options"),
@@ -241,7 +254,7 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     assert view.on_local_llm_secret_changed is provider.local_llm_secret_changed
     assert view.on_gpu_discovery_requested is provider.gpu_discovery_requested
     assert view.on_start_microphone_test is general.start_microphone_test
-    assert view.on_telemetry_consent_change is general.telemetry_consent_change
+    assert view.on_telemetry_enabled_change is general.telemetry_enabled_change
     assert view.on_list_loopback_capture_options is general.list_loopback_capture_options
     assert view.on_list_loopback_process_options is general.list_loopback_process_options
     assert view.on_list_loopback_device_options is general.list_loopback_device_options
@@ -294,7 +307,7 @@ def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
         ),
         general=SettingsGeneralIntents(
             start_microphone_test=lambda *_a, **_k: None,
-            telemetry_consent_change=lambda *_a, **_k: None,
+            telemetry_enabled_change=lambda *_a, **_k: None,
             list_loopback_capture_options=lambda *_a, **_k: None,
             list_loopback_process_options=lambda *_a, **_k: None,
             list_loopback_device_options=lambda *_a, **_k: None,
@@ -365,7 +378,7 @@ def test_general_surface_preserves_the_accepted_row_order_and_spacing() -> None:
     assert surface.clipboard_row.content.controls == [
         slots.clipboard_auto_translate,
         slots.vrchat_mic_intercept,
-        slots.telemetry_consent,
+        slots.telemetry_enabled,
     ]
     for row in surface.rows:
         assert row.visible is True
@@ -414,9 +427,9 @@ def test_overlay_surface_preserves_the_accepted_six_rows_and_recovery_visibility
         slots.desktop_background_alpha,
     ]
     assert surface.rows[4].content.controls == [
+        slots.desktop_swap_caption_languages,
         slots.desktop_reset,
-        slots.desktop_reset_spacer_a,
-        slots.desktop_reset_spacer_b,
+        slots.desktop_reset_spacer,
     ]
     assert surface.recovery_row.content.controls == [
         slots.desktop_status,

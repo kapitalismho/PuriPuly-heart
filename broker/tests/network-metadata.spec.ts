@@ -55,4 +55,20 @@ describe('request network metadata extraction', () => {
 
     expect(metadata.asn).toBe(24940);
   });
+
+  it('does not derive a risk label from HTTP or TLS metadata', async () => {
+    const env = createTestBrokerEnv();
+    const request = requestWithCloudflareMetadata({
+      httpProtocol: 'HTTP/1.1',
+      tlsVersion: 'TLSv1.0',
+      tlsCipher: 'legacy-cipher',
+    });
+
+    const metadata = await extractRequestNetworkMetadata(
+      createContextWithRequest(request),
+      env.BROKER_DB,
+    );
+
+    expect(metadata.riskLabel).toBeNull();
+  });
 });

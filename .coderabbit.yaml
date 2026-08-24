@@ -8,6 +8,8 @@ reviews:
   auto_review:
     enabled: true
     auto_incremental_review: true
+    ignore_usernames:
+      - "kapitalismho"
   path_filters:
     - "!installer_output/**"
     - "!dist/**"

@@ -1141,6 +1141,7 @@
         "puripuly_heart.app.wiring.wiring_local_asr_application",
         "puripuly_heart.app.wiring.wiring_local_asr_provider_runtime",
         "puripuly_heart.app.wiring.wiring_managed_account",
+        "puripuly_heart.app.wiring.wiring_managed_gemma",
         "puripuly_heart.app.wiring.wiring_microphone_test",
         "puripuly_heart.app.wiring.wiring_peer_application",
         "puripuly_heart.app.wiring.wiring_provider_runtime",
@@ -1215,9 +1216,18 @@
       "surface": "provider LLM internal error-detail helpers",
       "classification": "internal_provider_implementation_modules",
       "modules": [
-        "puripuly_heart.providers.llm.error_details"
+        "puripuly_heart.providers.llm.error_details",
+        "puripuly_heart.providers.llm.managed_gemma"
       ],
-      "rationale": "Provider error-detail helpers redact and extract safe diagnostic fragments for LLM adapters. They are internal implementation contracts, not external public compatibility facades."
+      "rationale": "Provider error-detail helpers and managed local-model adapters are internal implementation contracts, not external public compatibility facades."
+    },
+    {
+      "surface": "managed local translation runtime and asset modules",
+      "classification": "internal_local_translation_runtime",
+      "module_prefixes": [
+        "puripuly_heart.core.local_translation"
+      ],
+      "rationale": "Managed local-translation provisioning, runtime ownership, profiles, and package exports are internal composition contracts rather than external public compatibility facades."
     },
     {
       "surface": "provider STT local decode coordinator",

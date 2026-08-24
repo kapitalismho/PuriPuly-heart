@@ -10,9 +10,9 @@ from puripuly_heart.app.ports.osc_control import (
     FALLBACK_ID_BY_ALIAS,
     LANGUAGE_ID_BY_CODE,
     OSC_PARAMETER_ADDRESS_PREFIX,
-    TRANSLATION_MODEL_ID_BY_VALUE,
     OscControlCodecError,
     OscSenderPort,
+    translation_model_id_for_selection,
     validate_control_value,
 )
 
@@ -33,6 +33,7 @@ class OscCanonicalState:
     self_asr: str = "local_cpu_auto"
     peer_asr: str = "local_cpu_auto"
     translation_model: str = "gemma4_26b_31b"
+    translation_connection: str = "managed"
     fallback: str = "none"
 
 
@@ -155,9 +156,10 @@ class OscStatePublisher:
                 "PuriPuly_PeerDstLang": LANGUAGE_ID_BY_CODE[fields_by_name["peer_target_language"]],
                 "PuriPuly_SelfASR": ASR_ID_BY_PROVIDER[fields_by_name["self_asr"]],
                 "PuriPuly_PeerASR": ASR_ID_BY_PROVIDER[fields_by_name["peer_asr"]],
-                "PuriPuly_Translator": TRANSLATION_MODEL_ID_BY_VALUE[
-                    fields_by_name["translation_model"]
-                ],
+                "PuriPuly_Translator": translation_model_id_for_selection(
+                    fields_by_name["translation_model"],
+                    fields_by_name["translation_connection"],
+                ),
                 "PuriPuly_Fallback": FALLBACK_ID_BY_ALIAS[fields_by_name["fallback"]],
             }
         )
@@ -185,11 +187,21 @@ def state_from_settings(
         self_target_language=languages.target_language,
         peer_source_language=languages.peer_source_language,
         peer_target_language=languages.peer_target_language,
-        self_asr=settings.provider.stt.value,
-        peer_asr=settings.provider.peer_stt.value,
+        self_asr=_osc_asr_provider(settings.provider.stt, settings.custom_stt.mode),
+        peer_asr=_osc_asr_provider(settings.provider.peer_stt, settings.custom_stt.mode),
         translation_model=settings.translation.model.value,
+        translation_connection=settings.translation.connection.value,
         fallback=fallback_alias_from_settings(settings),
     )
+
+
+def _osc_asr_provider(provider: object, custom_mode: object) -> str:
+    value = str(getattr(provider, "value", provider))
+    if value != "custom":
+        return value
+    if str(custom_mode) == "realtime":
+        return "custom_realtime"
+    return "custom_offline"
 
 
 def fallback_alias_from_settings(settings: Any) -> str:

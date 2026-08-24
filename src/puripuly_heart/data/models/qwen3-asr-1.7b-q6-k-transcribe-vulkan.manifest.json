@@ -3,6 +3,7 @@
   "installed_manifest_version": 1,
   "model_id": "qwen3-asr-1.7b-q6-k-transcribe-vulkan",
   "engine": "transcribe.cpp-vulkan",
+  "license": "Apache-2.0",
   "upstream_repo": "Qwen/Qwen3-ASR-1.7B@7278e1e70fe206f11671096ffdd38061171dd6e5",
   "install_dirname": "qwen3-asr-1.7b-q6-k-transcribe-vulkan",
   "installed_manifest_filename": "installed-manifest.json",

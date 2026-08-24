@@ -4,6 +4,8 @@ import asyncio
 import contextlib
 import inspect
 import json
+import logging
+import os
 import socket
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
@@ -24,6 +26,10 @@ from puripuly_heart.core.osc.oscquery_contract import (
 
 OSCJSON_SERVICE_TYPE = "_oscjson._tcp.local."
 OSC_SERVICE_TYPE = "_osc._udp.local."
+OSCQUERY_ADVERTISEMENT_TTL_SECONDS = 120
+_UNREGISTER_RETRY_DELAY_SECONDS = 0.05
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -143,6 +149,7 @@ class ZeroconfOscQueryService(OscQueryServicePort):
             resolved = await self._resolve_host_info(candidate)
             if resolved is not None:
                 return resolved
+            self._forget_service(candidate.service_id)
         return None
 
     async def advertise_receiver(self, advertisement: OscQueryAdvertisement) -> None:
@@ -163,7 +170,9 @@ class ZeroconfOscQueryService(OscQueryServicePort):
             from zeroconf import ServiceInfo
 
             address = socket.inet_aton(advertisement.host)
-            name = _service_name(self.advertisement.service_name)
+            name = mdns_instance_name(self.advertisement.service_name)
+            await self._forget_unreachable_puripuly_services()
+            self._forget_service(name)
             server = f"{_service_name(socket.gethostname())}.local."
             properties = {
                 b"txtvers": b"1",
@@ -180,6 +189,8 @@ class ZeroconfOscQueryService(OscQueryServicePort):
                     port=query_port,
                     properties=properties,
                     server=server,
+                    host_ttl=OSCQUERY_ADVERTISEMENT_TTL_SECONDS,
+                    other_ttl=OSCQUERY_ADVERTISEMENT_TTL_SECONDS,
                 ),
                 ServiceInfo(
                     OSC_SERVICE_TYPE,
@@ -188,30 +199,92 @@ class ZeroconfOscQueryService(OscQueryServicePort):
                     port=advertisement.port,
                     properties=properties,
                     server=server,
+                    host_ttl=OSCQUERY_ADVERTISEMENT_TTL_SECONDS,
+                    other_ttl=OSCQUERY_ADVERTISEMENT_TTL_SECONDS,
                 ),
             ]
         except (ImportError, OSError, ValueError) as exc:
             await self._close_http_server()
             self.advertisement = None
             raise RuntimeError("failed to create OSCQuery advertisement") from exc
-        self._registered_infos = infos
-        for info in infos:
-            await asyncio.to_thread(self._zeroconf.register_service, info)
+        registered: list[object] = []
+        try:
+            for info in infos:
+                await self._register_service(info)
+                registered.append(info)
+        except BaseException:
+            self._registered_infos = registered
+            await self._unregister_registered_infos()
+            await self._close_http_server()
+            self.advertisement = None
+            raise
+        self._registered_infos = registered
 
     async def unadvertise_receiver(self) -> None:
-        zeroconf = self._zeroconf
-        infos = tuple(self._registered_infos)
-        self._registered_infos.clear()
-        if zeroconf is not None:
-            unregister = getattr(zeroconf, "unregister_service", None)
-            if callable(unregister):
-                for info in infos:
-                    with contextlib.suppress(Exception):
-                        await asyncio.to_thread(unregister, info)
+        await self._unregister_registered_infos()
         self.advertisement = None
         self._query_tree = {}
         self._host_info = {}
         await self._close_http_server()
+
+    async def _register_service(self, info: object) -> None:
+        zeroconf = self._zeroconf
+        if zeroconf is None:
+            raise RuntimeError("OSCQuery service is not started")
+
+        def _register() -> None:
+            zeroconf.register_service(info, allow_name_change=True)
+
+        await asyncio.to_thread(_register)
+
+    async def _unregister_registered_infos(self) -> None:
+        zeroconf = self._zeroconf
+        infos = list(self._registered_infos)
+        if zeroconf is None or not infos:
+            self._registered_infos.clear()
+            return
+        remaining = [info for info in infos if not await self._unregister_service(zeroconf, info)]
+        if remaining:
+            await asyncio.sleep(_UNREGISTER_RETRY_DELAY_SECONDS)
+            remaining = [
+                info for info in remaining if not await self._unregister_service(zeroconf, info)
+            ]
+        if remaining:
+            logger.error(
+                "OSCQuery unregister failed for %s service(s)",
+                len(remaining),
+            )
+        self._registered_infos = remaining
+
+    async def _unregister_service(self, zeroconf: object, info: object) -> bool:
+        try:
+            await self._await_zeroconf_unregister(zeroconf, info)
+        except Exception:
+            logger.warning(
+                "OSCQuery unregister attempt failed",
+                exc_info=True,
+            )
+            return False
+        return True
+
+    async def _await_zeroconf_unregister(self, zeroconf: object, info: object) -> None:
+        async_unregister = getattr(zeroconf, "async_unregister_service", None)
+        loop = getattr(zeroconf, "loop", None)
+        if callable(async_unregister) and loop is not None:
+
+            async def _unregister() -> None:
+                result = async_unregister(info)
+                if inspect.isawaitable(result):
+                    result = await result
+                if inspect.isawaitable(result):
+                    await result
+
+            await asyncio.wrap_future(asyncio.run_coroutine_threadsafe(_unregister(), loop))
+            return
+        unregister = getattr(zeroconf, "unregister_service", None)
+        if not callable(unregister):
+            raise RuntimeError("OSCQuery service cannot unregister advertisements")
+        await asyncio.to_thread(unregister, info)
 
     async def query_avatar(self, service: OscQueryServiceInfo) -> Mapping[str, object]:
         if service.query_port is None:
@@ -323,6 +396,20 @@ class ZeroconfOscQueryService(OscQueryServicePort):
             osc_receive_port=receive_port,
             is_vrchat=is_vrchat,
         )
+
+    async def _forget_unreachable_puripuly_services(self) -> None:
+        for service_id, service in list(self._services.items()):
+            if "puripuly" not in service_id.casefold():
+                continue
+            if service.query_port is None:
+                self._forget_service(service_id)
+                continue
+            if await self._resolve_host_info(service) is None:
+                self._forget_service(service_id)
+
+    def _forget_service(self, service_id: str) -> None:
+        self._raw_services.pop(service_id, None)
+        self._services.pop(service_id, None)
 
     def _notify_services_changed(self) -> None:
         callback = self._services_changed
@@ -490,6 +577,11 @@ class ZeroconfOscQueryService(OscQueryServicePort):
         }
 
 
+def mdns_instance_name(display_name: str, *, pid: int | None = None) -> str:
+    process_id = os.getpid() if pid is None else pid
+    return _service_name(f"{display_name} {process_id}")
+
+
 def _service_name(value: str) -> str:
     normalized = "".join(char if char.isalnum() else "-" for char in value).strip("-")
     return normalized or "PuriPuly-Heart"
@@ -557,5 +649,7 @@ def _mapping_port(values: Mapping[str, object], key: str) -> int | None:
 
 __all__ = [
     "CallbackOscQueryService",
+    "OSCQUERY_ADVERTISEMENT_TTL_SECONDS",
     "ZeroconfOscQueryService",
+    "mdns_instance_name",
 ]

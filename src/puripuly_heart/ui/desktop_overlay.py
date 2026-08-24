@@ -422,11 +422,13 @@ from puripuly_heart.ui.flet_desktop_runtime import (
     patch_hidden_view_launcher,
 )
 from puripuly_heart.ui.flet_runtime import invoke_control_method
-from puripuly_heart.ui.fonts import assets_dir
+from puripuly_heart.ui.fonts import assets_dir, register_fonts
 from puripuly_heart.ui.i18n import t_for_locale
 
 logger = logging.getLogger(__name__)
 
+DESKTOP_OVERLAY_RENDERER_STARTUP_TIMEOUT_S = 12.0
+DESKTOP_OVERLAY_WAIT_UNTIL_READY_TIMEOUT_S = 3.0
 _LOOPBACK_BRIDGE_HOSTS = {"127.0.0.1", "::1"}
 _SENSITIVE_EVENT_KEYS = {
     "accesstoken",
@@ -772,7 +774,8 @@ class FletDesktopRendererWindow:
         locale: str | None = None,
         logging_mode: str = "basic",
         bounds_debounce_s: float = 0.15,
-        startup_timeout_s: float = 5.0,
+        startup_timeout_s: float = DESKTOP_OVERLAY_RENDERER_STARTUP_TIMEOUT_S,
+        wait_until_ready_timeout_s: float = DESKTOP_OVERLAY_WAIT_UNTIL_READY_TIMEOUT_S,
         preview_catalog: DesktopOverlayPreviewCatalog | None = None,
         window_z_order_port: WindowZOrderPort | None = None,
         window_process_info_provider: FletProcessInfoProvider | None = None,
@@ -819,6 +822,7 @@ class FletDesktopRendererWindow:
         self._logging_mode = normalize_overlay_logging_mode(logging_mode)
         self._bounds_debounce_s = max(0.0, float(bounds_debounce_s))
         self._startup_timeout_s = max(0.1, float(startup_timeout_s))
+        self._wait_until_ready_timeout_s = max(0.1, float(wait_until_ready_timeout_s))
         self._preview_catalog = preview_catalog
         self._preview_fixture_id = preview_catalog.fixtures[0].id if preview_catalog else None
         self._preview_background_surface_id = _DESKTOP_PREVIEW_DEFAULT_BACKGROUND_SURFACE_ID
@@ -950,6 +954,11 @@ class FletDesktopRendererWindow:
             if ready_task not in done:
                 if self._app_task in done:
                     await self._app_task
+                if self._page is not None:
+                    phase = self.startup_phase or "launched"
+                    raise RuntimeError(
+                        f"desktop overlay startup timed out before ready (phase={phase})"
+                    )
                 raise RuntimeError("desktop overlay Flet page was not created")
             if self._page_start_error is not None:
                 if self._app_task.done():
@@ -1136,7 +1145,8 @@ class FletDesktopRendererWindow:
                 "runtime_control command=apply_visual_config "
                 f"text_scale={visual_state.text_scale} "
                 f"background_alpha={visual_state.background_alpha} "
-                f"outline_width={visual_state.outline_width}"
+                f"outline_width={visual_state.outline_width} "
+                f"swap_caption_languages={visual_state.swap_caption_languages}"
             )
             self._render_page()
             return
@@ -1186,7 +1196,13 @@ class FletDesktopRendererWindow:
             page = self._page
             if page is None:
                 raise RuntimeError("desktop overlay Flet page is missing")
-            await invoke_control_method(page.window, "wait_until_ready_to_show")
+            try:
+                await asyncio.wait_for(
+                    invoke_control_method(page.window, "wait_until_ready_to_show"),
+                    timeout=self._wait_until_ready_timeout_s,
+                )
+            except TimeoutError as exc:
+                raise RuntimeError("desktop overlay native window was not ready to show") from exc
             coordinator.advance(DesktopOverlayStartupPhase.NATIVE_READY)
             bounds_confirmation = await self._confirm_window_bounds()
             coordinator.advance(
@@ -1271,6 +1287,7 @@ class FletDesktopRendererWindow:
         import flet as ft
 
         window = page.window
+        register_fonts(page)
         page.title = self._window_title()
         window.icon = "icons/icon.ico"
         window.frameless = True
@@ -2293,10 +2310,14 @@ def _parse_runtime_visual_state(payload: dict[str, object]) -> DesktopCaptionVis
         if not DESKTOP_FLET_MIN_OUTLINE_WIDTH <= outline_number <= DESKTOP_FLET_MAX_OUTLINE_WIDTH:
             return None
         outline_width = float(outline_number)
+    swap_caption_languages = payload.get("swap_caption_languages", False)
+    if not isinstance(swap_caption_languages, bool):
+        return None
     return DesktopCaptionVisualState(
         text_scale=float(text_scale),
         background_alpha=float(background_alpha),
         outline_width=outline_width,
+        swap_caption_languages=swap_caption_languages,
     )
 
 

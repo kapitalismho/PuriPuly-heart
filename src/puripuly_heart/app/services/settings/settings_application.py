@@ -96,7 +96,12 @@ class SettingsApplicationOwner:
     failure_sink: SettingsFailureSink
     results: SettingsTransactionResultOwner = field(default_factory=SettingsTransactionResultOwner)
 
-    async def apply(self, next_settings: AppSettings) -> bool:
+    async def apply(
+        self,
+        next_settings: AppSettings,
+        *,
+        reload_settings_view: bool = True,
+    ) -> bool:
         current = self.settings.current
         if current is not None:
             self.settings.normalize_compatibility(current)
@@ -152,17 +157,34 @@ class SettingsApplicationOwner:
                 )
             installation_fallback = bool(fallback_plan.installation_fallback and fallback_channels)
         if next_settings is not self.settings.current:
-            if await self._route(next_settings):
+            if await self._route(
+                next_settings,
+                reload_settings_view=reload_settings_view,
+            ):
                 self.fallback_sink(fallback_channels, installation_fallback)
                 return True
-        await self.apply_direct(next_settings)
+        await self.apply_direct(
+            next_settings,
+            reload_settings_view=reload_settings_view,
+        )
         self.fallback_sink(fallback_channels, installation_fallback)
         return True
 
-    async def _route(self, next_settings: AppSettings) -> bool:
-        if await self._apply_combined(next_settings):
+    async def _route(
+        self,
+        next_settings: AppSettings,
+        *,
+        reload_settings_view: bool,
+    ) -> bool:
+        if await self._apply_combined(
+            next_settings,
+            reload_settings_view=reload_settings_view,
+        ):
             return True
-        if await self._apply_stt_language_audio(next_settings):
+        if await self._apply_stt_language_audio(
+            next_settings,
+            reload_settings_view=reload_settings_view,
+        ):
             return True
         if await self._apply_overlay_osc_output(next_settings):
             return True
@@ -309,6 +331,7 @@ class SettingsApplicationOwner:
         *,
         base_settings: AppSettings,
         committed_settings: AppSettings,
+        reload_settings_view: bool = True,
     ) -> None:
         self.settings.begin(legacy_snapshot=committed_settings)
         committed = False
@@ -329,14 +352,21 @@ class SettingsApplicationOwner:
             copy.deepcopy(base_settings),
             persist=False,
             strict_runtime_errors=False,
+            reload_settings_view=reload_settings_view,
         )
         self.settings.current = copy.deepcopy(base_settings)
-        self.projection.render(
-            self.settings.current,
-            preserve_custom_vocab_draft=True,
-        )
+        if reload_settings_view:
+            self.projection.render(
+                self.settings.current,
+                preserve_custom_vocab_draft=True,
+            )
 
-    async def _apply_combined(self, next_settings: AppSettings) -> bool:
+    async def _apply_combined(
+        self,
+        next_settings: AppSettings,
+        *,
+        reload_settings_view: bool,
+    ) -> bool:
         order22 = self.projection.order22_patch_base_and_values(next_settings)
         order23 = self.projection.order23_patch_base_and_values(next_settings)
         order24 = self.projection.order24_patch_base_and_values(next_settings)
@@ -405,6 +435,7 @@ class SettingsApplicationOwner:
                     next_settings,
                     strict_runtime_errors=True,
                     strict_persistence_errors=True,
+                    reload_settings_view=reload_settings_view,
                 )
             except StrictSettingsSaveFailed:
                 if committed_before_full_draft is not None:
@@ -421,7 +452,7 @@ class SettingsApplicationOwner:
             except Exception:
                 self._set_result(_ui_prompt_clipboard_state_runtime_degraded_transaction_result())
 
-        if self.settings.current is not None:
+        if reload_settings_view and self.settings.current is not None:
             self.projection.render(
                 self.settings.current,
                 preserve_custom_vocab_draft=True,
@@ -493,6 +524,7 @@ class SettingsApplicationOwner:
                 await self.compensate_failed_local_asr_settings_apply(
                     base_settings=base_settings,
                     committed_settings=committed_settings,
+                    reload_settings_view=reload_settings_view,
                 )
             except Exception:
                 self.failure_sink("Failed to compensate local ASR settings apply")

@@ -114,8 +114,8 @@ class RecordingBackend:
     async def ensure_gpu_device_discovery(self) -> None:
         self.events.append(("gpu-discovery",))
 
-    async def apply_telemetry_consent(self, consent: str) -> object:
-        self.events.append(("telemetry", consent))
+    async def apply_telemetry_enabled(self, enabled: bool) -> object:
+        self.events.append(("telemetry", enabled))
         return self.settings
 
     def persist_settings(self) -> None:
@@ -611,13 +611,13 @@ async def test_telemetry_and_verification_mutations_stay_behind_named_intents() 
     backend = RecordingBackend()
     boundary = UiApplicationBoundary(backend)
 
-    returned = await boundary.apply_telemetry_consent("allow")
+    returned = await boundary.apply_telemetry_enabled(True)
     boundary.clear_provider_verification("openrouter")
 
     assert returned is backend.settings
     assert backend.settings.api_key_verified.openrouter is False
     assert backend.events == [
-        ("telemetry", "allow"),
+        ("telemetry", True),
         ("clear-verification", "openrouter"),
     ]
 

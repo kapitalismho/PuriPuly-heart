@@ -31,19 +31,46 @@ def _make_session(
 
 
 @pytest.mark.asyncio
-async def test_deepgram_session_on_speech_end_enqueues_finalize():
+async def test_deepgram_session_on_speech_end_enqueues_finalize(caplog):
     session = _make_session()
 
-    await session.on_speech_end(trailing_silence_ms=200)
+    with caplog.at_level(logging.INFO):
+        await session.on_speech_end(trailing_silence_ms=500, reason="silence")
     finalize = session._audio_q.get_nowait()
     assert finalize is _FINALIZE
+    assert session._audio_q.empty()
+    assert "boundary_reason=silence" in caplog.text
+    assert "observed_tail_ms=500" in caplog.text
+    assert "boundary_wait_ms=500" in caplog.text
 
-    await session.on_speech_end(trailing_silence_ms=0)
-    silence = session._audio_q.get_nowait()
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        await session.on_speech_end(trailing_silence_ms=0, reason="max_duration")
     finalize = session._audio_q.get_nowait()
-
-    assert isinstance(silence, bytes)
     assert finalize is _FINALIZE
+    assert session._audio_q.empty()
+    assert "boundary_reason=max_duration" in caplog.text
+    assert "boundary_wait_ms=0" in caplog.text
+
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        await session.on_speech_end(trailing_silence_ms=160, reason="soft_pause")
+    finalize = session._audio_q.get_nowait()
+    assert finalize is _FINALIZE
+    assert session._audio_q.empty()
+    assert "boundary_reason=soft_pause" in caplog.text
+    assert "boundary_wait_ms=160" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_deepgram_session_on_speech_end_boundary_unknown(caplog):
+    session = _make_session()
+
+    with caplog.at_level(logging.INFO):
+        await session.on_speech_end()
+
+    assert "boundary_reason=None" in caplog.text
+    assert "boundary_wait_ms=None" in caplog.text
 
 
 @pytest.mark.asyncio

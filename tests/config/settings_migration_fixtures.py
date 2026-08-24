@@ -42,6 +42,7 @@ DYNAMIC_MAPPING_PATHS = frozenset(
         "local_llm.extra_body",
         "stt.custom_terms",
         "translation.connection_history",
+        "custom_stt.extra",
     }
 )
 
@@ -86,6 +87,11 @@ CURRENT_USER_INTENT_DESTINATIONS = {
     "audio.input_host_api": "intent.audio.input_host_api",
     "audio.ring_buffer_ms": "intent.audio.ring_buffer_ms",
     "cerebras.llm_model": "intent.translation.cerebras.llm_model",
+    "custom_stt.compatibility": "intent.stt.custom.compatibility",
+    "custom_stt.endpoint": "intent.stt.custom.endpoint",
+    "custom_stt.extra": "intent.stt.custom.extra",
+    "custom_stt.mode": "intent.stt.custom.mode",
+    "custom_stt.model": "intent.stt.custom.model",
     "deepseek.llm_model": "intent.translation.deepseek.llm_model",
     "deepgram_stt.model": "intent.stt.deepgram.model",
     "desktop_audio.output_device": "intent.desktop_audio.output_device",
@@ -112,7 +118,7 @@ CURRENT_USER_INTENT_DESTINATIONS = {
     "openrouter.routing_mode": "intent.translation.openrouter_routing_mode",
     "openrouter.selected_source": "intent.translation.openrouter_selected_source",
     "openrouter.selection_alias": "intent.translation.openrouter_selection_alias",
-    "telemetry.consent": "intent.telemetry.consent",
+    "telemetry.enabled": "intent.telemetry.enabled",
     "translation.fallback.connection": "intent.translation.fallback.connection",
     "translation.fallback.enabled": "intent.translation.fallback.enabled",
     "translation.fallback.model": "intent.translation.fallback.model",
@@ -135,6 +141,9 @@ CURRENT_USER_INTENT_DESTINATIONS = {
     "overlay.desktop_flet.position.x": "intent.overlay.desktop_flet.position.x",
     "overlay.desktop_flet.position.y": "intent.overlay.desktop_flet.position.y",
     "overlay.desktop_flet.size_preset": "intent.overlay.desktop_flet.size_preset",
+    "overlay.desktop_flet.swap_caption_languages": (
+        "intent.overlay.desktop_flet.swap_caption_languages"
+    ),
     "overlay.desktop_flet.visual.background_alpha": (
         "intent.overlay.desktop_flet.visual.background_alpha"
     ),
@@ -164,6 +173,7 @@ CURRENT_USER_INTENT_DESTINATIONS = {
     "system_prompt": "intent.prompts.system_prompt",
     "translation.connection": "intent.translation.connection",
     "translation.connection_history": "intent.translation.connection_history",
+    "translation.gpu_device_id": "intent.translation.gpu_device_id",
     "translation.model": "intent.translation.model",
     "ui.clipboard_auto_translate_enabled": "intent.clipboard.auto_translate_enabled",
     "ui.locale": "intent.ui.locale",
@@ -218,9 +228,7 @@ CURRENT_OPERATIONAL_STATE_DESTINATIONS = {
         "state.managed_connection.verified_hardware_hash_salt_version"
     ),
     "telemetry_state.anonymous_id": "state.telemetry.anonymous_id",
-    "telemetry_state.sent_translation_success_dates_utc": (
-        "state.telemetry.sent_translation_success_dates_utc"
-    ),
+    "telemetry_state.last_sent_date_utc": "state.telemetry.last_sent_date_utc",
     "ui.github_star_prompt_clicked": "state.github_star_prompt.clicked",
     "ui.github_star_prompt_eligible_launch_count": (
         "state.github_star_prompt.eligible_launch_count"
@@ -331,6 +339,7 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
             model=TranslationModel.GEMINI_37_FLASH,
             connection=TranslationConnection.OPENROUTER,
         ),
+        gpu_device_id="Vulkan1",
     )
     settings.languages.source_language = "ja"
     settings.languages.target_language = "zh-CN"
@@ -361,6 +370,7 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     settings.overlay.desktop_flet.size_preset = "large"
     settings.overlay.desktop_flet.position.x = 321
     settings.overlay.desktop_flet.position.y = 654
+    settings.overlay.desktop_flet.swap_caption_languages = True
     settings.overlay.desktop_flet.visual.background_alpha = 0.42
     settings.stt.drain_timeout_s = 3.5
     settings.stt.vad_speech_threshold = 0.3
@@ -377,6 +387,11 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     settings.soniox_stt.endpoint = "wss://soniox.fixture.test/transcribe"
     settings.soniox_stt.keepalive_interval_s = 12.5
     settings.soniox_stt.trailing_silence_ms = 250
+    settings.custom_stt.mode = "realtime"
+    settings.custom_stt.compatibility = "openai_realtime"
+    settings.custom_stt.endpoint = "https://custom-stt.fixture.test"
+    settings.custom_stt.model = "fixture-transcribe"
+    settings.custom_stt.extra = {"prompt": "fixture-prompt", "max_tokens": 16}
     settings.gemini.llm_model = GeminiLLMModel.GEMINI_37_FLASH
     settings.openrouter.llm_model = OpenRouterLLMModel.QWEN_35_FLASH_02_23
     settings.openrouter.routing_mode = OpenRouterRoutingMode.LATENCY
@@ -439,9 +454,9 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
         "fixture-pending-credential-ref"
     )
     settings.managed_identity.pending_delivery_ack_expires_at = "2026-07-10T00:00:00Z"
-    settings.telemetry.consent = "allow"
+    settings.telemetry.enabled = True
     settings.telemetry_state.anonymous_id = "fixture-telemetry-anonymous-id"
-    settings.telemetry_state.sent_translation_success_dates_utc = ["2026-07-01", "2026-07-02"]
+    settings.telemetry_state.last_sent_date_utc = "2026-07-02"
     settings.system_prompt = "Fixture system prompt text."
     settings.validate()
 
@@ -458,6 +473,11 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
 
 def legacy_compatibility_settings_fixture() -> dict[str, Any]:
     data = copy.deepcopy(maximal_v24_settings_fixture())
+    data["telemetry"] = {"consent": "allow"}
+    data["telemetry_state"] = {
+        "anonymous_id": "fixture-telemetry-anonymous-id",
+        "sent_translation_success_dates_utc": ["2026-07-01", "2026-07-02"],
+    }
     data["settings_version"] = 17
     data["openrouter"]["credential_source"] = OpenRouterCredentialSource.BYOK.value
     data["openrouter"]["selected_credential_source"] = OpenRouterCredentialSource.MANAGED.value
@@ -588,6 +608,18 @@ def _current_migration_classification() -> dict[str, FieldClassification]:
 V24_MIGRATION_CLASSIFICATION = _current_migration_classification()
 
 LEGACY_MIGRATION_CLASSIFICATION: dict[str, FieldClassification] = {
+    "telemetry.consent": FieldClassification(
+        category="legacy_input",
+        destination="intent.telemetry.enabled",
+        status="normalized_to_boolean",
+        fixture=LEGACY_COMPATIBILITY_FIXTURE_NAME,
+    ),
+    "telemetry_state.sent_translation_success_dates_utc": FieldClassification(
+        category="legacy_input",
+        destination="state.telemetry.last_sent_date_utc",
+        status="collapsed_to_latest_date",
+        fixture=LEGACY_COMPATIBILITY_FIXTURE_NAME,
+    ),
     "openrouter.credential_source": FieldClassification(
         category="legacy_input",
         destination="intent.translation.openrouter.selected_source",

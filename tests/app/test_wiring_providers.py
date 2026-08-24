@@ -1728,6 +1728,7 @@ def test_resolve_overlay_config_maps_desktop_flet_to_resolved_desktop_options() 
         "size_preset": "large",
         "position": {"x": 111, "y": 222},
         "locked": True,
+        "swap_caption_languages": False,
         "visual": {
             "text_scale": 1.0,
             "background_alpha": 0.44,

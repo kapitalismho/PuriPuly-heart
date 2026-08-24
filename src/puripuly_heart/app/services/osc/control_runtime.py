@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import inspect
 import time
@@ -12,6 +13,10 @@ from puripuly_heart.app.ports.osc_control import (
     decode_control_message,
 )
 from puripuly_heart.app.ports.oscquery import OscQueryServicePort
+from puripuly_heart.app.ports.ui_models import (
+    OscControlPresentationName,
+    OscControlPresentationState,
+)
 from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.runtime.oscquery import (
@@ -37,6 +42,10 @@ class OscControlIntegrationOwner:
         state_provider: Callable[[], OscCanonicalState],
         language_state_provider: Callable[[], tuple[str, str, str, str]],
         translation_model_normalizer: Callable[[object], object],
+        ui_state_provider: (
+            Callable[[OscControlPresentationName], OscControlPresentationState] | None
+        ) = None,
+        ui_state_sink: Callable[[OscControlPresentationState], None] | None = None,
         query_service: OscQueryServicePort | None = None,
         error_sink: Callable[[str], None] | None = None,
         resync_timeout_seconds: float = 1.5,
@@ -46,6 +55,8 @@ class OscControlIntegrationOwner:
         self._application_provider = application_provider
         self._sender_provider = sender_provider
         self._state_provider = state_provider
+        self._ui_state_provider = ui_state_provider
+        self._ui_state_sink = ui_state_sink
         self._error_sink = error_sink
         self._mode: OscConnectionMode = "off"
         self._send_port = 9000
@@ -62,6 +73,8 @@ class OscControlIntegrationOwner:
         self._publisher: OscStatePublisher | None = None
         self._avatar_parameter_diagnostics: dict[str, object] = {}
         self._avatar_sequence = 0
+        self._automatic_query_generation = 0
+        self._automatic_query_task: asyncio.Task[None] | None = None
         self._scope = LifecycleScope("OscControlIntegrationOwner")
         self._apply_settings_callback = apply_settings
 
@@ -80,6 +93,7 @@ class OscControlIntegrationOwner:
             echo_suppression_provider=self._is_echo,
             canonical_state_republisher=self._publish_delta,
             canonical_state_full_republisher=self._publish_full,
+            canonical_state_projector=self._project_ui_state,
             error_sink=error_sink,
         )
         self._receiver_owner.set_packet_handlers(
@@ -173,7 +187,7 @@ class OscControlIntegrationOwner:
             elif key[1] != "off":
                 self._ensure_publisher()
         await self._receiver_owner.configure(enabled=enabled)
-        if self._mode != "off":
+        if self._mode != "off" and not self._automatic_query_inflight():
             self._publish_delta()
 
     async def configure_connection(
@@ -199,12 +213,15 @@ class OscControlIntegrationOwner:
             if self._publisher is not None:
                 self._publisher.close()
             return
-        if self._configured_connection == key and (mode == "manual" or self.query_runtime.started):
+        if self._configured_connection == key and (
+            mode == "manual" or self.query_runtime.started or self._automatic_query_inflight()
+        ):
             self._ensure_publisher()
             self._publish_delta()
             return
 
         await self.router.suspend_ingress()
+        await self._cancel_automatic_query_start()
         await self.query_runtime.stop()
         self._send_port = int(send_port)
         self._receive_port = int(receive_port)
@@ -231,23 +248,70 @@ class OscControlIntegrationOwner:
             self.router.set_ingress_enabled(True)
             return
 
+        self.router.set_ingress_enabled(True)
+        self._schedule_automatic_query_start(resync_generation)
+
+    def _automatic_query_inflight(self) -> bool:
+        task = self._automatic_query_task
+        return task is not None and not task.done()
+
+    def _schedule_automatic_query_start(self, resync_generation: int | None) -> None:
+        self._automatic_query_generation += 1
+        generation = self._automatic_query_generation
+        self._automatic_query_task = start_lifecycle_task(
+            self._scope,
+            self._run_automatic_query_start(resync_generation, generation),
+            name=f"oscquery-automatic-start-{generation}",
+        )
+
+    async def _run_automatic_query_start(
+        self,
+        resync_generation: int | None,
+        generation: int,
+    ) -> None:
         try:
             await self.query_runtime.start(
                 "automatic",
                 snapshot_generation=resync_generation,
             )
+        except asyncio.CancelledError:
+            raise
         except Exception as exc:
+            if (
+                generation != self._automatic_query_generation
+                or not self._accepting_ingress
+                or self._closed
+            ):
+                return
             self._report_error(f"OSCQuery automatic discovery unavailable: {type(exc).__name__}")
             await self._receiver_owner.ensure_receiver()
-            await self._set_sender_destination(host, VRCHAT_OSC_DEFAULT_INPUT_PORT)
+            await self._set_sender_destination(self._host, VRCHAT_OSC_DEFAULT_INPUT_PORT)
             self._publish_start(resync_generation)
-        self.router.set_ingress_enabled(True)
+        finally:
+            if self._automatic_query_task is asyncio.current_task():
+                self._automatic_query_task = None
+
+    async def _cancel_automatic_query_start(self) -> None:
+        task = self._automatic_query_task
+        self._automatic_query_task = None
+        self._automatic_query_generation += 1
+        if task is None or task.done():
+            return
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await task
+
+    async def wait_automatic_query_start(self) -> None:
+        task = self._automatic_query_task
+        if task is not None:
+            await task
 
     async def close(self) -> None:
         if self._closed and self._receiver_owner.receiver is None:
             return
         self.stop_ingress()
         self._closed = True
+        await self.wait_automatic_query_start()
         await self._scope.close()
         await self.query_runtime.stop()
         await self.router.close()
@@ -277,6 +341,11 @@ class OscControlIntegrationOwner:
         if inspect.isawaitable(result):
             return await result
         return result
+
+    def _project_ui_state(self, control: OscControlPresentationName) -> None:
+        if self._ui_state_provider is None or self._ui_state_sink is None:
+            return
+        self._ui_state_sink(self._ui_state_provider(control))
 
     def _dashboard_command_matches_canonical_state(self, method_name: str, value: bool) -> bool:
         field_by_method = {

@@ -29,12 +29,13 @@ class SettingsProviderIntents:
     secret_cleared: Callable[[str], None]
     local_llm_secret_changed: Callable[[], None]
     gpu_discovery_requested: Callable[[], object]
+    custom_stt_secret_changed: Callable[[], None] | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class SettingsGeneralIntents:
     start_microphone_test: Callable[[], None]
-    telemetry_consent_change: Callable[[str], None]
+    telemetry_enabled_change: Callable[[bool], None]
     list_loopback_capture_options: Callable[[], object]
     list_loopback_process_options: Callable[[], object]
     list_loopback_device_options: Callable[[], object]
@@ -111,7 +112,12 @@ class SettingsProviderStateSink(Protocol):
 
     def set_local_cpu_auto_available(self, available: bool) -> None: ...
 
-    def set_gpu_devices(self, *, devices: tuple[GpuDeviceOption, ...]) -> None: ...
+    def set_gpu_devices(
+        self,
+        *,
+        devices: tuple[GpuDeviceOption, ...] | None = None,
+        llm_devices: tuple[GpuDeviceOption, ...] | None = None,
+    ) -> None: ...
 
     def consume_provider_apply_settings(self) -> SettingsSnapshot | None: ...
 
@@ -133,7 +139,13 @@ class SettingsApiSlotProvider(Protocol):
 
     def gpu_device_control(self) -> ft.Control: ...
 
+    def gpu_llm_control(self) -> ft.Control: ...
+
+    def gpu_refresh_control(self) -> ft.Control: ...
+
     def local_llm_connection_control(self) -> ft.Control: ...
+
+    def custom_stt_connection_control(self) -> ft.Control: ...
 
     def managed_key_control(self) -> ft.Control: ...
 
@@ -150,7 +162,10 @@ class SettingsApiSurfaceSlots:
     translation_connection: ft.Control
     translation_fallback: ft.Control
     gpu_device: ft.Control
+    gpu_llm: ft.Control
+    gpu_refresh: ft.Control
     local_llm_connection: ft.Control
+    custom_stt_connection: ft.Control
     managed_key: ft.Control
     peer_expected_language: ft.Control
     api_keys: ft.Control
@@ -166,7 +181,10 @@ class SettingsApiSurfaceSlots:
             translation_connection=provider.translation_connection_control(),
             translation_fallback=provider.translation_fallback_control(),
             gpu_device=provider.gpu_device_control(),
+            gpu_llm=provider.gpu_llm_control(),
+            gpu_refresh=provider.gpu_refresh_control(),
             local_llm_connection=provider.local_llm_connection_control(),
+            custom_stt_connection=provider.custom_stt_connection_control(),
             managed_key=provider.managed_key_control(),
             peer_expected_language=provider.peer_expected_language_control(),
             api_keys=provider.api_keys_control(),
@@ -184,7 +202,6 @@ class SettingsApiSurfaceRegions:
     translation_connection_leading_placeholder: ft.Control
     gpu_device_row: ft.Container
     gpu_device_controls: ft.Row
-    gpu_device_placeholders: tuple[ft.Control, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,7 +216,7 @@ class SettingsGeneralSurfaceSlots:
     peer_vad: ft.Control
     clipboard_auto_translate: ft.Control
     vrchat_mic_intercept: ft.Control
-    telemetry_consent: ft.Control
+    telemetry_enabled: ft.Control
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,9 +239,9 @@ class SettingsOverlaySurfaceSlots:
     desktop_size: ft.Control
     desktop_lock: ft.Control
     desktop_background_alpha: ft.Control
+    desktop_swap_caption_languages: ft.Control
     desktop_reset: ft.Control
-    desktop_reset_spacer_a: ft.Control
-    desktop_reset_spacer_b: ft.Control
+    desktop_reset_spacer: ft.Control
     desktop_status: ft.Control
     desktop_status_trailing: ft.Control
 

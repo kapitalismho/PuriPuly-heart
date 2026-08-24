@@ -320,9 +320,7 @@ def _load_settings_or_default(
                 prompts=replace(settings.intent.prompts, system_prompt=default_prompt),
             ),
         )
-    from puripuly_heart.config.settings_vnext.schema import with_telemetry_consent
-
-    return with_telemetry_consent(settings, "allow")
+    return settings
 
 
 def _settings_config_path(args: argparse.Namespace) -> tuple[Path, bool]:

@@ -14,6 +14,12 @@ if TYPE_CHECKING:
 FONT_FAMILY_NANUM = "NanumSquareRound"
 FONT_FAMILY_MPLUS = "MPLUSRounded1c"
 FONT_FAMILY_RESOURCE_HAN_CN = "ResourceHanRoundedCN"
+FONT_FAMILY_NOTO_SANS = "Noto Sans"
+FONT_FAMILY_NOTO_SANS_CJK_KR = "Noto Sans CJK KR"
+FONT_FAMILY_NOTO_SANS_CJK_JP = "Noto Sans CJK JP"
+FONT_FAMILY_NOTO_SANS_CJK_SC = "Noto Sans CJK SC"
+FONT_FAMILY_NOTO_SANS_CJK_TC = "Noto Sans CJK TC"
+_NOTO_CJK_FILENAME = "NotoSansCJK-Medium.ttc"
 
 DEFAULT_FONT_FAMILY = FOUNDATION_DESIGN_TOKENS.default_font_family
 
@@ -28,6 +34,11 @@ _FONT_FILE_CANDIDATES: dict[str, tuple[str, ...]] = {
         "MPLUSRounded1c-Bold.otf",
     ),
     FONT_FAMILY_RESOURCE_HAN_CN: ("ResourceHanRoundedCN-Bold.ttf",),
+    FONT_FAMILY_NOTO_SANS: (_NOTO_CJK_FILENAME,),
+    FONT_FAMILY_NOTO_SANS_CJK_KR: (_NOTO_CJK_FILENAME,),
+    FONT_FAMILY_NOTO_SANS_CJK_JP: (_NOTO_CJK_FILENAME,),
+    FONT_FAMILY_NOTO_SANS_CJK_SC: (_NOTO_CJK_FILENAME,),
+    FONT_FAMILY_NOTO_SANS_CJK_TC: (_NOTO_CJK_FILENAME,),
 }
 
 
@@ -60,6 +71,27 @@ def default_font_family() -> str | None:
     if _font_available(DEFAULT_FONT_FAMILY):
         return DEFAULT_FONT_FAMILY
     return None
+
+
+def noto_cjk_family_for_ui_locale(locale: str | None) -> str:
+    if not locale:
+        return FONT_FAMILY_NOTO_SANS_CJK_JP
+    normalized = locale.strip().replace("_", "-")
+    if not normalized:
+        return FONT_FAMILY_NOTO_SANS_CJK_JP
+    lowered = normalized.lower()
+    if lowered in {"zh-cn", "zh-hans"} or lowered.startswith("zh-hans-"):
+        return FONT_FAMILY_NOTO_SANS_CJK_SC
+    if lowered in {"zh-tw", "zh-hk", "zh-hant", "zh-mo"} or lowered.startswith("zh-hant-"):
+        return FONT_FAMILY_NOTO_SANS_CJK_TC
+    base = lowered.split("-", 1)[0]
+    if base == "ko":
+        return FONT_FAMILY_NOTO_SANS_CJK_KR
+    if base == "ja":
+        return FONT_FAMILY_NOTO_SANS_CJK_JP
+    if base == "zh":
+        return FONT_FAMILY_NOTO_SANS_CJK_SC
+    return FONT_FAMILY_NOTO_SANS_CJK_JP
 
 
 def font_for_language(code: str | None) -> str | None:

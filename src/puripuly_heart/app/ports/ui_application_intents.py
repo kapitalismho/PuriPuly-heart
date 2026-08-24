@@ -6,6 +6,7 @@ from typing import Protocol
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_models import (
     GpuNoticeAction,
+    ManagedGemmaNoticeAction,
     OverlayPeerPresentationState,
 )
 
@@ -65,7 +66,7 @@ class UiSettingsRuntimePort(Protocol):
 
     async def apply_settings(self, settings: object) -> object: ...
 
-    async def apply_telemetry_consent(self, consent: str) -> object | None: ...
+    async def apply_telemetry_enabled(self, enabled: bool) -> object | None: ...
 
 
 class UiProviderRuntimePort(Protocol):
@@ -107,6 +108,11 @@ class UiProviderRuntimePort(Protocol):
     def clear_provider_verification(self, provider: str) -> None: ...
 
     def handle_gpu_notice_action(self, action: GpuNoticeAction) -> object: ...
+
+    async def handle_managed_gemma_notice_action(
+        self,
+        action: ManagedGemmaNoticeAction,
+    ) -> object: ...
 
 
 class UiMicrophoneRuntimePort(Protocol):
@@ -166,7 +172,7 @@ class UiEngagementRuntimePort(Protocol):
 
     def schedule_github_star_prompt_translation_success_observed(self) -> None: ...
 
-    async def record_telemetry_translation_success_day(self) -> None: ...
+    async def record_telemetry_translation_success_day(self, active_date_utc: str) -> None: ...
 
     def should_show_github_star_prompt(self) -> bool: ...
 

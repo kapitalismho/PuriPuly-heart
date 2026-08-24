@@ -28,10 +28,11 @@ from puripuly_heart.config.settings_vnext.schema import (
     ProcessCaptureTargetIntent,
     ProviderVerificationEntry,
     ProviderVerificationState,
+    TelemetryIntent,
     TelemetryOperationalState,
     TranslationFallbackIntent,
     with_capture_target,
-    with_telemetry_consent,
+    with_telemetry_enabled,
 )
 from tests.config.settings_migration_fixtures import (
     legacy_compatibility_settings_fixture,
@@ -243,7 +244,7 @@ def test_final_dev_v30_fixture_migrates_with_semantic_and_verification_continuit
     )
     assert canonical["state"]["telemetry"] == {
         "anonymous_id": "fixture-telemetry-anonymous-id",
-        "sent_translation_success_dates_utc": ("2026-07-01", "2026-07-02"),
+        "last_sent_date_utc": "2026-07-02",
     }
     assert canonical["state"]["managed_connection"]["pending_delivery_ack_delivery_id"] == (
         "fixture-delivery-id"
@@ -258,7 +259,7 @@ def test_final_dev_v30_fixture_migrates_with_semantic_and_verification_continuit
     assert projected["deepseek"] == {"llm_model": "deepseek-v4-flash"}
     assert projected["telemetry_state"] == {
         "anonymous_id": raw["telemetry"]["identifier"],
-        "sent_translation_success_dates_utc": raw["telemetry"]["sent_utc_dates"],
+        "last_sent_date_utc": "2026-07-02",
     }
     assert (
         projected["managed_identity"]["pending_delivery_ack_delivery_id"]
@@ -330,6 +331,61 @@ def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
         "connection": "openrouter",
         "selection_alias": "openrouter_gemma4_26b_31b",
     }
+
+
+def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
+    from puripuly_heart.config.prompts import load_prompt_for_provider
+    from puripuly_heart.config.settings import LEGACY_TIMESTAMP_PROMPT
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    canonical["intent"]["prompts"]["system_prompt"] = LEGACY_TIMESTAMP_PROMPT
+
+    migrated = migration.from_dict(canonical)
+
+    assert migrated.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
+
+
+def test_vnext_dict_migrates_legacy_timestamp_prompt_from_legacy_shape() -> None:
+    from puripuly_heart.config.prompts import load_prompt_for_provider
+    from puripuly_heart.config.settings import LEGACY_TIMESTAMP_PROMPT
+    from puripuly_heart.config.settings_vnext import migration
+
+    raw = {
+        "settings_version": SETTINGS_SCHEMA_VERSION - 1,
+        "system_prompt": LEGACY_TIMESTAMP_PROMPT,
+    }
+
+    migrated = migration.from_dict(raw)
+
+    assert migrated.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
+
+
+def test_vnext_dict_preserves_custom_prompt_through_migration() -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    canonical["intent"]["prompts"]["system_prompt"] = "my customized prompt"
+
+    migrated = migration.from_dict(canonical)
+
+    assert migrated.intent.prompts.system_prompt == "my customized prompt"
+
+
+def test_vnext_dict_preserves_prompt_with_boundary_whitespace() -> None:
+    from puripuly_heart.config.settings import LEGACY_TIMESTAMP_PROMPT
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    stored_prompt = f"  {LEGACY_TIMESTAMP_PROMPT}  "
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    canonical["intent"]["prompts"]["system_prompt"] = stored_prompt
+
+    migrated = migration.from_dict(canonical)
+
+    assert migrated.intent.prompts.system_prompt == stored_prompt
 
 
 def test_vnext_dict_migrates_disabled_gemini_3_flash_fallback_to_none() -> None:
@@ -819,16 +875,16 @@ def test_legacy_missing_fallback_uses_unified_gemma_default() -> None:
     assert fallback == TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_31b")
 
 
-def test_maximal_v24_fixture_preserves_telemetry_consent_and_identifier() -> None:
+def test_maximal_v24_fixture_migrates_enabled_telemetry_and_identifier() -> None:
     migration = _migration()
     serialization = _serialization()
 
     serialized = serialization.to_dict(migration.from_dict(maximal_v24_settings_fixture()))
 
-    assert serialized["intent"]["telemetry"] == {"consent": "allow"}
+    assert serialized["intent"]["telemetry"] == {"enabled": True}
     assert serialized["state"]["telemetry"] == {
         "anonymous_id": "fixture-telemetry-anonymous-id",
-        "sent_translation_success_dates_utc": ("2026-07-01", "2026-07-02"),
+        "last_sent_date_utc": "2026-07-02",
     }
 
 
@@ -842,56 +898,169 @@ def test_existing_settings_upgrade_unknown_telemetry_to_allow_with_identifier() 
 
     serialized = serialization.to_dict(migration.from_dict(existing))
 
-    assert serialized["intent"]["telemetry"] == {"consent": "allow"}
+    assert serialized["intent"]["telemetry"] == {"enabled": True}
     assert serialized["state"]["telemetry"]["anonymous_id"]
-    assert serialized["state"]["telemetry"]["sent_translation_success_dates_utc"] == ()
+    assert serialized["state"]["telemetry"]["last_sent_date_utc"] is None
 
 
-def test_telemetry_consent_transitions_manage_operational_state() -> None:
+@pytest.mark.parametrize(
+    ("legacy_consent", "expected_enabled"),
+    [
+        ("allow", True),
+        ("unknown", True),
+        ("decline", False),
+        (None, True),
+        ("corrupt", False),
+    ],
+)
+def test_v36_telemetry_states_migrate_once_to_boolean_without_legacy_surfaces(
+    legacy_consent: str | None,
+    expected_enabled: bool,
+) -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 36
+    raw["intent"]["telemetry"] = {} if legacy_consent is None else {"consent": legacy_consent}
+    raw["state"]["telemetry"] = {
+        "anonymous_id": "existing-id",
+        "sent_translation_success_dates_utc": ["2026-07-01", "2026-07-03"],
+    }
+
+    serialized = serialization.to_dict(migration.from_dict(raw))
+
+    assert serialized["intent"]["telemetry"] == {"enabled": expected_enabled}
+    assert serialized["state"]["telemetry"] == (
+        {"anonymous_id": "existing-id", "last_sent_date_utc": "2026-07-03"}
+        if expected_enabled
+        else {"anonymous_id": None, "last_sent_date_utc": None}
+    )
+    persisted_text = json.dumps(serialized)
+    assert '"consent"' not in persisted_text
+    assert "sent_translation_success_dates_utc" not in persisted_text
+
+
+def test_current_schema_rejects_non_boolean_telemetry_enabled() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["telemetry"] = {"enabled": "yes"}
+
+    with pytest.raises(ValueError, match="telemetry enabled must be a boolean"):
+        migration.from_dict(raw)
+
+
+def test_current_schema_normalizes_legacy_telemetry_fields_without_extensions() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["telemetry"] = {"consent": "decline"}
+    raw["state"]["telemetry"] = {
+        "anonymous_id": "existing-id",
+        "sent_translation_success_dates_utc": ["2026-07-01", "2026-07-03"],
+    }
+
+    serialized = serialization.to_dict(migration.from_dict(raw))
+
+    assert serialized["intent"]["telemetry"] == {"enabled": False}
+    assert serialized["state"]["telemetry"] == {
+        "anonymous_id": None,
+        "last_sent_date_utc": None,
+    }
+    assert "consent" not in json.dumps(serialized)
+    assert "sent_translation_success_dates_utc" not in json.dumps(serialized)
+
+
+@pytest.mark.parametrize("malformed", [None, []])
+def test_present_malformed_telemetry_blocks_fail_closed(malformed: object) -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 36
+    raw["intent"]["telemetry"] = malformed
+
+    canonical = migration.from_dict(raw)
+    legacy = from_dict({"telemetry": malformed})
+
+    assert canonical.intent.telemetry.enabled is False
+    assert canonical.state.telemetry.anonymous_id is None
+    assert legacy.telemetry.enabled is False
+    assert legacy.telemetry_state.anonymous_id is None
+
+
+def test_legacy_explicit_decline_overrides_conflicting_enabled_field() -> None:
+    migration = _migration()
+    raw = {
+        "telemetry": {"enabled": True, "consent": "decline"},
+        "telemetry_state": {"anonymous_id": "existing-id"},
+    }
+
+    canonical = migration.from_dict(raw)
+    legacy = from_dict(raw)
+
+    assert canonical.intent.telemetry.enabled is False
+    assert canonical.state.telemetry.anonymous_id is None
+    assert legacy.telemetry.enabled is False
+    assert legacy.telemetry_state.anonymous_id is None
+
+
+def test_direct_settings_serialization_enforces_telemetry_state_lifecycle() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    legacy = AppSettings()
+    legacy.telemetry.enabled = False
+    disabled_canonical = migration.from_legacy_app_settings(legacy)
+    enabled_without_id = AppSettingsVNext(
+        state=PersistedOperationalState(telemetry=TelemetryOperationalState(anonymous_id=None))
+    )
+    disabled_with_id = AppSettingsVNext(
+        intent=replace(AppSettingsVNext().intent, telemetry=TelemetryIntent(enabled=False))
+    )
+
+    assert disabled_canonical.state.telemetry.anonymous_id is None
+    assert serialization.to_dict(enabled_without_id)["state"]["telemetry"]["anonymous_id"]
+    assert serialization.to_dict(disabled_with_id)["state"]["telemetry"] == {
+        "anonymous_id": None,
+        "last_sent_date_utc": None,
+    }
+
+
+def test_telemetry_enabled_transitions_manage_operational_state() -> None:
     base = AppSettingsVNext(
         state=PersistedOperationalState(
             telemetry=TelemetryOperationalState(
                 anonymous_id="existing-id",
-                sent_translation_success_dates_utc=("2026-07-01",),
+                last_sent_date_utc="2026-07-01",
             )
         )
     )
 
-    allowed = with_telemetry_consent(base, "allow", identifier_factory=lambda: "new-id")
-    declined = with_telemetry_consent(allowed, "decline")
-    allowed_again = with_telemetry_consent(declined, "allow", identifier_factory=lambda: "new-id")
+    enabled = with_telemetry_enabled(base, True, identifier_factory=lambda: "new-id")
+    disabled = with_telemetry_enabled(enabled, False)
+    enabled_again = with_telemetry_enabled(disabled, True, identifier_factory=lambda: "new-id")
 
-    assert allowed.intent.telemetry.consent == "allow"
-    assert allowed.state.telemetry.anonymous_id == "existing-id"
-    assert allowed.state.telemetry.sent_translation_success_dates_utc == ("2026-07-01",)
-    assert declined.intent.telemetry.consent == "decline"
-    assert declined.state.telemetry.anonymous_id is None
-    assert declined.state.telemetry.sent_translation_success_dates_utc == ()
-    assert allowed_again.intent.telemetry.consent == "allow"
-    assert allowed_again.state.telemetry.anonymous_id == "new-id"
+    assert enabled.intent.telemetry.enabled is True
+    assert enabled.state.telemetry.anonymous_id == "existing-id"
+    assert enabled.state.telemetry.last_sent_date_utc == "2026-07-01"
+    assert disabled.intent.telemetry.enabled is False
+    assert disabled.state.telemetry.anonymous_id is None
+    assert disabled.state.telemetry.last_sent_date_utc is None
+    assert enabled_again.intent.telemetry.enabled is True
+    assert enabled_again.state.telemetry.anonymous_id == "new-id"
 
 
-def test_malformed_telemetry_sent_dates_are_ignored_and_deduplicated() -> None:
+def test_malformed_telemetry_last_sent_date_is_ignored() -> None:
     serialization = _serialization()
     raw = serialization.to_dict(AppSettingsVNext())
     raw["state"]["telemetry"] = {
         "anonymous_id": " telemetry-id ",
-        "sent_translation_success_dates_utc": [
-            "2026-07-01",
-            "bad-date",
-            "2026-07-01",
-            7,
-            "2026-07-02",
-        ],
+        "last_sent_date_utc": "bad-date",
     }
 
     loaded = serialization.from_dict(raw)
 
     assert loaded.state.telemetry.anonymous_id == "telemetry-id"
-    assert loaded.state.telemetry.sent_translation_success_dates_utc == (
-        "2026-07-01",
-        "2026-07-02",
-    )
+    assert loaded.state.telemetry.last_sent_date_utc is None
 
 
 def test_current_vnext_status_only_provider_verification_entries_load_as_unknown() -> None:
@@ -984,9 +1153,9 @@ def test_current_vnext_dict_reads_and_serializes_idempotently() -> None:
     migration = _migration()
     serialization = _serialization()
 
-    original = with_telemetry_consent(
+    original = with_telemetry_enabled(
         AppSettingsVNext(),
-        "allow",
+        True,
         identifier_factory=lambda: "current-settings-test-id",
     )
     raw = serialization.to_dict(original)
@@ -1098,7 +1267,7 @@ def test_process_capture_target_round_trips_with_discord_update_resistant_identi
     migration = _migration()
     from puripuly_heart.config.capture_target_resolution import resolve_desktop_audio_capture_target
 
-    settings = with_telemetry_consent(
+    settings = with_telemetry_enabled(
         AppSettingsVNext(
             intent=replace(
                 AppSettingsVNext().intent,
@@ -1110,7 +1279,7 @@ def test_process_capture_target_round_trips_with_discord_update_resistant_identi
                 ),
             ),
         ),
-        "allow",
+        True,
         identifier_factory=lambda: "capture-target-test-id",
     )
 
@@ -1621,14 +1790,14 @@ def test_migration_on_load_creates_byte_identical_backup_and_writes_vnext_with_c
     fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
     path = tmp_path / "settings.json"
     original_bytes = _write_json_bytes(path, maximal_v24_settings_fixture())
-    colliding_backup = tmp_path / "settings.json.pre-v24.20260609T010203Z.bak"
+    colliding_backup = tmp_path / "settings.json.pre-v25.20260609T010203Z.bak"
     colliding_backup.write_bytes(b"existing backup")
 
     result = compat.load_vnext_settings(path, now=fixed_now)
 
     assert result.status == compat.SettingsPersistenceStatus.SUCCESS
     assert result.migrated is True
-    assert result.backup_path == tmp_path / "settings.json.pre-v24.20260609T010203Z.1.bak"
+    assert result.backup_path == tmp_path / "settings.json.pre-v25.20260609T010203Z.1.bak"
     assert result.backup_path.read_bytes() == original_bytes
     assert colliding_backup.read_bytes() == b"existing backup"
     persisted = json.loads(path.read_text(encoding="utf-8"))
@@ -1643,7 +1812,7 @@ def test_backup_creation_failure_aborts_vnext_save_and_leaves_original_bytes(
     fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
     path = tmp_path / "settings.json"
     original_bytes = _write_json_bytes(path, maximal_v24_settings_fixture())
-    first_backup = tmp_path / "settings.json.pre-v24.20260609T010203Z.bak"
+    first_backup = tmp_path / "settings.json.pre-v25.20260609T010203Z.bak"
     first_backup.write_bytes(b"collision")
 
     result = compat.load_vnext_settings(path, now=fixed_now, max_backup_attempts=1)
@@ -1668,7 +1837,7 @@ def test_save_failure_before_final_replace_leaves_original_and_backup_safe(
     assert result.status == compat.SettingsPersistenceStatus.SAVE_FAILED
     assert result.settings is None
     assert path.read_bytes() == original_bytes
-    backup_path = tmp_path / "settings.json.pre-v24.20260609T010203Z.bak"
+    backup_path = tmp_path / "settings.json.pre-v25.20260609T010203Z.bak"
     assert backup_path.read_bytes() == original_bytes
 
 
@@ -1830,9 +1999,9 @@ def test_vnext_settings_version_only_difference_does_not_backup_or_overwrite(
     serialization = _serialization()
     fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
     path = tmp_path / "settings.json"
-    settings = with_telemetry_consent(
+    settings = with_telemetry_enabled(
         AppSettingsVNext(),
-        "allow",
+        True,
         identifier_factory=lambda: "version-only-test-id",
     )
     raw = serialization.to_dict(settings)
@@ -1858,9 +2027,9 @@ def test_facade_projection_failure_returns_explicit_result_without_overwrite(
     compat = _compat()
     serialization = _serialization()
     path = tmp_path / "settings.json"
-    settings = with_telemetry_consent(
+    settings = with_telemetry_enabled(
         AppSettingsVNext(),
-        "allow",
+        True,
         identifier_factory=lambda: "projection-failure-test-id",
     )
     raw = serialization.to_dict(settings)

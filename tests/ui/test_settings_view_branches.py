@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import logging
 from pathlib import Path
@@ -12,6 +13,8 @@ pytest.importorskip("flet")
 
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
+from puripuly_heart.app.ports.ui_models import OscControlPresentationName
+from puripuly_heart.app.services.osc.state_publisher import state_from_settings
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.settings import (
     LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
@@ -35,6 +38,7 @@ from puripuly_heart.config.settings import (
     TranslationFallbackSettings,
     TranslationModel,
     TranslationSettings,
+    materialize_translation_settings,
     to_dict,
 )
 from puripuly_heart.ui import i18n as i18n_module
@@ -47,6 +51,7 @@ from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from puripuly_heart.ui.theme import COLOR_NEUTRAL_DARK
 from puripuly_heart.ui.views import settings as settings_view
 from tests.helpers.flet_page import attach_dummy_page
+from tests.helpers.osc_presentation import osc_control_presentation_state
 
 
 class DummySecretStore:
@@ -83,6 +88,125 @@ def _make_settings_view(
     return view, store
 
 
+def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    baseline = AppSettings()
+    view, _store = _make_settings_view(monkeypatch)
+    view.load_from_settings(baseline, config_path=Path("settings.json"))
+    api_visibility_updates: list[None] = []
+    monkeypatch.setattr(
+        view,
+        "_update_api_visibility",
+        lambda: api_visibility_updates.append(None),
+    )
+    draft = copy.deepcopy(baseline)
+    draft.translation.model = TranslationModel.LOCAL_LLM
+    draft.translation.connection = TranslationConnection.OLLAMA
+    materialize_translation_settings(draft)
+    draft.system_prompt = "unsaved prompt"
+    draft.custom_stt.endpoint = "https://draft.invalid/v1/audio/transcriptions"
+    view._provider_settings_draft = draft
+    view._custom_vocab_tag_editor._input_field.value = "unsubmitted vocabulary"
+    emitted: list[str] = []
+    view.on_settings_changed = lambda _settings: emitted.append("settings")
+    view.on_providers_changed = lambda: emitted.append("providers")
+    canonical = AppSettings()
+    canonical.languages.source_language = "ja"
+    canonical.languages.target_language = "fr"
+    canonical.languages.peer_source_language = "de"
+    canonical.languages.peer_target_language = "ko"
+    canonical.languages.peer_source_mode = "auto"
+    canonical.ui.peer_translation_enabled = True
+    canonical.ui.overlay_enabled = True
+    canonical.osc.vrc_mic_intercept = True
+    canonical.osc.chatbox_include_source = False
+    canonical.provider.stt = STTProviderName.SONIOX
+    canonical.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
+    canonical.translation.model = TranslationModel.GEMINI_37_FLASH
+    canonical.translation.connection = TranslationConnection.OFFICIAL_BYOK
+    materialize_translation_settings(canonical)
+    canonical.translation.fallback.enabled = True
+    canonical.translation.fallback.model = TranslationModel.DEEPSEEK_V4_FLASH
+    canonical.translation.fallback.connection = TranslationConnection.OFFICIAL_BYOK
+    canonical_state = state_from_settings(
+        canonical,
+        peer_capture=True,
+        captions=True,
+    )
+
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_MuteSync",
+            settings=canonical,
+            canonical_state=canonical_state,
+        )
+    )
+
+    assert draft.translation.model == TranslationModel.LOCAL_LLM
+    assert draft.translation.connection == TranslationConnection.OLLAMA
+
+    controls: tuple[OscControlPresentationName, ...] = (
+        "PuriPuly_Talk",
+        "PuriPuly_Trans",
+        "PuriPuly_Listen",
+        "PuriPuly_Captions",
+        "PuriPuly_PeerAuto",
+        "PuriPuly_ChatboxSource",
+        "PuriPuly_SelfSrcLang",
+        "PuriPuly_SelfDstLang",
+        "PuriPuly_PeerSrcLang",
+        "PuriPuly_PeerDstLang",
+        "PuriPuly_SelfASR",
+        "PuriPuly_PeerASR",
+        "PuriPuly_Translator",
+        "PuriPuly_Fallback",
+    )
+    for control in controls:
+        view.project_osc_control_state(
+            osc_control_presentation_state(
+                control,
+                settings=canonical,
+                canonical_state=canonical_state,
+            )
+        )
+
+    for projected_settings in (view._settings, view._provider_settings_draft):
+        assert projected_settings is not None
+        assert projected_settings.languages.source_language == "ja"
+        assert projected_settings.languages.target_language == "fr"
+        assert projected_settings.languages.peer_source_language == "de"
+        assert projected_settings.languages.peer_target_language == "ko"
+        assert projected_settings.languages.peer_source_mode == "auto"
+        assert projected_settings.ui.peer_translation_enabled is True
+        assert projected_settings.ui.overlay_enabled is True
+        assert projected_settings.osc.vrc_mic_intercept is True
+        assert projected_settings.osc.chatbox_include_source is False
+        assert projected_settings.provider.stt == STTProviderName.SONIOX
+        assert projected_settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
+        assert projected_settings.custom_stt.mode == canonical.custom_stt.mode
+        assert projected_settings.custom_stt.compatibility == canonical.custom_stt.compatibility
+        assert projected_settings.provider.llm == canonical.provider.llm
+        assert projected_settings.translation.model == TranslationModel.GEMINI_37_FLASH
+        assert projected_settings.translation.connection == TranslationConnection.OFFICIAL_BYOK
+        assert projected_settings.translation.fallback.enabled is True
+        assert projected_settings.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH
+        assert (
+            projected_settings.translation.fallback.connection
+            == TranslationConnection.OFFICIAL_BYOK
+        )
+    assert view._provider_settings_draft.system_prompt == "unsaved prompt"
+    assert (
+        view._provider_settings_draft.custom_stt.endpoint
+        == "https://draft.invalid/v1/audio/transcriptions"
+    )
+    assert view._custom_vocab_tag_editor._input_field.value == "unsubmitted vocabulary"
+    assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
+    assert view._chatbox_source_text.content.value == t("settings.chatbox_source.off")
+    assert len(api_visibility_updates) == 4
+    assert emitted == []
+
+
 def test_cpu_auto_option_is_disabled_until_all_models_are_available(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -99,75 +223,38 @@ def test_cpu_auto_option_is_disabled_until_all_models_are_available(
     assert view._peer_stt_option_item(STTProviderName.LOCAL_CPU_AUTO).disabled is False
 
 
-def test_telemetry_card_loads_state_and_modal_allow_decline(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_telemetry_card_loads_state_and_toggles_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     view, _store = _make_settings_view(monkeypatch)
-    page = attach_dummy_page(monkeypatch, view)
+    attach_dummy_page(monkeypatch, view)
     settings = AppSettings()
-    calls: list[str] = []
-    opened: list[tuple[str, list[object], str]] = []
-
-    class CapturingModal:
-        def __init__(self, page_arg, title, options, on_select, *, show_description=False):
-            assert page_arg is page
-            assert title == t("settings.telemetry.modal.title")
-            assert show_description is True
-            self.options = options
-            self.on_select = on_select
-
-        def open(self, current: str) -> None:
-            opened.append((current, list(self.options), current))
-
-    monkeypatch.setattr(settings_view, "SettingsModal", CapturingModal)
-    view.on_telemetry_consent_change = calls.append
+    settings.telemetry_state.last_sent_date_utc = "2026-07-03"
+    calls: list[bool] = []
+    view.on_telemetry_enabled_change = calls.append
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
-    assert view._telemetry_consent_text.content.value == t("settings.telemetry.state.on")
-    view._on_telemetry_consent_click(None)
-    assert opened[0][0] == "allow"
-    assert getattr(view, "_telemetry_consent_card") is not None
-
-    captured_select = []
-
-    class SelectingModal(CapturingModal):
-        def __init__(self, page_arg, title, options, on_select, *, show_description=False):
-            super().__init__(page_arg, title, options, on_select, show_description=show_description)
-            captured_select.append(on_select)
-
-    monkeypatch.setattr(settings_view, "SettingsModal", SelectingModal)
-    view._on_telemetry_consent_click(None)
-    captured_select[-1]("allow")
-    assert calls[-1] == "allow"
-    assert view._settings.telemetry.consent == "allow"
-    assert view._settings.telemetry_state.anonymous_id
-    assert view._telemetry_consent_text.content.value == t("settings.telemetry.state.on")
-    view._settings.telemetry_state.sent_translation_success_dates_utc = ["2026-07-03"]
-    captured_select[-1]("decline")
-    assert calls[-1] == "decline"
-    assert view._settings.telemetry.consent == "decline"
+    assert view._telemetry_enabled_text.content.value == t("settings.telemetry.state.on")
+    view._on_telemetry_enabled_click(None)
+    assert calls[-1] is False
+    assert view._settings.telemetry.enabled is False
     assert view._settings.telemetry_state.anonymous_id is None
-    assert view._settings.telemetry_state.sent_translation_success_dates_utc == []
+    assert view._settings.telemetry_state.last_sent_date_utc is None
+
+    view._on_telemetry_enabled_click(None)
+    assert calls[-1] is True
+    assert view._settings.telemetry.enabled is True
+    assert view._settings.telemetry_state.anonymous_id
 
 
 def test_telemetry_card_uses_callback_instead_of_send(monkeypatch: pytest.MonkeyPatch) -> None:
     view, _store = _make_settings_view(monkeypatch)
     attach_dummy_page(monkeypatch, view)
     view.load_from_settings(AppSettings(), config_path=Path("settings.json"))
-    calls: list[str] = []
-    view.on_telemetry_consent_change = calls.append
+    calls: list[bool] = []
+    view.on_telemetry_enabled_change = calls.append
 
-    monkeypatch.setattr(
-        settings_view,
-        "SettingsModal",
-        lambda _page, _title, _options, on_select, **_kwargs: SimpleNamespace(
-            open=lambda _current: on_select("allow")
-        ),
-    )
+    view._on_telemetry_enabled_click(None)
 
-    view._on_telemetry_consent_click(None)
-
-    assert calls == ["allow"]
+    assert calls == [False]
     assert not hasattr(view, "telemetry_client")
 
 
@@ -235,6 +322,7 @@ def _make_llm_selection_view(
         update=lambda: None,
     )
     view._local_llm_connection_card = SimpleNamespace(visible=False, update=lambda: None)
+    view._custom_stt_connection_card = SimpleNamespace(visible=False, update=lambda: None)
     view._managed_trial_usage_bar = SimpleNamespace(
         visible=False,
         percent=None,
@@ -1437,6 +1525,79 @@ def test_on_llm_selected_updates_to_local_llms_with_ollama_connection(
     assert view.has_provider_changes is True
 
 
+def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_37_FLASH,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+        fallback=_enabled_fallback(
+            TranslationModel.DEEPSEEK_V4_FLASH,
+            TranslationConnection.OPENROUTER,
+        ),
+    )
+    settings.provider.llm = LLMProviderName.GEMINI
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    applies: list[bool] = []
+    view.on_providers_changed = lambda: applies.append(True)
+
+    view._on_llm_selected("managed_gemma_cpu")
+
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.translation.model == TranslationModel.MANAGED_GEMMA
+    assert pending.translation.connection == TranslationConnection.CPU
+    assert pending.provider.llm == LLMProviderName.MANAGED_GEMMA
+    assert applies == [True]
+    assert view._openrouter_fallback_card.visible is False
+    assert view._translation_connection_row.visible is False
+    assert view._translation_connection_title.value == t("settings.translation_connection")
+    assert view._get_llm_display_label(pending) == t("provider.managed_gemma_cpu")
+
+    view._on_llm_selected("managed_gemma_gpu")
+
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.translation.model == TranslationModel.MANAGED_GEMMA
+    assert pending.translation.connection == TranslationConnection.GPU
+    assert applies == [True, True]
+    assert view._get_llm_display_label(pending) == t("provider.managed_gemma_gpu")
+
+    view._on_llm_selected("managed_gemma_gpu")
+
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.translation.connection == TranslationConnection.GPU
+    assert applies == [True, True]
+
+
+def test_managed_gemma_12b_selection_auto_applies_gpu_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_37_FLASH,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+    )
+    settings.provider.llm = LLMProviderName.GEMINI
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    applies: list[bool] = []
+    view.on_providers_changed = lambda: applies.append(True)
+
+    view._on_llm_selected(TranslationModel.MANAGED_GEMMA_12B.value)
+
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.translation.model == TranslationModel.MANAGED_GEMMA_12B
+    assert pending.translation.connection == TranslationConnection.GPU
+    assert pending.provider.llm == LLMProviderName.MANAGED_GEMMA
+    assert applies == [True]
+    assert view._openrouter_fallback_card.visible is False
+    assert view._translation_connection_row.visible is False
+    assert view._get_llm_display_label(pending) == t("provider.managed_gemma_12b")
+
+
 def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1452,6 +1613,29 @@ def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
     assert view._deepseek_key.visible is False
     assert view._alibaba_key_beijing.visible is False
     assert view._alibaba_key_singapore.visible is False
+
+
+def test_local_llm_hides_openrouter_key_and_fallback_card_even_with_saved_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
+    settings.translation = TranslationSettings(
+        model=TranslationModel.LOCAL_LLM,
+        connection=TranslationConnection.OLLAMA,
+        fallback=_enabled_fallback(
+            TranslationModel.GEMMA4_26B_31B,
+            TranslationConnection.OPENROUTER,
+        ),
+    )
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+
+    view._update_api_visibility()
+
+    assert view._openrouter_key.visible is False
+    assert view._openrouter_pkce_button_row.visible is False
+    assert view._openrouter_fallback_card.visible is False
+    assert view._api_keys_card.visible is False
+    assert view._managed_key_card.visible is False
 
 
 def test_local_llm_connection_card_matches_api_field_scale_and_copy(
@@ -2056,11 +2240,13 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
             *,
             show_description=False,
             two_column=False,
+            left_column_sections=1,
         ):
             captured["title"] = title
             captured["options"] = options
             captured["show_description"] = show_description
             captured["two_column"] = two_column
+            captured["left_column_sections"] = left_column_sections
 
         def open(self, current: str) -> None:
             captured["current"] = current
@@ -2077,6 +2263,7 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
     assert captured["title"] == t("settings.section.peer_stt")
     assert captured["show_description"] is True
     assert captured["two_column"] is True
+    assert captured["left_column_sections"] == 2
     assert local_qwen_option.label == "Qwen3 ASR 0.6B"
     assert local_qwen_option.disabled is False
     assert local_qwen_option.description == t("provider.local_qwen.description")
@@ -2093,6 +2280,8 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
         STTProviderName.DEEPGRAM.value,
         STTProviderName.QWEN_ASR.value,
         STTProviderName.SONIOX.value,
+        STTProviderName.CUSTOM_OFFLINE.value,
+        STTProviderName.CUSTOM_REALTIME.value,
     }
     assert STTProviderName.LOCAL_QWEN_GPU.value in {option.value for option in options}
 
@@ -2134,12 +2323,12 @@ def test_gpu_selection_shows_one_shared_device_card_and_retains_unavailable_save
     view.load_from_settings(settings, config_path=Path("settings.json"))
     view.set_gpu_devices(devices=(GpuDeviceOption("vk:0", "NVIDIA GeForce RTX 4070", "Vulkan0"),))
 
-    assert view._gpu_device_card.visible is True
     assert view._gpu_device_row.visible is True
     assert view._gpu_device_text.content.value == t(
         "settings.gpu_device.unavailable",
         device="vk:saved",
     )
+    assert view._gpu_llm_text.content.value == t("settings.gpu_device.auto")
 
     view._on_gpu_device_selected("vk:0")
 
@@ -2165,9 +2354,11 @@ def test_gpu_card_is_standard_one_by_one_and_contains_only_device_selection(
     assert view._gpu_device_text.content.size == view._stt_text.content.size
     assert view._gpu_device_text.content.color == view._stt_text.content.color
     assert view._gpu_device_text.content.text_align == view._stt_text.content.text_align
-    assert len(view._gpu_device_row.content.controls) == 3
-    assert view._gpu_device_row.content.controls[1].opacity == 1.0
-    assert view._gpu_device_row.content.controls[2].opacity == 1.0
+    assert view._gpu_device_row.content.controls == [
+        view._gpu_device_card,
+        view._gpu_llm_card,
+        view._gpu_refresh_card,
+    ]
 
 
 def test_gpu_row_repaints_and_collapses_immediately_with_provider_selection(
@@ -2180,22 +2371,100 @@ def test_gpu_row_repaints_and_collapses_immediately_with_provider_selection(
     monkeypatch.setattr(settings_view, "_update_control_if_mounted", repainted.append)
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
-    assert view._gpu_device_card.visible is False
     assert view._gpu_device_row.visible is False
+    assert view._http_extension_host.visible is False
 
     repainted.clear()
     view._on_stt_selected(STTProviderName.LOCAL_QWEN_GPU.value)
 
-    assert view._gpu_device_card.visible is True
     assert view._gpu_device_row.visible is True
+    assert view._http_extension_host.visible is False
     assert view._gpu_device_row in repainted
 
     repainted.clear()
     view._on_stt_selected(STTProviderName.LOCAL_QWEN.value)
 
-    assert view._gpu_device_card.visible is False
     assert view._gpu_device_row.visible is False
     assert view._gpu_device_row in repainted
+
+
+def test_gpu_card_shows_split_labels_when_asr_and_gemma_use_different_devices(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view._on_llm_selected(TranslationModel.MANAGED_GEMMA_12B.value)
+    view.set_gpu_devices(
+        devices=(GpuDeviceOption("vk:0", "NVIDIA GeForce RTX 4070", "Vulkan0"),),
+        llm_devices=(GpuDeviceOption("Vulkan1", "AMD Radeon Graphics", "Vulkan1"),),
+    )
+    view._on_gpu_device_selected("vk:0")
+    view._on_llm_gpu_device_selected("Vulkan1")
+
+    assert view._gpu_device_row.visible is True
+    assert view._gpu_device_text.content.value == "NVIDIA GeForce RTX 4070"
+    assert view._gpu_llm_text.content.value == "AMD Radeon Graphics"
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.stt.gpu_device_id == "vk:0"
+    assert pending.translation.gpu_device_id == "Vulkan1"
+
+    view._on_stt_selected(STTProviderName.LOCAL_QWEN.value)
+
+    assert view._gpu_device_row.visible is True
+    assert view._gpu_device_text.content.value == "NVIDIA GeForce RTX 4070"
+    assert view._gpu_llm_text.content.value == "AMD Radeon Graphics"
+
+
+def test_gpu_card_click_opens_column_modal_and_refresh_requests_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
+    view, _ = _make_settings_view(monkeypatch)
+    page = attach_dummy_page(monkeypatch, view)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    requests: list[str] = []
+    opened: list[object] = []
+    view.on_gpu_discovery_requested = lambda: requests.append("discover")
+
+    class CapturingModal:
+        def __init__(self, page_arg, title, options, on_select, **kwargs):
+            assert page_arg is page
+            opened.append((title, options[0].value, on_select))
+
+        def open(self, current: str) -> None:
+            opened.append(current)
+
+    monkeypatch.setattr(settings_view, "SettingsModal", CapturingModal)
+    view._on_gpu_device_click(None)
+    view._on_llm_gpu_device_click(None)
+    view._on_gpu_refresh_click(None)
+
+    assert requests == ["discover", "discover", "discover"]
+    assert opened[0][0] == t("settings.gpu_device.asr")
+    assert opened[0][1] == "auto"
+    assert opened[1] == "auto"
+    assert opened[2][0] == t("settings.gpu_device.llm")
+    assert opened[3] == "auto"
+
+
+def test_selecting_gemma_gpu_requests_discovery_and_shows_card(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    requests: list[str] = []
+    view.on_gpu_discovery_requested = lambda: requests.append("discover")
+
+    assert view._gpu_device_row.visible is False
+    view._on_llm_selected(TranslationModel.MANAGED_GEMMA_12B.value)
+
+    assert requests == ["discover"]
+    assert view._gpu_device_row.visible is True
 
 
 def test_selecting_gpu_for_self_or_peer_requests_discovery_once_per_new_selection(
@@ -3658,13 +3927,16 @@ def test_overlay_display_toggles_update_persistent_settings(
 
     view._on_overlay_translation_click(None)
     view._on_overlay_peer_original_click(None)
+    view._on_desktop_overlay_swap_caption_languages_click(None)
 
     assert settings.overlay.show_translation is False
     assert settings.overlay.show_peer_original is False
-    assert len(settings_calls) == 2
+    assert settings.overlay.desktop_flet.swap_caption_languages is False
+    assert len(settings_calls) == 3
     assert all(incoming is not settings for incoming in settings_calls)
     assert settings_calls[-1].overlay.show_translation is False
     assert settings_calls[-1].overlay.show_peer_original is False
+    assert settings_calls[-1].overlay.desktop_flet.swap_caption_languages is True
 
 
 def test_overlay_single_action_cards_use_broad_value_slot_click_targets(
@@ -3802,6 +4074,7 @@ def test_desktop_gui_product_standard_cards_show_current_values_and_desktop_only
         assert t("settings.overlay.desktop.size.title") in overlay_titles
         assert t("settings.overlay.desktop.background_alpha.title") in overlay_titles
         assert t("settings.overlay.desktop.lock.title") in overlay_titles
+        assert t("settings.overlay.desktop.swap_caption_languages.title") in overlay_titles
         assert t("settings.overlay.position_reset.desktop.title") in overlay_titles
         assert t("settings.overlay.calibration.anchor") not in overlay_titles
         assert t("settings.overlay.calibration.distance") not in overlay_titles
@@ -3856,6 +4129,7 @@ def test_overlay_tab_switches_visible_cards_when_caption_location_changes(
     assert t("settings.overlay.desktop.size.title") in overlay_titles
     assert t("settings.overlay.desktop.background_alpha.title") in overlay_titles
     assert t("settings.overlay.desktop.lock.title") in overlay_titles
+    assert t("settings.overlay.desktop.swap_caption_languages.title") in overlay_titles
     assert t("settings.overlay.position_reset.desktop.title") in overlay_titles
     assert t("settings.overlay.calibration.anchor") not in overlay_titles
     assert all(row.visible is False for row in view._overlay_vr_rows)
@@ -3889,6 +4163,27 @@ def test_desktop_gui_background_transparency_card_adjusts_in_ten_percent_steps(
     assert [
         incoming.overlay.desktop_flet.visual.background_alpha for incoming in changed
     ] == pytest.approx([0.4, 0.5, 0.6])
+
+
+def test_desktop_overlay_swap_caption_languages_emits_copy_without_mutating_loaded_settings_reference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.overlay.target = "desktop"
+    changed: list[AppSettings] = []
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view.on_settings_changed = lambda incoming: changed.append(incoming)
+
+    view._on_desktop_overlay_swap_caption_languages_click(None)
+
+    assert settings.overlay.desktop_flet.swap_caption_languages is False
+    assert changed
+    assert changed[-1] is not settings
+    assert changed[-1].overlay.desktop_flet.swap_caption_languages is True
+    assert view._settings is not changed[-1]
+    assert view._settings is not None
+    assert view._settings.overlay.desktop_flet.swap_caption_languages is True
 
 
 def test_desktop_gui_background_alpha_emits_copy_without_mutating_loaded_settings_reference(
@@ -4531,7 +4826,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     view, _ = _make_settings_view(monkeypatch)
     api_controls = _subtab_controls(view, "api")
 
-    assert len(api_controls) == 8
+    assert len(api_controls) == 9
     assert _row_card_titles(api_controls[0]) == [
         t("settings.section.stt"),
         t("settings.section.peer_stt"),
@@ -4541,21 +4836,29 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
         t("settings.translation_connection"),
         t("settings.fallback"),
     ]
+    assert api_controls[2] is view._http_extension_host
     assert api_controls[2].content is view._http_extension_row
+    assert api_controls[2].visible is False
     assert _row_card_titles(api_controls[2]) == [
         t("settings.http_extension.title"),
         t("settings.http_extension.path"),
         t("settings.http_extension.refresh"),
     ]
-    assert _row_card_titles(api_controls[3]) == [t("settings.gpu_device.title")]
-    assert view._gpu_device_card.visible is False
+    assert _row_card_titles(api_controls[3]) == [
+        t("settings.gpu_device.asr"),
+        t("settings.gpu_device.llm"),
+        t("settings.gpu_device.refresh"),
+    ]
+    assert view._gpu_device_row.visible is False
     assert _row_card_titles(api_controls[4]) == [t("settings.local_llm.connection")]
     assert api_controls[4] is view._local_llm_connection_card
-    assert api_controls[5] is view._managed_key_card
-    assert _row_card_titles(api_controls[5]) == [t("settings.managed_key.title")]
-    assert api_controls[6] is view._peer_auto_languages_card
-    assert api_controls[7] is not view._api_keys_column
-    assert _row_card_titles(api_controls[7]) == [t("settings.section.api_keys")]
+    assert api_controls[5] is view._custom_stt_connection_card
+    assert _row_card_titles(api_controls[5]) == [t("settings.custom_stt.title")]
+    assert api_controls[6] is view._managed_key_card
+    assert _row_card_titles(api_controls[6]) == [t("settings.managed_key.title")]
+    assert api_controls[7] is view._peer_auto_languages_card
+    assert api_controls[8] is not view._api_keys_column
+    assert _row_card_titles(api_controls[8]) == [t("settings.section.api_keys")]
 
 
 def test_api_tab_primary_value_typography_is_consistent_across_rows(
@@ -4679,6 +4982,7 @@ def test_overlay_tab_uses_target_specific_unit_card_rows(
         t("settings.overlay.desktop.background_alpha.title"),
     ]
     assert _row_card_titles(overlay_controls[4]) == [
+        t("settings.overlay.desktop.swap_caption_languages.title"),
         t("settings.overlay.position_reset.desktop.title"),
     ]
     assert len(_layout_cards(overlay_controls[4])) == 3

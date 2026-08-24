@@ -4,4 +4,3 @@
 - Report suspected architecture drift introduced by your changes to the user.
 - Prefer contract and behavior tests over implementation-detail tests.
 - Test observable outcomes and invariants so behavior-preserving refactors normally do not require test changes.
-

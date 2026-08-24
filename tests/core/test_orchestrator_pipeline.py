@@ -68,9 +68,7 @@ async def test_translation_fixture_uses_integrated_context_when_enabled_and_safe
     await harness.self_owner.submit_text("world")
     await asyncio.gather(*harness.self_runtime.translation_tasks.values(), return_exceptions=True)
 
-    assert inner.calls[0]["context"] == (
-        '- [self, 12s ago] "I am ready"\n- [peer, 7s ago] "hello from peer"'
-    )
+    assert inner.calls[0]["context"] == ('- [self] "I am ready"\n- [peer] "hello from peer"')
 
 
 async def test_orchestrator_e2e_pipeline():

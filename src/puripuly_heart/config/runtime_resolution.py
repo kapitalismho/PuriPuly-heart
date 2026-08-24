@@ -45,6 +45,8 @@ TRANSLATION_MODEL_GEMINI_37_FLASH: Final = "gemini37_flash"
 TRANSLATION_MODEL_GEMINI_31_FLASH_LITE: Final = "gemini31_flash_lite"
 TRANSLATION_MODEL_QWEN_35_PLUS: Final = "qwen35_plus"
 TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH: Final = "openrouter_qwen35_flash"
+TRANSLATION_MODEL_MANAGED_GEMMA: Final = "managed_gemma"
+TRANSLATION_MODEL_MANAGED_GEMMA_12B: Final = "managed_gemma_12b"
 TRANSLATION_MODEL_LOCAL_LLM: Final = "local_llm"
 TRANSLATION_MODEL_CUSTOM_HTTP: Final = "custom_http"
 
@@ -61,6 +63,8 @@ TranslationModelName: TypeAlias = Literal[
     "gemini31_flash_lite",
     "qwen35_plus",
     "openrouter_qwen35_flash",
+    "managed_gemma",
+    "managed_gemma_12b",
     "local_llm",
     "custom_http",
 ]
@@ -73,6 +77,8 @@ TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
     TRANSLATION_MODEL_GEMINI_31_FLASH_LITE,
     TRANSLATION_MODEL_QWEN_35_PLUS,
     TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH,
+    TRANSLATION_MODEL_MANAGED_GEMMA,
+    TRANSLATION_MODEL_MANAGED_GEMMA_12B,
     TRANSLATION_MODEL_LOCAL_LLM,
     TRANSLATION_MODEL_CUSTOM_HTTP,
 )
@@ -83,6 +89,8 @@ TRANSLATION_CONNECTION_OPENROUTER: Final = "openrouter"
 TRANSLATION_CONNECTION_CEREBRAS: Final = "cerebras"
 TRANSLATION_CONNECTION_OFFICIAL_BYOK: Final = "official_byok"
 TRANSLATION_CONNECTION_OLLAMA: Final = "ollama"
+TRANSLATION_CONNECTION_CPU: Final = "cpu"
+TRANSLATION_CONNECTION_GPU: Final = "gpu"
 TRANSLATION_CONNECTION_CUSTOM_HTTP: Final = "custom_http"
 
 TranslationConnectionName: TypeAlias = Literal[
@@ -92,6 +100,8 @@ TranslationConnectionName: TypeAlias = Literal[
     "cerebras",
     "official_byok",
     "ollama",
+    "cpu",
+    "gpu",
     "custom_http",
 ]
 TRANSLATION_CONNECTIONS: Final[tuple[TranslationConnectionName, ...]] = (
@@ -101,6 +111,8 @@ TRANSLATION_CONNECTIONS: Final[tuple[TranslationConnectionName, ...]] = (
     TRANSLATION_CONNECTION_CEREBRAS,
     TRANSLATION_CONNECTION_OFFICIAL_BYOK,
     TRANSLATION_CONNECTION_OLLAMA,
+    TRANSLATION_CONNECTION_CPU,
+    TRANSLATION_CONNECTION_GPU,
     TRANSLATION_CONNECTION_CUSTOM_HTTP,
 )
 TRANSLATION_CONNECTIONS_BY_MODEL: Final[
@@ -139,6 +151,11 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
             TRANSLATION_CONNECTION_MANAGED,
             TRANSLATION_CONNECTION_OPENROUTER,
         ),
+        TRANSLATION_MODEL_MANAGED_GEMMA: (
+            TRANSLATION_CONNECTION_CPU,
+            TRANSLATION_CONNECTION_GPU,
+        ),
+        TRANSLATION_MODEL_MANAGED_GEMMA_12B: (TRANSLATION_CONNECTION_GPU,),
         TRANSLATION_MODEL_LOCAL_LLM: (TRANSLATION_CONNECTION_OLLAMA,),
         TRANSLATION_MODEL_CUSTOM_HTTP: (TRANSLATION_CONNECTION_CUSTOM_HTTP,),
     }
@@ -170,6 +187,7 @@ PROVIDER_OPENROUTER: Final = "openrouter"
 PROVIDER_DEEPSEEK: Final = "deepseek"
 PROVIDER_GEMINI: Final = "gemini"
 PROVIDER_QWEN: Final = "qwen"
+PROVIDER_MANAGED_GEMMA: Final = "managed_gemma"
 PROVIDER_LOCAL_LLM: Final = "local_llm"
 PROVIDER_CEREBRAS: Final = "cerebras"
 PROVIDER_CUSTOM_HTTP: Final = "custom_http"
@@ -177,6 +195,7 @@ LLM_PROVIDERS: Final[tuple[str, ...]] = (
     PROVIDER_GEMINI,
     PROVIDER_OPENROUTER,
     PROVIDER_QWEN,
+    PROVIDER_MANAGED_GEMMA,
     PROVIDER_DEEPSEEK,
     PROVIDER_LOCAL_LLM,
     PROVIDER_CEREBRAS,
@@ -190,6 +209,8 @@ QWEN_MODEL_35_PLUS: Final = "qwen3.5-plus"
 LOCAL_LLM_BACKEND_OLLAMA: Final = "ollama"
 LOCAL_LLM_DEFAULT_BASE_URL: Final = "http://127.0.0.1:11434/v1"
 LOCAL_LLM_DEFAULT_MODEL: Final = "llama3.1:8b"
+MANAGED_GEMMA_MODEL: Final = "puripuly-gemma-4-e4b-q4"
+MANAGED_GEMMA_12B_MODEL: Final = "puripuly-gemma-4-12b-q4"
 CEREBRAS_MODEL_GEMMA_4_31B: Final = "gemma-4-31b"
 QWEN_REGION_BEIJING: Final = "beijing"
 QWEN_REGION_SINGAPORE: Final = "singapore"
@@ -204,6 +225,7 @@ CREDENTIAL_REF_QWEN_BEIJING: Final = "qwen:beijing"
 CREDENTIAL_REF_QWEN_SINGAPORE: Final = "qwen:singapore"
 CREDENTIAL_REF_DEEPGRAM_STT: Final = "deepgram:stt"
 CREDENTIAL_REF_SONIOX_STT: Final = "soniox:stt"
+CREDENTIAL_REF_CUSTOM_STT: Final = "custom:stt"
 
 STT_PROVIDER_LOCAL_CPU_AUTO: Final = "local_cpu_auto"
 STT_PROVIDER_LOCAL_PARAKEET_V3: Final = "local_parakeet_v3"
@@ -213,6 +235,14 @@ STT_PROVIDER_LOCAL_QWEN_GPU: Final = "local_qwen_gpu"
 STT_PROVIDER_DEEPGRAM: Final = "deepgram"
 STT_PROVIDER_QWEN_ASR: Final = "qwen_asr"
 STT_PROVIDER_SONIOX: Final = "soniox"
+STT_PROVIDER_CUSTOM: Final = "custom"
+STT_PROVIDER_CUSTOM_OFFLINE: Final = "custom_offline"
+STT_PROVIDER_CUSTOM_REALTIME: Final = "custom_realtime"
+STT_CUSTOM_PROVIDERS: Final[tuple[str, ...]] = (
+    STT_PROVIDER_CUSTOM,
+    STT_PROVIDER_CUSTOM_OFFLINE,
+    STT_PROVIDER_CUSTOM_REALTIME,
+)
 STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_LOCAL_CPU_AUTO,
     STT_PROVIDER_LOCAL_PARAKEET_V3,
@@ -222,6 +252,9 @@ STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_DEEPGRAM,
     STT_PROVIDER_QWEN_ASR,
     STT_PROVIDER_SONIOX,
+    STT_PROVIDER_CUSTOM,
+    STT_PROVIDER_CUSTOM_OFFLINE,
+    STT_PROVIDER_CUSTOM_REALTIME,
 )
 PEER_AUTO_DETECTION_STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_LOCAL_QWEN_GPU,
@@ -461,6 +494,35 @@ def _normalize_openrouter_broker_base_url(value: object) -> str | None:
     return None
 
 
+_CUSTOM_STT_COMPATIBILITIES_BY_MODE: Final[Mapping[str, tuple[str, ...]]] = {
+    "offline": ("openai_transcription",),
+    "realtime": ("openai_realtime",),
+}
+
+
+def _normalize_custom_stt_mode(value: object) -> str:
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"streaming", "realtime", "real-time"}:
+            return "realtime"
+        if normalized == "offline":
+            return "offline"
+    return "offline"
+
+
+def _normalize_custom_stt_compatibility(value: object, *, mode: str) -> str:
+    allowed = _CUSTOM_STT_COMPATIBILITIES_BY_MODE[mode]
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in allowed:
+            return normalized
+        if normalized:
+            raise ValueError(
+                f"Custom STT compatibility {normalized} is not supported in {mode} mode"
+            )
+    return allowed[0]
+
+
 def _no_credential() -> ResolvedCredentialRequirement:
     return ResolvedCredentialRequirement(
         source=CREDENTIAL_SOURCE_NONE,
@@ -559,6 +621,8 @@ class TranslationFallbackRuntimeIntent:
         _require_allowed(model, TRANSLATION_MODELS, field_name="fallback model")
         if model == TRANSLATION_MODEL_CUSTOM_HTTP:
             raise ValueError("custom HTTP translation cannot be used as fallback")
+        if model in (TRANSLATION_MODEL_MANAGED_GEMMA, TRANSLATION_MODEL_MANAGED_GEMMA_12B):
+            raise ValueError("managed local Gemma cannot be used as provider fallback")
         if connection not in TRANSLATION_CONNECTIONS_BY_MODEL[model]:
             raise ValueError("translation fallback connection is not supported for model")
 
@@ -675,6 +739,11 @@ class STTRuntimeIntent:
     soniox_enable_language_identification: bool = False
     soniox_language_hints: tuple[str, ...] | None = None
     soniox_language_hints_strict: bool = False
+    custom_stt_mode: str = "offline"
+    custom_stt_compatibility: str = "openai_transcription"
+    custom_stt_endpoint: str = ""
+    custom_stt_model: str = ""
+    custom_stt_extra: Mapping[str, ResolvedOptionValue] = field(default_factory=_empty_options)
 
     def __post_init__(self) -> None:
         channel = _normalize_allowed(
@@ -1015,6 +1084,13 @@ def derive_translation_runtime_intent_from_compatibility(
             concurrency_limit=concurrency,
         )
 
+    if provider == PROVIDER_MANAGED_GEMMA:
+        return TranslationRuntimeIntent(
+            model=TRANSLATION_MODEL_MANAGED_GEMMA,
+            connection=TRANSLATION_CONNECTION_CPU,
+            concurrency_limit=concurrency,
+        )
+
     if provider == PROVIDER_LOCAL_LLM:
         return TranslationRuntimeIntent(
             model=TRANSLATION_MODEL_LOCAL_LLM,
@@ -1177,6 +1253,31 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
                 **provider_options,
                 "language_hints_strict": True,
             }
+    elif provider in STT_CUSTOM_PROVIDERS:
+        if provider == STT_PROVIDER_CUSTOM_REALTIME:
+            mode = "realtime"
+            compatibility = "openai_realtime"
+        elif provider == STT_PROVIDER_CUSTOM_OFFLINE:
+            mode = "offline"
+            compatibility = "openai_transcription"
+        else:
+            mode = _normalize_custom_stt_mode(intent.custom_stt_mode)
+            compatibility = _normalize_custom_stt_compatibility(
+                intent.custom_stt_compatibility,
+                mode=mode,
+            )
+        model = str(intent.custom_stt_model or "").strip() or None
+        endpoint = str(intent.custom_stt_endpoint or "").strip()
+        credential = ResolvedCredentialRequirement(
+            source=CREDENTIAL_SOURCE_SECRET_STORE,
+            required=False,
+            reference=CREDENTIAL_REF_CUSTOM_STT,
+        )
+        provider_options = {
+            "mode": mode,
+            "compatibility": compatibility,
+            "extra": _freeze_option_mapping(cast(Mapping[str, object], intent.custom_stt_extra)),
+        }
 
     return ResolvedSTTConfig(
         channel=cast(str, intent.channel),
@@ -1229,6 +1330,22 @@ def _resolve_translation_target(
             provider=PROVIDER_CUSTOM_HTTP,
             model=TRANSLATION_MODEL_CUSTOM_HTTP,
             credential=_no_credential(),
+        )
+
+    if translation.model == TRANSLATION_MODEL_MANAGED_GEMMA:
+        return _resolved_direct_provider_target(
+            provider=PROVIDER_MANAGED_GEMMA,
+            model=MANAGED_GEMMA_MODEL,
+            credential=_no_credential(),
+            provider_options={"backend": translation.connection},
+        )
+
+    if translation.model == TRANSLATION_MODEL_MANAGED_GEMMA_12B:
+        return _resolved_direct_provider_target(
+            provider=PROVIDER_MANAGED_GEMMA,
+            model=MANAGED_GEMMA_12B_MODEL,
+            credential=_no_credential(),
+            provider_options={"backend": TRANSLATION_CONNECTION_GPU},
         )
 
     if translation.model == TRANSLATION_MODEL_GEMMA4_26B_31B:
@@ -1453,9 +1570,11 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
         ResolvedLLMAttemptPlan(target=primary),
     ]
 
-    if (
-        runtime_input.translation_fallback.enabled
-        and translation.model != TRANSLATION_MODEL_CUSTOM_HTTP
+    if runtime_input.translation_fallback.enabled and translation.model not in (
+        TRANSLATION_MODEL_CUSTOM_HTTP,
+        TRANSLATION_MODEL_MANAGED_GEMMA,
+        TRANSLATION_MODEL_MANAGED_GEMMA_12B,
+        TRANSLATION_MODEL_LOCAL_LLM,
     ):
         fallback_translation = TranslationRuntimeIntent(
             model=runtime_input.translation_fallback.model,
@@ -1501,6 +1620,7 @@ __all__ = [
     "CREDENTIAL_REF_OPENROUTER_BYOK",
     "CREDENTIAL_REF_OPENROUTER_MANAGED",
     "CREDENTIAL_REF_OPENROUTER_MANAGED_QQ",
+    "CREDENTIAL_REF_CUSTOM_STT",
     "CREDENTIAL_REF_DEEPGRAM_STT",
     "CREDENTIAL_REF_QWEN_BEIJING",
     "CREDENTIAL_REF_QWEN_SINGAPORE",
@@ -1514,6 +1634,8 @@ __all__ = [
     "LOCAL_LLM_BACKEND_OLLAMA",
     "LOCAL_LLM_DEFAULT_BASE_URL",
     "LOCAL_LLM_DEFAULT_MODEL",
+    "MANAGED_GEMMA_12B_MODEL",
+    "MANAGED_GEMMA_MODEL",
     "LLM_PROVIDERS",
     "OPENROUTER_SOURCE_BYOK",
     "OPENROUTER_MANAGED_CREDENTIAL_KINDS",
@@ -1529,6 +1651,7 @@ __all__ = [
     "PROVIDER_CEREBRAS",
     "PROVIDER_CUSTOM_HTTP",
     "PROVIDER_GEMINI",
+    "PROVIDER_MANAGED_GEMMA",
     "PROVIDER_LOCAL_LLM",
     "PROVIDER_OPENROUTER",
     "PROVIDER_QWEN",
@@ -1563,11 +1686,14 @@ __all__ = [
     "PEER_AUTO_DETECTION_STT_PROVIDERS",
     "STT_PROVIDER_QWEN_ASR",
     "STT_PROVIDER_SONIOX",
+    "STT_PROVIDER_CUSTOM",
     "STT_PROVIDERS",
     "STTRuntimeIntent",
     "TRANSLATION_CONNECTION_CEREBRAS",
     "TRANSLATION_CONNECTION_MANAGED",
     "TRANSLATION_CONNECTION_MANAGED_CHINA",
+    "TRANSLATION_CONNECTION_CPU",
+    "TRANSLATION_CONNECTION_GPU",
     "TRANSLATION_CONNECTION_OFFICIAL_BYOK",
     "TRANSLATION_CONNECTION_OLLAMA",
     "TRANSLATION_CONNECTION_CUSTOM_HTTP",
@@ -1582,6 +1708,8 @@ __all__ = [
     "TRANSLATION_MODEL_GEMMA4_31B",
     "TRANSLATION_MODEL_CUSTOM_HTTP",
     "TRANSLATION_MODEL_LOCAL_LLM",
+    "TRANSLATION_MODEL_MANAGED_GEMMA",
+    "TRANSLATION_MODEL_MANAGED_GEMMA_12B",
     "TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH",
     "TRANSLATION_MODEL_QWEN_35_PLUS",
     "TRANSLATION_MODELS",

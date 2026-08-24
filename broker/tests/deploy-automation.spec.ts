@@ -31,6 +31,10 @@ const deploySmokeSpec = new URL(
   import.meta.url,
 );
 const brokerReadme = new URL('../README.md', import.meta.url);
+const dailySummaryV2Finalizer = new URL(
+  '../deploy/finalize-daily-summary-v2.sql',
+  import.meta.url,
+);
 
 const tempDirs: string[] = [];
 
@@ -232,6 +236,10 @@ describe('broker direct deploy automation', () => {
     const remoteD1MigrationIndex = workflow.indexOf(
       'wrangler d1 migrations apply',
     );
+    const remoteD1BackupIndex = workflow.indexOf('wrangler d1 export');
+    const remoteD1BackupUploadIndex = workflow.indexOf(
+      'actions/upload-artifact@v4',
+    );
     const openRouterGuardrailPatchIndex = workflow.indexOf(
       'PATCH "$guardrail_url"',
     );
@@ -319,6 +327,11 @@ describe('broker direct deploy automation', () => {
       /wrangler d1 migrations apply\s+puripuly-heart-broker\s+--remote\s+--config/u,
     );
     expect(workflow).toMatch(
+      /wrangler d1 export puripuly-heart-broker\s+\\\s+--remote --config/u,
+    );
+    expect(workflow).toContain('$RUNNER_TEMP/puripuly-heart-broker-pre-migration-');
+    expect(workflow).toContain('if-no-files-found: error');
+    expect(workflow).toMatch(
       /wrangler d1 execute\s+puripuly-heart-broker\s+--remote\s+--config/u,
     );
     expect(workflow).toContain("json_extract(value, '$.current.salt')");
@@ -360,6 +373,10 @@ describe('broker direct deploy automation', () => {
     expect(managedUserHmacBlankCheckIndex).toBeGreaterThanOrEqual(0);
     expect(discordWebhookBlankCheckIndex).toBeGreaterThanOrEqual(0);
     expect(remoteD1MigrationIndex).toBeGreaterThanOrEqual(0);
+    expect(remoteD1BackupIndex).toBeGreaterThanOrEqual(0);
+    expect(remoteD1BackupUploadIndex).toBeGreaterThanOrEqual(0);
+    expect(remoteD1BackupIndex).toBeLessThan(remoteD1BackupUploadIndex);
+    expect(remoteD1BackupUploadIndex).toBeLessThan(remoteD1MigrationIndex);
     expect(managedUserHmacBlankCheckIndex).toBeLessThan(remoteD1MigrationIndex);
     expect(managedUserHmacSyncIndex).toBeGreaterThanOrEqual(0);
     expect(managedUserHmacBlankCheckIndex).toBeLessThan(managedUserHmacSyncIndex);
@@ -428,11 +445,9 @@ describe('broker direct deploy automation', () => {
     );
     expect(smokeSpec).toContain('ph-or-user-v');
     expect(smokeSpec).toContain('MANAGED_TRIAL_ALLOWED_MODELS');
-    expect(smokeSpec).toContain('qwen/qwen3.5-flash-02-23');
+    expect(smokeSpec).toContain('google/gemma-4-31b-it');
     expect(smokeSpec).toContain('deepseek/deepseek-v4-flash-0731');
-    expect(smokeSpec).toContain('deepseek/deepseek-v4-flash-0423');
     expect(smokeSpec).toContain('deepseek/deepseek-v4-flash');
-    expect(smokeSpec).toContain('google/gemini-2.5-flash-lite');
     expect(smokeSpec).toContain('MANAGED_TRIAL_ALLOWED_MODELS');
     expect(smokeSpec).toContain('must differ from the managed allowlisted models');
     expect(readme).toContain('per-installation OpenRouter child key');
@@ -471,15 +486,26 @@ describe('broker direct deploy automation', () => {
     expect(readme).toContain('DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION');
     expect(readme).toContain('DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL');
     expect(readme).toContain('DISCORD_DAILY_REPORT_WEBHOOK_URL');
-    expect(readme).toContain('daily Discord heartbeat');
+    expect(readme).toContain('puripuly_daily_summary.v2');
+    expect(workflow).toContain('deploy/finalize-daily-summary-v2.sql');
+    expect(workflow).toContain(
+      "json_type(value, '$.dailyReport.includeZeroActivity') AS legacy_type",
+    );
+    expect(workflow.indexOf('pnpm exec wrangler deploy')).toBeLessThan(
+      workflow.indexOf('deploy/finalize-daily-summary-v2.sql'),
+    );
+    expect(workflow.indexOf('deploy/finalize-daily-summary-v2.sql')).toBeLessThan(
+      workflow.indexOf('broker/tests/deploy-smoke/canonical-production.spec.ts'),
+    );
+    expect(readFileSync(dailySummaryV2Finalizer, 'utf8')).toContain(
+      "json_remove(value, '$.dailyReport.includeZeroActivity')",
+    );
     expect(readme).toContain('three-month expiry');
     expect(readme).not.toContain('six-month expiry');
     expect(readme).toContain('optional `openrouter_user_id`');
-    expect(readme).toContain('qwen/qwen3.5-flash-02-23');
+    expect(readme).toContain('google/gemma-4-31b-it');
     expect(readme).toContain('deepseek/deepseek-v4-flash-0731');
-    expect(readme).toContain('deepseek/deepseek-v4-flash-0423');
     expect(readme).toContain('deepseek/deepseek-v4-flash');
-    expect(readme).toContain('google/gemini-2.5-flash-lite');
   });
 
   it('ships a manual production workflow that updates only the broker daily auth cap runtime config', () => {

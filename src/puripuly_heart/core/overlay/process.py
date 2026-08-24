@@ -192,12 +192,11 @@ class _AsyncioOverlayProcess:
                 if event is not None:
                     await self._events.put(event)
                     continue
-                if (
-                    line
-                    and self._diagnostics is not None
-                    and self._should_capture_failure_line(line, stream_name)
-                ):
-                    self._diagnostics.record_child_line(stream_name, line)
+                if line and self._diagnostics is not None:
+                    if self._diagnostics.ingest_native_child_line(line):
+                        pass
+                    elif self._should_capture_failure_line(line, stream_name):
+                        self._diagnostics.record_child_line(stream_name, line)
                 self._log_passthrough_line(line, stream_name)
         except asyncio.CancelledError:
             raise
@@ -550,10 +549,15 @@ class OverlayProcessManager:
             self.diagnostics = OverlayDiagnosticsRecorder(
                 overlay_instance_id=self.overlay_instance_id,
                 diagnostics_dir=self.diagnostics_dir,
+                logging_mode=self.logging_mode,
             )
+        else:
+            self.diagnostics.set_logging_mode(self.logging_mode)
 
     def set_logging_mode(self, mode: str) -> None:
         self.logging_mode = normalize_overlay_logging_mode(mode)
+        if self.diagnostics is not None:
+            self.diagnostics.set_logging_mode(self.logging_mode)
         process = self._process
         if process is not None:
             set_logging_mode = getattr(process, "set_logging_mode", None)
@@ -1403,7 +1407,8 @@ class OverlayProcessManager:
     ) -> None:
         self.state = "failed"
         self.failure_reason = failure_reason
-        self.restart_scheduled = False
+        connected_session = self._last_transition in {"overlay_ready", "bridge_ready"}
+        self.restart_scheduled = connected_session and not self._shutdown_requested
         self._current_phase = "failed"
         stdout_count = (
             len(self.diagnostics.child_stdout_lines) if self.diagnostics is not None else 0

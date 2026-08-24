@@ -88,6 +88,7 @@ class Harness:
     ready: bool = True
     ingress_frozen: bool = False
     events: list[object] = field(default_factory=list)
+    translation_demands: list[bool] = field(default_factory=list)
     effective: list[tuple[bool, bool]] = field(default_factory=list)
     lifecycle_traces: list[tuple[str, dict[str, object]]] = field(default_factory=list)
     readiness_entered: asyncio.Event | None = None
@@ -149,7 +150,12 @@ class Harness:
             lifecycle_trace_sink=lambda event, fields: self.lifecycle_traces.append(
                 (event, fields)
             ),
+            translation_demand_sink=self._notify_translation_demand,
         )
+
+    async def _notify_translation_demand(self) -> None:
+        self.events.append("demand")
+        self.translation_demands.append(self.settings.ui.peer_translation_enabled)
 
 
 @pytest.mark.asyncio
@@ -171,6 +177,75 @@ async def test_peer_owner_preserves_eula_and_effective_activation_contract() -> 
     assert harness.settings.ui.overlay_enabled is True
     assert "overlay_start" in harness.events
     assert owner.snapshot().activation_requested is True
+    assert harness.translation_demands == [False, True]
+
+
+@pytest.mark.asyncio
+async def test_peer_owner_notifies_translation_demand_before_local_ready() -> None:
+    harness = Harness(
+        readiness_entered=asyncio.Event(),
+        readiness_release=asyncio.Event(),
+    )
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+
+    enabling = asyncio.create_task(owner.set_enabled(True))
+    await harness.readiness_entered.wait()
+
+    assert harness.translation_demands == [True]
+    assert harness.settings.ui.peer_translation_enabled is True
+
+    harness.readiness_release.set()
+    await enabling
+
+
+@pytest.mark.asyncio
+async def test_peer_enable_starts_overlay_before_waiting_for_local_ready() -> None:
+    harness = Harness(
+        overlay_state="off",
+        readiness_entered=asyncio.Event(),
+        readiness_release=asyncio.Event(),
+    )
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+
+    enabling = asyncio.create_task(owner.set_enabled(True))
+    await harness.readiness_entered.wait()
+
+    assert harness.settings.ui.overlay_enabled is True
+    assert "overlay_start" in harness.events
+    assert harness.events.index("overlay_start") < harness.events.index("demand")
+    assert harness.events.index("demand") < harness.events.index(("ready", 1))
+
+    harness.readiness_release.set()
+    await enabling
+
+
+@pytest.mark.asyncio
+async def test_peer_enable_starts_overlay_before_waiting_for_translation_demand() -> None:
+    harness = Harness(overlay_state="off")
+    harness.settings.ui.peer_translation_eula_accepted = True
+    demand_entered = asyncio.Event()
+    demand_release = asyncio.Event()
+
+    async def slow_demand() -> None:
+        harness.events.append("demand")
+        harness.translation_demands.append(harness.settings.ui.peer_translation_enabled)
+        demand_entered.set()
+        await demand_release.wait()
+
+    harness._notify_translation_demand = slow_demand
+    owner = harness.owner()
+
+    enabling = asyncio.create_task(owner.set_enabled(True))
+    await demand_entered.wait()
+
+    assert harness.settings.ui.overlay_enabled is True
+    assert "overlay_start" in harness.events
+    assert harness.events.index("overlay_start") < harness.events.index("demand")
+
+    demand_release.set()
+    await enabling
 
 
 @pytest.mark.asyncio
@@ -440,6 +515,35 @@ async def test_local_provider_prepares_while_overlay_start_is_in_progress() -> N
     assert len(runtime.policy_calls) == 1
     assert runtime.policy_calls[0][1] is True
     assert owner.snapshot().model_loading is False
+
+
+@pytest.mark.asyncio
+async def test_local_peer_attaches_after_overlay_connects_during_local_ready() -> None:
+    harness = Harness(
+        overlay_state="off",
+        provider_available=False,
+        readiness_entered=asyncio.Event(),
+        readiness_release=asyncio.Event(),
+    )
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+    runtime = Runtime(effective_active=False)
+    owner.bind_runtime(runtime)
+
+    enabling = asyncio.create_task(owner.set_enabled(True))
+    await harness.readiness_entered.wait()
+
+    assert "overlay_start" in harness.events
+    harness.overlay_state = "connected"
+    await owner.refresh_runtime()
+    assert runtime.policy_calls == []
+
+    harness.readiness_release.set()
+    await enabling
+
+    assert len(runtime.prepare_calls) == 1
+    assert len(runtime.policy_calls) == 1
+    assert runtime.policy_calls[0][1] is True
 
 
 @pytest.mark.asyncio

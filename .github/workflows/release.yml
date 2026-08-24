@@ -132,6 +132,11 @@ jobs:
         run: |
           ./scripts/ci/prepare-flet-runtime.ps1
 
+      - name: Prepare pinned llama.cpp runtime
+        shell: pwsh
+        run: |
+          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.managed_gemma_distribution prepare
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -214,6 +219,12 @@ jobs:
         shell: pwsh
         run: |
           ./.venv/Scripts/python.exe -m PyInstaller --clean --noconfirm build.spec
+
+      - name: Verify managed Gemma package contract
+        shell: pwsh
+        run: |
+          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.managed_gemma_distribution verify-installer installer.iss
+          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.managed_gemma_distribution verify-package dist/PuriPulyHeart --launch
 
       - name: Stage soxr compliance bundle
         shell: pwsh

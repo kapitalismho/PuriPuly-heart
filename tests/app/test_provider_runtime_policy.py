@@ -78,3 +78,31 @@ def test_llm_provider_signature_tracks_all_runtime_inputs() -> None:
     )
     assert build_llm_provider_signature(local) != build_llm_provider_signature(changed_model)
     assert build_llm_provider_signature(local) != build_llm_provider_signature(changed_body)
+
+
+def test_managed_gemma_signature_ignores_disabled_provider_fallback_but_tracks_prefix() -> None:
+    base = AppSettings()
+    base.translation.model = TranslationModel.MANAGED_GEMMA
+    base.translation.connection = TranslationConnection.CPU
+    base.provider.llm = LLMProviderName.MANAGED_GEMMA
+    base.translation.fallback = TranslationFallbackSettings(
+        enabled=True,
+        model=TranslationModel.DEEPSEEK_V4_FLASH,
+        connection=TranslationConnection.MANAGED_CHINA,
+    )
+
+    changed_fallback = copy.deepcopy(base)
+    changed_fallback.translation.fallback = TranslationFallbackSettings(enabled=False)
+    changed_fallback.openrouter.broker_base_url = "https://different.example"
+    changed_fallback.managed_identity.verified_hardware_hash = "different"
+    changed_language = copy.deepcopy(base)
+    changed_language.languages.target_language = "ja"
+    changed_prompt = copy.deepcopy(base)
+    changed_prompt.system_prompt = "different prompt"
+    changed_backend = copy.deepcopy(base)
+    changed_backend.translation.connection = TranslationConnection.GPU
+
+    assert build_llm_provider_signature(base) == build_llm_provider_signature(changed_fallback)
+    assert build_llm_provider_signature(base) != build_llm_provider_signature(changed_language)
+    assert build_llm_provider_signature(base) != build_llm_provider_signature(changed_prompt)
+    assert build_llm_provider_signature(base) != build_llm_provider_signature(changed_backend)

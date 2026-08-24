@@ -28,6 +28,7 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
         ("src/puripuly_heart/core/stt/controller.py", ASYNCIO_CREATE_TASK): 6,
         ("src/puripuly_heart/core/overlay/bridge.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/overlay/presenter.py", ASYNCIO_CREATE_TASK): 1,
+        ("src/puripuly_heart/providers/stt/custom.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/providers/stt/soniox.py", ASYNCIO_CREATE_TASK): 3,
         ("src/puripuly_heart/ui/components/subtab_shell.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/flet_runtime.py", BARE_RUN_TASK): 1,
@@ -120,6 +121,10 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         ASYNCIO_CREATE_TASK,
     ): "overlay subprocess and process-manager owners name reader, monitor, and locally awaited shutdown-cleanup tasks and gather them before releasing process state",
     (
+        "src/puripuly_heart/providers/stt/custom.py",
+        ASYNCIO_CREATE_TASK,
+    ): "Custom realtime session owns its websocket receive task under provider session close semantics",
+    (
         "src/puripuly_heart/providers/stt/soniox.py",
         ASYNCIO_CREATE_TASK,
     ): "Soniox session owns send/receive/keepalive tasks under provider session close semantics",
@@ -146,7 +151,7 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
     (
         "src/puripuly_heart/ui/views/settings.py",
         RUN_TASK,
-    ): "SettingsView uses page.run_task at the UI boundary to load loopback process capture options asynchronously while keeping the modal responsive",
+    ): "SettingsView uses page.run_task at the UI boundary for loopback process capture options while keeping the modal responsive",
     (
         "src/puripuly_heart/ui/presentation_adapter.py",
         BARE_RUN_TASK,

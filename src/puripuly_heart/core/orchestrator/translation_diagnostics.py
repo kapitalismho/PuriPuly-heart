@@ -379,7 +379,7 @@ class TranslationLatencyDiagnosticsOwner:
             peer_entries = sum(
                 1
                 for line in diagnostic.context_lines
-                if line.startswith("- [peer,") or line.startswith("- [others,")
+                if line.startswith("- [peer]") or line.startswith("- [others]")
             )
             self_entries = len(diagnostic.context_lines) - peer_entries
         self.emit(
@@ -399,6 +399,24 @@ class TranslationLatencyDiagnosticsOwner:
                 ),
             )
         )
+
+    def record_chatbox_stage(self, event: str, **fields: object) -> None:
+        recorder = self.overlay_diagnostics
+        if recorder is None:
+            return
+        recorder.record_chatbox(event, **fields)
+
+    def record_translation_wait(self, event: str, fields: dict[str, object]) -> None:
+        recorder = self.overlay_diagnostics
+        if recorder is None:
+            return
+        recorder.record_translation(event, **fields)
+
+    def record_stt_ingress(self, event: str, **fields: object) -> None:
+        recorder = self.overlay_diagnostics
+        if recorder is None:
+            return
+        recorder.record_stt(event, **fields)
 
     def record_latency_stage(self, diagnostic: LatencyStageDiagnostic) -> None:
         timeline = self._get_timeline(

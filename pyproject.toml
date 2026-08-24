@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "puripuly-heart"
-version = "2.4.0"
+version = "2.5.0"
 description = "LLM-based real-time translator for VRChat"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -26,7 +26,6 @@ dependencies = [
   "sounddevice==0.5.5",
   "onnxruntime==1.28.0",
   "google-genai>=2.16.0,<3.0.0",
-  "grpcio==1.82.1",
   "dashscope==1.26.4",
   "websockets>=16.1.1,<17.0.0",
   "deepgram-sdk>=5.3.4,<6.0.0",

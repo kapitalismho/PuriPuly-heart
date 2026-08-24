@@ -22,7 +22,7 @@ from puripuly_heart.config.settings_vnext import migration, serialization
 
 def _custom_settings() -> AppSettings:
     settings = AppSettings()
-    settings.telemetry.consent = "allow"
+    settings.telemetry.enabled = True
     settings.telemetry_state.anonymous_id = "custom-translation-test"
     settings.provider.llm = LLMProviderName.QWEN
     settings.qwen.region = QwenRegion.SINGAPORE

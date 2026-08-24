@@ -45,7 +45,6 @@ export {
 export type {
   BrokerAbuseRuntimeAuditRecord,
   BrokerAbuseRuntimeStateValue,
-  BrokerAsnClassificationEntry,
   BrokerDailyIssuanceCapConfig,
   BrokerDailyIssuanceCapEndpoint,
   BrokerEndpointRateLimitConfig,

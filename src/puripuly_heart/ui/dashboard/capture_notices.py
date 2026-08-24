@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from puripuly_heart.app.ports.ui_models import (
+    ManagedGemmaDashboardNotice,
+    ManagedGemmaNoticeAction,
+)
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice, GpuNoticeAction
 from puripuly_heart.ui.i18n import t
 
@@ -62,6 +66,23 @@ GPU_ACTION_KEYS = {
     "rediscover": "dashboard.gpu_action.rediscover",
     "restart": "dashboard.gpu_action.restart",
 }
+MANAGED_GEMMA_NOTICE_KEYS = {
+    "checking": "dashboard.managed_gemma_notice.checking",
+    "downloading": "dashboard.managed_gemma_notice.downloading",
+    "preparing": "dashboard.managed_gemma_notice.preparing",
+    "failed": "dashboard.managed_gemma_notice.failed",
+    "cancelled": "dashboard.managed_gemma_notice.cancelled",
+}
+MANAGED_GEMMA_NOTICE_TONES = {
+    "checking": "info",
+    "downloading": "info",
+    "preparing": "info",
+    "failed": "error",
+    "cancelled": "warning",
+}
+MANAGED_GEMMA_ACTION_KEYS = {
+    "cancel": "dashboard.managed_gemma_action.cancel",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,6 +139,30 @@ def gpu_capture_action_label(action: GpuNoticeAction | None) -> str | None:
     return t(GPU_ACTION_KEYS[action])
 
 
+def managed_gemma_capture_notice(
+    notice: ManagedGemmaDashboardNotice | None,
+) -> CaptureNotice | None:
+    if notice is None or notice.status not in MANAGED_GEMMA_NOTICE_KEYS:
+        return None
+    key = MANAGED_GEMMA_NOTICE_KEYS[notice.status]
+    text = (
+        t(key, percent=notice.progress_percent or 0) if notice.status == "downloading" else t(key)
+    )
+    return CaptureNotice(
+        text=text,
+        tone=MANAGED_GEMMA_NOTICE_TONES[notice.status],
+        action=None,
+    )
+
+
+def managed_gemma_action_label(
+    action: ManagedGemmaNoticeAction | None,
+) -> str | None:
+    if action is None:
+        return None
+    return t(MANAGED_GEMMA_ACTION_KEYS[action])
+
+
 __all__ = [
     "GPU_ACTION_KEYS",
     "GPU_NOTICE_KEYS",
@@ -126,8 +171,13 @@ __all__ = [
     "LOCAL_ASR_NOTICE_KEYS",
     "LOCAL_ASR_NOTICE_TONES",
     "LOCAL_ASR_TARGETED_NOTICE_KEYS",
+    "MANAGED_GEMMA_ACTION_KEYS",
+    "MANAGED_GEMMA_NOTICE_KEYS",
+    "MANAGED_GEMMA_NOTICE_TONES",
     "CaptureNotice",
     "gpu_capture_action_label",
     "gpu_capture_notice",
     "local_asr_capture_notice",
+    "managed_gemma_action_label",
+    "managed_gemma_capture_notice",
 ]

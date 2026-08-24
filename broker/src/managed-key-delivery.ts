@@ -10,6 +10,8 @@ const DELIVERY_ID_PREFIX = 'ph-delivery-v1_';
 const ACK_TOKEN_HASH_PREFIX = 'ph-delivery-ack-token-v1_';
 const DELIVERY_RANDOM_BYTES = 32;
 const ACK_TOKEN_RANDOM_BYTES = 32;
+export const STALE_DELIVERY_CLEANUP_CLAIM_REASON = 'stale_delivery_cleanup_claimed';
+const STALE_DELIVERY_CLEANUP_CLAIM_TTL_MS = 16 * 60_000;
 
 type ManagedKeyDeliveryIssueSource = BrokerIssueSuccessSource;
 
@@ -225,32 +227,118 @@ export async function listStalePendingManagedKeyDeliveries(
       `SELECT delivery_id, issue_source, subject_ref, installation_id, managed_credential_ref,
               ack_token_hash, status, created_at, expires_at, acknowledged_at, failed_at, failure_reason
          FROM managed_key_deliveries
-        WHERE status = 'pending'
-          AND expires_at <= ?
+        WHERE (
+                status = 'pending'
+                AND expires_at <= ?
+              )
+           OR (
+                status = 'expired'
+                AND failure_reason = ?
+                AND failed_at <= ?
+              )
         ORDER BY expires_at ASC
         LIMIT ?`,
     )
-    .bind(input.now.toISOString(), input.limit)
+    .bind(
+      input.now.toISOString(),
+      STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+      new Date(
+        input.now.getTime() - STALE_DELIVERY_CLEANUP_CLAIM_TTL_MS,
+      ).toISOString(),
+      input.limit,
+    )
     .all<ManagedKeyDeliveryRecord>();
 
   return result.results;
 }
 
-export async function markManagedKeyDeliveryCleanupRequired(
+export async function claimStaleManagedKeyDeliveryCleanup(
   db: D1Database,
-  input: { deliveryId: string; failedAt: string; failureReason: string },
+  input: { delivery: ManagedKeyDeliveryRecord; claimedAt: string },
+): Promise<boolean> {
+  const activeOwnerGuard =
+    input.delivery.issue_source === 'discord'
+      ? `AND NOT EXISTS (
+           SELECT 1
+             FROM openrouter_entitlements
+            WHERE managed_credential_ref = ?
+              AND status = 'active'
+              AND discord_issue_status = 'active'
+              AND discord_issue_delivered_at IS NOT NULL
+         )`
+      : `AND NOT EXISTS (
+           SELECT 1
+             FROM qq_managed_entitlements
+            WHERE managed_credential_ref = ?
+              AND status = 'active'
+              AND delivered_at IS NOT NULL
+         )`;
+  const statement =
+    input.delivery.status === 'pending'
+      ? db
+          .prepare(
+            `UPDATE managed_key_deliveries
+                SET status = 'expired', failed_at = ?, failure_reason = ?
+              WHERE delivery_id = ?
+                AND status = 'pending'
+                AND expires_at <= ?
+                ${activeOwnerGuard}`,
+          )
+          .bind(
+            input.claimedAt,
+            STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+            input.delivery.delivery_id,
+            input.claimedAt,
+            input.delivery.managed_credential_ref,
+          )
+      : db
+          .prepare(
+            `UPDATE managed_key_deliveries
+                SET failed_at = ?
+              WHERE delivery_id = ?
+                AND status = 'expired'
+                AND failure_reason = ?
+                AND failed_at IS ?`,
+          )
+          .bind(
+            input.claimedAt,
+            input.delivery.delivery_id,
+            STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+            input.delivery.failed_at,
+          );
+  const result = await statement.run();
+
+  return (result.meta?.changes ?? 0) === 1;
+}
+
+export async function acknowledgeManagedKeyDeliveryCleanupClaim(
+  db: D1Database,
+  input: {
+    deliveryId: string;
+    acknowledgedAt: string;
+    expectedClaimedAt: string | null;
+  },
 ): Promise<boolean> {
   const result = await db
     .prepare(
       `UPDATE managed_key_deliveries
-          SET status = 'cleanup_required', failed_at = ?, failure_reason = ?
+          SET status = 'acknowledged',
+              acknowledged_at = ?,
+              failed_at = NULL,
+              failure_reason = NULL
         WHERE delivery_id = ?
-          AND status IN ('pending', 'expired')`,
+          AND status = 'expired'
+          AND failure_reason = ?
+          AND failed_at IS ?`,
     )
-    .bind(input.failedAt, input.failureReason, input.deliveryId)
+    .bind(
+      input.acknowledgedAt,
+      input.deliveryId,
+      STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+      input.expectedClaimedAt,
+    )
     .run();
-
-  return (result.meta?.changes ?? 0) > 0;
+  return (result.meta?.changes ?? 0) === 1;
 }
 
 export async function handleManagedKeyDeliveryAck(
@@ -284,31 +372,27 @@ export async function handleManagedKeyDeliveryAck(
 
   if (validation.ok) {
     let ackDetails: Record<string, unknown> = {};
-    let status: 'acknowledged' | 'already_acknowledged' = 'already_acknowledged';
-    if (validation.status === 'pending') {
-      try {
-        if (validation.delivery.issue_source === 'discord') {
-          ackDetails = await finalizeDiscordManagedKeyDeliveryAck(c, {
-            managedCredentialRef,
-            acknowledgedAt,
-          });
-        } else if (validation.delivery.issue_source === 'qq') {
-          await finalizeQqManagedKeyDeliveryAck(c, {
-            managedCredentialRef,
-            acknowledgedAt,
-          });
+    let status: 'acknowledged' | 'already_acknowledged';
+    try {
+      if (validation.delivery.issue_source === 'discord') {
+        const result = await finalizeDiscordManagedKeyDeliveryAck(c, {
+          deliveryId,
+          managedCredentialRef,
+          acknowledgedAt,
+        });
+        status = result.acknowledgementStatus;
+        if (result.referralBonusApplied) {
+          ackDetails = { referralBonusApplied: true };
         }
-      } catch {
-        return ackErrorResponse(c, 409, 'failed', 'delivery acknowledgement cannot be applied');
+      } else {
+        status = await finalizeQqManagedKeyDeliveryAck(c, {
+          deliveryId,
+          managedCredentialRef,
+          acknowledgedAt,
+        });
       }
-      const ackResult = await markManagedKeyDeliveryAcknowledged(c.env.BROKER_DB, {
-        deliveryId,
-        acknowledgedAt,
-      });
-      if (!ackResult.ok) {
-        return ackErrorResponse(c, 409, 'failed', 'delivery acknowledgement cannot be applied');
-      }
-      status = ackResult.status;
+    } catch {
+      return ackErrorResponse(c, 409, 'failed', 'delivery acknowledgement cannot be applied');
     }
     return c.json({ ok: true, status, ...ackDetails });
   }

@@ -15,6 +15,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Sequence
 
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
     STTBackend,
     STTBackendSession,
@@ -345,31 +346,26 @@ class _DeepgramSDKSession(STTBackendSession):
             return
         self._audio_q.put_nowait(pcm16le)
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        """Handle end of speech: top up trailing silence if needed, then finalize."""
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        """Handle end of speech and finalize."""
         if self._stopped:
             return
 
-        min_silence_ms = 100
         existing_ms = max(int(trailing_silence_ms or 0), 0)
-        missing_ms = max(min_silence_ms - existing_ms, 0)
+        wait_ms = boundary_wait_ms(reason, observed_tail_ms=existing_ms)
 
-        if missing_ms > 0:
-            import numpy as np
-
-            silence_samples = int(self.sample_rate_hz * (missing_ms / 1000.0))
-            if silence_samples > 0:
-                silence = np.zeros(silence_samples, dtype=np.float32)
-                pcm16 = (silence * 32767).astype(np.int16).tobytes()
-                self._audio_q.put_nowait(pcm16)
-                logger.info(
-                    "[STT] Trailing silence sent (%sms, %s samples, %s bytes)",
-                    missing_ms,
-                    silence_samples,
-                    len(pcm16),
-                )
-
-        # Send Finalize
+        logger.info(
+            "[STT][Tail] provider=deepgram boundary_reason=%s observed_tail_ms=%s "
+            "boundary_wait_ms=%s",
+            reason,
+            existing_ms,
+            wait_ms,
+        )
         self._audio_q.put_nowait(_FINALIZE)
 
     async def stop(self) -> None:

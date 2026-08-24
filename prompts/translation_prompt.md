@@ -3,9 +3,9 @@ Interpret the ${sourceName} text to translate into ${targetName} naturally, pres
 
 ## Context
 * `<context>` is a multilingual history of prior utterances.
+* Context entries are ordered chronologically from older to newer.
 * Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.
 * When unsure whether context applies, translate `<input>` standalone.
-* Treat timestamps and speaker hints as metadata for tracking conversation flow.
 * `[self]` means the local user's earlier utterance.
 * `[peer]` means the other speaker from the peer audio channel; the channel may occasionally include more than one person.
 

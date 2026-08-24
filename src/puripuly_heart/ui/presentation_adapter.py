@@ -7,7 +7,11 @@ from typing import Any
 
 import flet as ft
 
-from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.ports.ui_models import (
+    ManagedGemmaDashboardNotice,
+    OscControlPresentationState,
+    OverlayPeerPresentationState,
+)
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.ui.event_bridge import (
     AppConversationEventDestination,
@@ -193,6 +197,12 @@ class FletUiPresentationAdapter:
                     progress_percent=progress_percent,
                 )
 
+    def set_dashboard_llm_gpu_devices(self, *, devices: tuple[object, ...]) -> None:
+        settings_view = getattr(self._app, "view_settings", None)
+        set_devices = getattr(settings_view, "set_gpu_devices", None)
+        if callable(set_devices):
+            set_devices(llm_devices=devices)
+
     def set_dashboard_local_stt_notice(
         self,
         *,
@@ -211,6 +221,21 @@ class FletUiPresentationAdapter:
         set_notice = getattr(dashboard, "set_local_stt_notice", None)
         if callable(set_notice):
             set_notice(status, percent=percent)
+
+    def set_dashboard_managed_gemma_notice(
+        self,
+        notice: ManagedGemmaDashboardNotice | None,
+    ) -> None:
+        dashboard = getattr(self._app, "view_dashboard", None)
+        setter = getattr(dashboard, "set_managed_gemma_notice", None)
+        if callable(setter):
+            setter(notice)
+
+    def set_dashboard_translation_starting(self, starting: bool) -> None:
+        dashboard = getattr(self._app, "view_dashboard", None)
+        setter = getattr(dashboard, "set_translation_starting", None)
+        if callable(setter):
+            setter(bool(starting))
 
     def set_dashboard_vrchat_osc_notice(self, active: bool) -> None:
         dashboard = getattr(self._app, "view_dashboard", None)
@@ -274,6 +299,16 @@ class FletUiPresentationAdapter:
         set_peer_auto = getattr(dashboard, "set_peer_auto_detect_available", None)
         if callable(set_peer_auto):
             set_peer_auto(peer_auto_detect_available)
+
+    def project_osc_control_state(self, state: OscControlPresentationState) -> None:
+        dashboard = getattr(self._app, "view_dashboard", None)
+        project_dashboard = getattr(dashboard, "project_osc_control_state", None)
+        if callable(project_dashboard):
+            project_dashboard(state)
+        settings = getattr(self._app, "view_settings", None)
+        project_settings = getattr(settings, "project_osc_control_state", None)
+        if callable(project_settings):
+            project_settings(state)
 
     def render_settings(
         self,

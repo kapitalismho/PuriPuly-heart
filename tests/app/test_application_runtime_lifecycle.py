@@ -109,6 +109,9 @@ class RecordingShutdownRuntime(ApplicationRuntimeShutdownStub):
     async def close_llm_runtime(self) -> None:
         self.events.append("llm-runtime")
 
+    async def close_managed_gemma_runtime(self) -> None:
+        self.events.append("managed-gemma")
+
     def close_vrchat_sender(self) -> None:
         self.events.append("vrchat-sender")
 
@@ -227,6 +230,7 @@ async def test_runtime_shutdown_graph_preserves_order_and_logging_last_after_fai
         "peer-channel",
         "local-asr-runtime",
         "llm-runtime",
+        "managed-gemma",
         "vrchat-sender",
         "managed-release",
         "final:1",

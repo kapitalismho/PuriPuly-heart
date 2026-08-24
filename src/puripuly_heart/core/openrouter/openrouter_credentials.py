@@ -76,11 +76,6 @@ def resolve_openrouter_credentials(
     opposite_managed_api_key = _normalize_secret(secrets.get(opposite_managed_secret_key))
     if opposite_managed_api_key is not None:
         raise ValueError("OpenRouter managed local claim conflict")
-    if (
-        managed_credential_kind == "qq"
-        and _normalize_secret(config.active_managed_credential_ref) is None
-    ):
-        managed_api_key = None
     if managed_api_key is not None:
         return OpenRouterCredentialResolution(
             selected_source=selected_source,

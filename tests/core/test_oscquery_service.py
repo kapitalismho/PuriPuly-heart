@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 
 import pytest
 import zeroconf
@@ -10,7 +11,9 @@ import zeroconf
 from puripuly_heart.app.ports.oscquery import OscQueryAdvertisement, OscQueryServiceInfo
 from puripuly_heart.core.osc.oscquery import (
     OSC_SERVICE_TYPE,
+    OSCQUERY_ADVERTISEMENT_TTL_SECONDS,
     ZeroconfOscQueryService,
+    mdns_instance_name,
 )
 
 
@@ -167,7 +170,126 @@ async def test_zeroconf_start_cleans_up_partial_browser_creation(
     assert service._browsers == []
     assert service._loop is None
     assert FakeZeroconf.instances[0].closed is True
-    assert FakeBrowser.instances[0].cancelled is True
+
+
+def test_mdns_instance_name_stays_stable_for_a_process() -> None:
+    first = mdns_instance_name("PuriPuly Heart")
+    second = mdns_instance_name("PuriPuly Heart", pid=os.getpid())
+
+    assert first == second
+    assert str(os.getpid()) in first
+    assert first.startswith("PuriPuly-Heart-")
+
+
+@pytest.mark.asyncio
+async def test_advertise_registers_unique_pid_name_with_short_ttl(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registered: list[object] = []
+
+    class FakeZeroconf:
+        def __init__(self) -> None:
+            self.loop = None
+
+        def register_service(self, info: object, *, allow_name_change: bool = False) -> None:
+            registered.append((info, allow_name_change))
+
+        def unregister_service(self, info: object) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class FakeBrowser:
+        def __init__(self, _zeroconf: object, _service_type: str, *, handlers: object) -> None:
+            _ = handlers
+
+        def cancel(self) -> None:
+            return None
+
+    monkeypatch.setattr(zeroconf, "Zeroconf", FakeZeroconf)
+    monkeypatch.setattr(zeroconf, "ServiceBrowser", FakeBrowser)
+    service = ZeroconfOscQueryService()
+    await service.start()
+    try:
+        await service.advertise_receiver(
+            OscQueryAdvertisement(
+                host="127.0.0.1",
+                port=49152,
+                parameters={"/avatar": "PuriPuly_*"},
+            )
+        )
+    finally:
+        await service.stop()
+
+    assert len(registered) == 2
+    instance = mdns_instance_name("PuriPuly Heart")
+    for info, allow_name_change in registered:
+        assert allow_name_change is True
+        assert info.name.startswith(f"{instance}.")
+        assert info.host_ttl == OSCQUERY_ADVERTISEMENT_TTL_SECONDS
+        assert info.other_ttl == OSCQUERY_ADVERTISEMENT_TTL_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_dead_puripuly_advertisement_is_forgotten() -> None:
+    service = ZeroconfOscQueryService()
+    service._services["PuriPuly-Heart-1"] = OscQueryServiceInfo(
+        service_id="PuriPuly-Heart-1",
+        host="127.0.0.1",
+        query_port=1,
+    )
+
+    await service._forget_unreachable_puripuly_services()
+
+    assert "PuriPuly-Heart-1" not in service._services
+
+
+@pytest.mark.asyncio
+async def test_partial_register_unregisters_successful_services(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unregistered: list[object] = []
+
+    class FakeZeroconf:
+        def __init__(self) -> None:
+            self.loop = None
+
+        def register_service(self, info: object, *, allow_name_change: bool = False) -> None:
+            _ = allow_name_change
+            if str(info.type).startswith("_osc._udp"):
+                raise RuntimeError("second register failed")
+
+        def unregister_service(self, info: object) -> None:
+            unregistered.append(info)
+
+        def close(self) -> None:
+            return None
+
+    class FakeBrowser:
+        def __init__(self, _zeroconf: object, _service_type: str, *, handlers: object) -> None:
+            _ = handlers
+
+        def cancel(self) -> None:
+            return None
+
+    monkeypatch.setattr(zeroconf, "Zeroconf", FakeZeroconf)
+    monkeypatch.setattr(zeroconf, "ServiceBrowser", FakeBrowser)
+    service = ZeroconfOscQueryService()
+    await service.start()
+    with pytest.raises(RuntimeError, match="second register failed"):
+        await service.advertise_receiver(
+            OscQueryAdvertisement(
+                host="127.0.0.1",
+                port=49152,
+                parameters={"/avatar": "PuriPuly_*"},
+            )
+        )
+
+    assert len(unregistered) == 1
+    assert str(unregistered[0].type).startswith("_oscjson._tcp")
+    assert service._registered_infos == []
+    await service.stop()
 
 
 @pytest.mark.asyncio

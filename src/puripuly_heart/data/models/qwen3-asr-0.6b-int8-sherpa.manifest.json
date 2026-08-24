@@ -3,6 +3,7 @@
   "installed_manifest_version": 1,
   "model_id": "qwen3-asr-0.6b-int8-sherpa",
   "engine": "sherpa-onnx",
+  "license": "Apache-2.0",
   "upstream_repo": "zengshuishui/Qwen3-ASR-onnx",
   "install_dirname": "qwen3-asr-0.6b-int8-sherpa",
   "installed_manifest_filename": "installed-manifest.json",

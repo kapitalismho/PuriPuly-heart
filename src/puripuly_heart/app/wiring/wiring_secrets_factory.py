@@ -26,6 +26,7 @@ VNEXT_IMPORT_SECRET_KEYS = (
     "alibaba_api_key_singapore",
     "alibaba_api_key",
     "local_llm_api_key",
+    "custom_stt_api_key",
 )
 
 

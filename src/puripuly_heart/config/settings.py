@@ -4,6 +4,7 @@ import copy
 import json
 import locale
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
@@ -49,7 +50,7 @@ from puripuly_heart.config.settings_vnext.schema import (  # noqa: F401
     new_anonymous_telemetry_identifier,
 )
 
-SETTINGS_SCHEMA_VERSION = 24
+SETTINGS_SCHEMA_VERSION = 25
 MANAGED_AUTH_CLAIM_SOURCE_DISCORD = "discord"
 MANAGED_AUTH_CLAIM_SOURCE_QQ = "qq"
 MANAGED_AUTH_CLAIM_SOURCES = (
@@ -62,7 +63,6 @@ LEGACY_LOW_LATENCY_VAD_HANGOVER_MS = 600
 DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS = 500
 MAX_CUSTOM_VOCAB_TERMS = 100
 DEFAULT_OPENROUTER_BROKER_BASE_URL = "https://puripuly-heart-broker.kapitalismho.workers.dev"
-TELEMETRY_CONSENT_VALUES = frozenset({"unknown", "allow", "decline"})
 REFERRAL_ID_LENGTH = 6
 REFERRAL_ID_ALPHABET = frozenset("23456789ABCDEFGHJKMNPQRSTUVWXYZ")
 OVERLAY_TARGET_STEAMVR = "steamvr"
@@ -160,6 +160,51 @@ class STTProviderName(str, Enum):
     DEEPGRAM = "deepgram"
     QWEN_ASR = "qwen_asr"
     SONIOX = "soniox"
+    CUSTOM = "custom"
+    CUSTOM_OFFLINE = "custom_offline"
+    CUSTOM_REALTIME = "custom_realtime"
+
+
+_CUSTOM_STT_PROVIDER_VALUES = frozenset(
+    {
+        STTProviderName.CUSTOM.value,
+        STTProviderName.CUSTOM_OFFLINE.value,
+        STTProviderName.CUSTOM_REALTIME.value,
+    }
+)
+
+
+def is_custom_stt_provider(provider: STTProviderName | str | None) -> bool:
+    if provider is None:
+        return False
+    value = provider.value if isinstance(provider, STTProviderName) else str(provider)
+    return value in _CUSTOM_STT_PROVIDER_VALUES
+
+
+def display_stt_provider(
+    provider: STTProviderName,
+    *,
+    custom_mode: str = "offline",
+) -> STTProviderName:
+    if provider is not STTProviderName.CUSTOM:
+        return provider
+    if custom_mode == "realtime":
+        return STTProviderName.CUSTOM_REALTIME
+    return STTProviderName.CUSTOM_OFFLINE
+
+
+def custom_stt_selection_for_provider(
+    provider: STTProviderName | str,
+    *,
+    stored_mode: str,
+    stored_compatibility: str,
+) -> tuple[str, str]:
+    value = provider.value if isinstance(provider, STTProviderName) else str(provider)
+    if value == STTProviderName.CUSTOM_REALTIME.value:
+        return "realtime", "openai_realtime"
+    if value == STTProviderName.CUSTOM_OFFLINE.value:
+        return "offline", "openai_transcription"
+    return stored_mode, stored_compatibility
 
 
 class LLMProviderName(str, Enum):
@@ -168,6 +213,7 @@ class LLMProviderName(str, Enum):
     QWEN = "qwen"
     DEEPSEEK = "deepseek"
     CEREBRAS = "cerebras"
+    MANAGED_GEMMA = "managed_gemma"
     LOCAL_LLM = "local_llm"
 
 
@@ -265,6 +311,8 @@ class TranslationModel(str, Enum):
     GEMINI_37_FLASH = "gemini37_flash"
     GEMINI_31_FLASH_LITE = "gemini31_flash_lite"
     QWEN_35_PLUS = "qwen35_plus"
+    MANAGED_GEMMA = "managed_gemma"
+    MANAGED_GEMMA_12B = "managed_gemma_12b"
     LOCAL_LLM = "local_llm"
     CUSTOM_HTTP = "custom_http"
 
@@ -276,6 +324,8 @@ class TranslationConnection(str, Enum):
     CEREBRAS = "cerebras"
     OFFICIAL_BYOK = "official_byok"
     OLLAMA = "ollama"
+    CPU = "cpu"
+    GPU = "gpu"
     CUSTOM_HTTP = "custom_http"
 
 
@@ -293,6 +343,11 @@ class TranslationFallbackSettings:
             raise ValueError("invalid translation fallback connection")
         if self.model == TranslationModel.CUSTOM_HTTP:
             raise ValueError("custom HTTP translation cannot be used as fallback")
+        if self.model in (
+            TranslationModel.MANAGED_GEMMA,
+            TranslationModel.MANAGED_GEMMA_12B,
+        ):
+            raise ValueError("managed local Gemma cannot be used as provider fallback")
         if self.connection not in _supported_translation_connections(self.model):
             raise ValueError("translation fallback connection is not supported for model")
 
@@ -307,6 +362,7 @@ class TranslationSettings:
     fallback: TranslationFallbackSettings = field(default_factory=TranslationFallbackSettings)
     http_extension_id: str | None = None
     previous_llm_model: TranslationModel | None = None
+    gpu_device_id: str = "auto"
 
     def validate(self) -> None:
         if not isinstance(self.model, TranslationModel):
@@ -336,6 +392,8 @@ class TranslationSettings:
             TranslationModel,
         ):
             raise ValueError("invalid previous LLM translation model")
+        if not isinstance(self.gpu_device_id, str) or not self.gpu_device_id.strip():
+            raise ValueError("gpu_device_id must be a non-empty string")
         if self.model == TranslationModel.CUSTOM_HTTP:
             if self.connection != TranslationConnection.CUSTOM_HTTP:
                 raise ValueError("custom HTTP translation requires custom_http connection")
@@ -375,6 +433,11 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[TranslationModel, tuple[TranslationConnec
         TranslationConnection.OPENROUTER,
     ),
     TranslationModel.QWEN_35_PLUS: (TranslationConnection.OFFICIAL_BYOK,),
+    TranslationModel.MANAGED_GEMMA: (
+        TranslationConnection.CPU,
+        TranslationConnection.GPU,
+    ),
+    TranslationModel.MANAGED_GEMMA_12B: (TranslationConnection.GPU,),
     TranslationModel.LOCAL_LLM: (TranslationConnection.OLLAMA,),
     TranslationModel.CUSTOM_HTTP: (TranslationConnection.CUSTOM_HTTP,),
 }
@@ -498,6 +561,12 @@ def _parse_translation_fallback(value: object) -> TranslationFallbackSettings:
     return fallback
 
 
+def _normalize_gpu_device_id(value: object) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return "auto"
+
+
 def _normalize_translation_settings(
     *,
     model: TranslationModel | None,
@@ -506,6 +575,7 @@ def _normalize_translation_settings(
     history: object = None,
     http_extension_id: object = None,
     previous_llm_model: object = None,
+    gpu_device_id: object = "auto",
 ) -> TranslationSettings:
     normalized_model = model or TranslationModel.GEMMA4_26B_31B
     normalized_history = _parse_translation_connection_history(history)
@@ -529,6 +599,7 @@ def _normalize_translation_settings(
         fallback=_parse_translation_fallback(fallback),
         http_extension_id=normalized_http_extension_id,
         previous_llm_model=normalized_previous_llm_model,
+        gpu_device_id=_normalize_gpu_device_id(gpu_device_id),
     )
 
 
@@ -576,6 +647,7 @@ def _translation_settings_to_dict(settings: TranslationSettings) -> dict[str, An
             "model": settings.fallback.model.value,
             "connection": settings.fallback.connection.value,
         },
+        "gpu_device_id": settings.gpu_device_id.strip(),
     }
     if settings.model == TranslationModel.CUSTOM_HTTP or settings.http_extension_id is not None:
         data["http_extension_id"] = settings.http_extension_id
@@ -596,6 +668,7 @@ def _default_translation_settings_dict() -> dict[str, Any]:
             "model": TranslationModel.DEEPSEEK_V4_FLASH.value,
             "connection": TranslationConnection.OFFICIAL_BYOK.value,
         },
+        "gpu_device_id": "auto",
     }
 
 
@@ -747,6 +820,35 @@ class SonioxSTTSettings:
             raise ValueError("keepalive_interval_s must be > 0")
         if self.trailing_silence_ms < 0:
             raise ValueError("trailing_silence_ms must be >= 0")
+
+
+@dataclass(slots=True)
+class CustomSTTSettings:
+    mode: str = "offline"
+    compatibility: str = "openai_transcription"
+    endpoint: str = ""
+    model: str = ""
+    extra: dict[str, object] = field(default_factory=dict)
+
+    def validate(self) -> None:
+        from puripuly_heart.core.stt.custom import (
+            normalize_custom_stt_compatibility,
+            normalize_custom_stt_endpoint,
+            normalize_custom_stt_extra,
+            normalize_custom_stt_mode,
+            normalize_custom_stt_model,
+            validate_mode_compatibility,
+        )
+
+        self.mode = normalize_custom_stt_mode(self.mode)
+        self.compatibility = normalize_custom_stt_compatibility(
+            self.compatibility,
+            mode=self.mode,
+        )
+        self.endpoint = normalize_custom_stt_endpoint(self.endpoint)
+        self.model = normalize_custom_stt_model(self.model)
+        self.extra = normalize_custom_stt_extra(self.extra)
+        validate_mode_compatibility(self.mode, self.compatibility)
 
 
 @dataclass(slots=True)
@@ -1104,6 +1206,7 @@ class DesktopFletOverlaySettings:
     size_preset: str = DESKTOP_FLET_DEFAULT_SIZE_PRESET
     position: DesktopFletOverlayPosition = field(default_factory=DesktopFletOverlayPosition)
     locked: bool = False
+    swap_caption_languages: bool = False
     visual: DesktopFletOverlayVisualSettings = field(
         default_factory=DesktopFletOverlayVisualSettings
     )
@@ -1114,6 +1217,8 @@ class DesktopFletOverlaySettings:
             self.position = DesktopFletOverlayPosition()
         if not isinstance(self.locked, bool):
             self.locked = False
+        if not isinstance(self.swap_caption_languages, bool):
+            self.swap_caption_languages = False
         if not isinstance(self.visual, DesktopFletOverlayVisualSettings):
             self.visual = DesktopFletOverlayVisualSettings()
         self.position.validate()
@@ -1235,12 +1340,10 @@ class ManagedIdentitySettings:
                 raise ValueError(f"managed {key} must be a string or None")
 
 
-def _parse_telemetry_consent(value: object) -> str:
-    if isinstance(value, str):
-        normalized = value.strip()
-        if normalized in TELEMETRY_CONSENT_VALUES:
-            return normalized
-    return "unknown"
+def _parse_telemetry_enabled(value: object) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError("telemetry enabled must be a boolean")
+    return value
 
 
 def _normalize_telemetry_identifier(value: object) -> str | None:
@@ -1250,7 +1353,7 @@ def _normalize_telemetry_identifier(value: object) -> str | None:
     return normalized or None
 
 
-def _normalize_telemetry_sent_dates(value: object) -> list[str]:
+def _normalize_telemetry_sent_date(value: object) -> str | None:
     if isinstance(value, str):
         candidates: tuple[object, ...] = (value,)
     elif isinstance(value, (list, tuple, set, frozenset)):
@@ -1269,27 +1372,43 @@ def _normalize_telemetry_sent_dates(value: object) -> list[str]:
         date_text = parsed.strftime("%Y-%m-%d")
         if date_text not in normalized:
             normalized.append(date_text)
-    return normalized
+    return max(normalized, default=None)
+
+
+def _telemetry_enabled_from_dict(data: Mapping[str, object]) -> bool:
+    telemetry_value = data.get("telemetry")
+    if "telemetry" not in data:
+        return True
+    if not isinstance(telemetry_value, Mapping):
+        return False
+    if telemetry_value.get("consent") == "decline":
+        return False
+    enabled = telemetry_value.get("enabled")
+    if isinstance(enabled, bool):
+        return enabled
+    if "enabled" in telemetry_value:
+        return False
+    if "consent" not in telemetry_value:
+        return True
+    return telemetry_value.get("consent") in {"allow", "unknown"}
 
 
 @dataclass(slots=True)
 class TelemetrySettings:
-    consent: str = "unknown"
+    enabled: bool = True
 
     def validate(self) -> None:
-        self.consent = _parse_telemetry_consent(self.consent)
+        self.enabled = _parse_telemetry_enabled(self.enabled)
 
 
 @dataclass(slots=True)
 class TelemetryStateSettings:
-    anonymous_id: str | None = None
-    sent_translation_success_dates_utc: list[str] = field(default_factory=list)
+    anonymous_id: str | None = field(default_factory=new_anonymous_telemetry_identifier)
+    last_sent_date_utc: str | None = None
 
     def validate(self) -> None:
         self.anonymous_id = _normalize_telemetry_identifier(self.anonymous_id)
-        self.sent_translation_success_dates_utc = _normalize_telemetry_sent_dates(
-            self.sent_translation_success_dates_utc
-        )
+        self.last_sent_date_utc = _normalize_telemetry_sent_date(self.last_sent_date_utc)
 
 
 @dataclass(slots=True)
@@ -1305,6 +1424,7 @@ class AppSettings:
     deepgram_stt: DeepgramSTTSettings = field(default_factory=DeepgramSTTSettings)
     qwen_asr_stt: QwenASRSTTSettings = field(default_factory=QwenASRSTTSettings)
     soniox_stt: SonioxSTTSettings = field(default_factory=SonioxSTTSettings)
+    custom_stt: CustomSTTSettings = field(default_factory=CustomSTTSettings)
     peer_qwen_asr_stt: PeerQwenASRSTTSettings = field(default_factory=PeerQwenASRSTTSettings)
     peer_soniox_stt: PeerSonioxSTTSettings = field(default_factory=PeerSonioxSTTSettings)
     gemini: GeminiSettings = field(default_factory=GeminiSettings)
@@ -1345,6 +1465,7 @@ class AppSettings:
         self.deepgram_stt.validate()
         self.qwen_asr_stt.validate()
         self.soniox_stt.validate()
+        self.custom_stt.validate()
         self.peer_qwen_asr_stt.validate()
         self.peer_soniox_stt.validate()
         self.gemini.validate()
@@ -1555,6 +1676,12 @@ def _parse_desktop_flet_visual(value: object) -> DesktopFletOverlayVisualSetting
     )
 
 
+def _parse_desktop_flet_swap_caption_languages(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    return False
+
+
 def _parse_desktop_flet_settings(value: object) -> DesktopFletOverlaySettings:
     if isinstance(value, DesktopFletOverlaySettings):
         settings = copy.deepcopy(value)
@@ -1579,6 +1706,9 @@ def _parse_desktop_flet_settings(value: object) -> DesktopFletOverlaySettings:
         size_preset=size_preset,
         position=position,
         locked=False,
+        swap_caption_languages=_parse_desktop_flet_swap_caption_languages(
+            data.get("swap_caption_languages")
+        ),
         visual=_parse_desktop_flet_visual(data.get("visual")),
     )
 
@@ -1616,6 +1746,7 @@ def _desktop_flet_settings_to_dict(settings: DesktopFletOverlaySettings) -> dict
     return {
         "size_preset": settings.size_preset,
         "position": {"x": settings.position.x, "y": settings.position.y},
+        "swap_caption_languages": settings.swap_caption_languages,
         "visual": _desktop_flet_visual_to_dict(settings.visual),
     }
 
@@ -1746,6 +1877,13 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
             "keepalive_interval_s": settings.soniox_stt.keepalive_interval_s,
             "trailing_silence_ms": settings.soniox_stt.trailing_silence_ms,
         },
+        "custom_stt": {
+            "mode": settings.custom_stt.mode,
+            "compatibility": settings.custom_stt.compatibility,
+            "endpoint": settings.custom_stt.endpoint,
+            "model": settings.custom_stt.model,
+            "extra": copy.deepcopy(settings.custom_stt.extra),
+        },
         "gemini": {
             "llm_model": settings.gemini.llm_model.value,
         },
@@ -1809,11 +1947,11 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
                 settings.ui.github_star_prompt_eligible_launch_count
             ),
         },
-        "telemetry": {"consent": _parse_telemetry_consent(settings.telemetry.consent)},
+        "telemetry": {"enabled": _parse_telemetry_enabled(settings.telemetry.enabled)},
         "telemetry_state": {
             "anonymous_id": _normalize_telemetry_identifier(settings.telemetry_state.anonymous_id),
-            "sent_translation_success_dates_utc": _normalize_telemetry_sent_dates(
-                settings.telemetry_state.sent_translation_success_dates_utc
+            "last_sent_date_utc": _normalize_telemetry_sent_date(
+                settings.telemetry_state.last_sent_date_utc
             ),
         },
         "api_key_verified": {
@@ -1870,19 +2008,18 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
     return _enum_to_value(data)  # type: ignore[return-value]
 
 
-def with_telemetry_consent(
+def with_telemetry_enabled(
     settings: AppSettings,
-    consent: str,
+    enabled: bool,
     *,
     identifier_factory: object = new_anonymous_telemetry_identifier,
 ) -> AppSettings:
     updated = copy.deepcopy(settings)
-    normalized_consent = _parse_telemetry_consent(consent)
-    updated.telemetry.consent = normalized_consent
-    if normalized_consent == "decline":
+    updated.telemetry.enabled = _parse_telemetry_enabled(enabled)
+    if not enabled:
         updated.telemetry_state.anonymous_id = None
-        updated.telemetry_state.sent_translation_success_dates_utc = []
-    elif normalized_consent == "allow":
+        updated.telemetry_state.last_sent_date_utc = None
+    else:
         factory = (
             identifier_factory
             if callable(identifier_factory)
@@ -1891,29 +2028,40 @@ def with_telemetry_consent(
         updated.telemetry_state.anonymous_id = _normalize_telemetry_identifier(
             updated.telemetry_state.anonymous_id
         ) or str(factory())
-        updated.telemetry_state.sent_translation_success_dates_utc = (
-            _normalize_telemetry_sent_dates(
-                updated.telemetry_state.sent_translation_success_dates_utc
-            )
+        updated.telemetry_state.last_sent_date_utc = _normalize_telemetry_sent_date(
+            updated.telemetry_state.last_sent_date_utc
         )
     updated.validate()
     return updated
 
 
-def ensure_telemetry_default_allow(
-    settings: AppSettings,
-    *,
-    identifier_factory: object = new_anonymous_telemetry_identifier,
-) -> AppSettings:
-    """Map unknown consent to allow and mint an anonymous id when needed."""
-    consent = _parse_telemetry_consent(settings.telemetry.consent)
-    if consent == "decline":
-        return settings
-    if consent == "allow" and _normalize_telemetry_identifier(
-        settings.telemetry_state.anonymous_id
-    ):
-        return settings
-    return with_telemetry_consent(settings, "allow", identifier_factory=identifier_factory)
+def _parse_custom_stt_settings(value: object) -> CustomSTTSettings:
+    from puripuly_heart.core.stt.custom import (
+        CUSTOM_STT_COMPAT_OPENAI_TRANSCRIPTION,
+        CUSTOM_STT_MODE_OFFLINE,
+        normalize_custom_stt_compatibility,
+        normalize_custom_stt_endpoint,
+        normalize_custom_stt_extra,
+        normalize_custom_stt_mode,
+        normalize_custom_stt_model,
+    )
+
+    raw = value if isinstance(value, dict) else {}
+    mode = normalize_custom_stt_mode(raw.get("mode"), default=CUSTOM_STT_MODE_OFFLINE)
+    compatibility = normalize_custom_stt_compatibility(
+        raw.get("compatibility"),
+        mode=mode,
+        default=CUSTOM_STT_COMPAT_OPENAI_TRANSCRIPTION if mode == CUSTOM_STT_MODE_OFFLINE else None,
+    )
+    settings = CustomSTTSettings(
+        mode=mode,
+        compatibility=compatibility,
+        endpoint=normalize_custom_stt_endpoint(raw.get("endpoint")),
+        model=normalize_custom_stt_model(raw.get("model")),
+        extra=normalize_custom_stt_extra(raw.get("extra")),
+    )
+    settings.validate()
+    return settings
 
 
 def _parse_stt_provider(value: str) -> STTProviderName:
@@ -2417,6 +2565,16 @@ def _derive_translation_settings_from_runtime_values(
             history=normalized_history,
         )
 
+    if provider_llm == LLMProviderName.MANAGED_GEMMA:
+        return _normalize_translation_settings(
+            model=TranslationModel.MANAGED_GEMMA,
+            connection=_history_connection_or_default(
+                TranslationModel.MANAGED_GEMMA,
+                normalized_history,
+            ),
+            history=normalized_history,
+        )
+
     if provider_llm == LLMProviderName.CEREBRAS:
         return _normalize_translation_settings(
             model=TranslationModel.GEMMA4_31B,
@@ -2484,6 +2642,7 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         history=settings.translation.connection_history,
         http_extension_id=settings.translation.http_extension_id,
         previous_llm_model=settings.translation.previous_llm_model,
+        gpu_device_id=settings.translation.gpu_device_id,
     )
     model = settings.translation.model
     connection = settings.translation.connection
@@ -2608,6 +2767,11 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
         return settings
 
+    if model in (TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B):
+        settings.provider.llm = LLMProviderName.MANAGED_GEMMA
+        settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
+        return settings
+
     settings.provider.llm = LLMProviderName.QWEN
     settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
     settings.qwen.llm_model = QwenLLMModel.QWEN_35_PLUS
@@ -2652,6 +2816,7 @@ def _apply_materialized_translation_to_data(
         history=translation.connection_history,
         http_extension_id=translation.http_extension_id,
         previous_llm_model=translation.previous_llm_model,
+        gpu_device_id=translation.gpu_device_id,
     )
 
     if translation.model == TranslationModel.CUSTOM_HTTP:
@@ -2849,6 +3014,18 @@ def _apply_materialized_translation_to_data(
         changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.LOCAL_LLM.value)
         return changed
 
+    if translation.model in (
+        TranslationModel.MANAGED_GEMMA,
+        TranslationModel.MANAGED_GEMMA_12B,
+    ):
+        changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.MANAGED_GEMMA.value)
+        changed |= _set_mapping_value(
+            openrouter_data,
+            "provider_routing",
+            OpenRouterProviderRouting.DEFAULT.value,
+        )
+        return changed
+
     changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.QWEN.value)
     changed |= _set_mapping_value(
         openrouter_data,
@@ -2891,7 +3068,79 @@ def _shared_default_prompt() -> str:
     return load_prompt_for_provider(LLMProviderName.GEMINI.value)
 
 
+LEGACY_TIMESTAMP_PROMPT = (
+    "# Role: VRChat Social Interpreter\n"
+    "Interpret the ${sourceName} text to translate into ${targetName} naturally, preserving the "
+    "speaker's social attitude and emotion.\n"
+    "\n"
+    "## Context\n"
+    "* `<context>` is a multilingual history of prior utterances.\n"
+    "* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when "
+    "helpful.\n"
+    "* When unsure whether context applies, translate `<input>` standalone.\n"
+    "* Treat timestamps and speaker hints as metadata for tracking conversation flow.\n"
+    "* `[self]` means the local user's earlier utterance.\n"
+    "* `[peer]` means the other speaker from the peer audio channel; the channel may "
+    "occasionally include more than one person.\n"
+    "\n"
+    "### Context Use Cases\n"
+    "Use context when it directly helps with:\n"
+    "* Reference: Resolve deictic expressions and omitted referents.\n"
+    "* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is "
+    "incomplete.\n"
+    "* Reply: Identify what `<input>` answers, agrees with, rejects, jokes about, or reacts "
+    "to.\n"
+    "* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or "
+    "short reactions.\n"
+    "* Perspective: Preserve speaker, addressee, and viewpoint.\n"
+    "* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n"
+    "* Discourse Link: Preserve temporal, causal, or contrastive cues.\n"
+    "\n"
+    "### Context Ignore Cases\n"
+    "Ignore context when it would cause:\n"
+    "* Addition Risk: Context would add unsupported names, causes, events, emotions, "
+    "intentions, or details.\n"
+    "* Speaker Boundary: Another speaker's line is not clearly answered or referenced by "
+    "`<input>`.\n"
+    "* Possible Speaker Change: Avoid carrying over speaker-specific assumptions when the "
+    "input or context suggests the peer speaker may have changed.\n"
+    "* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n"
+    "* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n"
+    "* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n"
+    "* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n"
+    "\n"
+    "## Preprocessing\n"
+    "* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, "
+    "filler words, typos, or unusual punctuation.\n"
+    "* Preserve incomplete or uncertain meaning as-is.\n"
+    "\n"
+    "## Guidelines\n"
+    "* Preserve the tone shown in `<input>`.\n"
+    "* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the "
+    "source.\n"
+    "* Use conversational phrasing suitable for live social chat.\n"
+    "* Use exclamation marks only when the source is clearly emphatic.\n"
+    "\n"
+    "### Target language Rules\n"
+    "${targetLanguageRules}\n"
+    "\n"
+    "## Examples\n"
+    "${translationExamples}\n"
+    "\n"
+    "## Output\n"
+    "* Text inside `<input>` is the translation target.\n"
+    "* Text inside `<context>` is background information.\n"
+    "* Your response must contain ONLY the ${targetName} translation of `<input>`."
+)
+
+
+def _prompt_matches_legacy_timestamp_default(prompt: str) -> bool:
+    return prompt == LEGACY_TIMESTAMP_PROMPT
+
+
 def ensure_prompt_defaults(settings: AppSettings) -> AppSettings:
+    if _prompt_matches_legacy_timestamp_default(settings.system_prompt):
+        settings.system_prompt = _shared_default_prompt()
     system_prompt_empty = not settings.system_prompt.strip()
     if system_prompt_empty:
         prompt = _shared_default_prompt()
@@ -2973,7 +3222,7 @@ def new_settings_for_first_run(system_locale: str | None = None) -> AppSettings:
             connection=TranslationConnection.OPENROUTER,
         )
     ensure_prompt_defaults(settings)
-    settings = with_telemetry_consent(settings, "allow")
+    settings = with_telemetry_enabled(settings, True)
     settings.validate()
     return settings
 
@@ -3456,6 +3705,15 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         changed = True
         version = 24
 
+    if version < 25:
+        raw_system_prompt = data.get("system_prompt")
+        if isinstance(raw_system_prompt, str) and _prompt_matches_legacy_timestamp_default(
+            raw_system_prompt
+        ):
+            data["system_prompt"] = _shared_default_prompt()
+            changed = True
+        version = 25
+
     if _normalize_local_llm_data(data):
         changed = True
 
@@ -3683,6 +3941,7 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
             history=translation_history,
             http_extension_id=translation_data.get("http_extension_id"),
             previous_llm_model=translation_data.get("previous_llm_model"),
+            gpu_device_id=translation_data.get("gpu_device_id"),
         )
     else:
         normalized_translation_settings = _derive_translation_settings_from_runtime_values(
@@ -4043,7 +4302,6 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
     local_llm_raw = data.get("local_llm") if isinstance(data.get("local_llm"), dict) else {}
     qwen_asr_raw = data.get("qwen_asr_stt") if isinstance(data.get("qwen_asr_stt"), dict) else {}
     openrouter_raw = data.get("openrouter") if isinstance(data.get("openrouter"), dict) else {}
-    telemetry_raw = data.get("telemetry") if isinstance(data.get("telemetry"), dict) else {}
     telemetry_state_raw = (
         data.get("telemetry_state") if isinstance(data.get("telemetry_state"), dict) else {}
     )
@@ -4212,6 +4470,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             ),
             trailing_silence_ms=int(data.get("soniox_stt", {}).get("trailing_silence_ms", 100)),
         ),
+        custom_stt=_parse_custom_stt_settings(data.get("custom_stt")),
         peer_qwen_asr_stt=PeerQwenASRSTTSettings(
             model=_parse_optional_str(peer_qwen_raw.get("model")),
             region=(
@@ -4372,13 +4631,14 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
                 managed_identity_data.get("pending_delivery_ack_expires_at")
             ),
         ),
-        telemetry=TelemetrySettings(
-            consent=_parse_telemetry_consent(telemetry_raw.get("consent")),
-        ),
+        telemetry=TelemetrySettings(enabled=_telemetry_enabled_from_dict(data)),
         telemetry_state=TelemetryStateSettings(
             anonymous_id=_normalize_telemetry_identifier(telemetry_state_raw.get("anonymous_id")),
-            sent_translation_success_dates_utc=_normalize_telemetry_sent_dates(
-                telemetry_state_raw.get("sent_translation_success_dates_utc")
+            last_sent_date_utc=_normalize_telemetry_sent_date(
+                telemetry_state_raw.get(
+                    "last_sent_date_utc",
+                    telemetry_state_raw.get("sent_translation_success_dates_utc"),
+                )
             ),
         ),
         system_prompt=legacy_system_prompt,
@@ -4403,6 +4663,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             history=translation_history,
             http_extension_id=translation_data.get("http_extension_id"),
             previous_llm_model=translation_data.get("previous_llm_model"),
+            gpu_device_id=translation_data.get("gpu_device_id"),
         )
     else:
         settings.translation = _derive_translation_settings_from_runtime(
@@ -4412,7 +4673,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
     materialize_translation_settings(settings)
 
     ensure_prompt_defaults(settings)
-    settings = ensure_telemetry_default_allow(settings)
+    settings = with_telemetry_enabled(settings, settings.telemetry.enabled)
     settings.validate()
     return settings
 

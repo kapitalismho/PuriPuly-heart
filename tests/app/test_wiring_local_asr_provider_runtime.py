@@ -3,7 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import puripuly_heart.app.wiring_local_asr_provider_runtime as runtime_wiring
-from puripuly_heart.app.wiring_local_asr_provider_runtime import ManagedSTTProviderFactory
+from puripuly_heart.app.wiring_local_asr_provider_runtime import (
+    LocalASRProviderRuntimeFactory,
+    ManagedSTTProviderFactory,
+)
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 
 from puripuly_heart.config.resolved import (
@@ -61,11 +64,13 @@ async def test_managed_provider_factory_builds_only_from_immutable_request(
         model_id="nova-3",
         session_options=options,
     )
+    observer = object()
     factory = ManagedSTTProviderFactory(
         secrets=object(),
         clock=FakeClock(),
         reset_deadline_s=300.0,
         gpu_model_path=Path("gpu.gguf"),
+        event_ingress_observer=observer,
     )
     gpu_runtime = object()
 
@@ -83,3 +88,23 @@ async def test_managed_provider_factory_builds_only_from_immutable_request(
     assert provider.channel == "peer"
     assert provider.bridging_ms == 320
     assert provider._pending_session_options == options
+    assert provider.event_ingress_observer is observer
+
+
+def test_local_asr_factory_binds_stt_event_ingress_observer() -> None:
+    inner = ManagedSTTProviderFactory(
+        secrets=object(),
+        clock=FakeClock(),
+        reset_deadline_s=300.0,
+        gpu_model_path=Path("gpu.gguf"),
+    )
+    factory = LocalASRProviderRuntimeFactory(
+        provider_factory=inner,
+        provisioning=object(),
+        clock=FakeClock(),
+    )
+    observer = object()
+
+    factory.bind_stt_event_ingress_observer(observer)
+
+    assert inner.event_ingress_observer is observer

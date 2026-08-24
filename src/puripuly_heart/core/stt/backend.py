@@ -6,6 +6,7 @@ from typing import AsyncIterator, Protocol, runtime_checkable
 import numpy as np
 
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.domain.models import FinalLanguageRun
 
 
@@ -19,7 +20,10 @@ class STTBackendTranscriptEvent:
 class STTBackendSession(Protocol):
     async def send_audio(self, pcm16le: bytes) -> None: ...
     async def on_speech_end(
-        self, *, trailing_silence_ms: int | None = None
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
     ) -> None: ...  # Backend-specific end-of-speech handling
     async def stop(self) -> None: ...
     async def close(self) -> None: ...

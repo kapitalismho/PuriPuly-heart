@@ -16,7 +16,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 36
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 37
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -60,7 +60,6 @@ _LOCAL_LLM_SECRET_BEARING_EXTRA_BODY_KEYS: Final = frozenset(
     }
 )
 _PROVIDER_VERIFICATION_STATUSES: Final = frozenset({"unknown", "verified", "failed", "skipped"})
-TELEMETRY_CONSENT_VALUES: Final = frozenset({"unknown", "allow", "decline"})
 CANONICAL_TRANSLATION_FALLBACK_ALIASES: Final = frozenset(
     {
         "none",
@@ -281,24 +280,13 @@ def _infer_translation_fallback_alias(
     return _FALLBACK_FIELDS_ALIAS.get(fields_key, "none")
 
 
-def _normalize_telemetry_sent_dates(value: object) -> tuple[str, ...]:
-    if isinstance(value, str):
-        candidates: tuple[object, ...] = (value,)
-    elif isinstance(value, list | tuple | set | frozenset):
-        candidates = tuple(value)
-    else:
-        candidates = ()
-    normalized: set[str] = set()
-    for candidate in candidates:
-        if not isinstance(candidate, str):
-            continue
-        raw = candidate.strip()
-        try:
-            parsed = date.fromisoformat(raw)
-        except ValueError:
-            continue
-        normalized.add(parsed.isoformat())
-    return tuple(sorted(normalized))
+def _normalize_telemetry_sent_date(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return date.fromisoformat(value.strip()).isoformat()
+    except ValueError:
+        return None
 
 
 def _normalize_telemetry_identifier(value: object) -> str | None:
@@ -385,6 +373,11 @@ class TranslationIntent:
     deepseek: DeepSeekTranslationIntent = field(default_factory=DeepSeekTranslationIntent)
     qwen: QwenTranslationIntent = field(default_factory=QwenTranslationIntent)
     cerebras: CerebrasTranslationIntent = field(default_factory=CerebrasTranslationIntent)
+    gpu_device_id: str = "auto"
+
+    def __post_init__(self) -> None:
+        device_id = self.gpu_device_id if isinstance(self.gpu_device_id, str) else "auto"
+        object.__setattr__(self, "gpu_device_id", device_id.strip() or "auto")
 
 
 @dataclass(frozen=True, slots=True)
@@ -417,6 +410,15 @@ class SonioxSTTIntent:
 
 
 @dataclass(frozen=True, slots=True)
+class CustomSTTIntent:
+    mode: str = "offline"
+    compatibility: str = "openai_transcription"
+    endpoint: str = ""
+    model: str = ""
+    extra: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
 class STTIntent:
     provider: str = "local_cpu_auto"
     drain_timeout_s: float = 2.0
@@ -431,6 +433,7 @@ class STTIntent:
     deepgram: DeepgramSTTIntent = field(default_factory=DeepgramSTTIntent)
     qwen_asr: QwenASRSTTIntent = field(default_factory=QwenASRSTTIntent)
     soniox: SonioxSTTIntent = field(default_factory=SonioxSTTIntent)
+    custom: CustomSTTIntent = field(default_factory=CustomSTTIntent)
 
     def __post_init__(self) -> None:
         device_id = self.gpu_device_id if isinstance(self.gpu_device_id, str) else "auto"
@@ -646,6 +649,7 @@ class DesktopFletOverlayIntent:
     position: DesktopFletOverlayPositionIntent = field(
         default_factory=DesktopFletOverlayPositionIntent
     )
+    swap_caption_languages: bool = False
     visual: DesktopFletOverlayVisualIntent = field(default_factory=DesktopFletOverlayVisualIntent)
 
 
@@ -725,15 +729,12 @@ class IntegratedContextIntent:
 
 
 @dataclass(frozen=True, slots=True)
-class TelemetryConsentIntent:
-    consent: str = "unknown"
+class TelemetryIntent:
+    enabled: bool = True
 
     def __post_init__(self) -> None:
-        consent = self.consent if isinstance(self.consent, str) else "unknown"
-        consent = consent.strip()
-        if consent not in TELEMETRY_CONSENT_VALUES:
-            consent = "unknown"
-        object.__setattr__(self, "consent", consent)
+        if not isinstance(self.enabled, bool):
+            raise ValueError("telemetry enabled must be a boolean")
 
 
 @dataclass(frozen=True, slots=True)
@@ -756,7 +757,7 @@ class UserIntentSettings:
     ui: UiIntent = field(default_factory=UiIntent)
     clipboard: ClipboardIntent = field(default_factory=ClipboardIntent)
     integrated_context: IntegratedContextIntent = field(default_factory=IntegratedContextIntent)
-    telemetry: TelemetryConsentIntent = field(default_factory=TelemetryConsentIntent)
+    telemetry: TelemetryIntent = field(default_factory=TelemetryIntent)
     prompts: PromptIntent = field(default_factory=PromptIntent)
 
 
@@ -913,15 +914,15 @@ class IntegratedContextState:
 
 @dataclass(frozen=True, slots=True)
 class TelemetryOperationalState:
-    anonymous_id: str | None = None
-    sent_translation_success_dates_utc: tuple[str, ...] = ()
+    anonymous_id: str | None = field(default_factory=new_anonymous_telemetry_identifier)
+    last_sent_date_utc: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "anonymous_id", _normalize_telemetry_identifier(self.anonymous_id))
         object.__setattr__(
             self,
-            "sent_translation_success_dates_utc",
-            _normalize_telemetry_sent_dates(self.sent_translation_success_dates_utc),
+            "last_sent_date_utc",
+            _normalize_telemetry_sent_date(self.last_sent_date_utc),
         )
 
 
@@ -997,17 +998,18 @@ def with_capture_target(
     )
 
 
-def with_telemetry_consent(
+def with_telemetry_enabled(
     settings: AppSettingsVNext,
-    consent: str,
+    enabled: bool,
     *,
     identifier_factory: object = new_anonymous_telemetry_identifier,
 ) -> AppSettingsVNext:
-    normalized_consent = TelemetryConsentIntent(consent).consent
+    if not isinstance(enabled, bool):
+        raise TypeError("telemetry enabled must be a boolean")
     current_state = settings.state.telemetry
-    if normalized_consent == "decline":
-        next_state = TelemetryOperationalState()
-    elif normalized_consent == "allow":
+    if not enabled:
+        next_state = TelemetryOperationalState(anonymous_id=None)
+    else:
         factory = (
             identifier_factory
             if callable(identifier_factory)
@@ -1015,28 +1017,13 @@ def with_telemetry_consent(
         )
         next_state = TelemetryOperationalState(
             anonymous_id=current_state.anonymous_id or str(factory()),
-            sent_translation_success_dates_utc=current_state.sent_translation_success_dates_utc,
+            last_sent_date_utc=current_state.last_sent_date_utc,
         )
-    else:
-        next_state = current_state
     return replace(
         settings,
-        intent=replace(settings.intent, telemetry=TelemetryConsentIntent(normalized_consent)),
+        intent=replace(settings.intent, telemetry=TelemetryIntent(enabled)),
         state=replace(settings.state, telemetry=next_state),
     )
-
-
-def ensure_telemetry_default_allow(
-    settings: AppSettingsVNext,
-    *,
-    identifier_factory: object = new_anonymous_telemetry_identifier,
-) -> AppSettingsVNext:
-    consent = TelemetryConsentIntent(settings.intent.telemetry.consent).consent
-    if consent == "decline":
-        return settings
-    if consent == "allow" and settings.state.telemetry.anonymous_id:
-        return settings
-    return with_telemetry_consent(settings, "allow", identifier_factory=identifier_factory)
 
 
 __all__ = [
@@ -1045,6 +1032,7 @@ __all__ = [
     "CaptureTargetIntent",
     "ClipboardIntent",
     "CerebrasTranslationIntent",
+    "CustomSTTIntent",
     "DeepgramSTTIntent",
     "DeepSeekTranslationIntent",
     "DesktopAudioIntent",
@@ -1083,9 +1071,8 @@ __all__ = [
     "SonioxSTTIntent",
     "TranslationIntent",
     "TranslationFallbackIntent",
-    "TelemetryConsentIntent",
+    "TelemetryIntent",
     "TelemetryOperationalState",
-    "TELEMETRY_CONSENT_VALUES",
     "UiIntent",
     "UserIntentSettings",
     "VNEXT_SETTINGS_SCHEMA_VERSION",
@@ -1094,7 +1081,6 @@ __all__ = [
     "OSC_DEFAULT_RECEIVE_PORT",
     "OSC_DEFAULT_SEND_PORT",
     "with_capture_target",
-    "with_telemetry_consent",
+    "with_telemetry_enabled",
     "with_translation_runtime_policy",
-    "ensure_telemetry_default_allow",
 ]

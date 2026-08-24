@@ -68,6 +68,7 @@ from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _positive_int_or_default,
     _RetainedDesktopCaptionSurface,
 )
+from puripuly_heart.ui.fonts import noto_cjk_family_for_ui_locale
 from puripuly_heart.ui.i18n import t_for_locale
 
 _DESKTOP_PREVIEW_SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -100,12 +101,16 @@ def build_desktop_caption_plan(
     primary_font_size = preset.primary_font_size
     secondary_font_size = preset.secondary_font_size
     outline_width = 0.0
-    _ = locale
+    cjk_font_family = noto_cjk_family_for_ui_locale(locale)
 
-    candidate_slots = _caption_slots_for_snapshot(
-        snapshot,
-        primary_font_size=primary_font_size,
-        secondary_font_size=secondary_font_size,
+    candidate_slots = _caption_slots_with_ui_cjk_font(
+        _caption_slots_for_snapshot(
+            snapshot,
+            primary_font_size=primary_font_size,
+            secondary_font_size=secondary_font_size,
+            swap_caption_languages=visual.swap_caption_languages,
+        ),
+        cjk_font_family=cjk_font_family,
     )
     slots = tuple(
         _caption_slot_with_dynamic_width(
@@ -153,6 +158,7 @@ def build_desktop_caption_plan(
         background_color=_caption_background_color(background_alpha),
         surface_visible=surface_visible,
         full_window_background_visible=full_window_background_visible,
+        cjk_font_family=cjk_font_family,
     )
 
 
@@ -192,7 +198,9 @@ def build_desktop_empty_lock_action(
         size=font_size,
         height=1.0,
         weight=ft.FontWeight.BOLD,
-        font_family=_desktop_caption_font_family_for_text(label),
+        font_family=_desktop_caption_font_family_for_text(
+            label, ui_locale_cjk_family=plan.cjk_font_family
+        ),
         decoration=None,
     )
     return ft.TextButton(
@@ -619,6 +627,7 @@ def _caption_slots_for_snapshot(
     *,
     primary_font_size: int,
     secondary_font_size: int,
+    swap_caption_languages: bool = False,
 ) -> tuple[DesktopCaptionSlot, ...]:
     slots: list[DesktopCaptionSlot] = []
     for block in sorted(snapshot.blocks, key=lambda item: (item.appearance_seq, item.occupant_key)):
@@ -626,6 +635,7 @@ def _caption_slots_for_snapshot(
             block,
             primary_font_size=primary_font_size,
             secondary_font_size=secondary_font_size,
+            swap_caption_languages=swap_caption_languages,
         )
         if not lines:
             continue
@@ -649,6 +659,7 @@ def _caption_lines_for_snapshot(
     *,
     primary_font_size: int,
     secondary_font_size: int,
+    swap_caption_languages: bool = False,
 ) -> tuple[DesktopCaptionLine, ...]:
     return tuple(
         line
@@ -656,6 +667,7 @@ def _caption_lines_for_snapshot(
             snapshot,
             primary_font_size=primary_font_size,
             secondary_font_size=secondary_font_size,
+            swap_caption_languages=swap_caption_languages,
         )
         for line in slot.lines
     )
@@ -666,6 +678,7 @@ def _caption_lines_for_block(
     *,
     primary_font_size: int,
     secondary_font_size: int,
+    swap_caption_languages: bool = False,
 ) -> tuple[DesktopCaptionLine, ...]:
     primary_text = block.primary_text.strip()
     secondary_text = block.secondary_text.strip()
@@ -673,33 +686,40 @@ def _caption_lines_for_block(
         return ()
 
     if block.block_variant == "active_self":
-        return _self_active_lines(
+        lines = _self_active_lines(
             block,
             primary_text=primary_text,
             secondary_text=secondary_text,
             primary_font_size=primary_font_size,
             secondary_font_size=secondary_font_size,
         )
-    if block.block_variant == "active_peer":
-        return _peer_active_lines(
+    elif block.block_variant == "active_peer":
+        lines = _peer_active_lines(
             block,
             primary_text=primary_text,
             secondary_text=secondary_text,
             primary_font_size=primary_font_size,
             secondary_font_size=secondary_font_size,
         )
-    if block.channel == "peer":
-        return _peer_finalized_lines(
+    elif block.channel == "peer":
+        lines = _peer_finalized_lines(
             block,
             primary_text=primary_text,
             secondary_text=secondary_text,
             primary_font_size=primary_font_size,
             secondary_font_size=secondary_font_size,
         )
-    return _self_finalized_lines(
-        block,
-        primary_text=primary_text,
-        secondary_text=secondary_text,
+    else:
+        lines = _self_finalized_lines(
+            block,
+            primary_text=primary_text,
+            secondary_text=secondary_text,
+            primary_font_size=primary_font_size,
+            secondary_font_size=secondary_font_size,
+        )
+    return _maybe_swap_caption_language_slots(
+        lines,
+        enabled=swap_caption_languages,
         primary_font_size=primary_font_size,
         secondary_font_size=secondary_font_size,
     )
@@ -879,6 +899,46 @@ def _self_finalized_lines(
     return ()
 
 
+def _maybe_swap_caption_language_slots(
+    lines: tuple[DesktopCaptionLine, ...],
+    *,
+    enabled: bool,
+    primary_font_size: int,
+    secondary_font_size: int,
+) -> tuple[DesktopCaptionLine, ...]:
+    if not enabled:
+        return lines
+    primary_index: int | None = None
+    secondary_index: int | None = None
+    for index, line in enumerate(lines):
+        if line.slot == "primary" and not line.promoted:
+            primary_index = index
+        elif line.slot == "secondary":
+            secondary_index = index
+    if primary_index is None or secondary_index is None:
+        return lines
+    primary = lines[primary_index]
+    secondary = lines[secondary_index]
+    swapped = list(lines)
+    swapped[primary_index] = replace(
+        secondary,
+        slot="primary",
+        font_size=primary_font_size,
+        max_lines=_DESKTOP_CAPTION_PRIMARY_MAX_LINES,
+        priority=primary.priority,
+        promoted=False,
+    )
+    swapped[secondary_index] = replace(
+        primary,
+        slot="secondary",
+        font_size=secondary_font_size,
+        max_lines=_DESKTOP_CAPTION_SECONDARY_MAX_LINES,
+        priority=secondary.priority,
+        promoted=False,
+    )
+    return tuple(swapped)
+
+
 def _caption_line(
     block: OverlayPresentationBlock,
     *,
@@ -982,9 +1042,37 @@ def _desktop_caption_char_is_cjk(char: str) -> bool:
     return _is_caption_cjk_or_hangul(ord(char))
 
 
-def _desktop_caption_font_family_for_text(text: str, language: str | None = None) -> str:
+def _caption_slots_with_ui_cjk_font(
+    slots: tuple[DesktopCaptionSlot, ...],
+    *,
+    cjk_font_family: str,
+) -> tuple[DesktopCaptionSlot, ...]:
+    if cjk_font_family == _DESKTOP_CAPTION_CJK_FONT_FAMILY:
+        return slots
+    return tuple(
+        replace(
+            slot,
+            lines=tuple(
+                (
+                    replace(line, font_family=cjk_font_family)
+                    if line.font_family == _DESKTOP_CAPTION_CJK_FONT_FAMILY
+                    else line
+                )
+                for line in slot.lines
+            ),
+        )
+        for slot in slots
+    )
+
+
+def _desktop_caption_font_family_for_text(
+    text: str,
+    language: str | None = None,
+    *,
+    ui_locale_cjk_family: str | None = None,
+) -> str:
     if _desktop_caption_uses_cjk_font_policy(text, language):
-        return _DESKTOP_CAPTION_CJK_FONT_FAMILY
+        return ui_locale_cjk_family or _DESKTOP_CAPTION_CJK_FONT_FAMILY
     return _DESKTOP_CAPTION_LATIN_FONT_FAMILY
 
 
@@ -1049,6 +1137,7 @@ def _validated_visual_state(
         text_scale=settings.text_scale,
         background_alpha=settings.background_alpha,
         outline_width=settings.outline_width,
+        swap_caption_languages=bool(source.swap_caption_languages),
     )
 
 

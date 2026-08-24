@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_models import (
+    GpuDeviceOption,
     GpuNoticeAction,
+    ManagedGemmaNoticeAction,
     OverlayPeerPresentationState,
 )
 from puripuly_heart.app.services.application_after_launch import (
@@ -20,6 +23,9 @@ from puripuly_heart.app.services.desktop_overlay_application import (
 )
 from puripuly_heart.app.services.github_star_prompt import GithubStarPromptOwner
 from puripuly_heart.app.services.gpu_runtime_interaction import GpuRuntimeInteractionOwner
+from puripuly_heart.app.services.managed_gemma_translation import (
+    ManagedGemmaTranslationOwner,
+)
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.overlay_calibration_application import (
@@ -47,10 +53,22 @@ from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
 from puripuly_heart.core.http_extensions import (
     http_extension_secret_key_prefix,
 )
+from puripuly_heart.core.local_translation.devices import list_llama_vulkan_devices
 from puripuly_heart.core.telemetry import (
     TranslationSuccessTelemetryResult,
     TranslationSuccessTelemetryService,
 )
+
+
+def _llama_gpu_device_options() -> tuple[GpuDeviceOption, ...]:
+    return tuple(
+        GpuDeviceOption(
+            device_id=device.device_id,
+            display_name=device.display_name,
+            backend_name=device.device_id,
+        )
+        for device in list_llama_vulkan_devices()
+    )
 
 
 @dataclass(slots=True)
@@ -200,7 +218,7 @@ class UiSettingsRuntimeAdapter:
     projection: SettingsProjectionOwner
     application: SettingsApplicationOwner
     merge_provider_settings: Callable[[object], object]
-    telemetry_consent_settings: Callable[[object, str], object]
+    telemetry_enabled_settings: Callable[[object, bool], object]
 
     async def on_dashboard_language_change(
         self,
@@ -244,11 +262,11 @@ class UiSettingsRuntimeAdapter:
     async def apply_settings(self, settings: object) -> object:
         return await self.application.apply(settings)
 
-    async def apply_telemetry_consent(self, consent: str) -> object | None:
+    async def apply_telemetry_enabled(self, enabled: bool) -> object | None:
         settings = self.settings.current
         if settings is None:
             return None
-        await self.application.apply(self.telemetry_consent_settings(settings, consent))
+        await self.application.apply(self.telemetry_enabled_settings(settings, enabled))
         return self.settings.current
 
 
@@ -261,6 +279,8 @@ class UiProviderRuntimeAdapter:
     credential_verification: ProviderCredentialVerificationInteractionOwner
     provider_settings: ProviderSettingsOwner
     build_byok_target_settings: Callable[[object | None], object | None]
+    managed_gemma: ManagedGemmaTranslationOwner | None = None
+    llm_devices_sink: Callable[[tuple[GpuDeviceOption, ...]], None] | None = None
 
     async def apply_providers(
         self,
@@ -291,6 +311,10 @@ class UiProviderRuntimeAdapter:
             force=False,
             origin="settings",
         )
+        sink = self.llm_devices_sink
+        if sink is None:
+            return
+        sink(await asyncio.to_thread(_llama_gpu_device_options))
 
     async def connect_openrouter_via_pkce(
         self,
@@ -344,6 +368,14 @@ class UiProviderRuntimeAdapter:
     def handle_gpu_notice_action(self, action: GpuNoticeAction) -> object:
         return self.gpu.handle_notice_action(action)
 
+    async def handle_managed_gemma_notice_action(
+        self,
+        action: ManagedGemmaNoticeAction,
+    ) -> object:
+        if action == "cancel":
+            return False if self.managed_gemma is None else self.managed_gemma.cancel()
+        raise ValueError(f"unsupported managed Gemma notice action: {action}")
+
 
 @dataclass(slots=True)
 class UiEngagementRuntimeAdapter:
@@ -367,6 +399,7 @@ class UiEngagementRuntimeAdapter:
 
     async def record_telemetry_translation_success_day(
         self,
+        active_date_utc: str,
     ) -> TranslationSuccessTelemetryResult:
         settings = self.settings.current
         if settings is None:
@@ -378,6 +411,7 @@ class UiEngagementRuntimeAdapter:
 
         return await self.telemetry.record_translation_success_day(
             settings,
+            active_date_utc=active_date_utc,
             persist_sent_date=persist,
         )
 

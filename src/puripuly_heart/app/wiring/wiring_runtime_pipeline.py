@@ -16,6 +16,7 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineCloseCallbacks,
     RuntimePipelineStartCallbacks,
 )
+from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTranslationOwner
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.config.paths import default_http_extensions_dir
 from puripuly_heart.config.settings import AppSettings, STTProviderName, TranslationModel
@@ -63,7 +64,9 @@ from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
 from puripuly_heart.domain.events import UIEvent
 
+from .wiring_local_asr_provider_runtime import LocalASRProviderRuntimeFactory
 from .wiring_managed_account import ManagedOpenRouterReleaseRuntime
+from .wiring_managed_gemma import noop_managed_gemma_release
 from .wiring_provider_runtime import (
     project_translation_runtime_settings,
 )
@@ -508,6 +511,7 @@ class RuntimePipelineLauncher:
     configure_vrc_mic: Callable[..., Awaitable[None]]
     stt_failure_sink: Callable[[str], None]
     cleanup_failure_sink: Callable[[str, BaseException], None]
+    managed_gemma: ManagedGemmaTranslationOwner | None = None
     http_extensions: HttpExtensionRegistry | None = None
     failed_resources: RuntimePipelineResourceOwner | None = field(
         init=False,
@@ -551,6 +555,7 @@ class RuntimePipelineLauncher:
                 runtime_logging=self.runtime_logging,
                 managed_release=self.managed_release,
                 managed_delegate_ready=self.managed_delegate_ready,
+                managed_gemma=self.managed_gemma,
                 local_asr_factory=self.local_asr_factory,
                 self_capture_factory=self.self_capture_factory,
                 peer_capture_factory=self.peer_capture_factory,
@@ -626,6 +631,7 @@ async def compose_runtime_pipeline(
     vrc_mic_audio_gate: VrcMicAudioGate | None,
     receiver_active: bool,
     stt_failure_sink: Callable[[str], None],
+    managed_gemma: ManagedGemmaTranslationOwner | None = None,
     http_extensions: HttpExtensionRegistry | None = None,
     resources: RuntimePipelineResourceOwner | None = None,
 ) -> RuntimePipelineComponents:
@@ -639,6 +645,7 @@ async def compose_runtime_pipeline(
             runtime_logging=runtime_logging,
             managed_release=managed_release,
             managed_delegate_ready=managed_delegate_ready,
+            managed_gemma=managed_gemma,
             local_asr_factory=local_asr_factory,
             self_capture_factory=self_capture_factory,
             peer_capture_factory=peer_capture_factory,
@@ -670,6 +677,7 @@ async def _compose_runtime_pipeline(
     runtime_logging: object,
     managed_release: ManagedOpenRouterReleaseRuntime,
     managed_delegate_ready: Callable[[], None],
+    managed_gemma: ManagedGemmaTranslationOwner | None,
     local_asr_factory: Callable[[object], LocalASRProviderRuntimeFactoryPort],
     self_capture_factory: Callable[
         [
@@ -699,18 +707,42 @@ async def _compose_runtime_pipeline(
     if http_extensions is None and settings.translation.model == TranslationModel.CUSTOM_HTTP:
         http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
         http_extensions.reload()
-    if settings.translation.model != TranslationModel.CUSTOM_HTTP:
+    if (
+        settings.translation.model
+        not in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
+        and managed_gemma is not None
+    ):
+        await managed_gemma.deactivate()
+    if settings.translation.model not in {
+        TranslationModel.CUSTOM_HTTP,
+        TranslationModel.MANAGED_GEMMA,
+        TranslationModel.MANAGED_GEMMA_12B,
+    }:
         await managed_release.rebuild(secrets=secrets)
 
     llm = None
     with contextlib.suppress(Exception):
+        gemma_runtime = None
+        gemma_release = None
+        if settings.translation.model in (
+            TranslationModel.MANAGED_GEMMA,
+            TranslationModel.MANAGED_GEMMA_12B,
+        ):
+            if managed_gemma is None:
+                raise RuntimeError("managed Gemma translation runtime is unavailable")
+            gemma_runtime = managed_gemma.runtime
+            gemma_release = noop_managed_gemma_release
         llm = create_translation_backend(
             settings,
             secrets=secrets,
-            http_extensions=http_extensions or HttpExtensionRegistry(default_http_extensions_dir()),
+            http_extensions=(
+                http_extensions or HttpExtensionRegistry(default_http_extensions_dir())
+            ),
             managed_release_service=managed_release.service,
             managed_delegate_ready=managed_delegate_ready,
             runtime_logging=runtime_logging,
+            managed_gemma_runtime=gemma_runtime,
+            managed_gemma_release=gemma_release,
         )
         resources.pending_llm = llm
 
@@ -766,6 +798,7 @@ async def _compose_runtime_pipeline(
         config_snapshot=translation_runtime_configuration.snapshot,
         runtime_logging=runtime_logging,
     )
+    osc.stage_recorder = translation_diagnostics.record_chatbox_stage
     translation_output_projection = TranslationOutputProjectionOwner(
         output_runtime=output_runtime,
         ui_messages=TranslationUiMessageQueue(ui_events),
@@ -795,13 +828,17 @@ async def _compose_runtime_pipeline(
         on_child_terminal=callbacks.child_terminal,
         on_parent_closed=callbacks.parent_closed,
         on_parent_rejected=callbacks.parent_rejected,
+        predecessor_wait_observer=translation_diagnostics.record_translation_wait,
         output=callbacks,
         config_snapshot=translation_runtime_configuration.snapshot,
     )
     resources.translation_turns = translation_turns
     await translation_turns.close_channel_ingress("self")
     await translation_turns.close_channel_ingress("peer")
-    local_asr_runtime = local_asr_factory(secrets).create(
+    asr_factory = local_asr_factory(secrets)
+    if isinstance(asr_factory, LocalASRProviderRuntimeFactory):
+        asr_factory.bind_stt_event_ingress_observer(translation_diagnostics.record_stt_ingress)
+    local_asr_runtime = asr_factory.create(
         LocalASRProviderRuntimeCallbacks(
             self_event_handler=callbacks.self_event_handler,
             peer_event_handler=callbacks.peer_event_handler,

@@ -55,10 +55,8 @@ export interface RequestNetworkMetadata {
   httpProtocol: string | null;
   tlsVersion: string | null;
   tlsCipher: string | null;
-  riskLabel: 'low' | 'medium' | 'high';
+  riskLabel: null;
 }
-
-export type BrokerAsnKind = 'cloud_or_vps' | 'other';
 
 export interface SubjectHookMatch extends AbuseDecision {
   hookKind: 'denylist' | 'reputation' | 'revocation';
@@ -161,7 +159,17 @@ export async function persistBrokerAbuseRuntimeState(
     sectionsToPersist.push(['$.brake', after.brake]);
   }
   if (!jsonEquals(before.alertLatches, after.alertLatches)) {
-    sectionsToPersist.push(['$.alertLatches', after.alertLatches]);
+    sectionsToPersist.push([
+      '$.alertLatches',
+      {
+        warning: after.alertLatches.warning,
+        warningObservedAt: after.alertLatches.warningObservedAt,
+        warn1: after.alertLatches.warning,
+        warn2: after.alertLatches.warning,
+        warn3: after.alertLatches.warning,
+        critical: after.alertLatches.warning,
+      } as BrokerAbuseRuntimeStateValue['alertLatches'],
+    ]);
   }
   if (!jsonEquals(before.dailyReport, after.dailyReport)) {
     sectionsToPersist.push(['$.dailyReport', after.dailyReport]);
@@ -197,16 +205,22 @@ export async function persistBrokerAbuseRuntimeState(
       }
       case '$.alertLatches': {
         guardClauses.push(
-          `json_extract(value, '$.alertLatches.warn1') = ?`,
-          `json_extract(value, '$.alertLatches.warn2') = ?`,
-          `json_extract(value, '$.alertLatches.warn3') = ?`,
-          `json_extract(value, '$.alertLatches.critical') = ?`,
+          `COALESCE(
+             json_extract(value, '$.alertLatches.warning'),
+             CASE
+               WHEN COALESCE(json_extract(value, '$.alertLatches.warn1'), 0) = 1
+                 OR COALESCE(json_extract(value, '$.alertLatches.warn2'), 0) = 1
+                 OR COALESCE(json_extract(value, '$.alertLatches.warn3'), 0) = 1
+                 OR COALESCE(json_extract(value, '$.alertLatches.critical'), 0) = 1
+               THEN 1
+               ELSE 0
+             END
+           ) = ?`,
+          `json_extract(value, '$.alertLatches.warningObservedAt') IS ?`,
         );
         guardArguments.push(
-          sqliteBoolean(before.alertLatches.warn1),
-          sqliteBoolean(before.alertLatches.warn2),
-          sqliteBoolean(before.alertLatches.warn3),
-          sqliteBoolean(before.alertLatches.critical),
+          sqliteBoolean(before.alertLatches.warning),
+          before.alertLatches.warningObservedAt,
         );
         break;
       }
@@ -281,38 +295,17 @@ export async function extractRequestNetworkMetadata(
   const ip = resolveClientIp(c);
   const cf = getCloudflareMetadata(c);
   const asn = normalizePositiveInteger(cf.asn);
-  const controls = await getBrokerAbuseControlsConfig(db);
-  const httpProtocol = nonEmptyString(cf.httpProtocol);
-  const tlsVersion = nonEmptyString(cf.tlsVersion);
 
   return {
     ipHash: ip ? await hashNetworkValue(ip) : null,
     ipPrefixHash: ip ? await hashNetworkValue(deriveIpPrefix(ip)) : null,
     asn,
     country: nonEmptyString(cf.country),
-    httpProtocol,
-    tlsVersion,
+    httpProtocol: nonEmptyString(cf.httpProtocol),
+    tlsVersion: nonEmptyString(cf.tlsVersion),
     tlsCipher: nonEmptyString(cf.tlsCipher),
-    riskLabel: deriveRiskLabel({
-      asnKind: classifyAsn(asn, controls),
-      httpProtocol,
-      tlsVersion,
-    }),
+    riskLabel: null,
   };
-}
-
-export function classifyAsn(
-  asn: number | null,
-  controls: BrokerAbuseControlsConfigValue,
-): BrokerAsnKind {
-  if (
-    asn !== null &&
-    controls.asnClassifications.some((entry) => entry.asn === asn && entry.kind === 'cloud_or_vps')
-  ) {
-    return 'cloud_or_vps';
-  }
-
-  return 'other';
 }
 
 export async function recordRequestEvent(
@@ -559,53 +552,37 @@ async function countManagedDailyIssuances(
       `SELECT (
           SELECT COUNT(*)
             FROM openrouter_entitlements capped
-           WHERE (
-             (
-               capped.issued_at IS NOT NULL
-               AND capped.issued_at >= ?
-               AND capped.issued_at < ?
-             )
-             OR (
-               capped.discord_issue_status = 'issuing'
-               AND capped.discord_issue_reserved_at >= ?
-               AND capped.discord_issue_reserved_at < ?
-             )
-           )
+           WHERE COALESCE(
+                   capped.issued_at,
+                   capped.discord_issue_reserved_at,
+                   capped.discord_issue_delivered_at
+                 ) >= ?
+             AND COALESCE(
+                   capped.issued_at,
+                   capped.discord_issue_reserved_at,
+                   capped.discord_issue_delivered_at
+                 ) < ?
            ${openRouterExcludeClause}
         ) + (
           SELECT COUNT(*)
             FROM qq_managed_entitlements qq_capped
-           WHERE (
-             (
-               qq_capped.status IN ('issuing', 'cleanup_required')
-               AND qq_capped.reserved_at >= ?
-               AND qq_capped.reserved_at < ?
-             )
-             OR (
-               qq_capped.status = 'active'
-               AND COALESCE(
-                 qq_capped.delivered_at,
-                 qq_capped.issued_at,
-                 qq_capped.reserved_at
-               ) >= ?
-               AND COALESCE(
-                 qq_capped.delivered_at,
-                 qq_capped.issued_at,
-                 qq_capped.reserved_at
-               ) < ?
-             )
-           )
+           WHERE COALESCE(
+                   qq_capped.issued_at,
+                   qq_capped.reserved_at,
+                   qq_capped.delivered_at
+                 ) >= ?
+             AND COALESCE(
+                   qq_capped.issued_at,
+                   qq_capped.reserved_at,
+                   qq_capped.delivered_at
+                 ) < ?
            ${qqExcludeClause}
         ) AS count`,
     )
     .bind(
       window.startIso,
       window.endIso,
-      window.startIso,
-      window.endIso,
       ...openRouterExcludeParams,
-      window.startIso,
-      window.endIso,
       window.startIso,
       window.endIso,
       ...qqExcludeParams,
@@ -652,7 +629,7 @@ export async function hasConflictingHardwareDuplicate(
          FROM openrouter_entitlements
         WHERE verified_hardware_hash = ?
           AND verified_hardware_hash_salt_version = ?
-          AND status IN ('pending_release', 'active')
+          AND status IN ('pending_release', 'active', 'expired', 'revoked')
           AND installation_id <> ?
         LIMIT 1`,
     )
@@ -673,7 +650,7 @@ export async function hasConflictingHardwareDuplicate(
          FROM openrouter_entitlements e
          JOIN installations i
             ON i.installation_id = e.installation_id
-        WHERE e.status IN ('pending_release', 'active')
+        WHERE e.status IN ('pending_release', 'active', 'expired', 'revoked')
           AND e.verified_hardware_hash IS NULL
           AND e.verified_hardware_hash_salt_version IS NULL
           AND i.hardware_hash = ?
@@ -960,8 +937,6 @@ function validateBrokerAbuseControlsConfig(
     value.newActiveEntitlementsPerDay,
   );
   const immediateAlerts = validateImmediateAlertsConfig(value.immediateAlerts);
-  const asnFastPath = validateAsnFastPathConfig(value.asnFastPath);
-  const asnClassifications = validateAsnClassificationsConfig(value.asnClassifications);
   const retention = validateRetentionConfig(value.retention);
   const referralAttempts = validateReferralAttemptControlsConfig(value.referralAttempts);
   const dailyReport = validateDailyReportConfig(value.dailyReport);
@@ -980,8 +955,6 @@ function validateBrokerAbuseControlsConfig(
     !pendingDiscordOAuthSessions ||
     !newActiveEntitlementsPerDay ||
     !immediateAlerts ||
-    !asnFastPath ||
-    !asnClassifications ||
     !retention ||
     !referralAttempts ||
     !dailyReport
@@ -1003,8 +976,6 @@ function validateBrokerAbuseControlsConfig(
     pendingDiscordOAuthSessions,
     newActiveEntitlementsPerDay,
     immediateAlerts,
-    asnFastPath,
-    asnClassifications,
     retention,
     referralAttempts,
     dailyReport,
@@ -1021,6 +992,19 @@ function validateBrokerAbuseRuntimeState(
   const brakeReason = value.brake.reason;
   const brakeChangedBy = value.brake.changedBy;
   const brakeChangedAt = value.brake.changedAt;
+  const explicitWarning = value.alertLatches.warning;
+  const legacyWarningValues = [
+    value.alertLatches.warn1,
+    value.alertLatches.warn2,
+    value.alertLatches.warn3,
+    value.alertLatches.critical,
+  ];
+  const warning = isBoolean(explicitWarning)
+    ? explicitWarning
+    : legacyWarningValues.every(isBoolean)
+      ? legacyWarningValues.some((entry) => entry === true)
+      : null;
+  const warningObservedAt = value.alertLatches.warningObservedAt;
   const lastDeliveredAt = value.dailyReport.lastDeliveredAt;
   const lastDeliveredDateUtc = value.dailyReport.lastDeliveredDateUtc;
 
@@ -1034,10 +1018,8 @@ function validateBrokerAbuseRuntimeState(
     ) ||
     !(brakeChangedBy === null || brakeChangedBy === 'system' || brakeChangedBy === 'operator') ||
     !(brakeChangedAt === null || typeof brakeChangedAt === 'string') ||
-    !isBoolean(value.alertLatches.warn1) ||
-    !isBoolean(value.alertLatches.warn2) ||
-    !isBoolean(value.alertLatches.warn3) ||
-    !isBoolean(value.alertLatches.critical) ||
+    warning === null ||
+    !(warningObservedAt === undefined || warningObservedAt === null || typeof warningObservedAt === 'string') ||
     !(lastDeliveredAt === null || typeof lastDeliveredAt === 'string') ||
     !(lastDeliveredDateUtc === null || typeof lastDeliveredDateUtc === 'string')
   ) {
@@ -1052,10 +1034,9 @@ function validateBrokerAbuseRuntimeState(
       changedBy: brakeChangedBy,
     },
     alertLatches: {
-      warn1: value.alertLatches.warn1,
-      warn2: value.alertLatches.warn2,
-      warn3: value.alertLatches.warn3,
-      critical: value.alertLatches.critical,
+      warning,
+      warningObservedAt:
+        typeof warningObservedAt === 'string' ? warningObservedAt : null,
     },
     dailyReport: {
       lastDeliveredAt,
@@ -1148,80 +1129,17 @@ function validateImmediateAlertsConfig(
   }
 
   if (
-    !isPositiveInteger(value.warn1) ||
-    !isPositiveInteger(value.warn2) ||
-    !isPositiveInteger(value.warn3) ||
-    !isPositiveInteger(value.critical) ||
-    !(value.warn1 < value.warn2 && value.warn2 < value.warn3 && value.warn3 < value.critical)
+    !isPositiveInteger(value.warning) ||
+    !isPositiveInteger(value.brake) ||
+    !(value.warning < value.brake)
   ) {
     return null;
   }
 
   return {
-    warn1: value.warn1,
-    warn2: value.warn2,
-    warn3: value.warn3,
-    critical: value.critical,
+    warning: value.warning,
+    brake: value.brake,
   };
-}
-
-function validateAsnFastPathConfig(
-  value: unknown,
-): BrokerAbuseControlsConfigValue['asnFastPath'] | null {
-  if (!isJsonObject(value)) {
-    return null;
-  }
-
-  if (
-    !isBoolean(value.enabled) ||
-    !isPositiveInteger(value.minIssueSuccess1h) ||
-    !isIntegerInRange(value.minTopAsnSharePct, 1, 100)
-  ) {
-    return null;
-  }
-
-  return {
-    enabled: value.enabled,
-    minIssueSuccess1h: value.minIssueSuccess1h,
-    minTopAsnSharePct: value.minTopAsnSharePct,
-  };
-}
-
-function validateAsnClassificationsConfig(
-  value: unknown,
-): BrokerAbuseControlsConfigValue['asnClassifications'] | null {
-  if (!Array.isArray(value)) {
-    return null;
-  }
-
-  const normalized: BrokerAbuseControlsConfigValue['asnClassifications'] = [];
-  const seenAsns = new Set<number>();
-
-  for (const entry of value) {
-    if (!isJsonObject(entry) || !isPositiveInteger(entry.asn) || entry.kind !== 'cloud_or_vps') {
-      return null;
-    }
-
-    if (seenAsns.has(entry.asn)) {
-      return null;
-    }
-    seenAsns.add(entry.asn);
-
-    normalized.push(
-      typeof entry.displayName === 'string'
-        ? {
-            asn: entry.asn,
-            kind: 'cloud_or_vps',
-            displayName: entry.displayName,
-          }
-        : {
-            asn: entry.asn,
-            kind: 'cloud_or_vps',
-          },
-    );
-  }
-
-  return normalized;
 }
 
 function validateRetentionConfig(
@@ -1232,7 +1150,7 @@ function validateRetentionConfig(
   }
 
   if (
-    !isPositiveInteger(value.requestEventsDays) ||
+    !isPositiveInteger(value.requestEventSafetyMarginDays) ||
     !isPositiveInteger(value.issueSuccessDays) ||
     !isPositiveInteger(value.runtimeAuditDays) ||
     !isPositiveInteger(value.referralSkippedDays) ||
@@ -1242,8 +1160,8 @@ function validateRetentionConfig(
   }
 
   return {
-    requestEventsDays: value.requestEventsDays,
-    issueSuccessDays: value.issueSuccessDays,
+    requestEventSafetyMarginDays: value.requestEventSafetyMarginDays,
+    issueSuccessDays: Math.max(2, value.issueSuccessDays),
     runtimeAuditDays: value.runtimeAuditDays,
     referralSkippedDays: value.referralSkippedDays,
     referralFailedDays: value.referralFailedDays,
@@ -1349,8 +1267,7 @@ function validateDailyReportConfig(
   if (
     !isBoolean(value.enabled) ||
     !isIntegerInRange(value.hourUtc, 0, 23) ||
-    !isIntegerInRange(value.minuteUtc, 0, 59) ||
-    !isBoolean(value.includeZeroActivity)
+    !isIntegerInRange(value.minuteUtc, 0, 59)
   ) {
     return null;
   }
@@ -1359,7 +1276,6 @@ function validateDailyReportConfig(
     enabled: value.enabled,
     hourUtc: value.hourUtc,
     minuteUtc: value.minuteUtc,
-    includeZeroActivity: value.includeZeroActivity,
   };
 }
 
@@ -1416,30 +1332,6 @@ function deriveIpPrefix(ip: string): string {
   }
 
   return ip.split('.').slice(0, 3).join('.');
-}
-
-function deriveRiskLabel(input: {
-  asnKind: BrokerAsnKind;
-  httpProtocol: string | null;
-  tlsVersion: string | null;
-}): RequestNetworkMetadata['riskLabel'] {
-  if (
-    input.asnKind === 'cloud_or_vps' ||
-    (input.httpProtocol === 'HTTP/1.1' &&
-      input.tlsVersion !== null &&
-      /TLSv1(?:\.0|\.1|\.2)?$/u.test(input.tlsVersion))
-  ) {
-    return 'high';
-  }
-
-  if (
-    input.httpProtocol === 'HTTP/1.1' ||
-    (input.tlsVersion !== null && /TLSv1(?:\.0|\.1|\.2)?$/u.test(input.tlsVersion))
-  ) {
-    return 'medium';
-  }
-
-  return 'low';
 }
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {

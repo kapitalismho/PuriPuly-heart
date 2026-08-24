@@ -11,12 +11,13 @@ import logging
 import math
 import re
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 import flet as ft
 from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
+from puripuly_heart.app.ports.ui_models import OscControlPresentationState
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
@@ -50,13 +51,19 @@ from puripuly_heart.config.settings import (
     TranslationModel,
     _normalize_local_llm_base_url,
     default_translation_connection,
+    display_stt_provider,
+    is_custom_stt_provider,
     materialize_translation_settings,
     normalize_owned_referral_id,
     supported_translation_connections,
-    with_telemetry_consent,
+    with_telemetry_enabled,
 )
 from puripuly_heart.core.http_extensions import http_extension_secret_key
 from puripuly_heart.core.language import get_stt_compatibility_warning
+from puripuly_heart.core.stt.custom import (
+    CustomSTTConfigurationError,
+    normalize_custom_stt_extra,
+)
 from puripuly_heart.ui.components.managed_trial_usage_bar import ManagedTrialUsageBar
 from puripuly_heart.ui.components.settings import (
     ApiKeyField,
@@ -140,24 +147,33 @@ _STT_UI_PROVIDERS = (
     STTProviderName.DEEPGRAM,
     STTProviderName.QWEN_ASR,
     STTProviderName.SONIOX,
+    STTProviderName.CUSTOM_OFFLINE,
+    STTProviderName.CUSTOM_REALTIME,
 )
 _STT_SECTION_ORDER = (
-    "settings.stt.section.recommended",
+    "settings.stt.section.recommended_cloud",
+    "settings.stt.section.recommended_local",
     "settings.stt.section.cloud",
     "settings.stt.section.gpu_inference",
     "settings.stt.section.cpu_inference",
+    "settings.stt.section.custom",
 )
 _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
-    STTProviderName.LOCAL_CPU_AUTO: "settings.stt.section.recommended",
-    STTProviderName.DEEPGRAM: "settings.stt.section.recommended",
-    STTProviderName.SONIOX: "settings.stt.section.recommended",
+    STTProviderName.DEEPGRAM: "settings.stt.section.recommended_cloud",
+    STTProviderName.SONIOX: "settings.stt.section.recommended_cloud",
+    STTProviderName.LOCAL_CPU_AUTO: "settings.stt.section.recommended_local",
     STTProviderName.QWEN_ASR: "settings.stt.section.cloud",
+    STTProviderName.CUSTOM: "settings.stt.section.custom",
+    STTProviderName.CUSTOM_OFFLINE: "settings.stt.section.custom",
+    STTProviderName.CUSTOM_REALTIME: "settings.stt.section.custom",
     STTProviderName.LOCAL_QWEN_GPU: "settings.stt.section.gpu_inference",
     STTProviderName.LOCAL_PARAKEET_V3: "settings.stt.section.cpu_inference",
     STTProviderName.LOCAL_PARAKEET_JAPANESE: "settings.stt.section.cpu_inference",
     STTProviderName.LOCAL_QWEN: "settings.stt.section.cpu_inference",
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
+    TranslationModel.MANAGED_GEMMA: "provider.managed_gemma",
+    TranslationModel.MANAGED_GEMMA_12B: "provider.managed_gemma_12b",
     TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
     TranslationModel.GEMMA4_31B: "provider.gemma4_31b",
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
@@ -169,6 +185,8 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.CUSTOM_HTTP: "provider.custom_http",
 }
 _TRANSLATION_CONNECTION_LABEL_KEYS = {
+    TranslationConnection.CPU: "settings.translation_connection.cpu",
+    TranslationConnection.GPU: "settings.translation_connection.gpu",
     TranslationConnection.MANAGED: "settings.translation_connection.managed",
     TranslationConnection.MANAGED_CHINA: "settings.translation_connection.managed_china",
     TranslationConnection.OPENROUTER: "settings.translation_connection.openrouter",
@@ -182,6 +200,8 @@ _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
 }
 _TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY = "settings.translation_connection.only_supported"
 _TRANSLATION_MODELS = (
+    TranslationModel.MANAGED_GEMMA,
+    TranslationModel.MANAGED_GEMMA_12B,
     TranslationModel.GEMMA4_26B_31B,
     TranslationModel.GEMMA4_31B,
     TranslationModel.GEMMA4,
@@ -193,22 +213,33 @@ _TRANSLATION_MODELS = (
     TranslationModel.QWEN_35_PLUS,
 )
 _TRANSLATION_MODEL_SECTION_ORDER = (
-    "settings.translation_model.section.recommended",
-    "settings.translation_model.section.gemma",
+    "settings.translation_model.section.recommended_cloud",
+    "settings.translation_model.section.recommended_local",
+    "settings.translation_model.section.gpu_inference",
     "settings.translation_model.section.user_settings",
     "settings.translation_model.section.others",
 )
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
-    TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended",
-    TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended",
-    TranslationModel.GEMMA4_31B: "settings.translation_model.section.gemma",
-    TranslationModel.GEMMA4: "settings.translation_model.section.gemma",
+    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.recommended_local",
+    TranslationModel.MANAGED_GEMMA_12B: "settings.translation_model.section.gpu_inference",
+    TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
+    TranslationModel.GEMMA4_31B: "settings.translation_model.section.recommended_cloud",
+    TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended_cloud",
+    TranslationModel.GEMMA4: "settings.translation_model.section.others",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
     TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
     TranslationModel.GEMINI_37_FLASH: "settings.translation_model.section.others",
     TranslationModel.GEMINI_31_FLASH_LITE: "settings.translation_model.section.others",
     TranslationModel.QWEN_35_PLUS: "settings.translation_model.section.others",
 }
+_TRANSLATION_MODELS_WITHOUT_PROVIDER_FALLBACK = frozenset(
+    {
+        TranslationModel.CUSTOM_HTTP,
+        TranslationModel.MANAGED_GEMMA,
+        TranslationModel.MANAGED_GEMMA_12B,
+        TranslationModel.LOCAL_LLM,
+    }
+)
 _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str], ...] = (
     (
         "none",
@@ -314,6 +345,12 @@ def _reject_json_constant(value: str) -> None:
     raise json.JSONDecodeError(f"invalid JSON constant: {value}", value, 0)
 
 
+def _custom_stt_extra_to_text(extra: Mapping[str, object]) -> str:
+    if not extra:
+        return "{}"
+    return json.dumps(extra, ensure_ascii=False, indent=2)
+
+
 def _update_control_if_mounted(control: ft.Control) -> None:
     update_control_if_mounted(control)
 
@@ -396,6 +433,7 @@ class SettingsView(ft.Column):
         self.on_prompt_apply_settings: Callable[[AppSettings], None] | None = None
         self.on_providers_changed: Callable[[], None] | None = None
         self.on_local_llm_secret_changed: Callable[[], None] | None = None
+        self.on_custom_stt_secret_changed: Callable[[], None] | None = None
         self.on_request_openrouter_pkce: Callable[[AppSettings], None] | None = None
         self.on_verify_api_key: Callable[[str, str], object] | None = None
         self.on_provider_secret_change: Callable[[str, str], object] | None = None
@@ -413,7 +451,7 @@ class SettingsView(ft.Column):
         self.on_view_logs: Callable[[], None] | None = None
         self.on_start_microphone_test: Callable[[], None] | None = None
         self.on_gpu_discovery_requested: Callable[[], object] | None = None
-        self.on_telemetry_consent_change: Callable[[str], None] | None = None
+        self.on_telemetry_enabled_change: Callable[[bool], None] | None = None
         self.on_list_loopback_capture_options: Callable[[], object] | None = None
         self.on_list_loopback_process_options: Callable[[], object] | None = None
         self.on_list_loopback_device_options: Callable[[], object] | None = None
@@ -459,6 +497,7 @@ class SettingsView(ft.Column):
         self._managed_key_pass_status: TalkTogetherPassStatus | None = None
         self._overlay_peer_contract: OverlayPeerConsumerContract | None = None
         self._gpu_devices: tuple[GpuDeviceOption, ...] = ()
+        self._llm_gpu_devices: tuple[GpuDeviceOption, ...] = ()
         self._local_cpu_auto_available = False
 
         # Build UI components
@@ -480,7 +519,7 @@ class SettingsView(ft.Column):
         return self._translation_connection_card
 
     def http_extension_control(self) -> ft.Control:
-        return ft.Container(content=self._http_extension_row)
+        return self._http_extension_host
 
     def set_http_extension_registry(
         self,
@@ -498,8 +537,17 @@ class SettingsView(ft.Column):
     def gpu_device_control(self) -> ft.Control:
         return self._gpu_device_card
 
+    def gpu_llm_control(self) -> ft.Control:
+        return self._gpu_llm_card
+
+    def gpu_refresh_control(self) -> ft.Control:
+        return self._gpu_refresh_card
+
     def local_llm_connection_control(self) -> ft.Control:
         return self._local_llm_connection_card
+
+    def custom_stt_connection_control(self) -> ft.Control:
+        return self._custom_stt_connection_card
 
     def managed_key_control(self) -> ft.Control:
         return self._managed_key_card
@@ -531,9 +579,10 @@ class SettingsView(ft.Column):
         self.on_provider_secret_change = provider.provider_secret_change
         self.on_secret_cleared = provider.secret_cleared
         self.on_local_llm_secret_changed = provider.local_llm_secret_changed
+        self.on_custom_stt_secret_changed = provider.custom_stt_secret_changed
         self.on_gpu_discovery_requested = provider.gpu_discovery_requested
         self.on_start_microphone_test = general.start_microphone_test
-        self.on_telemetry_consent_change = general.telemetry_consent_change
+        self.on_telemetry_enabled_change = general.telemetry_enabled_change
         self.on_list_loopback_capture_options = general.list_loopback_capture_options
         self.on_list_loopback_process_options = general.list_loopback_process_options
         self.on_list_loopback_device_options = general.list_loopback_device_options
@@ -661,6 +710,7 @@ class SettingsView(ft.Column):
             self._stt_text,
             self._peer_stt_text,
             self._gpu_device_text,
+            self._gpu_llm_text,
             self._llm_text,
             self._ui_text,
             self._chatbox_source_text,
@@ -678,13 +728,14 @@ class SettingsView(ft.Column):
             self._overlay_text_scale_text,
             self._desktop_overlay_size_button,
             self._desktop_overlay_lock_button,
+            self._desktop_overlay_swap_caption_languages_button,
             self._overlay_vr_reset_button,
             self._overlay_desktop_reset_button,
             self._desktop_overlay_primary_action,
             self._desktop_overlay_view_logs_action,
             self._translation_connection_text,
             self._openrouter_fallback_text,
-            self._telemetry_consent_text,
+            self._telemetry_enabled_text,
             self._http_extension_text,
             self._http_extension_path_text,
         )
@@ -1414,19 +1465,19 @@ class SettingsView(ft.Column):
             value=self._clipboard_auto_translate_text,
         )
 
-        self._telemetry_consent_text = self._build_clickable_text(
+        self._telemetry_enabled_text = self._build_clickable_text(
             t("settings.telemetry.state.off"),
-            self._on_telemetry_consent_click,
+            self._on_telemetry_enabled_click,
         )
-        self._telemetry_consent_title = ft.Text(
+        self._telemetry_enabled_title = ft.Text(
             t("settings.telemetry.title"),
             size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        self._telemetry_consent_card = self._wrap_unit_card(
-            title=self._telemetry_consent_title,
-            value=self._telemetry_consent_text,
+        self._telemetry_enabled_card = self._wrap_unit_card(
+            title=self._telemetry_enabled_title,
+            value=self._telemetry_enabled_text,
         )
 
         self._vrc_mic_text = self._build_clickable_text(
@@ -1583,7 +1634,7 @@ class SettingsView(ft.Column):
                 peer_vad=self._peer_vad_card,
                 clipboard_auto_translate=clipboard_auto_translate_card,
                 vrchat_mic_intercept=vrc_mic_card,
-                telemetry_consent=self._telemetry_consent_card,
+                telemetry_enabled=self._telemetry_enabled_card,
             ),
             placeholder_factory=lambda: self._vrchat_osc_card,
         )
@@ -1615,7 +1666,7 @@ class SettingsView(ft.Column):
         )
 
         self._gpu_device_title = ft.Text(
-            t("settings.gpu_device.title"),
+            t("settings.gpu_device.asr"),
             size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
@@ -1623,14 +1674,52 @@ class SettingsView(ft.Column):
         self._gpu_device_text = self._build_clickable_text(
             t("settings.gpu_device.auto"),
             self._on_gpu_device_click,
-            max_lines=2,
+            no_wrap=True,
+            max_lines=1,
             overflow=ft.TextOverflow.ELLIPSIS,
         )
         self._gpu_device_card = self._wrap_unit_card(
             title=self._gpu_device_title,
             value=self._gpu_device_text,
         )
-        self._gpu_device_card.visible = False
+        self._gpu_llm_title = ft.Text(
+            t("settings.gpu_device.llm"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._gpu_llm_text = self._build_clickable_text(
+            t("settings.gpu_device.auto"),
+            self._on_llm_gpu_device_click,
+            no_wrap=True,
+            max_lines=1,
+            overflow=ft.TextOverflow.ELLIPSIS,
+        )
+        self._gpu_llm_card = self._wrap_unit_card(
+            title=self._gpu_llm_title,
+            value=self._gpu_llm_text,
+        )
+        self._gpu_refresh_title = ft.Text(
+            t("settings.gpu_device.refresh"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._gpu_refresh_icon = ft.Container(
+            content=ft.Icon(
+                ft.Icons.REFRESH_ROUNDED,
+                size=44,
+                color=COLOR_ON_BACKGROUND,
+            ),
+            alignment=_CENTER_ALIGNMENT,
+            expand=True,
+            on_click=self._on_gpu_refresh_click,
+            on_hover=self._on_text_hover,
+        )
+        self._gpu_refresh_card = self._wrap_unit_card(
+            title=self._gpu_refresh_title,
+            value=self._gpu_refresh_icon,
+        )
 
         self._overlay_translation_title = ft.Text(
             t("settings.overlay.show_translation"),
@@ -1911,6 +2000,21 @@ class SettingsView(ft.Column):
             value=self._desktop_overlay_lock_button,
         )
 
+        self._desktop_overlay_swap_caption_languages_title = ft.Text(
+            t("settings.overlay.desktop.swap_caption_languages.title"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._desktop_overlay_swap_caption_languages_button = self._build_clickable_text(
+            t("settings.option.off"),
+            self._on_desktop_overlay_swap_caption_languages_click,
+        )
+        self._desktop_overlay_swap_caption_languages_card = self._wrap_unit_card(
+            title=self._desktop_overlay_swap_caption_languages_title,
+            value=self._desktop_overlay_swap_caption_languages_button,
+        )
+
         self._desktop_overlay_status_title = ft.Text(
             t("settings.overlay.status.off"),
             size=24,
@@ -1968,8 +2072,7 @@ class SettingsView(ft.Column):
             value=self._desktop_overlay_status_body,
         )
         self._overlay_empty_card = self._wrap_empty_unit_card()
-        self._overlay_desktop_reset_spacer_a = self._wrap_empty_unit_card()
-        self._overlay_desktop_reset_spacer_b = self._wrap_empty_unit_card()
+        self._overlay_desktop_reset_spacer = self._wrap_empty_unit_card()
 
         self._overlay_surface = compose_settings_overlay_surface(
             SettingsOverlaySurfaceSlots(
@@ -1985,9 +2088,9 @@ class SettingsView(ft.Column):
                 desktop_size=self._desktop_overlay_size_card,
                 desktop_lock=self._desktop_overlay_lock_card,
                 desktop_background_alpha=self._desktop_overlay_background_alpha_card,
+                desktop_swap_caption_languages=self._desktop_overlay_swap_caption_languages_card,
                 desktop_reset=self._overlay_desktop_reset_card,
-                desktop_reset_spacer_a=self._overlay_desktop_reset_spacer_a,
-                desktop_reset_spacer_b=self._overlay_desktop_reset_spacer_b,
+                desktop_reset_spacer=self._overlay_desktop_reset_spacer,
                 desktop_status=self._desktop_overlay_status_card,
                 desktop_status_trailing=self._overlay_empty_card,
             ),
@@ -2134,6 +2237,101 @@ class SettingsView(ft.Column):
         )
         self._local_llm_connection_card.visible = False
 
+        self._custom_stt_connection_title = ft.Text(
+            t("settings.custom_stt.title"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._custom_stt_endpoint = ft.TextField(
+            label=t("settings.custom_stt.endpoint"),
+            value="",
+            border_radius=12,
+            border_color=COLOR_DIVIDER,
+            focused_border_color=COLOR_PRIMARY,
+            expand=True,
+            text_size=24,
+            color=COLOR_NEUTRAL_DARK,
+            label_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD, color=COLOR_NEUTRAL_DARK),
+            on_change=self._on_custom_stt_field_change,
+            on_blur=self._on_custom_stt_endpoint_change_end,
+            on_submit=self._on_custom_stt_endpoint_change_end,
+        )
+        self._custom_stt_model = ft.TextField(
+            label=t("settings.custom_stt.model"),
+            value="",
+            border_radius=12,
+            border_color=COLOR_DIVIDER,
+            focused_border_color=COLOR_PRIMARY,
+            expand=True,
+            text_size=24,
+            color=COLOR_NEUTRAL_DARK,
+            label_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD, color=COLOR_NEUTRAL_DARK),
+            on_change=self._on_custom_stt_field_change,
+            on_blur=self._on_custom_stt_model_change_end,
+            on_submit=self._on_custom_stt_model_change_end,
+        )
+        self._custom_stt_api_key = ApiKeyField(
+            "settings.custom_stt.api_key",
+            "custom_stt_api_key",
+            "custom",
+            on_verify=None,
+            on_save=self._on_custom_stt_secret_change,
+            show_snackbar=lambda msg, bg: (
+                self.show_snackbar(msg, bg) if self.show_snackbar else None
+            ),
+            show_status=False,
+        )
+        custom_stt_api_key_description = t("settings.custom_stt.api_key.description")
+        self._custom_stt_api_key_helper = ft.Text(
+            custom_stt_api_key_description,
+            size=15,
+            color=COLOR_SECONDARY,
+            visible=bool(custom_stt_api_key_description.strip()),
+        )
+        self._custom_stt_extra = ft.TextField(
+            label=t("settings.custom_stt.extra"),
+            value="{}",
+            multiline=True,
+            min_lines=1,
+            max_lines=12,
+            border_radius=12,
+            border_color=COLOR_DIVIDER,
+            focused_border_color=COLOR_PRIMARY,
+            expand=True,
+            text_size=24,
+            color=COLOR_NEUTRAL_DARK,
+            label_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD, color=COLOR_NEUTRAL_DARK),
+            on_change=self._on_custom_stt_field_change,
+            on_blur=self._on_custom_stt_extra_change_end,
+            on_submit=self._on_custom_stt_extra_change_end,
+        )
+        self._custom_stt_extra_error = ft.Text(
+            "",
+            size=13,
+            color=ft.Colors.RED_600,
+            visible=False,
+        )
+        self._custom_stt_extra_error_key = ""
+        self._custom_stt_extra_error_kwargs: dict[str, object] = {}
+        self._custom_stt_connection_card = self._wrap_card(
+            ft.Column(
+                [
+                    self._custom_stt_connection_title,
+                    ft.Container(height=4),
+                    self._custom_stt_endpoint,
+                    self._custom_stt_model,
+                    self._custom_stt_extra,
+                    self._custom_stt_extra_error,
+                    self._custom_stt_api_key,
+                    self._custom_stt_api_key_helper,
+                ],
+                spacing=8,
+            ),
+            height=None,
+        )
+        self._custom_stt_connection_card.visible = False
+
         self._http_extension_title = ft.Text(
             t("settings.http_extension.title"),
             size=24,
@@ -2204,7 +2402,10 @@ class SettingsView(ft.Column):
             spacing=SETTINGS_ROW_SPACING,
             expand=True,
         )
-        self._http_extension_row.visible = False
+        self._http_extension_host = ft.Container(
+            content=self._http_extension_row,
+            visible=False,
+        )
 
         # === Row 8: Persona (2x2) - Licenses style ===
         self._prompt_editor = PromptEditor(
@@ -2307,44 +2508,67 @@ class SettingsView(ft.Column):
         )
         self.controls = [self._settings_subtab_shell]
 
+    def _gpu_asr_selected(self, settings: AppSettings) -> bool:
+        return (
+            settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
+            or settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
+        )
+
+    def _gpu_llm_selected(self, settings: AppSettings) -> bool:
+        model = settings.translation.model
+        if model == TranslationModel.MANAGED_GEMMA_12B:
+            return True
+        return (
+            model == TranslationModel.MANAGED_GEMMA
+            and settings.translation.connection == TranslationConnection.GPU
+        )
+
     def _gpu_selected(self, settings: AppSettings | None = None) -> bool:
         current = settings or self._build_settings_with_provider_draft()
         return bool(
             current is not None
-            and (
-                current.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-                or current.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
-            )
+            and (self._gpu_asr_selected(current) or self._gpu_llm_selected(current))
         )
+
+    def _gpu_column_label(
+        self,
+        selected: str,
+        devices: tuple[GpuDeviceOption, ...],
+    ) -> str:
+        if selected == "auto":
+            return t("settings.gpu_device.auto")
+        selected_device = next(
+            (device for device in devices if device.device_id == selected),
+            None,
+        )
+        if selected_device is not None:
+            return selected_device.display_name
+        return t("settings.gpu_device.unavailable", device=selected)
 
     def _sync_gpu_device_card(self) -> None:
         if not hasattr(self, "_gpu_device_text"):
             return
         settings = self._build_settings_with_provider_draft()
-        selected = settings.stt.gpu_device_id if settings is not None else "auto"
-        devices = getattr(self, "_gpu_devices", ())
-        selected_device = next(
-            (device for device in devices if device.device_id == selected),
-            None,
-        )
-        if selected == "auto":
-            label = t("settings.gpu_device.auto")
-        elif selected_device is not None:
-            label = selected_device.display_name
-        else:
-            label = t("settings.gpu_device.unavailable", device=selected)
-        self._set_unit_card_value_text(self._gpu_device_text, label)
+        asr_selected = settings.stt.gpu_device_id if settings is not None else "auto"
+        llm_selected = settings.translation.gpu_device_id if settings is not None else "auto"
+        asr_label = self._gpu_column_label(asr_selected, getattr(self, "_gpu_devices", ()))
+        llm_label = self._gpu_column_label(llm_selected, getattr(self, "_llm_gpu_devices", ()))
+        self._set_unit_card_value_text(self._gpu_device_text, asr_label)
+        self._set_unit_card_value_text(self._gpu_llm_text, llm_label)
         visible = self._gpu_selected(settings)
-        self._gpu_device_card.visible = visible
         self._gpu_device_row.visible = visible
         _update_control_if_mounted(self._gpu_device_row)
 
     def set_gpu_devices(
         self,
         *,
-        devices: tuple[GpuDeviceOption, ...],
+        devices: tuple[GpuDeviceOption, ...] | None = None,
+        llm_devices: tuple[GpuDeviceOption, ...] | None = None,
     ) -> None:
-        self._gpu_devices = devices
+        if devices is not None:
+            self._gpu_devices = devices
+        if llm_devices is not None:
+            self._llm_gpu_devices = llm_devices
         self._sync_gpu_device_card()
 
     @staticmethod
@@ -2354,11 +2578,11 @@ class SettingsView(ft.Column):
             return f"Vulkan {match.group(1)}"
         return name.strip()
 
-    def _on_gpu_device_click(self, _event) -> None:
-        if not is_control_mounted(self):
-            return
-        settings = self._build_settings_with_provider_draft()
-        selected = settings.stt.gpu_device_id if settings is not None else "auto"
+    def _gpu_column_options(
+        self,
+        selected: str,
+        devices: tuple[GpuDeviceOption, ...],
+    ) -> list[OptionItem]:
         options = [
             OptionItem(
                 value="auto",
@@ -2371,28 +2595,76 @@ class SettingsView(ft.Column):
                 label=device.display_name,
                 description=self._gpu_backend_label(device.backend_name),
             )
-            for device in self._gpu_devices
+            for device in devices
         )
-        if selected != "auto" and all(device.device_id != selected for device in self._gpu_devices):
+        if selected != "auto" and all(device.device_id != selected for device in devices):
             options.append(
                 OptionItem(
                     value=selected,
                     label=t("settings.gpu_device.unavailable", device=selected),
                 )
             )
+        return options
+
+    def _open_gpu_column_modal(
+        self,
+        *,
+        title: str,
+        selected: str,
+        devices: tuple[GpuDeviceOption, ...],
+        on_select,
+    ) -> None:
+        if self.on_gpu_discovery_requested is not None:
+            self.on_gpu_discovery_requested()
         SettingsModal(
             self.page,
-            t("settings.gpu_device.title"),
-            options,
-            self._on_gpu_device_selected,
+            title,
+            self._gpu_column_options(selected, devices),
+            on_select,
             show_description=True,
         ).open(selected)
+
+    def _on_gpu_device_click(self, _event) -> None:
+        if not is_control_mounted(self):
+            return
+        settings = self._build_settings_with_provider_draft()
+        selected = settings.stt.gpu_device_id if settings is not None else "auto"
+        self._open_gpu_column_modal(
+            title=t("settings.gpu_device.asr"),
+            selected=selected,
+            devices=self._gpu_devices,
+            on_select=self._on_gpu_device_selected,
+        )
+
+    def _on_llm_gpu_device_click(self, _event) -> None:
+        if not is_control_mounted(self):
+            return
+        settings = self._build_settings_with_provider_draft()
+        selected = settings.translation.gpu_device_id if settings is not None else "auto"
+        self._open_gpu_column_modal(
+            title=t("settings.gpu_device.llm"),
+            selected=selected,
+            devices=self._llm_gpu_devices,
+            on_select=self._on_llm_gpu_device_selected,
+        )
+
+    def _on_gpu_refresh_click(self, _event) -> None:
+        if self.on_gpu_discovery_requested is not None:
+            self.on_gpu_discovery_requested()
 
     def _on_gpu_device_selected(self, value: str) -> None:
         if self._settings is None:
             return
         draft = self._ensure_provider_settings_draft()
         draft.stt.gpu_device_id = value or "auto"
+        self.has_provider_changes = True
+        self._sync_gpu_device_card()
+
+    def _on_llm_gpu_device_selected(self, value: str) -> None:
+        if self._settings is None:
+            return
+        draft = self._ensure_provider_settings_draft()
+        draft.translation.gpu_device_id = value or "auto"
         self.has_provider_changes = True
         self._sync_gpu_device_card()
 
@@ -2446,8 +2718,8 @@ class SettingsView(ft.Column):
                     on_change=lambda _event, secret_id=secret.id: (
                         self._http_extension_secret_dirty.add(secret_id)
                     ),
-                    on_blur=lambda _event, secret_id=secret.id: (
-                        self._on_http_extension_secret_blur(secret_id)
+                    on_blur=lambda _event, secret_id=secret.id: self._on_http_extension_secret_blur(
+                        secret_id
                     ),
                 )
                 reveal_button = ft.IconButton(
@@ -2491,8 +2763,10 @@ class SettingsView(ft.Column):
             return
         is_custom = settings.translation.model == TranslationModel.CUSTOM_HTTP
         self._http_extension_row.visible = is_custom
+        self._http_extension_host.visible = is_custom
         self._http_extension_credentials.visible = is_custom
         if not is_custom:
+            _update_control_if_mounted(self._http_extension_host)
             return
         selected_id = settings.translation.http_extension_id
         loaded = self._http_extension_snapshot.get(selected_id)
@@ -2504,7 +2778,7 @@ class SettingsView(ft.Column):
         if selected_changed or force_credentials:
             self._sync_http_extension_credentials(loaded.definition if loaded else None)
             self._http_extension_selected_id = selected_id
-        _update_control_if_mounted(self._http_extension_row)
+        _update_control_if_mounted(self._http_extension_host)
         _update_control_if_mounted(self._http_extension_credentials)
 
     def _on_http_extension_click(self, _event) -> None:
@@ -2612,7 +2886,13 @@ class SettingsView(ft.Column):
         return pending
 
     def _get_llm_modal_value(self, settings: AppSettings) -> str:
-        return settings.translation.model.value
+        model = settings.translation.model
+        if model == TranslationModel.MANAGED_GEMMA:
+            connection = settings.translation.connection
+            if connection == TranslationConnection.GPU:
+                return "managed_gemma_gpu"
+            return "managed_gemma_cpu"
+        return model.value
 
     def _translation_model_display_label(self, model: TranslationModel) -> str:
         return t(_TRANSLATION_MODEL_LABEL_KEYS[model])
@@ -2630,6 +2910,12 @@ class SettingsView(ft.Column):
         text_control = self._translation_connection_text.content
         text_control.value = text
         text_control.size = 28
+
+    def _sync_translation_connection_title(self, settings: AppSettings) -> None:
+        title = getattr(self, "_translation_connection_title", None)
+        if title is None:
+            return
+        title.value = t("settings.translation_connection")
 
     def _stored_openrouter_selection_alias(
         self, settings: AppSettings
@@ -2702,7 +2988,7 @@ class SettingsView(ft.Column):
     def _openrouter_fallback_source(
         self, settings: AppSettings | None
     ) -> OpenRouterCredentialSource:
-        if settings is None:
+        if settings is None or not self._translation_uses_provider_fallback(settings):
             return OpenRouterCredentialSource.NONE
         fallback = settings.translation.fallback
         if not fallback.enabled:
@@ -2723,7 +3009,12 @@ class SettingsView(ft.Column):
         return t(profile.description_key, default="")
 
     def _get_llm_display_label(self, settings: AppSettings) -> str:
-        return self._translation_model_display_label(settings.translation.model)
+        model = settings.translation.model
+        if model == TranslationModel.MANAGED_GEMMA:
+            if settings.translation.connection == TranslationConnection.GPU:
+                return t("provider.managed_gemma_gpu")
+            return t("provider.managed_gemma_cpu")
+        return self._translation_model_display_label(model)
 
     def _get_translation_connection_display_label(self, settings: AppSettings | None) -> str:
         if settings is None:
@@ -2742,20 +3033,16 @@ class SettingsView(ft.Column):
             return t("settings.fallback.none.description")
         return t("settings.fallback.active_helper")
 
-    def _telemetry_consent_display_label(self, settings: AppSettings | None) -> str:
-        consent = getattr(getattr(settings, "telemetry", None), "consent", "unknown")
-        return t(
-            "settings.telemetry.state.on"
-            if consent != "decline"
-            else "settings.telemetry.state.off"
-        )
+    def _telemetry_enabled_display_label(self, settings: AppSettings | None) -> str:
+        enabled = bool(getattr(getattr(settings, "telemetry", None), "enabled", True))
+        return t("settings.telemetry.state.on" if enabled else "settings.telemetry.state.off")
 
-    def _sync_telemetry_consent_card(self, settings: AppSettings | None = None) -> None:
+    def _sync_telemetry_enabled_card(self, settings: AppSettings | None = None) -> None:
         if settings is None:
             settings = self._settings
         self._set_unit_card_value_text(
-            self._telemetry_consent_text,
-            self._telemetry_consent_display_label(settings),
+            self._telemetry_enabled_text,
+            self._telemetry_enabled_display_label(settings),
         )
 
     def _set_openrouter_fallback_text(self, text: str) -> None:
@@ -2782,6 +3069,8 @@ class SettingsView(ft.Column):
             return "deepseek"
         if settings.provider.llm == LLMProviderName.LOCAL_LLM:
             return "local_llm"
+        if settings.provider.llm == LLMProviderName.MANAGED_GEMMA:
+            return "managed_gemma"
         return "qwen"
 
     def _active_prompt_key(self) -> str:
@@ -2906,10 +3195,16 @@ class SettingsView(ft.Column):
             "remaining_percent": self._managed_trial_usage_remaining_percent,
         }
 
+    def _translation_uses_provider_fallback(self, settings: AppSettings | None) -> bool:
+        return bool(
+            settings is not None
+            and settings.translation.model not in _TRANSLATION_MODELS_WITHOUT_PROVIDER_FALLBACK
+        )
+
     def _is_managed_translation_connection_selected(self, settings: AppSettings | None) -> bool:
         if settings is None:
             return False
-        if settings.translation.model == TranslationModel.CUSTOM_HTTP:
+        if not self._translation_uses_provider_fallback(settings):
             return False
         managed_connections = (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
         return bool(
@@ -3091,6 +3386,7 @@ class SettingsView(ft.Column):
         target.qwen.region = source.qwen.region
         target.deepseek.llm_model = source.deepseek.llm_model
         target.local_llm = copy.deepcopy(source.local_llm)
+        target.custom_stt = copy.deepcopy(source.custom_stt)
         if source.openrouter.selected_source == OpenRouterCredentialSource.MANAGED:
             target.managed_identity.verified_hardware_hash = (
                 source.managed_identity.verified_hardware_hash
@@ -3115,6 +3411,14 @@ class SettingsView(ft.Column):
         if self._provider_settings_draft is None:
             self._provider_settings_draft = copy.deepcopy(self._settings)
         return self._provider_settings_draft
+
+    def _stt_provider_display_label(
+        self,
+        provider: STTProviderName,
+        *,
+        custom_mode: str = "offline",
+    ) -> str:
+        return provider_label(display_stt_provider(provider, custom_mode=custom_mode).value)
 
     def _normalized_peer_stt_provider(self, provider: STTProviderName) -> STTProviderName:
         return provider
@@ -3418,11 +3722,17 @@ class SettingsView(ft.Column):
         # STT Provider
         self._set_unit_card_value_text(
             self._stt_text,
-            provider_label(settings.provider.stt.value),
+            self._stt_provider_display_label(
+                settings.provider.stt,
+                custom_mode=settings.custom_stt.mode,
+            ),
         )
         self._set_unit_card_value_text(
             self._peer_stt_text,
-            provider_label(self._effective_peer_stt_provider(settings).value),
+            self._stt_provider_display_label(
+                self._effective_peer_stt_provider(settings),
+                custom_mode=settings.custom_stt.mode,
+            ),
         )
         self._update_api_visibility()
         self._sync_gpu_device_card()
@@ -3435,6 +3745,7 @@ class SettingsView(ft.Column):
         self._set_translation_connection_text(
             self._get_translation_connection_display_label(settings),
         )
+        self._sync_translation_connection_title(settings)
         self._sync_openrouter_fallback_card(settings)
         self._local_llm_base_url.value = settings.local_llm.base_url
         self._local_llm_base_url.error = None
@@ -3446,6 +3757,7 @@ class SettingsView(ft.Column):
             indent=2,
         )
         self._clear_local_llm_extra_body_error()
+        self._sync_custom_stt_card(settings)
 
         # Qwen Region
         region_label = t(f"region.{settings.qwen.region.value}")
@@ -3480,7 +3792,7 @@ class SettingsView(ft.Column):
             if settings.ui.clipboard_auto_translate_enabled
             else "settings.clipboard_auto_translate.off"
         )
-        self._sync_telemetry_consent_card(settings)
+        self._sync_telemetry_enabled_card(settings)
         # Prompt
         provider_name = self._active_prompt_key()
         self._prompt_editor.set_provider(provider_name)
@@ -3559,9 +3871,136 @@ class SettingsView(ft.Column):
 
     def sync_telemetry_settings(self, settings: AppSettings) -> None:
         self._settings = settings
-        self._sync_telemetry_consent_card(settings)
+        self._sync_telemetry_enabled_card(settings)
         if is_control_mounted(self):
-            _update_control_if_mounted(self._telemetry_consent_card)
+            _update_control_if_mounted(self._telemetry_enabled_card)
+
+    def project_osc_control_state(self, state: OscControlPresentationState) -> None:
+        if self._settings is None:
+            return
+        control = state.changed_control
+        if control in {"PuriPuly_Talk", "PuriPuly_Trans"}:
+            return
+        self._apply_osc_control_state(self._settings, state)
+        if self._provider_settings_draft is not None:
+            self._apply_osc_control_state(self._provider_settings_draft, state)
+        if control in {
+            "PuriPuly_PeerAuto",
+            "PuriPuly_SelfSrcLang",
+            "PuriPuly_SelfDstLang",
+            "PuriPuly_PeerSrcLang",
+            "PuriPuly_PeerDstLang",
+        }:
+            return
+        display_settings = self._build_settings_with_provider_draft()
+        if display_settings is None:
+            return
+        if control in {"PuriPuly_SelfASR", "PuriPuly_PeerASR"}:
+            self._set_unit_card_value_text(
+                self._stt_text,
+                self._stt_provider_display_label(
+                    display_settings.provider.stt,
+                    custom_mode=display_settings.custom_stt.mode,
+                ),
+            )
+            self._set_unit_card_value_text(
+                self._peer_stt_text,
+                self._stt_provider_display_label(
+                    self._effective_peer_stt_provider(display_settings),
+                    custom_mode=display_settings.custom_stt.mode,
+                ),
+            )
+            self._sync_custom_stt_card(display_settings)
+            self._update_api_visibility()
+            _update_control_if_mounted(self._stt_text)
+            _update_control_if_mounted(self._peer_stt_text)
+            _update_control_if_mounted(self._api_keys_column)
+        elif control == "PuriPuly_Translator":
+            self._set_unit_card_value_text(
+                self._llm_text,
+                self._get_llm_display_label(display_settings),
+            )
+            self._set_translation_connection_text(
+                self._get_translation_connection_display_label(display_settings)
+            )
+            self._sync_translation_connection_title(display_settings)
+            self._update_api_visibility()
+            _update_control_if_mounted(self._llm_text)
+            _update_control_if_mounted(self._translation_connection_row)
+            _update_control_if_mounted(self._api_keys_column)
+        elif control == "PuriPuly_Fallback":
+            self._sync_openrouter_fallback_card(display_settings)
+            self._update_api_visibility()
+            _update_control_if_mounted(self._openrouter_fallback_text)
+            _update_control_if_mounted(self._openrouter_fallback_helper_text)
+            _update_control_if_mounted(self._api_keys_column)
+        elif control == "PuriPuly_MuteSync":
+            self._vrc_mic_text.content.value = t(
+                "settings.vrc_mic.on" if state.mute_sync else "settings.vrc_mic.off"
+            )
+            _update_control_if_mounted(self._vrc_mic_text)
+        elif control == "PuriPuly_ChatboxSource":
+            self._chatbox_source_text.content.value = t(
+                "settings.chatbox_source.on"
+                if state.chatbox_source
+                else "settings.chatbox_source.off"
+            )
+            _update_control_if_mounted(self._chatbox_source_text)
+        elif control in {"PuriPuly_Listen", "PuriPuly_Captions"}:
+            self._sync_overlay_controls()
+
+    @staticmethod
+    def _apply_osc_control_state(
+        settings: AppSettings,
+        state: OscControlPresentationState,
+    ) -> None:
+        control = state.changed_control
+        if control == "PuriPuly_SelfSrcLang":
+            settings.languages.source_language = state.self_source_language
+        elif control == "PuriPuly_SelfDstLang":
+            settings.languages.target_language = state.self_target_language
+        elif control == "PuriPuly_PeerSrcLang":
+            settings.languages.peer_source_language = state.peer_source_language
+        elif control == "PuriPuly_PeerDstLang":
+            settings.languages.peer_target_language = state.peer_target_language
+        elif control == "PuriPuly_PeerAuto":
+            settings.languages.peer_source_mode = state.peer_source_mode
+        elif control == "PuriPuly_Listen":
+            settings.ui.peer_translation_enabled = state.peer_capture
+        elif control == "PuriPuly_Captions":
+            settings.ui.overlay_enabled = state.captions
+        elif control == "PuriPuly_MuteSync":
+            settings.osc.vrc_mic_intercept = state.mute_sync
+        elif control == "PuriPuly_ChatboxSource":
+            settings.osc.chatbox_include_source = state.chatbox_source
+        elif control in {"PuriPuly_SelfASR", "PuriPuly_PeerASR"}:
+            if control == "PuriPuly_SelfASR":
+                settings.provider.stt = STTProviderName(state.self_asr_setting)
+            else:
+                settings.provider.peer_stt = STTProviderName(state.peer_asr_setting)
+            settings.custom_stt.mode = state.custom_stt_mode
+            settings.custom_stt.compatibility = state.custom_stt_compatibility
+        elif control == "PuriPuly_Translator":
+            settings.provider.llm = LLMProviderName(state.llm_provider)
+            settings.translation.model = TranslationModel(state.translation_model)
+            settings.translation.connection = TranslationConnection(state.translation_connection)
+            settings.translation.connection_history = {
+                model: TranslationConnection(connection)
+                for model, connection in state.translation_connection_history
+            }
+            settings.translation.http_extension_id = state.translation_http_extension_id
+            settings.translation.previous_llm_model = (
+                None
+                if state.translation_previous_model is None
+                else TranslationModel(state.translation_previous_model)
+            )
+            materialize_translation_settings(settings)
+        elif control == "PuriPuly_Fallback":
+            settings.translation.fallback.enabled = state.fallback_enabled
+            settings.translation.fallback.model = TranslationModel(state.fallback_model)
+            settings.translation.fallback.connection = TranslationConnection(
+                state.fallback_connection
+            )
 
     def _load_secrets(self, settings: AppSettings, config_path: Path) -> None:
         """Load secret values into fields."""
@@ -3578,6 +4017,7 @@ class SettingsView(ft.Column):
         self._deepgram_key.value = store.get("deepgram_api_key") or ""
         self._soniox_key.value = store.get("soniox_api_key") or ""
         self._local_llm_api_key.value = store.get("local_llm_api_key") or ""
+        self._custom_stt_api_key.value = store.get("custom_stt_api_key") or ""
 
         # Alibaba keys with legacy fallback
         beijing_key = _load_secret_value(
@@ -3706,12 +4146,14 @@ class SettingsView(ft.Column):
             and (openrouter_byok_selected or fallback_source == OpenRouterCredentialSource.BYOK)
         )
         self._openrouter_pkce_button_row.visible = openrouter_byok_selected
+        uses_provider_fallback = self._translation_uses_provider_fallback(settings)
         self._deepseek_key.visible = bool(
             not is_custom_http
             and (
                 llm == LLMProviderName.DEEPSEEK
                 or (
-                    fallback.enabled
+                    uses_provider_fallback
+                    and fallback.enabled
                     and fallback.model == TranslationModel.DEEPSEEK_V4_FLASH
                     and fallback.connection == TranslationConnection.OFFICIAL_BYOK
                 )
@@ -3722,21 +4164,33 @@ class SettingsView(ft.Column):
             and (
                 llm == LLMProviderName.CEREBRAS
                 or (
-                    fallback.enabled
+                    uses_provider_fallback
+                    and fallback.enabled
                     and fallback.model == TranslationModel.GEMMA4_31B
                     and fallback.connection == TranslationConnection.CEREBRAS
                 )
             )
         )
         self._sync_openrouter_pkce_button_state(settings)
-        self._translation_connection_row.visible = not is_custom_http
+        self._translation_connection_row.visible = (
+            not is_custom_http
+            and settings.translation.model
+            not in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
+        )
         self._local_llm_connection_card.visible = (
             not is_custom_http and llm == LLMProviderName.LOCAL_LLM
         )
+        custom_stt_card = getattr(self, "_custom_stt_connection_card", None)
+        if custom_stt_card is not None:
+            custom_stt_card.visible = any(
+                is_custom_stt_provider(provider) for provider in active_stt_providers
+            )
+            if custom_stt_card.visible:
+                self._sync_custom_stt_card(settings)
         self._sync_openrouter_fallback_card(settings)
         openrouter_fallback_card = getattr(self, "_openrouter_fallback_card", None)
         if openrouter_fallback_card is not None:
-            openrouter_fallback_card.visible = not is_custom_http
+            openrouter_fallback_card.visible = self._translation_uses_provider_fallback(settings)
         self._sync_http_extension_card(settings)
 
         qwen_regions: set[QwenRegion] = set()
@@ -3754,6 +4208,25 @@ class SettingsView(ft.Column):
         )
         self._alibaba_key_beijing.visible = QwenRegion.BEIJING in qwen_regions
         self._alibaba_key_singapore.visible = QwenRegion.SINGAPORE in qwen_regions
+        api_keys_card = getattr(self, "_api_keys_card", None)
+        if api_keys_card is not None:
+            api_keys_card.visible = any(
+                getattr(control, "visible", False)
+                for control in (
+                    self._deepgram_key,
+                    self._soniox_key,
+                    self._google_key,
+                    self._deepseek_key,
+                    self._cerebras_key,
+                    self._alibaba_key_beijing,
+                    self._alibaba_key_singapore,
+                    self._openrouter_key,
+                    self._openrouter_pkce_button_row,
+                    self._qwen_region_btn,
+                    getattr(self, "_http_extension_credentials", None),
+                )
+                if control is not None
+            )
 
     # --- Event Handlers ---
     def _on_stt_click(self, e) -> None:
@@ -3769,7 +4242,10 @@ class SettingsView(ft.Column):
         options = [self._classified_stt_option_item(provider) for provider in ordered_providers]
         display_settings = self._build_settings_with_provider_draft()
         current = (
-            display_settings.provider.stt.value
+            display_stt_provider(
+                display_settings.provider.stt,
+                custom_mode=display_settings.custom_stt.mode,
+            ).value
             if display_settings is not None
             else STTProviderName.LOCAL_CPU_AUTO.value
         )
@@ -3780,6 +4256,7 @@ class SettingsView(ft.Column):
             self._on_stt_selected,
             show_description=True,
             two_column=True,
+            left_column_sections=2,
         )
         modal.open(current)
 
@@ -3850,7 +4327,12 @@ class SettingsView(ft.Column):
             if display_settings is not None
             else STTProviderName.LOCAL_CPU_AUTO
         )
-        current = self._normalized_peer_stt_provider(current_provider).value
+        current = display_stt_provider(
+            self._normalized_peer_stt_provider(current_provider),
+            custom_mode=(
+                display_settings.custom_stt.mode if display_settings is not None else "offline"
+            ),
+        ).value
         SettingsModal(
             self.page,
             t("settings.section.peer_stt"),
@@ -3858,6 +4340,7 @@ class SettingsView(ft.Column):
             self._on_peer_stt_selected,
             show_description=True,
             two_column=True,
+            left_column_sections=2,
         ).open(current)
 
     def _on_peer_stt_selected(self, value: str) -> None:
@@ -3914,17 +4397,48 @@ class SettingsView(ft.Column):
         """Open LLM provider selection modal."""
         if not is_control_mounted(self):
             return
-        options = [
-            OptionItem(
-                value=model.value,
-                label=self._translation_model_display_label(model),
-                description=t(f"settings.translation_model.{model.value}.description", default=""),
-                section=t(section_key),
-            )
-            for section_key in _TRANSLATION_MODEL_SECTION_ORDER
-            for model in _TRANSLATION_MODELS
-            if _TRANSLATION_MODEL_SECTION_BY_MODEL.get(model) == section_key
-        ]
+        options: list[OptionItem] = []
+        for section_key in _TRANSLATION_MODEL_SECTION_ORDER:
+            for model in _TRANSLATION_MODELS:
+                if model == TranslationModel.MANAGED_GEMMA:
+                    if section_key == "settings.translation_model.section.recommended_local":
+                        options.append(
+                            OptionItem(
+                                value="managed_gemma_cpu",
+                                label=t("provider.managed_gemma_cpu"),
+                                description=t(
+                                    "settings.translation_model.managed_gemma_cpu.description",
+                                    default="",
+                                ),
+                                section=t(section_key),
+                            )
+                        )
+                    elif section_key == "settings.translation_model.section.gpu_inference":
+                        options.append(
+                            OptionItem(
+                                value="managed_gemma_gpu",
+                                label=t("provider.managed_gemma_gpu"),
+                                description=t(
+                                    "settings.translation_model.managed_gemma_gpu.description",
+                                    default="",
+                                ),
+                                section=t(section_key),
+                            )
+                        )
+                    continue
+                if _TRANSLATION_MODEL_SECTION_BY_MODEL.get(model) != section_key:
+                    continue
+                options.append(
+                    OptionItem(
+                        value=model.value,
+                        label=self._translation_model_display_label(model),
+                        description=t(
+                            f"settings.translation_model.{model.value}.description",
+                            default="",
+                        ),
+                        section=t(section_key),
+                    )
+                )
         display_settings = self._build_settings_with_provider_draft()
         current = (
             self._get_llm_modal_value(display_settings)
@@ -3938,6 +4452,7 @@ class SettingsView(ft.Column):
             self._on_llm_selected,
             show_description=True,
             two_column=True,
+            left_column_sections=2,
         )
         modal.open(current)
 
@@ -3964,6 +4479,7 @@ class SettingsView(ft.Column):
         self._set_translation_connection_text(
             self._get_translation_connection_display_label(settings),
         )
+        self._sync_translation_connection_title(settings)
         self._sync_openrouter_fallback_card(settings)
 
     def _apply_translation_selection(
@@ -4016,11 +4532,19 @@ class SettingsView(ft.Column):
 
         self.has_provider_changes = True
         self._update_api_visibility()
+        if (
+            self._gpu_llm_selected(draft)
+            and not self._gpu_llm_selected(current_settings)
+            and self.on_gpu_discovery_requested is not None
+        ):
+            self.on_gpu_discovery_requested()
+        self._sync_gpu_device_card()
 
         if (
             connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
-            and getattr(self, "on_providers_changed", None) is not None
-        ):
+            or model in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
+            or old_model in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
+        ) and getattr(self, "on_providers_changed", None) is not None:
             self.on_providers_changed()
 
         display_settings = self._build_settings_with_provider_draft()
@@ -4041,9 +4565,9 @@ class SettingsView(ft.Column):
             self._llm_text.update()
             self._translation_connection_row.update()
             self._local_llm_connection_card.update()
-            http_extension_row = getattr(self, "_http_extension_row", None)
-            if http_extension_row is not None:
-                http_extension_row.update()
+            http_extension_host = getattr(self, "_http_extension_host", None)
+            if http_extension_host is not None:
+                http_extension_host.update()
 
     def _on_llm_selected(self, value: str) -> None:
         """Handle LLM provider selection from modal."""
@@ -4051,18 +4575,32 @@ class SettingsView(ft.Column):
             return
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
-        try:
-            model = TranslationModel(value)
-        except (TypeError, ValueError):
-            if value == LLMProviderName.OPENROUTER.value:
-                model = TranslationModel.GEMMA4
-            else:
-                return
+        if value in ("managed_gemma_cpu", "managed_gemma_gpu"):
+            model = TranslationModel.MANAGED_GEMMA
+            connection = (
+                TranslationConnection.GPU
+                if value == "managed_gemma_gpu"
+                else TranslationConnection.CPU
+            )
+        else:
+            try:
+                model = TranslationModel(value)
+            except (TypeError, ValueError):
+                if value == LLMProviderName.OPENROUTER.value:
+                    model = TranslationModel.GEMMA4
+                else:
+                    return
+            connection = None
 
         if current_settings.translation.model == model:
-            return
+            if connection is not None:
+                if current_settings.translation.connection == connection:
+                    return
+            else:
+                return
         history = copy.deepcopy(current_settings.translation.connection_history)
-        connection = self._restore_translation_connection_for_model(model, history)
+        if connection is None:
+            connection = self._restore_translation_connection_for_model(model, history)
         self._apply_translation_selection(model, connection)
 
     def _on_translation_connection_click(self, e) -> None:
@@ -4074,6 +4612,8 @@ class SettingsView(ft.Column):
             if display_settings is not None
             else TranslationModel.GEMMA4
         )
+        if model in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}:
+            return
         connections = supported_translation_connections(model)
         options = [
             OptionItem(
@@ -4117,6 +4657,9 @@ class SettingsView(ft.Column):
 
     def _on_openrouter_fallback_click(self, e) -> None:
         if not is_control_mounted(self):
+            return
+        display_settings = self._build_settings_with_provider_draft()
+        if not self._translation_uses_provider_fallback(display_settings):
             return
         options: list[OptionItem] = [
             OptionItem(
@@ -4298,6 +4841,132 @@ class SettingsView(ft.Column):
                 level=logging.WARNING,
             )
             return False
+
+    def _sync_custom_stt_card(self, settings: AppSettings | None = None) -> None:
+        if getattr(self, "_custom_stt_connection_card", None) is None:
+            return
+        current = settings or self._build_settings_with_provider_draft()
+        if current is None:
+            return
+        custom = current.custom_stt
+        self._custom_stt_endpoint.value = custom.endpoint
+        self._custom_stt_endpoint.error = None
+        self._custom_stt_model.value = custom.model
+        self._custom_stt_extra.value = _custom_stt_extra_to_text(custom.extra)
+        self._clear_custom_stt_extra_error()
+        if is_control_mounted(self):
+            _update_control_if_mounted(self._custom_stt_connection_card)
+
+    def _on_custom_stt_field_change(self, e) -> None:
+        _ = e
+        if not self._settings:
+            return
+        current = self._build_settings_with_provider_draft()
+        if current is None or not (
+            is_custom_stt_provider(current.provider.stt)
+            or is_custom_stt_provider(current.provider.peer_stt)
+        ):
+            return
+        self._ensure_provider_settings_draft()
+        self.has_provider_changes = True
+
+    def _on_custom_stt_endpoint_change_end(self, e) -> None:
+        _ = e
+        if not self._settings:
+            return
+        endpoint = (self._custom_stt_endpoint.value or "").strip()
+        current = self._provider_settings_draft or self._settings
+        if current.custom_stt.endpoint != endpoint:
+            draft = self._ensure_provider_settings_draft()
+            draft.custom_stt.endpoint = endpoint
+            self.has_provider_changes = True
+        self._custom_stt_endpoint.value = endpoint
+        _update_control_if_mounted(self._custom_stt_endpoint)
+
+    def _on_custom_stt_model_change_end(self, e) -> None:
+        _ = e
+        if not self._settings:
+            return
+        model = (self._custom_stt_model.value or "").strip()
+        current = self._provider_settings_draft or self._settings
+        if current.custom_stt.model != model:
+            draft = self._ensure_provider_settings_draft()
+            draft.custom_stt.model = model
+            self.has_provider_changes = True
+        self._custom_stt_model.value = model
+        _update_control_if_mounted(self._custom_stt_model)
+
+    def _custom_stt_extra_error_message(self, message_key: str, **kwargs: object) -> str:
+        if not kwargs:
+            return t(message_key)
+        template = t(message_key)
+        with contextlib.suppress(Exception):
+            return template.format(**kwargs)
+        return template
+
+    def _show_custom_stt_extra_error(self, message_key: str, **kwargs: object) -> None:
+        message = self._custom_stt_extra_error_message(message_key, **kwargs)
+        self._custom_stt_extra_error_key = message_key
+        self._custom_stt_extra_error_kwargs = dict(kwargs)
+        self._custom_stt_extra_error.value = message
+        self._custom_stt_extra_error.visible = True
+        self._custom_stt_extra.error = message
+        _update_control_if_mounted(self._custom_stt_extra)
+        _update_control_if_mounted(self._custom_stt_extra_error)
+
+    def _clear_custom_stt_extra_error(self) -> None:
+        self._custom_stt_extra_error_key = ""
+        self._custom_stt_extra_error_kwargs = {}
+        self._custom_stt_extra_error.value = ""
+        self._custom_stt_extra_error.visible = False
+        self._custom_stt_extra.error = None
+        _update_control_if_mounted(self._custom_stt_extra)
+        _update_control_if_mounted(self._custom_stt_extra_error)
+
+    def _on_custom_stt_extra_change_end(self, e) -> None:
+        _ = e
+        if not self._settings:
+            return
+        raw = (self._custom_stt_extra.value or "").strip()
+        try:
+            parsed = {} if not raw else json.loads(raw, parse_constant=_reject_json_constant)
+        except json.JSONDecodeError:
+            self._show_custom_stt_extra_error("settings.custom_stt.extra.invalid_json")
+            return
+        if not isinstance(parsed, dict):
+            self._show_custom_stt_extra_error("settings.custom_stt.extra.must_be_object")
+            return
+        try:
+            normalized = normalize_custom_stt_extra(parsed)
+        except CustomSTTConfigurationError as exc:
+            self._show_custom_stt_extra_error(
+                "settings.custom_stt.extra.rejected_key",
+                key=str(exc),
+            )
+            return
+        current = self._provider_settings_draft or self._settings
+        if current.custom_stt.extra != normalized:
+            draft = self._ensure_provider_settings_draft()
+            draft.custom_stt.extra = normalized
+            self.has_provider_changes = True
+        self._custom_stt_extra.value = _custom_stt_extra_to_text(normalized)
+        self._clear_custom_stt_extra_error()
+        _update_control_if_mounted(self._custom_stt_extra)
+
+    def _on_custom_stt_secret_change(self, key: str, value: str) -> None:
+        if key != "custom_stt_api_key":
+            return
+        stripped = value.strip()
+        if not self._write_secret_value(key, stripped):
+            if self.show_snackbar:
+                self.show_snackbar(t("settings.custom_stt.api_key.save_failed"), ft.Colors.RED_400)
+            return
+        self._custom_stt_api_key.value = stripped
+        from puripuly_heart.core.stt.custom import bump_custom_stt_secret_generation
+
+        bump_custom_stt_secret_generation()
+        if self.on_custom_stt_secret_changed:
+            self.on_custom_stt_secret_changed()
 
     def _on_local_llm_secret_change(self, key: str, value: str) -> None:
         if key != "local_llm_api_key":
@@ -4588,6 +5257,14 @@ class SettingsView(ft.Column):
             self._desktop_overlay_lock_button,
             self._desktop_overlay_lock_label_for(self._current_desktop_overlay_locked()),
         )
+        self._set_unit_card_value_text(
+            self._desktop_overlay_swap_caption_languages_button,
+            t(
+                "settings.option.on"
+                if self._current_desktop_overlay_swap_caption_languages()
+                else "settings.option.off"
+            ),
+        )
         self._desktop_overlay_background_alpha_value_text.value = (
             self._desktop_overlay_background_alpha_label_for(
                 self._current_desktop_overlay_background_alpha()
@@ -4598,6 +5275,7 @@ class SettingsView(ft.Column):
         self._desktop_overlay_background_alpha_decrease_button.disabled = disabled
         self._desktop_overlay_background_alpha_increase_button.disabled = disabled
         self._desktop_overlay_lock_button.disabled = disabled
+        self._desktop_overlay_swap_caption_languages_button.disabled = disabled
         self._overlay_vr_reset_button.disabled = disabled
         self._overlay_desktop_reset_button.disabled = disabled
 
@@ -4743,6 +5421,30 @@ class SettingsView(ft.Column):
             return
         self._settings.overlay.desktop_flet.size_preset = size_preset
         self._desktop_overlay_pending_size_preset = None
+        self._sync_desktop_overlay_main_controls()
+        self._emit_settings_changed()
+
+    def _current_desktop_overlay_swap_caption_languages(self) -> bool:
+        if self._settings is None:
+            return False
+        return bool(self._settings.overlay.desktop_flet.swap_caption_languages)
+
+    def _on_desktop_overlay_swap_caption_languages_click(self, e) -> None:
+        if not self._settings or self._desktop_overlay_swap_caption_languages_button.disabled:
+            return
+        next_value = "off" if self._current_desktop_overlay_swap_caption_languages() else "on"
+        self._on_desktop_overlay_swap_caption_languages_selected(next_value)
+
+    def _on_desktop_overlay_swap_caption_languages_selected(self, value: str) -> None:
+        if not self._settings:
+            return
+        enabled = value == "on"
+        if self._current_desktop_overlay_swap_caption_languages() == enabled:
+            self._sync_desktop_overlay_main_controls()
+            return
+        updated = copy.deepcopy(self._settings)
+        updated.overlay.desktop_flet.swap_caption_languages = enabled
+        self._settings = updated
         self._sync_desktop_overlay_main_controls()
         self._emit_settings_changed()
 
@@ -5356,40 +6058,17 @@ class SettingsView(ft.Column):
             self._clipboard_auto_translate_text.update()
         self._emit_settings_changed()
 
-    def _on_telemetry_consent_click(self, e) -> None:
+    def _on_telemetry_enabled_click(self, e) -> None:
         _ = e
         if not is_control_mounted(self) or not self._settings:
             return
 
-        def _select(value: str) -> None:
-            if value not in {"allow", "decline"} or self._settings is None:
-                return
-            updated = with_telemetry_consent(self._settings, value)
-            self._settings = updated
-            self._sync_telemetry_consent_card(updated)
-            if self.on_telemetry_consent_change is not None:
-                self.on_telemetry_consent_change(value)
-
-        options = [
-            OptionItem(
-                "allow",
-                t("settings.telemetry.option.allow"),
-                t("settings.telemetry.option.allow.description"),
-            ),
-            OptionItem(
-                "decline",
-                t("settings.telemetry.option.decline"),
-                "",
-            ),
-        ]
-        modal = SettingsModal(
-            self.page,
-            t("settings.telemetry.modal.title"),
-            options,
-            _select,
-            show_description=True,
-        )
-        modal.open("decline" if self._settings.telemetry.consent == "decline" else "allow")
+        enabled = not self._settings.telemetry.enabled
+        updated = with_telemetry_enabled(self._settings, enabled)
+        self._settings = updated
+        self._sync_telemetry_enabled_card(updated)
+        if self.on_telemetry_enabled_change is not None:
+            self.on_telemetry_enabled_change(enabled)
 
     def _on_prompt_change(self, value: str) -> None:
         self._stage_prompt_draft(value)
@@ -5563,6 +6242,14 @@ class SettingsView(ft.Column):
         self._translation_connection_title.value = t("settings.translation_connection")
         self._openrouter_fallback_title.value = t("settings.fallback")
         self._local_llm_connection_title.value = t("settings.local_llm.connection")
+        self._custom_stt_connection_title.value = t("settings.custom_stt.title")
+        self._custom_stt_endpoint.label = t("settings.custom_stt.endpoint")
+        self._custom_stt_model.label = t("settings.custom_stt.model")
+        self._custom_stt_api_key.apply_locale()
+        custom_stt_api_key_description = t("settings.custom_stt.api_key.description")
+        self._custom_stt_api_key_helper.value = custom_stt_api_key_description
+        self._custom_stt_api_key_helper.visible = bool(custom_stt_api_key_description.strip())
+        self._sync_custom_stt_card()
         self._http_extension_title.value = t("settings.http_extension.title")
         self._http_extension_path_title.value = t("settings.http_extension.path")
         self._http_extension_refresh_title.value = t("settings.http_extension.refresh")
@@ -5596,11 +6283,13 @@ class SettingsView(ft.Column):
         self._osc_connection_title.value = t("settings.osc.connection.title")
         self._chatbox_source_title.value = t("settings.chatbox_include_source")
         self._clipboard_auto_translate_title.value = t("settings.clipboard_auto_translate")
-        self._telemetry_consent_title.value = t("settings.telemetry.title")
+        self._telemetry_enabled_title.value = t("settings.telemetry.title")
         self._peer_provider_title.value = t("settings.section.peer_stt")
         self._dashboard_language_redirect_text.value = t("settings.dashboard_language_redirect")
         self._peer_stt_label.value = t("settings.peer_stt_provider")
-        self._gpu_device_title.value = t("settings.gpu_device.title")
+        self._gpu_device_title.value = t("settings.gpu_device.asr")
+        self._gpu_llm_title.value = t("settings.gpu_device.llm")
+        self._gpu_refresh_title.value = t("settings.gpu_device.refresh")
         self._overlay_target_title.value = t("settings.overlay.caption_location")
         self._overlay_translation_title.value = t("settings.overlay.show_translation")
         self._overlay_peer_original_title.value = t("settings.overlay.show_peer_original")
@@ -5618,6 +6307,9 @@ class SettingsView(ft.Column):
             "settings.overlay.desktop.background_alpha.title"
         )
         self._desktop_overlay_lock_title.value = t("settings.overlay.desktop.lock.title")
+        self._desktop_overlay_swap_caption_languages_title.value = t(
+            "settings.overlay.desktop.swap_caption_languages.title"
+        )
         self._set_unit_card_value_text(
             self._overlay_vr_reset_button, t("settings.overlay.position_reset.action.vr")
         )
@@ -5657,11 +6349,17 @@ class SettingsView(ft.Column):
         if display_settings:
             self._set_unit_card_value_text(
                 self._stt_text,
-                provider_label(display_settings.provider.stt.value),
+                self._stt_provider_display_label(
+                    display_settings.provider.stt,
+                    custom_mode=display_settings.custom_stt.mode,
+                ),
             )
             self._set_unit_card_value_text(
                 self._peer_stt_text,
-                provider_label(self._effective_peer_stt_provider(display_settings).value),
+                self._stt_provider_display_label(
+                    self._effective_peer_stt_provider(display_settings),
+                    custom_mode=display_settings.custom_stt.mode,
+                ),
             )
             self._set_unit_card_value_text(
                 self._llm_text,
@@ -5670,6 +6368,7 @@ class SettingsView(ft.Column):
             self._set_translation_connection_text(
                 self._get_translation_connection_display_label(display_settings),
             )
+            self._sync_translation_connection_title(display_settings)
             self._sync_openrouter_fallback_card(display_settings)
             self._sync_http_extension_card(display_settings, force_credentials=True)
             self._sync_managed_key_card(display_settings)
@@ -5694,7 +6393,7 @@ class SettingsView(ft.Column):
                 if display_settings.ui.clipboard_auto_translate_enabled
                 else "settings.clipboard_auto_translate.off"
             )
-            self._sync_telemetry_consent_card(display_settings)
+            self._sync_telemetry_enabled_card(display_settings)
             self._set_unit_card_value_text(
                 self._microphone_test_text,
                 t("settings.microphone_test.action"),

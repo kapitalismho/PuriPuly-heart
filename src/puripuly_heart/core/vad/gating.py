@@ -5,7 +5,7 @@ import logging
 import math
 import uuid
 from dataclasses import dataclass
-from typing import Callable, Literal, Protocol
+from typing import Callable, Protocol
 from uuid import UUID
 
 import numpy as np
@@ -13,6 +13,7 @@ import numpy as np
 from puripuly_heart.core.audio.diagnostics import compute_audio_frame_metrics
 from puripuly_heart.core.audio.format import AudioFrameF32
 from puripuly_heart.core.audio.ring_buffer import RingBufferF32
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class SpeechChunk:
 class SpeechEnd:
     utterance_id: UUID
     trailing_silence_ms: int = 0
-    reason: Literal["silence", "max_duration"] = "silence"
+    reason: SpeechBoundaryReason = "silence"
 
 
 VadEvent = SpeechStart | SpeechChunk | SpeechEnd
@@ -63,6 +64,8 @@ class VadGating:
     start_debounce_chunks: int
     start_commit_chunks: int
     max_segment_ms: int | None
+    soft_boundary_start_ms: int | None
+    soft_pause_ms: int | None
     candidate_log_label: str | None
     diagnostic_event_callback: Callable[[str], object] | None
     diagnostics_enabled: Callable[[], bool] | None
@@ -92,6 +95,8 @@ class VadGating:
         start_debounce_chunks: int = 1,
         start_commit_chunks: int = 1,
         candidate_log_label: str | None = None,
+        soft_boundary_start_ms: int | None = None,
+        soft_pause_ms: int | None = None,
         diagnostic_event_callback: Callable[[str], object] | None = None,
         diagnostics_enabled: Callable[[], bool] | None = None,
         diagnostic_label: str = "self",
@@ -110,6 +115,15 @@ class VadGating:
             raise ValueError("start_commit_chunks must be >= start_debounce_chunks")
         if max_segment_ms is not None and max_segment_ms <= 0:
             raise ValueError("max_segment_ms must be > 0")
+        if (soft_boundary_start_ms is None) != (soft_pause_ms is None):
+            raise ValueError("soft boundary start and pause must be configured together")
+        if soft_boundary_start_ms is not None:
+            if soft_boundary_start_ms <= 0:
+                raise ValueError("soft_boundary_start_ms must be > 0")
+            if soft_pause_ms is None or soft_pause_ms <= 0:
+                raise ValueError("soft_pause_ms must be > 0")
+            if max_segment_ms is None or soft_boundary_start_ms >= max_segment_ms:
+                raise ValueError("soft boundary start must be below max_segment_ms")
 
         self.engine = engine
         self.sample_rate_hz = sample_rate_hz
@@ -118,6 +132,8 @@ class VadGating:
         self.start_debounce_chunks = start_debounce_chunks
         self.start_commit_chunks = start_commit_chunks
         self.max_segment_ms = max_segment_ms
+        self.soft_boundary_start_ms = soft_boundary_start_ms
+        self.soft_pause_ms = soft_pause_ms
         self.candidate_log_label = candidate_log_label
         self.diagnostic_event_callback = diagnostic_event_callback
         self.diagnostics_enabled = diagnostics_enabled
@@ -188,10 +204,15 @@ class VadGating:
             return events
 
         self._silence_run += 1
-        if self._silence_run >= self.hangover_chunks:
-            trailing_silence_ms = int(
-                round(self._silence_run * (self.chunk_samples / self.sample_rate_hz) * 1000.0)
+        trailing_silence_ms = self._trailing_silence_ms()
+        if self._peer_hard_cap_reached():
+            self._emit_max_duration_end(
+                events,
+                trailing_silence_ms=trailing_silence_ms,
             )
+        elif self._soft_pause_reached(trailing_silence_ms):
+            self._emit_soft_pause_end(events, trailing_silence_ms=trailing_silence_ms)
+        elif self._silence_run >= self.hangover_chunks:
             logger.info(
                 "[VAD] SpeechEnd: id=%s, trailing_silence_ms=%s",
                 str(self._utterance_id)[:8],
@@ -228,6 +249,24 @@ class VadGating:
             return False
         speech_audio_ms = self._speech_sample_count * 1000.0 / self.sample_rate_hz
         return speech_audio_ms >= self.max_segment_ms
+
+    def _soft_pause_reached(self, trailing_silence_ms: int) -> bool:
+        if self.soft_boundary_start_ms is None or self.soft_pause_ms is None:
+            return False
+        speech_samples_before_tail = (
+            self._speech_sample_count - self._silence_run * self.chunk_samples
+        )
+        speech_audio_ms_before_tail = speech_samples_before_tail * 1000.0 / self.sample_rate_hz
+        return (
+            speech_audio_ms_before_tail >= self.soft_boundary_start_ms
+            and trailing_silence_ms >= self.soft_pause_ms
+        )
+
+    def _peer_hard_cap_reached(self) -> bool:
+        return self.soft_boundary_start_ms is not None and self._max_segment_reached()
+
+    def _trailing_silence_ms(self) -> int:
+        return int(round(self._silence_run * (self.chunk_samples / self.sample_rate_hz) * 1000.0))
 
     def _reset_active_segment(self) -> None:
         self._in_speech = False
@@ -304,14 +343,59 @@ class VadGating:
             self._emit_max_duration_end(events)
         return events
 
-    def _emit_max_duration_end(self, events: list[VadEvent]) -> None:
+    def _emit_soft_pause_end(
+        self,
+        events: list[VadEvent],
+        *,
+        trailing_silence_ms: int,
+    ) -> None:
+        utterance_id = self._utterance_id
+        if utterance_id is None:
+            return
+
+        speech_audio_ms = self._speech_sample_count * 1000.0 / self.sample_rate_hz
+        logger.info(
+            "[VAD] SpeechEnd: id=%s, reason=soft_pause, trailing_silence_ms=%s, "
+            "speech_audio_ms=%.1f",
+            str(utterance_id)[:8],
+            trailing_silence_ms,
+            speech_audio_ms,
+        )
+        with contextlib.suppress(Exception):
+            if self._diagnostics_enabled():
+                assert self.diagnostic_event_callback is not None
+                self.diagnostic_event_callback(
+                    f"[AudioDiag][VAD][{self.diagnostic_label}] event=SpeechEnd "
+                    f"utterance_id={str(utterance_id)[:8]} "
+                    f"reason=soft_pause trailing_silence_ms={trailing_silence_ms} "
+                    f"speech_audio_ms={speech_audio_ms:.1f} "
+                    f"chunk_count={self._speech_chunk_count}"
+                )
+
+        events.append(
+            SpeechEnd(
+                utterance_id,
+                trailing_silence_ms=trailing_silence_ms,
+                reason="soft_pause",
+            )
+        )
+        self._reset_active_segment()
+
+    def _emit_max_duration_end(
+        self,
+        events: list[VadEvent],
+        *,
+        trailing_silence_ms: int = 0,
+    ) -> None:
         utterance_id = self._utterance_id
         if utterance_id is None:
             return
 
         logger.info(
-            "[VAD] SpeechEnd: id=%s, reason=max_duration, speech_audio_ms=%.1f",
+            "[VAD] SpeechEnd: id=%s, reason=max_duration, trailing_silence_ms=%s, "
+            "speech_audio_ms=%.1f",
             str(utterance_id)[:8],
+            trailing_silence_ms,
             self._speech_sample_count * 1000.0 / self.sample_rate_hz,
         )
         with contextlib.suppress(Exception):
@@ -321,12 +405,18 @@ class VadGating:
                 self.diagnostic_event_callback(
                     f"[AudioDiag][VAD][{self.diagnostic_label}] event=SpeechEnd "
                     f"utterance_id={str(utterance_id)[:8]} "
-                    f"reason=max_duration trailing_silence_ms=0 "
+                    f"reason=max_duration trailing_silence_ms={trailing_silence_ms} "
                     f"speech_audio_ms={speech_audio_ms:.1f} "
                     f"chunk_count={self._speech_chunk_count}"
                 )
 
-        events.append(SpeechEnd(utterance_id, trailing_silence_ms=0, reason="max_duration"))
+        events.append(
+            SpeechEnd(
+                utterance_id,
+                trailing_silence_ms=trailing_silence_ms,
+                reason="max_duration",
+            )
+        )
         self._reset_active_segment()
 
     def _drop_pending_start(self) -> None:
@@ -391,6 +481,8 @@ class VadGating:
 PEER_VAD_SPEECH_THRESHOLD = 0.5
 PEER_VAD_START_DEBOUNCE_CHUNKS = 3
 PEER_VAD_START_COMMIT_CHUNKS = 3
+PEER_SOFT_BOUNDARY_START_MS = 5000
+PEER_SOFT_PAUSE_MS = 160
 PEER_MAX_SEGMENT_MS = 7000
 
 
@@ -414,6 +506,8 @@ def create_peer_vad_gating(
         max_segment_ms=PEER_MAX_SEGMENT_MS,
         start_debounce_chunks=PEER_VAD_START_DEBOUNCE_CHUNKS,
         start_commit_chunks=PEER_VAD_START_COMMIT_CHUNKS,
+        soft_boundary_start_ms=PEER_SOFT_BOUNDARY_START_MS,
+        soft_pause_ms=PEER_SOFT_PAUSE_MS,
         candidate_log_label="Peer",
         diagnostic_event_callback=diagnostic_event_callback,
         diagnostics_enabled=diagnostics_enabled,

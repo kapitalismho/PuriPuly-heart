@@ -9,7 +9,7 @@
 
 ## Expression Parameters
 
-- Add every required parameter to the avatar's Expression Parameters.
+- Add only the parameters you need to the avatar's Expression Parameters.
 - Match names, capitalization, and types exactly.
 
 | Parameter | Meaning | Type | Default | Saved | Synced |
@@ -79,6 +79,8 @@
 | 5 | Deepgram |
 | 6 | Qwen3 ASR Flash Realtime |
 | 7 | Soniox |
+| 8 | Custom Speech Recognition (Offline) |
+| 9 | Custom Speech Recognition (Realtime) |
 
 - Used by: `PuriPuly_SelfASR`, `PuriPuly_PeerASR`
 
@@ -95,10 +97,14 @@
 | 7 | Qwen 3.5 Plus |
 | 8 | OpenAI-compatible API |
 | 9 | Custom HTTP API |
+| 10 | Gemma 4 E4B CPU |
+| 11 | Gemma 4 E4B GPU |
+| 12 | Gemma 4 12B |
 
 - Used by: `PuriPuly_Translator`
 - Gemma 4 31B on a Cerebras connection is published as ID `1`; select the connection in PuriPuly.
 - ID `9` selects the currently configured custom HTTP API and does not select an individual extension.
+- IDs `10`, `11`, and `12` select the local models managed by PuriPuly; download them in PuriPuly before use.
 
 ### Fallback IDs
 

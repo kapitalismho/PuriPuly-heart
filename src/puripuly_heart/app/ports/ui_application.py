@@ -9,6 +9,7 @@ from typing import Any, Protocol
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_models import (
     GpuNoticeAction,
+    ManagedGemmaNoticeAction,
     OverlayPeerPresentationState,
 )
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
@@ -169,7 +170,7 @@ class UiApplicationPort(Protocol):
 
     def dashboard_managed_auth_prompt_kind(self) -> str: ...
 
-    async def apply_telemetry_consent(self, consent: str) -> Any | None: ...
+    async def apply_telemetry_enabled(self, enabled: bool) -> Any | None: ...
 
     async def accept_peer_translation_eula_and_enable(self) -> object: ...
 
@@ -217,7 +218,7 @@ class UiApplicationPort(Protocol):
 
     def schedule_github_star_prompt_translation_success_observed(self) -> None: ...
 
-    async def record_telemetry_translation_success_day(self) -> None: ...
+    async def record_telemetry_translation_success_day(self, active_date_utc: str) -> None: ...
 
     def should_show_github_star_prompt(self) -> bool: ...
 
@@ -279,6 +280,11 @@ class UiApplicationPort(Protocol):
     def clear_debug_audio_fault_profiles(self) -> None: ...
 
     def handle_gpu_notice_action(self, action: GpuNoticeAction) -> object: ...
+
+    async def handle_managed_gemma_notice_action(
+        self,
+        action: ManagedGemmaNoticeAction,
+    ) -> object: ...
 
 
 __all__ = ["UiApplicationPort", "UiApplicationState"]

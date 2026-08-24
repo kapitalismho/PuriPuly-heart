@@ -59,6 +59,7 @@ PeerApplicationEffectiveSink = Callable[[bool, bool], None]
 PeerApplicationLogSink = Callable[[str], object]
 PeerApplicationSupersededSink = Callable[[], None]
 PeerApplicationLifecycleTraceSink = Callable[[str, dict[str, object]], None]
+PeerApplicationTranslationDemandSink = Callable[[], Awaitable[None]]
 
 
 @dataclass(slots=True)
@@ -85,6 +86,10 @@ class PeerApplicationOwner:
         default=None,
         repr=False,
     )
+    translation_demand_sink: PeerApplicationTranslationDemandSink | None = field(
+        default=None,
+        repr=False,
+    )
     _runtime: PeerCaptureSessionOwner | None = field(init=False, default=None, repr=False)
     _rebuild: ProviderRuntimeRebuildService = field(
         init=False,
@@ -107,6 +112,11 @@ class PeerApplicationOwner:
     _activation_starting: bool = field(init=False, default=False, repr=False)
     _model_loading: bool = field(init=False, default=False, repr=False)
     _model_loading_generation: int | None = field(init=False, default=None, repr=False)
+    _runtime_refresh_hold_generation: int | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     _process_warning_reason: str | None = field(init=False, default=None, repr=False)
     _effective_trace_generation: int | None = field(init=False, default=None, repr=False)
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
@@ -335,6 +345,7 @@ class PeerApplicationOwner:
             self.sync_effective_flags()
             self.presentation_changed()
             self.log_basic("[Peer] Toggle ignored: eula_accepted=False")
+            await self._notify_translation_demand()
             return
         if enabled and not state.overlay_intent_enabled:
             self.overlay_intent_sink(True)
@@ -345,14 +356,30 @@ class PeerApplicationOwner:
             eula_accepted=state.eula_accepted,
         )
         self._activation_starting = enabled
+        if enabled:
+            current = self.state_provider()
+            if current.overlay_state not in {"starting", "connected"}:
+                await self.begin_overlay_start()
+                if generation != self._activation_generation:
+                    return
         self.presentation_changed()
+        await self._notify_translation_demand()
         ready = False
         if enabled:
-            ready = await self.ensure_local_ready(generation)
+            if self.local_stt_requested():
+                self._runtime_refresh_hold_generation = generation
+            try:
+                ready = await self.ensure_local_ready(generation)
+            except BaseException:
+                if self._runtime_refresh_hold_generation == generation:
+                    self._runtime_refresh_hold_generation = None
+                raise
             if generation != self._activation_generation:
                 return
             if not ready:
                 self._activation_starting = False
+                if self._runtime_refresh_hold_generation == generation:
+                    self._runtime_refresh_hold_generation = None
         else:
             self.clear_cpu_pending()
             self.clear_gpu_pending()
@@ -375,12 +402,6 @@ class PeerApplicationOwner:
             self.sync_local_notice()
             self.presentation_changed()
         try:
-            if enabled and current.overlay_state not in {"starting", "connected"}:
-                await self.begin_overlay_start()
-                if generation != self._activation_generation or (
-                    prepare_local and self._runtime is not runtime
-                ):
-                    return
             if prepare_local and runtime is not None and config is not None:
                 prepared_snapshot = await runtime.prepare_provider(config)
         finally:
@@ -389,6 +410,8 @@ class PeerApplicationOwner:
                 self._model_loading_generation = None
                 self.sync_local_notice()
                 self.presentation_changed()
+            if self._runtime_refresh_hold_generation == generation:
+                self._runtime_refresh_hold_generation = None
         if prepare_local and config is not None:
             if generation != self._activation_generation or self._runtime is not runtime:
                 return
@@ -411,6 +434,12 @@ class PeerApplicationOwner:
         if enabled:
             self.disclosure_sink()
         self.presentation_changed()
+
+    async def _notify_translation_demand(self) -> None:
+        sink = self.translation_demand_sink
+        if sink is None:
+            return
+        await sink()
 
     def disable_intent(self) -> None:
         if self.state_provider().settings_available:
@@ -447,11 +476,7 @@ class PeerApplicationOwner:
         runtime = self._runtime
         if not state.settings_available or not state.runtime_available or runtime is None:
             return
-        if (
-            self._model_loading
-            and self._model_loading_generation == self._activation_generation
-            and self.local_stt_requested(state)
-        ):
+        if self._should_hold_runtime_refresh(state):
             return
         config = self.config_factory()
         desired_active = self.desired_active(state)
@@ -548,6 +573,13 @@ class PeerApplicationOwner:
             and state.settings_available
             and self.desired_active(state)
         )
+
+    def _should_hold_runtime_refresh(self, state: PeerApplicationState) -> bool:
+        if not self.local_stt_requested(state):
+            return False
+        if self._model_loading and self._model_loading_generation == self._activation_generation:
+            return True
+        return self._runtime_refresh_hold_generation == self._activation_generation
 
     def local_stt_requested(self, state: PeerApplicationState | None = None) -> bool:
         resolved = state or self.state_provider()

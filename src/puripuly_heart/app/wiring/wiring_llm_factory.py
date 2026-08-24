@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, replace
 
 from puripuly_heart.app.ports.secret_store import SecretReadResult
@@ -33,9 +33,12 @@ from puripuly_heart.config.runtime_resolution import (
     PROVIDER_DEEPSEEK,
     PROVIDER_GEMINI,
     PROVIDER_LOCAL_LLM,
+    PROVIDER_MANAGED_GEMMA,
     PROVIDER_OPENROUTER,
     PROVIDER_QWEN,
     TRANSLATION_CONNECTION_OFFICIAL_BYOK,
+    TRANSLATION_MODEL_MANAGED_GEMMA,
+    TRANSLATION_MODEL_MANAGED_GEMMA_12B,
     TRANSLATION_MODEL_QWEN_35_PLUS,
     DirectProviderRuntimeIntent,
     RuntimeResolutionInput,
@@ -60,6 +63,8 @@ from puripuly_heart.config.settings import (
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.fallback_racing import LLMProviderAttempt
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
+from puripuly_heart.core.local_translation.devices import resolve_llama_vulkan_device
+from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_ENV,
     OPENROUTER_BYOK_API_KEY_SECRET,
@@ -75,6 +80,7 @@ from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
+from puripuly_heart.providers.llm.managed_gemma import ManagedGemmaLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 
@@ -210,6 +216,18 @@ def _runtime_resolution_input_from_compatibility_settings(
             connection="custom_http",
             concurrency_limit=settings.llm.concurrency_limit,
         )
+    elif settings.translation.model == TranslationModel.MANAGED_GEMMA:
+        translation_intent = normalize_translation_runtime_intent(
+            model=TRANSLATION_MODEL_MANAGED_GEMMA,
+            connection=settings.translation.connection.value,
+            concurrency_limit=settings.llm.concurrency_limit,
+        )
+    elif settings.translation.model == TranslationModel.MANAGED_GEMMA_12B:
+        translation_intent = normalize_translation_runtime_intent(
+            model=TRANSLATION_MODEL_MANAGED_GEMMA_12B,
+            connection=settings.translation.connection.value,
+            concurrency_limit=settings.llm.concurrency_limit,
+        )
     elif settings.provider.llm == LLMProviderName.QWEN:
         translation_intent = normalize_translation_runtime_intent(
             model=TRANSLATION_MODEL_QWEN_35_PLUS,
@@ -285,7 +303,6 @@ def _require_openrouter_byok_api_key(secrets: SecretStore) -> str:
 def _openrouter_managed_api_key(
     secrets: SecretStore,
     credential: ResolvedCredentialRequirement,
-    settings: AppSettings,
 ) -> str | None:
     requested_secret_key = _openrouter_managed_api_key_secret_for_resolved_credential(credential)
     opposite_secret_key = _opposite_openrouter_managed_api_key_secret(requested_secret_key)
@@ -293,11 +310,6 @@ def _openrouter_managed_api_key(
     opposite_value = _normalize_secret_value(secrets.get(opposite_secret_key))
     if opposite_value is not None:
         raise ValueError("OpenRouter managed local claim conflict")
-    if (
-        credential.reference == CREDENTIAL_REF_OPENROUTER_MANAGED_QQ
-        and _normalize_secret_value(settings.managed_identity.active_managed_credential_ref) is None
-    ):
-        return None
     return requested_value
 
 
@@ -612,7 +624,7 @@ def _openrouter_provider_from_resolved_fields(
             secrets=secrets,
             credential=credential,
         )
-        managed_api_key = _openrouter_managed_api_key(secrets, credential, openrouter_settings)
+        managed_api_key = _openrouter_managed_api_key(secrets, credential)
         if force_managed_wrapper or managed_api_key is None:
             from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
 
@@ -664,10 +676,32 @@ def _provider_from_resolved_target(
     managed_delegate_ready: Callable[[], object] | None,
     runtime_logging: SessionRuntimeLoggingService | None,
     compatibility_settings: AppSettings | None,
+    managed_gemma_runtime: ManagedGemmaRuntimeOwner | None,
+    managed_gemma_release: Callable[[], Awaitable[None]] | None,
     qwen_low_latency_mode: bool,
     force_managed_wrapper: bool = False,
     include_selection_alias: bool = True,
 ) -> LLMProvider:
+    if target.provider == PROVIDER_MANAGED_GEMMA:
+        if managed_gemma_runtime is None:
+            raise RuntimeError("managed Gemma runtime is unavailable")
+        backend = target.provider_options.get("backend")
+        if backend not in {"cpu", "gpu"}:
+            raise ValueError("managed Gemma backend must be cpu or gpu")
+        vulkan_device = "Vulkan0"
+        if compatibility_settings is not None:
+            translation = getattr(compatibility_settings, "translation", None)
+            vulkan_device = resolve_llama_vulkan_device(
+                getattr(translation, "gpu_device_id", "auto")
+            )
+        return ManagedGemmaLLMProvider(
+            runtime=managed_gemma_runtime,
+            backend=backend,
+            vulkan_device=vulkan_device,
+            release_runtime=managed_gemma_release,
+            runtime_logging=runtime_logging,
+        )
+
     if target.provider == PROVIDER_GEMINI:
         api_key = require_secret(secrets, key="google_api_key", env_var="GOOGLE_API_KEY")
         return GeminiLLMProvider(
@@ -739,6 +773,8 @@ def _base_llm_provider_from_resolved_config(
     managed_delegate_ready: Callable[[], object] | None,
     runtime_logging: SessionRuntimeLoggingService | None,
     compatibility_settings: AppSettings | None,
+    managed_gemma_runtime: ManagedGemmaRuntimeOwner | None,
+    managed_gemma_release: Callable[[], Awaitable[None]] | None,
     qwen_low_latency_mode: bool,
 ) -> LLMProvider:
     return _provider_from_resolved_target(
@@ -748,6 +784,8 @@ def _base_llm_provider_from_resolved_config(
         managed_delegate_ready=managed_delegate_ready,
         runtime_logging=runtime_logging,
         compatibility_settings=compatibility_settings,
+        managed_gemma_runtime=managed_gemma_runtime,
+        managed_gemma_release=managed_gemma_release,
         qwen_low_latency_mode=qwen_low_latency_mode,
     )
 
@@ -778,6 +816,8 @@ def create_llm_provider_from_resolved_config(
     managed_delegate_ready: Callable[[], object] | None = None,
     runtime_logging: SessionRuntimeLoggingService | None = None,
     compatibility_settings: AppSettings | None = None,
+    managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
+    managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
     qwen_low_latency_mode: bool = True,
 ) -> LLMProvider:
     base = _base_llm_provider_from_resolved_config(
@@ -787,6 +827,8 @@ def create_llm_provider_from_resolved_config(
         managed_delegate_ready=managed_delegate_ready,
         runtime_logging=runtime_logging,
         compatibility_settings=compatibility_settings,
+        managed_gemma_runtime=managed_gemma_runtime,
+        managed_gemma_release=managed_gemma_release,
         qwen_low_latency_mode=qwen_low_latency_mode,
     )
     if len(config.attempts) > 1:
@@ -814,6 +856,8 @@ def create_llm_provider_from_resolved_config(
                             managed_delegate_ready=managed_delegate_ready,
                             runtime_logging=runtime_logging,
                             compatibility_settings=compatibility_settings,
+                            managed_gemma_runtime=managed_gemma_runtime,
+                            managed_gemma_release=managed_gemma_release,
                             qwen_low_latency_mode=qwen_low_latency_mode,
                             force_managed_wrapper=force_managed_wrapper,
                             include_selection_alias=False,
@@ -848,6 +892,8 @@ def create_llm_provider(
     managed_release_service: object | None = None,
     managed_delegate_ready: Callable[[], object] | None = None,
     runtime_logging: SessionRuntimeLoggingService | None = None,
+    managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
+    managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
 ) -> LLMProvider:
     runtime_input = _runtime_resolution_input_from_compatibility_settings(settings)
     resolved = resolve_llm_config(runtime_input)
@@ -858,5 +904,7 @@ def create_llm_provider(
         managed_delegate_ready=managed_delegate_ready,
         runtime_logging=runtime_logging,
         compatibility_settings=settings,
+        managed_gemma_runtime=managed_gemma_runtime,
+        managed_gemma_release=managed_gemma_release,
         qwen_low_latency_mode=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
     )

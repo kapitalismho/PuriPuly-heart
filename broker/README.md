@@ -6,7 +6,7 @@ This directory establishes the managed-trial broker as a separate deployable ser
 
 - Runtime stack: TypeScript + Hono on Cloudflare Workers with native D1 and Worker secrets.
 - Hosting scope: single-region rollout assumption for the initial Worker deployment, with D1 `location_hint` set to `apac`.
-- Managed free-trial path: `OpenRouter` + curated allowlist `google/gemma-4-26b-a4b-it`, `qwen/qwen3.5-flash-02-23`, `deepseek/deepseek-v4-flash-0731`, `deepseek/deepseek-v4-flash-0423`, legacy `deepseek/deepseek-v4-flash`, and `google/gemini-2.5-flash-lite`.
+- Managed free-trial path: `OpenRouter` + curated allowlist `google/gemma-4-26b-a4b-it`, `google/gemma-4-31b-it`, `deepseek/deepseek-v4-flash-0731`, and `deepseek/deepseek-v4-flash`.
 - Inference boundary: the app talks to OpenRouter directly; the broker remains a trial and credential broker.
 - Out of scope in this foundation: translation proxying, multi-region deployment, KV, R2, and admin dashboard work.
 
@@ -20,14 +20,14 @@ Use `pnpm --filter @puripuly-heart/broker run verify:config` to exercise the pin
 
 - `broker/scripts/render-production-wrangler-config.mjs` renders a temporary deploy-time Wrangler config from `broker/wrangler.jsonc`, injects the production D1 `database_id`, and fails if the checked-in worker name stops being the canonical `puripuly-heart-broker`.
 - `broker/deploy/fingerprint-bootstrap.template.sql` plus `broker/scripts/render-fingerprint-bootstrap-sql.mjs` render guarded bootstrap SQL for `wrangler d1 execute --file ... --yes`. The rendered SQL only replaces the migration placeholder and fails before mutating `broker_config` if the placeholder is already gone.
-- `.github/workflows/deploy-broker-direct.yml` is the manual `workflow_dispatch` path for the first canonical deploy. It applies remote D1 migrations, bootstraps the fingerprint salt, reconciles the production OpenRouter guardrail through `PATCH /api/v1/guardrails/{id}`, syncs the OpenRouter, Discord, and QQ worker secrets needed for managed child-key issuance and QQ production issuance, deploys the canonical worker, and runs `broker/tests/deploy-smoke/canonical-production.spec.ts` against the canonical `workers.dev` URL.
+- `.github/workflows/deploy-broker-direct.yml` is the manual `workflow_dispatch` path for the first canonical deploy. It exports the remote production D1 database to a restricted seven-day workflow artifact before applying migrations, bootstraps the fingerprint salt, reconciles the production OpenRouter guardrail through `PATCH /api/v1/guardrails/{id}`, syncs the OpenRouter, Discord, and QQ worker secrets needed for managed child-key issuance and QQ production issuance, deploys the canonical worker, verifies health, removes the transitional `includeZeroActivity` field with `broker/deploy/finalize-daily-summary-v2.sql`, and runs `broker/tests/deploy-smoke/canonical-production.spec.ts` against the canonical `workers.dev` URL.
 - `OPENROUTER_MANAGED_API_KEY_PRODUCTION` remains transitional runtime compatibility only; `OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION` drives managed child-key creation / cleanup, `OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION` assigns the production guardrail to each issued key, and `OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION` is copied into the runtime secret `OPENROUTER_MANAGED_USER_HMAC_SECRET` so the worker can derive a deterministic versioned managed OpenRouter user id per installation or QQ subject.
 - `QQ_AUTH_HMAC_PSK_PRODUCTION` is copied into the runtime secret `QQ_AUTH_HMAC_PSK` for `POST /v1/auth/qq/assert`. The endpoint is production issuance-capable when runtime issuance configuration is present (`QQ_AUTH_HMAC_PSK`, `OPENROUTER_MANAGEMENT_API_KEY`, and `OPENROUTER_MANAGED_GUARDRAIL_ID` are all non-blank). The issuance-disabled verification-only behavior preserves `verified` / `already_verified` compatibility without touching `qq_managed_entitlements`; when issuance is enabled, OpenRouter, guardrail, cleanup, or D1 failures return a bounded retryable/internal error envelope instead of falling back to verification-only success. The PSK value, raw QQ identity, raw credential, and raw key-bearing payloads must stay out of source, docs, logs, and test output.
-- `TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION` is copied into the runtime secret `TELEMETRY_SUBJECT_HMAC_SECRET` for `POST /v1/telemetry/translation-success-day`. Production migration rollout must take a D1 backup before applying `0011_add_telemetry_active_days.sql` (for example, Cloudflare D1 export/backup of the target database), then apply the forward-only migration that creates the isolated telemetry table and additively patches the telemetry IP rate-limit default without replacing operator-tuned abuse controls.
+- `TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION` is copied into the runtime secret `TELEMETRY_SUBJECT_HMAC_SECRET` for `POST /v1/telemetry/translation-success-day`. Production migration rollout must take a D1 backup before applying `0011_add_telemetry_active_days.sql` and `0013_add_telemetry_subjects_and_daily_summary_v2.sql`, then apply the forward-only migrations that create isolated active-day and durable subject-history tables without joining telemetry to managed identities.
 - `DISCORD_CLIENT_ID_PRODUCTION`, `DISCORD_CLIENT_SECRET_PRODUCTION`, `DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION`, and `DISCORD_USER_REF_SECRET_PRODUCTION` are copied into the runtime secrets `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI_ALLOWLIST`, and `DISCORD_USER_REF_SECRET` for Discord OAuth onboarding.
-- `DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION` is copied into the runtime secrets `DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL` and `DISCORD_DAILY_REPORT_WEBHOOK_URL` so the broker can send real-time alerts, while the minute-resolution cron trigger consults `abuse_controls.dailyReport` plus persisted `abuse_runtime_state` to emit the daily Discord heartbeat only once per UTC day.
-- The deploy reconcile step sets `allowed_models` to `google/gemma-4-26b-a4b-it`, `qwen/qwen3.5-flash-02-23`, `deepseek/deepseek-v4-flash-0731`, `deepseek/deepseek-v4-flash-0423`, legacy `deepseek/deepseek-v4-flash`, and `google/gemini-2.5-flash-lite`, clears provider restrictions inside the guardrail (`allowed_providers` / `ignored_providers`), and sets `enforce_zdr = false` before smoke.
-- The deploy smoke verifies a synthetic non-PII QQ Managed assertion through `POST /v1/auth/qq/assert`, expects `status: "issued"` with a one-time `openrouter_api_key`, verifies duplicate/lifetime guardrail behavior without key recovery, verifies issued child-key metadata through `https://openrouter.ai/api/v1/key`, proves positive routing through `qwen/qwen3.5-flash-02-23`, `deepseek/deepseek-v4-flash-0731`, `deepseek/deepseek-v4-flash-0423`, legacy `deepseek/deepseek-v4-flash`, and `google/gemini-2.5-flash-lite`, and still probes `https://openrouter.ai/api/v1/chat/completions` with `BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION` to confirm guardrail enforcement.
+- `DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION` is copied into the runtime secrets `DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL` and `DISCORD_DAILY_REPORT_WEBHOOK_URL` so the broker can send real-time alerts and the `puripuly_daily_summary.v2` report. The minute-resolution cron consults `abuse_controls.dailyReport` and the v2 delivery ledger, then sends at 00:05 UTC for the last completed UTC date.
+- The deploy reconcile step sets `allowed_models` to `google/gemma-4-26b-a4b-it`, `google/gemma-4-31b-it`, `deepseek/deepseek-v4-flash-0731`, and `deepseek/deepseek-v4-flash`, clears provider restrictions inside the guardrail (`allowed_providers` / `ignored_providers`), and sets `enforce_zdr = false` before smoke.
+- The deploy smoke verifies a synthetic non-PII QQ Managed assertion through `POST /v1/auth/qq/assert`, expects `status: "issued"` with a one-time `openrouter_api_key`, verifies duplicate/lifetime guardrail behavior without key recovery, verifies issued child-key metadata through `https://openrouter.ai/api/v1/key`, proves positive routing through `google/gemma-4-31b-it`, `deepseek/deepseek-v4-flash-0731`, and `deepseek/deepseek-v4-flash`, and still probes `https://openrouter.ai/api/v1/chat/completions` with `BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION` to confirm guardrail enforcement.
 - Config verification is split by surface: `pnpm --filter @puripuly-heart/broker run verify:config` checks the checked-in Worker binding contract, while the direct-deploy guard step fails before migrations if the production secrets `QQ_AUTH_HMAC_PSK_PRODUCTION`, `TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION`, `OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION`, or `OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION` are missing or blank. Neither path prints secret values.
 - Account-level OpenRouter privacy / provider settings remain outside repo control and may still narrow effective routing even after the guardrail reconcile; the production smoke is the proof point for the resulting path.
 - The workflow expects CI-managed secrets / vars in the `production` GitHub Environment: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `BROKER_D1_DATABASE_ID_PRODUCTION`, `OPENROUTER_MANAGED_API_KEY_PRODUCTION`, `OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION`, `OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION`, `OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION`, `QQ_AUTH_HMAC_PSK_PRODUCTION`, `TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION`, `DISCORD_CLIENT_ID_PRODUCTION`, `DISCORD_CLIENT_SECRET_PRODUCTION`, `DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION`, `DISCORD_USER_REF_SECRET_PRODUCTION`, `DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION`, `BROKER_CANONICAL_WORKERS_DEV_URL`, and `BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION`.
@@ -116,9 +116,26 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
 - `POST /v1/telemetry/translation-success-day`
   - request: `signal: "translation_success_day"`, `telemetry_identifier`, `active_date_utc` as `YYYY-MM-DD`
   - accepts only the single active-day telemetry shape; malformed JSON, invalid identifiers/dates, unsupported signals, and additional telemetry fields return the existing public `invalid_request` envelope
-  - derives `subject_ref = ph-telemetry-subject-v1_ + HMAC-SHA256-HEX(TELEMETRY_SUBJECT_HMAC_SECRET, telemetry_identifier)` and persists only `subject_ref`, UTC active date, and receipt timestamps
+  - derives `subject_ref = ph-telemetry-subject-v1_ + HMAC-SHA256-HEX(TELEMETRY_SUBJECT_HMAC_SECRET, telemetry_identifier)` and persists only that derived reference, durable first/last active UTC dates, per-day activity, and receipt timestamps
   - duplicate same-subject same-date payloads update `last_received_at` on the same row and cannot inflate active-day counts
   - per-IP rate limiting uses `abuse_controls.telemetryTranslationSuccessDayIp`; the endpoint does not collect installation, Discord, QQ, hardware, provider, model, language, output-route, or content identity
+
+## Daily summary v2
+
+- `puripuly_daily_summary.v2` is generated at 00:05 UTC for the last completed UTC date.
+- `window_start <= observed_at < window_end` is used for both Discord and QQ delivered-key rows, so UTC midnight belongs to exactly one report.
+- DAU covers `report_date_utc`; WAU and MAU cover the seven and thirty completed UTC dates ending on that date.
+- The report contains only delivered-key total/Discord/QQ counts and translated DAU/WAU/MAU plus first-observed/returning counts.
+- Healthy-state security fields, legacy challenge/verify funnel metrics, ASN analysis, stickiness, and D1/D7/D30 cohort rows are excluded.
+- A per-report-date D1 lease prevents overlapping cron invocations from posting the same report twice. Failed dates remain pending across UTC midnight, retries keep their original fixed window, and later completed dates catch up in order without allowing retention to delete unreported issue events.
+- Delivery ACK finalization atomically commits the source owner, one idempotent issue-success event, and the acknowledgement ledger before evaluating immediate incidents. Stale reconciliation promotes already-finalized pending rows to acknowledged; otherwise it acquires a durable cleanup claim, recovers abandoned claims only after the scheduled invocation limit, and atomically terminalizes the owner and delivery ledger.
+
+## Immediate abuse incidents
+
+- Source-aware successful-delivery events feed a rolling 60-minute issuance count with one `warning` threshold and one automatic `brake` threshold. Healthy observations do not call the immediate-alert webhook, and a transition that crosses both thresholds emits only the brake incident.
+- A warning is emitted once per above-threshold interval and rearms only after the count drops back to or below its threshold. A brake incident is emitted only for the successful persisted transition into the automatic brake state.
+- Discord and QQ managed child-key cleanup failures, including stale-delivery reconciliation failures, persist `cleanup_required` where ownership exists and emit one immediate cleanup incident. An indeterminate provider create result also preserves lifetime-blocking remediation state and alerts instead of permitting another key. Notification failures are audited without replacing the original issuance or cleanup result.
+- Immediate incident payloads contain only operational counts, thresholds, source, cleanup phase/state, and nullable derived credential references. They must not contain raw anonymous identifiers, managed identities, translation content, audio, or API keys.
 
 ## Persistence model
 
@@ -126,19 +143,22 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
 
 - `0001_harden_installation_public_inputs.sql` rebuilds `installations` (and the dependent `openrouter_entitlements` table) under deferred foreign-key checks so already-initialized clean schemas pick up the hardened public-input constraints.
 - `0002_add_entitlement_verified_hardware_snapshot.sql` adds `verified_hardware_hash` and `verified_hardware_hash_salt_version` to `openrouter_entitlements` for the verified release-session hardware snapshot consumed by `/v1/providers/openrouter/issue`.
-- `0003_add_abuse_runtime_state_and_issue_success_events.sql` adds the persisted abuse runtime-state row plus append-only issue-success and runtime-audit tables used by alerting, brake state, daily heartbeat delivery, and retention.
+- `0003_add_abuse_runtime_state_and_issue_success_events.sql` adds the persisted abuse runtime-state row plus append-only issue-success and runtime-audit tables used by alerting, brake state, daily summary delivery, and retention.
 - `0004_add_discord_oauth_managed_issue.sql` adds Discord OAuth session and identity storage plus Discord-managed issue columns on `openrouter_entitlements`.
 - `0005_add_referral_persistence_foundation.sql` adds nullable OAuth session `referral_id` storage plus the referral code and referral reward ledger foundation.
 - `0008_add_qq_auth_assertions.sql` adds the `qq_auth_assertions` evidence table and inserts the `qqAuthAssertIp` abuse-control default without replacing operator-tuned `abuse_controls` values.
 - `0009_add_qq_managed_entitlements.sql` adds the `qq_managed_entitlements` lifecycle table for QQ production issuance without rewriting existing assertion evidence.
 - `0010_source_aware_issue_success_events.sql` rebuilds `broker_issue_success_events` so successful issue monitoring is source-aware: Discord rows keep installation identity, while QQ rows use `issue_source = 'qq'`, nullable `installation_id`, and `subject_ref = qq_subject_ref` instead of fake installation rows.
 - `0011_add_telemetry_active_days.sql` creates the isolated `telemetry_active_days` table and additively inserts the telemetry endpoint IP rate-limit default into `abuse_controls`; production rollout requires a pre-migration D1 backup/export before this forward migration is applied.
+- `0012_add_managed_key_delivery_ack.sql` adds the shared Discord/QQ delivery acknowledgement ledger and delivery-pending lifecycle states.
+- `0013_add_telemetry_subjects_and_daily_summary_v2.sql` creates and backfills `telemetry_subjects`, keeps it synchronized for the previous Worker during rollout, creates the v2 delivery ledger, preserves existing active-day rows, sets the daily report schedule to 00:05 UTC, and raises issue-event retention to the report-safe two-day minimum without replacing unrelated operator-tuned controls. It intentionally retains `includeZeroActivity` while the previous Worker may still run; the deploy workflow removes that dead field only after the new Worker passes its health check.
+- `0014_simplify_abuse_incidents.sql` additively derives the `warning` and `brake` thresholds, the ordered warning observation state, and the request-event safety margin from existing persisted controls. It also adds a QQ child-key-creation-start marker so ambiguous post-provider failures cannot be stale-reclaimed into a second key. Legacy alert/ASN JSON fields remain during the migration-before-deploy compatibility window; unused physical columns and indexes require a separate forward migration after stabilization.
 
 - `broker_config`
   - columns: `key`, `value`, `updated_at`
   - bootstrap rows: `fingerprint_salt`, `abuse_controls`, `abuse_runtime_state`
   - runtime-tunable non-secret operational controls live in `abuse_controls` so operators do not need code changes for threshold updates
-  - persisted mutable runtime state lives separately in `abuse_runtime_state` so brake status, alert latches, and last daily-heartbeat delivery metadata do not get mixed into the editable threshold policy blob
+  - persisted mutable runtime state lives separately in `abuse_runtime_state` so brake status, alert latches, and legacy v1 daily-heartbeat delivery metadata do not get mixed into the editable threshold policy blob
   - malformed `abuse_controls` payloads fall back to the built-in default layout/thresholds instead of disabling enforcement or surfacing 500s
   - constraints: keys are limited to the supported config rows for this rollout and `value` must be valid JSON
   - `abuse_controls` fixes the settled endpoint/dimension layout:
@@ -151,7 +171,7 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
     - global UTC-day cap on new active entitlements, counted by `issued_at` semantics even if an entitlement is later revoked, stored as a runtime-configurable broker value
 - `broker_issue_success_events`
   - append-only successful issue observations recorded only after child-key creation and entitlement persistence both succeed
-  - feeds immediate-alert evaluation, daily heartbeat rollups, and retention cleanup
+  - feeds immediate-alert evaluation, source-aware completed-day delivery totals, and retention cleanup
   - columns include `issue_source`, nullable `installation_id`, `subject_ref`, `managed_credential_ref`, safe network metadata, and `observed_at`
   - Discord rows use `issue_source = 'discord'`, retain `installation_id`, and set `subject_ref` to that same installation identity; QQ rows use `issue_source = 'qq'`, leave `installation_id` `NULL`, and set `subject_ref` to `qq_subject_ref`
   - QQ monitoring/reporting must not synthesize installation rows, and no raw QQ identity, raw credential, raw OpenRouter key, raw Broker payload, or raw OpenRouter payload belongs in issue-success events
@@ -161,10 +181,21 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
   - append-only request observations used for per-endpoint rate limiting and cross-endpoint velocity hooks
   - columns: `id`, `endpoint`, `ip`, `installation_id`, `observed_at`
   - indexes cover endpoint-scoped and subject-scoped sliding-window lookups
+  - retention is calculated at cleanup time from the longest configured endpoint rate-limit window and longest active, unexpired velocity-hook window, plus the explicit `requestEventSafetyMarginDays` margin; the default margin is one day
+- `telemetry_subjects`
+  - durable anonymous subject rows keyed by HMAC-derived `subject_ref`
+  - columns: `subject_ref`, `first_active_date_utc`, and `last_active_date_utc`
+  - remains independent of active-day retention so first-observed and returning classifications keep their meaning
+  - raw telemetry identifiers and managed Discord/QQ/installation identities are never stored or joined
 - `telemetry_active_days`
   - active-day telemetry rows keyed by `(subject_ref, active_date_utc)`
   - columns: HMAC-derived `subject_ref`, UTC active date, `first_received_at`, and `last_received_at`
   - raw telemetry identifiers, account identities, Discord/QQ/hardware identities, provider payloads, model/language/output-route values, and Translation content do not belong in this table
+- `broker_daily_summary_deliveries`
+  - one row per `report_date_utc` coordinates the v2 send with a bounded lease and records the delivered outcome
+  - columns: `report_date_utc`, `status`, `lease_token`, `lease_expires_at`, `attempted_at`, and `delivered_at`
+  - a failed webhook expires but preserves its pending claim so the same fixed completed-day window survives midnight; a delivered row permanently suppresses duplicate sends for that report date
+
 - `broker_velocity_cap_hooks`
   - explicit operator-controlled cross-endpoint velocity hooks with observable public outcomes
   - columns: `id`, `subject_type`, `subject_value`, `max_requests`, `window_minutes`, `outcome_code`, `outcome_class`, `outcome_subcode`, `reason`, `active`, `created_at`, `expires_at`
@@ -201,9 +232,9 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
   - stores only derived subject references and credential digests; raw QQ identities and raw credentials do not belong in D1, logs, docs, or checked-in tests
 - `qq_managed_entitlements`
   - QQ Managed production issuance lifecycle keyed by derived `qq_subject_ref`; absence means the subject has not reserved or used production issuance
-  - columns: `qq_subject_ref`, `status`, `issue_ref`, nullable `managed_credential_ref`, `budget_usd`, `reserved_at`, `issued_at`, `expires_at`, `delivered_at`, `created_at`, and `updated_at`
-  - stored statuses are `issuing`, `active`, `cleanup_required`, and `revoked`; `active`, `cleanup_required`, and `revoked` block automatic reissue
-  - `active` requires `managed_credential_ref`, `issued_at`, `expires_at`, and `delivered_at`; `cleanup_required` requires `managed_credential_ref`; stale `issuing` rows can be reclaimed only when no child-key hash was recorded
+  - columns: `qq_subject_ref`, `status`, `issue_ref`, nullable `managed_credential_ref`, `budget_usd`, `reserved_at`, `issued_at`, `expires_at`, `delivered_at`, `created_at`, `updated_at`, and nullable `child_key_creation_started_at`
+  - stored statuses are `issuing`, `delivery_pending`, `active`, `cleanup_required`, and `revoked`; `delivery_pending`, `active`, `cleanup_required`, and `revoked` block automatic reissue
+  - `active` requires `managed_credential_ref`, `issued_at`, `expires_at`, and `delivered_at`; `cleanup_required` requires `managed_credential_ref`; stale `issuing` rows can be reclaimed only when neither a child-key hash nor a child-key-creation-start marker was recorded
   - existing `qq_auth_assertions` rows without a `qq_managed_entitlements` row remain eligible for their first production issuance
   - stores derived and operational metadata only; raw QQ identities, raw credentials, and raw OpenRouter API keys do not belong in this table
 - `referral_codes`

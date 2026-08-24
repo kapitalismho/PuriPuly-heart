@@ -1,6 +1,6 @@
 use serde::Serialize;
 use std::path::Path;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use transcribe_cpp::{
     backend_available, devices, init_backends_default, Backend, CancelToken, DeviceType, Error,
     Feature, Model, ModelOptions, RunOptions, Session, TimestampKind,
@@ -115,41 +115,22 @@ pub struct GpuEngine {
     selected_device: Option<VulkanDevice>,
 }
 
+const DISCOVERY_ATTEMPTS: u32 = 8;
+const DISCOVERY_RETRY_DELAY: Duration = Duration::from_millis(250);
+
 impl GpuEngine {
     pub fn discover() -> Result<Vec<VulkanDevice>, EngineError> {
-        init_backends_default().map_err(map_backend_error)?;
-        if !backend_available(Backend::Vulkan) {
-            return Err(EngineError::UnsupportedCapability);
-        }
-        let devices = devices()
-            .into_iter()
-            .filter(|device| device.kind.eq_ignore_ascii_case("vulkan"))
-            .filter_map(|device| {
-                let registry_index = device.index?;
-                Some(VulkanDevice {
-                    device_id: device
-                        .device_id
-                        .unwrap_or_else(|| format!("vulkan-index-{registry_index}")),
-                    registry_index,
-                    name: device.name,
-                    description: device.description,
-                    device_type: match device.device_type {
-                        DeviceType::Gpu => "gpu",
-                        DeviceType::Igpu => "igpu",
-                        DeviceType::Cpu => "cpu",
-                        DeviceType::Accel => "accel",
-                        DeviceType::Unknown => "unknown",
-                    }
-                    .to_string(),
-                    memory_total_bytes: device.memory_total,
-                    memory_free_bytes: device.memory_free,
-                })
-            })
-            .collect::<Vec<_>>();
-        if devices.is_empty() {
-            return Err(EngineError::UnsupportedCapability);
-        }
-        Ok(devices)
+        retry_discovery(
+            || {
+                init_backends_default().map_err(map_backend_error)?;
+                if !backend_available(Backend::Vulkan) {
+                    return Ok(Vec::new());
+                }
+                Ok(enumerate_vulkan_devices())
+            },
+            DISCOVERY_ATTEMPTS,
+            DISCOVERY_RETRY_DELAY,
+        )
     }
 
     pub fn activate<F>(
@@ -376,12 +357,89 @@ fn report_native_error(stage: &str, error: &Error) {
     );
 }
 
+fn enumerate_vulkan_devices() -> Vec<VulkanDevice> {
+    devices()
+        .into_iter()
+        .filter(|device| device.kind.eq_ignore_ascii_case("vulkan"))
+        .filter_map(|device| {
+            let registry_index = device.index?;
+            Some(VulkanDevice {
+                device_id: device
+                    .device_id
+                    .unwrap_or_else(|| format!("vulkan-index-{registry_index}")),
+                registry_index,
+                name: device.name,
+                description: device.description,
+                device_type: match device.device_type {
+                    DeviceType::Gpu => "gpu",
+                    DeviceType::Igpu => "igpu",
+                    DeviceType::Cpu => "cpu",
+                    DeviceType::Accel => "accel",
+                    DeviceType::Unknown => "unknown",
+                }
+                .to_string(),
+                memory_total_bytes: device.memory_total,
+                memory_free_bytes: device.memory_free,
+            })
+        })
+        .collect()
+}
+
+fn retry_discovery<F>(
+    mut probe: F,
+    attempts: u32,
+    delay: Duration,
+) -> Result<Vec<VulkanDevice>, EngineError>
+where
+    F: FnMut() -> Result<Vec<VulkanDevice>, EngineError>,
+{
+    let attempts = attempts.max(1);
+    let mut last_error = None;
+    for attempt in 0..attempts {
+        match probe() {
+            Ok(devices) if !devices.is_empty() => return Ok(devices),
+            Ok(devices) => {
+                last_error = None;
+                if attempt + 1 == attempts {
+                    return Ok(devices);
+                }
+            }
+            Err(error) => {
+                last_error = Some(error);
+                if attempt + 1 == attempts {
+                    break;
+                }
+            }
+        }
+        if delay > Duration::ZERO {
+            std::thread::sleep(delay);
+        }
+    }
+    match last_error {
+        Some(error) => Err(error),
+        None => Ok(Vec::new()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{execute_started_decode, EngineError, GpuEngine};
+    use super::{execute_started_decode, retry_discovery, EngineError, GpuEngine, VulkanDevice};
     use std::cell::Cell;
     use std::path::Path;
+    use std::time::Duration;
     use transcribe_cpp::CancelToken;
+
+    fn sample_device(device_id: &str) -> VulkanDevice {
+        VulkanDevice {
+            device_id: device_id.to_string(),
+            registry_index: 0,
+            name: "GPU 0".to_string(),
+            description: "Physical Vulkan GPU".to_string(),
+            device_type: "gpu".to_string(),
+            memory_total_bytes: 8_000_000_000,
+            memory_free_bytes: 4_000_000_000,
+        }
+    }
 
     fn assert_started_failure(error: EngineError) {
         let started = Cell::new(false);
@@ -455,5 +513,61 @@ mod tests {
 
         assert_started_failure(EngineError::DecodeFailure);
         assert_started_failure(EngineError::Cancelled);
+    }
+
+    #[test]
+    fn discovery_retries_transient_empty_and_error_probes() {
+        let probes = Cell::new(0);
+        let devices = retry_discovery(
+            || {
+                let attempt = probes.get();
+                probes.set(attempt + 1);
+                match attempt {
+                    0 => Err(EngineError::BackendFailure),
+                    1 => Ok(Vec::new()),
+                    _ => Ok(vec![sample_device("vulkan-index-0")]),
+                }
+            },
+            3,
+            Duration::ZERO,
+        )
+        .expect("discovery eventually finds a device");
+
+        assert_eq!(probes.get(), 3);
+        assert_eq!(devices[0].device_id, "vulkan-index-0");
+    }
+
+    #[test]
+    fn discovery_empty_list_is_a_completed_answer() {
+        let probes = Cell::new(0);
+        let devices = retry_discovery(
+            || {
+                probes.set(probes.get() + 1);
+                Ok(Vec::new())
+            },
+            3,
+            Duration::ZERO,
+        )
+        .expect("empty discovery is not an error");
+
+        assert_eq!(probes.get(), 3);
+        assert!(devices.is_empty());
+    }
+
+    #[test]
+    fn discovery_keeps_init_failure_after_retries() {
+        let probes = Cell::new(0);
+        let error = retry_discovery(
+            || {
+                probes.set(probes.get() + 1);
+                Err(EngineError::BackendFailure)
+            },
+            2,
+            Duration::ZERO,
+        )
+        .expect_err("persistent init failure stays an error");
+
+        assert_eq!(probes.get(), 2);
+        assert!(matches!(error, EngineError::BackendFailure));
     }
 }

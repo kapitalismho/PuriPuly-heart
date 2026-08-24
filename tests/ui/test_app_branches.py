@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+from datetime import datetime as real_datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -34,7 +35,7 @@ from puripuly_heart.config.settings import (
     TranslationModel,
     TranslationSettings,
     build_managed_openrouter_byok_target_settings,
-    with_telemetry_consent,
+    with_telemetry_enabled,
 )
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS
@@ -190,12 +191,12 @@ class TelemetryController:
         self.settings = settings
         self.applied.append(settings)
 
-    async def apply_telemetry_consent(self, consent: str) -> AppSettings:
-        await self.apply_settings(with_telemetry_consent(self.settings, consent))
+    async def apply_telemetry_enabled(self, enabled: bool) -> AppSettings:
+        await self.apply_settings(with_telemetry_enabled(self.settings, enabled))
         return self.settings
 
-    async def record_telemetry_translation_success_day(self) -> None:
-        self.telemetry_success_recorded = True
+    async def record_telemetry_translation_success_day(self, active_date_utc: str) -> None:
+        self.telemetry_success_recorded = active_date_utc
 
 
 class TelemetrySettingsView:
@@ -231,69 +232,61 @@ def _dialog_containers(dialog) -> list[ft.Container]:
     return [node for node in _iter_control_tree(dialog) if isinstance(node, ft.Container)]
 
 
-def test_telemetry_consent_dialog_is_not_shown_on_launch() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app.controller = TelemetryController(AppSettings())
-    app._mark_launch_high_priority_feedback_shown = lambda *_args, **_kwargs: None
-
-    assert app.maybe_show_telemetry_consent_dialog() is False
-    assert app.page.opened == []
-
-    app.controller.settings.telemetry.consent = "unknown"
-    assert app.maybe_show_telemetry_consent_dialog() is False
-    assert app.page.opened == []
-
-
-def test_telemetry_consent_choice_persists_and_syncs_settings_view() -> None:
+def test_telemetry_enabled_choice_persists_and_syncs_settings_view() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     page = DummyPage()
     app.page = page
     settings = AppSettings()
-    settings.telemetry_state.sent_translation_success_dates_utc = ["2026-07-01"]
+    settings.telemetry_state.last_sent_date_utc = "2026-07-01"
     app.controller = TelemetryController(settings)
     app.view_settings = TelemetrySettingsView()
 
-    app._on_telemetry_consent_change("allow")
+    app._on_telemetry_enabled_change(False)
     assert len(page.tasks) == 1
     asyncio.run(page.tasks.pop(0)())
-    assert app.controller.settings.telemetry.consent == "allow"
-    assert app.controller.settings.telemetry_state.anonymous_id
-    assert app.controller.settings.telemetry_state.sent_translation_success_dates_utc == [
-        "2026-07-01"
-    ]
+    assert app.controller.settings.telemetry.enabled is False
+    assert app.controller.settings.telemetry_state.anonymous_id is None
+    assert app.controller.settings.telemetry_state.last_sent_date_utc is None
     assert app.view_settings.synced[-1] is app.controller.settings
 
-    app._on_telemetry_consent_change("decline")
+    app._on_telemetry_enabled_change(True)
     asyncio.run(page.tasks.pop(0)())
-    assert app.controller.settings.telemetry.consent == "decline"
-    assert app.controller.settings.telemetry_state.anonymous_id is None
-    assert app.controller.settings.telemetry_state.sent_translation_success_dates_utc == []
+    assert app.controller.settings.telemetry.enabled is True
+    assert app.controller.settings.telemetry_state.anonymous_id
 
 
-def test_telemetry_consent_dialog_actions_do_not_send() -> None:
+def test_telemetry_setting_action_does_not_send() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
     app.controller = TelemetryController(AppSettings())
     app.view_settings = TelemetrySettingsView()
 
-    app._on_telemetry_consent_change("allow")
+    app._on_telemetry_enabled_change(False)
 
     assert len(app.page.tasks) == 1
     assert not hasattr(app, "telemetry_client")
 
 
-def test_telemetry_translation_success_uses_app_settings_mutation_queue() -> None:
+def test_telemetry_translation_success_captures_date_before_settings_mutation_queue(
+    monkeypatch,
+) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     page = DummyPage()
     app.page = page
     app.controller = TelemetryController(AppSettings())
 
+    class CapturedDateTime:
+        @classmethod
+        def now(cls, timezone):
+            _ = timezone
+            return real_datetime.fromisoformat("2026-07-03T23:59:59+00:00")
+
+    monkeypatch.setattr(app_module, "datetime", CapturedDateTime)
     app.on_telemetry_translation_success()
 
     assert len(page.tasks) == 1
     asyncio.run(page.tasks.pop(0)())
-    assert app.controller.telemetry_success_recorded is True
+    assert app.controller.telemetry_success_recorded == "2026-07-03"
 
 
 class ConstructionDummyController:
@@ -411,7 +404,7 @@ class ConstructionDummySettingsView(ft.Container):
         self.on_local_llm_secret_changed = provider.local_llm_secret_changed
         self.on_gpu_discovery_requested = provider.gpu_discovery_requested
         self.on_start_microphone_test = general.start_microphone_test
-        self.on_telemetry_consent_change = general.telemetry_consent_change
+        self.on_telemetry_enabled_change = general.telemetry_enabled_change
         self.on_list_loopback_capture_options = general.list_loopback_capture_options
         self.on_list_loopback_process_options = general.list_loopback_process_options
         self.on_list_loopback_device_options = general.list_loopback_device_options
@@ -840,7 +833,6 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_brake_notice",
         "on_revoked_notice",
         "on_github_star_snackbar",
-        "on_telemetry_consent",
         "on_founder_letter",
         "on_pkce_failure",
         "on_discord_auth",
@@ -871,9 +863,6 @@ def test_translator_app_mounts_debug_preview_when_enabled(
     github_star = seen["callbacks"]["on_github_star_snackbar"]
     assert getattr(github_star, "__self__", None) is app
     assert getattr(github_star, "__func__", None) is TranslatorApp._preview_github_star_snackbar
-    telemetry_consent = seen["callbacks"]["on_telemetry_consent"]
-    assert getattr(telemetry_consent, "__self__", None) is app
-    assert getattr(telemetry_consent, "__func__", None) is TranslatorApp._preview_telemetry_consent
     local_qwen_modal = seen["callbacks"]["on_local_qwen_hallucination_modal"]
     assert getattr(local_qwen_modal, "__self__", None) is app
     assert (
@@ -897,56 +886,6 @@ def test_translator_app_mounts_debug_preview_when_enabled(
     root = page.added[0]
     assert isinstance(root.content, ft.Stack)
     assert root.content.controls[-1] is app.debug_preview_panel
-
-
-def test_debug_preview_telemetry_consent_opens_without_side_effects(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    settings = AppSettings()
-    settings.telemetry.consent = "unknown"
-    settings.telemetry_state.anonymous_id = "existing-id"
-    settings.telemetry_state.sent_translation_success_dates_utc = ["2026-07-03"]
-    app.controller = SimpleNamespace(
-        settings=settings,
-        apply_settings=lambda *_args, **_kwargs: pytest.fail(
-            "telemetry preview must not persist settings"
-        ),
-        apply_providers=lambda *_args, **_kwargs: pytest.fail(
-            "telemetry preview must not apply providers"
-        ),
-        record_telemetry_translation_success_day=lambda *_args, **_kwargs: pytest.fail(
-            "telemetry preview must not send telemetry"
-        ),
-    )
-    monkeypatch.setattr(
-        app_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: pytest.fail("telemetry preview must not mutate secrets"),
-        raising=False,
-    )
-    monkeypatch.setattr(
-        app_module.webbrowser,
-        "open",
-        lambda *_args, **_kwargs: pytest.fail("telemetry preview must not open network URLs"),
-    )
-
-    app._preview_telemetry_consent()
-
-    assert len(app.page.opened) == 1
-    action_buttons = [
-        node
-        for node in _iter_control_tree(app.page.opened[0])
-        if isinstance(node, ft.TextButton | ft.ElevatedButton)
-    ]
-    for button in action_buttons:
-        if getattr(button, "on_click", None) is not None:
-            button.on_click(None)
-    assert app.page.tasks == []
-    assert settings.telemetry.consent == "unknown"
-    assert settings.telemetry_state.anonymous_id == "existing-id"
-    assert settings.telemetry_state.sent_translation_success_dates_utc == ["2026-07-03"]
 
 
 def test_debug_preview_http_extension_form_writes_demo_extension_and_selects_it(
@@ -1493,7 +1432,7 @@ def test_translator_app_4x3_window_keeps_shell_navigation_usable(
     app._on_nav_change(0)
     assert app.content_area.content is app.view_dashboard
     assert app.content_area.padding == app_module.APP_CONTENT_PADDING
-    assert len(page.tasks) == 2
+    assert len(page.tasks) == 1
 
 
 def test_app_tab_key_reverses_message_input_languages_only_on_dashboard() -> None:
@@ -1988,10 +1927,8 @@ def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -
         ),
     )
     pkce_calls: list[tuple[AppSettings, str]] = []
-    app._on_request_openrouter_pkce = (
-        lambda target_settings, *, launch_source="settings": pkce_calls.append(
-            (target_settings, launch_source)
-        )
+    app._on_request_openrouter_pkce = lambda target_settings, *, launch_source="settings": (
+        pkce_calls.append((target_settings, launch_source))
     )
     app._show_snackbar = lambda *_args, **_kwargs: pytest.fail(
         "managed Discord auth BYOK should build a valid OpenRouter target"
@@ -2863,9 +2800,8 @@ async def test_on_nav_change_applies_provider_changes_when_leaving_settings() ->
     assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
     assert seen == ["merged-settings"]
-    assert len(app.page.tasks) == 2
-    await app.page.tasks[1]()
-    assert auto_installs == ["started"]
+    assert len(app.page.tasks) == 1
+    assert auto_installs == []
 
 
 @pytest.mark.asyncio
@@ -3017,10 +2953,9 @@ async def test_on_nav_change_refreshes_prompt_and_schedules_log_scroll() -> None
 
     app._on_nav_change(2)
     assert app.content_area.content is app.view_logs
-    assert len(app.page.tasks) == 2
+    assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
-    await app.page.tasks[1]()
-    assert auto_installs["count"] == 1
+    assert auto_installs["count"] == 0
     assert scrolled["count"] == 1
 
 
@@ -3570,10 +3505,9 @@ async def test_on_request_openrouter_pkce_uses_draft_preserving_refresh_on_succe
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         settings=updated_settings,
         config_path=Path("settings.json"),
-        refresh_settings_after_openrouter_pkce_success=lambda: refresh_calls.append(
-            (updated_settings, Path("settings.json"))
-        )
-        or True,
+        refresh_settings_after_openrouter_pkce_success=lambda: (
+            refresh_calls.append((updated_settings, Path("settings.json"))) or True
+        ),
     )
     app._show_snackbar = lambda message, bgcolor: snackbar_calls.append((message, bgcolor))
     queued: list[object] = []
@@ -3606,10 +3540,9 @@ async def test_on_request_openrouter_pkce_does_not_refresh_settings_view_on_fail
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         settings=AppSettings(),
         config_path=Path("settings.json"),
-        refresh_settings_after_openrouter_pkce_success=lambda: refresh_calls.append(
-            (AppSettings(), Path("settings.json"))
-        )
-        or True,
+        refresh_settings_after_openrouter_pkce_success=lambda: (
+            refresh_calls.append((AppSettings(), Path("settings.json"))) or True
+        ),
     )
     queued: list[object] = []
     monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
@@ -4094,8 +4027,8 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
         set_stt_needs_key=lambda value, update_ui=False: app.view_dashboard.stt_calls.append(
             (value, update_ui)
         ),
-        set_translation_needs_key=lambda value, update_ui=False: app.view_dashboard.trans_calls.append(
-            (value, update_ui)
+        set_translation_needs_key=lambda value, update_ui=False: (
+            app.view_dashboard.trans_calls.append((value, update_ui))
         ),
     )
 
@@ -4157,8 +4090,8 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
         set_stt_needs_key=lambda value, update_ui=False: app.view_dashboard.stt_calls.append(
             (value, update_ui)
         ),
-        set_translation_needs_key=lambda value, update_ui=False: app.view_dashboard.trans_calls.append(
-            (value, update_ui)
+        set_translation_needs_key=lambda value, update_ui=False: (
+            app.view_dashboard.trans_calls.append((value, update_ui))
         ),
     )
 

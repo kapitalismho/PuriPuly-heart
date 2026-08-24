@@ -4,7 +4,7 @@
 #define MyAppName "PuriPuly <3"
 #define MyAppDirName "PuriPulyHeart"
 #define MyAppGroupName "PuriPulyHeart"
-#define MyAppVersion "2.4.0"
+#define MyAppVersion "2.5.0"
 #define MyAppPublisher "salee"
 #define MyAppURL "https://github.com/kapitalismho/PuriPuly-heart"
 #ifndef MyAppExeName
@@ -134,9 +134,6 @@ Name: "{group}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppGroupName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
-
-[Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [InstallDelete]
 ; Remove the managed default-path VAD cache so the app can rehydrate it from the bundled model.

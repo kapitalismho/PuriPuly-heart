@@ -46,7 +46,7 @@ INTEGER_CONTROLS: Final[Mapping[str, str]] = MappingProxyType(
         "PuriPuly_PeerDstLang": "languages.peer_target_language",
         "PuriPuly_SelfASR": "stt.provider",
         "PuriPuly_PeerASR": "peer_stt.provider",
-        "PuriPuly_Translator": "translation.model",
+        "PuriPuly_Translator": "translation.selection",
         "PuriPuly_Fallback": "translation.fallback",
     }
 )
@@ -77,6 +77,8 @@ ASR_IDS: Final[Mapping[int, str]] = MappingProxyType(
         5: "deepgram",
         6: "qwen_asr",
         7: "soniox",
+        8: "custom_offline",
+        9: "custom_realtime",
     }
 )
 
@@ -91,6 +93,17 @@ TRANSLATION_MODEL_IDS: Final[Mapping[int, str]] = MappingProxyType(
         7: "qwen35_plus",
         8: "local_llm",
         9: "custom_http",
+        10: "managed_gemma",
+        11: "managed_gemma",
+        12: "managed_gemma_12b",
+    }
+)
+
+TRANSLATION_CONNECTION_BY_MODEL_ID: Final[Mapping[int, str]] = MappingProxyType(
+    {
+        10: "cpu",
+        11: "gpu",
+        12: "gpu",
     }
 )
 
@@ -151,12 +164,24 @@ if {code for _identifier, code in _LANGUAGE_ABI_ENTRIES} != set(SUPPORTED_LANGUA
 
 LANGUAGE_IDS: Final[Mapping[int, str]] = MappingProxyType(dict(_LANGUAGE_ABI_ENTRIES))
 ASR_ID_BY_PROVIDER: Final[Mapping[str, int]] = MappingProxyType(
-    {value: identifier for identifier, value in ASR_IDS.items()}
+    {
+        **{value: identifier for identifier, value in ASR_IDS.items()},
+        "custom": 8,
+    }
 )
 TRANSLATION_MODEL_ID_BY_VALUE: Final[Mapping[str, int]] = MappingProxyType(
     {
         **{value: identifier for identifier, value in TRANSLATION_MODEL_IDS.items()},
+        "managed_gemma": 10,
+        "managed_gemma_12b": 12,
         "gemma4_31b_cerebras": 1,
+    }
+)
+TRANSLATION_MODEL_ID_BY_SELECTION: Final[Mapping[tuple[str, str], int]] = MappingProxyType(
+    {
+        ("managed_gemma", "cpu"): 10,
+        ("managed_gemma", "gpu"): 11,
+        ("managed_gemma_12b", "gpu"): 12,
     }
 )
 FALLBACK_ID_BY_ALIAS: Final[Mapping[str, int]] = MappingProxyType(
@@ -196,6 +221,12 @@ def registry_for_parameter(name: str) -> Mapping[int, str] | None:
     return OSC_INTEGER_REGISTRIES.get(name)
 
 
+def translation_model_id_for_selection(model: str, connection: str) -> int:
+    if model in {"managed_gemma", "managed_gemma_12b"}:
+        return TRANSLATION_MODEL_ID_BY_SELECTION[(model, connection)]
+    return TRANSLATION_MODEL_ID_BY_VALUE[model]
+
+
 def is_puripuly_parameter_address(address: str) -> bool:
     return (
         isinstance(address, str)
@@ -224,9 +255,12 @@ __all__ = [
     "OscParameterDefinition",
     "OscParameterType",
     "TRANSLATION_MODEL_IDS",
+    "TRANSLATION_CONNECTION_BY_MODEL_ID",
     "TRANSLATION_MODEL_ID_BY_VALUE",
+    "TRANSLATION_MODEL_ID_BY_SELECTION",
     "is_puripuly_parameter_address",
     "parameter_definition",
     "parameter_definition_for_address",
     "registry_for_parameter",
+    "translation_model_id_for_selection",
 ]

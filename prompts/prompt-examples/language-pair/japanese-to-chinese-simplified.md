@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self, 4s ago] ミラーどこに出そうか。
+[self] ミラーどこに出そうか。
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Your response:
 
 ### Context Ignore Example
 <context>
-[self, 6s ago] このワールド、結構重いね。
+[self] このワールド、結構重いね。
 </context>
 
 <input>

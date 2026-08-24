@@ -20,9 +20,14 @@ def build_llm_provider_signature(
     *,
     http_extensions: HttpExtensionRegistry | None = None,
 ) -> tuple[object, ...]:
+    managed_gemma_selected = settings.translation.model in (
+        TranslationModel.MANAGED_GEMMA,
+        TranslationModel.MANAGED_GEMMA_12B,
+    )
     primary_uses_openrouter = settings.provider.llm == LLMProviderName.OPENROUTER
     fallback_uses_openrouter = bool(
-        settings.translation.fallback.enabled
+        not managed_gemma_selected
+        and settings.translation.fallback.enabled
         and settings.translation.fallback.connection
         in (
             TranslationConnection.OPENROUTER,
@@ -37,7 +42,8 @@ def build_llm_provider_signature(
             and settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
         )
         or (
-            settings.translation.fallback.enabled
+            not managed_gemma_selected
+            and settings.translation.fallback.enabled
             and settings.translation.fallback.connection
             in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
         )
@@ -70,9 +76,13 @@ def build_llm_provider_signature(
         settings.openrouter.selected_source if primary_uses_openrouter else None,
         settings.openrouter.selection_alias if primary_uses_openrouter else None,
         (
-            settings.translation.fallback.enabled,
-            settings.translation.fallback.model,
-            settings.translation.fallback.connection,
+            (False, None, None)
+            if managed_gemma_selected
+            else (
+                settings.translation.fallback.enabled,
+                settings.translation.fallback.model,
+                settings.translation.fallback.connection,
+            )
         ),
         settings.openrouter.broker_base_url if uses_openrouter else None,
         _managed_openrouter_identity_signature(settings) if uses_managed_openrouter else None,
@@ -91,6 +101,16 @@ def build_llm_provider_signature(
                 _canonical_json_signature(settings.local_llm.extra_body),
             )
             if settings.provider.llm == LLMProviderName.LOCAL_LLM
+            else None
+        ),
+        (
+            (
+                settings.languages.source_language,
+                settings.languages.target_language,
+                settings.system_prompt,
+                settings.translation.gpu_device_id,
+            )
+            if managed_gemma_selected
             else None
         ),
     )

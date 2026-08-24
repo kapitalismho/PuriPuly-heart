@@ -18,6 +18,8 @@ from puripuly_heart.core.osc.control_schema import (
     OSC_BOOLEAN_PARAMETER_NAMES,
     OSC_INTEGER_PARAMETER_NAMES,
     OSC_PARAMETER_DEFINITIONS,
+    TRANSLATION_CONNECTION_BY_MODEL_ID,
+    TRANSLATION_MODEL_ID_BY_SELECTION,
     TRANSLATION_MODEL_IDS,
 )
 
@@ -32,12 +34,21 @@ def test_osc_abi_registries_are_explicit_and_cover_current_languages() -> None:
         5: "deepgram",
         6: "qwen_asr",
         7: "soniox",
+        8: "custom_offline",
+        9: "custom_realtime",
     }
     assert TRANSLATION_MODEL_IDS[0] == "gemma4_26b_31b"
     assert TRANSLATION_MODEL_IDS[9] == "custom_http"
     assert FALLBACK_IDS[0] == "none"
     assert set(LANGUAGE_IDS.values()) == set(SUPPORTED_LANGUAGES)
     assert len(LANGUAGE_IDS) == len(set(LANGUAGE_IDS.values()))
+
+
+def test_translation_model_publish_ids_cover_every_product_model() -> None:
+    from puripuly_heart.app.ports.osc_control import TRANSLATION_MODEL_ID_BY_VALUE
+    from puripuly_heart.config.settings import TranslationModel
+
+    assert {model.value for model in TranslationModel} <= set(TRANSLATION_MODEL_ID_BY_VALUE)
 
 
 def test_codec_validates_absolute_boolean_and_integer_controls() -> None:
@@ -104,7 +115,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         "PuriPuly_PeerDstLang": "languages.peer_target_language",
         "PuriPuly_SelfASR": "stt.provider",
         "PuriPuly_PeerASR": "peer_stt.provider",
-        "PuriPuly_Translator": "translation.model",
+        "PuriPuly_Translator": "translation.selection",
         "PuriPuly_Fallback": "translation.fallback",
     }
     assert tuple(
@@ -124,7 +135,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         ("PuriPuly_PeerDstLang", "int", "languages.peer_target_language"),
         ("PuriPuly_SelfASR", "int", "stt.provider"),
         ("PuriPuly_PeerASR", "int", "peer_stt.provider"),
-        ("PuriPuly_Translator", "int", "translation.model"),
+        ("PuriPuly_Translator", "int", "translation.selection"),
         ("PuriPuly_Fallback", "int", "translation.fallback"),
     )
     assert dict(ASR_IDS) == {
@@ -136,6 +147,8 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         5: "deepgram",
         6: "qwen_asr",
         7: "soniox",
+        8: "custom_offline",
+        9: "custom_realtime",
     }
     assert dict(TRANSLATION_MODEL_IDS) == {
         0: "gemma4_26b_31b",
@@ -147,6 +160,19 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         7: "qwen35_plus",
         8: "local_llm",
         9: "custom_http",
+        10: "managed_gemma",
+        11: "managed_gemma",
+        12: "managed_gemma_12b",
+    }
+    assert dict(TRANSLATION_CONNECTION_BY_MODEL_ID) == {
+        10: "cpu",
+        11: "gpu",
+        12: "gpu",
+    }
+    assert dict(TRANSLATION_MODEL_ID_BY_SELECTION) == {
+        ("managed_gemma", "cpu"): 10,
+        ("managed_gemma", "gpu"): 11,
+        ("managed_gemma_12b", "gpu"): 12,
     }
     assert dict(FALLBACK_IDS) == {
         0: "none",

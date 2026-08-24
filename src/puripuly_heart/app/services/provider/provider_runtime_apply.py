@@ -87,10 +87,10 @@ class LlmProviderRebuildOwner:
         default_factory=ProviderRuntimeRebuildService,
     )
 
-    async def rebuild(self) -> None:
+    async def rebuild(self) -> bool:
         context = self.context_provider()
         if context is None:
-            return
+            return False
         outcome = await self.runtime.rebuild_llm_provider(
             replace_provider=context.replace_provider,
             create_provider=lambda: self.provider_factory(context.settings),
@@ -100,8 +100,9 @@ class LlmProviderRebuildOwner:
         await self.usage_refresh()
         if provider is None:
             self.failure_sink(f"{context.resource_label} not available")
-            return
+            return False
         self.success_sink(f"[Settings] {context.resource_label} rebuilt successfully")
+        return True
 
 
 @dataclass(slots=True)

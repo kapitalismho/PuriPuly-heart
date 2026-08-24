@@ -9,10 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from puripuly_heart.config.settings_vnext import migration, serialization
-from puripuly_heart.config.settings_vnext.schema import (
-    AppSettingsVNext,
-    ensure_telemetry_default_allow,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 logger = logging.getLogger(__name__)
 
@@ -167,9 +164,8 @@ def save_vnext_settings(path: Path, settings: AppSettingsVNext) -> VNextSettings
 
 def _save_vnext_settings_or_raise(path: Path, settings: AppSettingsVNext) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    normalized = ensure_telemetry_default_allow(settings)
-    content = serialization.to_json_text(normalized)
-    _validate_canonical_text(content, normalized)
+    content = serialization.to_json_text(settings)
+    _validate_canonical_text(content, settings)
     _atomic_write_text(path, content, encoding="utf-8")
 
 

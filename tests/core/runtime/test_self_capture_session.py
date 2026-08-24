@@ -254,6 +254,22 @@ async def test_inactive_active_restart_and_explicit_toggle_off_preserve_release_
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("toggle_delay_s", [0.0, 0.1, 0.3, 1.0])
+async def test_cloud_explicit_toggle_off_routes_to_abort_at_each_delay(
+    toggle_delay_s: float,
+) -> None:
+    owner, _, provider, _, _, _ = build_owner()
+    session_config = config()
+
+    await owner.apply_intent(session_config, enabled=True)
+    await asyncio.sleep(toggle_delay_s)
+    snapshot = await owner.apply_intent(session_config, enabled=False)
+
+    assert snapshot.state is SelfCaptureSessionState.STOPPED
+    assert provider.release_calls == [("abort", None)]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("admission_result", "state", "desired"),
     [
@@ -716,7 +732,7 @@ async def test_same_signature_release_and_rebuild_rejects_retired_attachment_fai
     assert owner.snapshot.failure_reason is None
     assert sources[0].close_calls == 1
     assert sources[1].close_calls == 0
-    assert provider.release_calls == [("drain", None)]
+    assert provider.release_calls == [("abort", None)]
 
     await owner.close()
 
@@ -801,6 +817,46 @@ async def test_close_cancels_pending_admission_and_rejects_future_intent() -> No
     assert provider.replace_calls == []
     with pytest.raises(RuntimeError, match="closed"):
         await owner.apply_intent(session_config, enabled=True)
+
+
+@pytest.mark.asyncio
+async def test_prepare_provider_replaces_when_provider_identity_changes() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+
+    await owner.prepare_provider(config("one"))
+    snapshot = await owner.prepare_provider(config("two"))
+
+    assert provider.replace_calls == [
+        (("provider-one", False), False),
+        (("provider-two", False), False),
+    ]
+    assert snapshot.runtime_signature == config("two").runtime_signature
+    assert sources == []
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_prepare_provider_reuses_ready_provider_with_same_identity() -> None:
+    owner, _, provider, _, _, _ = build_owner()
+    session_config = config("one")
+
+    await owner.prepare_provider(session_config)
+    await owner.prepare_provider(session_config)
+
+    assert provider.replace_calls == [(("provider-one", False), False)]
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_start_replaces_ready_provider_when_identity_changed() -> None:
+    owner, _, provider, _, _, _ = build_owner()
+
+    await owner.prepare_provider(config("one"))
+    snapshot = await owner.apply_intent(config("two"), enabled=True)
+
+    assert ("provider-two", False) in {request for request, _start in provider.replace_calls}
+    assert snapshot.runtime_signature == config("two").runtime_signature
+    await owner.close()
 
 
 @pytest.mark.asyncio

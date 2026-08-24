@@ -40,6 +40,7 @@ class SettingsModal:
         *,
         show_description: bool = False,
         two_column: bool = False,
+        left_column_sections: int = 1,
     ):
         """Initialize settings modal.
 
@@ -52,6 +53,8 @@ class SettingsModal:
             two_column: Whether to force a 2-column layout. When False, the
                 modal always renders as a single column regardless of how
                 many sections the options carry.
+            left_column_sections: Number of sections placed in the left column
+                of a two-column layout. Only used when two_column is True.
         """
         self._page = page
         self._title = title
@@ -59,11 +62,13 @@ class SettingsModal:
         self._on_select = on_select
         self._show_description = show_description
         self._two_column = two_column
+        self._left_column_sections = left_column_sections
         self._dialog: ft.AlertDialog | None = None
         self._option_list: ft.ListView | ft.Row | None = None
         self._section_lists: list[tuple[ft.ListView, list[str]]] | None = None
         self._current: str = ""
         self._loading_section: str = ""
+        self._partition_left_sections = left_column_sections
 
     def open(self, current: str, *, loading_section: str = "") -> None:
         """Open the settings selection dialog.
@@ -188,23 +193,24 @@ class SettingsModal:
         )
         return self._option_list
 
-    @staticmethod
-    def _partition_sections(sections: list[str], n_columns: int) -> list[list[str]]:
+    def _partition_sections(self, sections: list[str], n_columns: int) -> list[list[str]]:
         """Distribute sections across a fixed number of columns.
 
-        The first column receives a single section (when available); the
-        remaining sections are balanced across the other columns. This
-        keeps the recommended grouping prominent on the left while the
-        detailed classifications flow down the right column.
+        The first column receives ``left_column_sections`` leading groups;
+        the remaining sections are balanced across the other columns.
         """
         n = len(sections)
         if n == 0:
             return [[] for _ in range(n_columns)]
         if n_columns <= 1:
             return [list(sections)]
-        left = [sections[0]]
-        rest = sections[1:]
+        left_count = self._partition_left_sections
+        left_count = max(1, min(left_count, n))
+        left = list(sections[:left_count])
+        rest = sections[left_count:]
         remaining = n_columns - 1
+        if not rest:
+            return [left, []]
         base = len(rest) // remaining
         extra = len(rest) % remaining
         cols: list[list[str]] = [left]
@@ -299,6 +305,11 @@ class SettingsModal:
                 text_align=ft.TextAlign.CENTER,
             )
 
+        # Cards grow to fit multi-line descriptions instead of clipping them.
+        card_height = 110
+        if self._show_description and option.description and "\n" in option.description:
+            card_height = 140
+
         return ft.Container(
             content=content,
             bgcolor=bg_color,
@@ -309,15 +320,17 @@ class SettingsModal:
             on_click=None if option.disabled else lambda e, val=option.value: self._select(val),
             on_hover=None if option.disabled else self._on_item_hover,
             animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
-            height=110,
+            height=card_height,
         )
 
     def _build_loading_placeholder(self) -> ft.Control:
         """Build a loading placeholder with a spinner."""
+        from puripuly_heart.ui.components.loading_spinner import create_section_spinner
+
         return ft.Container(
             content=ft.Row(
                 controls=[
-                    ft.ProgressRing(width=32, height=32, stroke_width=3),
+                    create_section_spinner(size=32, stroke_width=3),
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
             ),

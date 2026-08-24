@@ -326,10 +326,12 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
             *,
             show_description=False,
             two_column=False,
+            left_column_sections=1,
         ):
             captured["options"] = options
             captured["show_description"] = show_description
             captured["two_column"] = two_column
+            captured["left_column_sections"] = left_column_sections
 
         def open(self, current: str) -> None:
             captured["current"] = current
@@ -339,16 +341,21 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
     view._on_llm_click(None)
 
     assert captured["show_description"] is True
+    assert captured["two_column"] is True
+    assert captured["left_column_sections"] == 2
     options = captured["options"]
     values = [option.value for option in options]
 
     assert values == [
         TranslationModel.GEMMA4_26B_31B.value,
-        TranslationModel.DEEPSEEK_V4_FLASH.value,
         TranslationModel.GEMMA4_31B.value,
-        TranslationModel.GEMMA4.value,
+        TranslationModel.DEEPSEEK_V4_FLASH.value,
+        "managed_gemma_cpu",
+        "managed_gemma_gpu",
+        TranslationModel.MANAGED_GEMMA_12B.value,
         TranslationModel.LOCAL_LLM.value,
         TranslationModel.CUSTOM_HTTP.value,
+        TranslationModel.GEMMA4.value,
         TranslationModel.GEMINI_37_FLASH.value,
         TranslationModel.GEMINI_31_FLASH_LITE.value,
         TranslationModel.QWEN_35_PLUS.value,
@@ -357,17 +364,58 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
     assert TranslationModel.LOCAL_LLM.value in values
     assert all("qwen35_flash" not in value for value in values)
     assert len(values) == len(set(values))
+    assert TranslationModel.MANAGED_GEMMA.value not in values
+
+    managed = {option.value: option for option in options}
+    assert managed["managed_gemma_cpu"].label == t("provider.managed_gemma_cpu")
+    assert managed["managed_gemma_cpu"].description == t(
+        "settings.translation_model.managed_gemma_cpu.description"
+    )
+    assert managed["managed_gemma_gpu"].label == t("provider.managed_gemma_gpu")
+    assert managed["managed_gemma_gpu"].description == t(
+        "settings.translation_model.managed_gemma_gpu.description"
+    )
+    assert managed["managed_gemma_cpu"].section == t(
+        "settings.translation_model.section.recommended_local"
+    )
+    assert managed["managed_gemma_gpu"].section == t(
+        "settings.translation_model.section.gpu_inference"
+    )
+    assert managed[TranslationModel.MANAGED_GEMMA_12B.value].label == t(
+        "provider.managed_gemma_12b"
+    )
+    assert managed[TranslationModel.MANAGED_GEMMA_12B.value].description == t(
+        "settings.translation_model.managed_gemma_12b.description"
+    )
+    assert managed[TranslationModel.MANAGED_GEMMA_12B.value].section == t(
+        "settings.translation_model.section.gpu_inference"
+    )
+
+    gemma31 = next(
+        option for option in options if option.value == TranslationModel.GEMMA4_31B.value
+    )
+    assert gemma31.section == t("settings.translation_model.section.recommended_cloud")
+    assert gemma31.description == t("settings.translation_model.gemma4_31b.description")
+
+    gemma26_a4b = next(
+        option for option in options if option.value == TranslationModel.GEMMA4.value
+    )
+    assert gemma26_a4b.section == t("settings.translation_model.section.others")
 
     sections: list[str] = []
     for option in options:
         if option.section and option.section not in sections:
             sections.append(option.section)
     assert sections == [
-        t("settings.translation_model.section.recommended"),
-        t("settings.translation_model.section.gemma"),
+        t("settings.translation_model.section.recommended_cloud"),
+        t("settings.translation_model.section.recommended_local"),
+        t("settings.translation_model.section.gpu_inference"),
         t("settings.translation_model.section.user_settings"),
         t("settings.translation_model.section.others"),
     ]
+
+    others_options = [option for option in options if option.section == gemma26_a4b.section]
+    assert others_options[0] is gemma26_a4b
 
 
 def test_gemma31_connection_modal_lists_managed_openrouter_and_cerebras(monkeypatch) -> None:
