@@ -76,7 +76,7 @@ describe('broker persistence retention model', () => {
   it('deletes expired request events, issue-success events, and runtime-audit rows using the configured retention windows', async () => {
     const env = createTestBrokerEnv();
     updateAbuseControls(env, (controls) => {
-      controls.retention.requestEventsDays = 7;
+      controls.retention.requestEventSafetyMarginDays = 7;
       controls.retention.issueSuccessDays = 3;
       controls.retention.runtimeAuditDays = 10;
     });
@@ -216,6 +216,107 @@ describe('broker persistence retention model', () => {
         .prepare('SELECT COUNT(*) AS count FROM broker_abuse_runtime_audit')
         .get() as { count: number },
     ).toEqual({ count: 1 });
+  });
+
+  it('keeps request events for the longest active enforcement window plus the configured safety margin', async () => {
+    const env = createTestBrokerEnv();
+    updateAbuseControls(env, (controls) => {
+      controls.retention.requestEventSafetyMarginDays = 1;
+    });
+    env.__db
+      .prepare(
+        `INSERT INTO broker_velocity_cap_hooks (
+            subject_type,
+            subject_value,
+            max_requests,
+            window_minutes,
+            outcome_code,
+            outcome_class,
+            active,
+            created_at
+          ) VALUES ('ip', ?, 2, 4320, 'rate_limited', 'retryable', 1, ?)`,
+      )
+      .run('203.0.113.44', '2026-04-01T00:00:00.000Z');
+    const insert = env.__db.prepare(
+      `INSERT INTO broker_request_events (
+          endpoint,
+          ip,
+          installation_id,
+          observed_at
+        ) VALUES (?, ?, ?, ?)`,
+    );
+    insert.run(
+      'POST /v1/trial/challenge',
+      '203.0.113.44',
+      'retention-outside-safety',
+      '2026-04-15T00:00:00.000Z',
+    );
+    insert.run(
+      'POST /v1/trial/challenge',
+      '203.0.113.44',
+      'retention-inside-safety',
+      '2026-04-16T12:00:00.000Z',
+    );
+
+    const result = await applyAbuseMonitoringRetention(
+      env.BROKER_DB,
+      new Date('2026-04-20T00:00:00.000Z'),
+    );
+
+    expect(result.requestEventsDeleted).toBe(1);
+    expect(
+      env.__db
+        .prepare(
+          `SELECT installation_id
+             FROM broker_request_events
+            ORDER BY installation_id`,
+        )
+        .all(),
+    ).toEqual([{ installation_id: 'retention-inside-safety' }]);
+  });
+
+  it('includes the pending Discord OAuth IP window in request-event retention', async () => {
+    const env = createTestBrokerEnv();
+    updateAbuseControls(env, (controls) => {
+      controls.pendingDiscordOAuthSessions.windowMinutes = 4320;
+      controls.retention.requestEventSafetyMarginDays = 1;
+    });
+    const insert = env.__db.prepare(
+      `INSERT INTO broker_request_events (
+          endpoint,
+          ip,
+          installation_id,
+          observed_at
+        ) VALUES (?, ?, ?, ?)`,
+    );
+    insert.run(
+      'POST /v1/auth/discord/start',
+      '203.0.113.45',
+      'pending-oauth-outside-window',
+      '2026-04-15T23:59:59.000Z',
+    );
+    insert.run(
+      'POST /v1/auth/discord/start',
+      '203.0.113.45',
+      'pending-oauth-at-cutoff',
+      '2026-04-16T00:00:00.000Z',
+    );
+
+    const result = await applyAbuseMonitoringRetention(
+      env.BROKER_DB,
+      new Date('2026-04-20T00:00:00.000Z'),
+    );
+
+    expect(result.requestEventsDeleted).toBe(1);
+    expect(
+      env.__db
+        .prepare(
+          `SELECT installation_id
+             FROM broker_request_events
+            ORDER BY installation_id`,
+        )
+        .all(),
+    ).toEqual([{ installation_id: 'pending-oauth-at-cutoff' }]);
   });
 
   it('deletes telemetry active-day rows older than 400 days and keeps rows at the cutoff or newer', async () => {

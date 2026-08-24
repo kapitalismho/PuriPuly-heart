@@ -36,6 +36,7 @@ interface QqManagedEntitlementRow {
   issued_at: string | null;
   expires_at: string | null;
   delivered_at: string | null;
+  child_key_creation_started_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -676,6 +677,55 @@ describe('QQ auth assertion route', () => {
     );
   });
 
+  it('notifies when stale QQ cleanup-required persistence fails', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW_ISO));
+    const env = createTestBrokerEnv({
+      beforeRun: ({ sql }) => {
+        if (
+          sql.includes('UPDATE qq_managed_entitlements') &&
+          sql.includes("SET status = 'cleanup_required'")
+        ) {
+          throw new Error('synthetic stale cleanup-required failure');
+        }
+      },
+    });
+    const qqIdentity = 'qq-openid-stale-cleanup-state-failure';
+    const credential = await signQqCredential(env.QQ_AUTH_HMAC_PSK, qqIdentity);
+    const qqSubjectRef = await deriveExpectedQqSubjectRef(
+      env.QQ_AUTH_HMAC_PSK,
+      qqIdentity,
+    );
+    insertQqManagedEntitlement(env, {
+      qq_subject_ref: qqSubjectRef,
+      status: 'issuing',
+      issue_ref: 'qq-issue-v1_stale-cleanup-state-failure',
+      managed_credential_ref: 'hash_qq_stale_cleanup_state_failure',
+      reserved_at: '2026-06-05T11:40:00.000Z',
+    });
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(null, { status: 204 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await postQqAssertion(env, {
+      qq_identity: qqIdentity,
+      credential,
+      asserted_at: '2026-06-05T12:03:00Z',
+    });
+
+    expect(response.status).toBe(409);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(String(fetchMock.mock.calls[0]?.[1]?.body)).toContain(
+      'cleanup_required state could not be confirmed',
+    );
+    expect(readQqManagedEntitlement(env, qqSubjectRef)).toMatchObject({
+      status: 'issuing',
+      managed_credential_ref: 'hash_qq_stale_cleanup_state_failure',
+    });
+  });
+
   it('applies the active issuance brake and global cap before OpenRouter side effects', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW_ISO));
@@ -714,17 +764,37 @@ describe('QQ auth assertion route', () => {
 
     const capEnv = createTestBrokerEnv();
     updateAbuseControls(capEnv, (controls) => {
-      controls.newActiveEntitlementsPerDay.maxCount = 1;
+      controls.newActiveEntitlementsPerDay.maxCount = 3;
     });
     insertQqManagedEntitlement(capEnv, {
       qq_subject_ref: 'ph-qq-subject-v1_existing-cap-subject',
-      status: 'active',
+      status: 'delivery_pending',
       issue_ref: 'qq-issue-v1_existing-cap-issue',
       managed_credential_ref: 'hash_qq_existing_cap_child',
       reserved_at: '2026-06-05T11:00:00.000Z',
       issued_at: '2026-06-05T11:00:00.000Z',
       expires_at: '2026-09-05T11:00:00.000Z',
-      delivered_at: '2026-06-05T11:00:00.000Z',
+      delivered_at: null,
+    });
+    insertQqManagedEntitlement(capEnv, {
+      qq_subject_ref: 'ph-qq-subject-v1_delayed-ack-cap-subject',
+      status: 'active',
+      issue_ref: 'qq-issue-v1_delayed-ack-cap-issue',
+      managed_credential_ref: 'hash_qq_delayed_ack_cap_child',
+      reserved_at: '2026-06-05T10:00:00.000Z',
+      issued_at: '2026-06-05T10:00:00.000Z',
+      expires_at: '2026-09-05T10:00:00.000Z',
+      delivered_at: '2026-06-06T00:01:00.000Z',
+    });
+    insertQqManagedEntitlement(capEnv, {
+      qq_subject_ref: 'ph-qq-subject-v1_revoked-cap-subject',
+      status: 'revoked',
+      issue_ref: 'qq-issue-v1_revoked-cap-issue',
+      managed_credential_ref: 'hash_qq_revoked_cap_child',
+      reserved_at: '2026-06-05T09:00:00.000Z',
+      issued_at: '2026-06-05T09:00:00.000Z',
+      expires_at: '2026-09-05T09:00:00.000Z',
+      delivered_at: '2026-06-05T09:00:00.000Z',
     });
     const capIdentity = 'qq-openid-global-cap-user';
     const capCredential = await signQqCredential(capEnv.QQ_AUTH_HMAC_PSK, capIdentity);
@@ -747,10 +817,10 @@ describe('QQ auth assertion route', () => {
       }),
     );
     expect(capOpenRouter.openRouterCreateCalls).toHaveLength(0);
-    expect(countQqManagedEntitlements(capEnv)).toBe(1);
+    expect(countQqManagedEntitlements(capEnv)).toBe(3);
     expect(readQqManagedEntitlement(capEnv, 'ph-qq-subject-v1_existing-cap-subject')).toEqual(
       expect.objectContaining({
-        status: 'active',
+        status: 'delivery_pending',
         managed_credential_ref: 'hash_qq_existing_cap_child',
       }),
     );
@@ -782,6 +852,56 @@ describe('QQ auth assertion route', () => {
     expect(openRouter.openRouterGuardrailCalls).toHaveLength(0);
     expect(countQqManagedEntitlements(env)).toBe(0);
   });
+
+  it.each(['create_network_failure', 'create_retryable_failure'] as const)(
+    'lifetime-blocks and notifies when OpenRouter create may have succeeded after %s',
+    async (createMode) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_ISO));
+
+      const env = createTestBrokerEnv();
+      const qqIdentity = `qq-openid-indeterminate-create-${createMode}-user`;
+      const credential = await signQqCredential(env.QQ_AUTH_HMAC_PSK, qqIdentity);
+      const qqSubjectRef = await deriveExpectedQqSubjectRef(
+        env.QQ_AUTH_HMAC_PSK,
+        qqIdentity,
+      );
+      const openRouter = mockOpenRouterManagementApi({
+        mode: createMode,
+      });
+
+      const response = await postQqAssertion(env, {
+        qq_identity: qqIdentity,
+        credential,
+        asserted_at: '2026-06-05T12:03:00Z',
+      });
+
+      expect(response.status).toBe(500);
+      expect(openRouter.openRouterCreateCalls).toHaveLength(1);
+      expect(readQqManagedEntitlement(env, qqSubjectRef)).toEqual(
+        expect.objectContaining({
+          status: 'issuing',
+          managed_credential_ref: null,
+          child_key_creation_started_at: NOW_ISO,
+        }),
+      );
+      const cleanupIncidentCalls = openRouter.fetchMock.mock.calls.filter(
+        ([request]) => String(request) === env.DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL,
+      );
+      expect(cleanupIncidentCalls).toHaveLength(1);
+      expect(String(cleanupIncidentCalls[0]?.[1]?.body)).toContain(
+        'cleanup_required state could not be confirmed',
+      );
+
+      const retryResponse = await postQqAssertion(env, {
+        qq_identity: qqIdentity,
+        credential,
+        asserted_at: '2026-06-05T12:20:00Z',
+      });
+      expect(retryResponse.status).toBe(409);
+      expect(openRouter.openRouterCreateCalls).toHaveLength(1);
+    },
+  );
 
   it('cleans up and releases the matching reservation when guardrail assignment fails after child-key creation', async () => {
     vi.useFakeTimers();
@@ -907,6 +1027,18 @@ describe('QQ auth assertion route', () => {
         delivered_at: null,
       }),
     );
+    const cleanupIncidentCalls = openRouter.fetchMock.mock.calls.filter(
+      ([input]) => String(input) === env.DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL,
+    );
+    expect(cleanupIncidentCalls).toHaveLength(1);
+    const cleanupIncidentBody = String(
+      (cleanupIncidentCalls[0]?.[1] as RequestInit | undefined)?.body,
+    );
+    expect(cleanupIncidentBody).toContain('Broker managed-key cleanup incident');
+    expect(cleanupIncidentBody).toContain('cleanup_required');
+    for (const sensitiveValue of [qqIdentity, credential, rawOpenRouterChildKey]) {
+      expect(cleanupIncidentBody).not.toContain(sensitiveValue);
+    }
     expect(countManagedKeyDeliveries(env)).toBe(0);
   });
 
@@ -1140,8 +1272,17 @@ describe('QQ auth assertion route', () => {
       expect.objectContaining({
         status: 'issuing',
         managed_credential_ref: null,
+        child_key_creation_started_at: NOW_ISO,
       }),
     );
+    vi.advanceTimersByTime(16 * 60_000);
+    const retryResponse = await postQqAssertion(env, {
+      qq_identity: qqIdentity,
+      credential,
+      asserted_at: new Date().toISOString(),
+    });
+    expect(retryResponse.status).toBe(409);
+    expect(openRouter.openRouterCreateCalls).toHaveLength(1);
   });
 
   it('logs D1 release failures after successful managed cleanup without leaking sensitive values', async () => {
@@ -1182,6 +1323,13 @@ describe('QQ auth assertion route', () => {
     const consoleText = stringifyConsoleCalls(consoleErrorSpy);
     expect(consoleText).toContain('qq_managed_child_key_cleanup_release_failed');
     expect(consoleText).toContain(childKeyHash);
+    const cleanupIncidentCalls = openRouter.fetchMock.mock.calls.filter(
+      ([request]) => String(request) === env.DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL,
+    );
+    expect(cleanupIncidentCalls).toHaveLength(1);
+    expect(String(cleanupIncidentCalls[0]?.[1]?.body)).toContain(
+      'cleanup_required state could not be confirmed',
+    );
     for (const sensitiveValue of [qqIdentity, credential, rawOpenRouterChildKey]) {
       expect(consoleText).not.toContain(sensitiveValue);
       expect(await response.clone().text()).not.toContain(sensitiveValue);
@@ -1572,7 +1720,7 @@ function readQqManagedEntitlement(
     .prepare(
       `SELECT qq_subject_ref, status, issue_ref, managed_credential_ref,
               budget_usd, reserved_at, issued_at, expires_at, delivered_at,
-              created_at, updated_at
+              child_key_creation_started_at, created_at, updated_at
          FROM qq_managed_entitlements
         WHERE qq_subject_ref = ?`,
     )
@@ -1689,6 +1837,8 @@ function mockOpenRouterManagementApi(options: {
   mode?:
     | 'success'
     | 'create_failure'
+    | 'create_network_failure'
+    | 'create_retryable_failure'
     | 'guardrail_failure'
     | 'guardrail_failure_cleanup_failure'
     | 'cleanup_failure';
@@ -1720,8 +1870,14 @@ function mockOpenRouterManagementApi(options: {
               message: options.createFailureMessage ?? 'create failed before key delivery',
             },
           },
-          500,
+          400,
         );
+      }
+      if (options.mode === 'create_retryable_failure') {
+        return jsonResponse({ error: { message: 'create temporarily failed' } }, 503);
+      }
+      if (options.mode === 'create_network_failure') {
+        throw new TypeError('OpenRouter create response was interrupted');
       }
 
       const sequence = openRouterCreateCalls.length;
@@ -1790,6 +1946,10 @@ function mockOpenRouterManagementApi(options: {
         );
       }
 
+      return new Response(null, { status: 204 });
+    }
+
+    if (url === 'https://discord.test/immediate-alert' && method === 'POST') {
       return new Response(null, { status: 204 });
     }
 

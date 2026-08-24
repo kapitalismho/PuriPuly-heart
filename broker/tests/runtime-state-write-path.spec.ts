@@ -16,7 +16,7 @@ describe('broker abuse runtime-state write path', () => {
     monitoringAfter.brake.reason = 'global_threshold';
     monitoringAfter.brake.changedAt = '2026-04-19T00:05:00.000Z';
     monitoringAfter.brake.changedBy = 'system';
-    monitoringAfter.alertLatches.warn1 = true;
+    monitoringAfter.alertLatches.warning = true;
 
     const reportBefore = await getBrokerAbuseRuntimeState(env.BROKER_DB);
     const reportAfter = structuredClone(reportBefore);
@@ -40,10 +40,7 @@ describe('broker abuse runtime-state write path', () => {
         changedBy: 'system',
       },
       alertLatches: {
-        warn1: true,
-        warn2: false,
-        warn3: false,
-        critical: false,
+        warning: true,
       },
       dailyReport: {
         lastDeliveredAt: '2026-04-19T00:00:00.000Z',
@@ -64,11 +61,10 @@ describe('broker abuse runtime-state write path', () => {
     const monitoringBefore = await getBrokerAbuseRuntimeState(env.BROKER_DB);
     const monitoringAfter = structuredClone(monitoringBefore);
     monitoringAfter.brake.active = true;
-    monitoringAfter.brake.reason = 'asn_fast_path';
+    monitoringAfter.brake.reason = 'global_threshold';
     monitoringAfter.brake.changedAt = '2026-04-19T00:05:00.000Z';
     monitoringAfter.brake.changedBy = 'system';
-    monitoringAfter.alertLatches.warn1 = true;
-    monitoringAfter.alertLatches.critical = true;
+    monitoringAfter.alertLatches.warning = true;
 
     await persistBrokerAbuseRuntimeState(
       env.BROKER_DB,
@@ -80,15 +76,12 @@ describe('broker abuse runtime-state write path', () => {
     expect(readAbuseRuntimeState(env)).toMatchObject({
       brake: {
         active: true,
-        reason: 'asn_fast_path',
+        reason: 'global_threshold',
         changedAt: '2026-04-19T00:05:00.000Z',
         changedBy: 'system',
       },
       alertLatches: {
-        warn1: true,
-        warn2: false,
-        warn3: false,
-        critical: true,
+        warning: true,
       },
       dailyReport: {
         lastDeliveredAt: '2026-04-19T00:00:00.000Z',

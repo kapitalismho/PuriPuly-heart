@@ -1,11 +1,16 @@
 import { getBrokerAbuseControlsConfig } from './abuse-controls';
-import { applyAbuseMonitoringRetention } from './abuse-monitoring';
+import {
+  applyAbuseMonitoringRetention,
+  deliverManagedCleanupIncident,
+} from './abuse-monitoring';
 import type { BrokerBindings } from './contract';
 import { sendDailyReport, type DailyReportPayload } from './discord-alerts';
 import {
+  acknowledgeManagedKeyDeliveryCleanupClaim,
+  claimStaleManagedKeyDeliveryCleanup,
   listStalePendingManagedKeyDeliveries,
   markManagedKeyDeliveryAcknowledged,
-  markManagedKeyDeliveryCleanupRequired,
+  STALE_DELIVERY_CLEANUP_CLAIM_REASON,
 } from './managed-key-delivery';
 import { cleanupManagedChildKey } from './openrouter-management';
 import type {
@@ -59,43 +64,85 @@ export async function handleScheduled(
   controller: ScheduledControllerLike,
   env: Pick<
     BrokerBindings,
-    'BROKER_DB' | 'DISCORD_DAILY_REPORT_WEBHOOK_URL' | 'OPENROUTER_MANAGEMENT_API_KEY'
+    | 'BROKER_DB'
+    | 'DISCORD_DAILY_REPORT_WEBHOOK_URL'
+    | 'DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL'
+    | 'OPENROUTER_MANAGEMENT_API_KEY'
   >,
   _ctx: ExecutionContextLike,
 ): Promise<void> {
   const now = new Date(controller.scheduledTime);
+  const failures: unknown[] = [];
 
-  await reconcileStaleManagedKeyDeliveries(env, now);
-  await reconcileStaleReferralRewards(env.BROKER_DB, { nowIso: now.toISOString() });
-  await applyReferralRewardRetention(env.BROKER_DB, now);
+  await runScheduledPhase(failures, () =>
+    reconcileStaleManagedKeyDeliveries(env, now),
+  );
+  await runScheduledPhase(failures, () =>
+    reconcileStaleReferralRewards(env.BROKER_DB, { nowIso: now.toISOString() }),
+  );
+  await runScheduledPhase(failures, () =>
+    applyReferralRewardRetention(env.BROKER_DB, now),
+  );
 
-  const controls = await getBrokerAbuseControlsConfig(env.BROKER_DB);
-
-  if (!isDailyReportScheduleDue(controls.dailyReport, now)) {
-    await applyScheduledRetention(env.BROKER_DB, now);
-    return;
-  }
-
+  let controls: BrokerAbuseControlsConfigValue | null = null;
   try {
-    await runDailyReport(env, now);
-  } finally {
-    await applyScheduledRetention(env.BROKER_DB, now);
+    controls = await getBrokerAbuseControlsConfig(env.BROKER_DB);
+  } catch (error) {
+    failures.push(error);
   }
+
+  if (controls && isDailyReportScheduleDue(controls.dailyReport, now)) {
+    await runScheduledPhase(failures, () => runDailyReport(env, now));
+  }
+
+  await runScheduledPhase(failures, () => applyScheduledRetention(env.BROKER_DB, now));
+  throwFirstScheduledFailure(failures);
 }
 
 async function applyScheduledRetention(db: D1Database, now: Date): Promise<void> {
-  const preserveIssueSuccessFrom = await resolveIssueSuccessPreservationStart(
-    db,
-    now,
-  );
-  await Promise.all([
-    applyAbuseMonitoringRetention(db, now, { preserveIssueSuccessFrom }),
+  const failures: unknown[] = [];
+  let preserveIssueSuccessFrom: string | null = null;
+  await runScheduledPhase(failures, async () => {
+    preserveIssueSuccessFrom = await resolveIssueSuccessPreservationStart(db, now);
+  });
+  const preservationStart = preserveIssueSuccessFrom;
+  if (preservationStart !== null) {
+    await runScheduledPhase(failures, () =>
+      applyAbuseMonitoringRetention(db, now, {
+        preserveIssueSuccessFrom: preservationStart,
+      }),
+    );
+  }
+  await runScheduledPhase(failures, () =>
     applyTelemetryActiveDayRetention(db, now),
-  ]);
+  );
+  throwFirstScheduledFailure(failures);
+}
+
+async function runScheduledPhase(
+  failures: unknown[],
+  phase: () => Promise<unknown>,
+): Promise<void> {
+  try {
+    await phase();
+  } catch (error) {
+    failures.push(error);
+  }
+}
+
+function throwFirstScheduledFailure(failures: unknown[]): void {
+  if (failures.length > 0) {
+    throw failures[0];
+  }
 }
 
 export async function reconcileStaleManagedKeyDeliveries(
-  env: Pick<BrokerBindings, 'BROKER_DB' | 'OPENROUTER_MANAGEMENT_API_KEY'>,
+  env: Pick<
+    BrokerBindings,
+    | 'BROKER_DB'
+    | 'OPENROUTER_MANAGEMENT_API_KEY'
+    | 'DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL'
+  >,
   now: Date,
 ): Promise<{ expired: number; cleanupRequired: number }> {
   let expired = 0;
@@ -107,12 +154,42 @@ export async function reconcileStaleManagedKeyDeliveries(
   const nowIso = now.toISOString();
   for (const delivery of staleDeliveries) {
     if (await isManagedKeyDeliveryFinalized(env.BROKER_DB, delivery)) {
-      const repaired = await markManagedKeyDeliveryAcknowledged(env.BROKER_DB, {
-        deliveryId: delivery.delivery_id,
-        acknowledgedAt: now,
-      });
-      if (!repaired.ok) {
+      const repaired =
+        delivery.status === 'pending'
+          ? (
+              await markManagedKeyDeliveryAcknowledged(env.BROKER_DB, {
+                deliveryId: delivery.delivery_id,
+                acknowledgedAt: now,
+              })
+            ).ok
+          : await acknowledgeManagedKeyDeliveryCleanupClaim(env.BROKER_DB, {
+              deliveryId: delivery.delivery_id,
+              acknowledgedAt: nowIso,
+              expectedClaimedAt: delivery.failed_at,
+            });
+      if (!repaired) {
         throw new Error('failed to reconcile finalized managed key delivery');
+      }
+      continue;
+    }
+    const claimed = await claimStaleManagedKeyDeliveryCleanup(env.BROKER_DB, {
+      delivery,
+      claimedAt: nowIso,
+    });
+    if (!claimed) {
+      continue;
+    }
+    if (await isManagedKeyDeliveryFinalized(env.BROKER_DB, delivery)) {
+      const repaired = await acknowledgeManagedKeyDeliveryCleanupClaim(
+        env.BROKER_DB,
+        {
+          deliveryId: delivery.delivery_id,
+          acknowledgedAt: nowIso,
+          expectedClaimedAt: nowIso,
+        },
+      );
+      if (!repaired) {
+        throw new Error('failed to reconcile claimed finalized managed key delivery');
       }
       continue;
     }
@@ -121,118 +198,278 @@ export async function reconcileStaleManagedKeyDeliveries(
       keyHash: delivery.managed_credential_ref,
     });
     if (!cleanup.ok) {
-      await markManagedKeyDeliveryCleanupRequired(env.BROKER_DB, {
-        deliveryId: delivery.delivery_id,
-        failedAt: nowIso,
-        failureReason: 'managed_child_key_cleanup_failed',
-      });
-      await markDeliveryOwnerCleanupRequired(env.BROKER_DB, delivery, nowIso);
-      cleanupRequired += 1;
+      let transition: Awaited<ReturnType<typeof markDeliveryCleanupRequired>>;
+      try {
+        transition = await markDeliveryCleanupRequired(
+          env.BROKER_DB,
+          delivery,
+          nowIso,
+        );
+      } catch (error) {
+        await deliverManagedCleanupIncident(env, {
+          issueSource: delivery.issue_source,
+          managedCredentialRef: delivery.managed_credential_ref,
+          phase: 'stale_delivery',
+          cleanupRequiredRecorded: false,
+          occurredAt: nowIso,
+        });
+        throw error;
+      }
+      if (transition.incidentRecorded) {
+        await deliverManagedCleanupIncident(env, {
+          issueSource: delivery.issue_source,
+          managedCredentialRef: delivery.managed_credential_ref,
+          phase: 'stale_delivery',
+          cleanupRequiredRecorded: transition.ownerRecorded,
+          occurredAt: nowIso,
+        });
+      }
+      cleanupRequired += transition.incidentRecorded ? 1 : 0;
       continue;
     }
-    await markDeliveryOwnerExpired(env.BROKER_DB, delivery, nowIso);
-    await env.BROKER_DB.prepare(
-      `UPDATE managed_key_deliveries
-          SET status = 'expired', failed_at = ?, failure_reason = 'ack_expired_child_key_cleaned'
-        WHERE delivery_id = ?
-          AND status = 'pending'`,
-    )
-      .bind(nowIso, delivery.delivery_id)
-      .run();
-    expired += 1;
+    const completed = await completeDeliveryCleanup(
+      env.BROKER_DB,
+      delivery,
+      nowIso,
+    );
+    expired += completed ? 1 : 0;
   }
   return { expired, cleanupRequired };
 }
 
-async function markDeliveryOwnerExpired(
+async function completeDeliveryCleanup(
   db: D1Database,
   delivery: ManagedKeyDeliveryRecord,
   nowIso: string,
-): Promise<void> {
+): Promise<boolean> {
   if (delivery.issue_source === 'discord') {
-    await db
-      .prepare(
+    const results = await db.batch([
+      db.prepare(
         `DELETE FROM openrouter_entitlements
           WHERE managed_credential_ref = ?
             AND status IN ('pending_release', 'active')
-            AND discord_issue_status IN ('delivery_pending', 'active')`,
-      )
-      .bind(delivery.managed_credential_ref)
-      .run();
-    await db
-      .prepare(
+            AND discord_issue_status IN ('delivery_pending', 'active')
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        delivery.managed_credential_ref,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
         `DELETE FROM discord_identities
           WHERE discord_user_ref = ?
             AND entitlement_installation_id = ?
-            AND status IN ('issuing', 'active')`,
-      )
-      .bind(delivery.subject_ref ?? '', delivery.installation_id ?? '')
-      .run();
-    await db
-      .prepare(
+            AND status IN ('issuing', 'active')
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        delivery.subject_ref ?? '',
+        delivery.installation_id ?? '',
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
         `UPDATE referral_rewards
             SET referred_bonus_status = 'failed', referrer_bonus_status = 'failed', failure_reason = 'issue_delivery_failed', updated_at = ?
           WHERE referred_managed_credential_ref IS NULL
             AND referred_bonus_status = 'reserved'
-            AND referred_installation_id = ?`,
-      )
-      .bind(nowIso, delivery.installation_id ?? '')
-      .run();
-    return;
+            AND referred_installation_id = ?
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        nowIso,
+        delivery.installation_id ?? '',
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
+        `UPDATE managed_key_deliveries
+            SET failed_at = ?, failure_reason = 'ack_expired_child_key_cleaned'
+          WHERE delivery_id = ?
+            AND status = 'expired'
+            AND failure_reason = ?
+            AND failed_at = ?`,
+      ).bind(
+        nowIso,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+    ]);
+    return Number(results.at(-1)?.meta.changes ?? 0) === 1;
   }
   if (delivery.issue_source === 'qq') {
-    await db
-      .prepare(
+    const results = await db.batch([
+      db.prepare(
         `DELETE FROM qq_managed_entitlements
           WHERE managed_credential_ref = ?
-            AND status IN ('delivery_pending', 'active')`,
-      )
-      .bind(delivery.managed_credential_ref)
-      .run();
+            AND status IN ('delivery_pending', 'active')
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        delivery.managed_credential_ref,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
+        `UPDATE managed_key_deliveries
+            SET failed_at = ?, failure_reason = 'ack_expired_child_key_cleaned'
+          WHERE delivery_id = ?
+            AND status = 'expired'
+            AND failure_reason = ?
+            AND failed_at = ?`,
+      ).bind(
+        nowIso,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+    ]);
+    return Number(results.at(-1)?.meta.changes ?? 0) === 1;
   }
+  return false;
 }
 
-async function markDeliveryOwnerCleanupRequired(
+async function markDeliveryCleanupRequired(
   db: D1Database,
   delivery: ManagedKeyDeliveryRecord,
   nowIso: string,
-): Promise<void> {
+): Promise<{ incidentRecorded: boolean; ownerRecorded: boolean }> {
   if (delivery.issue_source === 'discord') {
-    await db
-      .prepare(
+    const results = await db.batch([
+      db.prepare(
         `UPDATE openrouter_entitlements
             SET status = 'pending_release',
                 discord_issue_status = 'cleanup_required',
                 discord_issue_delivered_at = NULL
           WHERE managed_credential_ref = ?
             AND status IN ('pending_release', 'active')
-            AND discord_issue_status IN ('delivery_pending', 'active')`,
-      )
-      .bind(delivery.managed_credential_ref)
-      .run();
-    await db
-      .prepare(
+            AND discord_issue_status IN ('delivery_pending', 'active')
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        delivery.managed_credential_ref,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
         `UPDATE discord_identities
             SET status = 'cleanup_required', updated_at = ?
           WHERE discord_user_ref = ?
             AND entitlement_installation_id = ?
-            AND status IN ('issuing', 'active')`,
-      )
-      .bind(nowIso, delivery.subject_ref ?? '', delivery.installation_id ?? '')
-      .run();
-    return;
+            AND status IN ('issuing', 'active')
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        nowIso,
+        delivery.subject_ref ?? '',
+        delivery.installation_id ?? '',
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
+        `UPDATE managed_key_deliveries
+            SET status = 'cleanup_required',
+                failed_at = ?,
+                failure_reason = 'managed_child_key_cleanup_failed'
+          WHERE delivery_id = ?
+            AND status = 'expired'
+            AND failure_reason = ?
+            AND failed_at = ?`,
+      ).bind(
+        nowIso,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+    ]);
+    return {
+      incidentRecorded: Number(results[2]?.meta.changes ?? 0) === 1,
+      ownerRecorded:
+        Number(results[0]?.meta.changes ?? 0) === 1 &&
+        Number(results[1]?.meta.changes ?? 0) === 1,
+    };
   }
   if (delivery.issue_source === 'qq') {
-    await db
-      .prepare(
+    const results = await db.batch([
+      db.prepare(
         `UPDATE qq_managed_entitlements
             SET status = 'cleanup_required', delivered_at = NULL, updated_at = ?
           WHERE managed_credential_ref = ?
-            AND status IN ('delivery_pending', 'active')`,
-      )
-      .bind(nowIso, delivery.managed_credential_ref)
-      .run();
+            AND status IN ('delivery_pending', 'active')
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        nowIso,
+        delivery.managed_credential_ref,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
+        `UPDATE managed_key_deliveries
+            SET status = 'cleanup_required',
+                failed_at = ?,
+                failure_reason = 'managed_child_key_cleanup_failed'
+          WHERE delivery_id = ?
+            AND status = 'expired'
+            AND failure_reason = ?
+            AND failed_at = ?`,
+      ).bind(
+        nowIso,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+    ]);
+    return {
+      incidentRecorded: Number(results[1]?.meta.changes ?? 0) === 1,
+      ownerRecorded: Number(results[0]?.meta.changes ?? 0) === 1,
+    };
   }
+  return { incidentRecorded: false, ownerRecorded: false };
 }
 
 async function isManagedKeyDeliveryFinalized(

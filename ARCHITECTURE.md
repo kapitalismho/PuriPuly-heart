@@ -44,7 +44,7 @@ core runtime and domain contracts
 | VRChat OSC           | Bidirectional control, canonical state, chatbox output, mute      |
 | Overlay processes    | Desktop and VR subtitle presentation                              |
 | GPU worker           | Native local GPU ASR                                              |
-| Broker               | Managed identity, entitlement, credentials, telemetry, operational reporting |
+| Broker               | Managed identity, entitlement, credentials, telemetry             |
 | Local storage        | Settings, secrets, diagnostics, model assets                      |
 
 
@@ -127,29 +127,6 @@ managed authentication
 → provider runtime activation
 → normal translation request path
 ```
-
-### Broker operational reporting
-
-```text
-managed-key delivery acknowledgement
-→ source-aware delivery event
-→ finalized-owner ACK-ledger reconciliation before stale cleanup
-→ last-completed-UTC-day aggregation
-→ per-report-date delivery lease
-→ oldest-pending-date retry and ordered catch-up
-→ puripuly_daily_summary.v2
-→ Discord operations channel
-```
-
-```text
-translation-success callback and origin UTC-date capture
-→ owned settings-mutation queue
-→ HMAC-derived anonymous subject and active-day state
-→ completed-day DAU / WAU / MAU and first / returning aggregation
-→ puripuly_daily_summary.v2
-```
-
-Anonymous translation subjects remain separate from managed Discord, QQ, installation, and credential identities. Active-day retention does not remove durable first/last-observed subject bounds.
 
 ## Ports and Adapters
 

@@ -1715,7 +1715,7 @@ function mockDiscordApi(options: {
     if (url === OPENROUTER_KEYS_URL && method === 'POST') {
       openRouterCreateCalls.push({ input, init });
       if (options.openRouterMode === 'create_failure') {
-        return jsonResponse({ error: { message: 'create failed before key delivery' } }, 500);
+        return jsonResponse({ error: { message: 'create failed before key delivery' } }, 400);
       }
 
       const sequence = openRouterCreateCalls.length;

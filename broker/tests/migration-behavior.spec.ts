@@ -67,12 +67,38 @@ describe('broker migration behavior', () => {
       expect(rows.map(({ value }) => JSON.parse(value))).toEqual([
         {
           ...TEST_DEFAULT_ABUSE_CONTROLS,
+          immediateAlerts: {
+            warn1: 10,
+            warn2: 25,
+            warn3: 50,
+            critical: 70,
+            ...TEST_DEFAULT_ABUSE_CONTROLS.immediateAlerts,
+          },
+          asnFastPath: {
+            enabled: true,
+            minIssueSuccess1h: 20,
+            minTopAsnSharePct: 70,
+          },
+          asnClassifications: [],
+          retention: {
+            requestEventsDays: 30,
+            ...TEST_DEFAULT_ABUSE_CONTROLS.retention,
+          },
           dailyReport: {
             ...TEST_DEFAULT_ABUSE_CONTROLS.dailyReport,
             includeZeroActivity: false,
           },
         },
-        TEST_DEFAULT_ABUSE_RUNTIME_STATE,
+        {
+          ...TEST_DEFAULT_ABUSE_RUNTIME_STATE,
+          alertLatches: {
+            warn1: false,
+            warn2: false,
+            warn3: false,
+            critical: false,
+            ...TEST_DEFAULT_ABUSE_RUNTIME_STATE.alertLatches,
+          },
+        },
         {
           current: {
             version: 1,
@@ -598,9 +624,15 @@ describe('broker migration behavior', () => {
       const runtimeStateRow = db
         .prepare('SELECT value FROM broker_config WHERE key = ?')
         .get('abuse_runtime_state') as { value: string };
-      expect(JSON.parse(runtimeStateRow.value)).toEqual(
-        TEST_DEFAULT_ABUSE_RUNTIME_STATE,
-      );
+      expect(JSON.parse(runtimeStateRow.value)).toEqual({
+        ...TEST_DEFAULT_ABUSE_RUNTIME_STATE,
+        alertLatches: {
+          warn1: false,
+          warn2: false,
+          warn3: false,
+          critical: false,
+        },
+      });
 
       const issueEventColumns = db
         .prepare("SELECT name FROM pragma_table_info('broker_issue_success_events') ORDER BY cid")
@@ -692,34 +724,30 @@ describe('broker migration behavior', () => {
       const migratedRow = db
         .prepare('SELECT value FROM broker_config WHERE key = ?')
         .get('abuse_controls') as { value: string };
-      const {
-        discordAuthStartIp: _discordAuthStartIp,
-        discordAuthStartInstallation: _discordAuthStartInstallation,
-        discordOpenrouterIssueIp: _discordOpenrouterIssueIp,
-        discordOpenrouterIssueInstallation: _discordOpenrouterIssueInstallation,
-        pendingDiscordOAuthSessions: _pendingDiscordOAuthSessions,
-        qqAuthAssertIp: _qqAuthAssertIp,
-        telemetryTranslationSuccessDayIp: _telemetryTranslationSuccessDayIp,
-        referralAttempts: _referralAttempts,
-        dailyReport: _dailyReport,
-        retention: defaultRetention,
-        ...defaultsThrough0003
-      } = TEST_DEFAULT_ABUSE_CONTROLS;
-      const {
-        referralSkippedDays: _referralSkippedDays,
-        referralFailedDays: _referralFailedDays,
-        ...retentionThrough0003
-      } = defaultRetention;
-
-      expect(JSON.parse(migratedRow.value)).toEqual({
-        ...defaultsThrough0003,
+      expect(JSON.parse(migratedRow.value)).toMatchObject({
+        immediateAlerts: {
+          warn1: 10,
+          warn2: 25,
+          warn3: 50,
+          critical: 70,
+        },
+        asnFastPath: {
+          enabled: true,
+          minIssueSuccess1h: 20,
+          minTopAsnSharePct: 70,
+        },
+        asnClassifications: [],
         dailyReport: {
           enabled: true,
           hourUtc: 13,
           minuteUtc: 0,
           includeZeroActivity: false,
         },
-        retention: retentionThrough0003,
+        retention: {
+          requestEventsDays: 30,
+          issueSuccessDays: 30,
+          runtimeAuditDays: 90,
+        },
         ...tunedLegacyControls,
       });
     } finally {
@@ -1504,6 +1532,68 @@ describe('broker migration behavior', () => {
 
       expect(insertedRow.id).toBe(101);
       expect(sequenceRow.seq).toBe(101);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('adds warning, brake, and enforcement-retention controls without breaking the previous Worker shape', () => {
+    const db = new DatabaseSync(':memory:');
+
+    try {
+      applyBrokerMigrations(db, {
+        through: '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
+      });
+      const controlsRow = db
+        .prepare("SELECT value FROM broker_config WHERE key = 'abuse_controls'")
+        .get() as { value: string };
+      const controls = JSON.parse(controlsRow.value) as Record<string, any>;
+      controls.immediateAlerts.warn1 = 12;
+      controls.immediateAlerts.critical = 80;
+      db.prepare("UPDATE broker_config SET value = ? WHERE key = 'abuse_controls'").run(
+        JSON.stringify(controls),
+      );
+      const runtimeRow = db
+        .prepare("SELECT value FROM broker_config WHERE key = 'abuse_runtime_state'")
+        .get() as { value: string };
+      const runtime = JSON.parse(runtimeRow.value) as Record<string, any>;
+      runtime.alertLatches.warn2 = true;
+      db.prepare(
+        "UPDATE broker_config SET value = ? WHERE key = 'abuse_runtime_state'",
+      ).run(JSON.stringify(runtime));
+
+      applyBrokerMigrations(db, {
+        after: '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
+        through: '0014_simplify_abuse_incidents.sql',
+      });
+
+      const migratedControls = JSON.parse(
+        (db
+          .prepare("SELECT value FROM broker_config WHERE key = 'abuse_controls'")
+          .get() as { value: string }).value,
+      ) as Record<string, any>;
+      const migratedRuntime = JSON.parse(
+        (db
+          .prepare("SELECT value FROM broker_config WHERE key = 'abuse_runtime_state'")
+          .get() as { value: string }).value,
+      ) as Record<string, any>;
+      expect(migratedControls.immediateAlerts).toMatchObject({
+        warning: 12,
+        brake: 80,
+        warn1: 12,
+        critical: 80,
+      });
+      expect(migratedControls.retention.requestEventSafetyMarginDays).toBe(1);
+      expect(migratedRuntime.alertLatches).toMatchObject({
+        warning: true,
+        warningObservedAt: null,
+        warn2: true,
+      });
+      expect(
+        db
+          .prepare("SELECT COUNT(*) AS count FROM pragma_table_info('qq_managed_entitlements') WHERE name = 'child_key_creation_started_at'")
+          .get(),
+      ).toEqual({ count: 1 });
     } finally {
       db.close();
     }

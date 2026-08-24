@@ -128,7 +128,14 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
 - The report contains only delivered-key total/Discord/QQ counts and translated DAU/WAU/MAU plus first-observed/returning counts.
 - Healthy-state security fields, legacy challenge/verify funnel metrics, ASN analysis, stickiness, and D1/D7/D30 cohort rows are excluded.
 - A per-report-date D1 lease prevents overlapping cron invocations from posting the same report twice. Failed dates remain pending across UTC midnight, retries keep their original fixed window, and later completed dates catch up in order without allowing retention to delete unreported issue events.
-- Stale managed-key delivery reconciliation promotes a pending ACK ledger row to acknowledged when the source owner and issue-success event are already finalized, before any upstream key cleanup is attempted.
+- Delivery ACK finalization atomically commits the source owner, one idempotent issue-success event, and the acknowledgement ledger before evaluating immediate incidents. Stale reconciliation promotes already-finalized pending rows to acknowledged; otherwise it acquires a durable cleanup claim, recovers abandoned claims only after the scheduled invocation limit, and atomically terminalizes the owner and delivery ledger.
+
+## Immediate abuse incidents
+
+- Source-aware successful-delivery events feed a rolling 60-minute issuance count with one `warning` threshold and one automatic `brake` threshold. Healthy observations do not call the immediate-alert webhook, and a transition that crosses both thresholds emits only the brake incident.
+- A warning is emitted once per above-threshold interval and rearms only after the count drops back to or below its threshold. A brake incident is emitted only for the successful persisted transition into the automatic brake state.
+- Discord and QQ managed child-key cleanup failures, including stale-delivery reconciliation failures, persist `cleanup_required` where ownership exists and emit one immediate cleanup incident. An indeterminate provider create result also preserves lifetime-blocking remediation state and alerts instead of permitting another key. Notification failures are audited without replacing the original issuance or cleanup result.
+- Immediate incident payloads contain only operational counts, thresholds, source, cleanup phase/state, and nullable derived credential references. They must not contain raw anonymous identifiers, managed identities, translation content, audio, or API keys.
 
 ## Persistence model
 
@@ -145,6 +152,7 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
 - `0011_add_telemetry_active_days.sql` creates the isolated `telemetry_active_days` table and additively inserts the telemetry endpoint IP rate-limit default into `abuse_controls`; production rollout requires a pre-migration D1 backup/export before this forward migration is applied.
 - `0012_add_managed_key_delivery_ack.sql` adds the shared Discord/QQ delivery acknowledgement ledger and delivery-pending lifecycle states.
 - `0013_add_telemetry_subjects_and_daily_summary_v2.sql` creates and backfills `telemetry_subjects`, keeps it synchronized for the previous Worker during rollout, creates the v2 delivery ledger, preserves existing active-day rows, sets the daily report schedule to 00:05 UTC, and raises issue-event retention to the report-safe two-day minimum without replacing unrelated operator-tuned controls. It intentionally retains `includeZeroActivity` while the previous Worker may still run; the deploy workflow removes that dead field only after the new Worker passes its health check.
+- `0014_simplify_abuse_incidents.sql` additively derives the `warning` and `brake` thresholds, the ordered warning observation state, and the request-event safety margin from existing persisted controls. It also adds a QQ child-key-creation-start marker so ambiguous post-provider failures cannot be stale-reclaimed into a second key. Legacy alert/ASN JSON fields remain during the migration-before-deploy compatibility window; unused physical columns and indexes require a separate forward migration after stabilization.
 
 - `broker_config`
   - columns: `key`, `value`, `updated_at`
@@ -173,6 +181,7 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
   - append-only request observations used for per-endpoint rate limiting and cross-endpoint velocity hooks
   - columns: `id`, `endpoint`, `ip`, `installation_id`, `observed_at`
   - indexes cover endpoint-scoped and subject-scoped sliding-window lookups
+  - retention is calculated at cleanup time from the longest configured endpoint rate-limit window and longest active, unexpired velocity-hook window, plus the explicit `requestEventSafetyMarginDays` margin; the default margin is one day
 - `telemetry_subjects`
   - durable anonymous subject rows keyed by HMAC-derived `subject_ref`
   - columns: `subject_ref`, `first_active_date_utc`, and `last_active_date_utc`
@@ -223,9 +232,9 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
   - stores only derived subject references and credential digests; raw QQ identities and raw credentials do not belong in D1, logs, docs, or checked-in tests
 - `qq_managed_entitlements`
   - QQ Managed production issuance lifecycle keyed by derived `qq_subject_ref`; absence means the subject has not reserved or used production issuance
-  - columns: `qq_subject_ref`, `status`, `issue_ref`, nullable `managed_credential_ref`, `budget_usd`, `reserved_at`, `issued_at`, `expires_at`, `delivered_at`, `created_at`, and `updated_at`
-  - stored statuses are `issuing`, `active`, `cleanup_required`, and `revoked`; `active`, `cleanup_required`, and `revoked` block automatic reissue
-  - `active` requires `managed_credential_ref`, `issued_at`, `expires_at`, and `delivered_at`; `cleanup_required` requires `managed_credential_ref`; stale `issuing` rows can be reclaimed only when no child-key hash was recorded
+  - columns: `qq_subject_ref`, `status`, `issue_ref`, nullable `managed_credential_ref`, `budget_usd`, `reserved_at`, `issued_at`, `expires_at`, `delivered_at`, `created_at`, `updated_at`, and nullable `child_key_creation_started_at`
+  - stored statuses are `issuing`, `delivery_pending`, `active`, `cleanup_required`, and `revoked`; `delivery_pending`, `active`, `cleanup_required`, and `revoked` block automatic reissue
+  - `active` requires `managed_credential_ref`, `issued_at`, `expires_at`, and `delivered_at`; `cleanup_required` requires `managed_credential_ref`; stale `issuing` rows can be reclaimed only when neither a child-key hash nor a child-key-creation-start marker was recorded
   - existing `qq_auth_assertions` rows without a `qq_managed_entitlements` row remain eligible for their first production issuance
   - stores derived and operational metadata only; raw QQ identities, raw credentials, and raw OpenRouter API keys do not belong in this table
 - `referral_codes`

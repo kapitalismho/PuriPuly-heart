@@ -379,6 +379,7 @@ describe('broker persistent state model', () => {
             'delivered_at',
             'created_at',
             'updated_at',
+            'child_key_creation_started_at',
           ],
           unique: ['issue_ref'],
           partialUniqueIndexes: [
@@ -396,13 +397,13 @@ describe('broker persistent state model', () => {
               'requires managed_credential_ref, issued_at, and expires_at; delivered_at remains null until ACK succeeds',
             cleanup_required: 'requires managed_credential_ref',
             issuing:
-              'may be stale-reclaimed only when managed_credential_ref is NULL; issuing with a credential ref requires cleanup/remediation',
+              'may be stale-reclaimed only when managed_credential_ref and child_key_creation_started_at are NULL; any started child-key creation requires manual remediation or cleanup',
             revoked: 'blocks automatic reissue',
           },
           staleIssuingPolicy: {
             ttlMinutes: 15,
             withoutManagedCredentialRef:
-              'eligible for same-subject release/reclaim by a later valid request after TTL',
+              'eligible for same-subject release/reclaim by a later valid request after TTL only when child-key creation never started',
             withManagedCredentialRef:
               'cleanup/remediation candidate; must not be silently overwritten',
           },
@@ -445,7 +446,7 @@ describe('broker persistent state model', () => {
           rawAckTokenStorage: false,
           rawOpenRouterKeyStorage: false,
           stalePendingCleanup:
-            'pending rows remain pending after expired ACK attempts until cleanup owner marks expired or cleanup_required',
+            'expired rows are claimed exclusively; abandoned claims recover only after the scheduled invocation limit, and terminal owner/ledger transitions are atomic',
         },
         brokerRequestEvents: {
           name: 'broker_request_events',
@@ -461,7 +462,7 @@ describe('broker persistent state model', () => {
         },
         brokerIssueSuccessEvents: {
           name: 'broker_issue_success_events',
-          purpose: ['issue success alerting', 'daily reporting', 'asn-based heuristics'],
+          purpose: ['issuance spike detection', 'daily reporting'],
           issueSources: ['discord', 'qq'],
           sourceAwareSubjectModel: {
             discord: {
@@ -644,6 +645,7 @@ describe('broker persistent state model', () => {
       '0011_add_telemetry_active_days.sql',
       '0012_add_managed_key_delivery_ack.sql',
       '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
+      '0014_simplify_abuse_incidents.sql',
     ]);
     expect(existsSync(FIRST_BROKER_MIGRATION)).toBe(true);
     expect(existsSync(LATEST_BROKER_MIGRATION)).toBe(true);
@@ -693,6 +695,9 @@ describe('broker persistent state model', () => {
     );
     const dailySummaryV2Migration = readBrokerMigrationSql(
       '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
+    );
+    const simplifiedAbuseIncidentsMigration = readBrokerMigrationSql(
+      '0014_simplify_abuse_incidents.sql',
     );
     const dailySummaryV2Finalizer = readFileSync(
       DAILY_SUMMARY_V2_FINALIZER,
@@ -901,6 +906,12 @@ describe('broker persistent state model', () => {
     );
     expect(dailySummaryV2Migration).toContain("'$.retention.issueSuccessDays'");
     expect(dailySummaryV2Migration).not.toContain('telemetry_identifier');
+    expect(simplifiedAbuseIncidentsMigration).toContain(
+      "'$.immediateAlerts.warning'",
+    );
+    expect(simplifiedAbuseIncidentsMigration).toContain(
+      "'$.retention.requestEventSafetyMarginDays'",
+    );
     expect(managedKeyDeliveryAckMigration).toContain('CREATE TABLE managed_key_deliveries');
     expect(managedKeyDeliveryAckMigration).toContain(
       "discord_issue_status TEXT CHECK(discord_issue_status IS NULL OR discord_issue_status IN ('issuing', 'delivery_pending', 'active', 'failed', 'cleanup_required'))",
