@@ -22,6 +22,9 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
     TranslationReadyDiagnostic,
     TranslationSkipDiagnostic,
 )
+from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
+from puripuly_heart.domain.models import OSCMessage
+from tests.helpers.fakes import FakeSender
 
 
 class RuntimeLogging:
@@ -132,6 +135,78 @@ def test_owner_emits_latency_contract_once_with_channel_hangover_and_cause() -> 
     assert "provider=llm" in cause
     assert "dominant_stage=llm_request_to_llm_done" in cause
     assert "llm_request_to_llm_done_ms=300" in cause
+
+
+def test_chatbox_replacement_and_prune_reach_runtime_logging_without_overlay_diagnostics() -> None:
+    clock = FakeClock(_now=10.0)
+    logging = RuntimeLogging()
+    owner = make_owner(clock=clock, runtime_logging=logging, overlay_diagnostics=None)
+    paginator = ChatboxPaginator(
+        sender=FakeSender(),
+        clock=clock,
+        max_chars=4,
+        runtime_logging=logging,
+        stage_recorder=owner.record_chatbox_stage,
+    )
+    parent_id = uuid4()
+
+    paginator.enqueue(
+        OSCMessage(
+            utterance_id=parent_id,
+            text="PRIVATE_FIRST",
+            created_at=clock.now(),
+            turn_generation=3,
+            turn_order=7,
+            presentation_revision=1,
+            target_indexes=(1,),
+            target_languages=("ja",),
+        )
+    )
+    paginator.enqueue(
+        OSCMessage(
+            utterance_id=parent_id,
+            text="PRIVATE_COMPLETE",
+            created_at=clock.now(),
+            turn_generation=3,
+            turn_order=7,
+            presentation_revision=2,
+            target_indexes=(0, 1),
+            target_languages=("zh-CN", "ja"),
+        )
+    )
+    newer_parent_id = uuid4()
+    paginator.enqueue(
+        OSCMessage(
+            utterance_id=newer_parent_id,
+            text="PRIVATE_NEWER",
+            created_at=clock.now(),
+            turn_generation=3,
+            turn_order=8,
+            presentation_revision=1,
+            target_indexes=(0,),
+            target_languages=("zh-CN",),
+        )
+    )
+
+    replacement = next(
+        message for message in logging.detailed if "chatbox_revision_replaced" in message
+    )
+    prune = next(message for message in logging.detailed if "chatbox_older_turn_pruned" in message)
+    assert f"parent_utterance_id={parent_id}" in replacement
+    assert "turn_generation=3" in replacement
+    assert "turn_order=7" in replacement
+    assert "target_indexes=(0, 1)" in replacement
+    assert "target_languages=('zh-CN', 'ja')" in replacement
+    assert "presentation_revision=2" in replacement
+    assert "previous_revision=1" in replacement
+    assert f"parent_utterance_id={newer_parent_id}" in prune
+    assert "turn_order=8" in prune
+    assert "target_indexes=(0,)" in prune
+    assert "target_languages=('zh-CN',)" in prune
+    combined = "\n".join(logging.detailed)
+    assert "PRIVATE_FIRST" not in combined
+    assert "PRIVATE_COMPLETE" not in combined
+    assert "PRIVATE_NEWER" not in combined
 
 
 def test_owner_inherits_and_clears_only_the_selected_timeline() -> None:

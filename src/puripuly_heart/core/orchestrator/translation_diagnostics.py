@@ -513,6 +513,33 @@ class TranslationLatencyDiagnosticsOwner:
             )
 
     def record_chatbox_stage(self, event: str, **fields: object) -> None:
+        if event in {"chatbox_revision_replaced", "chatbox_older_turn_pruned"}:
+            self.emit(
+                RuntimeDiagnostic(
+                    message=(
+                        "[Detailed][Translation] %s parent_utterance_id=%s "
+                        "turn_generation=%s turn_order=%s target_indexes=%s "
+                        "target_languages=%s presentation_revision=%s "
+                        "previous_revision=%s location=%s dropped_pages=%s "
+                        "pruned_messages=%s pruned_pages=%s"
+                    ),
+                    args=(
+                        event,
+                        fields.get("utterance_id"),
+                        fields.get("turn_generation"),
+                        fields.get("turn_order"),
+                        fields.get("target_indexes"),
+                        fields.get("target_languages"),
+                        fields.get("presentation_revision"),
+                        fields.get("previous_revision"),
+                        fields.get("location"),
+                        fields.get("dropped_pages"),
+                        fields.get("pruned_messages"),
+                        fields.get("pruned_pages"),
+                    ),
+                    detailed=True,
+                )
+            )
         recorder = self.overlay_diagnostics
         if recorder is None:
             return

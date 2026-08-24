@@ -85,6 +85,38 @@ def test_short_message_sends_immediately_without_cooldown() -> None:
     assert sender.sent == ["hello", "world"]
 
 
+def test_detailed_send_attempt_records_length_without_chatbox_payload() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    runtime_logging = FakeRuntimeLogging(detailed_enabled=True)
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        runtime_logging=runtime_logging,
+    )
+    payload = "PRIVATE_PRIMARY\nPRIVATE_SECONDARY"
+
+    paginator.enqueue(
+        _message(
+            payload,
+            clock,
+            turn_generation=2,
+            turn_order=7,
+            presentation_revision=2,
+            target_indexes=(0, 1),
+            target_languages=("zh-CN", "ja"),
+        )
+    )
+
+    combined = "\n".join(message for _level, message in runtime_logging.detailed)
+    assert "status=attempt" in combined
+    assert f"chars={len(payload)}" in combined
+    assert "remaining_parts=0" in combined
+    assert "PRIVATE_PRIMARY" not in combined
+    assert "PRIVATE_SECONDARY" not in combined
+    assert "text=" not in combined
+
+
 def test_default_limits_send_144_chars_immediately_and_paginate_145_chars_every_3s() -> None:
     clock = FakeClock()
     sender = FakeSender()

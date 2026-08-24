@@ -430,7 +430,7 @@ class ChatboxPaginator:
     def _emit_send_attempt(self, *, mode: str, text: str, remaining_parts: int) -> None:
         self._emit_detailed(
             f"[Detailed][OSC] send mode={mode} status=attempt chars={len(text)} "
-            f"remaining_parts={remaining_parts} text={text!r}"
+            f"remaining_parts={remaining_parts}"
         )
 
     def _emit_send_delivered(self, *, mode: str, text: str, remaining_parts: int) -> None:
