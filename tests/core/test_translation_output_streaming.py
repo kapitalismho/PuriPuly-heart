@@ -130,10 +130,16 @@ def _active_self_metadata_for_buffer(
 @dataclass(slots=True)
 class RecordingTranslationDiagnostics:
     translation_events: list[dict[str, object]] = field(default_factory=list)
+    stt_events: list[dict[str, object]] = field(default_factory=list)
 
     def record_translation(self, event: str, **fields: object) -> dict[str, object]:
         payload = {"event": event, **fields}
         self.translation_events.append(payload)
+        return payload
+
+    def record_stt(self, event: str, **fields: object) -> dict[str, object]:
+        payload = {"event": event, **fields}
+        self.stt_events.append(payload)
         return payload
 
 
