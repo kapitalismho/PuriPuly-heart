@@ -22,8 +22,20 @@ $env:PSEM_REFERENCE_ROOT = 'C:\path\to\diar-forced-alignment-at-9527b7c'
 uv run --project experiments\speaker_representation_scd\environment --frozen python -m experiments.psem_training_strategy_gate.run preflight
 ```
 
-Preflight writes a machine-readable receipt even when it rejects a run. Training commands
-must consume a current passing receipt and never infer readiness from file presence alone.
+From a clean committed candidate, derive the fixed TRAIN-only sampling and augmentation
+manifests, run the real-batch model audits, and then write the complete preflight receipt:
+
+```powershell
+uv run --project experiments\speaker_representation_scd\environment --frozen python -m experiments.psem_training_strategy_gate.run prepare
+uv run --project experiments\speaker_representation_scd\environment --frozen python -m experiments.psem_training_strategy_gate.run audit
+uv run --project experiments\speaker_representation_scd\environment --frozen python -m experiments.psem_training_strategy_gate.run preflight
+```
+
+`prepare` and `audit` refuse a dirty Git candidate. Preflight independently re-hashes every
+referenced manifest and audit artifact, writes a machine-readable receipt even when it rejects
+a run, and passes only when all eight runtime receipts match the current contract, data,
+label generator, source registry, and Git commit. Training commands must consume a current
+passing receipt and never infer readiness from file presence alone.
 
 The final report must retain the frozen-data limitation: the common AMI/AliMeeting temporal
 activity references are the commit-pinned forced alignments released by Horiguchi et al.

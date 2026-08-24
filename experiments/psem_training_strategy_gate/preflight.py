@@ -18,6 +18,14 @@ from experiments.psem_training_strategy_gate.data.dataset_freeze import (
 from experiments.psem_training_strategy_gate.data.reference_normalization import (
     open_reference_checkout,
 )
+from experiments.psem_training_strategy_gate.runtime_contract import (
+    RUNTIME_ARTIFACT_PATHS,
+    RUNTIME_CHECK_ARTIFACT_PATHS,
+    RUNTIME_CHECK_IDS,
+    RUNTIME_RECEIPT_ROLES,
+    RuntimeEvidenceError,
+    runtime_artifact_checks,
+)
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 EXPERIMENT_ROOT = Path(__file__).resolve().parent
@@ -67,16 +75,7 @@ OUTPUT_RELATIVE_PATH = Path("results") / EXPERIMENT_ID
 DEFAULT_OUTPUT_ROOT = (
     Path(tempfile.gettempdir()).resolve() / "puripuly-heart-research" / EXPERIMENT_ID
 )
-RUNTIME_RECEIPTS = {
-    "sampling_manifest": "psem_sampling_manifest",
-    "augmentation_manifest": "psem_augmentation_manifest",
-    "model_graphs": "psem_model_graph_receipt",
-    "parameter_inventory": "psem_parameter_inventory",
-    "gradient_canary": "psem_gradient_canary",
-    "weight_update_canary": "psem_weight_update_canary",
-    "arm_comparability": "psem_arm_comparability",
-    "metric_contract": "psem_metric_contract",
-}
+RUNTIME_RECEIPTS = RUNTIME_RECEIPT_ROLES
 EXPECTED_CHECK_IDS = (
     "contract.issue_76_controls_exact",
     "paths.roots_safe",
@@ -595,8 +594,12 @@ def _source_checks(
 
 def _runtime_receipt_valid(
     receipt: Mapping[str, Any],
+    receipt_name: str,
     artifact_role: str,
     binding: Mapping[str, Any],
+    output_root: Path | None,
+    corpus_root: Path | None = None,
+    reference_root: Path | None = None,
 ) -> tuple[bool, dict[str, Any]]:
     payload = dict(receipt)
     digest = payload.pop("payload_sha256", None)
@@ -606,9 +609,7 @@ def _runtime_receipt_valid(
     )
     checks_valid = (
         isinstance(rows, list)
-        and bool(rows)
-        and len(check_ids) == len(rows)
-        and len(check_ids) == len(set(check_ids))
+        and tuple(check_ids) == RUNTIME_CHECK_IDS[receipt_name]
         and all(
             set(row) == {"id", "passed", "expected", "observed"}
             and isinstance(row.get("id"), str)
@@ -618,13 +619,188 @@ def _runtime_receipt_valid(
             if isinstance(row, dict)
         )
     )
+    try:
+        generated_at = datetime.fromisoformat(str(receipt.get("generated_at")))
+        timestamp_valid = generated_at.tzinfo is not None
+    except ValueError:
+        timestamp_valid = False
+    details = receipt.get("details")
+    descriptors = details.get("artifacts") if isinstance(details, Mapping) else None
+    expected_relatives = tuple(Path(value) for value in RUNTIME_ARTIFACT_PATHS[receipt_name])
+    details_schema_valid = (
+        isinstance(details, Mapping)
+        and set(details) == {"artifacts"}
+        and isinstance(descriptors, list)
+        and len(descriptors) == len(expected_relatives)
+    )
+    if not details_schema_valid:
+        descriptors = []
+    artifact_rows = []
+    for descriptor, relative in zip(descriptors, expected_relatives):
+        valid = False
+        try:
+            path = Path(str(descriptor["path"]))
+            resolved = path.resolve()
+            expected_path = (output_root / relative).resolve() if output_root is not None else None
+            expected_keys = {"path", "sha256", "size_bytes"}
+            if relative.suffix == ".json":
+                expected_keys.add("canonical_sha256")
+            valid = (
+                output_root is not None
+                and str(resolved) == str(path)
+                and resolved == expected_path
+                and set(descriptor) == expected_keys
+                and isinstance(descriptor["size_bytes"], int)
+                and not isinstance(descriptor["size_bytes"], bool)
+                and descriptor["size_bytes"] >= 0
+                and re.fullmatch(r"[0-9a-f]{64}", str(descriptor["sha256"])) is not None
+                and resolved.is_file()
+                and resolved.stat().st_size == descriptor["size_bytes"]
+                and sha256_file(resolved) == descriptor["sha256"]
+            )
+            if valid and relative.suffix == ".json":
+                value = load_json(resolved)
+                valid = (
+                    re.fullmatch(r"[0-9a-f]{64}", str(descriptor["canonical_sha256"])) is not None
+                    and canonical_sha256(value) == descriptor["canonical_sha256"]
+                )
+        except (KeyError, OSError, TypeError, ValueError):
+            resolved = None
+            valid = False
+        artifact_rows.append(
+            {"path": str(resolved) if resolved is not None else None, "valid": valid}
+        )
+    expected_artifacts = (
+        {
+            str((output_root / relative).resolve())
+            for relative in RUNTIME_ARTIFACT_PATHS[receipt_name]
+        }
+        if output_root is not None
+        else set()
+    )
+    artifacts_valid = {row["path"] for row in artifact_rows} == expected_artifacts and all(
+        row["valid"] for row in artifact_rows
+    )
+    try:
+        check_artifact_path = (
+            output_root / RUNTIME_CHECK_ARTIFACT_PATHS[receipt_name]
+            if output_root is not None
+            else None
+        )
+        check_artifact = load_json(check_artifact_path) if check_artifact_path is not None else None
+        validation_context: dict[str, Any] = {}
+        if receipt_name in {"gradient_canary", "weight_update_canary"}:
+            parameter_artifact = load_json(output_root / "audits" / "parameter_inventory.json")
+            validation_context["parameter_inventory"] = parameter_artifact
+        if receipt_name == "arm_comparability":
+            if corpus_root is None or reference_root is None:
+                raise RuntimeEvidenceError("comparability validation roots are unavailable")
+            from experiments.psem_training_strategy_gate.audit import comparability_provenance
+            from experiments.psem_training_strategy_gate.augmentation import (
+                augmentation_decision,
+                validate_augmentation_decision,
+            )
+            from experiments.psem_training_strategy_gate.sampling import (
+                TRAIN_ROLE,
+                iter_rows,
+                load_runtime_sessions,
+                load_waveform_window,
+                target_for_row,
+            )
+
+            row_id = check_artifact.get("row_id")
+            matching_rows = [
+                value
+                for value in iter_rows(output_root / "manifests" / "sampling_manifest.jsonl")
+                if value.get("row_id") == row_id
+            ]
+            if len(matching_rows) != 1:
+                raise RuntimeEvidenceError("comparability row is absent or duplicated")
+            row = matching_rows[0]
+            if check_artifact.get("source_id") != row.get("source_id") or check_artifact.get(
+                "boundary_sample"
+            ) != row.get("boundary_sample"):
+                raise RuntimeEvidenceError(
+                    "comparability artifact is not bound to its sampling row"
+                )
+            decision = row.get("augmentation")
+            validate_augmentation_decision(decision)
+            if decision != augmentation_decision(str(row_id)):
+                raise RuntimeEvidenceError("comparability augmentation is not row-bound")
+            sessions = load_runtime_sessions(
+                corpus_root,
+                reference_root,
+                roles=(TRAIN_ROLE,),
+            )
+            session = sessions[str(row["source_id"])]
+            target = target_for_row(row, session)
+            raw_waveform = load_waveform_window(row, session, corpus_root)
+            validation_context["comparability"] = comparability_provenance(
+                row,
+                session,
+                raw_waveform,
+                target,
+            )
+        expected_semantic_checks = (
+            runtime_artifact_checks(
+                receipt_name,
+                check_artifact,
+                validation_context=validation_context,
+            )
+            if isinstance(check_artifact, Mapping)
+            else None
+        )
+        semantic_checks_valid = rows == expected_semantic_checks
+        if receipt_name in {"sampling_manifest", "augmentation_manifest"}:
+            sampling_path = output_root / "manifests" / "sampling_manifest.jsonl"
+            sampling_sha256 = sha256_file(sampling_path)
+            if receipt_name == "sampling_manifest":
+                with sampling_path.open("r", encoding="utf-8") as handle:
+                    sampling_row_count = sum(1 for _ in handle)
+                semantic_checks_valid = (
+                    semantic_checks_valid
+                    and check_artifact.get("manifest_sha256") == sampling_sha256
+                    and check_artifact.get("row_count") == sampling_row_count
+                )
+            else:
+                semantic_checks_valid = (
+                    semantic_checks_valid
+                    and check_artifact.get("sampling_manifest_sha256") == sampling_sha256
+                )
+    except (
+        AttributeError,
+        IndexError,
+        KeyError,
+        OSError,
+        TypeError,
+        ValueError,
+        RuntimeError,
+    ):
+        semantic_checks_valid = False
     observed = {
+        "top_level_schema_exact": set(receipt)
+        == {
+            "schema_version",
+            "artifact_role",
+            "status",
+            "generated_at",
+            "binding",
+            "checks",
+            "details",
+            "payload_sha256",
+        },
         "schema_version": receipt.get("schema_version"),
         "artifact_role": receipt.get("artifact_role"),
         "status": receipt.get("status"),
         "binding": receipt.get("binding"),
         "check_ids": check_ids,
         "checks_valid": checks_valid,
+        "semantic_checks_valid": semantic_checks_valid,
+        "details_present": isinstance(details, dict) and bool(details),
+        "details_schema_valid": details_schema_valid,
+        "timestamp_valid": timestamp_valid,
+        "artifacts": artifact_rows,
+        "artifacts_valid": artifacts_valid,
         "payload_sha256_valid": (
             isinstance(digest, str)
             and bool(re.fullmatch(r"[0-9a-f]{64}", digest))
@@ -632,11 +808,17 @@ def _runtime_receipt_valid(
         ),
     }
     passed = (
-        observed["schema_version"] == 1
+        observed["top_level_schema_exact"] is True
+        and observed["schema_version"] == 1
         and observed["artifact_role"] == artifact_role
         and observed["status"] == "pass"
         and observed["binding"] == dict(binding)
         and observed["checks_valid"] is True
+        and observed["semantic_checks_valid"] is True
+        and observed["details_present"] is True
+        and observed["details_schema_valid"] is True
+        and observed["timestamp_valid"] is True
+        and observed["artifacts_valid"] is True
         and observed["payload_sha256_valid"] is True
     )
     return passed, observed
@@ -645,6 +827,8 @@ def _runtime_receipt_valid(
 def _receipt_checks(
     output_root: Path | None,
     binding: Mapping[str, Any],
+    corpus_root: Path | None = None,
+    reference_root: Path | None = None,
 ) -> list[dict[str, Any]]:
     checks: list[dict[str, Any]] = []
     for name, artifact_role in RUNTIME_RECEIPTS.items():
@@ -658,7 +842,15 @@ def _receipt_checks(
             passed = False
             observed = None
         else:
-            passed, observed = _runtime_receipt_valid(receipt, artifact_role, binding)
+            passed, observed = _runtime_receipt_valid(
+                receipt,
+                name,
+                artifact_role,
+                binding,
+                output_root,
+                corpus_root,
+                reference_root,
+            )
         checks.append(
             _check(
                 f"runtime_receipt.{name}",
@@ -669,6 +861,8 @@ def _receipt_checks(
                     "status": "pass",
                     "binding": dict(binding),
                     "checks": "nonempty, unique, complete, and all passing",
+                    "check_ids": list(RUNTIME_CHECK_IDS[name]),
+                    "artifacts": list(RUNTIME_ARTIFACT_PATHS[name]),
                     "payload_sha256_valid": True,
                 },
                 observed=observed,
@@ -756,7 +950,17 @@ def build_preflight(
         )
     )
     runtime_ids = tuple(f"runtime_receipt.{name}" for name in RUNTIME_RECEIPTS)
-    checks.extend(_run_group(runtime_ids, lambda: _receipt_checks(paths.output_root, binding)))
+    checks.extend(
+        _run_group(
+            runtime_ids,
+            lambda: _receipt_checks(
+                paths.output_root,
+                binding,
+                paths.corpus_root,
+                paths.reference_root,
+            ),
+        )
+    )
     checks.extend(
         _run_group(
             ("git.candidate_is_clean",),
