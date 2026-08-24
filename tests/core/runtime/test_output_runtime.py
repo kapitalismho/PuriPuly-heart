@@ -516,6 +516,47 @@ async def test_output_runtime_suppresses_duplicate_chatbox_and_overlay_delivery(
 
 
 @pytest.mark.asyncio
+async def test_output_runtime_accepts_distinct_parent_presentation_revisions_once() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = RecordingChatbox()
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+    parent_id = uuid4()
+
+    first = await owner.publish_chatbox(
+        publication_id=parent_id,
+        channel="self",
+        transcript_text="",
+        translation_text="first",
+        include_source=False,
+        presentation_revision=1,
+    )
+    complete = await owner.publish_chatbox(
+        publication_id=parent_id,
+        channel="self",
+        transcript_text="",
+        translation_text="first\nsecond",
+        include_source=False,
+        presentation_revision=2,
+    )
+    duplicate_complete = await owner.publish_chatbox(
+        publication_id=parent_id,
+        channel="self",
+        transcript_text="",
+        translation_text="first\nsecond",
+        include_source=False,
+        presentation_revision=2,
+    )
+
+    assert first.decision.decision == "published"
+    assert complete.decision.decision == "published"
+    assert duplicate_complete.decision.reason == "duplicate_publication"
+    assert duplicate_complete.decision.publication_id == str(parent_id)
+    assert duplicate_complete.decision.metadata["presentation_revision"] == 2
+    assert [message.utterance_id for message in chatbox.messages] == [parent_id, parent_id]
+    assert [message.text for message in chatbox.messages] == ["first", "first\nsecond"]
+
+
+@pytest.mark.asyncio
 async def test_output_runtime_isolates_overlay_failure_with_safe_diagnostics() -> None:
     OutputRuntime = _output_runtime_class()
     owner = OutputRuntime(

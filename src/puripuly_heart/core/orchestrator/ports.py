@@ -45,6 +45,8 @@ def format_detailed_latency_trace(
     parent_utterance_id: str | None = None,
     target_index: int | None = None,
     target_language: str | None = None,
+    turn_generation: int | None = None,
+    turn_order: int | None = None,
 ) -> str:
     parts = [
         f"[Detailed][Latency] channel={channel}",
@@ -58,6 +60,8 @@ def format_detailed_latency_trace(
                 f"parent_utterance_id={parent_utterance_id}",
                 f"target_index={target_index}",
                 f"target_language={target_language}",
+                f"turn_generation={turn_generation}",
+                f"turn_order={turn_order}",
             )
         )
     return " ".join(parts)
@@ -103,6 +107,8 @@ def format_latency_cause_metric(
     parent_utterance_id: str | None = None,
     target_index: int | None = None,
     target_language: str | None = None,
+    turn_generation: int | None = None,
+    turn_order: int | None = None,
 ) -> str | None:
     dominant_stage = compute_latency_dominant_stage(stage_durations_ms)
     if dominant_stage is None:
@@ -120,6 +126,8 @@ def format_latency_cause_metric(
                 f"parent_utterance_id={parent_utterance_id}",
                 f"target_index={target_index}",
                 f"target_language={target_language}",
+                f"turn_generation={turn_generation}",
+                f"turn_order={turn_order}",
             )
         )
     for stage in sorted(stage_durations_ms):
@@ -145,6 +153,8 @@ def format_translation_ready_for_output(
     parent_utterance_id: str | None = None,
     target_index: int | None = None,
     target_language: str | None = None,
+    turn_generation: int | None = None,
+    turn_order: int | None = None,
 ) -> str:
     parts = [
         "[Detailed][Translation] translation_ready_for_output",
@@ -164,6 +174,8 @@ def format_translation_ready_for_output(
                 f"parent_utterance_id={parent_utterance_id}",
                 f"target_index={target_index}",
                 f"target_language={target_language}",
+                f"turn_generation={turn_generation}",
+                f"turn_order={turn_order}",
             )
         )
     if elapsed_ms is not None:

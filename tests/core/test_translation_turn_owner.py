@@ -99,6 +99,7 @@ def _owner(
     output=None,
     trace=None,
     predecessor_wait_observer=None,
+    turn_generation_observer=None,
 ) -> TranslationTurnLifecycleOwner:
     events = trace if trace is not None else []
 
@@ -130,6 +131,7 @@ def _owner(
         on_parent_closed=closed,
         on_parent_rejected=rejected,
         predecessor_wait_observer=predecessor_wait_observer,
+        turn_generation_observer=turn_generation_observer,
         output=output,
     )
 
@@ -259,6 +261,43 @@ async def test_self_target_children_start_concurrently() -> None:
         await owner.wait_for_idle()
     finally:
         await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_self_turn_order_is_monotonic_and_resets_with_generation() -> None:
+    observed: list[tuple[int, int]] = []
+
+    async def process(child: TranslationTurnChild, _cancellation_requested):
+        observed.append((child.turn_generation, child.turn_order))
+        return "translated"
+
+    owner = _owner(process_child=process)
+    try:
+        await owner.submit(_request(parent_id=uuid4(), turn_kind="self"))
+        await owner.submit(_request(parent_id=uuid4(), turn_kind="self"))
+        await owner.wait_for_idle()
+        await owner.cancel_pending(channel="self")
+        await owner.submit(_request(parent_id=uuid4(), turn_kind="self"))
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+
+    assert observed == [(0, 0), (0, 1), (1, 0)]
+
+
+@pytest.mark.asyncio
+async def test_cancel_and_close_publish_generation_retirement_before_draining() -> None:
+    observed: list[tuple[str, int]] = []
+    owner = _owner(
+        turn_generation_observer=lambda channel, generation: observed.append(
+            (channel, generation)
+        )
+    )
+
+    await owner.cancel_pending(channel="self")
+    await owner.close()
+
+    assert observed == [("self", 1), ("self", 2), ("peer", 1)]
 
 
 @pytest.mark.asyncio

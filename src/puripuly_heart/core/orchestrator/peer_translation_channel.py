@@ -596,6 +596,8 @@ class PeerTranslationChannelOwner:
                     config_snapshot=config_snapshot,
                     translation=child.precomputed_translation,
                     target_index=child.target_index,
+                    turn_generation=child.turn_generation,
+                    turn_order=child.turn_order,
                 ),
             )
         result = await self.translation_requests.process(
@@ -611,6 +613,8 @@ class PeerTranslationChannelOwner:
                 detected_language=child.detected_language,
                 config_snapshot=config_snapshot,
                 target_index=child.target_index,
+                turn_generation=child.turn_generation,
+                turn_order=child.turn_order,
             ),
             cancellation_requested=cancellation_requested,
         )

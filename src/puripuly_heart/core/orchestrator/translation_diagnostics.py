@@ -114,6 +114,8 @@ class LatencyStageDiagnostic:
     parent_utterance_id: UUID | None = None
     target_index: int | None = None
     target_language: str | None = None
+    turn_generation: int | None = None
+    turn_order: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +145,8 @@ class TranslationReadyDiagnostic:
     parent_utterance_id: UUID | None = None
     target_index: int | None = None
     target_language: str | None = None
+    turn_generation: int | None = None
+    turn_order: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,6 +231,8 @@ class _LatencyTimeline:
     parent_utterance_id: UUID | None = None
     target_index: int | None = None
     target_language: str | None = None
+    turn_generation: int | None = None
+    turn_order: int | None = None
 
 
 @dataclass(slots=True)
@@ -541,6 +547,10 @@ class TranslationLatencyDiagnosticsOwner:
             timeline.target_index = diagnostic.target_index
         if diagnostic.target_language is not None:
             timeline.target_language = diagnostic.target_language
+        if diagnostic.turn_generation is not None:
+            timeline.turn_generation = diagnostic.turn_generation
+        if diagnostic.turn_order is not None:
+            timeline.turn_order = diagnostic.turn_order
         if not diagnostic.overwrite and diagnostic.stage in timeline.stage_times:
             return
         timeline.stage_times[diagnostic.stage] = (
@@ -623,6 +633,8 @@ class TranslationLatencyDiagnosticsOwner:
                 ),
                 target_index=diagnostic.target_index,
                 target_language=diagnostic.target_language,
+                turn_generation=diagnostic.turn_generation,
+                turn_order=diagnostic.turn_order,
             )
         )
 
@@ -828,6 +840,8 @@ class TranslationLatencyDiagnosticsOwner:
                     ),
                     target_index=timeline.target_index,
                     target_language=timeline.target_language,
+                    turn_generation=timeline.turn_generation,
+                    turn_order=timeline.turn_order,
                 ),
                 detailed=True,
             )
@@ -904,6 +918,8 @@ class TranslationLatencyDiagnosticsOwner:
             ),
             target_index=timeline.target_index,
             target_language=timeline.target_language,
+            turn_generation=timeline.turn_generation,
+            turn_order=timeline.turn_order,
             stage_durations_ms={
                 "speech_end_to_stt_final": self._elapsed_ms(
                     speech_end_at,

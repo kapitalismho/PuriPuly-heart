@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -36,6 +36,38 @@ class ConcurrentRecordingProvider:
             }
         )
         await self.release.wait()
+        return Translation(
+            utterance_id=utterance_id,
+            text=f"translated-{target_language}",
+            source_text=text,
+            source_language=source_language,
+            target_language=target_language,
+        )
+
+    async def close(self) -> None:
+        return None
+
+
+@dataclass
+class TargetControlledProvider:
+    started: asyncio.Queue[tuple[str, str]] = field(default_factory=asyncio.Queue)
+    releases: dict[tuple[str, str], asyncio.Event] = field(default_factory=dict)
+
+    async def translate(
+        self,
+        *,
+        utterance_id: UUID,
+        text: str,
+        system_prompt: str,
+        source_language: str,
+        target_language: str,
+        context: str = "",
+    ) -> Translation:
+        _ = system_prompt, context
+        key = (text, target_language)
+        release = self.releases.setdefault(key, asyncio.Event())
+        await self.started.put(key)
+        await release.wait()
         return Translation(
             utterance_id=utterance_id,
             text=f"translated-{target_language}",
@@ -134,4 +166,93 @@ async def test_failed_child_creation_does_not_retain_prepared_self_request() -> 
         assert harness.self_owner._admitted_requests == {}
         assert harness.translation_turns.has_resources is False
     finally:
+        await harness.translation_turns.close()
+
+
+@pytest.mark.asyncio
+async def test_end_to_end_secondary_first_publishes_progressive_parent_snapshots() -> None:
+    provider = TargetControlledProvider()
+    osc = RecordingOsc()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=osc,
+        source_language="en",
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+
+    try:
+        parent_id = await harness.self_owner.submit_text("source text")
+        started = {
+            await asyncio.wait_for(provider.started.get(), timeout=1),
+            await asyncio.wait_for(provider.started.get(), timeout=1),
+        }
+        assert started == {("source text", "zh-CN"), ("source text", "ja")}
+
+        provider.releases[("source text", "ja")].set()
+        for _ in range(100):
+            if len(osc.messages) == 1:
+                break
+            await asyncio.sleep(0)
+        assert [(message.utterance_id, message.text) for message in osc.messages] == [
+            (parent_id, "translated-ja")
+        ]
+
+        provider.releases[("source text", "zh-CN")].set()
+        await harness.translation_turns.wait_for_idle()
+        assert [(message.utterance_id, message.text) for message in osc.messages] == [
+            (parent_id, "translated-ja"),
+            (parent_id, "translated-zh-CN\ntranslated-ja"),
+        ]
+        assert harness.output_projection.self_turn_aggregate_count == 0
+    finally:
+        for release in provider.releases.values():
+            release.set()
+        await harness.translation_turns.close()
+
+
+@pytest.mark.asyncio
+async def test_direct_self_translation_uses_dual_target_turn_lifecycle() -> None:
+    provider = TargetControlledProvider()
+    osc = RecordingOsc()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=osc,
+        source_language="en",
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    parent_id = uuid4()
+    task = asyncio.create_task(
+        harness.self_owner.translate_and_enqueue(parent_id, "source text")
+    )
+
+    try:
+        started = {
+            await asyncio.wait_for(provider.started.get(), timeout=1),
+            await asyncio.wait_for(provider.started.get(), timeout=1),
+        }
+        assert started == {("source text", "zh-CN"), ("source text", "ja")}
+
+        provider.releases[("source text", "ja")].set()
+        for _ in range(100):
+            if len(osc.messages) == 1:
+                break
+            await asyncio.sleep(0)
+        assert [(message.utterance_id, message.text) for message in osc.messages] == [
+            (parent_id, "translated-ja")
+        ]
+
+        provider.releases[("source text", "zh-CN")].set()
+        await asyncio.wait_for(task, timeout=1)
+        assert [(message.utterance_id, message.text) for message in osc.messages] == [
+            (parent_id, "translated-ja"),
+            (parent_id, "translated-zh-CN\ntranslated-ja"),
+        ]
+    finally:
+        for release in provider.releases.values():
+            release.set()
+        await asyncio.gather(task, return_exceptions=True)
         await harness.translation_turns.close()

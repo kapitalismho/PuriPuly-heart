@@ -305,7 +305,10 @@ class OutputRuntime:
         translation_text: str | None,
         include_source: bool,
         publication_kind: OutputPublicationKind | None = None,
+        presentation_revision: int = 0,
     ) -> OutputPublicationResult:
+        if presentation_revision < 0:
+            raise ValueError("presentation_revision must be non-negative")
         publication_kind = publication_kind or (
             PUBLICATION_KIND_PEER_SUBTITLE if channel == "peer" else PUBLICATION_KIND_SELF_UTTERANCE
         )
@@ -332,11 +335,16 @@ class OutputRuntime:
         if not self.chatbox_is_eligible(channel):
             raise ValueError("unknown chatbox publication channel")
 
-        publication_key = (OUTPUT_ROUTE_SELF_CHATBOX, str(publication_id))
+        publication_key = (
+            OUTPUT_ROUTE_SELF_CHATBOX,
+            f"{publication_id}:{presentation_revision}",
+        )
         duplicate = self._duplicate_publication_result(
             publication_key=publication_key,
             publication_kind=publication_kind,
             channel=channel,
+            logical_publication_id=str(publication_id),
+            metadata={"presentation_revision": presentation_revision},
         )
         if duplicate is not None:
             return duplicate
@@ -369,7 +377,7 @@ class OutputRuntime:
             publication_id=str(publication_id),
             publication_kind=publication_kind,
             reason=None,
-            metadata={"channel": channel},
+            metadata={"channel": channel, "presentation_revision": presentation_revision},
             message=message,
         )
 
@@ -881,6 +889,8 @@ class OutputRuntime:
         publication_key: tuple[OutputRoute, str],
         publication_kind: OutputPublicationKind,
         channel: ChannelId | str | None,
+        logical_publication_id: str | None = None,
+        metadata: dict[str, str | int | float | bool | None] | None = None,
     ) -> OutputPublicationResult | None:
         if (
             publication_key not in self._delivered_publications
@@ -888,13 +898,16 @@ class OutputRuntime:
         ):
             return None
         route, publication_id = publication_key
+        decision_metadata: dict[str, str | int | float | bool | None] = {"channel": channel}
+        if metadata is not None:
+            decision_metadata.update(metadata)
         return self._observe_result(
             status=OUTPUT_ROUTING_DECISION_SKIPPED,
             route=route,
-            publication_id=publication_id,
+            publication_id=logical_publication_id or publication_id,
             publication_kind=publication_kind,
             reason="duplicate_publication",
-            metadata={"channel": channel},
+            metadata=decision_metadata,
         )
 
     def _remember_delivered_publication(

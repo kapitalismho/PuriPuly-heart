@@ -244,6 +244,8 @@ def test_target_diagnostics_include_parent_index_and_language_metadata() -> None
             parent_utterance_id=parent_id,
             target_index=1,
             target_language="ja",
+            turn_generation=3,
+            turn_order=7,
         )
     )
     owner.emit_translation_ready(
@@ -260,6 +262,8 @@ def test_target_diagnostics_include_parent_index_and_language_metadata() -> None
             parent_utterance_id=parent_id,
             target_index=1,
             target_language="ja",
+            turn_generation=3,
+            turn_order=7,
         )
     )
 
@@ -267,6 +271,8 @@ def test_target_diagnostics_include_parent_index_and_language_metadata() -> None
     assert f"parent_utterance_id={parent_id}" in combined
     assert "target_index=1" in combined
     assert "target_language=ja" in combined
+    assert "turn_generation=3" in combined
+    assert "turn_order=7" in combined
 
 
 def test_owner_suppresses_runtime_and_overlay_decision_duplicates_independently() -> None:

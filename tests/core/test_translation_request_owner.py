@@ -409,6 +409,27 @@ async def test_http_backend_rejects_completion_after_runtime_replacement() -> No
 
 
 @pytest.mark.asyncio
+async def test_process_propagates_parent_turn_and_target_identity_to_output() -> None:
+    fixture = build_owner(RecordingProvider())
+    request = replace(
+        process_request(fixture),
+        target_index=1,
+        turn_generation=2,
+        turn_order=7,
+    )
+
+    result = await fixture.owner.process(request)
+
+    assert result.outcome == "translated"
+    assert result.output is not None
+    assert result.output.parent_utterance_id == request.parent_utterance_id
+    assert result.output.target_index == 1
+    assert result.output.target_language == request.target_language
+    assert result.output.turn_generation == 2
+    assert result.output.turn_order == 7
+
+
+@pytest.mark.asyncio
 async def test_process_returns_source_only_when_provider_is_unavailable() -> None:
     fixture = build_owner()
 

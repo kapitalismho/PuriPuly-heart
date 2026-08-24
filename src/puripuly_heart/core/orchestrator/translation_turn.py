@@ -80,6 +80,8 @@ class TranslationTurnChild:
     utterance_id: UUID
     sequence: int
     target_index: int
+    turn_generation: int
+    turn_order: int
     transcript: Transcript
     detected_language: str | None
     target_language: str
@@ -110,6 +112,8 @@ class TranslationOutputSubmission:
     applied_context_mode: Literal["local", "integrated"] | None = None
     failure_code: str | None = None
     target_index: int = 0
+    turn_generation: int = 0
+    turn_order: int = 0
 
     def __post_init__(self) -> None:
         if self.outcome == "translated" and self.translation is None:
@@ -142,6 +146,8 @@ class _TranslationTurnParent:
     parent_utterance_id: UUID
     channel: ChannelId
     children: tuple[TranslationTurnChild, ...]
+    turn_generation: int
+    turn_order: int
     completed_child_ids: set[UUID] = field(default_factory=set)
     semantic_completed_child_ids: set[UUID] = field(default_factory=set)
     semantic_done_event: asyncio.Event = field(default_factory=asyncio.Event)
@@ -166,6 +172,7 @@ ChildTerminal = Callable[[TranslationTurnChild, TranslationTurnOutcome], Awaitab
 ParentClosed = Callable[[UUID], Awaitable[None]]
 ParentRejected = Callable[[UUID], Awaitable[None]]
 ParentAdmitted = Callable[[tuple[TranslationTurnChild, ...]], Awaitable[None]]
+TurnGenerationAdvanced = Callable[[ChannelId, int], None]
 
 
 @dataclass(slots=True)
@@ -178,6 +185,7 @@ class TranslationTurnLifecycleOwner:
     on_parent_rejected: ParentRejected
     on_parent_admitted: ParentAdmitted | None = None
     predecessor_wait_observer: Callable[[str, Mapping[str, object]], None] | None = None
+    turn_generation_observer: TurnGenerationAdvanced | None = None
     output: TranslationOutputSubmissionPort | None = None
     config_snapshot: TranslationRuntimeConfigSnapshotPort = _default_config_snapshot
     policy: TranslationRuntimePolicy = field(default_factory=TranslationRuntimePolicy)
@@ -190,6 +198,12 @@ class TranslationTurnLifecycleOwner:
     )
     _channel_tails: dict[ChannelId, _TranslationTurnParent] = field(default_factory=dict)
     _channel_admission_locks: dict[ChannelId, asyncio.Lock] = field(default_factory=dict)
+    _channel_turn_generations: dict[ChannelId, int] = field(
+        default_factory=lambda: {"self": 0, "peer": 0}
+    )
+    _channel_next_turn_orders: dict[ChannelId, int] = field(
+        default_factory=lambda: {"self": 0, "peer": 0}
+    )
     _scope: LifecycleScope = field(init=False)
     _blocked_channels: set[ChannelId] = field(default_factory=set)
     _accepting: bool = True
@@ -249,6 +263,7 @@ class TranslationTurnLifecycleOwner:
 
     async def close_channel_ingress(self, channel: ChannelId) -> None:
         self._blocked_channels.add(channel)
+        self._advance_turn_generation(channel)
         await self._cancel_channel(channel)
         self._blocked_channels.add(channel)
 
@@ -269,11 +284,21 @@ class TranslationTurnLifecycleOwner:
         ):
             await self._reject_parent(parent_id)
             return ()
-        children = self._build_children(request)
+        channel = request.transcript.channel
+        turn_generation = self._channel_turn_generations[channel]
+        turn_order = self._channel_next_turn_orders[channel]
+        self._channel_next_turn_orders[channel] = turn_order + 1
+        children = self._build_children(
+            request,
+            turn_generation=turn_generation,
+            turn_order=turn_order,
+        )
         parent = _TranslationTurnParent(
             parent_utterance_id=parent_id,
-            channel=request.transcript.channel,
+            channel=channel,
             children=children,
+            turn_generation=turn_generation,
+            turn_order=turn_order,
         )
         self._parents[parent_id] = parent
         if not children:
@@ -355,8 +380,11 @@ class TranslationTurnLifecycleOwner:
         if self._closed:
             return
         if channel is not None:
+            self._advance_turn_generation(channel)
             await self._cancel_channel(channel)
             return
+        self._advance_turn_generation("self")
+        self._advance_turn_generation("peer")
         self._accepting = False
         self._request_cancellation()
         await self._drain_admission_locks()
@@ -418,6 +446,8 @@ class TranslationTurnLifecycleOwner:
     async def close(self) -> None:
         if self._closed:
             return
+        self._advance_turn_generation("self")
+        self._advance_turn_generation("peer")
         self._accepting = False
         self._closed = True
         self._request_cancellation()
@@ -429,7 +459,13 @@ class TranslationTurnLifecycleOwner:
         self._channel_tails.clear()
         self._channel_admission_locks.clear()
 
-    def _build_children(self, request: TranslationTurnRequest) -> tuple[TranslationTurnChild, ...]:
+    def _build_children(
+        self,
+        request: TranslationTurnRequest,
+        *,
+        turn_generation: int,
+        turn_order: int,
+    ) -> tuple[TranslationTurnChild, ...]:
         runs = request.transcript.final_language_runs or (
             FinalLanguageRun(text=request.transcript.text, language=""),
         )
@@ -456,6 +492,8 @@ class TranslationTurnLifecycleOwner:
                     utterance_id=child_id,
                     sequence=sequence,
                     target_index=target_index,
+                    turn_generation=turn_generation,
+                    turn_order=turn_order,
                     transcript=Transcript(
                         utterance_id=child_id,
                         text=run.text,
@@ -491,9 +529,10 @@ class TranslationTurnLifecycleOwner:
         predecessor: _TranslationTurnParent | None,
     ) -> None:
         try:
-            is_dual_target_self = parent.channel == "self" and len(
-                {child.target_language for child in parent.children}
-            ) > 1
+            is_dual_target_self = (
+                parent.channel == "self"
+                and len({child.target_language for child in parent.children}) > 1
+            )
             if is_dual_target_self:
                 child_runners = tuple(
                     start_lifecycle_task(
@@ -684,6 +723,19 @@ class TranslationTurnLifecycleOwner:
         for admission_lock in tuple(self._channel_admission_locks.values()):
             async with admission_lock:
                 pass
+
+    def _advance_turn_generation(self, channel: ChannelId) -> None:
+        self._channel_turn_generations[channel] += 1
+        self._channel_next_turn_orders[channel] = 0
+        if self.turn_generation_observer is None:
+            return
+        try:
+            self.turn_generation_observer(
+                channel,
+                self._channel_turn_generations[channel],
+            )
+        except Exception:
+            logger.exception("translation turn generation observer failed")
 
     async def _terminalize_unfinished_parents(
         self,

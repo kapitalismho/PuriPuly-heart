@@ -188,6 +188,8 @@ class TranslationProcessRequest:
     config_snapshot: TranslationRuntimeConfigSnapshot
     detected_language: str | None = None
     target_index: int = 0
+    turn_generation: int = 0
+    turn_order: int = 0
 
 
 class StaleProviderCompletion(Exception):
@@ -540,6 +542,8 @@ class TranslationRequestOwner:
                 "llm_request_start",
                 parent_utterance_id=request.parent_utterance_id,
                 target_index=request.target_index,
+                turn_generation=request.turn_generation,
+                turn_order=request.turn_order,
                 target_language=request.target_language,
             )
             try:
@@ -572,6 +576,8 @@ class TranslationRequestOwner:
                 "llm_done",
                 parent_utterance_id=request.parent_utterance_id,
                 target_index=request.target_index,
+                turn_generation=request.turn_generation,
+                turn_order=request.turn_order,
                 target_language=request.target_language,
             )
         except asyncio.CancelledError:
@@ -608,6 +614,8 @@ class TranslationRequestOwner:
                 translation=translation,
                 applied_context_mode=applied_mode,
                 target_index=request.target_index,
+                turn_generation=request.turn_generation,
+                turn_order=request.turn_order,
             ),
         )
 
@@ -689,6 +697,8 @@ class TranslationRequestOwner:
         parent_utterance_id: UUID | None = None,
         target_index: int | None = None,
         target_language: str | None = None,
+        turn_generation: int | None = None,
+        turn_order: int | None = None,
     ) -> None:
         self.diagnostics.record_latency_stage(
             LatencyStageDiagnostic(
@@ -698,6 +708,8 @@ class TranslationRequestOwner:
                 parent_utterance_id=parent_utterance_id,
                 target_index=target_index,
                 target_language=target_language,
+                turn_generation=turn_generation,
+                turn_order=turn_order,
             )
         )
 
@@ -756,6 +768,8 @@ class TranslationRequestOwner:
                 config_snapshot=request.config_snapshot,
                 failure_code=failure_code,
                 target_index=request.target_index,
+                turn_generation=request.turn_generation,
+                turn_order=request.turn_order,
             ),
         )
 

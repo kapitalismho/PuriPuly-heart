@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Protocol, cast
 from uuid import UUID
@@ -19,7 +20,11 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
     TranslationLatencyDiagnosticsOwner,
     TranslationReadyDiagnostic,
 )
-from puripuly_heart.core.orchestrator.translation_turn import TranslationOutputSubmission
+from puripuly_heart.core.orchestrator.translation_turn import (
+    TranslationOutputSubmission,
+    TranslationTurnChild,
+    TranslationTurnOutcome,
+)
 from puripuly_heart.core.output.models import OutputRoutingDecision
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter, OverlayEventUnion, OverlaySink
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
@@ -70,6 +75,7 @@ class ChatboxProjection:
     translation_text: str | None
     include_source: bool
     source: str | None
+    presentation_revision: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +103,46 @@ class ActiveSelfProjectionReceipt:
 class TranslationResultProjectionReceipt:
     clear_runtime_latency_bookkeeping: bool
     complete_peer_logical_turn: bool = False
+    record_runtime_translation: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class SelfTranslationTurnSnapshot:
+    parent_utterance_id: UUID
+    turn_generation: int
+    turn_order: int
+    configured_targets: tuple[str, ...]
+    completed_translations_by_target: tuple[tuple[str, str], ...]
+    failed_targets: frozenset[str]
+    revision: int
+    terminal: bool
+
+    @property
+    def text(self) -> str:
+        return "\n".join(text for _target, text in self.completed_translations_by_target)
+
+
+@dataclass(slots=True)
+class _SelfTranslationTurnAggregate:
+    parent_utterance_id: UUID
+    turn_generation: int
+    turn_order: int
+    configured_targets: tuple[str, ...]
+    expected_children_by_target: tuple[tuple[UUID, ...], ...]
+    child_target_indexes: dict[UUID, int]
+    child_sequences: dict[UUID, int]
+    translations_by_child: dict[UUID, Translation] = field(default_factory=dict)
+    terminal_child_ids: set[UUID] = field(default_factory=set)
+    failed_child_ids: set[UUID] = field(default_factory=set)
+    revision: int = 0
+    visible_signature: tuple[tuple[str, str], ...] = ()
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+
+
+@dataclass(frozen=True, slots=True)
+class _SelfProjectionUpdate:
+    accepted: bool
+    snapshot: SelfTranslationTurnSnapshot | None = None
 
 
 @dataclass(slots=True)
@@ -113,6 +159,96 @@ class TranslationOutputProjectionOwner:
     ui_messages: TranslationUiMessagePort = field(repr=False)
     diagnostics: TranslationLatencyDiagnosticsOwner = field(repr=False)
     clock: Clock
+    self_turn_tombstone_capacity: int = 4096
+    _self_turns: dict[UUID, _SelfTranslationTurnAggregate] = field(default_factory=dict)
+    _self_turn_tombstones: set[tuple[int, UUID]] = field(default_factory=set)
+    _self_turn_tombstone_order: deque[tuple[int, UUID]] = field(default_factory=deque)
+    _active_self_turn_generation: int = -1
+    _latest_visible_self_turn: tuple[int, int] | None = None
+    _latest_visible_self_revision: int = 0
+    _self_publish_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.self_turn_tombstone_capacity < 1:
+            raise ValueError("self_turn_tombstone_capacity must be positive")
+
+    @property
+    def self_turn_aggregate_count(self) -> int:
+        return len(self._self_turns)
+
+    @property
+    def self_turn_tombstone_count(self) -> int:
+        return len(self._self_turn_tombstones)
+
+    def retire_turn_generation(self, channel: ChannelId, turn_generation: int) -> None:
+        if turn_generation < 0:
+            raise ValueError("turn_generation must be non-negative")
+        if channel != "self" or turn_generation <= self._active_self_turn_generation:
+            return
+        self._active_self_turn_generation = turn_generation
+        for aggregate in tuple(self._self_turns.values()):
+            self._remember_self_turn_tombstone(
+                aggregate.turn_generation,
+                aggregate.parent_utterance_id,
+            )
+        self._self_turns.clear()
+
+    def admit_self_turn(self, children: tuple[TranslationTurnChild, ...]) -> bool:
+        if not children:
+            return False
+        first = children[0]
+        if first.channel != "self" or any(child.channel != "self" for child in children):
+            raise ValueError("self projection admission requires Self children")
+        if any(
+            (child.parent_utterance_id, child.turn_generation, child.turn_order)
+            != (first.parent_utterance_id, first.turn_generation, first.turn_order)
+            for child in children
+        ):
+            raise ValueError("self projection admission identity mismatch")
+        if first.turn_generation < self._active_self_turn_generation:
+            return False
+        if first.turn_generation > self._active_self_turn_generation:
+            self.retire_turn_generation("self", first.turn_generation)
+        target_pairs = tuple(
+            sorted({(child.target_index, child.target_language.strip()) for child in children})
+        )
+        if tuple(index for index, _target in target_pairs) != tuple(range(len(target_pairs))):
+            raise ValueError("self projection target indexes must be contiguous")
+        configured_targets = tuple(target for _index, target in target_pairs)
+        if len(configured_targets) < 2:
+            return True
+        tombstone_key = (first.turn_generation, first.parent_utterance_id)
+        if tombstone_key in self._self_turn_tombstones:
+            return False
+        existing = self._self_turns.get(first.parent_utterance_id)
+        if existing is not None:
+            return (
+                existing.turn_generation,
+                existing.turn_order,
+                existing.configured_targets,
+            ) == (
+                first.turn_generation,
+                first.turn_order,
+                configured_targets,
+            )
+        expected_children_by_target = tuple(
+            tuple(
+                child.utterance_id
+                for child in sorted(children, key=lambda item: item.sequence)
+                if child.target_index == target_index
+            )
+            for target_index in range(len(configured_targets))
+        )
+        self._self_turns[first.parent_utterance_id] = _SelfTranslationTurnAggregate(
+            parent_utterance_id=first.parent_utterance_id,
+            turn_generation=first.turn_generation,
+            turn_order=first.turn_order,
+            configured_targets=configured_targets,
+            expected_children_by_target=expected_children_by_target,
+            child_target_indexes={child.utterance_id: child.target_index for child in children},
+            child_sequences={child.utterance_id: child.sequence for child in children},
+        )
+        return True
 
     def set_clock(self, clock: Clock) -> None:
         self.clock = clock
@@ -545,12 +681,248 @@ class TranslationOutputProjectionOwner:
             self._language_or_fallback(metadata.secondary_language, target_language),
         )
 
+    async def complete_self_target(
+        self,
+        child: TranslationTurnChild,
+        outcome: TranslationTurnOutcome,
+    ) -> None:
+        aggregate = self._self_turns.get(child.parent_utterance_id)
+        if aggregate is None:
+            return
+        async with aggregate.lock:
+            if not self._self_child_matches_aggregate(child, aggregate):
+                return
+            aggregate.terminal_child_ids.add(child.utterance_id)
+            if (
+                outcome != "translated"
+                and child.utterance_id not in aggregate.translations_by_child
+            ):
+                aggregate.failed_child_ids.add(child.utterance_id)
+            self._refresh_self_snapshot(aggregate)
+            terminal = self._self_aggregate_terminal(aggregate)
+        self.diagnostics.emit(
+            RuntimeDiagnostic(
+                message=(
+                    "[Detailed][Translation] translation_target_completed "
+                    "parent_utterance_id=%s turn_generation=%s turn_order=%s "
+                    "target_index=%s target_language=%s outcome=%s"
+                ),
+                args=(
+                    child.parent_utterance_id,
+                    child.turn_generation,
+                    child.turn_order,
+                    child.target_index,
+                    child.target_language,
+                    outcome,
+                ),
+                detailed=True,
+            )
+        )
+        if terminal and self._self_turns.get(child.parent_utterance_id) is aggregate:
+            self._self_turns.pop(child.parent_utterance_id, None)
+            self._remember_self_turn_tombstone(
+                aggregate.turn_generation,
+                aggregate.parent_utterance_id,
+            )
+
+    async def _record_self_submission(
+        self,
+        submission: TranslationOutputSubmission,
+    ) -> _SelfProjectionUpdate:
+        aggregate = self._self_turns.get(submission.parent_utterance_id)
+        if aggregate is None:
+            return _SelfProjectionUpdate(False)
+        async with aggregate.lock:
+            if (
+                submission.turn_generation != self._active_self_turn_generation
+                or not self._self_submission_matches_aggregate(submission, aggregate)
+                or submission.child_utterance_id in aggregate.terminal_child_ids
+            ):
+                return _SelfProjectionUpdate(False)
+            aggregate.terminal_child_ids.add(submission.child_utterance_id)
+            if submission.outcome == "translated":
+                translation = submission.translation
+                if translation is None:
+                    return _SelfProjectionUpdate(False)
+                aggregate.translations_by_child[submission.child_utterance_id] = translation
+                aggregate.failed_child_ids.discard(submission.child_utterance_id)
+            else:
+                aggregate.failed_child_ids.add(submission.child_utterance_id)
+            snapshot = self._refresh_self_snapshot(aggregate)
+            if snapshot is not None:
+                await self._publish_self_snapshot(snapshot, source=submission.source)
+            if submission.turn_generation != self._active_self_turn_generation:
+                return _SelfProjectionUpdate(False)
+        return _SelfProjectionUpdate(True, snapshot)
+
+    def _refresh_self_snapshot(
+        self,
+        aggregate: _SelfTranslationTurnAggregate,
+    ) -> SelfTranslationTurnSnapshot | None:
+        completed: list[tuple[str, str]] = []
+        failed: set[str] = set()
+        for target_index, child_ids in enumerate(aggregate.expected_children_by_target):
+            if not set(child_ids).issubset(aggregate.terminal_child_ids):
+                continue
+            target = aggregate.configured_targets[target_index]
+            if any(child_id in aggregate.failed_child_ids for child_id in child_ids):
+                failed.add(target)
+                continue
+            if any(child_id not in aggregate.translations_by_child for child_id in child_ids):
+                failed.add(target)
+                continue
+            translated_parts = tuple(
+                aggregate.translations_by_child[child_id].text.strip()
+                for child_id in child_ids
+                if aggregate.translations_by_child[child_id].text.strip()
+            )
+            if translated_parts:
+                completed.append((target, " ".join(translated_parts)))
+            else:
+                failed.add(target)
+        signature = tuple(completed)
+        if signature == aggregate.visible_signature:
+            return None
+        aggregate.visible_signature = signature
+        aggregate.revision += 1
+        return SelfTranslationTurnSnapshot(
+            parent_utterance_id=aggregate.parent_utterance_id,
+            turn_generation=aggregate.turn_generation,
+            turn_order=aggregate.turn_order,
+            configured_targets=aggregate.configured_targets,
+            completed_translations_by_target=signature,
+            failed_targets=frozenset(failed),
+            revision=aggregate.revision,
+            terminal=self._self_aggregate_terminal(aggregate),
+        )
+
+    async def _publish_self_snapshot(
+        self,
+        snapshot: SelfTranslationTurnSnapshot,
+        *,
+        source: str | None,
+    ) -> OutputPublicationResult | None:
+        if not snapshot.text:
+            return None
+        turn_key = (snapshot.turn_generation, snapshot.turn_order)
+        async with self._self_publish_lock:
+            if snapshot.turn_generation != self._active_self_turn_generation:
+                self._emit_self_stale_snapshot(snapshot)
+                return None
+            latest = self._latest_visible_self_turn
+            if latest is not None and turn_key < latest:
+                self._emit_self_stale_snapshot(snapshot)
+                return None
+            if latest == turn_key and snapshot.revision <= self._latest_visible_self_revision:
+                return None
+            result = await self.publish_chatbox(
+                ChatboxProjection(
+                    utterance_id=snapshot.parent_utterance_id,
+                    channel="self",
+                    transcript_text="",
+                    translation_text=snapshot.text,
+                    include_source=False,
+                    source=source,
+                    presentation_revision=snapshot.revision,
+                )
+            )
+            if result.decision.decision != "published":
+                return result
+            self._latest_visible_self_turn = turn_key
+            self._latest_visible_self_revision = snapshot.revision
+            stage = (
+                "translation_complete_result_published"
+                if len(snapshot.completed_translations_by_target)
+                == len(snapshot.configured_targets)
+                else "translation_first_result_published"
+            )
+            self.diagnostics.emit(
+                RuntimeDiagnostic(
+                    message=(
+                        "[Detailed][Translation] %s parent_utterance_id=%s "
+                        "turn_generation=%s turn_order=%s revision=%s terminal=%s"
+                    ),
+                    args=(
+                        stage,
+                        snapshot.parent_utterance_id,
+                        snapshot.turn_generation,
+                        snapshot.turn_order,
+                        snapshot.revision,
+                        snapshot.terminal,
+                    ),
+                    detailed=True,
+                )
+            )
+            return result
+
+    def _emit_self_stale_snapshot(self, snapshot: SelfTranslationTurnSnapshot) -> None:
+        self.diagnostics.emit(
+            RuntimeDiagnostic(
+                message=(
+                    "[Detailed][Translation] translation_result_suppressed_stale_turn "
+                    "parent_utterance_id=%s turn_generation=%s turn_order=%s revision=%s"
+                ),
+                args=(
+                    snapshot.parent_utterance_id,
+                    snapshot.turn_generation,
+                    snapshot.turn_order,
+                    snapshot.revision,
+                ),
+                detailed=True,
+            )
+        )
+
+    @staticmethod
+    def _self_submission_matches_aggregate(
+        submission: TranslationOutputSubmission,
+        aggregate: _SelfTranslationTurnAggregate,
+    ) -> bool:
+        target_index = aggregate.child_target_indexes.get(submission.child_utterance_id)
+        return (
+            submission.turn_generation == aggregate.turn_generation
+            and submission.turn_order == aggregate.turn_order
+            and target_index == submission.target_index
+            and target_index is not None
+            and aggregate.configured_targets[target_index] == submission.target_language.strip()
+        )
+
+    @staticmethod
+    def _self_child_matches_aggregate(
+        child: TranslationTurnChild,
+        aggregate: _SelfTranslationTurnAggregate,
+    ) -> bool:
+        return (
+            child.turn_generation == aggregate.turn_generation
+            and child.turn_order == aggregate.turn_order
+            and aggregate.child_target_indexes.get(child.utterance_id) == child.target_index
+        )
+
+    @staticmethod
+    def _self_aggregate_terminal(aggregate: _SelfTranslationTurnAggregate) -> bool:
+        return set(aggregate.child_target_indexes).issubset(aggregate.terminal_child_ids)
+
+    def _remember_self_turn_tombstone(
+        self,
+        turn_generation: int,
+        parent_utterance_id: UUID,
+    ) -> None:
+        key = (turn_generation, parent_utterance_id)
+        if key in self._self_turn_tombstones:
+            return
+        if len(self._self_turn_tombstone_order) >= self.self_turn_tombstone_capacity:
+            evicted = self._self_turn_tombstone_order.popleft()
+            self._self_turn_tombstones.discard(evicted)
+        self._self_turn_tombstone_order.append(key)
+        self._self_turn_tombstones.add(key)
+
     def emit_translation_ready(
         self,
         translation: Translation,
         *,
         parent_utterance_id: UUID | None = None,
         target_index: int | None = None,
+        turn_generation: int | None = None,
+        turn_order: int | None = None,
     ) -> bool:
         return self.diagnostics.emit_translation_ready(
             TranslationReadyDiagnostic(
@@ -566,6 +938,8 @@ class TranslationOutputProjectionOwner:
                 parent_utterance_id=parent_utterance_id,
                 target_index=target_index,
                 target_language=translation.target_language,
+                turn_generation=turn_generation,
+                turn_order=turn_order,
             )
         )
 
@@ -580,6 +954,15 @@ class TranslationOutputProjectionOwner:
         target_language = self._target_language_for(channel, configuration)
         publish_to_chatbox = self.chatbox_is_eligible(channel)
         deny_peer_chatbox_attempt = self.chatbox_is_denied(channel)
+        dual_target_self = channel == "self" and len(configuration.self_target_languages) == 2
+        self_update = _SelfProjectionUpdate(True)
+        if dual_target_self:
+            self_update = await self._record_self_submission(submission)
+            if not self_update.accepted:
+                return TranslationResultProjectionReceipt(
+                    True,
+                    record_runtime_translation=False,
+                )
 
         if submission.outcome == "source_only":
             if channel == "peer":
@@ -597,6 +980,8 @@ class TranslationOutputProjectionOwner:
                     finalize_latency=True,
                 )
                 await self.publish_peer_chatbox_denial(utterance_id)
+            elif dual_target_self:
+                self.diagnostics.clear_latency_timeline(channel, utterance_id)
             elif publish_to_chatbox:
                 await self.publish_chatbox(
                     ChatboxProjection(
@@ -613,6 +998,14 @@ class TranslationOutputProjectionOwner:
             return TranslationResultProjectionReceipt(True)
 
         if submission.outcome == "failed":
+            if dual_target_self:
+                await self.close_overlay_utterance(
+                    utterance_id=utterance_id,
+                    channel=channel,
+                    is_final=False,
+                    finalize_latency=True,
+                )
+                return TranslationResultProjectionReceipt(True)
             if submission.failure_code == "stale_provider_completion":
                 if channel == "peer":
                     await self.publish_peer_chatbox_denial(utterance_id)
@@ -677,6 +1070,8 @@ class TranslationOutputProjectionOwner:
             translation,
             parent_utterance_id=submission.parent_utterance_id,
             target_index=submission.target_index,
+            turn_generation=submission.turn_generation,
+            turn_order=submission.turn_order,
         )
         if channel == "peer" and self.has_overlay_destination:
             await self.emit_translation(
@@ -730,7 +1125,10 @@ class TranslationOutputProjectionOwner:
                 is_final=True,
                 finalize_latency=not publish_to_chatbox,
             )
-        if publish_to_chatbox:
+        if dual_target_self:
+            if self_update.snapshot is None:
+                self.diagnostics.clear_latency_timeline(channel, utterance_id)
+        elif publish_to_chatbox:
             await self.publish_chatbox(
                 ChatboxProjection(
                     utterance_id=utterance_id,
@@ -757,6 +1155,7 @@ class TranslationOutputProjectionOwner:
             transcript_text=projection.transcript_text,
             translation_text=projection.translation_text,
             include_source=projection.include_source,
+            presentation_revision=projection.presentation_revision,
         )
         if result.decision.decision != "published":
             self.diagnostics.emit(
@@ -1020,6 +1419,7 @@ __all__ = [
     "ActiveSelfProjection",
     "ActiveSelfProjectionReceipt",
     "ChatboxProjection",
+    "SelfTranslationTurnSnapshot",
     "TranscriptOverlayProjection",
     "TranslationOutputProjectionOwner",
     "TranslationOverlayProjection",
