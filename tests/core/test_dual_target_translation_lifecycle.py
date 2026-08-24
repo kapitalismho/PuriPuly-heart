@@ -223,6 +223,8 @@ async def test_end_to_end_secondary_first_publishes_progressive_parent_snapshots
         assert [(message.utterance_id, message.text) for message in osc.messages] == [
             (parent_id, "translated-ja")
         ]
+        assert osc.messages[0].target_indexes == (1,)
+        assert osc.messages[0].target_languages == ("ja",)
 
         provider.releases[("source text", "zh-CN")].set()
         await harness.translation_turns.wait_for_idle()
@@ -230,6 +232,8 @@ async def test_end_to_end_secondary_first_publishes_progressive_parent_snapshots
             (parent_id, "translated-ja"),
             (parent_id, "translated-zh-CN\ntranslated-ja"),
         ]
+        assert osc.messages[1].target_indexes == (0, 1)
+        assert osc.messages[1].target_languages == ("zh-CN", "ja")
         assert harness.output_projection.self_turn_aggregate_count == 0
     finally:
         for release in provider.releases.values():
@@ -304,6 +308,8 @@ async def test_dual_target_observability_distinguishes_parent_latency_milestones
 
         assert f"parent_utterance_id={parent_id}" in admitted
         assert "turn_order=0" in admitted
+        assert "target_indexes=(0, 1)" in admitted
+        assert "target_languages=('zh-CN', 'ja')" in admitted
         assert "presentation_revision=0" in admitted
         assert len(target_starts) == 2
         assert any(

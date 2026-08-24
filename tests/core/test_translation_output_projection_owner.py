@@ -270,6 +270,8 @@ async def test_lifecycle_single_target_chatbox_carries_turn_identity_without_rev
     assert [message.text for message in chatbox.messages] == ["source text (single)"]
     assert chatbox.messages[0].self_turn_key == (2, 7)
     assert chatbox.messages[0].presentation_revision == 0
+    assert chatbox.messages[0].target_indexes == (0,)
+    assert chatbox.messages[0].target_languages == ("zh-CN",)
 
 
 @pytest.mark.asyncio
@@ -298,6 +300,11 @@ async def test_dual_target_projection_publishes_first_completion_then_ordered_sn
     ]
     assert [message.self_turn_key for message in chatbox.messages] == [(0, 4), (0, 4)]
     assert [message.presentation_revision for message in chatbox.messages] == [1, 2]
+    assert [message.target_indexes for message in chatbox.messages] == [(1,), (0, 1)]
+    assert [message.target_languages for message in chatbox.messages] == [
+        ("ja",),
+        ("zh-CN", "ja"),
+    ]
     assert [
         decision.metadata["presentation_revision"]
         for decision in owner.routing_decisions
@@ -305,6 +312,13 @@ async def test_dual_target_projection_publishes_first_completion_then_ordered_sn
         and decision.route == "self_chatbox"
         and "presentation_revision" in decision.metadata
     ] == [1, 2]
+    assert [
+        decision.metadata["target_indexes"]
+        for decision in owner.routing_decisions
+        if decision.decision == "published"
+        and decision.route == "self_chatbox"
+        and "target_indexes" in decision.metadata
+    ] == ["1", "0,1"]
     assert owner.self_turn_aggregate_count == 0
     assert owner.self_turn_tombstone_count == 1
 

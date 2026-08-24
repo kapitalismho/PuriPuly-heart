@@ -95,7 +95,13 @@ async def test_chatbox_adapter_propagates_turn_revision_metadata_to_paginator() 
             source_language="ko",
             target_language="en",
             is_final=True,
-            metadata={"turn_generation": 2, "turn_order": 3, "presentation_revision": 1},
+            metadata={
+                "turn_generation": 2,
+                "turn_order": 3,
+                "presentation_revision": 1,
+                "target_indexes": "1",
+                "target_languages": "ja",
+            },
         )
     )
     await adapter.publish_self_utterance(
@@ -106,7 +112,13 @@ async def test_chatbox_adapter_propagates_turn_revision_metadata_to_paginator() 
             source_language="ko",
             target_language="en",
             is_final=True,
-            metadata={"turn_generation": 2, "turn_order": 3, "presentation_revision": 2},
+            metadata={
+                "turn_generation": 2,
+                "turn_order": 3,
+                "presentation_revision": 2,
+                "target_indexes": "0,1",
+                "target_languages": "zh-CN,ja",
+            },
         )
     )
     clock.advance(3.0)

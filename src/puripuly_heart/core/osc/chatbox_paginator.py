@@ -77,6 +77,8 @@ class ChatboxPaginator:
                 turn_generation=message.turn_generation,
                 turn_order=message.turn_order,
                 presentation_revision=message.presentation_revision,
+                target_indexes=message.target_indexes,
+                target_languages=message.target_languages,
             )
             return
         self._record_stage(
@@ -88,6 +90,8 @@ class ChatboxPaginator:
             turn_generation=message.turn_generation,
             turn_order=message.turn_order,
             presentation_revision=message.presentation_revision,
+            target_indexes=message.target_indexes,
+            target_languages=message.target_languages,
         )
         self._start_message(message)
         if not self._is_paginating():
@@ -242,6 +246,8 @@ class ChatboxPaginator:
                 presentation_revision=message.presentation_revision,
                 location="active",
                 dropped_pages=dropped_pages,
+                target_indexes=message.target_indexes,
+                target_languages=message.target_languages,
             )
         elif active_key is not None and active_key < incoming_key:
             dropped_pages = self._clear_active_message()
@@ -282,6 +288,8 @@ class ChatboxPaginator:
                 presentation_revision=message.presentation_revision,
                 location="pending",
                 dropped_pages=0,
+                target_indexes=message.target_indexes,
+                target_languages=message.target_languages,
             )
 
         if active_pruned or pruned_messages:
@@ -293,6 +301,8 @@ class ChatboxPaginator:
                 presentation_revision=message.presentation_revision,
                 pruned_messages=pruned_messages,
                 pruned_pages=dropped_pages,
+                target_indexes=message.target_indexes,
+                target_languages=message.target_languages,
             )
 
         if self._is_paginating() and replacement_index is not None:
@@ -307,6 +317,8 @@ class ChatboxPaginator:
                 turn_generation=message.turn_generation,
                 turn_order=message.turn_order,
                 presentation_revision=message.presentation_revision,
+                target_indexes=message.target_indexes,
+                target_languages=message.target_languages,
             )
             return True
         return False
@@ -385,6 +397,8 @@ class ChatboxPaginator:
                 turn_generation=None if active is None else active.turn_generation,
                 turn_order=None if active is None else active.turn_order,
                 presentation_revision=(None if active is None else active.presentation_revision),
+                target_indexes=() if active is None else active.target_indexes,
+                target_languages=() if active is None else active.target_languages,
             )
         return True
 
@@ -455,6 +469,8 @@ class ChatboxPaginatorOutputAdapter:
         generation = self._non_negative_metadata_int(publication, "turn_generation")
         order = self._non_negative_metadata_int(publication, "turn_order")
         revision = self._non_negative_metadata_int(publication, "presentation_revision")
+        target_indexes = self._target_indexes(publication)
+        target_languages = self._target_languages(publication)
         if "turn_generation" in metadata and generation is None:
             raise TypeError("turn_generation must be a non-negative integer")
         if "turn_order" in metadata and order is None:
@@ -473,6 +489,8 @@ class ChatboxPaginatorOutputAdapter:
             turn_generation=generation,
             turn_order=order,
             presentation_revision=revision,
+            target_indexes=target_indexes,
+            target_languages=target_languages,
         )
         self.paginator.enqueue(message)
         self.paginator.send_typing(False)
@@ -503,6 +521,29 @@ class ChatboxPaginatorOutputAdapter:
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             return None
         return value
+
+    @staticmethod
+    def _target_indexes(publication: SelfUtterancePublication) -> tuple[int, ...]:
+        metadata = publication.metadata
+        if "target_indexes" not in metadata:
+            return ()
+        value = metadata["target_indexes"]
+        if not isinstance(value, str) or not value:
+            raise TypeError("target_indexes must be a comma-separated string")
+        try:
+            return tuple(int(part) for part in value.split(","))
+        except ValueError as exc:
+            raise TypeError("target_indexes must contain integers") from exc
+
+    @staticmethod
+    def _target_languages(publication: SelfUtterancePublication) -> tuple[str, ...]:
+        metadata = publication.metadata
+        if "target_languages" not in metadata:
+            return ()
+        value = metadata["target_languages"]
+        if not isinstance(value, str) or not value:
+            raise TypeError("target_languages must be a comma-separated string")
+        return tuple(value.split(","))
 
 
 def _redact_chatbox_disclosure_text(text: str) -> str:

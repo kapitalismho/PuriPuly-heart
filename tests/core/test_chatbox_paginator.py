@@ -58,6 +58,8 @@ def _message(
     turn_generation: int | None = None,
     turn_order: int | None = None,
     presentation_revision: int = 0,
+    target_indexes: tuple[int, ...] = (),
+    target_languages: tuple[str, ...] = (),
 ) -> OSCMessage:
     return OSCMessage(
         utterance_id or uuid.uuid4(),
@@ -66,6 +68,8 @@ def _message(
         turn_generation=turn_generation,
         turn_order=turn_order,
         presentation_revision=presentation_revision,
+        target_indexes=target_indexes,
+        target_languages=target_languages,
     )
 
 
@@ -458,6 +462,8 @@ def test_newer_active_revision_replaces_all_unsent_pages() -> None:
             turn_generation=2,
             turn_order=7,
             presentation_revision=1,
+            target_indexes=(1,),
+            target_languages=("ja",),
         )
     )
     paginator.enqueue(
@@ -468,6 +474,8 @@ def test_newer_active_revision_replaces_all_unsent_pages() -> None:
             turn_generation=2,
             turn_order=7,
             presentation_revision=2,
+            target_indexes=(0, 1),
+            target_languages=("zh-CN", "ja"),
         )
     )
     paginator.enqueue(
@@ -478,6 +486,8 @@ def test_newer_active_revision_replaces_all_unsent_pages() -> None:
             turn_generation=2,
             turn_order=7,
             presentation_revision=1,
+            target_indexes=(1,),
+            target_languages=("ja",),
         )
     )
     clock.advance(3.0)
@@ -489,6 +499,8 @@ def test_newer_active_revision_replaces_all_unsent_pages() -> None:
     assert replacement["presentation_revision"] == 2
     assert replacement["turn_generation"] == 2
     assert replacement["turn_order"] == 7
+    assert replacement["target_indexes"] == (0, 1)
+    assert replacement["target_languages"] == ("zh-CN", "ja")
     assert all("abcdefgh" not in str(fields) for _event, fields in stages)
 
 
@@ -559,6 +571,8 @@ def test_newer_turn_prunes_active_pages_and_preserves_system_disclosure() -> Non
             turn_generation=0,
             turn_order=5,
             presentation_revision=1,
+            target_indexes=(0,),
+            target_languages=("zh-CN",),
         )
     )
     clock.advance(3.0)
@@ -569,6 +583,8 @@ def test_newer_turn_prunes_active_pages_and_preserves_system_disclosure() -> Non
     assert prune["pruned_pages"] == 1
     assert prune["pruned_messages"] == 0
     assert prune["turn_order"] == 5
+    assert prune["target_indexes"] == (0,)
+    assert prune["target_languages"] == ("zh-CN",)
     assert all("old-turn" not in str(fields) for _event, fields in stages)
 
 

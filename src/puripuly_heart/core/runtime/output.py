@@ -308,73 +308,9 @@ class OutputRuntime:
         presentation_revision: int = 0,
         turn_generation: int | None = None,
         turn_order: int | None = None,
+        target_indexes: tuple[int, ...] = (),
+        target_languages: tuple[str, ...] = (),
     ) -> OutputPublicationResult:
-        if isinstance(presentation_revision, bool) or not isinstance(presentation_revision, int):
-            raise TypeError("presentation_revision must be an integer")
-        if presentation_revision < 0:
-            raise ValueError("presentation_revision must be non-negative")
-        if (turn_generation is None) != (turn_order is None):
-            raise ValueError("turn generation and order must be provided together")
-        if turn_generation is not None:
-            if isinstance(turn_generation, bool) or not isinstance(turn_generation, int):
-                raise TypeError("turn_generation must be an integer")
-            if turn_generation < 0:
-                raise ValueError("turn_generation must be non-negative")
-        if turn_order is not None:
-            if isinstance(turn_order, bool) or not isinstance(turn_order, int):
-                raise TypeError("turn_order must be an integer")
-            if turn_order < 0:
-                raise ValueError("turn_order must be non-negative")
-        if turn_generation is None and presentation_revision != 0:
-            raise ValueError("presentation_revision requires self turn identity")
-        publication_kind = publication_kind or (
-            PUBLICATION_KIND_PEER_SUBTITLE if channel == "peer" else PUBLICATION_KIND_SELF_UTTERANCE
-        )
-        if self._state != "open":
-            return self._observe_result(
-                status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                route=OUTPUT_ROUTE_SELF_CHATBOX,
-                publication_id=str(publication_id),
-                publication_kind=publication_kind,
-                reason=(
-                    "output_runtime_closed" if self._state == "closed" else "output_runtime_closing"
-                ),
-                metadata={"channel": channel, "state": self._state},
-            )
-        if self.chatbox_is_denied(channel):
-            return self._observe_result(
-                status=OUTPUT_ROUTING_DECISION_DENIED,
-                route=OUTPUT_ROUTE_SELF_CHATBOX,
-                publication_id=str(publication_id),
-                publication_kind=PUBLICATION_KIND_PEER_SUBTITLE,
-                reason="peer_chatbox_denied",
-                metadata={"channel": "peer", "attempted_route": OUTPUT_ROUTE_SELF_CHATBOX},
-            )
-        if not self.chatbox_is_eligible(channel):
-            raise ValueError("unknown chatbox publication channel")
-
-        publication_key = (
-            OUTPUT_ROUTE_SELF_CHATBOX,
-            f"{publication_id}:{presentation_revision}",
-        )
-        publication_metadata: dict[str, str | int | float | bool | None] = {
-            "presentation_revision": presentation_revision,
-        }
-        if turn_generation is not None:
-            publication_metadata.update(
-                turn_generation=turn_generation,
-                turn_order=turn_order,
-            )
-        duplicate = self._duplicate_publication_result(
-            publication_key=publication_key,
-            publication_kind=publication_kind,
-            channel=channel,
-            logical_publication_id=str(publication_id),
-            metadata=publication_metadata,
-        )
-        if duplicate is not None:
-            return duplicate
-
         message = OSCMessage(
             utterance_id=publication_id,
             text=self._merge_chatbox_text(
@@ -386,7 +322,66 @@ class OutputRuntime:
             turn_generation=turn_generation,
             turn_order=turn_order,
             presentation_revision=presentation_revision,
+            target_indexes=target_indexes,
+            target_languages=target_languages,
         )
+        publication_kind = publication_kind or (
+            PUBLICATION_KIND_PEER_SUBTITLE if channel == "peer" else PUBLICATION_KIND_SELF_UTTERANCE
+        )
+        publication_metadata: dict[str, str | int | float | bool | None] = {
+            "presentation_revision": presentation_revision,
+        }
+        if turn_generation is not None:
+            publication_metadata.update(
+                turn_generation=turn_generation,
+                turn_order=turn_order,
+            )
+        if target_indexes:
+            publication_metadata.update(
+                target_indexes=",".join(str(index) for index in target_indexes),
+                target_languages=",".join(target_languages),
+            )
+        if self._state != "open":
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SELF_CHATBOX,
+                publication_id=str(publication_id),
+                publication_kind=publication_kind,
+                reason=(
+                    "output_runtime_closed" if self._state == "closed" else "output_runtime_closing"
+                ),
+                metadata={"channel": channel, "state": self._state, **publication_metadata},
+            )
+        if self.chatbox_is_denied(channel):
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_DENIED,
+                route=OUTPUT_ROUTE_SELF_CHATBOX,
+                publication_id=str(publication_id),
+                publication_kind=PUBLICATION_KIND_PEER_SUBTITLE,
+                reason="peer_chatbox_denied",
+                metadata={
+                    "channel": "peer",
+                    "attempted_route": OUTPUT_ROUTE_SELF_CHATBOX,
+                    **publication_metadata,
+                },
+            )
+        if not self.chatbox_is_eligible(channel):
+            raise ValueError("unknown chatbox publication channel")
+
+        publication_key = (
+            OUTPUT_ROUTE_SELF_CHATBOX,
+            f"{publication_id}:{presentation_revision}",
+        )
+        duplicate = self._duplicate_publication_result(
+            publication_key=publication_key,
+            publication_kind=publication_kind,
+            channel=channel,
+            logical_publication_id=str(publication_id),
+            metadata=publication_metadata,
+        )
+        if duplicate is not None:
+            return duplicate
+
         try:
             self.chatbox.enqueue(message)
         except Exception as exc:
@@ -396,7 +391,11 @@ class OutputRuntime:
                 publication_id=str(publication_id),
                 publication_kind=publication_kind,
                 reason="destination_publish_failed",
-                metadata={"channel": channel, "error_type": type(exc).__name__},
+                metadata={
+                    "channel": channel,
+                    "error_type": type(exc).__name__,
+                    **publication_metadata,
+                },
             )
         self._remember_delivered_publication(publication_key)
         self.set_self_chatbox_typing_reason(SELF_SPEECH_TYPING_REASON, False)

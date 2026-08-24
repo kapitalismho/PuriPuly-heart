@@ -78,6 +78,8 @@ class ChatboxProjection:
     presentation_revision: int = 0
     turn_generation: int | None = None
     turn_order: int | None = None
+    target_indexes: tuple[int, ...] = ()
+    target_languages: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,12 +280,15 @@ class TranslationOutputProjectionOwner:
                 message=(
                     "[Detailed][Translation] translation_turn_admitted "
                     "parent_utterance_id=%s turn_generation=%s turn_order=%s "
-                    "target_count=%s presentation_revision=0"
+                    "target_indexes=%s target_languages=%s target_count=%s "
+                    "presentation_revision=0"
                 ),
                 args=(
                     aggregate.parent_utterance_id,
                     aggregate.turn_generation,
                     aggregate.turn_order,
+                    tuple(range(len(aggregate.configured_targets))),
+                    aggregate.configured_targets,
                     len(aggregate.configured_targets),
                 ),
                 detailed=True,
@@ -918,6 +923,8 @@ class TranslationOutputProjectionOwner:
                     presentation_revision=snapshot.revision,
                     turn_generation=snapshot.turn_generation,
                     turn_order=snapshot.turn_order,
+                    target_indexes=target_indexes,
+                    target_languages=target_languages,
                 )
             )
             if result.decision.decision != "published":
@@ -1319,6 +1326,14 @@ class TranslationOutputProjectionOwner:
                     source=submission.source,
                     turn_generation=submission.turn_generation,
                     turn_order=submission.turn_order,
+                    target_indexes=(
+                        (submission.target_index,) if submission.turn_generation is not None else ()
+                    ),
+                    target_languages=(
+                        (submission.target_language,)
+                        if submission.turn_generation is not None
+                        else ()
+                    ),
                 )
             )
         elif deny_peer_chatbox_attempt:
@@ -1340,6 +1355,8 @@ class TranslationOutputProjectionOwner:
             presentation_revision=projection.presentation_revision,
             turn_generation=projection.turn_generation,
             turn_order=projection.turn_order,
+            target_indexes=projection.target_indexes,
+            target_languages=projection.target_languages,
         )
         if result.decision.decision != "published":
             self.diagnostics.emit(
