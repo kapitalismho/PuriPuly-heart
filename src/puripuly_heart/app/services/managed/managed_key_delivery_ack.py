@@ -62,6 +62,43 @@ class ManagedKeyDeliveryAckService:
         )
         self.managed_state.pending_delivery_ack_expires_at = metadata.expires_at
 
+    async def recover_pending(
+        self,
+        *,
+        source: str,
+        managed_secret_key: str,
+    ) -> ManagedKeyDeliveryAckServiceResult:
+        if self.managed_state.pending_delivery_ack_source != source:
+            return ManagedKeyDeliveryAckServiceResult(succeeded=True, status="none")
+        if (
+            not self.managed_state.pending_delivery_ack_delivery_id
+            or not self.managed_state.pending_delivery_ack_managed_credential_ref
+        ):
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False,
+                status="pending_metadata_incomplete",
+                diagnostics=_diagnostics(
+                    operation="recover_managed_key_delivery",
+                    code="delivery_ack_pending_metadata_incomplete",
+                    fields={"source": source},
+                ),
+            )
+        try:
+            managed_secret = await self.secret_store.get_secret(managed_secret_key)
+        except Exception:
+            managed_secret = None
+        if managed_secret is None or not managed_secret.value:
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False,
+                status="managed_secret_missing",
+                diagnostics=_diagnostics(
+                    operation="recover_managed_key_delivery",
+                    code="delivery_ack_managed_secret_missing",
+                    fields={"source": source, "managed_secret_present": False},
+                ),
+            )
+        return await self.retry_pending()
+
     async def retry_pending(self) -> ManagedKeyDeliveryAckServiceResult:
         source = self.managed_state.pending_delivery_ack_source
         delivery_id = self.managed_state.pending_delivery_ack_delivery_id
@@ -91,13 +128,24 @@ class ManagedKeyDeliveryAckService:
                     fields={"source": source, "token_present": False},
                 ),
             )
-        ack_result = await self.broker_client.acknowledge_managed_key_delivery(
-            ManagedKeyDeliveryAckRequest(
-                delivery_id=delivery_id,
-                managed_credential_ref=managed_credential_ref,
-                delivery_ack_token=token_read.value,
+        try:
+            ack_result = await self.broker_client.acknowledge_managed_key_delivery(
+                ManagedKeyDeliveryAckRequest(
+                    delivery_id=delivery_id,
+                    managed_credential_ref=managed_credential_ref,
+                    delivery_ack_token=token_read.value,
+                )
             )
-        )
+        except Exception:
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False,
+                status="ack_exception",
+                diagnostics=_diagnostics(
+                    operation="acknowledge_managed_key_delivery",
+                    code="delivery_ack_exception",
+                    fields={"source": source},
+                ),
+            )
         if ack_result.succeeded and ack_result.status in {"acknowledged", "already_acknowledged"}:
             try:
                 await self.clear_pending(source)

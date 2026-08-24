@@ -41,6 +41,9 @@ from puripuly_heart.app.services.managed_connection_auth import (
     ManagedConnectionAuthRequest,
     ManagedConnectionAuthService,
 )
+from puripuly_heart.app.services.managed_key_delivery_ack import (
+    ManagedKeyDeliveryAckService,
+)
 from puripuly_heart.app.services.qq_managed_auth import (
     QqManagedAuthRequest,
     QqManagedAuthService,
@@ -989,6 +992,11 @@ class ManagedAuthRuntimeAdapter:
             claim_guard=ManagedAuthClaimGuard(
                 managed_state=managed_state,
                 secret_store=secret_store_port,
+            ),
+            delivery_ack_service=ManagedKeyDeliveryAckService(
+                broker_client=broker,
+                secret_store=secret_store_port,
+                managed_state=managed_state,
             ),
         ).authorize(
             ManagedConnectionAuthRequest(

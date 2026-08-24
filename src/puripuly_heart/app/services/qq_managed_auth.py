@@ -21,6 +21,7 @@ from puripuly_heart.app.services.managed_auth_claims import (
     ManagedAuthClaimGuard,
 )
 from puripuly_heart.app.services.managed_key_delivery_ack import (
+    ACK_SOURCE_QQ,
     ManagedKeyDeliveryAckService,
     ManagedKeyDeliveryAckTokenStoreError,
 )
@@ -88,6 +89,10 @@ class QqManagedAuthService:
     delivery_ack_service: ManagedKeyDeliveryAckService | None = None
 
     async def authenticate(self, request: QqManagedAuthRequest) -> TransactionResult:
+        recovery_result = await self._recover_pending_delivery_ack()
+        if recovery_result is not None:
+            return recovery_result
+
         claim_result = await self._preflight_claim_source()
         if claim_result is not None:
             return claim_result
@@ -224,6 +229,36 @@ class QqManagedAuthService:
             broker_client=self.broker_client,
             secret_store=self.secret_store,
             managed_state=self.managed_state,
+        )
+
+    async def _recover_pending_delivery_ack(self) -> TransactionResult | None:
+        if self.managed_state.pending_delivery_ack_source != ACK_SOURCE_QQ:
+            return None
+        result = await self._delivery_ack_service().recover_pending(
+            source=ACK_SOURCE_QQ,
+            managed_secret_key=OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+        )
+        if not result.succeeded:
+            return _delivery_ack_pending_result(
+                ack_status=result.status,
+                diagnostics_present=result.diagnostics is not None,
+            )
+        if result.status == "none":
+            return None
+        return TransactionResult(
+            status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+            message=_message("qq_managed_auth.success", severity=SEVERITY_INFO),
+            diagnostics=_diagnostics(
+                operation="recover_qq_managed_key_delivery",
+                code="qq_delivery_ack_recovered",
+                category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+                fields={
+                    "phase": "remote_delivery_ack_recovery",
+                    "delivery_ack_status": result.status,
+                    "secret_write_succeeded": True,
+                    "settings_commit_succeeded": True,
+                },
+            ),
         )
 
     async def _assert_qq_identity(
