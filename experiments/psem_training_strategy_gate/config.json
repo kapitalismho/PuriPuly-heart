@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "experiment_id": "psem_training_strategy_gate_v1",
+  "contract_version": "issue-76-v1",
+  "dataset_freeze_id": "PSEM-STRATEGY-DATA-v2",
+  "output_relative_path": "results/psem_training_strategy_gate_v1",
+  "sample_rate_hz": 16000,
+  "temporal": {
+    "input_past_ms": 2000,
+    "input_future_ms": 1000,
+    "input_duration_ms": 3000,
+    "output_hop_ms": 100,
+    "output_cells": 30,
+    "duplicate_suppression_ms": 200,
+    "matching_collars_ms": [100, 250, 500]
+  },
+  "target_mapping": {
+    "handoff_training_cell": "nearest_100ms_source_grid_tie_to_earlier_cell",
+    "handoff_evaluation_reference": "original_unsnapped_source_sample",
+    "activity_cell": "state_at_100ms_cell_midpoint",
+    "relation_pairs": [
+      "adjacent_reliable_solo_cells",
+      "reliable_solo_endpoints_separated_only_by_valid_local_silence",
+      "reliable_solo_before_overlap_to_reliable_solo_after_overlap"
+    ]
+  },
+  "pretrained_checkpoint": {
+    "model_id": "wavlm-base-plus",
+    "loader_class": "transformers.WavLMModel",
+    "repository": "https://huggingface.co/microsoft/wavlm-base-plus",
+    "revision": "4c66d4806a428f2e922ccfa1a962776e232d487b",
+    "source_registry_path": "experiments/speaker_representation_scd/models/source_registry.json",
+    "source_registry_sha256": "0cc07fa30294a2ae9a4d30ef4bcb7201f6b03d700ce815139975678704d182bb"
+  },
+  "arms": {
+    "FROZEN-WAVLM": {
+      "encoder": "wavlm-base-plus",
+      "trainable_wavlm_layers": [],
+      "raw_waveform_required": true
+    },
+    "FINETUNE-WAVLM": {
+      "encoder": "wavlm-base-plus",
+      "frozen_feature_extractor": true,
+      "frozen_transformer_layers": [0, 1, 2, 3, 4, 5, 6, 7],
+      "trainable_transformer_layers": [8, 9, 10, 11],
+      "trainable_final_encoder_normalization": true,
+      "raw_waveform_required": true
+    },
+    "SCRATCH-PSEM": {
+      "frontend": {
+        "kind": "log_mel",
+        "mel_bins": 64,
+        "frame_ms": 25,
+        "hop_ms": 10
+      },
+      "encoder": {
+        "width": 320,
+        "expansion": 2,
+        "kernel": 5,
+        "dilations": [1, 2, 4, 8, 16, 1, 2, 4],
+        "output_dimension": 256
+      },
+      "minimum_parameters": 5000000,
+      "maximum_parameters": 10000000,
+      "pretrained_artifacts_allowed": false
+    }
+  },
+  "common_head": {
+    "cell_dimension": 256,
+    "gru_layers": 2,
+    "gru_hidden_per_direction": 128,
+    "bidirectional": true,
+    "dropout": 0.1,
+    "state_classes": ["silence", "singleton", "overlap"],
+    "relation_classes": ["same", "different"]
+  },
+  "losses": {
+    "handoff_weight": 1.0,
+    "state_weight": 0.5,
+    "relation_weight": 0.5,
+    "handoff": "weighted_bce",
+    "state": "class_weighted_cross_entropy",
+    "relation": "balanced_bce"
+  },
+  "sampling": {
+    "handoff_positive_fraction": 0.25,
+    "topology_hard_negative_fraction": 0.25,
+    "source_time_uniform_fraction": 0.5,
+    "positive_families": ["clean_direct_different_speaker_handoff", "silence_gap_different_speaker_handoff", "overlap_takeover"],
+    "hard_negative_families": ["stable_singleton_continuation", "same_speaker_silence_gap_resume", "overlap_return", "overlap_continuation", "silence_continuation"],
+    "synthetic_max_optimizer_batch_fraction": 0.25
+  },
+  "augmentation": [
+    "global_gain",
+    "additive_non_speech_noise",
+    "light_reverberation",
+    "band_limitation",
+    "codec_simulation"
+  ],
+  "optimization": {
+    "optimizer": "AdamW",
+    "weight_decay": 0.0001,
+    "gradient_clip_norm": 5.0,
+    "maximum_epochs": 20,
+    "early_stopping_patience": 4,
+    "warmup_fraction": 0.05,
+    "schedule": "cosine",
+    "seeds": [7301, 7302],
+    "learning_rates": {
+      "common_head_and_projection": 0.001,
+      "finetuned_wavlm": 0.00001,
+      "scratch_encoder": 0.0003
+    },
+    "checkpoint_metric": "dev_event_average_precision",
+    "checkpoint_tiebreak": "dev_total_loss"
+  },
+  "evaluation": {
+    "thresholds": "all_unique_scores",
+    "eventizer": "local_maxima_then_score_ordered_duplicate_suppression",
+    "matching": "maximum_cardinality_one_to_one_nearest_then_earlier_source",
+    "bootstrap_replicates": 2000,
+    "bootstrap_unit": "meeting",
+    "eval_threshold_selection_allowed": false,
+    "false_events_per_hour_ceiling": null
+  }
+}

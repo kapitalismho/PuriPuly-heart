@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "experiment_id": "psem_training_strategy_gate_v1",
+  "contract_version": "issue-76-v1",
+  "authority": {
+    "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/76",
+    "sha256": "48fbea67633ce4876a94a2901332f8455dccb8275c408fd11ca244bc3f6181bb"
+  },
+  "decision": "compare complete FROZEN-WAVLM, FINETUNE-WAVLM, and SCRATCH-PSEM speaker-handoff performance frontiers",
+  "primary_event": "handoff_confirmed",
+  "label_contract": "psem-handoff-v1",
+  "dataset_freeze": {
+    "id": "PSEM-STRATEGY-DATA-v2",
+    "path": "data/v2/dataset_freeze.json",
+    "sha256": "bc7e63bb201c2a33a9b2d69b2364fed8f03839278098f0bd175d6833b330a41e",
+    "preflight_path": "data/v2/preflight_report.json",
+    "preflight_sha256": "79c4f4d188381288ccefcd2e4dcbbf6b17c86936119af538292dd04f379f4531"
+  },
+  "anti_inheritance": {
+    "forbidden_task_authority": [
+      "experiments/speaker_representation_scd/r7_relation_verifier.py::_event_rows",
+      "experiments/speaker_representation_scd/r7b_local_segmentation.py labels/events",
+      "cached R7/R7-B event manifests",
+      "issue #72 labels"
+    ],
+    "fine_tuning_requires_pretrained_weight_gradients_and_updates": true,
+    "false_events_per_hour_is_policy_gate": false
+  },
+  "allowed_outcomes": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "inconclusive"
+  ],
+  "required_stop_after_decision": true
+}
