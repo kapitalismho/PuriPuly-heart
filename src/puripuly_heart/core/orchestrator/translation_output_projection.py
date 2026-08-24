@@ -179,6 +179,7 @@ class TranslationOutputProjectionOwner:
     _active_self_turn_generation: int = -1
     _latest_visible_self_turn: tuple[int, int] | None = None
     _latest_visible_self_revision: int = 0
+    _latest_presented_primary_self_turn: tuple[int, int] | None = None
     _self_publish_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
     def __post_init__(self) -> None:
@@ -1005,6 +1006,32 @@ class TranslationOutputProjectionOwner:
             )
             return result
 
+    async def claim_self_primary_presentation(
+        self,
+        *,
+        target_index: int,
+        turn_generation: int | None,
+        turn_order: int | None,
+    ) -> bool:
+        if target_index != 0 or turn_generation is None or turn_order is None:
+            return False
+        turn_key = (turn_generation, turn_order)
+        async with self._self_publish_lock:
+            if turn_generation != self._active_self_turn_generation:
+                return False
+            if (
+                self._latest_visible_self_turn is not None
+                and turn_key < self._latest_visible_self_turn
+            ):
+                return False
+            if (
+                self._latest_presented_primary_self_turn is not None
+                and turn_key < self._latest_presented_primary_self_turn
+            ):
+                return False
+            self._latest_presented_primary_self_turn = turn_key
+            return True
+
     def _emit_self_stale_snapshot(self, snapshot: SelfTranslationTurnSnapshot) -> None:
         target_languages = tuple(
             target for target, _text in snapshot.completed_translations_by_target
@@ -1143,6 +1170,7 @@ class TranslationOutputProjectionOwner:
         deny_peer_chatbox_attempt = self.chatbox_is_denied(channel)
         dual_target_self = channel == "self" and len(configuration.self_target_languages) == 2
         self_update = _SelfProjectionUpdate(True)
+        present_self_result = True
         if dual_target_self:
             self_update = await self._record_self_submission(submission)
             if not self_update.accepted:
@@ -1150,6 +1178,14 @@ class TranslationOutputProjectionOwner:
                     True,
                     record_runtime_translation=False,
                 )
+            if submission.outcome in {"translated", "failed"}:
+                present_self_result = await self.claim_self_primary_presentation(
+                    target_index=submission.target_index,
+                    turn_generation=submission.turn_generation,
+                    turn_order=submission.turn_order,
+                )
+            else:
+                present_self_result = False
 
         if submission.outcome == "source_only":
             if channel == "peer":
@@ -1186,12 +1222,13 @@ class TranslationOutputProjectionOwner:
 
         if submission.outcome == "failed":
             if dual_target_self:
-                await self.close_overlay_utterance(
-                    utterance_id=utterance_id,
-                    channel=channel,
-                    is_final=False,
-                    finalize_latency=True,
-                )
+                if present_self_result:
+                    await self.close_overlay_utterance(
+                        utterance_id=utterance_id,
+                        channel=channel,
+                        is_final=False,
+                        finalize_latency=True,
+                    )
                 return TranslationResultProjectionReceipt(True)
             if submission.failure_code == "stale_provider_completion":
                 if channel == "peer":
@@ -1283,15 +1320,16 @@ class TranslationOutputProjectionOwner:
                 is_final=True,
                 finalize_latency=not (publish_to_chatbox or deny_peer_chatbox_attempt),
             )
-        await self.publish_ui(
-            TranslationUiMessage(
-                event_type=UIEventType.TRANSLATION_DONE,
-                utterance_id=utterance_id,
-                payload=translation,
-                source=submission.source,
+        if channel != "self" or present_self_result:
+            await self.publish_ui(
+                TranslationUiMessage(
+                    event_type=UIEventType.TRANSLATION_DONE,
+                    utterance_id=utterance_id,
+                    payload=translation,
+                    source=submission.source,
+                )
             )
-        )
-        if channel == "self":
+        if channel == "self" and present_self_result:
             await self.emit_translation(
                 TranslationOverlayProjection(
                     translation=translation,

@@ -280,13 +280,19 @@ async def test_dual_target_projection_publishes_first_completion_then_ordered_sn
         target_language="zh-CN",
         self_target_languages=("zh-CN", "ja"),
     )
-    owner, chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    overlay = RecordingOverlay()
+    owner, chatbox, ui_messages, config_owner = make_owner(
+        configuration=configuration,
+        overlay=overlay,
+    )
     children = self_children(config_owner, turn_order=4)
     primary, secondary = children
     assert owner.admit_self_turn(children)
 
     await owner.project_translation_result(self_submission(secondary, text="こんにちは"))
     await owner.complete_self_target(secondary, "translated")
+    assert [event.type for event in ui_messages.events] == [UIEventType.OSC_SENT]
+    assert overlay.events == []
     await owner.project_translation_result(self_submission(primary, text="你好"))
     await owner.complete_self_target(primary, "translated")
 
@@ -319,6 +325,15 @@ async def test_dual_target_projection_publishes_first_completion_then_ordered_sn
         and decision.route == "self_chatbox"
         and "target_indexes" in decision.metadata
     ] == ["1", "0,1"]
+    translation_events = [
+        event for event in ui_messages.events if event.type == UIEventType.TRANSLATION_DONE
+    ]
+    assert [event.utterance_id for event in translation_events] == [primary.utterance_id]
+    assert [event.payload.target_language for event in translation_events] == ["zh-CN"]
+    assert [event.utterance_id for event in overlay.events] == [
+        primary.utterance_id,
+        primary.utterance_id,
+    ]
     assert owner.self_turn_aggregate_count == 0
     assert owner.self_turn_tombstone_count == 1
 
@@ -385,7 +400,11 @@ async def test_newer_visible_turn_suppresses_older_late_complete_revision() -> N
         target_language="zh-CN",
         self_target_languages=("zh-CN", "ja"),
     )
-    owner, chatbox, ui_messages, config_owner = make_owner(configuration=configuration)
+    overlay = RecordingOverlay()
+    owner, chatbox, ui_messages, config_owner = make_owner(
+        configuration=configuration,
+        overlay=overlay,
+    )
     older = self_children(config_owner, turn_order=10)
     newer = self_children(config_owner, turn_order=11)
     assert owner.admit_self_turn(older)
@@ -408,7 +427,87 @@ async def test_newer_visible_turn_suppresses_older_late_complete_revision() -> N
         "new primary",
         "new primary\nnew secondary",
     ]
-    assert sum(event.type == UIEventType.TRANSLATION_DONE for event in ui_messages.events) == 4
+    translation_events = [
+        event for event in ui_messages.events if event.type == UIEventType.TRANSLATION_DONE
+    ]
+    assert [event.payload.text for event in translation_events] == ["old primary", "new primary"]
+    assert [event.utterance_id for event in overlay.events] == [
+        older[0].utterance_id,
+        older[0].utterance_id,
+        newer[0].utterance_id,
+        newer[0].utterance_id,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_older_primary_arriving_after_newer_visibility_is_history_only() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    overlay = RecordingOverlay()
+    owner, chatbox, ui_messages, config_owner = make_owner(
+        configuration=configuration,
+        overlay=overlay,
+    )
+    older = self_children(config_owner, turn_order=10)
+    newer = self_children(config_owner, turn_order=11)
+    assert owner.admit_self_turn(older)
+    assert owner.admit_self_turn(newer)
+
+    await owner.project_translation_result(self_submission(newer[1], text="new secondary"))
+    older_late = await owner.project_translation_result(
+        self_submission(older[0], text="old primary")
+    )
+    await owner.project_translation_result(self_submission(newer[0], text="new primary"))
+
+    assert older_late.record_runtime_translation
+    assert [message.text for message in chatbox.messages] == [
+        "new secondary",
+        "new primary\nnew secondary",
+    ]
+    translation_events = [
+        event for event in ui_messages.events if event.type == UIEventType.TRANSLATION_DONE
+    ]
+    assert [event.payload.text for event in translation_events] == ["new primary"]
+    assert [event.utterance_id for event in overlay.events] == [
+        newer[0].utterance_id,
+        newer[0].utterance_id,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_primary_presentation_freshness_survives_chatbox_failure() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    overlay = RecordingOverlay()
+    owner, chatbox, ui_messages, config_owner = make_owner(
+        configuration=configuration,
+        overlay=overlay,
+        chatbox=RecordingChatbox(fail=True),
+    )
+    older = self_children(config_owner, turn_order=10)
+    newer = self_children(config_owner, turn_order=11)
+    assert owner.admit_self_turn(older)
+    assert owner.admit_self_turn(newer)
+
+    await owner.project_translation_result(self_submission(newer[0], text="new primary"))
+    older_late = await owner.project_translation_result(
+        self_submission(older[0], text="old primary")
+    )
+
+    assert older_late.record_runtime_translation
+    assert chatbox.messages == []
+    translation_events = [
+        event for event in ui_messages.events if event.type == UIEventType.TRANSLATION_DONE
+    ]
+    assert [event.payload.text for event in translation_events] == ["new primary"]
+    assert [event.utterance_id for event in overlay.events] == [
+        newer[0].utterance_id,
+        newer[0].utterance_id,
+    ]
 
 
 @pytest.mark.asyncio
@@ -518,7 +617,11 @@ async def test_target_with_multiple_source_runs_publishes_only_after_all_runs_co
         target_language="zh-CN",
         self_target_languages=("zh-CN", "ja"),
     )
-    owner, chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    overlay = RecordingOverlay()
+    owner, chatbox, ui_messages, config_owner = make_owner(
+        configuration=configuration,
+        overlay=overlay,
+    )
     children = self_children(config_owner, source_parts=("first", "second"))
     assert owner.admit_self_turn(children)
 
@@ -534,6 +637,19 @@ async def test_target_with_multiple_source_runs_publishes_only_after_all_runs_co
     await owner.complete_self_target(children[3], "translated")
 
     assert chatbox.messages[-1].text == ("primary one primary two\nsecondary one secondary two")
+    translation_events = [
+        event for event in ui_messages.events if event.type == UIEventType.TRANSLATION_DONE
+    ]
+    assert [event.utterance_id for event in translation_events] == [
+        children[0].utterance_id,
+        children[2].utterance_id,
+    ]
+    assert [event.utterance_id for event in overlay.events] == [
+        children[0].utterance_id,
+        children[0].utterance_id,
+        children[2].utterance_id,
+        children[2].utterance_id,
+    ]
 
 
 @pytest.mark.asyncio

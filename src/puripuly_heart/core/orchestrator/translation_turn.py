@@ -487,12 +487,16 @@ class TranslationTurnLifecycleOwner:
             if run.text.strip()
             for target_index, target_language in enumerate(request.target_languages)
         ]
-        single_identity = len(child_specs) == 1 and request.turn_kind in {"manual", "self"}
+        nonempty_run_count = sum(1 for run in runs if run.text.strip())
+        primary_uses_parent_identity = nonempty_run_count == 1 and request.turn_kind in {
+            "manual",
+            "self",
+        }
         children: list[TranslationTurnChild] = []
         for sequence, (run_index, target_index, run, target_language) in enumerate(child_specs):
             child_id = (
                 request.transcript.utterance_id
-                if single_identity
+                if primary_uses_parent_identity and target_index == 0
                 else uuid5(
                     request.transcript.utterance_id,
                     f"{request.turn_kind}:{run_index}:{target_index}:{run.language}:{target_language}",

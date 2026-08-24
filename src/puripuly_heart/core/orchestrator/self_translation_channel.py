@@ -317,6 +317,10 @@ class SelfTranslationChannelOwner:
     async def on_child_created(self, child: TranslationTurnChild) -> None:
         if child.channel != "self":
             raise ValueError("Self translation owner received a non-Self child")
+        if child.target_index != 0:
+            self.runtime.get_or_create_bundle(child.utterance_id).with_transcript(child.transcript)
+            self.runtime.remember_source(child.utterance_id, child.source)
+            return
         if child.utterance_id != child.parent_utterance_id:
             await self._handle_transcript(child.transcript, is_final=True, source=child.source)
 
@@ -426,6 +430,13 @@ class SelfTranslationChannelOwner:
         await self.output_projection.complete_self_target(child, outcome)
         if outcome != "cancelled":
             return
+        if len(child.config_snapshot.value.self_target_languages) == 2:
+            if not await self.output_projection.claim_self_primary_presentation(
+                target_index=child.target_index,
+                turn_generation=child.turn_generation,
+                turn_order=child.turn_order,
+            ):
+                return
         finalized = await self.output_projection.close_overlay_utterance(
             utterance_id=child.utterance_id,
             channel="self",

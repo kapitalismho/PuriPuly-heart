@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.domain.events import UIEventType
 from puripuly_heart.domain.models import Translation
 from tests.helpers.translation_owners import compose_translation_test_harness
 
@@ -107,6 +108,17 @@ class RecordingOsc:
         return None
 
 
+@dataclass
+class RecordingOverlay:
+    events: list[object] = field(default_factory=list)
+
+    async def emit(self, event: object) -> None:
+        self.events.append(event)
+
+    def active_self_overlay_metadata(self) -> None:
+        return None
+
+
 class RecordingRuntimeLogging:
     mode = "detailed"
 
@@ -198,10 +210,12 @@ async def test_failed_child_creation_does_not_retain_prepared_self_request() -> 
 async def test_end_to_end_secondary_first_publishes_progressive_parent_snapshots() -> None:
     provider = TargetControlledProvider()
     osc = RecordingOsc()
+    overlay = RecordingOverlay()
     harness = compose_translation_test_harness(
         stt=None,
         llm=provider,
         osc=osc,
+        overlay_sink=overlay,
         source_language="en",
         target_language="zh-CN",
         self_target_languages=("zh-CN", "ja"),
@@ -225,6 +239,13 @@ async def test_end_to_end_secondary_first_publishes_progressive_parent_snapshots
         ]
         assert osc.messages[0].target_indexes == (1,)
         assert osc.messages[0].target_languages == ("ja",)
+        first_ui_events = []
+        while not harness.ui_events.empty():
+            first_ui_events.append(harness.ui_events.get_nowait())
+        assert sum(event.type == UIEventType.TRANSCRIPT_FINAL for event in first_ui_events) == 1
+        assert sum(event.type == UIEventType.TRANSLATION_DONE for event in first_ui_events) == 0
+        assert sum(event.type == UIEventType.OSC_SENT for event in first_ui_events) == 1
+        assert [event.type for event in overlay.events] == ["self_transcript_final"]
 
         provider.releases[("source text", "zh-CN")].set()
         await harness.translation_turns.wait_for_idle()
@@ -234,6 +255,25 @@ async def test_end_to_end_secondary_first_publishes_progressive_parent_snapshots
         ]
         assert osc.messages[1].target_indexes == (0, 1)
         assert osc.messages[1].target_languages == ("zh-CN", "ja")
+        final_ui_events = []
+        while not harness.ui_events.empty():
+            final_ui_events.append(harness.ui_events.get_nowait())
+        translation_events = [
+            event for event in final_ui_events if event.type == UIEventType.TRANSLATION_DONE
+        ]
+        assert [event.utterance_id for event in translation_events] == [parent_id]
+        assert [event.payload.target_language for event in translation_events] == ["zh-CN"]
+        assert [event.type for event in overlay.events] == [
+            "self_transcript_final",
+            "translation_final",
+            "utterance_closed",
+        ]
+        assert all(event.utterance_id == parent_id for event in overlay.events)
+        assert len(harness.self_runtime.utterances) == 2
+        assert all(
+            bundle.final is not None and bundle.final.text == "source text"
+            for bundle in harness.self_runtime.utterances.values()
+        )
         assert harness.output_projection.self_turn_aggregate_count == 0
     finally:
         for release in provider.releases.values():
@@ -406,10 +446,12 @@ async def test_dual_target_cancellation_records_each_outcome_and_all_terminal_ti
     provider = TargetControlledProvider()
     clock = FakeClock(_now=30.0)
     runtime_logging = RecordingRuntimeLogging()
+    overlay = RecordingOverlay()
     harness = compose_translation_test_harness(
         stt=None,
         llm=provider,
         osc=RecordingOsc(),
+        overlay_sink=overlay,
         clock=clock,
         runtime_logging=runtime_logging,
         source_language="en",
@@ -437,6 +479,8 @@ async def test_dual_target_cancellation_records_each_outcome_and_all_terminal_ti
             == 1
         )
         assert "private cancellation source" not in "\n".join(runtime_logging.messages)
+        closed_events = [event for event in overlay.events if event.type == "utterance_closed"]
+        assert closed_events == []
         assert harness.output_projection.self_turn_aggregate_count == 0
     finally:
         for release in provider.releases.values():

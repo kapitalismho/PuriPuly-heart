@@ -234,6 +234,87 @@ async def test_manual_and_self_single_child_preserve_parent_identity() -> None:
 
 
 @pytest.mark.asyncio
+async def test_dual_target_single_run_preserves_primary_parent_identity() -> None:
+    parent_id = uuid4()
+    observed: list[TranslationTurnChild] = []
+
+    async def process(child: TranslationTurnChild, _cancellation_requested):
+        observed.append(child)
+        return "translated"
+
+    owner = _owner(process_child=process)
+    try:
+        child_ids = await owner.submit(
+            _request(
+                parent_id=parent_id,
+                turn_kind="self",
+                targets=("zh-CN", "ja"),
+            )
+        )
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+
+    primary = next(child for child in observed if child.target_index == 0)
+    secondary = next(child for child in observed if child.target_index == 1)
+    assert primary.utterance_id == parent_id
+    assert secondary.utterance_id != parent_id
+    assert child_ids == (primary.utterance_id, secondary.utterance_id)
+
+
+@pytest.mark.asyncio
+async def test_dual_target_multi_run_preserves_single_target_primary_identities() -> None:
+    parent_id = uuid4()
+    runs = (
+        FinalLanguageRun("first", "en"),
+        FinalLanguageRun("second", "ja"),
+    )
+    single_children: list[TranslationTurnChild] = []
+    dual_children: list[TranslationTurnChild] = []
+
+    async def process_single(child: TranslationTurnChild, _cancellation_requested):
+        single_children.append(child)
+        return "translated"
+
+    async def process_dual(child: TranslationTurnChild, _cancellation_requested):
+        dual_children.append(child)
+        return "translated"
+
+    single_owner = _owner(process_child=process_single)
+    dual_owner = _owner(process_child=process_dual)
+    try:
+        await single_owner.submit(
+            _request(
+                parent_id=parent_id,
+                turn_kind="self",
+                runs=runs,
+                targets=("zh-CN",),
+            )
+        )
+        await dual_owner.submit(
+            _request(
+                parent_id=parent_id,
+                turn_kind="self",
+                runs=runs,
+                targets=("zh-CN", "ja"),
+            )
+        )
+        await single_owner.wait_for_idle()
+        await dual_owner.wait_for_idle()
+    finally:
+        await single_owner.close()
+        await dual_owner.close()
+
+    assert [
+        child.utterance_id
+        for child in sorted(dual_children, key=lambda child: child.sequence)
+        if child.target_index == 0
+    ] == [child.utterance_id for child in sorted(single_children, key=lambda child: child.sequence)]
+    assert len({child.utterance_id for child in dual_children}) == 4
+    assert all(child.utterance_id != parent_id for child in dual_children)
+
+
+@pytest.mark.asyncio
 async def test_self_target_children_start_concurrently() -> None:
     started: asyncio.Queue[str] = asyncio.Queue()
     release = asyncio.Event()
