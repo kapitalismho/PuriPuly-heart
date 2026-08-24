@@ -289,9 +289,7 @@ async def test_self_turn_order_is_monotonic_and_resets_with_generation() -> None
 async def test_cancel_and_close_publish_generation_retirement_before_draining() -> None:
     observed: list[tuple[str, int]] = []
     owner = _owner(
-        turn_generation_observer=lambda channel, generation: observed.append(
-            (channel, generation)
-        )
+        turn_generation_observer=lambda channel, generation: observed.append((channel, generation))
     )
 
     await owner.cancel_pending(channel="self")
@@ -367,15 +365,11 @@ async def test_self_parent_admission_precedes_suspendable_child_creation() -> No
     owner.on_child_created = created
     owner.on_parent_admitted = admitted
     older_submit = asyncio.create_task(
-        owner.submit(
-            _request(parent_id=older_id, turn_kind="self", targets=("zh-CN", "ja"))
-        )
+        owner.submit(_request(parent_id=older_id, turn_kind="self", targets=("zh-CN", "ja")))
     )
     try:
         await older_creation_started.wait()
-        await owner.submit(
-            _request(parent_id=newer_id, turn_kind="self", targets=("zh-CN", "ja"))
-        )
+        await owner.submit(_request(parent_id=newer_id, turn_kind="self", targets=("zh-CN", "ja")))
         assert admissions == [older_id, newer_id]
         release_older_creation.set()
         await older_submit
@@ -405,9 +399,7 @@ async def test_child_creation_failure_releases_all_admitted_child_state() -> Non
     owner.on_child_created = created
     owner.on_child_terminal = terminal
     try:
-        await owner.submit(
-            _request(parent_id=uuid4(), turn_kind="self", targets=("zh-CN", "ja"))
-        )
+        await owner.submit(_request(parent_id=uuid4(), turn_kind="self", targets=("zh-CN", "ja")))
         await owner.wait_for_idle()
     finally:
         await owner.close()
@@ -435,9 +427,7 @@ async def test_channel_cancellation_drains_inflight_admission_before_reset_retur
     owner.on_parent_admitted = admitted
     owner.on_child_terminal = terminal
     submit_task = asyncio.create_task(
-        owner.submit(
-            _request(parent_id=parent_id, turn_kind="self", targets=("zh-CN", "ja"))
-        )
+        owner.submit(_request(parent_id=parent_id, turn_kind="self", targets=("zh-CN", "ja")))
     )
     try:
         await admission_started.wait()

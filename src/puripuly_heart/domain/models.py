@@ -148,9 +148,7 @@ class OSCMessage:
         if (self.turn_generation is None) != (self.turn_order is None):
             raise ValueError("turn generation and order must be provided together")
         if self.turn_generation is not None:
-            if isinstance(self.turn_generation, bool) or not isinstance(
-                self.turn_generation, int
-            ):
+            if isinstance(self.turn_generation, bool) or not isinstance(self.turn_generation, int):
                 raise TypeError("turn_generation must be an integer")
             if self.turn_generation < 0:
                 raise ValueError("turn_generation must be non-negative")

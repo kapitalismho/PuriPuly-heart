@@ -424,9 +424,7 @@ class TranslationLatencyDiagnosticsOwner:
             if diagnostic.target_language is not None
             else None
         )
-        legacy_changed = (
-            self._last_context_modes.get(diagnostic.channel) != diagnostic.applied_mode
-        )
+        legacy_changed = self._last_context_modes.get(diagnostic.channel) != diagnostic.applied_mode
         target_changed = (
             target_key is not None
             and self._last_target_context_modes.get(target_key) != diagnostic.applied_mode
@@ -463,9 +461,7 @@ class TranslationLatencyDiagnosticsOwner:
         diagnostic: ContextApplicationDiagnostic,
     ) -> None:
         applied_mode = (
-            self._last_target_context_modes.get(
-                (diagnostic.channel, diagnostic.target_language)
-            )
+            self._last_target_context_modes.get((diagnostic.channel, diagnostic.target_language))
             if diagnostic.target_language is not None
             else self._last_context_modes.get(diagnostic.channel)
         )

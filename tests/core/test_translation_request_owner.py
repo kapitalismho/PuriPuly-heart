@@ -242,9 +242,7 @@ def test_prepare_falls_back_to_local_context_without_eligible_peer_entry() -> No
     assert prepared.applied_context_mode == "local"
 
 
-def test_parent_admission_freezes_target_specific_context_before_registering_current_turn() -> (
-    None
-):
+def test_parent_admission_freezes_target_specific_context_before_registering_current_turn() -> None:
     fixture = build_owner(RecordingProvider())
 
     class DetailedRuntimeLogging:

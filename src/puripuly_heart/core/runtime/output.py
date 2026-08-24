@@ -309,9 +309,7 @@ class OutputRuntime:
         turn_generation: int | None = None,
         turn_order: int | None = None,
     ) -> OutputPublicationResult:
-        if isinstance(presentation_revision, bool) or not isinstance(
-            presentation_revision, int
-        ):
+        if isinstance(presentation_revision, bool) or not isinstance(presentation_revision, int):
             raise TypeError("presentation_revision must be an integer")
         if presentation_revision < 0:
             raise ValueError("presentation_revision must be non-negative")

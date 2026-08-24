@@ -978,10 +978,7 @@ class TranslationOutputProjectionOwner:
                     snapshot.parent_utterance_id,
                     snapshot.turn_generation,
                     snapshot.turn_order,
-                    tuple(
-                        snapshot.configured_targets.index(target)
-                        for target in target_languages
-                    ),
+                    tuple(snapshot.configured_targets.index(target) for target in target_languages),
                     target_languages,
                     snapshot.revision,
                 ),

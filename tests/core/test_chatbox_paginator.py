@@ -484,9 +484,7 @@ def test_newer_active_revision_replaces_all_unsent_pages() -> None:
     paginator.process_due()
 
     assert sender.sent == ["abcd", "1234", "5678"]
-    replacement = next(
-        fields for event, fields in stages if event == "chatbox_revision_replaced"
-    )
+    replacement = next(fields for event, fields in stages if event == "chatbox_revision_replaced")
     assert replacement["previous_revision"] == 1
     assert replacement["presentation_revision"] == 2
     assert replacement["turn_generation"] == 2

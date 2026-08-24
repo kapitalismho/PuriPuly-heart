@@ -39,9 +39,7 @@ def test_secondary_target_change_is_a_self_language_runtime_change() -> None:
     )
     owner = TranslationRuntimeConfigurationOwner(initial)
 
-    change = owner.replace(
-        replace(initial, self_target_languages=("en", "fr"))
-    )
+    change = owner.replace(replace(initial, self_target_languages=("en", "fr")))
 
     assert change.self_language_changed is True
     assert change.changed_fields == {"self_target_languages"}

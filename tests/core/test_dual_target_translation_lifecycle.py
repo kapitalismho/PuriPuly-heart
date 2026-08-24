@@ -306,8 +306,14 @@ async def test_dual_target_observability_distinguishes_parent_latency_milestones
         assert "turn_order=0" in admitted
         assert "presentation_revision=0" in admitted
         assert len(target_starts) == 2
-        assert any("target_index=0" in message and "target_language=zh-CN" in message for message in target_starts)
-        assert any("target_index=1" in message and "target_language=ja" in message for message in target_starts)
+        assert any(
+            "target_index=0" in message and "target_language=zh-CN" in message
+            for message in target_starts
+        )
+        assert any(
+            "target_index=1" in message and "target_language=ja" in message
+            for message in target_starts
+        )
         assert len(target_completions) == 2
         assert any("presentation_revision=1" in message for message in target_completions)
         assert any(
@@ -445,9 +451,7 @@ async def test_direct_self_translation_uses_dual_target_turn_lifecycle() -> None
         self_target_languages=("zh-CN", "ja"),
     )
     parent_id = uuid4()
-    task = asyncio.create_task(
-        harness.self_owner.translate_and_enqueue(parent_id, "source text")
-    )
+    task = asyncio.create_task(harness.self_owner.translate_and_enqueue(parent_id, "source text"))
 
     try:
         started = {

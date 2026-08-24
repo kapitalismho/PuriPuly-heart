@@ -2346,9 +2346,7 @@ class TestSpecCommitPaths:
         )
         harness.self_owner.merge_buffer = buffer
         harness.self_runtime.utterance_start_times[source_id] = clock.now()
-        commit = asyncio.create_task(
-            harness.self_owner._commit_merge(buffer, reason="spec_done")
-        )
+        commit = asyncio.create_task(harness.self_owner._commit_merge(buffer, reason="spec_done"))
 
         try:
             await asyncio.wait_for(llm.started.wait(), timeout=1.0)

@@ -514,8 +514,7 @@ class TranslationTurnLifecycleOwner:
                             parent_utterance_id=request.transcript.utterance_id,
                             target_language=target_language,
                         )
-                        if request.precomputed_translation is not None
-                        and target_index == 0
+                        if request.precomputed_translation is not None and target_index == 0
                         else None
                     ),
                     config_snapshot=request.config_snapshot,

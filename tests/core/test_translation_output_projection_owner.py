@@ -297,16 +297,12 @@ async def test_duplicate_or_terminal_child_output_cannot_create_another_revision
     children = self_children(config_owner)
     assert owner.admit_self_turn(children)
 
-    first = await owner.project_translation_result(
-        self_submission(children[0], text="first")
-    )
+    first = await owner.project_translation_result(self_submission(children[0], text="first"))
     duplicate = await owner.project_translation_result(
         self_submission(children[0], text="changed duplicate")
     )
     await owner.complete_self_target(children[1], "cancelled")
-    late = await owner.project_translation_result(
-        self_submission(children[1], text="late success")
-    )
+    late = await owner.project_translation_result(self_submission(children[1], text="late success"))
 
     assert first.record_runtime_translation
     assert not duplicate.record_runtime_translation
@@ -439,9 +435,7 @@ async def test_lifecycle_generation_retirement_rejects_output_without_new_admiss
     assert owner.admit_self_turn(retired)
 
     owner.retire_turn_generation("self", 1)
-    receipt = await owner.project_translation_result(
-        self_submission(retired[0], text="retired")
-    )
+    receipt = await owner.project_translation_result(self_submission(retired[0], text="retired"))
 
     assert not receipt.record_runtime_translation
     assert chatbox.messages == []

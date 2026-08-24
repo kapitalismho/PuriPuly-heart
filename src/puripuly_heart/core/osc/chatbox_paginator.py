@@ -384,9 +384,7 @@ class ChatboxPaginator:
                 text_len=len(text),
                 turn_generation=None if active is None else active.turn_generation,
                 turn_order=None if active is None else active.turn_order,
-                presentation_revision=(
-                    None if active is None else active.presentation_revision
-                ),
+                presentation_revision=(None if active is None else active.presentation_revision),
             )
         return True
 
