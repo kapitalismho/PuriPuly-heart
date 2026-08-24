@@ -2,9 +2,9 @@
   <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — VRChat向けリアルタイム双方向音声翻訳ツール" width="128" />
 </p>
 
-<h1 align="center">PuriPuly</h1>
-
-<h2 align="center">VRChat向けリアルタイム双方向音声翻訳ツール</h2>
+<h1 align="center">PuriPuly<br>
+  <sub>VRChat向けリアルタイム双方向音声翻訳ツール</sub>
+</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.5.0-blue" alt="Version" />
@@ -86,7 +86,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 ---
 
 ## 翻訳比較
-![翻訳品質ベンチマークチャート。文あたりの平均エラーペナルティ（低いほど良い）をモデル別に並べたランキング。1位 Gemma 4 31B (0.353)、2位 Gemma 4 26B A4B (0.387)、3位 DeepSeek V4 Flash 0731 (0.571)、4位 Gemma 4 E4B QAT Q4 (1.577)、5位 Papago (2.699)、6位 Gemini 3.5 Live Translate (2.991)、7位 MiLMMT 46-4B (3.087)、8位 DeepL (3.914)、9位 Google Cloud Translation Basic (5.731)。](docs/images/performance/1.png)
+![韓国語→英語/日本語/中国語（簡体）翻訳の文あたり平均エラーペナルティチャート。216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：1位 Gemma 4 31B (0.353)、2位 Gemma 4 26B A4B (0.387)、3位 DeepSeek-V4 Flash 0731 (0.571)、4位 Gemma 4 12B QAT Q4 (0.855)、5位 Gemma 4 E4B QAT Q4 (1.577)。オレンジの棒は外部ベースライン：Hy-MT-7B (1.863)、Papago (2.699)、Gemini 3.5 Live Translate (2.991)、MiLMMT 46-4B (3.087)、DeepL (3.914)、Google Cloud Translation Basic (5.731)。](docs/images/performance/2.png)
 
 - 青い棒グラフはPuriPulyで使用できるモデルです。
 - マイクロソフトのGemba MQMフレームワークを使って実験しました。

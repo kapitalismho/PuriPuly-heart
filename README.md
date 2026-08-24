@@ -2,9 +2,9 @@
   <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — Real-Time Two-Way Voice Translator for VRChat" width="128" />
 </p>
 
-<h1 align="center">PuriPuly</h1>
-
-<h2 align="center">Real-Time Two-Way Voice Translator for VRChat</h2>
+<h1 align="center">PuriPuly<br>
+  <sub>Real-Time Two-Way Voice Translator for VRChat</sub>
+</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.5.0-blue" alt="Version" />
@@ -87,7 +87,7 @@ It works in many environments, including VRChat and Discord.
 ---
 
 ## Translation Comparison
-![Translation quality benchmark chart. Mean error penalty per sentence (lower is better), ranked by model: 1st Gemma 4 31B (0.353), 2nd Gemma 4 26B A4B (0.387), 3rd DeepSeek V4 Flash 0731 (0.571), 4th Gemma 4 E4B QAT Q4 (1.577), 5th Papago (2.699), 6th Gemini 3.5 Live Translate (2.991), 7th MiLMMT 46-4B (3.087), 8th DeepL (3.914), 9th Google Cloud Translation Basic (5.731).](docs/images/performance/1.png)
+![Mean error penalty per sentence for Korean to EN / JA / ZH-Hans across 216 multi-turn samples (Gemba MQM evaluation, lower is better). Blue bars are models available in PuriPuly: 1st Gemma 4 31B (0.353), 2nd Gemma 4 26B A4B (0.387), 3rd DeepSeek-V4 Flash 0731 (0.571), 4th Gemma 4 12B QAT Q4 (0.855), 5th Gemma 4 E4B QAT Q4 (1.577). Orange bars are external baselines: Hy-MT-7B (1.863), Papago (2.699), Gemini 3.5 Live Translate (2.991), MiLMMT 46-4B (3.087), DeepL (3.914), Google Cloud Translation Basic (5.731).](docs/images/performance/2.png)
 
 - The blue bars are the models available in PuriPuly.
 - We ran the experiment using Microsoft's Gemba MQM framework.

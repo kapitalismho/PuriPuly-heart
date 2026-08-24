@@ -2,9 +2,9 @@
   <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — двусторонний голосовой переводчик для VRChat в реальном времени" width="128" />
 </p>
 
-<h1 align="center">PuriPuly</h1>
-
-<h2 align="center">двусторонний голосовой переводчик для VRChat в реальном времени</h2>
+<h1 align="center">PuriPuly<br>
+  <sub>двусторонний голосовой переводчик для VRChat в реальном времени</sub>
+</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.5.0-blue" alt="Version" />
@@ -88,7 +88,7 @@ PuriPuly — двусторонний голосовой переводчик д
 
 ## Сравнение перевода
 
-![Диаграмма качества перевода. Рейтинг моделей по среднему штрафу за предложение (чем ниже — тем лучше): 1-е место Gemma 4 31B (0.353), 2-е Gemma 4 26B A4B (0.387), 3-е DeepSeek V4 Flash 0731 (0.571), 4-е Gemma 4 E4B QAT Q4 (1.577), 5-е Papago (2.699), 6-е Gemini 3.5 Live Translate (2.991), 7-е MiLMMT 46-4B (3.087), 8-е DeepL (3.914), 9-е Google Cloud Translation Basic (5.731).](docs/images/performance/1.png)
+![Диаграмма среднего штрафа за предложение при переводе с корейского на EN / JA / ZH-Hans: 216 многоходовых примеров, оценка Gemba MQM, чем ниже — тем лучше. Синие столбцы — модели, доступные в PuriPuly: 1-е место Gemma 4 31B (0.353), 2-е Gemma 4 26B A4B (0.387), 3-е DeepSeek-V4 Flash 0731 (0.571), 4-е Gemma 4 12B QAT Q4 (0.855), 5-е Gemma 4 E4B QAT Q4 (1.577). Оранжевые столбцы — внешние базовые показатели: Hy-MT-7B (1.863), Papago (2.699), Gemini 3.5 Live Translate (2.991), MiLMMT 46-4B (3.087), DeepL (3.914), Google Cloud Translation Basic (5.731).](docs/images/performance/2.png)
 
 - Синие столбцы — модели, доступные в PuriPuly.
 - Для эксперимента использован фреймворк Microsoft Gemba MQM.

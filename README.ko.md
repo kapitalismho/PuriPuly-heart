@@ -4,9 +4,9 @@
 
 </p>
 
-<h1 align="center">PuriPuly</h1>
-
-<h2 align="center">VRChat 실시간 양방향 음성 번역기</h2>
+<h1 align="center">PuriPuly<br>
+  <sub>VRChat 실시간 양방향 음성 번역기</sub>
+</h1>
 
 <p align="center">
 
@@ -94,7 +94,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 
 ## 번역 품질 비교
 
-![번역 품질 벤치마크 차트. 문장당 평균 에러 페널티(낮을수록 좋음)를 모델별로 나열한 순위표이다. 1위 Gemma 4 31B (0.353), 2위 Gemma 4 26B A4B (0.387), 3위 DeepSeek V4 Flash 0731 (0.571), 4위 Gemma 4 E4B QAT Q4 (1.577), 5위 Papago (2.699), 6위 Gemini 3.5 Live Translate (2.991), 7위 MiLMMT 46-4B (3.087), 8위 DeepL (3.914), 9위 Google Cloud Translation Basic (5.731) 이다.](docs/images/performance/1.png)
+![한국어 → 영어/일본어/중국어(간체) 번역에 대한 문장당 평균 에러 페널티 차트. 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 PuriPuly에서 사용할 수 있는 모델: 1위 Gemma 4 31B (0.353), 2위 Gemma 4 26B A4B (0.387), 3위 DeepSeek-V4 Flash 0731 (0.571), 4위 Gemma 4 12B QAT Q4 (0.855), 5위 Gemma 4 E4B QAT Q4 (1.577). 주황색 막대는 외부 베이스라인: Hy-MT-7B (1.863), Papago (2.699), Gemini 3.5 Live Translate (2.991), MiLMMT 46-4B (3.087), DeepL (3.914), Google Cloud Translation Basic (5.731).](docs/images/performance/2.png)
 
 - 파란색 막대 그래프들이 PuriPuly에서 사용할 수 있는 모델이에요.
 - 마이크로소프트의 Gemba MQM 프레임워크를 사용해서 실험했어요.
