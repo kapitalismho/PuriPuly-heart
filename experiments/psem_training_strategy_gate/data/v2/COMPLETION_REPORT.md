@@ -2,7 +2,7 @@
 
 ## Result
 
-The issue #86 dataset freeze artifact is recorded at local commit `2fbd021598cbb75891d1e0505f66791d164fa47e` for the dataset prerequisite to issue #76.
+The issue #86 dataset freeze artifact is recorded at local commit `f409b8bad97499812cadaececa5db3bf68d787ae` for the dataset prerequisite to issue #76.
 
 - authority: `https://github.com/kapitalismho/PuriPuly-heart/issues/86`
 - pinned authority SHA-256: `90078d66026f1374b065a5b9022788c40fac076cd4cf307df87b5027ea3fcb63`
@@ -11,10 +11,10 @@ The accepted package is:
 
 - label contract: `psem-handoff-v1`
 - dataset freeze: `PSEM-STRATEGY-DATA-v2`
-- freeze file SHA-256: `080f008af0f3ca089cc44f89fc4a1a33b12ee9345090661955f215e069fb2bf0`
-- freeze payload SHA-256: `76e2840d5cbd8f56b7cc65dadc2c40daf26df8020fa065fb1d43514d0ae9b747`
-- preflight file SHA-256: `844b52454d91f30106ac14ecbd325d1e11eb4b0b3e2db53e053af88d9f906ebe`
-- preflight payload SHA-256: `d2ff76399281c7e9428ea715318ee7683348daa2120d918bb5696a5996f3a195`
+- freeze file SHA-256: `bc7e63bb201c2a33a9b2d69b2364fed8f03839278098f0bd175d6833b330a41e`
+- freeze payload SHA-256: `f9f1882d0de08a4fcd19e63f1da7ae022f940420863be5bbfc14d1d2a7b0f95e`
+- preflight file SHA-256: `79c4f4d188381288ccefcd2e4dcbbf6b17c86936119af538292dd04f379f4531`
+- preflight payload SHA-256: `a3c38994f4755fa0b27689b0d1ceaecf5a956785b3f96246d3b1098ea3f507ce`
 
 SHA-256 values are integrity receipts for files, contracts, and bound identities. They are not model-selection evidence. AliMeeting Train objectives 1–3 produced one optimum, so the salted SHA-256 tie-break was not exercised.
 
