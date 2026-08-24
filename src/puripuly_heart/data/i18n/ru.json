@@ -85,7 +85,7 @@
   "settings.translation_model.gemma4.description": "",
   "settings.translation_model.managed_gemma_cpu.description": "Рекомендуется использовать на системах с 8 и более ядрами и DDR5.",
   "settings.translation_model.managed_gemma_gpu.description": "Нужно 3 ГБ свободной VRAM.",
-  "settings.translation_model.managed_gemma_12b.description": "Очень тяжёлая. Нужно 7.5 ГБ VRAM.",
+  "settings.translation_model.managed_gemma_12b.description": "Очень тяжёлая модель.\nНужно 7.5 ГБ свободной VRAM.",
   "settings.translation_model.gemma4_26b_31b.description": "Подходит для большинства случаев",
   "settings.translation_model.deepseek_v4_flash.description": "Хорошо знает китайский",
   "settings.translation_model.gemini37_flash.description": "",

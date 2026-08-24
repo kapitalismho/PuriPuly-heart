@@ -85,7 +85,7 @@
   "settings.translation_model.gemma4.description": "",
   "settings.translation_model.managed_gemma_cpu.description": "8コアDDR5システム以上での使用を推奨します",
   "settings.translation_model.managed_gemma_gpu.description": "空き VRAM が 3 GB 必要です。",
-  "settings.translation_model.managed_gemma_12b.description": "非常に重いです。空き VRAM 7.5 GB 必要。",
+  "settings.translation_model.managed_gemma_12b.description": "非常に重いです。\n空き VRAM が 7.5 GB 必要です。",
   "settings.translation_model.gemma4_26b_31b.description": "ほとんどの場面で優秀です",
   "settings.translation_model.deepseek_v4_flash.description": "中国語に強いです",
   "settings.translation_model.gemini37_flash.description": "",

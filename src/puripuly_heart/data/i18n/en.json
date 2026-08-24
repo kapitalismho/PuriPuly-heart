@@ -85,7 +85,7 @@
   "settings.translation_model.gemma4.description": "",
   "settings.translation_model.managed_gemma_cpu.description": "Recommended for systems with 8 or more cores and DDR5 RAM.",
   "settings.translation_model.managed_gemma_gpu.description": "Needs 3 GB of free VRAM.",
-  "settings.translation_model.managed_gemma_12b.description": "Very heavy. Needs 7.5 GB of free VRAM.",
+  "settings.translation_model.managed_gemma_12b.description": "Very heavy.\nNeeds 7.5 GB of free VRAM.",
   "settings.translation_model.gemma4_26b_31b.description": "Good for most situations",
   "settings.translation_model.deepseek_v4_flash.description": "Good at Chinese",
   "settings.translation_model.gemini37_flash.description": "",

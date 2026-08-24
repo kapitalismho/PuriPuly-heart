@@ -85,7 +85,7 @@
   "settings.translation_model.gemma4.description": "",
   "settings.translation_model.managed_gemma_cpu.description": "8코어 DDR5 시스템 이상에서 사용하는걸 권장해요",
   "settings.translation_model.managed_gemma_gpu.description": "여유 VRAM이 3 GB 필요해요",
-  "settings.translation_model.managed_gemma_12b.description": "매우 무거워요 · 여유 VRAM 7.5 GB 필요",
+  "settings.translation_model.managed_gemma_12b.description": "매우 무거워요\n여유 VRAM이 7.5 GB 필요해요",
   "settings.translation_model.gemma4_26b_31b.description": "대부분의 상황에서 좋아요",
   "settings.translation_model.deepseek_v4_flash.description": "중국어를 잘해요",
   "settings.translation_model.gemini37_flash.description": "",
