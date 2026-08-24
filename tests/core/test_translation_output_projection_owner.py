@@ -269,6 +269,8 @@ async def test_dual_target_projection_publishes_first_completion_then_ordered_sn
         "こんにちは",
         "你好\nこんにちは",
     ]
+    assert [message.self_turn_key for message in chatbox.messages] == [(0, 4), (0, 4)]
+    assert [message.presentation_revision for message in chatbox.messages] == [1, 2]
     assert [
         decision.metadata["presentation_revision"]
         for decision in owner.routing_decisions

@@ -136,6 +136,39 @@ class OSCMessage:
     utterance_id: UUID
     text: str
     created_at: float  # monotonic seconds (Clock)
+    turn_generation: int | None = None
+    turn_order: int | None = None
+    presentation_revision: int = 0
+
+    def __post_init__(self) -> None:
+        if isinstance(self.presentation_revision, bool) or not isinstance(
+            self.presentation_revision, int
+        ):
+            raise TypeError("presentation_revision must be an integer")
+        if (self.turn_generation is None) != (self.turn_order is None):
+            raise ValueError("turn generation and order must be provided together")
+        if self.turn_generation is not None:
+            if isinstance(self.turn_generation, bool) or not isinstance(
+                self.turn_generation, int
+            ):
+                raise TypeError("turn_generation must be an integer")
+            if self.turn_generation < 0:
+                raise ValueError("turn_generation must be non-negative")
+        if self.turn_order is not None:
+            if isinstance(self.turn_order, bool) or not isinstance(self.turn_order, int):
+                raise TypeError("turn_order must be an integer")
+            if self.turn_order < 0:
+                raise ValueError("turn_order must be non-negative")
+        if self.presentation_revision < 0:
+            raise ValueError("presentation_revision must be non-negative")
+        if self.turn_generation is None and self.presentation_revision != 0:
+            raise ValueError("presentation_revision requires self turn identity")
+
+    @property
+    def self_turn_key(self) -> tuple[int, int] | None:
+        if self.turn_generation is None or self.turn_order is None:
+            return None
+        return (self.turn_generation, self.turn_order)
 
 
 @dataclass(slots=True)

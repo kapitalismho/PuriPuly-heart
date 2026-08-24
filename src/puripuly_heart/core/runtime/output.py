@@ -306,9 +306,29 @@ class OutputRuntime:
         include_source: bool,
         publication_kind: OutputPublicationKind | None = None,
         presentation_revision: int = 0,
+        turn_generation: int | None = None,
+        turn_order: int | None = None,
     ) -> OutputPublicationResult:
+        if isinstance(presentation_revision, bool) or not isinstance(
+            presentation_revision, int
+        ):
+            raise TypeError("presentation_revision must be an integer")
         if presentation_revision < 0:
             raise ValueError("presentation_revision must be non-negative")
+        if (turn_generation is None) != (turn_order is None):
+            raise ValueError("turn generation and order must be provided together")
+        if turn_generation is not None:
+            if isinstance(turn_generation, bool) or not isinstance(turn_generation, int):
+                raise TypeError("turn_generation must be an integer")
+            if turn_generation < 0:
+                raise ValueError("turn_generation must be non-negative")
+        if turn_order is not None:
+            if isinstance(turn_order, bool) or not isinstance(turn_order, int):
+                raise TypeError("turn_order must be an integer")
+            if turn_order < 0:
+                raise ValueError("turn_order must be non-negative")
+        if turn_generation is None and presentation_revision != 0:
+            raise ValueError("presentation_revision requires self turn identity")
         publication_kind = publication_kind or (
             PUBLICATION_KIND_PEER_SUBTITLE if channel == "peer" else PUBLICATION_KIND_SELF_UTTERANCE
         )
@@ -339,12 +359,20 @@ class OutputRuntime:
             OUTPUT_ROUTE_SELF_CHATBOX,
             f"{publication_id}:{presentation_revision}",
         )
+        publication_metadata: dict[str, str | int | float | bool | None] = {
+            "presentation_revision": presentation_revision,
+        }
+        if turn_generation is not None:
+            publication_metadata.update(
+                turn_generation=turn_generation,
+                turn_order=turn_order,
+            )
         duplicate = self._duplicate_publication_result(
             publication_key=publication_key,
             publication_kind=publication_kind,
             channel=channel,
             logical_publication_id=str(publication_id),
-            metadata={"presentation_revision": presentation_revision},
+            metadata=publication_metadata,
         )
         if duplicate is not None:
             return duplicate
@@ -357,6 +385,9 @@ class OutputRuntime:
                 include_source=include_source,
             ),
             created_at=self.clock.now(),
+            turn_generation=turn_generation,
+            turn_order=turn_order,
+            presentation_revision=presentation_revision,
         )
         try:
             self.chatbox.enqueue(message)
@@ -377,7 +408,7 @@ class OutputRuntime:
             publication_id=str(publication_id),
             publication_kind=publication_kind,
             reason=None,
-            metadata={"channel": channel, "presentation_revision": presentation_revision},
+            metadata={"channel": channel, **publication_metadata},
             message=message,
         )
 

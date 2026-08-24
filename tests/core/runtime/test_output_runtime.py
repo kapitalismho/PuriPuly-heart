@@ -529,6 +529,8 @@ async def test_output_runtime_accepts_distinct_parent_presentation_revisions_onc
         translation_text="first",
         include_source=False,
         presentation_revision=1,
+        turn_generation=2,
+        turn_order=7,
     )
     complete = await owner.publish_chatbox(
         publication_id=parent_id,
@@ -537,6 +539,8 @@ async def test_output_runtime_accepts_distinct_parent_presentation_revisions_onc
         translation_text="first\nsecond",
         include_source=False,
         presentation_revision=2,
+        turn_generation=2,
+        turn_order=7,
     )
     duplicate_complete = await owner.publish_chatbox(
         publication_id=parent_id,
@@ -545,6 +549,8 @@ async def test_output_runtime_accepts_distinct_parent_presentation_revisions_onc
         translation_text="first\nsecond",
         include_source=False,
         presentation_revision=2,
+        turn_generation=2,
+        turn_order=7,
     )
 
     assert first.decision.decision == "published"
@@ -552,8 +558,42 @@ async def test_output_runtime_accepts_distinct_parent_presentation_revisions_onc
     assert duplicate_complete.decision.reason == "duplicate_publication"
     assert duplicate_complete.decision.publication_id == str(parent_id)
     assert duplicate_complete.decision.metadata["presentation_revision"] == 2
+    assert duplicate_complete.decision.metadata["turn_generation"] == 2
+    assert duplicate_complete.decision.metadata["turn_order"] == 7
     assert [message.utterance_id for message in chatbox.messages] == [parent_id, parent_id]
     assert [message.text for message in chatbox.messages] == ["first", "first\nsecond"]
+    assert [message.self_turn_key for message in chatbox.messages] == [(2, 7), (2, 7)]
+    assert [message.presentation_revision for message in chatbox.messages] == [1, 2]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("metadata", "error_type"),
+    [
+        ({"presentation_revision": True}, TypeError),
+        ({"presentation_revision": 1.5}, TypeError),
+        ({"presentation_revision": float("nan")}, TypeError),
+        ({"turn_generation": True, "turn_order": 0}, TypeError),
+        ({"turn_generation": 0, "turn_order": 1.5}, TypeError),
+        ({"presentation_revision": 1}, ValueError),
+    ],
+)
+async def test_output_runtime_rejects_malformed_self_turn_identity(
+    metadata: dict[str, object],
+    error_type: type[Exception],
+) -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(chatbox=RecordingChatbox(), clock=FakeClock(_now=10.0))
+
+    with pytest.raises(error_type):
+        await owner.publish_chatbox(
+            publication_id=uuid4(),
+            channel="self",
+            transcript_text="",
+            translation_text="translation",
+            include_source=False,
+            **metadata,
+        )
 
 
 @pytest.mark.asyncio

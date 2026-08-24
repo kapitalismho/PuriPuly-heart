@@ -76,6 +76,8 @@ class ChatboxProjection:
     include_source: bool
     source: str | None
     presentation_revision: int = 0
+    turn_generation: int | None = None
+    turn_order: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -824,6 +826,8 @@ class TranslationOutputProjectionOwner:
                     include_source=False,
                     source=source,
                     presentation_revision=snapshot.revision,
+                    turn_generation=snapshot.turn_generation,
+                    turn_order=snapshot.turn_order,
                 )
             )
             if result.decision.decision != "published":
@@ -1156,6 +1160,8 @@ class TranslationOutputProjectionOwner:
             translation_text=projection.translation_text,
             include_source=projection.include_source,
             presentation_revision=projection.presentation_revision,
+            turn_generation=projection.turn_generation,
+            turn_order=projection.turn_order,
         )
         if result.decision.decision != "published":
             self.diagnostics.emit(

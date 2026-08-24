@@ -76,6 +76,70 @@ async def test_chatbox_paginator_output_adapter_preserves_self_and_system_paths(
 
 
 @pytest.mark.asyncio
+async def test_chatbox_adapter_propagates_turn_revision_metadata_to_paginator() -> None:
+    sender = RecordingOscSender()
+    clock = FakeClock(_now=123.0)
+    paginator = ChatboxPaginator(sender=sender, clock=clock, max_chars=4)
+    adapter = ChatboxPaginatorOutputAdapter(
+        paginator=paginator,
+        include_source=False,
+        render_system_disclosure=lambda publication: publication.message.key,
+    )
+    parent_id = str(uuid4())
+
+    await adapter.publish_self_utterance(
+        SelfUtterancePublication(
+            utterance_id=parent_id,
+            transcript_text="source",
+            translation_text="abcdefgh",
+            source_language="ko",
+            target_language="en",
+            is_final=True,
+            metadata={"turn_generation": 2, "turn_order": 3, "presentation_revision": 1},
+        )
+    )
+    await adapter.publish_self_utterance(
+        SelfUtterancePublication(
+            utterance_id=parent_id,
+            transcript_text="source",
+            translation_text="12345678",
+            source_language="ko",
+            target_language="en",
+            is_final=True,
+            metadata={"turn_generation": 2, "turn_order": 3, "presentation_revision": 2},
+        )
+    )
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.chatbox_texts == ["abcd", "1234", "5678"]
+
+
+@pytest.mark.asyncio
+async def test_chatbox_adapter_rejects_partial_turn_revision_metadata() -> None:
+    sender = RecordingOscSender()
+    adapter = ChatboxPaginatorOutputAdapter(
+        paginator=ChatboxPaginator(sender=sender, clock=FakeClock(_now=123.0)),
+        include_source=False,
+        render_system_disclosure=lambda publication: publication.message.key,
+    )
+    publication = SelfUtterancePublication(
+        utterance_id=str(uuid4()),
+        transcript_text="source",
+        translation_text="translation",
+        source_language="ko",
+        target_language="en",
+        is_final=True,
+        metadata={"presentation_revision": 1},
+    )
+
+    with pytest.raises(ValueError, match="self turn identity"):
+        await adapter.publish_self_utterance(publication)
+
+    assert sender.chatbox_texts == []
+
+
+@pytest.mark.asyncio
 async def test_chatbox_paginator_output_adapter_redacts_system_disclosure_text() -> None:
     sender = RecordingOscSender()
     paginator = ChatboxPaginator(sender=sender, clock=FakeClock(_now=123.0))
