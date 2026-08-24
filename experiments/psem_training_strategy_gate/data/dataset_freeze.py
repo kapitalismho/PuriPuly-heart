@@ -113,7 +113,9 @@ V2_PIPELINE_INPUTS = (
     "experiments/psem_training_strategy_gate/data/split_feasibility.py",
     "experiments/psem_training_strategy_gate/data/topology_census.py",
 )
-V2_REPOSITORY_INPUTS = tuple(sorted({*REPOSITORY_INPUTS, *V2_PIPELINE_INPUTS}))
+V2_REPOSITORY_INPUTS = tuple(
+    sorted({*REPOSITORY_INPUTS, *V2_PIPELINE_INPUTS, "pyproject.toml", "uv.lock"})
+)
 V2_INHERITED_ARTIFACTS = (
     "experiments/psem_training_strategy_gate/data/annotation_calibration.json",
     "experiments/psem_training_strategy_gate/data/ANNOTATION_CALIBRATION.md",

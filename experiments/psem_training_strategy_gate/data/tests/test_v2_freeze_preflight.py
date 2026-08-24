@@ -48,6 +48,7 @@ def test_checked_v2_freeze_and_preflight_are_current_and_complete() -> None:
     assert set(freeze["artifact_sha256"]) == set(V2_FROZEN_ARTIFACTS)
     assert set(freeze["inherited_artifact_sha256"]) == set(V2_INHERITED_ARTIFACTS)
     assert set(freeze["repository_input_sha256"]) == set(V2_REPOSITORY_INPUTS)
+    assert {"pyproject.toml", "uv.lock"} <= set(freeze["repository_input_sha256"])
     freeze_core = copy.deepcopy(freeze)
     freeze_core.pop("freeze_payload_sha256")
     preflight_binding = freeze_core.pop("preflight_binding")
