@@ -242,6 +242,95 @@ def test_prepare_falls_back_to_local_context_without_eligible_peer_entry() -> No
     assert prepared.applied_context_mode == "local"
 
 
+def test_parent_admission_freezes_target_specific_context_before_registering_current_turn() -> (
+    None
+):
+    fixture = build_owner(RecordingProvider())
+
+    class DetailedRuntimeLogging:
+        mode = "detailed"
+
+        def __init__(self) -> None:
+            self.basic: list[str] = []
+            self.detailed: list[str] = []
+
+        def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
+            _ = level
+            self.basic.append(message)
+
+        def emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
+            _ = level
+            self.detailed.append(message)
+            return True
+
+        def emit_detailed_lazy(self, build_message, *, level: int = logging.INFO) -> bool:
+            _ = level
+            self.detailed.append(build_message())
+            return True
+
+    runtime_logging = DetailedRuntimeLogging()
+    fixture.owner.diagnostics.runtime_logging = runtime_logging
+    fixture.self_runtime.remember_context(
+        "previous English target",
+        timestamp=fixture.clock.now(),
+        source_language="ko",
+        target_language="en",
+    )
+    fixture.self_runtime.remember_context(
+        "previous Japanese target",
+        timestamp=fixture.clock.now(),
+        source_language="ko",
+        target_language="ja",
+    )
+    parent_id = uuid4()
+    english_id = uuid4()
+    japanese_id = uuid4()
+    snapshot = fixture.configuration.snapshot()
+    requests = (
+        TranslationProcessRequest(
+            parent_utterance_id=parent_id,
+            utterance_id=english_id,
+            sequence=0,
+            text="current turn",
+            channel="self",
+            source="Mic",
+            target_language="en",
+            context_policy="integrated_preferred",
+            config_snapshot=snapshot,
+            target_index=0,
+        ),
+        TranslationProcessRequest(
+            parent_utterance_id=parent_id,
+            utterance_id=japanese_id,
+            sequence=1,
+            text="current turn",
+            channel="self",
+            source="Mic",
+            target_language="ja",
+            context_policy="integrated_preferred",
+            config_snapshot=snapshot,
+            target_index=1,
+        ),
+    )
+
+    admitted = fixture.owner.admit(requests)
+
+    assert admitted[english_id].target_language == "en"
+    assert admitted[english_id].system_prompt == "Korean|English"
+    assert admitted[english_id].context == '- [self] "previous English target"'
+    assert admitted[japanese_id].target_language == "ja"
+    assert admitted[japanese_id].system_prompt == "Korean|Japanese"
+    assert admitted[japanese_id].context == '- [self] "previous Japanese target"'
+    assert [entry.target_language for entry in fixture.self_runtime.translation_history[-2:]] == [
+        "en",
+        "ja",
+    ]
+    context_logs = "\n".join(runtime_logging.detailed)
+    assert f"parent_utterance_id={parent_id}" in context_logs
+    assert "target_index=0 target_language=en" in context_logs
+    assert "target_index=1 target_language=ja" in context_logs
+
+
 @pytest.mark.asyncio
 async def test_direct_request_uses_captured_configuration_snapshot() -> None:
     provider = BlockingProvider()

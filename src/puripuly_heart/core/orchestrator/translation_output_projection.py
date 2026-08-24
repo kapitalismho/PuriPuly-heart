@@ -545,7 +545,13 @@ class TranslationOutputProjectionOwner:
             self._language_or_fallback(metadata.secondary_language, target_language),
         )
 
-    def emit_translation_ready(self, translation: Translation) -> bool:
+    def emit_translation_ready(
+        self,
+        translation: Translation,
+        *,
+        parent_utterance_id: UUID | None = None,
+        target_index: int | None = None,
+    ) -> bool:
         return self.diagnostics.emit_translation_ready(
             TranslationReadyDiagnostic(
                 channel=translation.channel,
@@ -557,6 +563,9 @@ class TranslationOutputProjectionOwner:
                 source_text_len=translation.source_text_len,
                 logical_turn_key=translation.logical_turn_key,
                 translation_len=len(translation.text),
+                parent_utterance_id=parent_utterance_id,
+                target_index=target_index,
+                target_language=translation.target_language,
             )
         )
 
@@ -664,7 +673,11 @@ class TranslationOutputProjectionOwner:
         translation = submission.translation
         if translation is None:
             raise ValueError("translated submission requires a translation")
-        self.emit_translation_ready(translation)
+        self.emit_translation_ready(
+            translation,
+            parent_utterance_id=submission.parent_utterance_id,
+            target_index=submission.target_index,
+        )
         if channel == "peer" and self.has_overlay_destination:
             await self.emit_translation(
                 TranslationOverlayProjection(

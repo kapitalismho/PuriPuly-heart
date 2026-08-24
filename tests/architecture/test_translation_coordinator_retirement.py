@@ -10,6 +10,7 @@ TRANSLATION_CONSUMERS = {
     "core/test_audio_vad_loop.py",
     "core/test_channel_runtime.py",
     "core/test_context_memory.py",
+    "core/test_dual_target_translation_lifecycle.py",
     "core/test_orchestrator_pipeline.py",
     "core/test_output_owner_wiring.py",
     "core/test_peer_channel_routing.py",

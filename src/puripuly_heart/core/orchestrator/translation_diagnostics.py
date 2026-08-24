@@ -67,6 +67,9 @@ class TranslationSkipDiagnostic:
     publish_chatbox: bool
     llm_available: bool
     configuration: TranslationRuntimeConfig
+    parent_utterance_id: UUID | None = None
+    target_index: int | None = None
+    target_language: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,12 +78,18 @@ class TranslationFailureDiagnostic:
     channel: ChannelId
     exception: Exception
     detailed: bool = False
+    parent_utterance_id: UUID | None = None
+    target_index: int | None = None
+    target_language: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ContextModeDiagnostic:
     channel: ChannelId
     applied_mode: ContextMode
+    parent_utterance_id: UUID | None = None
+    target_index: int | None = None
+    target_language: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +98,9 @@ class ContextApplicationDiagnostic:
     request_chars: int
     context_lines: tuple[str, ...]
     context_chars: int
+    parent_utterance_id: UUID | None = None
+    target_index: int | None = None
+    target_language: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +111,9 @@ class LatencyStageDiagnostic:
     timestamp: float | None = None
     overwrite: bool = True
     publish_now: bool = True
+    parent_utterance_id: UUID | None = None
+    target_index: int | None = None
+    target_language: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +140,9 @@ class TranslationReadyDiagnostic:
     source_text_len: int | None
     logical_turn_key: str | None
     translation_len: int
+    parent_utterance_id: UUID | None = None
+    target_index: int | None = None
+    target_language: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -206,6 +224,9 @@ class _LatencyTimeline:
     emitted_trace_points: set[str] = field(default_factory=set)
     basic_summary_emitted: bool = False
     latency_cause_emitted: bool = False
+    parent_utterance_id: UUID | None = None
+    target_index: int | None = None
+    target_language: str | None = None
 
 
 @dataclass(slots=True)
@@ -221,6 +242,11 @@ class TranslationLatencyDiagnosticsOwner:
     _last_context_modes: dict[ChannelId, ContextMode | None] = field(
         init=False,
         default_factory=lambda: {"self": None, "peer": None},
+        repr=False,
+    )
+    _last_target_context_modes: dict[tuple[ChannelId, str], ContextMode] = field(
+        init=False,
+        default_factory=dict,
         repr=False,
     )
     _last_overlay_runtime_signature: tuple[object, ...] | None = field(
@@ -331,6 +357,21 @@ class TranslationLatencyDiagnosticsOwner:
                 detailed=True,
             )
         )
+        if diagnostic.target_language is not None:
+            self.emit(
+                RuntimeDiagnostic(
+                    message=(
+                        "[Detailed][Translation] translation_target_skipped "
+                        "parent_utterance_id=%s target_index=%s target_language=%s"
+                    ),
+                    args=(
+                        diagnostic.parent_utterance_id,
+                        diagnostic.target_index,
+                        diagnostic.target_language,
+                    ),
+                    detailed=True,
+                )
+            )
 
     def record_translation_failure(
         self,
@@ -354,24 +395,74 @@ class TranslationLatencyDiagnosticsOwner:
                 detailed=diagnostic.detailed,
             )
         )
+        if diagnostic.target_language is not None:
+            self.emit(
+                RuntimeDiagnostic(
+                    message=(
+                        "[Detailed][Translation] translation_target_failed "
+                        "parent_utterance_id=%s target_index=%s target_language=%s"
+                    ),
+                    args=(
+                        diagnostic.parent_utterance_id,
+                        diagnostic.target_index,
+                        diagnostic.target_language,
+                    ),
+                    detailed=True,
+                )
+            )
         return report
 
     def record_context_mode(self, diagnostic: ContextModeDiagnostic) -> None:
-        if self._last_context_modes.get(diagnostic.channel) == diagnostic.applied_mode:
-            return
-        self._last_context_modes[diagnostic.channel] = diagnostic.applied_mode
-        self.emit(
-            RuntimeDiagnostic(
-                message="[Translation] Context mode: channel=%s mode=%s",
-                args=(diagnostic.channel, diagnostic.applied_mode),
-            )
+        target_key = (
+            (diagnostic.channel, diagnostic.target_language)
+            if diagnostic.target_language is not None
+            else None
         )
+        legacy_changed = (
+            self._last_context_modes.get(diagnostic.channel) != diagnostic.applied_mode
+        )
+        target_changed = (
+            target_key is not None
+            and self._last_target_context_modes.get(target_key) != diagnostic.applied_mode
+        )
+        if legacy_changed:
+            self._last_context_modes[diagnostic.channel] = diagnostic.applied_mode
+            self.emit(
+                RuntimeDiagnostic(
+                    message="[Translation] Context mode: channel=%s mode=%s",
+                    args=(diagnostic.channel, diagnostic.applied_mode),
+                )
+            )
+        if target_key is not None:
+            self._last_target_context_modes[target_key] = diagnostic.applied_mode
+        if target_changed:
+            self.emit(
+                RuntimeDiagnostic(
+                    message=(
+                        "[Detailed][Translation] context_mode_target "
+                        "parent_utterance_id=%s target_index=%s target_language=%s mode=%s"
+                    ),
+                    args=(
+                        diagnostic.parent_utterance_id,
+                        diagnostic.target_index,
+                        diagnostic.target_language,
+                        diagnostic.applied_mode,
+                    ),
+                    detailed=True,
+                )
+            )
 
     def record_context_application(
         self,
         diagnostic: ContextApplicationDiagnostic,
     ) -> None:
-        applied_mode = self._last_context_modes.get(diagnostic.channel)
+        applied_mode = (
+            self._last_target_context_modes.get(
+                (diagnostic.channel, diagnostic.target_language)
+            )
+            if diagnostic.target_language is not None
+            else self._last_context_modes.get(diagnostic.channel)
+        )
         if diagnostic.channel == "peer" and applied_mode in (None, "local"):
             peer_entries = len(diagnostic.context_lines)
             self_entries = 0
@@ -399,6 +490,25 @@ class TranslationLatencyDiagnosticsOwner:
                 ),
             )
         )
+        if diagnostic.target_language is not None:
+            self.emit(
+                RuntimeDiagnostic(
+                    message=(
+                        "[Detailed][Translation] context_apply_target "
+                        "parent_utterance_id=%s target_index=%s target_language=%s "
+                        "mode=%s request_chars=%s context_chars=%s"
+                    ),
+                    args=(
+                        diagnostic.parent_utterance_id,
+                        diagnostic.target_index,
+                        diagnostic.target_language,
+                        applied_mode,
+                        diagnostic.request_chars,
+                        diagnostic.context_chars,
+                    ),
+                    detailed=True,
+                )
+            )
 
     def record_chatbox_stage(self, event: str, **fields: object) -> None:
         recorder = self.overlay_diagnostics
@@ -425,6 +535,12 @@ class TranslationLatencyDiagnosticsOwner:
             create=True,
         )
         assert timeline is not None
+        if diagnostic.parent_utterance_id is not None:
+            timeline.parent_utterance_id = diagnostic.parent_utterance_id
+        if diagnostic.target_index is not None:
+            timeline.target_index = diagnostic.target_index
+        if diagnostic.target_language is not None:
+            timeline.target_language = diagnostic.target_language
         if not diagnostic.overwrite and diagnostic.stage in timeline.stage_times:
             return
         timeline.stage_times[diagnostic.stage] = (
@@ -500,6 +616,13 @@ class TranslationLatencyDiagnosticsOwner:
                 logical_turn_key=diagnostic.logical_turn_key,
                 translation_len=diagnostic.translation_len,
                 elapsed_ms=elapsed_ms,
+                parent_utterance_id=(
+                    str(diagnostic.parent_utterance_id)
+                    if diagnostic.parent_utterance_id is not None
+                    else None
+                ),
+                target_index=diagnostic.target_index,
+                target_language=diagnostic.target_language,
             )
         )
 
@@ -698,6 +821,13 @@ class TranslationLatencyDiagnosticsOwner:
                     utterance_id=str(utterance_id)[:8],
                     stage=stage,
                     elapsed_ms=elapsed_ms,
+                    parent_utterance_id=(
+                        str(timeline.parent_utterance_id)
+                        if timeline.parent_utterance_id is not None
+                        else None
+                    ),
+                    target_index=timeline.target_index,
+                    target_language=timeline.target_language,
                 ),
                 detailed=True,
             )
@@ -767,6 +897,13 @@ class TranslationLatencyDiagnosticsOwner:
             channel=channel,
             provider="llm" if llm_request_start_at is not None else "stt",
             utterance_id=str(utterance_id)[:8],
+            parent_utterance_id=(
+                str(timeline.parent_utterance_id)
+                if timeline.parent_utterance_id is not None
+                else None
+            ),
+            target_index=timeline.target_index,
+            target_language=timeline.target_language,
             stage_durations_ms={
                 "speech_end_to_stt_final": self._elapsed_ms(
                     speech_end_at,

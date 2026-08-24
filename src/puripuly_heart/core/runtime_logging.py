@@ -147,11 +147,25 @@ def format_detailed_latency_trace(
     utterance_id: str,
     stage: str,
     elapsed_ms: int,
+    parent_utterance_id: str | None = None,
+    target_index: int | None = None,
+    target_language: str | None = None,
 ) -> str:
-    return (
-        f"[Detailed][Latency] channel={channel} utterance_id={utterance_id} "
-        f"stage={stage} elapsed_ms={elapsed_ms}"
-    )
+    parts = [
+        f"[Detailed][Latency] channel={channel}",
+        f"utterance_id={utterance_id}",
+        f"stage={stage}",
+        f"elapsed_ms={elapsed_ms}",
+    ]
+    if target_language is not None:
+        parts.extend(
+            (
+                f"parent_utterance_id={parent_utterance_id}",
+                f"target_index={target_index}",
+                f"target_language={target_language}",
+            )
+        )
+    return " ".join(parts)
 
 
 def format_detailed_latency_breakdown(
@@ -184,6 +198,9 @@ def format_translation_ready_for_output(
     logical_turn_key: str | None,
     translation_len: int,
     elapsed_ms: int | None,
+    parent_utterance_id: str | None = None,
+    target_index: int | None = None,
+    target_language: str | None = None,
 ) -> str:
     parts = [
         "[Detailed][Translation] translation_ready_for_output",
@@ -197,6 +214,14 @@ def format_translation_ready_for_output(
         f"logical_turn_key={logical_turn_key}",
         f"translation_len={translation_len}",
     ]
+    if target_language is not None:
+        parts.extend(
+            (
+                f"parent_utterance_id={parent_utterance_id}",
+                f"target_index={target_index}",
+                f"target_language={target_language}",
+            )
+        )
     if elapsed_ms is not None:
         parts.append(f"elapsed_ms={elapsed_ms}")
     return " ".join(parts)

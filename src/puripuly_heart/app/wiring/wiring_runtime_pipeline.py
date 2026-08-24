@@ -828,6 +828,7 @@ async def _compose_runtime_pipeline(
         on_child_terminal=callbacks.child_terminal,
         on_parent_closed=callbacks.parent_closed,
         on_parent_rejected=callbacks.parent_rejected,
+        on_parent_admitted=callbacks.parent_admitted,
         predecessor_wait_observer=translation_diagnostics.record_translation_wait,
         output=callbacks,
         config_snapshot=translation_runtime_configuration.snapshot,

@@ -595,6 +595,7 @@ class PeerTranslationChannelOwner:
                     outcome="translated",
                     config_snapshot=config_snapshot,
                     translation=child.precomputed_translation,
+                    target_index=child.target_index,
                 ),
             )
         result = await self.translation_requests.process(
@@ -609,6 +610,7 @@ class PeerTranslationChannelOwner:
                 context_policy=child.context_policy,
                 detected_language=child.detected_language,
                 config_snapshot=config_snapshot,
+                target_index=child.target_index,
             ),
             cancellation_requested=cancellation_requested,
         )

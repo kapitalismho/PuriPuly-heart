@@ -122,6 +122,7 @@ class TranslationRequestPort(Protocol):
         channel: ChannelId = "self",
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
         source_language: str | None = None,
+        target_language: str | None = None,
     ) -> None: ...
 
     def prepare(
@@ -130,9 +131,17 @@ class TranslationRequestPort(Protocol):
         *,
         channel: ChannelId = "self",
         detected_language: str | None = None,
+        target_language: str | None = None,
         context_policy: TranslationContextPolicy = "integrated_preferred",
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
+        parent_utterance_id: UUID | None = None,
+        target_index: int | None = None,
     ) -> PreparedTranslationRequest: ...
+
+    def admit(
+        self,
+        requests: tuple[TranslationProcessRequest, ...],
+    ) -> Mapping[UUID, PreparedTranslationRequest]: ...
 
     async def translate(self, request: DirectTranslationRequest) -> Translation: ...
 
@@ -141,6 +150,7 @@ class TranslationRequestPort(Protocol):
         request: TranslationProcessRequest,
         *,
         cancellation_requested: Callable[[], bool] | None = None,
+        prepared: PreparedTranslationRequest | None = None,
     ) -> TranslationTurnProcessResult: ...
 
 
@@ -161,6 +171,7 @@ class DirectTranslationRequest:
     channel: ChannelId = "self"
     record_latency: bool = True
     detected_language: str | None = None
+    target_language: str | None = None
     config_snapshot: TranslationRuntimeConfigSnapshot | None = None
 
 
@@ -176,6 +187,7 @@ class TranslationProcessRequest:
     context_policy: TranslationContextPolicy
     config_snapshot: TranslationRuntimeConfigSnapshot
     detected_language: str | None = None
+    target_index: int = 0
 
 
 class StaleProviderCompletion(Exception):
@@ -280,6 +292,7 @@ class TranslationRequestOwner:
         channel: ChannelId = "self",
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
         source_language: str | None = None,
+        target_language: str | None = None,
     ) -> None:
         runtime = self.runtime_for_channel(channel)
         config_snapshot = config_snapshot or self.config_snapshot()
@@ -288,7 +301,7 @@ class TranslationRequestOwner:
             text,
             timestamp=timestamp,
             source_language=source_language or self.source_language_for(channel, configuration),
-            target_language=self.target_language_for(channel, configuration),
+            target_language=target_language or self.target_language_for(channel, configuration),
             max_entries=max(
                 configuration.context_max_entries,
                 configuration.integrated_context_max_entries,
@@ -301,8 +314,11 @@ class TranslationRequestOwner:
         *,
         channel: ChannelId = "self",
         detected_language: str | None = None,
+        target_language: str | None = None,
         context_policy: TranslationContextPolicy = "integrated_preferred",
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
+        parent_utterance_id: UUID | None = None,
+        target_index: int | None = None,
     ) -> PreparedTranslationRequest:
         config_snapshot = config_snapshot or self.config_snapshot()
         configuration = config_snapshot.value
@@ -317,6 +333,7 @@ class TranslationRequestOwner:
         if context_policy != "integrated_preferred":
             raise ValueError("unsupported translation context policy")
         runtime = self.runtime_for_channel(channel)
+        target_language = target_language or self.target_language_for(channel, configuration)
         other_channel: ChannelId = "self" if channel == "peer" else "peer"
         other_runtime = self.runtime_for_channel(other_channel)
         context, applied_mode = self.context_resolver.resolve_for_request(
@@ -325,13 +342,19 @@ class TranslationRequestOwner:
             requested_mode="integrated",
             peer_translation_enabled=configuration.peer_translation_enabled,
             source_language=source_language,
-            target_language=self.target_language_for(channel, configuration),
+            target_language=target_language,
             other_source_language=self.source_language_for(other_channel, configuration),
             other_target_language=self.target_language_for(other_channel, configuration),
             configuration=configuration,
         )
         self.diagnostics.record_context_mode(
-            ContextModeDiagnostic(channel=channel, applied_mode=applied_mode)
+            ContextModeDiagnostic(
+                channel=channel,
+                applied_mode=applied_mode,
+                parent_utterance_id=parent_utterance_id,
+                target_index=target_index,
+                target_language=target_language,
+            )
         )
         self.diagnostics.record_context_application(
             ContextApplicationDiagnostic(
@@ -339,9 +362,11 @@ class TranslationRequestOwner:
                 request_chars=len(text),
                 context_lines=tuple(context.splitlines()) if context else (),
                 context_chars=len(context),
+                parent_utterance_id=parent_utterance_id,
+                target_index=target_index,
+                target_language=target_language,
             )
         )
-        target_language = self.target_language_for(channel, configuration)
         return PreparedTranslationRequest(
             system_prompt=render_translation_system_prompt(
                 configuration.system_prompt,
@@ -356,6 +381,43 @@ class TranslationRequestOwner:
             target_language=target_language,
         )
 
+    def admit(
+        self,
+        requests: tuple[TranslationProcessRequest, ...],
+    ) -> Mapping[UUID, PreparedTranslationRequest]:
+        prepared_requests: list[tuple[TranslationProcessRequest, PreparedTranslationRequest]] = []
+        for request in requests:
+            configuration = request.config_snapshot.value
+            if not self.provider_available or not self.translation_enabled_for(
+                request.channel,
+                configuration,
+            ):
+                continue
+            try:
+                prepared = self.prepare(
+                    request.text,
+                    channel=request.channel,
+                    detected_language=request.detected_language,
+                    target_language=request.target_language,
+                    context_policy=request.context_policy,
+                    config_snapshot=request.config_snapshot,
+                    parent_utterance_id=request.parent_utterance_id,
+                    target_index=request.target_index,
+                )
+            except _UnmappedDetectedLanguage:
+                continue
+            prepared_requests.append((request, prepared))
+        for request, prepared in prepared_requests:
+            self.remember_context(
+                request.text,
+                prepared.requested_at,
+                channel=request.channel,
+                config_snapshot=request.config_snapshot,
+                source_language=prepared.source_language,
+                target_language=prepared.target_language,
+            )
+        return {request.utterance_id: prepared for request, prepared in prepared_requests}
+
     async def translate(self, request: DirectTranslationRequest) -> Translation:
         config_snapshot = request.config_snapshot or self.config_snapshot()
         provider_request = self._capture_provider_request()
@@ -366,6 +428,7 @@ class TranslationRequestOwner:
             request.text,
             channel=request.channel,
             detected_language=request.detected_language,
+            target_language=request.target_language,
             config_snapshot=config_snapshot,
         )
         if request.record_latency:
@@ -400,6 +463,7 @@ class TranslationRequestOwner:
         request: TranslationProcessRequest,
         *,
         cancellation_requested: Callable[[], bool] | None = None,
+        prepared: PreparedTranslationRequest | None = None,
     ) -> TranslationTurnProcessResult:
         configuration = request.config_snapshot.value
         provider_request = self._capture_provider_request()
@@ -414,6 +478,9 @@ class TranslationRequestOwner:
                     publish_chatbox=self.presentation.chatbox_is_eligible(request.channel),
                     llm_available=self.provider_runtime.provider is not None,
                     configuration=configuration,
+                    parent_utterance_id=request.parent_utterance_id,
+                    target_index=request.target_index,
+                    target_language=request.target_language,
                 )
             )
             return self._result(
@@ -434,7 +501,7 @@ class TranslationRequestOwner:
             )
             if outcome == "failed":
                 exc = _UnmappedDetectedLanguage()
-                report = self._record_failure(request.channel, exc)
+                report = self._record_failure(request, exc)
                 await self._publish_failure(request, report)
             return self._result(
                 request,
@@ -445,22 +512,36 @@ class TranslationRequestOwner:
         source_language, _ = request_source
         applied_mode: ContextMode | None = None
         try:
-            prepared = self.prepare(
-                request.text,
-                channel=request.channel,
-                detected_language=request.detected_language,
-                context_policy=request.context_policy,
-                config_snapshot=request.config_snapshot,
-            )
+            if prepared is None:
+                prepared = self.prepare(
+                    request.text,
+                    channel=request.channel,
+                    detected_language=request.detected_language,
+                    target_language=request.target_language,
+                    context_policy=request.context_policy,
+                    config_snapshot=request.config_snapshot,
+                    parent_utterance_id=request.parent_utterance_id,
+                    target_index=request.target_index,
+                )
+                self.remember_context(
+                    request.text,
+                    prepared.requested_at,
+                    channel=request.channel,
+                    config_snapshot=request.config_snapshot,
+                    source_language=source_language,
+                    target_language=request.target_language,
+                )
+            elif prepared.target_language != request.target_language:
+                raise ValueError("prepared translation target mismatch")
             applied_mode = prepared.applied_context_mode
-            self.remember_context(
-                request.text,
-                prepared.requested_at,
-                channel=request.channel,
-                config_snapshot=request.config_snapshot,
-                source_language=source_language,
+            self._record_latency(
+                request.channel,
+                request.utterance_id,
+                "llm_request_start",
+                parent_utterance_id=request.parent_utterance_id,
+                target_index=request.target_index,
+                target_language=request.target_language,
             )
-            self._record_latency(request.channel, request.utterance_id, "llm_request_start")
             try:
                 raw_translation = await backend.translate(
                     TranslationBackendRequest(
@@ -485,7 +566,14 @@ class TranslationRequestOwner:
                 source_language=source_language,
                 target_language=request.target_language,
             )
-            self._record_latency(request.channel, request.utterance_id, "llm_done")
+            self._record_latency(
+                request.channel,
+                request.utterance_id,
+                "llm_done",
+                parent_utterance_id=request.parent_utterance_id,
+                target_index=request.target_index,
+                target_language=request.target_language,
+            )
         except asyncio.CancelledError:
             raise
         except StaleProviderCompletion:
@@ -496,7 +584,7 @@ class TranslationRequestOwner:
                 source_language=source_language,
             )
         except Exception as exc:
-            report = self._record_failure(request.channel, exc)
+            report = self._record_failure(request, exc)
             await self._publish_failure(request, self._translation_error_payload(exc, report))
             return self._result(
                 request,
@@ -519,6 +607,7 @@ class TranslationRequestOwner:
                 config_snapshot=request.config_snapshot,
                 translation=translation,
                 applied_context_mode=applied_mode,
+                target_index=request.target_index,
             ),
         )
 
@@ -591,21 +680,40 @@ class TranslationRequestOwner:
             return language
         return fallback
 
-    def _record_latency(self, channel: ChannelId, utterance_id: UUID, stage: str) -> None:
+    def _record_latency(
+        self,
+        channel: ChannelId,
+        utterance_id: UUID,
+        stage: str,
+        *,
+        parent_utterance_id: UUID | None = None,
+        target_index: int | None = None,
+        target_language: str | None = None,
+    ) -> None:
         self.diagnostics.record_latency_stage(
             LatencyStageDiagnostic(
                 channel=channel,
                 utterance_id=utterance_id,
                 stage=stage,
+                parent_utterance_id=parent_utterance_id,
+                target_index=target_index,
+                target_language=target_language,
             )
         )
 
-    def _record_failure(self, channel: ChannelId, exc: Exception) -> UserErrorReport:
+    def _record_failure(
+        self,
+        request: TranslationProcessRequest,
+        exc: Exception,
+    ) -> UserErrorReport:
         return self.diagnostics.record_translation_failure(
             TranslationFailureDiagnostic(
                 stage="final",
-                channel=channel,
+                channel=request.channel,
                 exception=exc,
+                parent_utterance_id=request.parent_utterance_id,
+                target_index=request.target_index,
+                target_language=request.target_language,
             )
         )
 
@@ -647,6 +755,7 @@ class TranslationRequestOwner:
                 outcome=outcome,
                 config_snapshot=request.config_snapshot,
                 failure_code=failure_code,
+                target_index=request.target_index,
             ),
         )
 

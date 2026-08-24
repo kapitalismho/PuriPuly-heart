@@ -200,6 +200,75 @@ def test_owner_suppresses_duplicate_context_mode_and_logs_metadata_only() -> Non
     assert "second" not in application
 
 
+def test_target_diagnostics_include_parent_index_and_language_metadata() -> None:
+    clock = FakeClock(10.0)
+    logging = RuntimeLogging()
+    owner = make_owner(clock=clock, runtime_logging=logging)
+    parent_id = uuid4()
+    child_id = uuid4()
+
+    owner.record_context_mode(
+        ContextModeDiagnostic(
+            channel="self",
+            applied_mode="local",
+            parent_utterance_id=parent_id,
+            target_index=1,
+            target_language="ja",
+        )
+    )
+    owner.record_context_application(
+        ContextApplicationDiagnostic(
+            channel="self",
+            request_chars=12,
+            context_lines=(),
+            context_chars=0,
+            parent_utterance_id=parent_id,
+            target_index=1,
+            target_language="ja",
+        )
+    )
+    owner.record_latency_stage(
+        LatencyStageDiagnostic(
+            channel="self",
+            utterance_id=child_id,
+            stage="speech_end",
+            publish_now=False,
+        )
+    )
+    clock.advance(0.2)
+    owner.record_latency_stage(
+        LatencyStageDiagnostic(
+            channel="self",
+            utterance_id=child_id,
+            stage="llm_done",
+            parent_utterance_id=parent_id,
+            target_index=1,
+            target_language="ja",
+        )
+    )
+    owner.emit_translation_ready(
+        TranslationReadyDiagnostic(
+            channel="self",
+            utterance_id=child_id,
+            update_id="update",
+            origin_wall_clock_ms=None,
+            session_scope=None,
+            source_text_hash=None,
+            source_text_len=None,
+            logical_turn_key=f"self:{parent_id}",
+            translation_len=3,
+            parent_utterance_id=parent_id,
+            target_index=1,
+            target_language="ja",
+        )
+    )
+
+    combined = "\n".join(logging.basic + logging.detailed)
+    assert f"parent_utterance_id={parent_id}" in combined
+    assert "target_index=1" in combined
+    assert "target_language=ja" in combined
+
+
 def test_owner_suppresses_runtime_and_overlay_decision_duplicates_independently() -> None:
     logging = RuntimeLogging()
     overlay = OverlayDiagnostics()
