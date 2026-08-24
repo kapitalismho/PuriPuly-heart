@@ -653,6 +653,72 @@ def test_metadata_free_multiline_message_keeps_legacy_wrapping() -> None:
     assert sender.sent == ["abcd", "efgh"]
 
 
+def test_single_target_turn_identity_keeps_legacy_multiline_wrapping() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=5,
+        page_interval_s=3.0,
+    )
+
+    paginator.enqueue(
+        _message(
+            "abcd\nefgh",
+            clock,
+            turn_generation=1,
+            turn_order=0,
+            presentation_revision=0,
+        )
+    )
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.sent == ["abcd", "efgh"]
+
+
+@pytest.mark.parametrize(
+    ("older_revision", "newer_revision"),
+    [(1, 0), (0, 1)],
+)
+def test_newer_self_turn_prunes_active_pages_across_single_dual_transitions(
+    older_revision: int,
+    newer_revision: int,
+) -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=4,
+        page_interval_s=3.0,
+    )
+
+    paginator.enqueue(
+        _message(
+            "abcdefgh",
+            clock,
+            turn_generation=0,
+            turn_order=0,
+            presentation_revision=older_revision,
+        )
+    )
+    paginator.enqueue(
+        _message(
+            "NEW",
+            clock,
+            turn_generation=1,
+            turn_order=0,
+            presentation_revision=newer_revision,
+        )
+    )
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.sent == ["abcd", "NEW"]
+
+
 def test_latest_self_turn_watermark_rejects_stale_messages_after_queue_drains() -> None:
     clock = FakeClock()
     sender = FakeSender()

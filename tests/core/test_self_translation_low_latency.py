@@ -2347,6 +2347,7 @@ class TestSpecCommitPaths:
         harness.self_owner.merge_buffer = buffer
         harness.self_runtime.utterance_start_times[source_id] = clock.now()
         commit = asyncio.create_task(harness.self_owner._commit_merge(buffer, reason="spec_done"))
+        next_turn: asyncio.Task[object] | None = None
 
         try:
             await asyncio.wait_for(llm.started.wait(), timeout=1.0)
@@ -2363,17 +2364,28 @@ class TestSpecCommitPaths:
                 if "translation_target_started" in message and "target_index=1" in message
             )
             assert "presentation_revision=1" in secondary_start
+            await asyncio.wait_for(commit, timeout=1.0)
+            assert not llm.release.is_set()
+
+            next_turn = asyncio.create_task(harness.self_owner.submit_text("next source"))
+            for _ in range(100):
+                if len(llm.calls) == 3:
+                    break
+                await asyncio.sleep(0)
+            next_calls = [call for call in llm.calls if call["text"] == "next source"]
+            assert {call["target_language"] for call in next_calls} == {"zh-CN", "ja"}
 
             llm.release.set()
-            await asyncio.wait_for(commit, timeout=1.0)
+            await asyncio.wait_for(next_turn, timeout=1.0)
+            await harness.translation_turns.wait_for_idle()
 
-            assert [message.text for message in osc.messages] == [
-                "reused primary",
-                "reused primary\nsecondary translation",
-            ]
+            assert osc.messages[0].text == "reused primary"
+            assert osc.messages[-1].text == "secondary translation\nsecondary translation"
         finally:
             llm.release.set()
             await asyncio.gather(commit, return_exceptions=True)
+            if next_turn is not None:
+                await asyncio.gather(next_turn, return_exceptions=True)
             await harness.stop()
 
     @pytest.mark.asyncio

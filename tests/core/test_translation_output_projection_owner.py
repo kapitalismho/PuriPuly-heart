@@ -37,8 +37,11 @@ from tests.core.test_translation_owner_branch_coverage import (
 @dataclass(slots=True)
 class RecordingChatbox:
     messages: list[OSCMessage] = field(default_factory=list)
+    fail: bool = False
 
     def enqueue(self, message: OSCMessage) -> None:
+        if self.fail:
+            raise RuntimeError("chatbox failed")
         self.messages.append(message)
 
     def send_immediate(self, text: str) -> bool:
@@ -85,6 +88,7 @@ def make_owner(
     *,
     configuration: TranslationRuntimeConfig | None = None,
     overlay: RecordingOverlay | None = None,
+    chatbox: RecordingChatbox | None = None,
 ) -> tuple[
     TranslationOutputProjectionOwner,
     RecordingChatbox,
@@ -93,7 +97,7 @@ def make_owner(
 ]:
     clock = FakeClock(_now=10.0)
     config_owner = TranslationRuntimeConfigurationOwner(configuration or TranslationRuntimeConfig())
-    chatbox = RecordingChatbox()
+    chatbox = chatbox or RecordingChatbox()
     ui_messages = RecordingUiMessages()
     diagnostics = TranslationLatencyDiagnosticsOwner(
         clock=clock,
@@ -248,6 +252,24 @@ async def test_translated_self_projects_ui_overlay_and_chatbox_once() -> None:
         "utterance_closed",
     ]
     assert [message.text for message in chatbox.messages] == ["source text (translated)"]
+    assert chatbox.messages[0].self_turn_key is None
+
+
+@pytest.mark.asyncio
+async def test_lifecycle_single_target_chatbox_carries_turn_identity_without_revision() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN",),
+    )
+    owner, chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    child = self_children(config_owner, turn_generation=2, turn_order=7)[0]
+    assert owner.admit_self_turn((child,))
+
+    await owner.project_translation_result(self_submission(child, text="single"))
+
+    assert [message.text for message in chatbox.messages] == ["source text (single)"]
+    assert chatbox.messages[0].self_turn_key == (2, 7)
+    assert chatbox.messages[0].presentation_revision == 0
 
 
 @pytest.mark.asyncio
@@ -498,6 +520,52 @@ async def test_target_with_multiple_source_runs_publishes_only_after_all_runs_co
     await owner.complete_self_target(children[3], "translated")
 
     assert chatbox.messages[-1].text == ("primary one primary two\nsecondary one secondary two")
+
+
+@pytest.mark.asyncio
+async def test_dual_target_publication_denial_records_identity_and_attempt_latency() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    owner, chatbox, _ui_messages, config_owner = make_owner(
+        configuration=configuration,
+        chatbox=RecordingChatbox(fail=True),
+    )
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
+    owner.diagnostics.runtime_logging = runtime_logging
+    children = self_children(config_owner, turn_generation=3, turn_order=4)
+    assert owner.admit_self_turn(children)
+
+    await owner.project_translation_result(self_submission(children[0], text="private primary"))
+    await owner.complete_self_target(children[0], "translated")
+    await owner.project_translation_result(self_submission(children[1], text="private secondary"))
+    await owner.complete_self_target(children[1], "translated")
+
+    messages = _runtime_log_messages(log_stream)
+    first_denied = next(
+        message for message in messages if "translation_first_result_publication_denied" in message
+    )
+    complete_denied = next(
+        message
+        for message in messages
+        if "translation_complete_result_publication_denied" in message
+    )
+    assert chatbox.messages == []
+    assert "turn_generation=3 turn_order=4" in first_denied
+    assert "target_indexes=(0,)" in first_denied
+    assert "target_languages=('zh-CN',)" in first_denied
+    assert "revision=1" in first_denied
+    assert "reason=destination_publish_failed" in first_denied
+    assert "publication_attempt_elapsed_ms=0" in first_denied
+    assert "first_visible_elapsed_ms=None" in first_denied
+    assert "target_indexes=(0, 1)" in complete_denied
+    assert "revision=2" in complete_denied
+    assert "complete_visible_elapsed_ms=None" in complete_denied
+    combined = "\n".join(messages)
+    assert "private primary" not in combined
+    assert "private secondary" not in combined
 
 
 @pytest.mark.asyncio

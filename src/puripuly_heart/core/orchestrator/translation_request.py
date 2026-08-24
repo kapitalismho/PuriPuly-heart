@@ -188,8 +188,22 @@ class TranslationProcessRequest:
     config_snapshot: TranslationRuntimeConfigSnapshot
     detected_language: str | None = None
     target_index: int = 0
-    turn_generation: int = 0
-    turn_order: int = 0
+    turn_generation: int | None = None
+    turn_order: int | None = None
+
+    def __post_init__(self) -> None:
+        if (self.turn_generation is None) != (self.turn_order is None):
+            raise ValueError("turn generation and order must be provided together")
+        for name, value in (
+            ("turn_generation", self.turn_generation),
+            ("turn_order", self.turn_order),
+        ):
+            if value is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise TypeError(f"{name} must be an integer")
+            if value < 0:
+                raise ValueError(f"{name} must be non-negative")
 
 
 class StaleProviderCompletion(Exception):

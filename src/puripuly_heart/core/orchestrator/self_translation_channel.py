@@ -1312,7 +1312,7 @@ class SelfTranslationChannelOwner:
             await self._ensure_translation(
                 transcript,
                 turn_kind="self",
-                wait_for_parent=True,
+                wait_for_parent=len(config_snapshot.value.self_target_languages) == 1,
                 config_snapshot=config_snapshot,
             )
             return
@@ -1345,7 +1345,7 @@ class SelfTranslationChannelOwner:
                     transcript,
                     turn_kind="self",
                     precomputed_translation=translation,
-                    wait_for_parent=True,
+                    wait_for_parent=len(config_snapshot.value.self_target_languages) == 1,
                     config_snapshot=config_snapshot,
                 )
                 return
@@ -1360,7 +1360,7 @@ class SelfTranslationChannelOwner:
         await self._ensure_translation(
             transcript,
             turn_kind="self",
-            wait_for_parent=True,
+            wait_for_parent=len(config_snapshot.value.self_target_languages) == 1,
             config_snapshot=config_snapshot,
         )
 

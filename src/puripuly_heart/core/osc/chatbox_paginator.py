@@ -55,7 +55,7 @@ class ChatboxPaginator:
             len(
                 self._split_text(
                     message.text.strip(),
-                    preserve_newlines=message.self_turn_key is not None,
+                    preserve_newlines=message.presentation_revision > 0,
                 )
             )
             if message.text.strip()
@@ -328,7 +328,7 @@ class ChatboxPaginator:
 
         parts = self._split_text(
             text,
-            preserve_newlines=message.self_turn_key is not None,
+            preserve_newlines=message.presentation_revision > 0,
         )
         head = parts[0]
         tail = parts[1:]

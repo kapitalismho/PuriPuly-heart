@@ -894,6 +894,19 @@ class TranslationOutputProjectionOwner:
                 return None
             if latest == turn_key and snapshot.revision <= self._latest_visible_self_revision:
                 return None
+            target_languages = tuple(
+                target for target, _text in snapshot.completed_translations_by_target
+            )
+            target_indexes = tuple(
+                snapshot.configured_targets.index(target) for target in target_languages
+            )
+            stage = (
+                "translation_complete_result_published"
+                if len(snapshot.completed_translations_by_target)
+                == len(snapshot.configured_targets)
+                else "translation_first_result_published"
+            )
+            visible_elapsed_ms = self._elapsed_ms(snapshot.admitted_at, self.clock.now())
             result = await self.publish_chatbox(
                 ChatboxProjection(
                     utterance_id=snapshot.parent_utterance_id,
@@ -908,22 +921,44 @@ class TranslationOutputProjectionOwner:
                 )
             )
             if result.decision.decision != "published":
+                self.diagnostics.emit(
+                    RuntimeDiagnostic(
+                        message=(
+                            "[Detailed][Translation] %s parent_utterance_id=%s "
+                            "turn_generation=%s turn_order=%s target_indexes=%s "
+                            "target_languages=%s revision=%s terminal=%s reason=%s "
+                            "first_success_elapsed_ms=%s "
+                            "all_targets_terminal_elapsed_ms=%s "
+                            "publication_attempt_elapsed_ms=%s "
+                            "first_visible_elapsed_ms=None "
+                            "complete_visible_elapsed_ms=None"
+                        ),
+                        args=(
+                            stage.replace("_published", "_publication_denied"),
+                            snapshot.parent_utterance_id,
+                            snapshot.turn_generation,
+                            snapshot.turn_order,
+                            target_indexes,
+                            target_languages,
+                            snapshot.revision,
+                            snapshot.terminal,
+                            result.decision.reason,
+                            self._elapsed_ms(
+                                snapshot.admitted_at,
+                                snapshot.first_success_at,
+                            ),
+                            self._elapsed_ms(
+                                snapshot.admitted_at,
+                                snapshot.all_targets_terminal_at,
+                            ),
+                            visible_elapsed_ms,
+                        ),
+                        detailed=True,
+                    )
+                )
                 return result
             self._latest_visible_self_turn = turn_key
             self._latest_visible_self_revision = snapshot.revision
-            target_languages = tuple(
-                target for target, _text in snapshot.completed_translations_by_target
-            )
-            target_indexes = tuple(
-                snapshot.configured_targets.index(target) for target in target_languages
-            )
-            stage = (
-                "translation_complete_result_published"
-                if len(snapshot.completed_translations_by_target)
-                == len(snapshot.configured_targets)
-                else "translation_first_result_published"
-            )
-            visible_elapsed_ms = self._elapsed_ms(snapshot.admitted_at, self.clock.now())
             self.diagnostics.emit(
                 RuntimeDiagnostic(
                     message=(
@@ -1282,6 +1317,8 @@ class TranslationOutputProjectionOwner:
                     translation_text=translation.text,
                     include_source=configuration.chatbox_include_source,
                     source=submission.source,
+                    turn_generation=submission.turn_generation,
+                    turn_order=submission.turn_order,
                 )
             )
         elif deny_peer_chatbox_attempt:
