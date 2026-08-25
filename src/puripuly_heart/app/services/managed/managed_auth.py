@@ -179,6 +179,9 @@ class ManagedAuthOwner:
                     f"message_key={result.message_key} "
                     f"class={result.error_class or 'unknown'}"
                 )
+            if result.delivery_ack_pending and result.referral_id is not None:
+                self.usage_view_sink(result.referral_id, result.pass_status)
+                self.usage_refresh_sink()
             self.message_sink(result.message_key, result.message_kwargs)
             return False
         finally:

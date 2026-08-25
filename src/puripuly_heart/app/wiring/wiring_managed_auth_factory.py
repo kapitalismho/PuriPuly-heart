@@ -1009,7 +1009,14 @@ class ManagedAuthRuntimeAdapter:
             )
         )
         self.settings_owner_complete()
-        if result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING:
+        delivery_ack_pending = result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
+        issue = broker.last_issue_response
+        issued_referral_id = normalize_owned_referral_id(getattr(issue, "referral_id", None))
+        referral_id = issued_referral_id or normalize_owned_referral_id(managed_state.referral_id)
+        pass_status = getattr(issue, "pass_status", None)
+        if getattr(pass_status, "pass_id", None) != referral_id:
+            pass_status = None
+        if delivery_ack_pending:
             self.settings_sink(updated)
         if not _settings_mutation_committed(result):
             message = result.message
@@ -1017,21 +1024,20 @@ class ManagedAuthRuntimeAdapter:
             return ManagedAuthExecutionResult(
                 succeeded=False,
                 transaction_result=result,
-                delivery_ack_pending=(
-                    result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
-                ),
+                delivery_ack_pending=delivery_ack_pending,
+                referral_id=referral_id if delivery_ack_pending else None,
+                pass_status=pass_status if delivery_ack_pending else None,
                 message_key=(message.key if message is not None else "discord_auth.error.retry"),
                 message_kwargs=dict(message.params) if message is not None else {},
                 error_class=getattr(diagnostics, "category", None),
             )
-        issue = broker.last_issue_response
         self.settings_sink(updated)
         return ManagedAuthExecutionResult(
             succeeded=True,
             transaction_result=result,
             referral_bonus_applied=bool(getattr(issue, "referral_bonus_applied", False)),
-            referral_id=normalize_owned_referral_id(getattr(issue, "referral_id", None)),
-            pass_status=getattr(issue, "pass_status", None),
+            referral_id=referral_id,
+            pass_status=pass_status,
             runtime_rebuild="always",
         )
 

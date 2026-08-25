@@ -156,12 +156,15 @@ class ManagedConnectionAuthService:
                 message=broker_result.message,
             )
 
-        settings_values = request.settings_values
+        settings_values = _settings_values_with_broker_issue(
+            request.settings_values,
+            broker_result,
+        )
         commit_result: TransactionResult | None = None
         if broker_result.delivery_ack is not None:
             try:
                 settings_values = await store_pending_ack_in_settings_values(
-                    settings_values=request.settings_values,
+                    settings_values=settings_values,
                     secret_store=self.secret_store,
                     metadata=broker_result.delivery_ack,
                 )
@@ -871,6 +874,41 @@ def _delivery_ack_recovery_pending_result(
             },
         ),
     )
+
+
+def _settings_values_with_broker_issue(
+    settings_values: Mapping[str, object],
+    broker_result: BrokerIssueResult,
+) -> dict[str, object]:
+    values = _copy_settings_values(settings_values)
+    state = values.setdefault("state", {})
+    if not isinstance(state, dict):
+        state = {}
+        values["state"] = state
+    managed = state.setdefault("managed_connection", {})
+    if not isinstance(managed, dict):
+        managed = {}
+        state["managed_connection"] = managed
+    managed_credential_ref = broker_result.managed_credential_ref
+    if managed_credential_ref:
+        managed["active_managed_credential_ref"] = managed_credential_ref
+    if broker_result.expires_at:
+        managed["active_managed_expires_at"] = broker_result.expires_at
+    if broker_result.referral_id:
+        managed["referral_id"] = broker_result.referral_id
+    return values
+
+
+def _copy_settings_values(values: Mapping[str, object]) -> dict[str, object]:
+    return {key: _copy_settings_value(value) for key, value in values.items()}
+
+
+def _copy_settings_value(value: object) -> object:
+    if isinstance(value, Mapping):
+        return _copy_settings_values(value)
+    if isinstance(value, tuple | list):
+        return [_copy_settings_value(item) for item in value]
+    return value
 
 
 def _metadata_diagnostics(

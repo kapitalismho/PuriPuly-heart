@@ -423,6 +423,9 @@ def _broker_success(
     *,
     openrouter_user_id: str | None = None,
     delivery_ack: broker_client.ManagedKeyDeliveryAckMetadata | None = None,
+    managed_credential_ref: str | None = None,
+    expires_at: str | None = None,
+    referral_id: str | None = None,
 ) -> broker_client.BrokerIssueResult:
     return broker_client.BrokerIssueResult(
         succeeded=True,
@@ -431,7 +434,10 @@ def _broker_success(
         remote_key_revision="remote-r1",
         message=None,
         diagnostics=None,
+        managed_credential_ref=managed_credential_ref,
+        expires_at=expires_at,
         openrouter_user_id=openrouter_user_id,
+        referral_id=referral_id,
         delivery_ack=delivery_ack,
     )
 
@@ -770,6 +776,35 @@ async def test_success_preflights_identity_then_discord_auth_then_broker_issue_a
     assert saved_request.expected_revision == "settings-r1"
     assert saved_request.reason == "managed_connection_auth"
     assert saved_request.values["intent"]["translation"]["connection"] == "managed"  # type: ignore[index]
+
+
+@pytest.mark.asyncio
+async def test_success_commits_broker_entitlement_and_owned_pass_id() -> None:
+    broker = RecordingBrokerClient(
+        _broker_success(
+            managed_credential_ref="managed-ref-discord-2",
+            expires_at="2026-11-24T00:00:00.000Z",
+            referral_id="7KQ9M2",
+            delivery_ack=_delivery_ack_metadata(),
+        )
+    )
+    repository = RecordingSettingsRepository(_commit_success())
+
+    result = await _service(
+        identity=RecordingLocalIdentity(_identity_success()),
+        discord=RecordingDiscordAuth(_discord_success()),
+        broker=broker,
+        store=RecordingSecretStore(),
+        repository=repository,
+    ).authorize(_request())
+
+    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+    assert len(repository.saved_requests) == 2
+    for saved_request in repository.saved_requests:
+        saved = saved_request.values["state"]["managed_connection"]  # type: ignore[index]
+        assert saved["active_managed_credential_ref"] == "managed-ref-discord-2"
+        assert saved["active_managed_expires_at"] == "2026-11-24T00:00:00.000Z"
+        assert saved["referral_id"] == "7KQ9M2"
 
 
 @pytest.mark.asyncio
