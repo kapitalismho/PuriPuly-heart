@@ -19,7 +19,7 @@ The V2 normalization implementation is reused only to reconstruct and hash-check
 
 ## Frozen model surfaces
 
-Streaming Sortformer uses the R8 Q8 model and patched telemetry-capable `transcribe-bench` CPU path. Only the native four-slot posterior dump and runtime telemetry are reused. R8 change-event decoding, threshold selection, duplicate suppression, and event metrics are rejected.
+Streaming Sortformer uses the R8 Q8 model and the pinned telemetry-capable `transcribe-bench` Vulkan build. Authoritative traces require the `vulkan` request and resolved `Vulkan0` backend under a distinct backend-specific trace root. The earlier CPU run is retained only as non-authoritative diagnostic evidence and is never mixed with DEV or EVAL receipts. Only the native four-slot posterior dump and runtime telemetry are reused. R8 change-event decoding, threshold selection, duplicate suppression, and event metrics are rejected.
 
 LS-EEND uses the domain-matched `L-AMI` stateful ONNX checkpoint. The streaming frontend, recurrent model state, raw four-slot logits, exact source-time availability functions, and model receipts are reused. The old `StreamingReducer` and boundary events are rejected.
 

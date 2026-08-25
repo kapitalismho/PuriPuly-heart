@@ -1,0 +1,167 @@
+{
+  "backend": "vulkan",
+  "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+  "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+  "chunk_audio_ms": 480,
+  "eval_status": "sealed",
+  "family": "streaming_sortformer",
+  "model_filename": "diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+  "model_repository": "handy-computer/diar_streaming_sortformer_4spk-v2.1-gguf",
+  "model_revision": "7ef0c15dc8f9d717e9d24fac29a6e6551e9c6ddf",
+  "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+  "native_frame_ms": 80,
+  "preset": "low_latency",
+  "recorded_algorithmic_lookahead_ms": 1040,
+  "role": "PSEM-STRATEGY-TRAIN",
+  "schema_version": "psem.relative_occupancy.model_receipt.v1",
+  "slot_count": 4,
+  "slot_validity_metadata": false,
+  "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+  "source_count": 1,
+  "source_ids": [
+    "alimeeting_R8001_M8004"
+  ],
+  "source_receipts": [
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 149.858,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 3819.173,
+              "mel_ms": 0.0,
+              "total_ms": 3819.173,
+              "wall_ms": 3854.842
+            }
+          ],
+          "rtf_compute_mean": 7.855,
+          "rtf_wall_mean": 7.782,
+          "sample_duration_s": 30.0,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-TRAIN\\alimeeting_R8001_M8004__samples_0_480000\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 3819.173,
+              "mean": 3819.173,
+              "min": 3819.173
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 3819.173,
+              "mean": 3819.173,
+              "min": 3819.173
+            },
+            "wall_ms": {
+              "max": 3854.842,
+              "mean": 3854.842,
+              "min": 3854.842
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-TRAIN\\alimeeting_R8001_M8004__samples_0_480000\\run\\bench.json",
+        "bench_sha256": "63cc82d550807e45ed496690e663b4a5e6140ec4f7bfbad85dd1941e3b0f8bac",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-TRAIN\\alimeeting_R8001_M8004__samples_0_480000\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-TRAIN\\alimeeting_R8001_M8004__samples_0_480000\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-TRAIN\\alimeeting_R8001_M8004__samples_0_480000\\run\\run.log",
+        "log_sha256": "e7d0aef8feb2104e501f32c107caa2e0a9d21acfb38023cdcd2d32341ec076a1",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 4.0468738000054145
+      },
+      "manifest_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\train_manifest.jsonl",
+      "manifest_row_sha256": "0dd166f467c1cf4bbbea836435d4b0a95f232ea9224d1b8fe34f6bbd896c8686",
+      "manifest_sha256": "fb6f7542cc84c3589db6f21568c1ed3db37bdded533404e2a69abf412cfaf5ab",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-TRAIN",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 480000,
+      "source_id": "alimeeting_R8001_M8004",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 185.543,
+          "p50": 24.062,
+          "p90": 164.3246,
+          "p99": 184.1604,
+          "sum": 3802.976
+        },
+        "chunk_count": 63,
+        "compression_call_count": 1,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-TRAIN\\alimeeting_R8001_M8004__samples_0_480000\\run\\telemetry.jsonl",
+        "sha256": "b75704ac569681b236deba96157cd621fc41f463e76a31aa53bfc7ecf9e14a41"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 375,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "alimeeting_R8001_M8004",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-TRAIN\\alimeeting_R8001_M8004__samples_0_480000\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "5e8a8dd31e432c9d484e6be5f1e553dfa62fc1b1a30e4bd40583e10a23f963cf",
+        "trace_size_bytes": 9104
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "non_authoritative_train_adapter_smoke",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\alimeeting\\far_ch0\\R8001_M8004.wav",
+      "waveform_sha256": "7312be8c5c34e2cfc5b53812010449023a8c5648565e1908080d481216710c9e",
+      "waveform_size_bytes": 50363244
+    }
+  ],
+  "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+  "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+  "threads": 8,
+  "usage": "non_authoritative_train_adapter_smoke"
+}

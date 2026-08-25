@@ -12,6 +12,7 @@ import numpy as np
 PACKAGE_ROOT = Path(__file__).resolve().parent
 REPOSITORY_ROOT = PACKAGE_ROOT.parents[1]
 CONFIG_PATH = PACKAGE_ROOT / "config.json"
+RESULTS_ROOT = PACKAGE_ROOT / "results"
 FROZEN_DATA_RELATIVE_PATH = Path("experiments/psem_training_strategy_gate/data/v2")
 
 
@@ -88,11 +89,32 @@ def data_dir() -> Path:
     return expected
 
 
+def path_has_alias(path: Path) -> bool:
+    absolute = path.absolute()
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if current.is_symlink() or (
+            hasattr(os.path, "isjunction") and os.path.isjunction(current)
+        ):
+            return True
+    return False
+
+
+def strict_regular_file(path: Path, field: str) -> Path:
+    if path_has_alias(path) or not path.is_file():
+        raise ExperimentError(f"{field} must be a regular non-aliased file")
+    return path.resolve()
+
+
 def required_external_root(name: str, explicit: Path | None = None) -> Path:
     raw = str(explicit) if explicit is not None else os.environ.get(name)
     if not raw:
         raise ExperimentError(f"{name} is required")
-    path = Path(raw).resolve()
+    unresolved = Path(raw).absolute()
+    if path_has_alias(unresolved):
+        raise ExperimentError(f"{name} must not use symlinks or junctions")
+    path = unresolved.resolve()
     if (
         not path.is_absolute()
         or not path.is_dir()
@@ -108,17 +130,29 @@ def safe_child(root: Path, relative: str | Path, field: str) -> Path:
     if value.is_absolute() or any(part == ".." for part in value.parts):
         raise ExperimentError(f"{field} must be a relative path inside its pinned root")
     resolved_root = root.resolve()
-    path = (resolved_root / value).resolve()
+    unresolved = resolved_root / value
+    if path_has_alias(unresolved):
+        raise ExperimentError(f"{field} must not use symlinks or junctions")
+    path = unresolved.resolve()
     if path == resolved_root or resolved_root not in path.parents:
         raise ExperimentError(f"{field} escapes its pinned root")
     return path
 
 
 def safe_output_path(path: Path) -> Path:
-    resolved = path.resolve()
+    unresolved = path.absolute()
+    if path_has_alias(unresolved):
+        raise ExperimentError("experiment outputs cannot use symlinks or junctions")
+    resolved = unresolved.resolve()
     frozen = data_dir()
     if resolved == frozen or frozen in resolved.parents:
         raise ExperimentError("experiment outputs cannot modify the immutable V2 dataset")
+    if resolved == REPOSITORY_ROOT or (
+        REPOSITORY_ROOT in resolved.parents
+        and resolved != RESULTS_ROOT
+        and RESULTS_ROOT not in resolved.parents
+    ):
+        raise ExperimentError("repository outputs must remain under the experiment results root")
     return resolved
 
 

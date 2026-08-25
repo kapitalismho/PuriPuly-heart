@@ -3,7 +3,7 @@
   "experiment_id": "psem-relative-occupancy-v0",
   "authority": {
     "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/97",
-    "sha256": "4a09449425c9990c47228dafa9d48ecefc6d703437d4f92b1d945fa4899b305c"
+    "sha256": "3d330f4af5f11362ca142162858d5b6e9af21ef6e972fdc9add05e342a0ab013"
   },
   "dataset": {
     "id": "PSEM-STRATEGY-DATA-v2",
@@ -42,6 +42,8 @@
     "active_thresholds": [0.40, 0.50, 0.60, 0.70, 0.80],
     "other_low_thresholds": [0.10, 0.20, 0.30, 0.40],
     "confirm_ms": [400, 600, 800, 1000, 1200],
+    "validity_rule": "other_low_threshold < active_threshold",
+    "valid_candidate_count": 95,
     "selection_order": [
       "wrong_anchor_rate_ascending",
       "fraction_enrolled_within_1500ms_descending",
@@ -61,8 +63,9 @@
     "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
     "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
     "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
-    "bench_sha256": "06002011f39e3c709a85fa4ed3856d5b8f5d0b429f705727d0e076451f2af24f",
-    "backend": "cpu",
+    "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+    "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+    "backend": "vulkan",
     "threads": 8,
     "preset": "low_latency",
     "slot_count": 4,

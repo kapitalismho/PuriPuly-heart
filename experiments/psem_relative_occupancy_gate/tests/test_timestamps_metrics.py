@@ -20,6 +20,7 @@ def test_sortformer_80ms_support_maps_to_100ms_centers() -> None:
     trace = Trace(
         source_id="fixture",
         family="streaming_sortformer",
+        slot_ids=("slot-0",),
         probabilities=np.asarray([[0.1], [0.2], [0.3]], dtype=np.float32),
         frame_start_samples=np.asarray([0, 1280, 2560], dtype=np.int64),
         frame_end_samples=np.asarray([1280, 2560, 3840], dtype=np.int64),
@@ -40,6 +41,7 @@ def test_trace_rejects_frontier_before_audio() -> None:
         Trace(
             source_id="fixture",
             family="family",
+            slot_ids=("slot-0",),
             probabilities=np.ones((1, 1), dtype=np.float32),
             frame_start_samples=np.asarray([0], dtype=np.int64),
             frame_end_samples=np.asarray([1600], dtype=np.int64),
@@ -55,6 +57,7 @@ def test_trace_requires_initial_reset_marker() -> None:
         Trace(
             source_id="fixture",
             family="family",
+            slot_ids=("slot-0",),
             probabilities=np.ones((1, 1), dtype=np.float32),
             frame_start_samples=np.asarray([0], dtype=np.int64),
             frame_end_samples=np.asarray([1600], dtype=np.int64),
@@ -69,6 +72,7 @@ def test_empty_trace_maps_to_invalid_cells() -> None:
     trace = Trace(
         source_id="fixture",
         family="family",
+        slot_ids=("slot-0", "slot-1"),
         probabilities=np.empty((0, 2), dtype=np.float32),
         frame_start_samples=np.empty(0, dtype=np.int64),
         frame_end_samples=np.empty(0, dtype=np.int64),

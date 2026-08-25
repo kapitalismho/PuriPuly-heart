@@ -17,7 +17,7 @@ from experiments.psem_relative_occupancy_gate.io_utils import (
 )
 
 AUTHORITY_REF = "https://github.com/kapitalismho/PuriPuly-heart/issues/97"
-AUTHORITY_PIN = "4a09449425c9990c47228dafa9d48ecefc6d703437d4f92b1d945fa4899b305c"
+AUTHORITY_PIN = "3d330f4af5f11362ca142162858d5b6e9af21ef6e972fdc9add05e342a0ab013"
 DATASET_ID = "PSEM-STRATEGY-DATA-v2"
 FREEZE_FILE_SHA256 = "bc7e63bb201c2a33a9b2d69b2364fed8f03839278098f0bd175d6833b330a41e"
 FREEZE_PAYLOAD_SHA256 = "f9f1882d0de08a4fcd19e63f1da7ae022f940420863be5bbfc14d1d2a7b0f95e"

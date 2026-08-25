@@ -1,18 +1,18 @@
 {
-  "config_sha256": "0971a2879cf42f76846137c0a0db2468a043fa5921f61e7d608313fe1e449013",
-  "content_sha256": "a09032a16d8168c59166bde20ca9e5229b214cebc7ba032b69fc7a4cd98dbf12",
+  "config_sha256": "4d08c9f2216388dc30ff1c7134f0488a29cc45e4dce383b1ce6c2eae9a145ecb",
+  "content_sha256": "86a55a6c2ef5d059a39d5a3a67515aa8f5685f78bd832f3c9915773135c2232f",
   "contract_artifacts": {
-    "BASELINE.md": "9d746da1905a032148407782ea545311c65604608129ee26bcbd0df4e63d9226",
-    "EVALUATOR.md": "b2e2cc1e5175e27b972fa949a6bcfcd0c2a28fe720468da50d64393ce7783126",
+    "BASELINE.md": "a39045fad7925daf301c0d9cb091aba2f14a03c8b2ad6fd875a35635e949207a",
+    "EVALUATOR.md": "af82af4cd486a85e9074ebb2ca0ce8b9caa79c2e8f9fbc50c918a16972650a86",
     "ONTOLOGY.md": "7463b15db6780007f52ac87e2cbabb81dcd5930515ba648bced7c8d2adaea916",
-    "config.json": "0971a2879cf42f76846137c0a0db2468a043fa5921f61e7d608313fe1e449013",
-    "contracts.py": "33c43a2ca935888edaa6b7068294a83384c53f64847b9f47216fcdfe1349922b",
+    "config.json": "4d08c9f2216388dc30ff1c7134f0488a29cc45e4dce383b1ce6c2eae9a145ecb",
+    "contracts.py": "8b4bf34f58bf7a222d1ffb3b85968edcfca58bcbcabd0e09b03340035d33df6e",
     "decoder.py": "b836be0cab5f401c38e294f4e7c48af90e431668c3ac8c5c6460bff371d6c5f8",
-    "derive_relative_occupancy.py": "5115ac9cc41dc8900c60e99e38bf9909e9cab071ee7067120c55f0ece3356222",
+    "derive_relative_occupancy.py": "2bfc3c9436b2261a0acf60699fb4789be5c9193938e61c40c77774e1f3ef3c41",
     "evaluate.py": "f244ba8024872ca3b94c601320f3c6ce522b95cca4c87779d97bac37f4ec021c",
-    "io_utils.py": "ad6d1e4c1af65935bcffd5d1fca8d8e532936b87b561aa2d19ded5c1a3cbdccb",
-    "preflight.py": "ea4db5c80eca31913cbcd77e183ea7d80ae1dc669b6c62dc6dcc9c90a2f82eb7",
-    "provenance.py": "ed798920b6cffc48da23e559ec806d7f23aa09c09b95a8a08d8a5e4407ba4715",
+    "io_utils.py": "0e1fffaa901efd51766cf3949f4302b17bccf0723d1b97fdb9ddec29c535e772",
+    "preflight.py": "61e9cb540669515ee58b2fe4890c6d62130264d818320f18d33580bd539d3c44",
+    "provenance.py": "c064940b7cea200bccd458321e24549a17b62262b088901c3280b29446a97263",
     "run_gate0.py": "d9793a8ab0543c86f388ee9d35773574e1aa971fa35e569eeb84a626b6bb088e",
     "verify_gate0.py": "d69fb26d56bc0349ac5ecf3932d7d5a28d27b4146c1c7e98960998f0abf7210f"
   },
@@ -69,7 +69,7 @@
     "silence_reset_ms": 1200
   },
   "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\dev\\relative_occupancy_manifest.jsonl",
-  "manifest_sha256": "5d700b1bdfd6ab2ef87215353eb7c334ac850e7b593021168f2f7463e287bac6",
+  "manifest_sha256": "b5a6d1369fc1165adb98ce91508b7f8b171ad2a981495b33e0060a324e6176b9",
   "natural_topology_failures": [],
   "no_speaker_cut_baseline": {
     "active_speech_hours": 4.492728055555555,
@@ -88,7 +88,7 @@
   "oracle_events_sha256": "e56152d070b361beb53417542c473d6039f9d2496f6cda6fdf1fecad4d714d50",
   "passed": true,
   "preflight_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\dev\\preflight_receipt.json",
-  "preflight_sha256": "64065486ac7acb5214df8b0c0a0a050debb5f81bd59650352ecf36bfa6af64fb",
+  "preflight_sha256": "ae6a860723fbde977bff4d74e8359ded8d4b2c3d4551b4711965f8c99a56572e",
   "role": "PSEM-STRATEGY-DEV",
   "schema_version": "psem.relative_occupancy.gate0_metrics.v1",
   "settings": [

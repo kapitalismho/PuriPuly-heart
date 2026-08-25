@@ -1,0 +1,24 @@
+{
+  "artifact_sha256": {
+    "gate0": "5892e5883b2d2d63392d4aebd0ac13666f0534d391c8ab78a59749771ef7ec24",
+    "gate0_verification": "8b40306ead12391b077f4b2b1549d0a3c4c69c6885b27d754462b18be7a60161",
+    "gate1": "3100401d8c3d9e34324e252a6640dbfb2bf5b562bd647f0b44c20fb9ac67c631",
+    "gate1_events": "397b384fb2246259e38b834be2bac7fdc7017cb60429a792ae48ff95e514ba85",
+    "gate1_latency": "9f8cabe26c7bf2ab2fa4a2006f5c43ed251aa27211c9fdb6cf641bf7ed5c9095",
+    "gate1_product": "fec777c72f4d9cf2060011b1169f996f93dedfc59f4b0e3f682baeffc9c705cd",
+    "gate1_topology": "b6085518694143e5155acad901b71f2b57cbe34a7c35980a71f91ba124ee3804",
+    "gate2": "5b96d8e61bece21ba615dba72a0d6974e3aa57807a43a6290c4d5a1405d9e672",
+    "gate2_events": "3a7c811301f93f91234262d16df2bb2343b42fb242768f23d4efd90a0168522f",
+    "latency": "b379699e4ace1f7255e083d6cc921c3ede2687a16433f63c22d8e1fe04716a53",
+    "product": "c6b1ebfd3fe0a077f6ff33d8f6d46d6526698a994260fbcc6dedc22736a66eb9",
+    "selection": "28a3ba705153882ebc59a9b2318a382576de899644d676a8df066d04ba0a7974",
+    "topology": "5f2ab02770791a4ce091e1f99111a154e9279602a40cfaaec9cb1c89b533cf52"
+  },
+  "deterministic_regeneration": true,
+  "eval_status": "sealed",
+  "independent_structural_verification": true,
+  "passed": true,
+  "role": "PSEM-STRATEGY-DEV",
+  "schema_version": "psem.relative_occupancy.model_gate_verification.v1",
+  "selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489"
+}

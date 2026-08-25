@@ -1,0 +1,51 @@
+{
+  "config_sha256": "4d08c9f2216388dc30ff1c7134f0488a29cc45e4dce383b1ce6c2eae9a145ecb",
+  "eval_status": "sealed",
+  "event_ledger_sha256": "397b384fb2246259e38b834be2bac7fdc7017cb60429a792ae48ff95e514ba85",
+  "families": {
+    "ls_eend": {
+      "algorithmic_buffering_ms": 0,
+      "native_frame_ms": 100,
+      "replacement_confirmation_ms": [
+        100,
+        200,
+        300,
+        500
+      ],
+      "runtime": {
+        "audio_seconds": 21993.9115625,
+        "inference_origin_counts": {
+          "fresh_single_frozen_inference_pass": 10
+        },
+        "measured_cpu_seconds": 258.140625,
+        "measured_process_wall_rtf": 0.02544685340802485,
+        "measured_process_wall_seconds": 559.6758434000003,
+        "source_count": 10
+      }
+    },
+    "streaming_sortformer": {
+      "algorithmic_buffering_ms": 1040,
+      "native_frame_ms": 80,
+      "replacement_confirmation_ms": [
+        100,
+        200,
+        300,
+        500
+      ],
+      "runtime": {
+        "audio_seconds": 21993.9115625,
+        "inference_origin_counts": {
+          "fresh_single_frozen_inference_pass": 10
+        },
+        "measured_cpu_seconds": null,
+        "measured_process_wall_rtf": 0.3327647720143915,
+        "measured_process_wall_seconds": 7318.798966800001,
+        "source_count": 10
+      }
+    }
+  },
+  "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\dev\\relative_occupancy_manifest.jsonl",
+  "manifest_sha256": "b5a6d1369fc1165adb98ce91508b7f8b171ad2a981495b33e0060a324e6176b9",
+  "role": "PSEM-STRATEGY-DEV",
+  "schema_version": "psem.relative_occupancy.latency_breakdown.v1"
+}

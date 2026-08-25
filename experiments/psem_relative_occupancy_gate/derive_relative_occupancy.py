@@ -6,16 +6,24 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from experiments.psem_relative_occupancy_gate.contracts import ActivityInterval
+from experiments.psem_relative_occupancy_gate.eval_access import (
+    access_receipt_path,
+    claim_eval_authorization,
+    consumption_receipt_path,
+    validate_unused_eval_authorization,
+)
 from experiments.psem_relative_occupancy_gate.io_utils import (
     CONFIG_PATH,
     canonical_sha256,
     config,
     corpus_root,
     data_dir,
+    load_json,
     reference_root,
     safe_child,
     safe_output_path,
     sha256_file,
+    write_json,
     write_jsonl,
 )
 from experiments.psem_relative_occupancy_gate.provenance import load_frozen_dataset
@@ -38,19 +46,36 @@ def derive_rows(
     reference: Path,
     roles: Iterable[str],
     frozen_selection: Path | None,
+    eval_authorization: Path | None = None,
+    eval_output: Path | None = None,
 ) -> list[dict[str, Any]]:
     corpus = corpus_root(corpus)
     reference = reference_root(reference)
     requested_roles = tuple(sorted(set(roles)))
     if not requested_roles:
         raise DerivationError("at least one role is required")
-    if "PSEM-STRATEGY-EVAL" in requested_roles:
-        raise DerivationError(
-            "EVAL is sealed until the frozen DEV selection implementation is accepted"
+    eval_requested = "PSEM-STRATEGY-EVAL" in requested_roles
+    selection_sha256: str | None = None
+    authorization_sha256: str | None = None
+    if eval_requested:
+        if requested_roles != ("PSEM-STRATEGY-EVAL",):
+            raise DerivationError("EVAL must be derived as a separate one-use role")
+        if frozen_selection is None or eval_authorization is None or eval_output is None:
+            raise DerivationError("EVAL requires a frozen selection and one-use authorization")
+        selection, authorization = validate_unused_eval_authorization(
+            selection_path=frozen_selection,
+            authorization_path=eval_authorization,
+            manifest_output=eval_output,
         )
-    if frozen_selection is not None:
-        raise DerivationError("a frozen selection receipt is invalid before EVAL authorization")
-    allowed_roles = {"PSEM-STRATEGY-TRAIN", "PSEM-STRATEGY-DEV"}
+        selection_sha256 = str(selection["selection_sha256"])
+        authorization_sha256 = str(authorization["authorization_sha256"])
+    elif frozen_selection is not None or eval_authorization is not None or eval_output is not None:
+        raise DerivationError("EVAL access artifacts are invalid for TRAIN or DEV")
+    allowed_roles = {
+        "PSEM-STRATEGY-TRAIN",
+        "PSEM-STRATEGY-DEV",
+        "PSEM-STRATEGY-EVAL",
+    }
     if not set(requested_roles) <= allowed_roles:
         raise DerivationError("requested role is outside the frozen V2 contract")
     dataset = load_frozen_dataset()
@@ -125,8 +150,9 @@ def derive_rows(
             "split_manifest_sha256": sha256_file(split_path),
             "reference_checkout_sha256": canonical_sha256(opening_provenance),
             "config_sha256": sha256_file(CONFIG_PATH),
-            "eval_selection_sha256": None,
-            "eval_status": "sealed",
+            "eval_selection_sha256": selection_sha256,
+            "eval_authorization_sha256": authorization_sha256,
+            "eval_status": "opened_once" if eval_requested else "sealed",
         }
         row["row_sha256"] = canonical_sha256(row)
         result.append(row)
@@ -146,16 +172,70 @@ def main() -> None:
     parser.add_argument("--reference-root", type=Path)
     parser.add_argument("--roles", nargs="+", required=True)
     parser.add_argument("--frozen-selection", type=Path)
+    parser.add_argument("--eval-authorization", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    output = safe_output_path(args.output)
+    eval_access = (
+        validate_unused_eval_authorization(
+            selection_path=args.frozen_selection.resolve(),
+            authorization_path=args.eval_authorization.resolve(),
+            manifest_output=output,
+        )
+        if "PSEM-STRATEGY-EVAL" in args.roles
+        and args.frozen_selection is not None
+        and args.eval_authorization is not None
+        else None
+    )
     rows = derive_rows(
         corpus=corpus_root(args.corpus_root),
         reference=reference_root(args.reference_root),
         roles=args.roles,
         frozen_selection=args.frozen_selection.resolve() if args.frozen_selection else None,
+        eval_authorization=(args.eval_authorization.resolve() if args.eval_authorization else None),
+        eval_output=output if "PSEM-STRATEGY-EVAL" in args.roles else None,
     )
-    output = safe_output_path(args.output)
-    write_jsonl(output, rows)
+    if "PSEM-STRATEGY-EVAL" in args.roles:
+        if eval_access is None:
+            raise DerivationError("EVAL access validation was not completed")
+        selection, authorization, claim = claim_eval_authorization(
+            selection_path=args.frozen_selection.resolve(),
+            authorization_path=args.eval_authorization.resolve(),
+            manifest_output=output,
+        )
+        if any(
+            row.get("eval_selection_sha256") != selection["selection_sha256"]
+            or row.get("eval_authorization_sha256")
+            != authorization["authorization_sha256"]
+            for row in rows
+        ):
+            raise DerivationError("EVAL authorization changed before its atomic claim")
+        write_jsonl(output, rows)
+        claim_path = consumption_receipt_path(args.eval_authorization.resolve())
+        receipt = {
+            "schema_version": "psem.relative_occupancy.eval_access_receipt.v1",
+            "role": "PSEM-STRATEGY-EVAL",
+            "open_count": 1,
+            "selection_sha256": selection["selection_sha256"],
+            "accepted_c2_head": authorization["accepted_c2_head"],
+            "authorization_path": str(args.eval_authorization.resolve()),
+            "authorization_file_sha256": sha256_file(args.eval_authorization.resolve()),
+            "authorization_sha256": authorization["authorization_sha256"],
+            "consumption_receipt_path": str(claim_path),
+            "consumption_receipt_sha256": sha256_file(claim_path),
+            "model_gate_verification_sha256": authorization[
+                "model_gate_verification_sha256"
+            ],
+            "manifest_path": str(output),
+            "manifest_sha256": sha256_file(output),
+            "source_count": len(rows),
+        }
+        if claim["claim_sha256"] != load_json(claim_path)["claim_sha256"]:
+            raise DerivationError("EVAL authorization claim changed during derivation")
+        receipt["access_sha256"] = canonical_sha256(receipt)
+        write_json(access_receipt_path(output), receipt)
+    else:
+        write_jsonl(output, rows)
     print(json.dumps({"output": str(output), "source_count": len(rows)}, sort_keys=True))
 
 

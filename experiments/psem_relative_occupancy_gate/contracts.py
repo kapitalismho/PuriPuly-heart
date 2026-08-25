@@ -90,6 +90,7 @@ class AnchorEpisode:
 class Trace:
     source_id: str
     family: str
+    slot_ids: tuple[str, ...]
     probabilities: np.ndarray
     frame_start_samples: np.ndarray
     frame_end_samples: np.ndarray
@@ -99,9 +100,17 @@ class Trace:
     metadata: dict[str, Any]
 
     def __post_init__(self) -> None:
+        if not self.source_id or not self.family:
+            raise ValueError("trace identity is missing")
         frame_count = self.probabilities.shape[0]
         if self.probabilities.ndim != 2 or self.probabilities.shape[1] < 1:
             raise ValueError("trace probabilities must be [frames, slots]")
+        if len(self.slot_ids) != self.probabilities.shape[1]:
+            raise ValueError("trace slot identity geometry mismatch")
+        if any(not value for value in self.slot_ids) or len(set(self.slot_ids)) != len(
+            self.slot_ids
+        ):
+            raise ValueError("trace slot identities must be non-empty and unique")
         for values in (
             self.frame_start_samples,
             self.frame_end_samples,

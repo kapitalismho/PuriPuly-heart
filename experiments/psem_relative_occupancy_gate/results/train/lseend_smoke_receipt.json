@@ -1,0 +1,90 @@
+{
+  "backend": "CPUExecutionProvider",
+  "eval_status": "sealed",
+  "family": "ls_eend",
+  "inter_op_threads": 1,
+  "intra_op_threads": 1,
+  "model_load_seconds_for_new_sources": 0.14112999999633757,
+  "model_relative_path": "AMI/ls_eend_ami_step.onnx",
+  "model_sha256": "5a2b813ffe41170e40d0fc08a6eb1699e579e377af30c7962d07885608a6aa77",
+  "native_frame_ms": 100,
+  "onnxruntime_version": "1.28.0",
+  "repository": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX",
+  "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+  "role": "PSEM-STRATEGY-TRAIN",
+  "schema_version": "psem.relative_occupancy.model_receipt.v1",
+  "sidecar_relative_path": "AMI/ls_eend_ami_step.json",
+  "sidecar_sha256": "47f29718254995ec017636d5ff31fef8b20bf47dca30d883edcb91e022dc3353",
+  "slot_count": 4,
+  "slot_validity_metadata": false,
+  "source_count": 1,
+  "source_ids": [
+    "alimeeting_R8001_M8004"
+  ],
+  "source_receipts": [
+    {
+      "backend": "CPUExecutionProvider",
+      "family": "ls_eend",
+      "inter_op_threads": 1,
+      "intra_op_threads": 1,
+      "manifest_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\train_manifest.jsonl",
+      "manifest_row_sha256": "0dd166f467c1cf4bbbea836435d4b0a95f232ea9224d1b8fe34f6bbd896c8686",
+      "manifest_sha256": "fb6f7542cc84c3589db6f21568c1ed3db37bdded533404e2a69abf412cfaf5ab",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\AMI\\ls_eend_ami_step.onnx",
+      "model_sha256": "5a2b813ffe41170e40d0fc08a6eb1699e579e377af30c7962d07885608a6aa77",
+      "repository": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX",
+      "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+      "role": "PSEM-STRATEGY-TRAIN",
+      "runtime": {
+        "chunk_compute_ms": {
+          "maximum": 6.030399999872316,
+          "p50": 0.43900000309804454,
+          "p90": 1.9713399997272067,
+          "p99": 2.7099929965334013,
+          "sum": 858.6205999818048
+        },
+        "cpu_rtf": 0.0026041666666666665,
+        "cpu_seconds": 0.078125,
+        "final_tail_frame_count": 0,
+        "input_chunk_count": 938,
+        "input_chunk_samples_16k": 512,
+        "normal_frame_count": 291,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "wall_rtf": 0.029126126666475707,
+        "wall_seconds": 0.8737837999942712
+      },
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "sidecar_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\AMI\\ls_eend_ami_step.json",
+      "sidecar_sha256": "47f29718254995ec017636d5ff31fef8b20bf47dca30d883edcb91e022dc3353",
+      "source_end_sample": 480000,
+      "source_id": "alimeeting_R8001_M8004",
+      "source_start_sample": 0,
+      "trace": {
+        "family": "ls_eend",
+        "frame_count": 291,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "alimeeting_R8001_M8004",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-TRAIN\\alimeeting_R8001_M8004__samples_0_480000\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "234756dbf3350891698abdfac91546715ba56680b0b0e7f8fba8f25771fc16f0",
+        "trace_size_bytes": 6979
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "non_authoritative_train_adapter_smoke",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\alimeeting\\far_ch0\\R8001_M8004.wav",
+      "waveform_sha256": "7312be8c5c34e2cfc5b53812010449023a8c5648565e1908080d481216710c9e",
+      "waveform_size_bytes": 50363244
+    }
+  ],
+  "usage": "non_authoritative_train_adapter_smoke",
+  "variant": "L-AMI"
+}

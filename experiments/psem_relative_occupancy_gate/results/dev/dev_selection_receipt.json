@@ -1,0 +1,149 @@
+{
+  "artifact_bindings": {
+    "contract_files": {
+      "BASELINE.md": "a39045fad7925daf301c0d9cb091aba2f14a03c8b2ad6fd875a35635e949207a",
+      "EVALUATOR.md": "af82af4cd486a85e9074ebb2ca0ce8b9caa79c2e8f9fbc50c918a16972650a86",
+      "ONTOLOGY.md": "7463b15db6780007f52ac87e2cbabb81dcd5930515ba648bced7c8d2adaea916",
+      "authorize_eval.py": "df265a494af7ea65935a3eaec290b000ca293836851eeef885961cd0c0999a46",
+      "config.json": "4d08c9f2216388dc30ff1c7134f0488a29cc45e4dce383b1ce6c2eae9a145ecb",
+      "contracts.py": "8b4bf34f58bf7a222d1ffb3b85968edcfca58bcbcabd0e09b03340035d33df6e",
+      "decoder.py": "b836be0cab5f401c38e294f4e7c48af90e431668c3ac8c5c6460bff371d6c5f8",
+      "derive_relative_occupancy.py": "2bfc3c9436b2261a0acf60699fb4789be5c9193938e61c40c77774e1f3ef3c41",
+      "eval_access.py": "dcba2656581874912384e8c92a1900a7100c564342f04ded8121d138805f9cde",
+      "evaluate.py": "f244ba8024872ca3b94c601320f3c6ce522b95cca4c87779d97bac37f4ec021c",
+      "io_utils.py": "0e1fffaa901efd51766cf3949f4302b17bccf0723d1b97fdb9ddec29c535e772",
+      "model_decode.py": "83469df925883cd5212a03bef6b9fd666b5f03f18ba8b65739b2a99ea0322fe4",
+      "model_evaluate.py": "7ed9ca8a685f37c47608df9169cd952110affe6f7920e1907bf2c46781481a5a",
+      "model_run_io.py": "4ec65439e5de3cb7e967c96e75abc16cd779915644fc4db7c1bc025fdc7019bc",
+      "preflight.py": "61e9cb540669515ee58b2fe4890c6d62130264d818320f18d33580bd539d3c44",
+      "provenance.py": "c064940b7cea200bccd458321e24549a17b62262b088901c3280b29446a97263",
+      "run_eval.py": "5281e13028a05cd1b8088f5256390555df670c9d83dee9ab9eb4f80ebc65bc66",
+      "run_eval_traces.py": "a9333715ed6739f2eec5e48ecbe04946b3bb4424fae6e1fadecce22d6cbbed91",
+      "run_gate0.py": "d9793a8ab0543c86f388ee9d35773574e1aa971fa35e569eeb84a626b6bb088e",
+      "run_gate1.py": "48dc135e8d1465138a6054282cae4dc1c28f36559054d5eaa6475461495b40bf",
+      "run_gate2.py": "aaaef6fe7012386319b6b61dcb010e132a58966359c395c3ec8a4d4a9fed6368",
+      "run_lseend_trace.py": "7912d4296ed3d3537d92120cdde71ac1dedab74a2c6a4bf0c61a5c767b6bf325",
+      "run_sortformer_trace.py": "3b78cd4671026a71250a66d7a9964bf74b85d949513190d898705a7d963358e7",
+      "trace_io.py": "6966d2f4d96f463a8263fe040610b4390a9f33f766e465535152f487ca26f2a8",
+      "trace_runtime.py": "15eb9676aec39d186ae088c977cc21f82f28a229ca31280396f3abaa1e9621b1",
+      "verify_eval.py": "460a6826de9afcd1d3085e9cabc3a02a8342682a96270b570412e60aec6017ee",
+      "verify_gate0.py": "d69fb26d56bc0349ac5ecf3932d7d5a28d27b4146c1c7e98960998f0abf7210f",
+      "verify_model_gates.py": "1b3ea5cdf45f08011d657a9d378d06123e279bfea076ee175a03dbd511a74818"
+    },
+    "gate0_metrics_sha256": "5892e5883b2d2d63392d4aebd0ac13666f0534d391c8ab78a59749771ef7ec24",
+    "gate0_verification_sha256": "8b40306ead12391b077f4b2b1549d0a3c4c69c6885b27d754462b18be7a60161",
+    "gate1_event_ledger_sha256": "397b384fb2246259e38b834be2bac7fdc7017cb60429a792ae48ff95e514ba85",
+    "gate1_latency_breakdown_sha256": "9f8cabe26c7bf2ab2fa4a2006f5c43ed251aa27211c9fdb6cf641bf7ed5c9095",
+    "gate1_metrics_sha256": "3100401d8c3d9e34324e252a6640dbfb2bf5b562bd647f0b44c20fb9ac67c631",
+    "gate1_product_frontier_sha256": "fec777c72f4d9cf2060011b1169f996f93dedfc59f4b0e3f682baeffc9c705cd",
+    "gate1_topology_slices_sha256": "b6085518694143e5155acad901b71f2b57cbe34a7c35980a71f91ba124ee3804",
+    "gate2_event_ledger_sha256": "3a7c811301f93f91234262d16df2bb2343b42fb242768f23d4efd90a0168522f",
+    "gate2_metrics_sha256": "5b96d8e61bece21ba615dba72a0d6974e3aa57807a43a6290c4d5a1405d9e672",
+    "latency_breakdown_sha256": "b379699e4ace1f7255e083d6cc921c3ede2687a16433f63c22d8e1fe04716a53",
+    "model_receipts": {
+      "lseend": "2d155fdcb72024e1089f74467bc198bf247b04fa912059524a6074acdcdb5049",
+      "sortformer": "2131a251304da65006dd116d59ab4310311356c5909bc570e41ebb6978e5dc03"
+    },
+    "product_frontiers_sha256": "c6b1ebfd3fe0a077f6ff33d8f6d46d6526698a994260fbcc6dedc22736a66eb9",
+    "topology_slices_sha256": "5f2ab02770791a4ce091e1f99111a154e9279602a40cfaaec9cb1c89b533cf52"
+  },
+  "authority": {
+    "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/97",
+    "sha256": "3d330f4af5f11362ca142162858d5b6e9af21ef6e972fdc9add05e342a0ab013"
+  },
+  "causal_enrollment_grid": {
+    "active_thresholds": [
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8
+    ],
+    "confirm_ms": [
+      400,
+      600,
+      800,
+      1000,
+      1200
+    ],
+    "other_low_thresholds": [
+      0.1,
+      0.2,
+      0.3,
+      0.4
+    ],
+    "selection_order": [
+      "wrong_anchor_rate_ascending",
+      "fraction_enrolled_within_1500ms_descending",
+      "enrollment_failure_rate_ascending",
+      "enrollment_delay_p90_ascending",
+      "active_threshold_descending",
+      "other_low_threshold_ascending",
+      "confirm_ms_ascending"
+    ],
+    "valid_candidate_count": 95,
+    "validity_rule": "other_low_threshold < active_threshold"
+  },
+  "config_sha256": "4d08c9f2216388dc30ff1c7134f0488a29cc45e4dce383b1ce6c2eae9a145ecb",
+  "eval_open_authorized": false,
+  "eval_open_count": 0,
+  "eval_status": "sealed",
+  "event_ledger_sha256": "3a7c811301f93f91234262d16df2bb2343b42fb242768f23d4efd90a0168522f",
+  "gate0_sha256": "5892e5883b2d2d63392d4aebd0ac13666f0534d391c8ab78a59749771ef7ec24",
+  "gate0_verification_sha256": "8b40306ead12391b077f4b2b1549d0a3c4c69c6885b27d754462b18be7a60161",
+  "gate1_event_ledger_sha256": "397b384fb2246259e38b834be2bac7fdc7017cb60429a792ae48ff95e514ba85",
+  "gate1_sha256": "3100401d8c3d9e34324e252a6640dbfb2bf5b562bd647f0b44c20fb9ac67c631",
+  "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\dev\\relative_occupancy_manifest.jsonl",
+  "manifest_sha256": "b5a6d1369fc1165adb98ce91508b7f8b171ad2a981495b33e0060a324e6176b9",
+  "role": "PSEM-STRATEGY-DEV",
+  "same_cached_trace_for_gate1_and_gate2": true,
+  "schema_version": "psem.relative_occupancy.dev_selection.v1",
+  "selected_settings": {
+    "ls_eend": {
+      "anchor_threshold": 0.7,
+      "causal_enrollment": {
+        "active_threshold": 0.7,
+        "confirmation_samples": 6400,
+        "other_low_threshold": 0.3
+      },
+      "other_threshold": 0.3,
+      "selection_order": [
+        "wrong_anchor_rate_ascending",
+        "fraction_enrolled_within_1500ms_descending",
+        "enrollment_failure_rate_ascending",
+        "enrollment_delay_p90_ascending",
+        "active_threshold_descending",
+        "other_low_threshold_ascending",
+        "confirm_ms_ascending"
+      ]
+    },
+    "streaming_sortformer": {
+      "anchor_threshold": 0.5,
+      "causal_enrollment": {
+        "active_threshold": 0.5,
+        "confirmation_samples": 6400,
+        "other_low_threshold": 0.4
+      },
+      "other_threshold": 0.35,
+      "selection_order": [
+        "wrong_anchor_rate_ascending",
+        "fraction_enrolled_within_1500ms_descending",
+        "enrollment_failure_rate_ascending",
+        "enrollment_delay_p90_ascending",
+        "active_threshold_descending",
+        "other_low_threshold_ascending",
+        "confirm_ms_ascending"
+      ]
+    }
+  },
+  "selection_order": [
+    "wrong_anchor_rate_ascending",
+    "fraction_enrolled_within_1500ms_descending",
+    "enrollment_failure_rate_ascending",
+    "enrollment_delay_p90_ascending",
+    "active_threshold_descending",
+    "other_low_threshold_ascending",
+    "confirm_ms_ascending"
+  ],
+  "selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489"
+}
