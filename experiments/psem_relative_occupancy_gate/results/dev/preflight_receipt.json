@@ -1,0 +1,555 @@
+{
+  "authority": {
+    "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/97",
+    "sha256": "4a09449425c9990c47228dafa9d48ecefc6d703437d4f92b1d945fa4899b305c"
+  },
+  "checks": [
+    {
+      "detail": {
+        "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/97",
+        "sha256": "4a09449425c9990c47228dafa9d48ecefc6d703437d4f92b1d945fa4899b305c"
+      },
+      "id": "authority_pin",
+      "passed": true
+    },
+    {
+      "detail": "psem-relative-occupancy-v0",
+      "id": "experiment_namespace",
+      "passed": true
+    },
+    {
+      "detail": 16000,
+      "id": "sample_rate_16k",
+      "passed": true
+    },
+    {
+      "detail": "bc7e63bb201c2a33a9b2d69b2364fed8f03839278098f0bd175d6833b330a41e",
+      "id": "dataset_freeze_file_pin",
+      "passed": true
+    },
+    {
+      "detail": "f9f1882d0de08a4fcd19e63f1da7ae022f940420863be5bbfc14d1d2a7b0f95e",
+      "id": "dataset_freeze_payload_pin",
+      "passed": true
+    },
+    {
+      "detail": {
+        "PSEM-STRATEGY-DEV": 10,
+        "PSEM-STRATEGY-EVAL": 19,
+        "PSEM-STRATEGY-TRAIN": 64
+      },
+      "id": "dataset_role_counts_pin",
+      "passed": true
+    },
+    {
+      "detail": 100,
+      "id": "evaluation_grid_100ms",
+      "passed": true
+    },
+    {
+      "detail": 200,
+      "id": "gate0_enrollment_frozen",
+      "passed": true
+    },
+    {
+      "detail": 1200,
+      "id": "lifecycle_proxy_frozen",
+      "passed": true
+    },
+    {
+      "detail": 500,
+      "id": "diagnostic_handoff_alignment_frozen",
+      "passed": true
+    },
+    {
+      "detail": 500,
+      "id": "product_event_alignment_frozen",
+      "passed": true
+    },
+    {
+      "detail": [
+        100,
+        200,
+        300,
+        500
+      ],
+      "id": "replacement_grid_frozen",
+      "passed": true
+    },
+    {
+      "detail": "psem.relative_occupancy.trace.v1",
+      "id": "trace_schema_frozen",
+      "passed": true
+    },
+    {
+      "detail": {
+        "other_aggregation": "max_alive_non_anchor",
+        "support": "duration_weighted_mean_on_unmasked_gt_anchor_active_cells",
+        "tie_break": "lowest_slot_index"
+      },
+      "id": "oracle_mapping_frozen",
+      "passed": true
+    },
+    {
+      "detail": [
+        0.05,
+        0.1,
+        0.15,
+        0.2,
+        0.25,
+        0.3,
+        0.35,
+        0.4,
+        0.45,
+        0.5,
+        0.55,
+        0.6,
+        0.65,
+        0.7,
+        0.75,
+        0.8,
+        0.85,
+        0.9,
+        0.95
+      ],
+      "id": "activity_threshold_grid_frozen",
+      "passed": true
+    },
+    {
+      "detail": {
+        "active_thresholds": [
+          0.4,
+          0.5,
+          0.6,
+          0.7,
+          0.8
+        ],
+        "confirm_ms": [
+          400,
+          600,
+          800,
+          1000,
+          1200
+        ],
+        "other_low_thresholds": [
+          0.1,
+          0.2,
+          0.3,
+          0.4
+        ],
+        "selection_order": [
+          "wrong_anchor_rate_ascending",
+          "fraction_enrolled_within_1500ms_descending",
+          "enrollment_failure_rate_ascending",
+          "enrollment_delay_p90_ascending",
+          "active_threshold_descending",
+          "other_low_threshold_ascending",
+          "confirm_ms_ascending"
+        ]
+      },
+      "id": "causal_enrollment_grid_frozen",
+      "passed": true
+    },
+    {
+      "detail": {
+        "algorithmic_lookahead_ms": 1040,
+        "backend": "cpu",
+        "bench_sha256": "06002011f39e3c709a85fa4ed3856d5b8f5d0b429f705727d0e076451f2af24f",
+        "chunk_audio_ms": 480,
+        "family": "streaming_sortformer",
+        "model_filename": "diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+        "model_repository": "handy-computer/diar_streaming_sortformer_4spk-v2.1-gguf",
+        "model_revision": "7ef0c15dc8f9d717e9d24fac29a6e6551e9c6ddf",
+        "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+        "native_frame_ms": 80,
+        "preset": "low_latency",
+        "slot_count": 4,
+        "slot_validity_metadata": false,
+        "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+        "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+        "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+        "threads": 8
+      },
+      "id": "sortformer_contract_frozen",
+      "passed": true
+    },
+    {
+      "detail": {
+        "backend": "CPUExecutionProvider",
+        "family": "ls_eend",
+        "inter_op_threads": 1,
+        "intra_op_threads": 1,
+        "model_relative_path": "AMI/ls_eend_ami_step.onnx",
+        "model_sha256": "5a2b813ffe41170e40d0fc08a6eb1699e579e377af30c7962d07885608a6aa77",
+        "native_frame_ms": 100,
+        "repository": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX",
+        "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+        "sidecar_relative_path": "AMI/ls_eend_ami_step.json",
+        "sidecar_sha256": "47f29718254995ec017636d5ff31fef8b20bf47dca30d883edcb91e022dc3353",
+        "slot_count": 4,
+        "slot_validity_metadata": false,
+        "variant": "L-AMI"
+      },
+      "id": "lseend_contract_frozen",
+      "passed": true
+    },
+    {
+      "detail": [
+        "activity_thresholds",
+        "authority",
+        "causal_enrollment",
+        "dataset",
+        "derived_handoff_alignment_tolerance_ms",
+        "evaluation_grid_ms",
+        "experiment_id",
+        "gate0_enrollment_confirm_ms",
+        "lifecycle_proxy_silence_reset_ms",
+        "lseend",
+        "oracle_anchor_mapping",
+        "product_event_alignment_tolerance_ms",
+        "replacement_confirm_ms",
+        "schema_version",
+        "sortformer",
+        "trace_schema_version"
+      ],
+      "id": "no_model_learning",
+      "passed": true
+    },
+    {
+      "detail": 1200,
+      "id": "lifecycle_proxy_matches_v2",
+      "passed": true
+    },
+    {
+      "detail": 200,
+      "id": "gate0_enrollment_matches_v2",
+      "passed": true
+    },
+    {
+      "detail": {
+        "artifact_sha256": {
+          "DATA_CENSUS.md": "36d0da74bcc5eb7a686ea3877faeb7e0336aba0fabffec45bf107bb2e9663cf1",
+          "REFERENCE_MIGRATION.md": "85e3cf38541b53011d0478b5b2f63a1f919005e47ff1515654cfd4b4f2d326e9",
+          "annotation_manifest.jsonl": "e2c5b917019000172b08c90d366697d3b5388c4aafbed1b23cd4b8159b6966b2",
+          "evaluator_contract.json": "ebaa6a81650c23dd66ca0e07e2522418dd44f81dc24892f1095ec8dae8f76d11",
+          "identity_components.json": "09aa1c50b7978cc780c8314cdf43af765de9e1cd74622fa4099aace52437e29f",
+          "nonlexical_risk_inventory.json": "88b9fec85ccce9297942e0bffef6ce679bb6e89f7ea17ceb758c401ddb6ce44f",
+          "normalization_manifest.jsonl": "d275962bc78d0b50aafe9c052a7bf613ed0274110e3e450e7df82b1e875e1999",
+          "operational_label_contract.json": "55a9aa10f47543067b004640367d3ee10a2ea689e1d01e0ef244a8ce0898bc95",
+          "prior_exposure_manifest.jsonl": "0daa8db197b464ac40ba6daa442cb4a97f936d5eb06d28fd3a7a38bfc8ab84e7",
+          "reference_artifact_receipt.json": "bd896219d4646e341e35377459c51c052373d74010235ea47c0615bab4358885",
+          "reference_integrity_report.json": "bc3c0a4a2158084fbf12595bdb8e59ee909bd5d92446cca2a7b63eb95d29ea54",
+          "reference_migration.jsonl": "9a1b03ee8bb3684d749a4d005dd01e4525712c1f155091eea5e3c67cd763c558",
+          "reference_migration_summary.json": "1a3c2fd4ae76fd3bd9fdad98d0716493034f1b3157e177eec0b5048653cad478",
+          "reference_provenance.json": "4d3f6a06d080bd7fd0da008912993899bc1dd9ea4e95f616df03a21946ea3c61",
+          "source_manifest.jsonl": "76d5a6640ffabbc3cf91c25f5a94284f9869ad266e621ee06f48a987d5d7c6de",
+          "split_feasibility.json": "bbc9b260fcc6fbe5580581d2ebf1ed0215997af4a144c067b3abc4ca8aa093db",
+          "split_manifest.json": "dce084ca8394f70e4f7fe4c72687bbfd95998d26e9ce43e600ef2eb8a65490b4",
+          "topology_census.json": "087e85312dbabdb4db515ee6c90ad9c79d49d6efb0324a5d608fae27f1ee12b3",
+          "topology_manifest.jsonl": "728c33d17d239dedf08eed9e014cd7e42f4b980c9bcb5b7826c67449f897d7cd",
+          "wavlm_pretraining_overlap.json": "afb046fa6c2f39170f264d470360ffc5d8797a61c03253f01fb2e2451b655990"
+        },
+        "dataset_freeze_id": "PSEM-STRATEGY-DATA-v2",
+        "dev_source_ids": [
+          "alimeeting_R1019_M1928",
+          "alimeeting_R1021_M4073",
+          "alimeeting_R8009_M8019",
+          "ami_EN2009d",
+          "ami_ES2002b",
+          "ami_ES2009a",
+          "ami_ES2009b",
+          "ami_ES2009c",
+          "ami_ES2009d",
+          "ami_ES2015d"
+        ],
+        "freeze_file_sha256": "bc7e63bb201c2a33a9b2d69b2364fed8f03839278098f0bd175d6833b330a41e",
+        "freeze_payload_sha256": "f9f1882d0de08a4fcd19e63f1da7ae022f940420863be5bbfc14d1d2a7b0f95e",
+        "role_source_counts": {
+          "PSEM-STRATEGY-DEV": 10,
+          "PSEM-STRATEGY-EVAL": 19,
+          "PSEM-STRATEGY-TRAIN": 64
+        },
+        "source_count": 93,
+        "source_ids_sha256": "9381079be4823bd894e33410e2e7270f6f00946ce03a856b24aa80e2819521c0"
+      },
+      "id": "frozen_dataset_contract",
+      "passed": true
+    },
+    {
+      "detail": {
+        "source_count": 93,
+        "waveform_identities_sha256": "9d75cfa12a9a2e1f112508bc0c5b8169f2d4eb98006ed759e30fdd1fc860bbe8"
+      },
+      "id": "all_v2_waveforms_pinned",
+      "passed": true
+    },
+    {
+      "detail": {
+        "commit": "9527b7c64846fb38316a610f32e9d3466bd6d8b7",
+        "git_object_format": "sha1",
+        "git_tree": "ef50279a5041eea70a9a77c4a03446e538cb90bf",
+        "license_ref": "LICENSE",
+        "license_sha256": "41c689784902f8341b8e8766bf43167d748218d336012e4582575e67502a9619",
+        "readme_ref": "README.md",
+        "readme_sha256": "e5789507cbf40438109cdc52e6a4c3203f9ccfcc90376b865ae967a96a9bf176",
+        "repository": "https://github.com/nttcslab-sp/diar-forced-alignment",
+        "tracked_file_count": 409
+      },
+      "id": "reference_checkout_pin",
+      "passed": true
+    },
+    {
+      "detail": {
+        "head": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+        "origin": "https://github.com/handy-computer/transcribe.cpp.git",
+        "passed": true,
+        "root": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp",
+        "tracked_dirty_paths": [
+          "src/arch/sortformer/model.cpp",
+          "src/arch/sortformer/sortformer.h",
+          "src/arch/sortformer/stream.cpp"
+        ]
+      },
+      "id": "sortformer_source_checkout_pin",
+      "passed": true
+    },
+    {
+      "detail": {
+        "head": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+        "origin": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX",
+        "passed": true,
+        "root": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo",
+        "tracked_dirty_paths": []
+      },
+      "id": "lseend_source_checkout_pin",
+      "passed": true
+    },
+    {
+      "detail": {
+        "actual_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+        "expected_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf"
+      },
+      "id": "sortformer_model_pin",
+      "passed": true
+    },
+    {
+      "detail": {
+        "actual_sha256": "06002011f39e3c709a85fa4ed3856d5b8f5d0b429f705727d0e076451f2af24f",
+        "expected_sha256": "06002011f39e3c709a85fa4ed3856d5b8f5d0b429f705727d0e076451f2af24f",
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-cpu\\bin\\Release\\transcribe-bench.exe"
+      },
+      "id": "sortformer_bench_pin",
+      "passed": true
+    },
+    {
+      "detail": {
+        "actual_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+        "expected_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\r8\\streaming_sortformer_feasibility_v1\\telemetry_patch.diff"
+      },
+      "id": "sortformer_telemetry_patch_pin",
+      "passed": true
+    },
+    {
+      "detail": {
+        "actual_sha256": "5a2b813ffe41170e40d0fc08a6eb1699e579e377af30c7962d07885608a6aa77",
+        "expected_sha256": "5a2b813ffe41170e40d0fc08a6eb1699e579e377af30c7962d07885608a6aa77",
+        "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\AMI\\ls_eend_ami_step.onnx"
+      },
+      "id": "lseend_model_pin",
+      "passed": true
+    },
+    {
+      "detail": {
+        "actual_sha256": "47f29718254995ec017636d5ff31fef8b20bf47dca30d883edcb91e022dc3353",
+        "expected_sha256": "47f29718254995ec017636d5ff31fef8b20bf47dca30d883edcb91e022dc3353",
+        "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\AMI\\ls_eend_ami_step.json"
+      },
+      "id": "lseend_sidecar_pin",
+      "passed": true
+    },
+    {
+      "detail": {
+        "artifact_sha256": {
+          "DATA_CENSUS.md": "36d0da74bcc5eb7a686ea3877faeb7e0336aba0fabffec45bf107bb2e9663cf1",
+          "REFERENCE_MIGRATION.md": "85e3cf38541b53011d0478b5b2f63a1f919005e47ff1515654cfd4b4f2d326e9",
+          "annotation_manifest.jsonl": "e2c5b917019000172b08c90d366697d3b5388c4aafbed1b23cd4b8159b6966b2",
+          "evaluator_contract.json": "ebaa6a81650c23dd66ca0e07e2522418dd44f81dc24892f1095ec8dae8f76d11",
+          "identity_components.json": "09aa1c50b7978cc780c8314cdf43af765de9e1cd74622fa4099aace52437e29f",
+          "nonlexical_risk_inventory.json": "88b9fec85ccce9297942e0bffef6ce679bb6e89f7ea17ceb758c401ddb6ce44f",
+          "normalization_manifest.jsonl": "d275962bc78d0b50aafe9c052a7bf613ed0274110e3e450e7df82b1e875e1999",
+          "operational_label_contract.json": "55a9aa10f47543067b004640367d3ee10a2ea689e1d01e0ef244a8ce0898bc95",
+          "prior_exposure_manifest.jsonl": "0daa8db197b464ac40ba6daa442cb4a97f936d5eb06d28fd3a7a38bfc8ab84e7",
+          "reference_artifact_receipt.json": "bd896219d4646e341e35377459c51c052373d74010235ea47c0615bab4358885",
+          "reference_integrity_report.json": "bc3c0a4a2158084fbf12595bdb8e59ee909bd5d92446cca2a7b63eb95d29ea54",
+          "reference_migration.jsonl": "9a1b03ee8bb3684d749a4d005dd01e4525712c1f155091eea5e3c67cd763c558",
+          "reference_migration_summary.json": "1a3c2fd4ae76fd3bd9fdad98d0716493034f1b3157e177eec0b5048653cad478",
+          "reference_provenance.json": "4d3f6a06d080bd7fd0da008912993899bc1dd9ea4e95f616df03a21946ea3c61",
+          "source_manifest.jsonl": "76d5a6640ffabbc3cf91c25f5a94284f9869ad266e621ee06f48a987d5d7c6de",
+          "split_feasibility.json": "bbc9b260fcc6fbe5580581d2ebf1ed0215997af4a144c067b3abc4ca8aa093db",
+          "split_manifest.json": "dce084ca8394f70e4f7fe4c72687bbfd95998d26e9ce43e600ef2eb8a65490b4",
+          "topology_census.json": "087e85312dbabdb4db515ee6c90ad9c79d49d6efb0324a5d608fae27f1ee12b3",
+          "topology_manifest.jsonl": "728c33d17d239dedf08eed9e014cd7e42f4b980c9bcb5b7826c67449f897d7cd",
+          "wavlm_pretraining_overlap.json": "afb046fa6c2f39170f264d470360ffc5d8797a61c03253f01fb2e2451b655990"
+        },
+        "dataset_freeze_id": "PSEM-STRATEGY-DATA-v2",
+        "dev_source_ids": [
+          "alimeeting_R1019_M1928",
+          "alimeeting_R1021_M4073",
+          "alimeeting_R8009_M8019",
+          "ami_EN2009d",
+          "ami_ES2002b",
+          "ami_ES2009a",
+          "ami_ES2009b",
+          "ami_ES2009c",
+          "ami_ES2009d",
+          "ami_ES2015d"
+        ],
+        "freeze_file_sha256": "bc7e63bb201c2a33a9b2d69b2364fed8f03839278098f0bd175d6833b330a41e",
+        "freeze_payload_sha256": "f9f1882d0de08a4fcd19e63f1da7ae022f940420863be5bbfc14d1d2a7b0f95e",
+        "role_source_counts": {
+          "PSEM-STRATEGY-DEV": 10,
+          "PSEM-STRATEGY-EVAL": 19,
+          "PSEM-STRATEGY-TRAIN": 64
+        },
+        "source_count": 93,
+        "source_ids_sha256": "9381079be4823bd894e33410e2e7270f6f00946ce03a856b24aa80e2819521c0"
+      },
+      "id": "frozen_dataset_closing_identity",
+      "passed": true
+    }
+  ],
+  "config_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\config.json",
+  "config_sha256": "0971a2879cf42f76846137c0a0db2468a043fa5921f61e7d608313fe1e449013",
+  "created_at_utc": "2026-08-25T08:43:49.330904+00:00",
+  "dataset": {
+    "artifact_sha256": {
+      "DATA_CENSUS.md": "36d0da74bcc5eb7a686ea3877faeb7e0336aba0fabffec45bf107bb2e9663cf1",
+      "REFERENCE_MIGRATION.md": "85e3cf38541b53011d0478b5b2f63a1f919005e47ff1515654cfd4b4f2d326e9",
+      "annotation_manifest.jsonl": "e2c5b917019000172b08c90d366697d3b5388c4aafbed1b23cd4b8159b6966b2",
+      "evaluator_contract.json": "ebaa6a81650c23dd66ca0e07e2522418dd44f81dc24892f1095ec8dae8f76d11",
+      "identity_components.json": "09aa1c50b7978cc780c8314cdf43af765de9e1cd74622fa4099aace52437e29f",
+      "nonlexical_risk_inventory.json": "88b9fec85ccce9297942e0bffef6ce679bb6e89f7ea17ceb758c401ddb6ce44f",
+      "normalization_manifest.jsonl": "d275962bc78d0b50aafe9c052a7bf613ed0274110e3e450e7df82b1e875e1999",
+      "operational_label_contract.json": "55a9aa10f47543067b004640367d3ee10a2ea689e1d01e0ef244a8ce0898bc95",
+      "prior_exposure_manifest.jsonl": "0daa8db197b464ac40ba6daa442cb4a97f936d5eb06d28fd3a7a38bfc8ab84e7",
+      "reference_artifact_receipt.json": "bd896219d4646e341e35377459c51c052373d74010235ea47c0615bab4358885",
+      "reference_integrity_report.json": "bc3c0a4a2158084fbf12595bdb8e59ee909bd5d92446cca2a7b63eb95d29ea54",
+      "reference_migration.jsonl": "9a1b03ee8bb3684d749a4d005dd01e4525712c1f155091eea5e3c67cd763c558",
+      "reference_migration_summary.json": "1a3c2fd4ae76fd3bd9fdad98d0716493034f1b3157e177eec0b5048653cad478",
+      "reference_provenance.json": "4d3f6a06d080bd7fd0da008912993899bc1dd9ea4e95f616df03a21946ea3c61",
+      "source_manifest.jsonl": "76d5a6640ffabbc3cf91c25f5a94284f9869ad266e621ee06f48a987d5d7c6de",
+      "split_feasibility.json": "bbc9b260fcc6fbe5580581d2ebf1ed0215997af4a144c067b3abc4ca8aa093db",
+      "split_manifest.json": "dce084ca8394f70e4f7fe4c72687bbfd95998d26e9ce43e600ef2eb8a65490b4",
+      "topology_census.json": "087e85312dbabdb4db515ee6c90ad9c79d49d6efb0324a5d608fae27f1ee12b3",
+      "topology_manifest.jsonl": "728c33d17d239dedf08eed9e014cd7e42f4b980c9bcb5b7826c67449f897d7cd",
+      "wavlm_pretraining_overlap.json": "afb046fa6c2f39170f264d470360ffc5d8797a61c03253f01fb2e2451b655990"
+    },
+    "dataset_freeze_id": "PSEM-STRATEGY-DATA-v2",
+    "dev_source_ids": [
+      "alimeeting_R1019_M1928",
+      "alimeeting_R1021_M4073",
+      "alimeeting_R8009_M8019",
+      "ami_EN2009d",
+      "ami_ES2002b",
+      "ami_ES2009a",
+      "ami_ES2009b",
+      "ami_ES2009c",
+      "ami_ES2009d",
+      "ami_ES2015d"
+    ],
+    "freeze_file_sha256": "bc7e63bb201c2a33a9b2d69b2364fed8f03839278098f0bd175d6833b330a41e",
+    "freeze_payload_sha256": "f9f1882d0de08a4fcd19e63f1da7ae022f940420863be5bbfc14d1d2a7b0f95e",
+    "role_source_counts": {
+      "PSEM-STRATEGY-DEV": 10,
+      "PSEM-STRATEGY-EVAL": 19,
+      "PSEM-STRATEGY-TRAIN": 64
+    },
+    "source_count": 93,
+    "source_ids_sha256": "9381079be4823bd894e33410e2e7270f6f00946ce03a856b24aa80e2819521c0"
+  },
+  "environment": {
+    "logical_cpu_count": 16,
+    "numpy": "2.5.1",
+    "onnxruntime": "1.28.0",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]"
+  },
+  "eval_status": "sealed",
+  "git": {
+    "dirty": true,
+    "dirty_paths": [
+      "M experiments/psem_relative_occupancy_gate/BASELINE.md",
+      " M experiments/psem_relative_occupancy_gate/EVALUATOR.md",
+      " M experiments/psem_relative_occupancy_gate/ONTOLOGY.md",
+      " M experiments/psem_relative_occupancy_gate/README.md",
+      " M experiments/psem_relative_occupancy_gate/config.json",
+      " M experiments/psem_relative_occupancy_gate/contracts.py",
+      " M experiments/psem_relative_occupancy_gate/decoder.py",
+      " M experiments/psem_relative_occupancy_gate/derive_relative_occupancy.py",
+      " M experiments/psem_relative_occupancy_gate/evaluate.py",
+      " M experiments/psem_relative_occupancy_gate/io_utils.py",
+      " M experiments/psem_relative_occupancy_gate/preflight.py",
+      " M experiments/psem_relative_occupancy_gate/results/dev/gate0_oracle_events.jsonl",
+      " M experiments/psem_relative_occupancy_gate/results/dev/gate0_oracle_metrics.json",
+      " M experiments/psem_relative_occupancy_gate/results/dev/gate0_topology_examples.jsonl",
+      " M experiments/psem_relative_occupancy_gate/results/dev/gate0_verification.json",
+      " M experiments/psem_relative_occupancy_gate/results/dev/preflight_receipt.json",
+      " M experiments/psem_relative_occupancy_gate/results/dev/relative_occupancy_manifest.jsonl",
+      " M experiments/psem_relative_occupancy_gate/run_gate0.py",
+      " M experiments/psem_relative_occupancy_gate/tests/test_ontology_decoder.py",
+      " M experiments/psem_relative_occupancy_gate/tests/test_timestamps_metrics.py",
+      " M experiments/psem_relative_occupancy_gate/verify_gate0.py",
+      "?? experiments/psem_relative_occupancy_gate/provenance.py",
+      "?? experiments/psem_relative_occupancy_gate/tests/test_provenance_sealing.py"
+    ],
+    "head": "d1bb0947d406acdf106ec8ef9e37d9fc3a51827d",
+    "role": "informational_not_acceptance_binding"
+  },
+  "model_source_checkouts": {
+    "lseend": {
+      "head": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+      "origin": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX",
+      "passed": true,
+      "root": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo",
+      "tracked_dirty_paths": []
+    },
+    "sortformer": {
+      "head": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "origin": "https://github.com/handy-computer/transcribe.cpp.git",
+      "passed": true,
+      "root": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp",
+      "tracked_dirty_paths": [
+        "src/arch/sortformer/model.cpp",
+        "src/arch/sortformer/sortformer.h",
+        "src/arch/sortformer/stream.cpp"
+      ]
+    }
+  },
+  "passed": true,
+  "paths": {
+    "corpus_root": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora",
+    "lseend_model": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\AMI\\ls_eend_ami_step.onnx",
+    "lseend_root": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo",
+    "lseend_sidecar": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\AMI\\ls_eend_ami_step.json",
+    "reference_root": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\psem-relative-occupancy\\diar-forced-alignment",
+    "research_root": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1",
+    "sortformer_bench": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-cpu\\bin\\Release\\transcribe-bench.exe",
+    "sortformer_checkout": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp",
+    "sortformer_model": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+    "sortformer_patch": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\r8\\streaming_sortformer_feasibility_v1\\telemetry_patch.diff"
+  },
+  "reference_receipt": {
+    "commit": "9527b7c64846fb38316a610f32e9d3466bd6d8b7",
+    "git_object_format": "sha1",
+    "git_tree": "ef50279a5041eea70a9a77c4a03446e538cb90bf",
+    "license_ref": "LICENSE",
+    "license_sha256": "41c689784902f8341b8e8766bf43167d748218d336012e4582575e67502a9619",
+    "readme_ref": "README.md",
+    "readme_sha256": "e5789507cbf40438109cdc52e6a4c3203f9ccfcc90376b865ae967a96a9bf176",
+    "repository": "https://github.com/nttcslab-sp/diar-forced-alignment",
+    "tracked_file_count": 409
+  },
+  "schema_version": "psem.relative_occupancy.preflight.v1"
+}
