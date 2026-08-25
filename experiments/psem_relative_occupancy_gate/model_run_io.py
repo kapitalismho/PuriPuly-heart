@@ -12,6 +12,12 @@ from experiments.psem_relative_occupancy_gate.io_utils import (
     sha256_file,
     strict_regular_file,
 )
+from experiments.psem_relative_occupancy_gate.run_sortformer_trace import (
+    SORTFORMER_CHUNK_FRAMES,
+    SortformerTraceError,
+    sortformer_inference_audio_geometry,
+    validate_sortformer_telemetry_receipt,
+)
 from experiments.psem_relative_occupancy_gate.trace_io import validate_trace_receipt
 from experiments.psem_relative_occupancy_gate.trace_runtime import (
     TraceRuntimeError,
@@ -50,14 +56,14 @@ def _sortformer_inference_audio(
     path = strict_regular_file(
         Path(str(binding.get("path", ""))), "Sortformer inference audio"
     )
+    geometry = sortformer_inference_audio_geometry(source_duration_samples)
     expected = {
         "path": str(path),
         "sha256": sha256_file(path),
         "size_bytes": path.stat().st_size,
-        "sample_count": source_duration_samples,
+        **geometry,
         "source_start_sample": 0,
         "source_end_sample": source_duration_samples,
-        "materialization": "exact_pcm16_mono_16khz_frozen_source_window",
     }
     if binding != expected or inference.get("audio") != binding:
         raise ModelRunError("Sortformer inference audio binding mismatch")
@@ -227,6 +233,13 @@ def load_model_traces(
                 Path(str(inference.get("bench_path", ""))) if isinstance(inference, dict) else Path(),
                 "Sortformer raw bench receipt",
             )
+            telemetry_receipt = source_receipt.get("telemetry")
+            telemetry_path = strict_regular_file(
+                Path(str(telemetry_receipt.get("path", "")))
+                if isinstance(telemetry_receipt, dict)
+                else Path(),
+                "Sortformer telemetry",
+            )
             inferred_research_root = _root_before_suffix(
                 bench_path, family_config["bench_relative_path"]
             )
@@ -234,6 +247,8 @@ def load_model_traces(
                 not backend_resolution_matches(family_config["backend"], resolved_backend)
                 or not isinstance(bench, dict)
                 or bench.get("backend") != resolved_backend
+                or bench.get("iters") != 1
+                or bench.get("warmup") != 0
                 or inference.get("backend_resolved") != resolved_backend
                 or sha256_file(bench_path) != family_config["bench_sha256"]
                 or sha256_file(model_path) != family_config["model_sha256"]
@@ -247,6 +262,10 @@ def load_model_traces(
                 or load_json(raw_bench_path) != bench
                 or bench.get("model_path") != str(model_path)
                 or bench.get("sample_path") != str(inference_audio_path)
+                or inference.get("raw_probability_frame_count")
+                != inference_audio["native_frame_count"]
+                or inference.get("retained_probability_frame_count")
+                != inference_audio["retained_frame_count"]
                 or inference.get("command")
                 != [
                     str(bench_path),
@@ -307,6 +326,10 @@ def load_model_traces(
                 trace_path.parent / "run" / "bench.json"
             ):
                 raise TraceRuntimeError("Sortformer raw bench receipt root mismatch")
+            if family == "streaming_sortformer" and telemetry_path != (
+                trace_path.parent / "run" / "telemetry.jsonl"
+            ):
+                raise TraceRuntimeError("Sortformer telemetry root mismatch")
             if family == "streaming_sortformer" and inference_audio_path != (
                 trace_path.parent / "input.wav"
             ):
@@ -317,13 +340,20 @@ def load_model_traces(
                 or inferred_research_root not in trace_root.parents
             ):
                 raise TraceRuntimeError("posterior trace root is outside the research root")
+            if family == "streaming_sortformer":
+                validate_sortformer_telemetry_receipt(
+                    telemetry_path,
+                    telemetry_receipt,
+                    expected_chunks=int(inference_audio["native_frame_count"])
+                    // SORTFORMER_CHUNK_FRAMES,
+                )
             validate_full_trace_geometry(
                 trace,
                 family=family,
                 source_start_sample=0,
                 source_end_sample=int(row["source_duration_samples"]),
             )
-        except TraceRuntimeError as exc:
+        except (SortformerTraceError, TraceRuntimeError) as exc:
             raise ModelRunError(f"model trace coverage mismatch: {family}:{source_id}") from exc
         trace_roots.add(trace_path.parents[4])
         expected_metadata = {
@@ -357,6 +387,18 @@ def load_model_traces(
                     "inference_audio_path": inference_audio["path"],
                     "inference_audio_sha256": inference_audio["sha256"],
                     "inference_audio_sample_count": inference_audio["sample_count"],
+                    "inference_audio_source_sample_count": inference_audio[
+                        "source_sample_count"
+                    ],
+                    "inference_audio_trailing_zero_sample_count": inference_audio[
+                        "trailing_zero_sample_count"
+                    ],
+                    "inference_audio_native_frame_count": inference_audio[
+                        "native_frame_count"
+                    ],
+                    "inference_audio_retained_frame_count": inference_audio[
+                        "retained_frame_count"
+                    ],
                     "inference_audio_materialization": inference_audio[
                         "materialization"
                     ],

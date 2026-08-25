@@ -8,6 +8,7 @@ import pytest
 
 from experiments.psem_relative_occupancy_gate import (
     authorize_eval,
+    authorize_eval_recovery,
     derive_relative_occupancy,
     eval_access,
     preflight,
@@ -27,6 +28,7 @@ from experiments.psem_relative_occupancy_gate.io_utils import (
     ExperimentError,
     canonical_sha256,
     data_dir,
+    load_json,
     safe_child,
     safe_output_path,
     sha256_file,
@@ -306,14 +308,27 @@ def test_eval_recovery_accepts_only_bound_same_manifest_commit(
         },
     }
     recovery["recovery_sha256"] = canonical_sha256(recovery)
-    write_json(eval_access.recovery_receipt_path(authorization_path), recovery)
+    recovery_path = eval_access.recovery_receipt_path(authorization_path)
+    write_json(recovery_path, recovery)
     observed_overrides: list[dict[str, dict[str, str]] | None] = []
     monkeypatch.setattr(eval_access, "PACKAGE_ROOT", package)
     monkeypatch.setattr(eval_access, "CONFIG_PATH", config_path)
     monkeypatch.setattr(eval_access, "EVAL_RECOVERY_ALLOWED_PATHS", {relative_path})
     monkeypatch.setattr(eval_access, "EVAL_RECOVERY_REQUIRED_PATHS", {relative_path})
+    monkeypatch.setattr(eval_access, "EVAL_RECOVERY_ACCEPTED_C3_HEAD", "b" * 40)
+    monkeypatch.setattr(
+        eval_access,
+        "EVAL_RECOVERY_ACCEPTED_C3_SHA256",
+        recovery["recovery_sha256"],
+    )
+    monkeypatch.setattr(
+        eval_access,
+        "EVAL_RECOVERY_ACCEPTED_C3_FILE_SHA256",
+        sha256_file(recovery_path),
+    )
     monkeypatch.setattr(eval_access, "_current_head", lambda: "b" * 40)
     monkeypatch.setattr(eval_access, "_tracked_worktree_is_clean", lambda _root: True)
+    monkeypatch.setattr(eval_access, "_git_is_direct_child", lambda _base, _head: True)
     monkeypatch.setattr(eval_access, "_git_is_ancestor", lambda _base, _head: True)
     monkeypatch.setattr(
         eval_access, "_git_changed_paths", lambda _base, _head: {relative_path}
@@ -321,7 +336,7 @@ def test_eval_recovery_accepts_only_bound_same_manifest_commit(
     monkeypatch.setattr(
         eval_access,
         "_git_file_sha256",
-        lambda _head, _path: before_hash,
+        lambda head, _path: after_hash if head == "b" * 40 else before_hash,
     )
     monkeypatch.setattr(
         eval_access,
@@ -350,13 +365,122 @@ def test_eval_recovery_accepts_only_bound_same_manifest_commit(
         )
     monkeypatch.setattr(eval_access, "_current_head", lambda: "b" * 40)
     monkeypatch.setattr(eval_access, "_git_is_ancestor", lambda _base, _head: False)
-    with pytest.raises(EvalAccessError, match="recovery binding mismatch"):
+    with pytest.raises(EvalAccessError, match="recovery ancestry mismatch"):
         eval_access.load_eval_authorization(
             authorization_path,
             selection_path=selection_path,
             selection=selection,
             manifest_output=manifest_path,
         )
+
+
+def test_eval_recovery_extension_binds_prior_recovery_chain(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    authorization_path = tmp_path / "eval_authorization.json"
+    selection_path = tmp_path / "selection.json"
+    manifest_path = tmp_path / "eval_manifest.jsonl"
+    access_path = eval_access.access_receipt_path(manifest_path)
+    claim_path = eval_access.consumption_receipt_path(authorization_path)
+    prior_path = eval_access.recovery_receipt_path(authorization_path)
+    extension_path = eval_access.recovery_extension_receipt_path(authorization_path)
+    for path, value in (
+        (authorization_path, {"authorization": True}),
+        (selection_path, {"selection": True}),
+        (manifest_path, {"manifest": True}),
+        (access_path, {"access": True}),
+        (claim_path, {"claim": True}),
+        (prior_path, {"prior": True}),
+    ):
+        write_json(path, value)
+    authorization = {
+        "accepted_c2_head": "a" * 40,
+        "authorization_sha256": "authorization",
+    }
+    selection = {"selection_sha256": "selection"}
+    prior = {
+        "recovery_head": "b" * 40,
+        "recovery_sha256": "prior-recovery",
+    }
+    extension = {
+        **eval_access._recovery_expected(
+            authorization_path=authorization_path,
+            authorization=authorization,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_path,
+        ),
+        "schema_version": eval_access.EVAL_RECOVERY_EXTENSION_SCHEMA_VERSION,
+        "recovery_reason": eval_access.EVAL_RECOVERY_EXTENSION_REASON,
+        "recovery_head": "c" * 40,
+        "recovery_sequence": 2,
+        "prior_recovery_path": str(prior_path),
+        "prior_recovery_file_sha256": sha256_file(prior_path),
+        "prior_recovery_sha256": prior["recovery_sha256"],
+        "prior_recovery_head": prior["recovery_head"],
+        "prior_recovery_result": "failed_before_eval_aggregate",
+        "failed_family": "streaming_sortformer",
+        "failed_source_id": "alimeeting_R1021_M1940",
+        "completed_sortformer_source_count": 2,
+        "lseend_started": False,
+        "changed_files": {"contract.py": {}},
+        "contract_overrides": {},
+    }
+    extension["recovery_sha256"] = canonical_sha256(extension)
+    write_json(extension_path, extension)
+    overrides = {"contract.py": {"before_sha256": "1", "after_sha256": "2"}}
+    monkeypatch.setattr(
+        eval_access,
+        "_load_eval_recovery_history",
+        lambda *_args, **_kwargs: prior,
+    )
+    monkeypatch.setattr(eval_access, "_current_head", lambda: "c" * 40)
+    monkeypatch.setattr(eval_access, "_tracked_worktree_is_clean", lambda _root: True)
+    monkeypatch.setattr(eval_access, "_git_is_direct_child", lambda _base, _head: True)
+    monkeypatch.setattr(
+        eval_access,
+        "_git_is_ancestor",
+        lambda base, head: (base, head) == ("b" * 40, "c" * 40),
+    )
+    monkeypatch.setattr(
+        eval_access,
+        "_validate_recovery_file_set",
+        lambda *_args, **_kwargs: overrides,
+    )
+    assert (
+        eval_access._load_eval_recovery_extension(
+            authorization_path,
+            authorization=authorization,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_path,
+        )
+        == overrides
+    )
+    extension["prior_recovery_sha256"] = "tampered"
+    extension.pop("recovery_sha256")
+    extension["recovery_sha256"] = canonical_sha256(extension)
+    write_json(extension_path, extension)
+    with pytest.raises(EvalAccessError, match="extension binding mismatch"):
+        eval_access._load_eval_recovery_extension(
+            authorization_path,
+            authorization=authorization,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_path,
+        )
+
+
+def test_eval_recovery_exclusive_creation_rejects_existing_file(tmp_path: Path) -> None:
+    path = tmp_path / "recovery.json"
+    authorize_eval_recovery._write_json_exclusive(path, {"sequence": 2})
+    assert load_json(path) == {"sequence": 2}
+    with pytest.raises(
+        authorize_eval_recovery.EvalRecoveryAuthorizationError,
+        match="already exists",
+    ):
+        authorize_eval_recovery._write_json_exclusive(path, {"sequence": 3})
+    assert load_json(path) == {"sequence": 2}
 
 
 def test_eval_recovery_cleanliness_whitelists_only_eval_outputs(

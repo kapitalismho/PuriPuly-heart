@@ -1,23 +1,29 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 from pathlib import Path
 from typing import Any
 
 from experiments.psem_relative_occupancy_gate.eval_access import (
+    EVAL_RECOVERY_ACCEPTED_C3_HEAD,
     EVAL_RECOVERY_ALLOWED_PATHS,
-    EVAL_RECOVERY_REASON,
+    EVAL_RECOVERY_EXTENSION_REASON,
+    EVAL_RECOVERY_EXTENSION_SCHEMA_VERSION,
     EVAL_RECOVERY_REQUIRED_PATHS,
-    EVAL_RECOVERY_SCHEMA_VERSION,
     EvalAccessError,
     _current_head,
     _git_changed_paths,
     _git_file_sha256,
     _git_is_ancestor,
+    _git_is_direct_child,
+    _load_eval_recovery_history,
     _tracked_worktree_is_clean,
     access_receipt_path,
     consumption_receipt_path,
     load_frozen_selection,
+    recovery_extension_receipt_path,
     recovery_receipt_path,
     validate_frozen_selection_bindings,
 )
@@ -29,7 +35,6 @@ from experiments.psem_relative_occupancy_gate.io_utils import (
     load_jsonl,
     safe_output_path,
     sha256_file,
-    write_json,
 )
 from experiments.psem_relative_occupancy_gate.provenance import load_frozen_dataset
 
@@ -52,6 +57,17 @@ def _load_canonical(path: Path, hash_field: str, label: str) -> dict[str, Any]:
 def _validate_ancestor(base: str, head: str) -> None:
     if not _git_is_ancestor(base, head):
         raise EvalRecoveryAuthorizationError("recovery head does not descend from accepted C2")
+
+
+def _write_json_exclusive(path: Path, value: dict[str, Any]) -> None:
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+    except FileExistsError as exc:
+        raise EvalRecoveryAuthorizationError(
+            "EVAL recovery authorization already exists"
+        ) from exc
+    with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
 
 
 def _validate_manifest(
@@ -159,10 +175,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     output = safe_output_path(Path(args.output))
     if access_path != access_receipt_path(manifest_path):
         raise EvalRecoveryAuthorizationError("EVAL access receipt path is not canonical")
-    if output != recovery_receipt_path(authorization_path):
+    prior_recovery_path = recovery_receipt_path(authorization_path)
+    expected_output = recovery_extension_receipt_path(authorization_path)
+    if output != expected_output:
         raise EvalRecoveryAuthorizationError("EVAL recovery output path is not canonical")
-    if output.exists():
-        raise EvalRecoveryAuthorizationError("EVAL recovery authorization already exists")
+    if not prior_recovery_path.is_file():
+        raise EvalRecoveryAuthorizationError("prior EVAL recovery receipt is missing")
     selection = load_frozen_selection(selection_path)
     authorization = _load_canonical(
         authorization_path, "authorization_sha256", "EVAL authorization"
@@ -182,12 +200,28 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         for field, expected_value in expected_authorization.items()
     ):
         raise EvalRecoveryAuthorizationError("original EVAL authorization binding changed")
+    try:
+        prior_recovery = _load_eval_recovery_history(
+            authorization_path,
+            authorization=authorization,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_path,
+        )
+    except EvalAccessError as exc:
+        raise EvalRecoveryAuthorizationError(
+            "prior EVAL recovery binding changed"
+        ) from exc
     recovery_head = _current_head()
     if recovery_head == args.accepted_c2_head or not _tracked_worktree_is_clean(
         manifest_path.parent
     ):
         raise EvalRecoveryAuthorizationError("recovery candidate is not an exact clean commit")
     _validate_ancestor(args.accepted_c2_head, recovery_head)
+    if not _git_is_direct_child(EVAL_RECOVERY_ACCEPTED_C3_HEAD, recovery_head):
+        raise EvalRecoveryAuthorizationError(
+            "recovery head is not the direct C4 child of accepted C3"
+        )
     changed_paths = _git_changed_paths(args.accepted_c2_head, recovery_head)
     if (
         not EVAL_RECOVERY_REQUIRED_PATHS <= changed_paths
@@ -240,10 +274,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "after_sha256": sha256_file(current_path),
         }
     payload: dict[str, Any] = {
-        "schema_version": EVAL_RECOVERY_SCHEMA_VERSION,
+        "schema_version": EVAL_RECOVERY_EXTENSION_SCHEMA_VERSION,
         "role": "PSEM-STRATEGY-EVAL",
         "recovery_state": "authorized_for_same_opened_manifest_resume",
-        "recovery_reason": EVAL_RECOVERY_REASON,
+        "recovery_reason": EVAL_RECOVERY_EXTENSION_REASON,
         "accepted_c2_head": args.accepted_c2_head,
         "recovery_head": recovery_head,
         "authorization_sha256": authorization["authorization_sha256"],
@@ -261,9 +295,19 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "prior_eval_aggregate_count": 0,
         "changed_files": changed_files,
         "contract_overrides": contract_overrides,
+        "recovery_sequence": 2,
+        "prior_recovery_path": str(prior_recovery_path),
+        "prior_recovery_file_sha256": sha256_file(prior_recovery_path),
+        "prior_recovery_sha256": prior_recovery["recovery_sha256"],
+        "prior_recovery_head": prior_recovery["recovery_head"],
+        "prior_recovery_result": "failed_before_eval_aggregate",
+        "failed_family": "streaming_sortformer",
+        "failed_source_id": "alimeeting_R1021_M1940",
+        "completed_sortformer_source_count": 2,
+        "lseend_started": False,
     }
     payload["recovery_sha256"] = canonical_sha256(payload)
-    write_json(output, payload)
+    _write_json_exclusive(output, payload)
     return payload
 
 

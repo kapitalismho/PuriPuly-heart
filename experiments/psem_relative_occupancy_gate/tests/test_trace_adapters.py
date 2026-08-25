@@ -11,7 +11,11 @@ import experiments.psem_relative_occupancy_gate.run_lseend_trace as lseend_modul
 import experiments.psem_relative_occupancy_gate.run_sortformer_trace as sortformer_module
 from experiments.psem_relative_occupancy_gate import model_run_io
 from experiments.psem_relative_occupancy_gate.contracts import Trace
-from experiments.psem_relative_occupancy_gate.io_utils import sha256_file, write_json
+from experiments.psem_relative_occupancy_gate.io_utils import (
+    sha256_file,
+    write_json,
+    write_jsonl,
+)
 from experiments.psem_relative_occupancy_gate.run_lseend_trace import (
     LSEENDTraceError,
     lseend_frame_geometry,
@@ -171,7 +175,7 @@ def test_sortformer_geometry_uses_scalar_chunk_frontier() -> None:
     assert frontiers[-1] == 41000
 
 
-def test_sortformer_materializes_exact_frozen_source_window(tmp_path: Path) -> None:
+def test_sortformer_materializes_frozen_source_with_zero_flush(tmp_path: Path) -> None:
     source = tmp_path / "source.wav"
     samples = np.arange(4000, dtype=np.int16)
     with wave.open(str(source), "wb") as writer:
@@ -188,11 +192,44 @@ def test_sortformer_materializes_exact_frozen_source_window(tmp_path: Path) -> N
     )
     with wave.open(str(path), "rb") as reader:
         observed = np.frombuffer(reader.readframes(reader.getnframes()), dtype=np.int16)
-        assert reader.getnframes() == 3200
-    np.testing.assert_array_equal(observed, samples[:3200])
-    assert receipt["sample_count"] == 3200
+        assert reader.getnframes() == 15360
+    np.testing.assert_array_equal(observed[:3200], samples[:3200])
+    np.testing.assert_array_equal(observed[3200:], np.zeros(12160, dtype=np.int16))
+    assert receipt["sample_count"] == 15360
+    assert receipt["source_sample_count"] == 3200
+    assert receipt["trailing_zero_sample_count"] == 12160
+    assert receipt["native_mel_frame_count"] == 96
+    assert receipt["native_frame_count"] == 12
+    assert receipt["retained_frame_count"] == 3
     assert receipt["source_end_sample"] == 3200
-    assert receipt["materialization"] == "exact_pcm16_mono_16khz_frozen_source_window"
+    assert receipt["materialization"] == sortformer_module.INFERENCE_AUDIO_MATERIALIZATION
+
+
+def test_sortformer_failed_eval_source_zero_flush_geometry() -> None:
+    geometry = sortformer_module.sortformer_inference_audio_geometry(28_329_539)
+    assert geometry == {
+        "sample_count": 28_339_200,
+        "source_sample_count": 28_329_539,
+        "trailing_zero_sample_count": 9_661,
+        "source_mel_frame_count": 177_060,
+        "native_mel_frame_count": 177_120,
+        "retained_frame_count": 22_133,
+        "native_frame_count": 22_140,
+        "materialization": sortformer_module.INFERENCE_AUDIO_MATERIALIZATION,
+    }
+
+
+def test_sortformer_retains_only_frozen_source_probability_frames() -> None:
+    geometry = sortformer_module.sortformer_inference_audio_geometry(3200)
+    raw = np.arange(48, dtype=np.float32).reshape(12, 4)
+    retained = sortformer_module._retain_source_probabilities(raw, geometry)
+    np.testing.assert_array_equal(retained, raw[:3])
+    assert not np.shares_memory(retained, raw)
+    with pytest.raises(
+        sortformer_module.SortformerTraceError,
+        match="native probability frame count mismatch",
+    ):
+        sortformer_module._retain_source_probabilities(raw[:-1], geometry)
 
 
 def test_sortformer_resume_rejects_missing_or_changed_materialized_input(
@@ -217,42 +254,73 @@ def test_sortformer_resume_rejects_missing_or_changed_materialized_input(
     audio_path.unlink()
     with pytest.raises(sortformer_module.SortformerTraceError, match="audio is invalid"):
         sortformer_module._load_resume_inference_audio(receipt_path, audio_path, 0, 3200)
+    audio_path, _ = sortformer_module._materialize_inference_audio(
+        source_root,
+        {"audio_path": str(source), "source_duration_samples": 3200},
+        0,
+        3200,
+    )
+    with wave.open(str(audio_path), "rb") as reader:
+        changed = np.frombuffer(
+            reader.readframes(reader.getnframes()), dtype=np.int16
+        ).copy()
+    changed[0] += 1
     with wave.open(str(audio_path), "wb") as writer:
         writer.setnchannels(1)
         writer.setsampwidth(2)
         writer.setframerate(16000)
-        writer.writeframes((samples[:3200] + 1).tobytes())
+        writer.writeframes(changed.tobytes())
     with pytest.raises(sortformer_module.SortformerTraceError, match="binding mismatch"):
         sortformer_module._load_resume_inference_audio(receipt_path, audio_path, 0, 3200)
 
 
+def test_sortformer_resume_reruns_legacy_materialization(tmp_path: Path) -> None:
+    receipt_path = tmp_path / "receipt.json"
+    write_json(
+        receipt_path,
+        {
+            "inference_audio": {
+                "materialization": "exact_pcm16_mono_16khz_frozen_source_window"
+            }
+        },
+    )
+    assert (
+        sortformer_module._load_resume_inference_audio(
+            receipt_path, tmp_path / "missing.wav", 0, 3200
+        )
+        is None
+    )
+
+
 def test_model_run_io_binds_sortformer_materialized_input(tmp_path: Path) -> None:
-    audio_path = tmp_path / "input.wav"
+    source_path = tmp_path / "source.wav"
     samples = np.arange(3200, dtype=np.int16)
-    with wave.open(str(audio_path), "wb") as writer:
+    with wave.open(str(source_path), "wb") as writer:
         writer.setnchannels(1)
         writer.setsampwidth(2)
         writer.setframerate(16000)
         writer.writeframes(samples.tobytes())
-    binding = {
-        "path": str(audio_path.resolve()),
-        "sha256": sha256_file(audio_path),
-        "size_bytes": audio_path.stat().st_size,
-        "sample_count": 3200,
-        "source_start_sample": 0,
-        "source_end_sample": 3200,
-        "materialization": "exact_pcm16_mono_16khz_frozen_source_window",
-    }
+    audio_path, binding = sortformer_module._materialize_inference_audio(
+        tmp_path / "trace",
+        {"audio_path": str(source_path), "source_duration_samples": 3200},
+        0,
+        3200,
+    )
     observed_path, observed_binding = model_run_io._sortformer_inference_audio(
         {"inference_audio": binding}, {"audio": binding}, 3200
     )
     assert observed_path == audio_path.resolve()
     assert observed_binding == binding
+    with wave.open(str(audio_path), "rb") as reader:
+        changed = np.frombuffer(
+            reader.readframes(reader.getnframes()), dtype=np.int16
+        ).copy()
+    changed[0] += 1
     with wave.open(str(audio_path), "wb") as writer:
         writer.setnchannels(1)
         writer.setsampwidth(2)
         writer.setframerate(16000)
-        writer.writeframes((samples + 1).tobytes())
+        writer.writeframes(changed.tobytes())
     with pytest.raises(model_run_io.ModelRunError, match="binding mismatch"):
         model_run_io._sortformer_inference_audio(
             {"inference_audio": binding}, {"audio": binding}, 3200
@@ -335,19 +403,48 @@ def test_sortformer_resume_rejects_backend_drift(
     raw_bench_path = source_root / "run" / "bench.json"
     bench_receipt = {
         "backend": "Vulkan0",
+        "iters": 1,
         "model_path": str(model_path.resolve()),
         "sample_path": str(audio_path.resolve()),
+        "warmup": 0,
     }
     write_json(raw_bench_path, bench_receipt)
+    telemetry_path = source_root / "run" / "telemetry.jsonl"
+    telemetry_rows = [
+        {
+            "chunk_index": index,
+            "pre_encode_us": 0,
+            "infer_us": 0,
+            "update_us": 0,
+            "compression_called": False,
+            "compression_us": 0,
+            "total_us": 1000,
+            "new_audio_frames": 6,
+        }
+        for index in range(2)
+    ]
+    write_jsonl(telemetry_path, telemetry_rows)
+    telemetry_receipt = {
+        "path": str(telemetry_path.resolve()),
+        "sha256": "code",
+        "chunk_count": 2,
+        "chunk_compute_ms": {
+            "p50": 1.0,
+            "p90": 1.0,
+            "p99": 1.0,
+            "maximum": 1.0,
+            "sum": 2.0,
+        },
+        "compression_call_count": 0,
+    }
     row["audio_path"] = str(waveform_path.resolve())
     inference_audio = {
         "path": str(audio_path.resolve()),
         "sha256": "code",
         "size_bytes": 7,
-        "sample_count": 3200,
+        **sortformer_module.sortformer_inference_audio_geometry(3200),
         "source_start_sample": 0,
         "source_end_sample": 3200,
-        "materialization": "exact_pcm16_mono_16khz_frozen_source_window",
     }
     metadata = {
         "source_id": "source",
@@ -357,8 +454,16 @@ def test_sortformer_resume_rejects_backend_drift(
         "waveform_sha256": "waveform",
         "inference_audio_path": str(audio_path.resolve()),
         "inference_audio_sha256": "code",
-        "inference_audio_sample_count": 3200,
-        "inference_audio_materialization": "exact_pcm16_mono_16khz_frozen_source_window",
+        "inference_audio_sample_count": inference_audio["sample_count"],
+        "inference_audio_source_sample_count": 3200,
+        "inference_audio_trailing_zero_sample_count": inference_audio[
+            "trailing_zero_sample_count"
+        ],
+        "inference_audio_native_frame_count": inference_audio["native_frame_count"],
+        "inference_audio_retained_frame_count": inference_audio[
+            "retained_frame_count"
+        ],
+        "inference_audio_materialization": sortformer_module.INFERENCE_AUDIO_MATERIALIZATION,
         "source_start_sample": 0,
         "source_end_sample": 3200,
         "model_sha256": "model",
@@ -403,6 +508,10 @@ def test_sortformer_resume_rejects_backend_drift(
         "inference": {
             "backend_resolved": "Vulkan0",
             "audio": inference_audio,
+            "raw_probability_frame_count": inference_audio["native_frame_count"],
+            "retained_probability_frame_count": inference_audio[
+                "retained_frame_count"
+            ],
             "bench": bench_receipt,
             "bench_path": str(raw_bench_path.resolve()),
             "bench_sha256": "code",
@@ -424,6 +533,7 @@ def test_sortformer_resume_rejects_backend_drift(
                 str(raw_bench_path.resolve()),
             ],
         },
+        "telemetry": telemetry_receipt,
         "trace": {"trace_path": str(trace_path)},
     }
     receipt_path = tmp_path / "sortformer-receipt.json"
@@ -467,6 +577,22 @@ def test_sortformer_resume_rejects_backend_drift(
         is None
     )
     write_json(raw_bench_path, bench_receipt)
+    telemetry_path.unlink()
+    assert (
+        sortformer_module._resume_receipt(
+            receipt_path,
+            row=row,
+            source_start_sample=0,
+            source_end_sample=3200,
+            source_root=source_root,
+            bench=bench_path.resolve(),
+            model=model_path.resolve(),
+            audio=audio_path.resolve(),
+            inference_audio=inference_audio,
+        )
+        is None
+    )
+    write_jsonl(telemetry_path, telemetry_rows)
     receipt["backend_resolved"] = "CPU"
     receipt["inference"]["backend_resolved"] = "CPU"
     receipt["inference"]["bench"]["backend"] = "CPU"

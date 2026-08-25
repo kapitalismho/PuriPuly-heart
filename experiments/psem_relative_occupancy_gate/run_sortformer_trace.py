@@ -42,7 +42,7 @@ from experiments.psem_relative_occupancy_gate.trace_runtime import (
     trace_run_key,
     validate_full_trace_geometry,
     validate_trace_location,
-    write_waveform_slice,
+    waveform_slice,
 )
 
 SORTFORMER_FAMILY = "streaming_sortformer"
@@ -54,6 +54,9 @@ SORTFORMER_SUBSAMPLING = 8
 SORTFORMER_WINDOW_SAMPLES = 400
 SORTFORMER_STFT_RIGHT_SAMPLES = SORTFORMER_WINDOW_SAMPLES // 2
 SLOT_IDS = ("slot-0", "slot-1", "slot-2", "slot-3")
+INFERENCE_AUDIO_MATERIALIZATION = (
+    "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk"
+)
 
 
 class SortformerTraceError(RuntimeError):
@@ -203,6 +206,18 @@ def _trace(
         "inference_audio_path": inference_audio["path"],
         "inference_audio_sha256": inference_audio["sha256"],
         "inference_audio_sample_count": inference_audio["sample_count"],
+        "inference_audio_source_sample_count": inference_audio[
+            "source_sample_count"
+        ],
+        "inference_audio_trailing_zero_sample_count": inference_audio[
+            "trailing_zero_sample_count"
+        ],
+        "inference_audio_native_frame_count": inference_audio[
+            "native_frame_count"
+        ],
+        "inference_audio_retained_frame_count": inference_audio[
+            "retained_frame_count"
+        ],
         "inference_audio_materialization": inference_audio["materialization"],
         "source_start_sample": source_start_sample,
         "source_end_sample": source_end_sample,
@@ -275,6 +290,25 @@ def _telemetry_summary(
     }
 
 
+def validate_sortformer_telemetry_receipt(
+    path: Path,
+    receipt: Any,
+    *,
+    expected_chunks: int,
+) -> dict[str, Any]:
+    try:
+        path = strict_regular_file(path, "Sortformer telemetry")
+        runs = _telemetry_runs(_telemetry_rows(path))
+    except ExperimentError as exc:
+        raise SortformerTraceError("Sortformer telemetry receipt is invalid") from exc
+    if len(runs) != 1:
+        raise SortformerTraceError("Sortformer telemetry does not contain exactly one run")
+    observed = _telemetry_summary(path, runs[0], expected_chunks)
+    if not isinstance(receipt, dict) or receipt != observed:
+        raise SortformerTraceError("Sortformer telemetry receipt binding mismatch")
+    return observed
+
+
 def _materialize_inference_audio(
     source_root: Path,
     row: dict[str, Any],
@@ -282,13 +316,59 @@ def _materialize_inference_audio(
     source_end_sample: int,
 ) -> tuple[Path, dict[str, Any]]:
     path = source_root / "input.wav"
-    write_waveform_slice(path, row, source_start_sample, source_end_sample)
+    geometry = sortformer_inference_audio_geometry(
+        source_end_sample - source_start_sample
+    )
+    payload = waveform_slice(row, source_start_sample, source_end_sample)
+    if len(payload) != geometry["source_sample_count"] * 2:
+        raise SortformerTraceError("Sortformer source audio geometry is invalid")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(path), "wb") as writer:
+        writer.setnchannels(1)
+        writer.setsampwidth(2)
+        writer.setframerate(16000)
+        writer.writeframesraw(payload)
+        writer.writeframes(bytes(geometry["trailing_zero_sample_count"] * 2))
     return path, _inspect_inference_audio(path, source_start_sample, source_end_sample)
+
+
+def sortformer_inference_audio_geometry(
+    source_sample_count: int,
+) -> dict[str, int | str]:
+    if source_sample_count <= 0:
+        raise SortformerTraceError("Sortformer source audio is empty")
+    source_mel_frame_count = math.ceil(
+        source_sample_count / SORTFORMER_MEL_HOP_SAMPLES
+    )
+    native_mel_chunk = SORTFORMER_CHUNK_FRAMES * SORTFORMER_SUBSAMPLING
+    minimum_native_mel_frames = (
+        source_mel_frame_count
+        + SORTFORMER_RIGHT_CONTEXT_FRAMES * SORTFORMER_SUBSAMPLING
+    )
+    native_mel_frame_count = (
+        math.ceil(minimum_native_mel_frames / native_mel_chunk) * native_mel_chunk
+    )
+    sample_count = native_mel_frame_count * SORTFORMER_MEL_HOP_SAMPLES
+    return {
+        "sample_count": sample_count,
+        "source_sample_count": source_sample_count,
+        "trailing_zero_sample_count": sample_count - source_sample_count,
+        "source_mel_frame_count": source_mel_frame_count,
+        "native_mel_frame_count": native_mel_frame_count,
+        "retained_frame_count": math.ceil(
+            source_sample_count / SORTFORMER_FRAME_SAMPLES
+        ),
+        "native_frame_count": native_mel_frame_count // SORTFORMER_SUBSAMPLING,
+        "materialization": INFERENCE_AUDIO_MATERIALIZATION,
+    }
 
 
 def _inspect_inference_audio(
     path: Path, source_start_sample: int, source_end_sample: int
 ) -> dict[str, Any]:
+    geometry = sortformer_inference_audio_geometry(
+        source_end_sample - source_start_sample
+    )
     try:
         path = strict_regular_file(path, "Sortformer inference audio")
         with wave.open(str(path), "rb") as reader:
@@ -296,8 +376,16 @@ def _inspect_inference_audio(
                 reader.getnchannels() == 1
                 and reader.getsampwidth() == 2
                 and reader.getframerate() == 16000
-                and reader.getnframes() == source_end_sample - source_start_sample
+                and reader.getnframes() == geometry["sample_count"]
             )
+            if valid:
+                reader.setpos(int(geometry["source_sample_count"]))
+                trailing = reader.readframes(
+                    int(geometry["trailing_zero_sample_count"])
+                )
+                valid = trailing == bytes(len(trailing)) and len(trailing) == int(
+                    geometry["trailing_zero_sample_count"]
+                ) * 2
     except (ExperimentError, EOFError, OSError, wave.Error) as exc:
         raise SortformerTraceError("Sortformer inference audio is invalid") from exc
     if not valid:
@@ -306,10 +394,9 @@ def _inspect_inference_audio(
         "path": str(path),
         "sha256": sha256_file(path),
         "size_bytes": path.stat().st_size,
-        "sample_count": source_end_sample - source_start_sample,
+        **geometry,
         "source_start_sample": source_start_sample,
         "source_end_sample": source_end_sample,
-        "materialization": "exact_pcm16_mono_16khz_frozen_source_window",
     }
 
 
@@ -327,12 +414,30 @@ def _load_resume_inference_audio(
     expected = receipt.get("inference_audio")
     if expected is None:
         return None
+    if (
+        not isinstance(expected, dict)
+        or expected.get("materialization") != INFERENCE_AUDIO_MATERIALIZATION
+    ):
+        return None
     observed = _inspect_inference_audio(
         audio_path, source_start_sample, source_end_sample
     )
-    if not isinstance(expected, dict) or observed != expected:
+    if observed != expected:
         raise SortformerTraceError("Sortformer resume inference audio binding mismatch")
     return observed
+
+
+def _retain_source_probabilities(
+    raw_probabilities: np.ndarray, inference_audio: dict[str, Any]
+) -> np.ndarray:
+    if raw_probabilities.shape[0] != inference_audio["native_frame_count"]:
+        raise SortformerTraceError("Sortformer native probability frame count mismatch")
+    retained = raw_probabilities[
+        : int(inference_audio["retained_frame_count"])
+    ].copy()
+    if retained.shape[0] != inference_audio["retained_frame_count"]:
+        raise SortformerTraceError("Sortformer retained probability frame count mismatch")
+    return retained
 
 
 def _run_new_inference(
@@ -499,6 +604,7 @@ def _resume_receipt(
     trace_path = Path(str(receipt.get("trace", {}).get("trace_path", "")))
     model_cfg = config()["sortformer"]
     inference_receipt = receipt.get("inference")
+    telemetry_receipt = receipt.get("telemetry")
     bench_receipt = (
         inference_receipt.get("bench")
         if isinstance(inference_receipt, dict)
@@ -538,8 +644,14 @@ def _resume_receipt(
         and isinstance(inference_receipt, dict)
         and inference_receipt.get("backend_resolved") == receipt.get("backend_resolved")
         and inference_receipt.get("audio") == inference_audio
+        and inference_receipt.get("raw_probability_frame_count")
+        == inference_audio["native_frame_count"]
+        and inference_receipt.get("retained_probability_frame_count")
+        == inference_audio["retained_frame_count"]
         and isinstance(bench_receipt, dict)
         and bench_receipt.get("backend") == receipt.get("backend_resolved")
+        and bench_receipt.get("iters") == 1
+        and bench_receipt.get("warmup") == 0
         and receipt.get("threads") == model_cfg["threads"]
         and receipt.get("preset") == model_cfg["preset"]
         and Path(str(receipt.get("bench_path", ""))).resolve() == bench
@@ -569,8 +681,15 @@ def _resume_receipt(
         raw_bench_path = strict_regular_file(
             Path(str(inference_receipt.get("bench_path", ""))), "Sortformer raw bench receipt"
         )
+        telemetry_path = strict_regular_file(
+            Path(str(telemetry_receipt.get("path", "")))
+            if isinstance(telemetry_receipt, dict)
+            else Path(),
+            "Sortformer telemetry",
+        )
         if (
             raw_bench_path != source_root / "run" / "bench.json"
+            or telemetry_path != source_root / "run" / "telemetry.jsonl"
             or inference_receipt.get("bench_sha256") != sha256_file(raw_bench_path)
             or load_json(raw_bench_path) != bench_receipt
             or bench_receipt.get("model_path") != str(model)
@@ -595,7 +714,20 @@ def _resume_receipt(
             ]
         ):
             return None
-    except (ExperimentError, KeyError, TraceIOError, TraceRuntimeError, OSError):
+        validate_sortformer_telemetry_receipt(
+            telemetry_path,
+            telemetry_receipt,
+            expected_chunks=int(inference_audio["native_frame_count"])
+            // SORTFORMER_CHUNK_FRAMES,
+        )
+    except (
+        ExperimentError,
+        KeyError,
+        SortformerTraceError,
+        TraceIOError,
+        TraceRuntimeError,
+        OSError,
+    ):
         return None
     expected_metadata = {
         "source_id": row["source_id"],
@@ -606,6 +738,18 @@ def _resume_receipt(
         "inference_audio_path": inference_audio["path"],
         "inference_audio_sha256": inference_audio["sha256"],
         "inference_audio_sample_count": inference_audio["sample_count"],
+        "inference_audio_source_sample_count": inference_audio[
+            "source_sample_count"
+        ],
+        "inference_audio_trailing_zero_sample_count": inference_audio[
+            "trailing_zero_sample_count"
+        ],
+        "inference_audio_native_frame_count": inference_audio[
+            "native_frame_count"
+        ],
+        "inference_audio_retained_frame_count": inference_audio[
+            "retained_frame_count"
+        ],
         "inference_audio_materialization": inference_audio["materialization"],
         "source_start_sample": source_start_sample,
         "source_end_sample": source_end_sample,
@@ -717,16 +861,21 @@ def run_traces(
         if reuse_r8_cache and usage == "full_frozen_source":
             reused = _reuse_r8(row=row, research=research)
         if reused is None:
-            probabilities, telemetry, inference, telemetry_path = _run_new_inference(
+            raw_probabilities, telemetry, inference, telemetry_path = _run_new_inference(
                 bench=bench,
                 model=model,
                 audio=audio,
                 run_directory=source_root / "run",
             )
         else:
-            probabilities, telemetry, inference, telemetry_path = reused
+            raw_probabilities, telemetry, inference, telemetry_path = reused
+        probabilities = _retain_source_probabilities(
+            raw_probabilities, inference_audio
+        )
         inference = dict(inference)
         inference["audio"] = inference_audio
+        inference["raw_probability_frame_count"] = raw_probabilities.shape[0]
+        inference["retained_probability_frame_count"] = probabilities.shape[0]
         trace = _trace(
             row=row,
             probabilities=probabilities,
@@ -736,7 +885,9 @@ def run_traces(
         )
         trace_path = source_root / "posterior_trace.npz"
         trace_info = write_trace(trace_path, trace)
-        expected_chunks = math.ceil(probabilities.shape[0] / SORTFORMER_CHUNK_FRAMES)
+        expected_chunks = (
+            int(inference_audio["native_frame_count"]) // SORTFORMER_CHUNK_FRAMES
+        )
         receipt = {
             "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
             "trace_schema_version": TRACE_SCHEMA_VERSION,
