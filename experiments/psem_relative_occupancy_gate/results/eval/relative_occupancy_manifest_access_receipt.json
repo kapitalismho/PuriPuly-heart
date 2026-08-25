@@ -1,0 +1,17 @@
+{
+  "accepted_c2_head": "247aaa041b6bf6a2d482408dfb39f9f6bff58340",
+  "access_sha256": "03fba475f5760e0d8261b617f99e19f4d956389520f633fd7a3ec81c9f262c1f",
+  "authorization_file_sha256": "d447e0e6def62fe59d9102a6ca0dcfa2bd72b15929c79aa1520d32e642c9517b",
+  "authorization_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\eval_authorization.json",
+  "authorization_sha256": "48b1c91556a078ebb5a1621ea3490ff238542adc252ecfe9505577a0a9b75b7c",
+  "consumption_receipt_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\eval_authorization_consumed.json",
+  "consumption_receipt_sha256": "278a5d62e4672e5ee85a86c02aee364b45b5c06886c2002e1491f7d6c6abe5be",
+  "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+  "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+  "model_gate_verification_sha256": "146d27e89131753a807ab7c0b78599d646d42439eb9852eb1d699378d7f0b239",
+  "open_count": 1,
+  "role": "PSEM-STRATEGY-EVAL",
+  "schema_version": "psem.relative_occupancy.eval_access_receipt.v1",
+  "selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489",
+  "source_count": 19
+}

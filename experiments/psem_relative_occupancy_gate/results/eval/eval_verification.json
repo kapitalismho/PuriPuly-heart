@@ -1,0 +1,14 @@
+{
+  "artifact_sha256": {
+    "latency": "2b9da6d2a39164078fd00376252fa255272179465bb5ce6c7626398c77fe0e1c",
+    "metrics": "efeb8e7696994a3ffc047c22395a3a33f6b974a7eea1ce72f135fe727346f3af",
+    "product": "f5d42bfe93be6927c9c3491d65d9a0fdf340558f642ec35c881e0542a42d51d8",
+    "topology": "ecf23c068b3f1c525925062811b3918482e70c5a0ed7da8e8b239d37ef470e3f"
+  },
+  "eval_status": "opened_once",
+  "independent_regeneration": true,
+  "passed": true,
+  "role": "PSEM-STRATEGY-EVAL",
+  "schema_version": "psem.relative_occupancy.eval_verification.v1",
+  "selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489"
+}

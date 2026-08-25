@@ -1,0 +1,62 @@
+{
+  "accepted_c2_head": "247aaa041b6bf6a2d482408dfb39f9f6bff58340",
+  "access_receipt_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest_access_receipt.json",
+  "access_receipt_sha256": "4f8dca664ce9ad216f58a8069b448c522098d38b8f0b6b381634260ae7f3cbeb",
+  "additional_manifest_derivations": 0,
+  "authorization_file_sha256": "d447e0e6def62fe59d9102a6ca0dcfa2bd72b15929c79aa1520d32e642c9517b",
+  "authorization_sha256": "48b1c91556a078ebb5a1621ea3490ff238542adc252ecfe9505577a0a9b75b7c",
+  "changed_files": {
+    "experiments/psem_relative_occupancy_gate/authorize_eval_recovery.py": {
+      "after_sha256": "07ee8d92eacc5b5621c66f3cf51122e55a1d7a3aca0f32fa356d5f51de4e3f7e",
+      "before_sha256": null
+    },
+    "experiments/psem_relative_occupancy_gate/eval_access.py": {
+      "after_sha256": "3d163e5ebcaa227f4cb120821f0f0992ae59827c451238e18b59a4557a4e9124",
+      "before_sha256": "dcba2656581874912384e8c92a1900a7100c564342f04ded8121d138805f9cde"
+    },
+    "experiments/psem_relative_occupancy_gate/model_run_io.py": {
+      "after_sha256": "13179938a621fd685ebdbb457c7ba3cef35486b1e4d5d726eb22578f4ae0022e",
+      "before_sha256": "4ec65439e5de3cb7e967c96e75abc16cd779915644fc4db7c1bc025fdc7019bc"
+    },
+    "experiments/psem_relative_occupancy_gate/run_sortformer_trace.py": {
+      "after_sha256": "23e327a563b30792f7ef707f58e07ca7bfe3c585725f11deb1aea8dfc11cffa1",
+      "before_sha256": "3b78cd4671026a71250a66d7a9964bf74b85d949513190d898705a7d963358e7"
+    },
+    "experiments/psem_relative_occupancy_gate/tests/test_provenance_sealing.py": {
+      "after_sha256": "a6d02c642400bcb51efedfffefa9c901507efd262a0fcb935f20e182d165b667",
+      "before_sha256": "df36d8f4386d815849aa4039cd928be5be189dfca79e7ef1d3f7c2f52cfe78cc"
+    },
+    "experiments/psem_relative_occupancy_gate/tests/test_trace_adapters.py": {
+      "after_sha256": "d1ae274e7e567ca2a3b37b393b654aaee6e5aa75435e1dc4558dc2a3353cc71c",
+      "before_sha256": "d27bd453209a82b7601e20b45ce5e4713d70145213f957da7fb97d8bd6f489cb"
+    }
+  },
+  "consumption_receipt_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\eval_authorization_consumed.json",
+  "consumption_receipt_sha256": "278a5d62e4672e5ee85a86c02aee364b45b5c06886c2002e1491f7d6c6abe5be",
+  "contract_overrides": {
+    "eval_access.py": {
+      "after_sha256": "3d163e5ebcaa227f4cb120821f0f0992ae59827c451238e18b59a4557a4e9124",
+      "before_sha256": "dcba2656581874912384e8c92a1900a7100c564342f04ded8121d138805f9cde"
+    },
+    "model_run_io.py": {
+      "after_sha256": "13179938a621fd685ebdbb457c7ba3cef35486b1e4d5d726eb22578f4ae0022e",
+      "before_sha256": "4ec65439e5de3cb7e967c96e75abc16cd779915644fc4db7c1bc025fdc7019bc"
+    },
+    "run_sortformer_trace.py": {
+      "after_sha256": "23e327a563b30792f7ef707f58e07ca7bfe3c585725f11deb1aea8dfc11cffa1",
+      "before_sha256": "3b78cd4671026a71250a66d7a9964bf74b85d949513190d898705a7d963358e7"
+    }
+  },
+  "manifest_open_count": 1,
+  "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+  "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+  "prior_eval_aggregate_count": 0,
+  "recovery_head": "07f78c391f980132f97d43f3b6d4280f7898d741",
+  "recovery_reason": "sortformer_exact_frozen_source_window_materialization",
+  "recovery_sha256": "5965b4a839f3ed114253e9e14899460f380629512c9d337d6301a9cb6887f7f3",
+  "recovery_state": "authorized_for_same_opened_manifest_resume",
+  "role": "PSEM-STRATEGY-EVAL",
+  "schema_version": "psem.relative_occupancy.eval_recovery.v1",
+  "selection_file_sha256": "28a3ba705153882ebc59a9b2318a382576de899644d676a8df066d04ba0a7974",
+  "selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489"
+}

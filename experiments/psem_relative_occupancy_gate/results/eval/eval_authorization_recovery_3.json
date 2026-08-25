@@ -1,0 +1,109 @@
+{
+  "accepted_c2_head": "247aaa041b6bf6a2d482408dfb39f9f6bff58340",
+  "access_receipt_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest_access_receipt.json",
+  "access_receipt_sha256": "4f8dca664ce9ad216f58a8069b448c522098d38b8f0b6b381634260ae7f3cbeb",
+  "additional_manifest_derivations": 0,
+  "authorization_file_sha256": "d447e0e6def62fe59d9102a6ca0dcfa2bd72b15929c79aa1520d32e642c9517b",
+  "authorization_sha256": "48b1c91556a078ebb5a1621ea3490ff238542adc252ecfe9505577a0a9b75b7c",
+  "changed_files": {
+    "experiments/psem_relative_occupancy_gate/authorize_eval_recovery.py": {
+      "after_sha256": "479215b7732748365e523cef733f61915e908a4b4eb48a589585beb00c08c512",
+      "before_sha256": null
+    },
+    "experiments/psem_relative_occupancy_gate/eval_access.py": {
+      "after_sha256": "302e3cefdd237d13bb59ef5557071e8a13fe819aba0c9123140fe83a4f8ca420",
+      "before_sha256": "dcba2656581874912384e8c92a1900a7100c564342f04ded8121d138805f9cde"
+    },
+    "experiments/psem_relative_occupancy_gate/model_run_io.py": {
+      "after_sha256": "14a9cedc02ac919d89d20b6abdaddba3c8720efed5e4b25edb3a504832f763cf",
+      "before_sha256": "4ec65439e5de3cb7e967c96e75abc16cd779915644fc4db7c1bc025fdc7019bc"
+    },
+    "experiments/psem_relative_occupancy_gate/run_eval.py": {
+      "after_sha256": "1c8ee36e87b9a61e276638329a8e70e1a4f9a6d5aabb15a5452ff7a9a245bd57",
+      "before_sha256": "5281e13028a05cd1b8088f5256390555df670c9d83dee9ab9eb4f80ebc65bc66"
+    },
+    "experiments/psem_relative_occupancy_gate/run_eval_traces.py": {
+      "after_sha256": "abc17f88a518e0411bb6ed998acf4a5277663a9e9ef06b915a15719d722aecd1",
+      "before_sha256": "a9333715ed6739f2eec5e48ecbe04946b3bb4424fae6e1fadecce22d6cbbed91"
+    },
+    "experiments/psem_relative_occupancy_gate/run_sortformer_trace.py": {
+      "after_sha256": "b9bb564082ac7b12dce2736524ec1158a367ae91d7ffd6f87716ef105aeab321",
+      "before_sha256": "3b78cd4671026a71250a66d7a9964bf74b85d949513190d898705a7d963358e7"
+    },
+    "experiments/psem_relative_occupancy_gate/tests/test_provenance_sealing.py": {
+      "after_sha256": "d2bd40f8bff02f9d0253ced549052c335afc5035a663e0eec1bfd5273c808662",
+      "before_sha256": "df36d8f4386d815849aa4039cd928be5be189dfca79e7ef1d3f7c2f52cfe78cc"
+    },
+    "experiments/psem_relative_occupancy_gate/tests/test_trace_adapters.py": {
+      "after_sha256": "0ac16c75dcdd127f0ab3fa8fb7a5224dd8b3ad169bbda3720d721e229f0742aa",
+      "before_sha256": "d27bd453209a82b7601e20b45ce5e4713d70145213f957da7fb97d8bd6f489cb"
+    },
+    "experiments/psem_relative_occupancy_gate/trace_runtime.py": {
+      "after_sha256": "085ee35567d383c5fb7ef1971f9e929daf5a762838e2b794bcdad0d7d540fdc1",
+      "before_sha256": "15eb9676aec39d186ae088c977cc21f82f28a229ca31280396f3abaa1e9621b1"
+    },
+    "experiments/psem_relative_occupancy_gate/verify_eval.py": {
+      "after_sha256": "f83b96fcf35e90087ede007b92612bd78a8f7b5204f69bd595a2d305bcaf9357",
+      "before_sha256": "460a6826de9afcd1d3085e9cabc3a02a8342682a96270b570412e60aec6017ee"
+    }
+  },
+  "completed_lseend_source_count": 19,
+  "completed_sortformer_source_count": 19,
+  "consumption_receipt_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\eval_authorization_consumed.json",
+  "consumption_receipt_sha256": "278a5d62e4672e5ee85a86c02aee364b45b5c06886c2002e1491f7d6c6abe5be",
+  "contract_overrides": {
+    "eval_access.py": {
+      "after_sha256": "302e3cefdd237d13bb59ef5557071e8a13fe819aba0c9123140fe83a4f8ca420",
+      "before_sha256": "dcba2656581874912384e8c92a1900a7100c564342f04ded8121d138805f9cde"
+    },
+    "model_run_io.py": {
+      "after_sha256": "14a9cedc02ac919d89d20b6abdaddba3c8720efed5e4b25edb3a504832f763cf",
+      "before_sha256": "4ec65439e5de3cb7e967c96e75abc16cd779915644fc4db7c1bc025fdc7019bc"
+    },
+    "run_eval.py": {
+      "after_sha256": "1c8ee36e87b9a61e276638329a8e70e1a4f9a6d5aabb15a5452ff7a9a245bd57",
+      "before_sha256": "5281e13028a05cd1b8088f5256390555df670c9d83dee9ab9eb4f80ebc65bc66"
+    },
+    "run_eval_traces.py": {
+      "after_sha256": "abc17f88a518e0411bb6ed998acf4a5277663a9e9ef06b915a15719d722aecd1",
+      "before_sha256": "a9333715ed6739f2eec5e48ecbe04946b3bb4424fae6e1fadecce22d6cbbed91"
+    },
+    "run_sortformer_trace.py": {
+      "after_sha256": "b9bb564082ac7b12dce2736524ec1158a367ae91d7ffd6f87716ef105aeab321",
+      "before_sha256": "3b78cd4671026a71250a66d7a9964bf74b85d949513190d898705a7d963358e7"
+    },
+    "trace_runtime.py": {
+      "after_sha256": "085ee35567d383c5fb7ef1971f9e929daf5a762838e2b794bcdad0d7d540fdc1",
+      "before_sha256": "15eb9676aec39d186ae088c977cc21f82f28a229ca31280396f3abaa1e9621b1"
+    },
+    "verify_eval.py": {
+      "after_sha256": "f83b96fcf35e90087ede007b92612bd78a8f7b5204f69bd595a2d305bcaf9357",
+      "before_sha256": "460a6826de9afcd1d3085e9cabc3a02a8342682a96270b570412e60aec6017ee"
+    }
+  },
+  "failed_family": "ls_eend",
+  "failed_source_id": "alimeeting_R1021_M1940",
+  "failed_stage": "eval_trace_validation",
+  "manifest_open_count": 1,
+  "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+  "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+  "prior_eval_aggregate_count": 2,
+  "prior_model_aggregates": {
+    "lseend_model_receipt.json": "aea66b589a7458b1609e927fed69e43ddcbd4bb5ad9ee03af892918806b86a4e",
+    "sortformer_model_receipt.json": "b402a194ca919f25cdf7d75e984ec99fd9cc303471c8e3b1d779482714e6ae42"
+  },
+  "prior_recovery_file_sha256": "75a506fa64fc36419b239be13797f30de37427465bf98f9cc9587e614ed86524",
+  "prior_recovery_head": "cc757522886048bc4ab1d40072ce4fd3c0521899",
+  "prior_recovery_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\eval_authorization_recovery_2.json",
+  "prior_recovery_result": "failed_before_eval_metrics",
+  "prior_recovery_sha256": "3d708dfc0dc9b2a84d8558686bd81eb6be8ffdb37a75ed2dc8b10fd53da9b36d",
+  "recovery_head": "1edac159a8f7dfb4f7014d5cdec1292f0cfbbe83",
+  "recovery_reason": "lseend_unemitted_partial_terminal_audio",
+  "recovery_sequence": 3,
+  "recovery_sha256": "9c98dc57892f24f5b6b1ba7d32536856bef013152ca2d68f161369cd2d61d29f",
+  "recovery_state": "authorized_for_same_opened_manifest_resume",
+  "role": "PSEM-STRATEGY-EVAL",
+  "schema_version": "psem.relative_occupancy.eval_recovery.v3",
+  "selection_file_sha256": "28a3ba705153882ebc59a9b2318a382576de899644d676a8df066d04ba0a7974",
+  "selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489"
+}

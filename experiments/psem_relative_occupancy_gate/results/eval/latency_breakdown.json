@@ -1,0 +1,68 @@
+{
+  "config_sha256": "4d08c9f2216388dc30ff1c7134f0488a29cc45e4dce383b1ce6c2eae9a145ecb",
+  "eval_access_receipt_sha256": "4f8dca664ce9ad216f58a8069b448c522098d38b8f0b6b381634260ae7f3cbeb",
+  "eval_status": "opened_once",
+  "families": {
+    "ls_eend": {
+      "algorithmic_buffering_ms": 0,
+      "causal_enrollment_delay_ms": {
+        "p50": 1370.0,
+        "p90": 7296.0
+      },
+      "fraction_enrolled_within_1000ms": 0.3411658382286489,
+      "fraction_enrolled_within_1500ms": 0.5761409850881157,
+      "native_frame_ms": 100,
+      "replacement_confirmation_ms": [
+        100,
+        200,
+        300,
+        500
+      ],
+      "runtime": {
+        "audio_seconds": 36085.6179375,
+        "inference_origin_counts": {
+          "fresh_single_frozen_inference_pass": 19
+        },
+        "measured_cpu_seconds": 870.890625,
+        "measured_process_wall_rtf": 0.025244642263789804,
+        "measured_process_wall_seconds": 910.968515699984,
+        "source_count": 19
+      },
+      "selected_enrollment_confirmation_ms": 400.0
+    },
+    "streaming_sortformer": {
+      "algorithmic_buffering_ms": 1040,
+      "causal_enrollment_delay_ms": {
+        "p50": 1006.5,
+        "p90": 1920.0
+      },
+      "fraction_enrolled_within_1000ms": 0.49468763280917977,
+      "fraction_enrolled_within_1500ms": 0.8616659583510412,
+      "native_frame_ms": 80,
+      "replacement_confirmation_ms": [
+        100,
+        200,
+        300,
+        500
+      ],
+      "runtime": {
+        "audio_seconds": 36085.6179375,
+        "inference_origin_counts": {
+          "fresh_single_frozen_inference_pass": 19
+        },
+        "measured_cpu_seconds": null,
+        "measured_process_wall_rtf": 0.047698603185379065,
+        "measured_process_wall_seconds": 1721.2335707000093,
+        "source_count": 19
+      },
+      "selected_enrollment_confirmation_ms": 400.0
+    }
+  },
+  "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+  "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+  "role": "PSEM-STRATEGY-EVAL",
+  "schema_version": "psem.relative_occupancy.latency_breakdown.v2",
+  "selection_file_sha256": "28a3ba705153882ebc59a9b2318a382576de899644d676a8df066d04ba0a7974",
+  "selection_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\dev\\dev_selection_receipt.json",
+  "selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489"
+}

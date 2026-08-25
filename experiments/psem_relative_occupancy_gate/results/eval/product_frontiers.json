@@ -1,0 +1,1015 @@
+{
+  "config_sha256": "4d08c9f2216388dc30ff1c7134f0488a29cc45e4dce383b1ce6c2eae9a145ecb",
+  "eval_access_receipt_sha256": "4f8dca664ce9ad216f58a8069b448c522098d38b8f0b6b381634260ae7f3cbeb",
+  "eval_status": "opened_once",
+  "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+  "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+  "role": "PSEM-STRATEGY-EVAL",
+  "rows": [
+    {
+      "active_speech_hours": 6.725263888888889,
+      "boundary_backdating_exact": true,
+      "exclusive_other_contamination_seconds": 9541.048999999999,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 1418.687676443923,
+      "exclusive_other_contamination_upper_bound_seconds": 9995.858,
+      "exclusive_other_contamination_upper_bound_seconds_per_active_speech_hour": 1486.3146138420839,
+      "fail_closed_unknown_active_speech_seconds": 1219.466,
+      "family": "none",
+      "gate": "vad_only_no_speaker_cut",
+      "replacement_confirm_ms": null,
+      "source_count": 19,
+      "speaker_induced_cut_count": 0,
+      "speaker_induced_cut_count_per_active_speech_hour": 0.0
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "boundary_backdating_exact": true,
+      "exclusive_other_contamination_seconds": 504.805,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 75.06099512823744,
+      "exclusive_other_contamination_upper_bound_seconds": 2471.062,
+      "exclusive_other_contamination_upper_bound_seconds_per_active_speech_hour": 367.42974563162534,
+      "fail_closed_unknown_active_speech_seconds": 2730.914,
+      "family": "perfect_gt_relative_occupancy",
+      "gate": "gate0_oracle",
+      "replacement_confirm_ms": 100,
+      "source_count": 19,
+      "speaker_induced_cut_count": 4861,
+      "speaker_induced_cut_count_per_active_speech_hour": 722.7969162713566
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "boundary_backdating_exact": true,
+      "exclusive_other_contamination_seconds": 928.007,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 137.98819129360888,
+      "exclusive_other_contamination_upper_bound_seconds": 2742.0080000000003,
+      "exclusive_other_contamination_upper_bound_seconds_per_active_speech_hour": 407.7175327692635,
+      "fail_closed_unknown_active_speech_seconds": 2578.658,
+      "family": "perfect_gt_relative_occupancy",
+      "gate": "gate0_oracle",
+      "replacement_confirm_ms": 200,
+      "source_count": 19,
+      "speaker_induced_cut_count": 4251,
+      "speaker_induced_cut_count_per_active_speech_hour": 632.0941557435789
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "boundary_backdating_exact": true,
+      "exclusive_other_contamination_seconds": 1320.1009999999999,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 196.28984405816377,
+      "exclusive_other_contamination_upper_bound_seconds": 2901.189,
+      "exclusive_other_contamination_upper_bound_seconds_per_active_speech_hour": 431.38664116856216,
+      "fail_closed_unknown_active_speech_seconds": 2345.745,
+      "family": "perfect_gt_relative_occupancy",
+      "gate": "gate0_oracle",
+      "replacement_confirm_ms": 300,
+      "source_count": 19,
+      "speaker_induced_cut_count": 3609,
+      "speaker_induced_cut_count_per_active_speech_hour": 536.633217614344
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "boundary_backdating_exact": true,
+      "exclusive_other_contamination_seconds": 1983.503,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 294.9331108444733,
+      "exclusive_other_contamination_upper_bound_seconds": 3256.323,
+      "exclusive_other_contamination_upper_bound_seconds_per_active_speech_hour": 484.19259880343395,
+      "fail_closed_unknown_active_speech_seconds": 2037.477,
+      "family": "perfect_gt_relative_occupancy",
+      "gate": "gate0_oracle",
+      "replacement_confirm_ms": 500,
+      "source_count": 19,
+      "speaker_induced_cut_count": 2798,
+      "speaker_induced_cut_count_per_active_speech_hour": 416.0431540274132
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_threshold": 0.5,
+      "anchor_uncertain_active_speech_seconds": 27.172,
+      "backdated_boundary_error_ms": {
+        "p50": -30.0,
+        "p90": 0.0
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 0.8725,
+        "p90": 6.96
+      },
+      "exclusive_other_contamination_seconds": 13479.5735,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 2004.3188970279978,
+      "exclusive_other_contamination_upper_bound_seconds": 16560.224,
+      "fail_closed_unknown_active_speech_seconds": 3845.3075,
+      "false_cut_count": 522,
+      "family": "streaming_sortformer",
+      "gate": "gate1_oracle_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 448.714,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 1291,
+      "missed_replacement_count": 3570,
+      "model_evidence_delay_ms": {
+        "p50": 812.5,
+        "p90": 1042.5
+      },
+      "other_threshold": 0.35,
+      "predicted_cut_count": 1813,
+      "reference_replacement_count": 4861,
+      "replacement_confirm_ms": 100,
+      "replacement_emit_delay_ms": {
+        "p50": 812.5,
+        "p90": 1042.5
+      },
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 269.580499732559,
+      "unanchored_active_speech_seconds": 3053.4784999999997
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_enrollment_delay_ms": {
+        "p50": 1006.5,
+        "p90": 1920.0
+      },
+      "anchor_error_cascade_length": {
+        "distribution": {
+          "1": 161,
+          "2": 8
+        },
+        "maximum": 2,
+        "p50": 1.0,
+        "p90": 1.0
+      },
+      "anchor_threshold": 0.5,
+      "anchor_uncertain_active_speech_seconds": 0.0,
+      "anchor_uncertain_seconds": 0.0,
+      "anchor_uncertain_time_fraction": 0.0,
+      "backdated_boundary_error_ms": {
+        "p50": 44.0,
+        "p90": 210.5
+      },
+      "causal_enrollment": {
+        "active_threshold": 0.5,
+        "confirmation_samples": 6400,
+        "other_low_threshold": 0.4
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 0.7225,
+        "p90": 3.48
+      },
+      "enrollment_count": 4702,
+      "enrollment_failure_count": 4,
+      "enrollment_failure_rate": 0.0008499787505312367,
+      "exclusive_other_contamination_seconds": 7904.293,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 1175.3134346235897,
+      "exclusive_other_contamination_upper_bound_seconds": 15168.5605,
+      "expected_opportunity_count": 4706,
+      "fail_closed_unknown_active_speech_seconds": 8028.9245,
+      "false_cut_count": 634,
+      "false_cuts_after_wrong_anchor": 177,
+      "family": "streaming_sortformer",
+      "fraction_enrolled_within_1000ms": 0.49468763280917977,
+      "fraction_enrolled_within_1500ms": 0.8616659583510412,
+      "gate": "gate2_causal_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 2522.283,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 3235,
+      "missed_replacement_count": 1626,
+      "model_evidence_delay_ms": {
+        "p50": 922.5,
+        "p90": 1154.5
+      },
+      "no_anchor_timeout_rate": 0.0008499787505312367,
+      "other_threshold": 0.35,
+      "predicted_cut_count": 3869,
+      "reference_replacement_count": 4861,
+      "replacement_confirm_ms": 100,
+      "replacement_emit_delay_ms": {
+        "p50": 922.5,
+        "p90": 1154.5
+      },
+      "slot_loss_count": 0,
+      "slot_loss_rate": 0.0,
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 575.2934106261836,
+      "total_enrollment_count": 5142,
+      "unanchored_active_speech_seconds": 7264.2675,
+      "unmatched_enrollment_count": 440,
+      "wrong_anchor_count": 867,
+      "wrong_anchor_rate": 0.16861143523920655
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_threshold": 0.5,
+      "anchor_uncertain_active_speech_seconds": 33.536,
+      "backdated_boundary_error_ms": {
+        "p50": -30.0,
+        "p90": 0.0
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 1.01,
+        "p90": 7.77
+      },
+      "exclusive_other_contamination_seconds": 13338.8445,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 1983.3934727881392,
+      "exclusive_other_contamination_upper_bound_seconds": 16235.6615,
+      "fail_closed_unknown_active_speech_seconds": 3661.4739999999997,
+      "false_cut_count": 494,
+      "family": "streaming_sortformer",
+      "gate": "gate1_oracle_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 833.504,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 1092,
+      "missed_replacement_count": 3159,
+      "model_evidence_delay_ms": {
+        "p50": 892.5,
+        "p90": 1112.5
+      },
+      "other_threshold": 0.35,
+      "predicted_cut_count": 1586,
+      "reference_replacement_count": 4251,
+      "replacement_confirm_ms": 200,
+      "replacement_emit_delay_ms": {
+        "p50": 892.5,
+        "p90": 1112.5
+      },
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 235.82717737222208,
+      "unanchored_active_speech_seconds": 2863.281
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_enrollment_delay_ms": {
+        "p50": 1023.5,
+        "p90": 1920.0
+      },
+      "anchor_error_cascade_length": {
+        "distribution": {
+          "1": 152,
+          "2": 8
+        },
+        "maximum": 2,
+        "p50": 1.0,
+        "p90": 1.0
+      },
+      "anchor_threshold": 0.5,
+      "anchor_uncertain_active_speech_seconds": 0.0,
+      "anchor_uncertain_seconds": 0.0,
+      "anchor_uncertain_time_fraction": 0.0,
+      "backdated_boundary_error_ms": {
+        "p50": 44.0,
+        "p90": 200.0
+      },
+      "causal_enrollment": {
+        "active_threshold": 0.5,
+        "confirmation_samples": 6400,
+        "other_low_threshold": 0.4
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 0.8125,
+        "p90": 3.23
+      },
+      "enrollment_count": 4462,
+      "enrollment_failure_count": 4,
+      "enrollment_failure_rate": 0.0008956560680698612,
+      "exclusive_other_contamination_seconds": 7095.3195,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 1055.0246975025764,
+      "exclusive_other_contamination_upper_bound_seconds": 13855.3985,
+      "expected_opportunity_count": 4466,
+      "fail_closed_unknown_active_speech_seconds": 7524.736,
+      "false_cut_count": 624,
+      "false_cuts_after_wrong_anchor": 168,
+      "family": "streaming_sortformer",
+      "fraction_enrolled_within_1000ms": 0.4820868786386028,
+      "fraction_enrolled_within_1500ms": 0.8593819973130318,
+      "gate": "gate2_causal_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 2655.941,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 2947,
+      "missed_replacement_count": 1304,
+      "model_evidence_delay_ms": {
+        "p50": 1010.5,
+        "p90": 1236.1000000000004
+      },
+      "no_anchor_timeout_rate": 0.0008956560680698612,
+      "other_threshold": 0.35,
+      "predicted_cut_count": 3571,
+      "reference_replacement_count": 4251,
+      "replacement_confirm_ms": 200,
+      "replacement_emit_delay_ms": {
+        "p50": 1010.5,
+        "p90": 1236.1000000000004
+      },
+      "slot_loss_count": 0,
+      "slot_loss_rate": 0.0,
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 530.9828817126136,
+      "total_enrollment_count": 4862,
+      "unanchored_active_speech_seconds": 6760.079,
+      "unmatched_enrollment_count": 400,
+      "wrong_anchor_count": 795,
+      "wrong_anchor_rate": 0.1635129576306047
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_threshold": 0.5,
+      "anchor_uncertain_active_speech_seconds": 35.558,
+      "backdated_boundary_error_ms": {
+        "p50": -36.0,
+        "p90": 0.0
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 1.2225,
+        "p90": 9.402000000000003
+      },
+      "exclusive_other_contamination_seconds": 13692.3355,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 2035.955127741786,
+      "exclusive_other_contamination_upper_bound_seconds": 16733.193,
+      "fail_closed_unknown_active_speech_seconds": 3805.5144999999998,
+      "false_cut_count": 561,
+      "family": "streaming_sortformer",
+      "gate": "gate1_oracle_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 1164.818,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 911,
+      "missed_replacement_count": 2698,
+      "model_evidence_delay_ms": {
+        "p50": 972.5,
+        "p90": 1212.5
+      },
+      "other_threshold": 0.35,
+      "predicted_cut_count": 1472,
+      "reference_replacement_count": 3609,
+      "replacement_confirm_ms": 300,
+      "replacement_emit_delay_ms": {
+        "p50": 972.5,
+        "p90": 1212.5
+      },
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 218.87616966703084,
+      "unanchored_active_speech_seconds": 3005.2995
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_enrollment_delay_ms": {
+        "p50": 1032.5,
+        "p90": 1922.9
+      },
+      "anchor_error_cascade_length": {
+        "distribution": {
+          "1": 143,
+          "2": 14,
+          "3": 2
+        },
+        "maximum": 3,
+        "p50": 1.0,
+        "p90": 1.200000000000017
+      },
+      "anchor_threshold": 0.5,
+      "anchor_uncertain_active_speech_seconds": 0.0,
+      "anchor_uncertain_seconds": 0.0,
+      "anchor_uncertain_time_fraction": 0.0,
+      "backdated_boundary_error_ms": {
+        "p50": 40.0,
+        "p90": 200.0
+      },
+      "causal_enrollment": {
+        "active_threshold": 0.5,
+        "confirmation_samples": 6400,
+        "other_low_threshold": 0.4
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 0.9465,
+        "p90": 3.7340000000000053
+      },
+      "enrollment_count": 4217,
+      "enrollment_failure_count": 4,
+      "enrollment_failure_rate": 0.0009476427386875149,
+      "exclusive_other_contamination_seconds": 6972.005,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 1036.688688382736,
+      "exclusive_other_contamination_upper_bound_seconds": 13230.959,
+      "expected_opportunity_count": 4221,
+      "fail_closed_unknown_active_speech_seconds": 7023.611,
+      "false_cut_count": 693,
+      "false_cuts_after_wrong_anchor": 177,
+      "family": "streaming_sortformer",
+      "fraction_enrolled_within_1000ms": 0.47358445865908555,
+      "fraction_enrolled_within_1500ms": 0.8585643212508884,
+      "gate": "gate2_causal_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 2861.4249999999997,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 2563,
+      "missed_replacement_count": 1046,
+      "model_evidence_delay_ms": {
+        "p50": 1090.5,
+        "p90": 1332.5
+      },
+      "no_anchor_timeout_rate": 0.0009476427386875149,
+      "other_threshold": 0.35,
+      "predicted_cut_count": 3256,
+      "reference_replacement_count": 3609,
+      "replacement_confirm_ms": 300,
+      "replacement_emit_delay_ms": {
+        "p50": 1090.5,
+        "p90": 1332.5
+      },
+      "slot_loss_count": 0,
+      "slot_loss_rate": 0.0,
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 484.1445709482693,
+      "total_enrollment_count": 4579,
+      "unanchored_active_speech_seconds": 6258.954,
+      "unmatched_enrollment_count": 362,
+      "wrong_anchor_count": 721,
+      "wrong_anchor_rate": 0.15745796025333042
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_threshold": 0.5,
+      "anchor_uncertain_active_speech_seconds": 38.676,
+      "backdated_boundary_error_ms": {
+        "p50": -40.0,
+        "p90": 0.0
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 1.92,
+        "p90": 12.424800000000003
+      },
+      "exclusive_other_contamination_seconds": 13911.8035,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 2068.58849404918,
+      "exclusive_other_contamination_upper_bound_seconds": 16073.9305,
+      "fail_closed_unknown_active_speech_seconds": 2926.784,
+      "false_cut_count": 403,
+      "family": "streaming_sortformer",
+      "gate": "gate1_oracle_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 1818.9285,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 720,
+      "missed_replacement_count": 2078,
+      "model_evidence_delay_ms": {
+        "p50": 1182.5,
+        "p90": 1415.8000000000002
+      },
+      "other_threshold": 0.35,
+      "predicted_cut_count": 1123,
+      "reference_replacement_count": 2798,
+      "replacement_confirm_ms": 500,
+      "replacement_emit_delay_ms": {
+        "p50": 1182.5,
+        "p90": 1415.8000000000002
+      },
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 166.98229520113833,
+      "unanchored_active_speech_seconds": 2123.451
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_enrollment_delay_ms": {
+        "p50": 1070.5,
+        "p90": 1991.0
+      },
+      "anchor_error_cascade_length": {
+        "distribution": {
+          "1": 103,
+          "2": 4,
+          "3": 1
+        },
+        "maximum": 3,
+        "p50": 1.0,
+        "p90": 1.0
+      },
+      "anchor_threshold": 0.5,
+      "anchor_uncertain_active_speech_seconds": 0.0,
+      "anchor_uncertain_seconds": 0.0,
+      "anchor_uncertain_time_fraction": 0.0,
+      "backdated_boundary_error_ms": {
+        "p50": 40.0,
+        "p90": 210.0
+      },
+      "causal_enrollment": {
+        "active_threshold": 0.5,
+        "confirmation_samples": 6400,
+        "other_low_threshold": 0.4
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 1.2185,
+        "p90": 4.859000000000005
+      },
+      "enrollment_count": 3666,
+      "enrollment_failure_count": 2,
+      "enrollment_failure_rate": 0.0005452562704471102,
+      "exclusive_other_contamination_seconds": 7013.9725,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 1042.928963960522,
+      "exclusive_other_contamination_upper_bound_seconds": 12349.094000000001,
+      "expected_opportunity_count": 3668,
+      "fail_closed_unknown_active_speech_seconds": 6099.778499999999,
+      "false_cut_count": 531,
+      "false_cuts_after_wrong_anchor": 114,
+      "family": "streaming_sortformer",
+      "fraction_enrolled_within_1000ms": 0.447928026172301,
+      "fraction_enrolled_within_1500ms": 0.8538713195201745,
+      "gate": "gate2_causal_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 3233.572,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 2016,
+      "missed_replacement_count": 782,
+      "model_evidence_delay_ms": {
+        "p50": 1322.5,
+        "p90": 1572.5
+      },
+      "no_anchor_timeout_rate": 0.0005452562704471102,
+      "other_threshold": 0.35,
+      "predicted_cut_count": 2547,
+      "reference_replacement_count": 2798,
+      "replacement_confirm_ms": 500,
+      "replacement_emit_delay_ms": {
+        "p50": 1322.5,
+        "p90": 1572.5
+      },
+      "slot_loss_count": 0,
+      "slot_loss_rate": 0.0,
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 378.7211984659834,
+      "total_enrollment_count": 3935,
+      "unanchored_active_speech_seconds": 5335.1215,
+      "unmatched_enrollment_count": 269,
+      "wrong_anchor_count": 555,
+      "wrong_anchor_rate": 0.14104193138500634
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_threshold": 0.7,
+      "anchor_uncertain_active_speech_seconds": 27.462,
+      "backdated_boundary_error_ms": {
+        "p50": 300.0,
+        "p90": 300.0
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 0.8,
+        "p90": 7.774
+      },
+      "exclusive_other_contamination_seconds": 14285.673999999999,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 2124.18043901623,
+      "exclusive_other_contamination_upper_bound_seconds": 20199.649999999998,
+      "fail_closed_unknown_active_speech_seconds": 6678.633,
+      "false_cut_count": 822,
+      "family": "ls_eend",
+      "gate": "gate1_oracle_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 372.35200000000003,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 817,
+      "missed_replacement_count": 4044,
+      "model_evidence_delay_ms": {
+        "p50": 438.0,
+        "p90": 496.0
+      },
+      "other_threshold": 0.3,
+      "predicted_cut_count": 1639,
+      "reference_replacement_count": 4861,
+      "replacement_confirm_ms": 100,
+      "replacement_emit_delay_ms": {
+        "p50": 438.0,
+        "p90": 496.0
+      },
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 243.70790902463554,
+      "unanchored_active_speech_seconds": 5886.514
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_enrollment_delay_ms": {
+        "p50": 1370.0,
+        "p90": 7296.0
+      },
+      "anchor_error_cascade_length": {
+        "distribution": {
+          "1": 191,
+          "2": 23,
+          "3": 5,
+          "4": 1,
+          "6": 1
+        },
+        "maximum": 6,
+        "p50": 1.0,
+        "p90": 2.0
+      },
+      "anchor_threshold": 0.7,
+      "anchor_uncertain_active_speech_seconds": 0.0,
+      "anchor_uncertain_seconds": 0.0,
+      "anchor_uncertain_time_fraction": 0.0,
+      "backdated_boundary_error_ms": {
+        "p50": 64.0,
+        "p90": 439.40000000000003
+      },
+      "causal_enrollment": {
+        "active_threshold": 0.7,
+        "confirmation_samples": 6400,
+        "other_low_threshold": 0.3
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 1.226,
+        "p90": 8.44
+      },
+      "enrollment_count": 2198,
+      "enrollment_failure_count": 15,
+      "enrollment_failure_rate": 0.006778129236330773,
+      "exclusive_other_contamination_seconds": 16267.068,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 2418.7999562181576,
+      "exclusive_other_contamination_upper_bound_seconds": 30439.637,
+      "expected_opportunity_count": 2213,
+      "fail_closed_unknown_active_speech_seconds": 14937.226,
+      "false_cut_count": 1114,
+      "false_cuts_after_wrong_anchor": 262,
+      "family": "ls_eend",
+      "fraction_enrolled_within_1000ms": 0.3411658382286489,
+      "fraction_enrolled_within_1500ms": 0.5761409850881157,
+      "gate": "gate2_causal_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 1902.733,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 367,
+      "missed_replacement_count": 4494,
+      "model_evidence_delay_ms": {
+        "p50": 180.0,
+        "p90": 552.4000000000001
+      },
+      "no_anchor_timeout_rate": 0.006778129236330773,
+      "other_threshold": 0.3,
+      "predicted_cut_count": 1481,
+      "reference_replacement_count": 4861,
+      "replacement_confirm_ms": 100,
+      "replacement_emit_delay_ms": {
+        "p50": 180.0,
+        "p90": 552.4000000000001
+      },
+      "slot_loss_count": 0,
+      "slot_loss_rate": 0.0,
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 220.21440711744066,
+      "total_enrollment_count": 2273,
+      "unanchored_active_speech_seconds": 14172.569,
+      "unmatched_enrollment_count": 75,
+      "wrong_anchor_count": 491,
+      "wrong_anchor_rate": 0.21601407831060274
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_threshold": 0.7,
+      "anchor_uncertain_active_speech_seconds": 33.536,
+      "backdated_boundary_error_ms": {
+        "p50": 400.0,
+        "p90": 400.0
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 1.12,
+        "p90": 9.02
+      },
+      "exclusive_other_contamination_seconds": 14674.087,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 2181.9347526635675,
+      "exclusive_other_contamination_upper_bound_seconds": 19493.661,
+      "fail_closed_unknown_active_speech_seconds": 5584.231,
+      "false_cut_count": 733,
+      "family": "ls_eend",
+      "gate": "gate1_oracle_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 728.32,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 563,
+      "missed_replacement_count": 3688,
+      "model_evidence_delay_ms": {
+        "p50": 627.0,
+        "p90": 688.0
+      },
+      "other_threshold": 0.3,
+      "predicted_cut_count": 1296,
+      "reference_replacement_count": 4251,
+      "replacement_confirm_ms": 200,
+      "replacement_emit_delay_ms": {
+        "p50": 627.0,
+        "p90": 688.0
+      },
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 192.70619285901628,
+      "unanchored_active_speech_seconds": 4786.0380000000005
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_enrollment_delay_ms": {
+        "p50": 1368.0,
+        "p90": 7306.0
+      },
+      "anchor_error_cascade_length": {
+        "distribution": {
+          "1": 202,
+          "2": 29,
+          "3": 2,
+          "4": 2,
+          "6": 1
+        },
+        "maximum": 6,
+        "p50": 1.0,
+        "p90": 2.0
+      },
+      "anchor_threshold": 0.7,
+      "anchor_uncertain_active_speech_seconds": 0.0,
+      "anchor_uncertain_seconds": 0.0,
+      "anchor_uncertain_time_fraction": 0.0,
+      "backdated_boundary_error_ms": {
+        "p50": 29.0,
+        "p90": 432.4000000000001
+      },
+      "causal_enrollment": {
+        "active_threshold": 0.7,
+        "confirmation_samples": 6400,
+        "other_low_threshold": 0.3
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 1.48,
+        "p90": 9.467
+      },
+      "enrollment_count": 2126,
+      "enrollment_failure_count": 14,
+      "enrollment_failure_rate": 0.0065420560747663555,
+      "exclusive_other_contamination_seconds": 16011.455,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 2380.792079616868,
+      "exclusive_other_contamination_upper_bound_seconds": 30043.67,
+      "expected_opportunity_count": 2140,
+      "fail_closed_unknown_active_speech_seconds": 14796.872,
+      "false_cut_count": 1115,
+      "false_cuts_after_wrong_anchor": 280,
+      "family": "ls_eend",
+      "fraction_enrolled_within_1000ms": 0.34205607476635513,
+      "fraction_enrolled_within_1500ms": 0.5785046728971963,
+      "gate": "gate2_causal_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 1990.485,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 295,
+      "missed_replacement_count": 3956,
+      "model_evidence_delay_ms": {
+        "p50": 260.0,
+        "p90": 640.6
+      },
+      "no_anchor_timeout_rate": 0.0065420560747663555,
+      "other_threshold": 0.3,
+      "predicted_cut_count": 1410,
+      "reference_replacement_count": 4251,
+      "replacement_confirm_ms": 200,
+      "replacement_emit_delay_ms": {
+        "p50": 260.0,
+        "p90": 640.6
+      },
+      "slot_loss_count": 0,
+      "slot_loss_rate": 0.0,
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 209.65720056420753,
+      "total_enrollment_count": 2211,
+      "unanchored_active_speech_seconds": 14032.215,
+      "unmatched_enrollment_count": 85,
+      "wrong_anchor_count": 486,
+      "wrong_anchor_rate": 0.2198100407055631
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_threshold": 0.7,
+      "anchor_uncertain_active_speech_seconds": 35.558,
+      "backdated_boundary_error_ms": {
+        "p50": 500.0,
+        "p90": 500.0
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 1.696,
+        "p90": 10.924000000000005
+      },
+      "exclusive_other_contamination_seconds": 15731.404,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 2339.150442258565,
+      "exclusive_other_contamination_upper_bound_seconds": 19631.78,
+      "fail_closed_unknown_active_speech_seconds": 4665.033,
+      "false_cut_count": 632,
+      "family": "ls_eend",
+      "gate": "gate1_oracle_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 1092.142,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 383,
+      "missed_replacement_count": 3226,
+      "model_evidence_delay_ms": {
+        "p50": 819.0,
+        "p90": 888.0
+      },
+      "other_threshold": 0.3,
+      "predicted_cut_count": 1015,
+      "reference_replacement_count": 3609,
+      "replacement_confirm_ms": 300,
+      "replacement_emit_delay_ms": {
+        "p50": 819.0,
+        "p90": 888.0
+      },
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 150.9234457962203,
+      "unanchored_active_speech_seconds": 3864.818
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_enrollment_delay_ms": {
+        "p50": 1366.0,
+        "p90": 7313.500000000001
+      },
+      "anchor_error_cascade_length": {
+        "distribution": {
+          "1": 202,
+          "2": 28,
+          "3": 3,
+          "4": 1,
+          "6": 1
+        },
+        "maximum": 6,
+        "p50": 1.0,
+        "p90": 2.0
+      },
+      "anchor_threshold": 0.7,
+      "anchor_uncertain_active_speech_seconds": 0.0,
+      "anchor_uncertain_seconds": 0.0,
+      "anchor_uncertain_time_fraction": 0.0,
+      "backdated_boundary_error_ms": {
+        "p50": 0.0,
+        "p90": 428.0
+      },
+      "causal_enrollment": {
+        "active_threshold": 0.7,
+        "confirmation_samples": 6400,
+        "other_low_threshold": 0.3
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 1.97,
+        "p90": 11.156
+      },
+      "enrollment_count": 2084,
+      "enrollment_failure_count": 13,
+      "enrollment_failure_rate": 0.00619933237958989,
+      "exclusive_other_contamination_seconds": 16397.558,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 2438.2029123186,
+      "exclusive_other_contamination_upper_bound_seconds": 30324.334,
+      "expected_opportunity_count": 2097,
+      "fail_closed_unknown_active_speech_seconds": 14691.433,
+      "false_cut_count": 1099,
+      "false_cuts_after_wrong_anchor": 277,
+      "family": "ls_eend",
+      "fraction_enrolled_within_1000ms": 0.34287076776347164,
+      "fraction_enrolled_within_1500ms": 0.5827372436814496,
+      "gate": "gate2_causal_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 2029.63,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 251,
+      "missed_replacement_count": 3358,
+      "model_evidence_delay_ms": {
+        "p50": 355.0,
+        "p90": 747.0
+      },
+      "no_anchor_timeout_rate": 0.00619933237958989,
+      "other_threshold": 0.3,
+      "predicted_cut_count": 1350,
+      "reference_replacement_count": 3609,
+      "replacement_confirm_ms": 300,
+      "replacement_emit_delay_ms": {
+        "p50": 355.0,
+        "p90": 747.0
+      },
+      "slot_loss_count": 0,
+      "slot_loss_rate": 0.0,
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 200.7356175614753,
+      "total_enrollment_count": 2166,
+      "unanchored_active_speech_seconds": 13926.776,
+      "unmatched_enrollment_count": 82,
+      "wrong_anchor_count": 478,
+      "wrong_anchor_rate": 0.22068328716528163
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_threshold": 0.7,
+      "anchor_uncertain_active_speech_seconds": 38.676,
+      "backdated_boundary_error_ms": {
+        "p50": -162.5,
+        "p90": 0.0
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 3.243,
+        "p90": 15.063800000000013
+      },
+      "exclusive_other_contamination_seconds": 17891.404,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 2660.327430356925,
+      "exclusive_other_contamination_upper_bound_seconds": 20627.585,
+      "fail_closed_unknown_active_speech_seconds": 3500.838,
+      "false_cut_count": 601,
+      "family": "ls_eend",
+      "gate": "gate1_oracle_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 1739.385,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 114,
+      "missed_replacement_count": 2684,
+      "model_evidence_delay_ms": {
+        "p50": 348.5,
+        "p90": 528.8
+      },
+      "other_threshold": 0.3,
+      "predicted_cut_count": 715,
+      "reference_replacement_count": 2798,
+      "replacement_confirm_ms": 500,
+      "replacement_emit_delay_ms": {
+        "p50": 348.5,
+        "p90": 528.8
+      },
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 106.31553078255914,
+      "unanchored_active_speech_seconds": 2697.505
+    },
+    {
+      "active_speech_hours": 6.725263888888889,
+      "anchor_enrollment_delay_ms": {
+        "p50": 1365.0,
+        "p90": 7477.9999999999945
+      },
+      "anchor_error_cascade_length": {
+        "distribution": {
+          "1": 190,
+          "2": 23,
+          "3": 6,
+          "4": 1,
+          "6": 1
+        },
+        "maximum": 6,
+        "p50": 1.0,
+        "p90": 2.0
+      },
+      "anchor_threshold": 0.7,
+      "anchor_uncertain_active_speech_seconds": 0.0,
+      "anchor_uncertain_seconds": 0.0,
+      "anchor_uncertain_time_fraction": 0.0,
+      "backdated_boundary_error_ms": {
+        "p50": 126.0,
+        "p90": 439.70000000000005
+      },
+      "causal_enrollment": {
+        "active_threshold": 0.7,
+        "confirmation_samples": 6400,
+        "other_low_threshold": 0.3
+      },
+      "contamination_seconds_per_true_replacement": {
+        "p50": 3.01,
+        "p90": 14.892400000000002
+      },
+      "enrollment_count": 2013,
+      "enrollment_failure_count": 11,
+      "enrollment_failure_rate": 0.005434782608695652,
+      "exclusive_other_contamination_seconds": 17289.775,
+      "exclusive_other_contamination_seconds_per_active_speech_hour": 2570.8693793510793,
+      "exclusive_other_contamination_upper_bound_seconds": 31081.847,
+      "expected_opportunity_count": 2024,
+      "fail_closed_unknown_active_speech_seconds": 14556.729,
+      "false_cut_count": 1012,
+      "false_cuts_after_wrong_anchor": 264,
+      "family": "ls_eend",
+      "fraction_enrolled_within_1000ms": 0.3448616600790514,
+      "fraction_enrolled_within_1500ms": 0.583498023715415,
+      "gate": "gate2_causal_anchor",
+      "logical_episode_exclusive_other_contamination_seconds": 2198.83,
+      "masked_active_speech_seconds": 764.657,
+      "masked_seconds": 1422.644,
+      "matched_replacement_count": 222,
+      "missed_replacement_count": 2576,
+      "model_evidence_delay_ms": {
+        "p50": 630.5,
+        "p90": 953.1
+      },
+      "no_anchor_timeout_rate": 0.005434782608695652,
+      "other_threshold": 0.3,
+      "predicted_cut_count": 1234,
+      "reference_replacement_count": 2798,
+      "replacement_confirm_ms": 500,
+      "replacement_emit_delay_ms": {
+        "p50": 630.5,
+        "p90": 953.1
+      },
+      "slot_loss_count": 0,
+      "slot_loss_rate": 0.0,
+      "source_count": 19,
+      "speaker_induced_cut_count_per_active_speech_hour": 183.48722375619298,
+      "total_enrollment_count": 2077,
+      "unanchored_active_speech_seconds": 13792.072,
+      "unmatched_enrollment_count": 64,
+      "wrong_anchor_count": 454,
+      "wrong_anchor_rate": 0.21858449687048628
+    }
+  ],
+  "schema_version": "psem.relative_occupancy.product_frontiers.v1",
+  "selection_file_sha256": "28a3ba705153882ebc59a9b2318a382576de899644d676a8df066d04ba0a7974",
+  "selection_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\dev\\dev_selection_receipt.json",
+  "selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489"
+}
