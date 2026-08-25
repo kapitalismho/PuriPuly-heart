@@ -217,6 +217,170 @@ def test_opened_eval_manifest_binds_selection_and_access_receipt(
     )
     assert rows == [row]
     assert observed_selection == selection
+    copied_access_path = tmp_path / "copied_access.json"
+    write_json(copied_access_path, access)
+    with pytest.raises(EvalAccessError, match="path is not canonical"):
+        validate_opened_eval_manifest(
+            manifest_path=manifest_path,
+            access_path=copied_access_path,
+            selection_path=selection_path,
+            authorization_path=authorization_path,
+        )
+
+
+def test_eval_recovery_accepts_only_bound_same_manifest_commit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_root = tmp_path / "repo"
+    package = repo_root / "experiments" / "psem_relative_occupancy_gate"
+    package.mkdir(parents=True)
+    contract_path = package / "contract.py"
+    contract_path.write_text("after\n", encoding="utf-8")
+    config_path = package / "config.json"
+    config_path.write_text("{}\n", encoding="utf-8")
+    selection_path = tmp_path / "selection.json"
+    manifest_path = tmp_path / "eval_manifest.jsonl"
+    access_path = eval_access.access_receipt_path(manifest_path)
+    authorization_path = tmp_path / "eval_authorization.json"
+    claim_path = eval_access.consumption_receipt_path(authorization_path)
+    verification_path = tmp_path / "model_gate_verification.json"
+    write_json(verification_path, {"passed": True})
+    write_jsonl(manifest_path, [{"source_id": "eval"}])
+    write_json(access_path, {"access": True})
+    write_json(claim_path, {"claim": True})
+    before_hash = "1" * 64
+    after_hash = sha256_file(contract_path)
+    selection = {
+        "selection_sha256": "selection",
+        "artifact_bindings": {
+            "contract_files": {"contract.py": before_hash},
+        },
+    }
+    write_json(selection_path, selection)
+    authorization = {
+        "schema_version": "psem.relative_occupancy.eval_authorization.v1",
+        "role": "PSEM-STRATEGY-EVAL",
+        "authorization_state": "authorized_for_one_manifest_derivation",
+        "use_limit": 1,
+        "accepted_c2_head": "a" * 40,
+        "selection_sha256": "selection",
+        "selection_file_sha256": sha256_file(selection_path),
+        "model_gate_verification_path": str(verification_path.resolve()),
+        "model_gate_verification_sha256": sha256_file(verification_path),
+        "manifest_output_path": str(manifest_path.resolve()),
+    }
+    authorization["authorization_sha256"] = canonical_sha256(authorization)
+    write_json(authorization_path, authorization)
+    relative_path = "experiments/psem_relative_occupancy_gate/contract.py"
+    recovery = {
+        "schema_version": eval_access.EVAL_RECOVERY_SCHEMA_VERSION,
+        "role": "PSEM-STRATEGY-EVAL",
+        "recovery_state": "authorized_for_same_opened_manifest_resume",
+        "recovery_reason": eval_access.EVAL_RECOVERY_REASON,
+        "accepted_c2_head": "a" * 40,
+        "recovery_head": "b" * 40,
+        "authorization_sha256": authorization["authorization_sha256"],
+        "authorization_file_sha256": sha256_file(authorization_path),
+        "selection_sha256": "selection",
+        "selection_file_sha256": sha256_file(selection_path),
+        "manifest_path": str(manifest_path.resolve()),
+        "manifest_sha256": sha256_file(manifest_path),
+        "access_receipt_path": str(access_path.resolve()),
+        "access_receipt_sha256": sha256_file(access_path),
+        "consumption_receipt_path": str(claim_path.resolve()),
+        "consumption_receipt_sha256": sha256_file(claim_path),
+        "manifest_open_count": 1,
+        "additional_manifest_derivations": 0,
+        "prior_eval_aggregate_count": 0,
+        "changed_files": {
+            relative_path: {
+                "before_sha256": before_hash,
+                "after_sha256": after_hash,
+            }
+        },
+        "contract_overrides": {
+            "contract.py": {
+                "before_sha256": before_hash,
+                "after_sha256": after_hash,
+            }
+        },
+    }
+    recovery["recovery_sha256"] = canonical_sha256(recovery)
+    write_json(eval_access.recovery_receipt_path(authorization_path), recovery)
+    observed_overrides: list[dict[str, dict[str, str]] | None] = []
+    monkeypatch.setattr(eval_access, "PACKAGE_ROOT", package)
+    monkeypatch.setattr(eval_access, "CONFIG_PATH", config_path)
+    monkeypatch.setattr(eval_access, "EVAL_RECOVERY_ALLOWED_PATHS", {relative_path})
+    monkeypatch.setattr(eval_access, "EVAL_RECOVERY_REQUIRED_PATHS", {relative_path})
+    monkeypatch.setattr(eval_access, "_current_head", lambda: "b" * 40)
+    monkeypatch.setattr(eval_access, "_tracked_worktree_is_clean", lambda _root: True)
+    monkeypatch.setattr(eval_access, "_git_is_ancestor", lambda _base, _head: True)
+    monkeypatch.setattr(
+        eval_access, "_git_changed_paths", lambda _base, _head: {relative_path}
+    )
+    monkeypatch.setattr(
+        eval_access,
+        "_git_file_sha256",
+        lambda _head, _path: before_hash,
+    )
+    monkeypatch.setattr(
+        eval_access,
+        "validate_frozen_selection_bindings",
+        lambda _path, _selection, contract_overrides=None: observed_overrides.append(
+            contract_overrides
+        ),
+    )
+    assert (
+        eval_access.load_eval_authorization(
+            authorization_path,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_path,
+        )
+        == authorization
+    )
+    assert observed_overrides == [recovery["contract_overrides"]]
+    monkeypatch.setattr(eval_access, "_current_head", lambda: "a" * 40)
+    with pytest.raises(EvalAccessError, match="recovery binding mismatch"):
+        eval_access.load_eval_authorization(
+            authorization_path,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_path,
+        )
+    monkeypatch.setattr(eval_access, "_current_head", lambda: "b" * 40)
+    monkeypatch.setattr(eval_access, "_git_is_ancestor", lambda _base, _head: False)
+    with pytest.raises(EvalAccessError, match="recovery binding mismatch"):
+        eval_access.load_eval_authorization(
+            authorization_path,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_path,
+        )
+
+
+def test_eval_recovery_cleanliness_whitelists_only_eval_outputs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_root = tmp_path / "repo"
+    package = repo_root / "experiments" / "psem_relative_occupancy_gate"
+    eval_root = package / "results" / "eval"
+    eval_root.mkdir(parents=True)
+    monkeypatch.setattr(eval_access, "PACKAGE_ROOT", package)
+
+    def status(stdout: bytes) -> None:
+        monkeypatch.setattr(
+            eval_access.subprocess,
+            "run",
+            lambda *_args, **_kwargs: SimpleNamespace(stdout=stdout),
+        )
+
+    status(b"?? experiments/psem_relative_occupancy_gate/results/eval/receipt.json\0")
+    assert eval_access._tracked_worktree_is_clean(eval_root)
+    status(b"?? arbitrary.txt\0")
+    assert not eval_access._tracked_worktree_is_clean(eval_root)
+    status(b" M experiments/psem_relative_occupancy_gate/eval_access.py\0")
+    assert not eval_access._tracked_worktree_is_clean(eval_root)
 
 
 def test_eval_authorization_revalidates_accepted_dev_evidence(

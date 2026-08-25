@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -21,6 +22,24 @@ from experiments.psem_relative_occupancy_gate.provenance import load_frozen_data
 
 class EvalAccessError(RuntimeError):
     pass
+
+
+EVAL_RECOVERY_SCHEMA_VERSION = "psem.relative_occupancy.eval_recovery.v1"
+EVAL_RECOVERY_REASON = "sortformer_exact_frozen_source_window_materialization"
+EVAL_RECOVERY_ALLOWED_PATHS = {
+    "experiments/psem_relative_occupancy_gate/authorize_eval_recovery.py",
+    "experiments/psem_relative_occupancy_gate/eval_access.py",
+    "experiments/psem_relative_occupancy_gate/model_run_io.py",
+    "experiments/psem_relative_occupancy_gate/run_sortformer_trace.py",
+    "experiments/psem_relative_occupancy_gate/tests/test_provenance_sealing.py",
+    "experiments/psem_relative_occupancy_gate/tests/test_trace_adapters.py",
+}
+EVAL_RECOVERY_REQUIRED_PATHS = {
+    "experiments/psem_relative_occupancy_gate/authorize_eval_recovery.py",
+    "experiments/psem_relative_occupancy_gate/eval_access.py",
+    "experiments/psem_relative_occupancy_gate/model_run_io.py",
+    "experiments/psem_relative_occupancy_gate/run_sortformer_trace.py",
+}
 
 
 def _strict_file(path: Path, field: str) -> Path:
@@ -57,6 +76,10 @@ def consumption_receipt_path(authorization_path: Path) -> Path:
     return authorization_path.with_name(f"{authorization_path.stem}_consumed.json")
 
 
+def recovery_receipt_path(authorization_path: Path) -> Path:
+    return authorization_path.with_name(f"{authorization_path.stem}_recovery.json")
+
+
 def _current_head() -> str:
     return subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -66,8 +89,65 @@ def _current_head() -> str:
     ).stdout.strip()
 
 
+def _tracked_worktree_is_clean(allowed_untracked_root: Path) -> bool:
+    repo_root = PACKAGE_ROOT.parent.parent.resolve()
+    allowed_untracked_root = allowed_untracked_root.resolve()
+    if repo_root not in allowed_untracked_root.parents:
+        return False
+    output = subprocess.run(
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        check=True,
+        capture_output=True,
+    ).stdout
+    for record in output.split(b"\0"):
+        if not record:
+            continue
+        if not record.startswith(b"?? "):
+            return False
+        relative_path = record[3:].decode("utf-8", errors="surrogateescape")
+        path = (repo_root / relative_path).resolve()
+        if path != allowed_untracked_root and allowed_untracked_root not in path.parents:
+            return False
+    return True
+
+
+def _git_is_ancestor(base: str, head: str) -> bool:
+    return (
+        subprocess.run(
+            ["git", "merge-base", "--is-ancestor", base, head],
+            check=False,
+            capture_output=True,
+        ).returncode
+        == 0
+    )
+
+
+def _git_changed_paths(base: str, head: str) -> set[str]:
+    output = subprocess.run(
+        ["git", "diff", "--name-only", f"{base}..{head}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    return {line.strip().replace("\\", "/") for line in output.splitlines() if line.strip()}
+
+
+def _git_file_sha256(head: str, relative_path: str) -> str | None:
+    completed = subprocess.run(
+        ["git", "show", f"{head}:{relative_path}"],
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        return None
+    return hashlib.sha256(completed.stdout).hexdigest()
+
+
 def validate_frozen_selection_bindings(
-    selection_path: Path, selection: dict[str, Any]
+    selection_path: Path,
+    selection: dict[str, Any],
+    *,
+    contract_overrides: dict[str, dict[str, str]] | None = None,
 ) -> None:
     root = selection_path.resolve().parent
     bindings = selection.get("artifact_bindings")
@@ -78,10 +158,19 @@ def validate_frozen_selection_bindings(
         raise EvalAccessError("DEV selection contract bindings are missing")
     for name, expected_hash in contracts.items():
         path = PACKAGE_ROOT / str(name)
+        observed_hash = sha256_file(path)
+        override = (contract_overrides or {}).get(str(name))
         if (
             Path(str(name)).name != str(name)
             or _strict_file(path, f"DEV contract {name}") != path.resolve()
-            or sha256_file(path) != expected_hash
+            or (
+                observed_hash != expected_hash
+                and (
+                    not isinstance(override, dict)
+                    or override.get("before_sha256") != expected_hash
+                    or override.get("after_sha256") != observed_hash
+                )
+            )
         ):
             raise EvalAccessError(f"DEV selection contract changed: {name}")
     expected = {
@@ -124,6 +213,99 @@ def validate_frozen_selection_bindings(
         raise EvalAccessError("DEV selection manifest or configuration changed")
 
 
+def _load_eval_recovery(
+    authorization_path: Path,
+    *,
+    authorization: dict[str, Any],
+    selection_path: Path,
+    selection: dict[str, Any],
+    manifest_output: Path,
+) -> dict[str, dict[str, str]]:
+    path = _strict_file(recovery_receipt_path(authorization_path), "EVAL recovery receipt")
+    value = load_json(path)
+    if not isinstance(value, dict):
+        raise EvalAccessError("EVAL recovery receipt must be an object")
+    payload = dict(value)
+    observed_hash = payload.pop("recovery_sha256", None)
+    access_path = access_receipt_path(manifest_output)
+    claim_path = consumption_receipt_path(authorization_path)
+    expected = {
+        "schema_version": EVAL_RECOVERY_SCHEMA_VERSION,
+        "role": "PSEM-STRATEGY-EVAL",
+        "recovery_state": "authorized_for_same_opened_manifest_resume",
+        "recovery_reason": EVAL_RECOVERY_REASON,
+        "accepted_c2_head": authorization["accepted_c2_head"],
+        "authorization_sha256": authorization["authorization_sha256"],
+        "authorization_file_sha256": sha256_file(authorization_path),
+        "selection_sha256": selection["selection_sha256"],
+        "selection_file_sha256": sha256_file(selection_path),
+        "manifest_path": str(manifest_output),
+        "manifest_sha256": sha256_file(manifest_output),
+        "access_receipt_path": str(access_path),
+        "access_receipt_sha256": sha256_file(access_path),
+        "consumption_receipt_path": str(claim_path),
+        "consumption_receipt_sha256": sha256_file(claim_path),
+        "manifest_open_count": 1,
+        "additional_manifest_derivations": 0,
+        "prior_eval_aggregate_count": 0,
+    }
+    if (
+        observed_hash != canonical_sha256(payload)
+        or any(value.get(field) != expected_value for field, expected_value in expected.items())
+        or value.get("recovery_head") != _current_head()
+        or not _tracked_worktree_is_clean(manifest_output.parent)
+        or not _git_is_ancestor(
+            str(authorization["accepted_c2_head"]), str(value.get("recovery_head", ""))
+        )
+    ):
+        raise EvalAccessError("EVAL recovery binding mismatch")
+    changed_files = value.get("changed_files")
+    if not isinstance(changed_files, dict) or not changed_files:
+        raise EvalAccessError("EVAL recovery changed-file binding is missing")
+    observed_paths = _git_changed_paths(
+        str(authorization["accepted_c2_head"]), str(value["recovery_head"])
+    )
+    if (
+        observed_paths != set(changed_files)
+        or not EVAL_RECOVERY_REQUIRED_PATHS <= observed_paths
+        or not observed_paths <= EVAL_RECOVERY_ALLOWED_PATHS
+    ):
+        raise EvalAccessError("EVAL recovery changed-file set mismatch")
+    root = PACKAGE_ROOT.parent.parent
+    for relative_path, binding in changed_files.items():
+        if (
+            not isinstance(relative_path, str)
+            or not isinstance(binding, dict)
+            or Path(relative_path).is_absolute()
+            or ".." in Path(relative_path).parts
+        ):
+            raise EvalAccessError("EVAL recovery changed-file path is invalid")
+        current_path = (root / relative_path).resolve()
+        if root not in current_path.parents or not current_path.is_file():
+            raise EvalAccessError("EVAL recovery changed-file location is invalid")
+        if (
+            binding.get("before_sha256")
+            != _git_file_sha256(str(authorization["accepted_c2_head"]), relative_path)
+            or binding.get("after_sha256") != sha256_file(current_path)
+        ):
+            raise EvalAccessError("EVAL recovery changed-file hash mismatch")
+    overrides = value.get("contract_overrides")
+    if not isinstance(overrides, dict):
+        raise EvalAccessError("EVAL recovery contract overrides are invalid")
+    contracts = selection.get("artifact_bindings", {}).get("contract_files", {})
+    expected_overrides: dict[str, dict[str, str]] = {}
+    for name, before_sha256 in contracts.items():
+        after_sha256 = sha256_file(PACKAGE_ROOT / str(name))
+        if after_sha256 != before_sha256:
+            expected_overrides[str(name)] = {
+                "before_sha256": str(before_sha256),
+                "after_sha256": after_sha256,
+            }
+    if overrides != expected_overrides:
+        raise EvalAccessError("EVAL recovery contract override set mismatch")
+    return overrides
+
+
 def load_eval_authorization(
     path: Path,
     *,
@@ -155,7 +337,6 @@ def load_eval_authorization(
     if (
         not isinstance(candidate_head, str)
         or len(candidate_head) != 40
-        or candidate_head != _current_head()
         or verification_path
         != selection_path.resolve().parent / "model_gate_verification.json"
         or _strict_file(verification_path, "model-gate verification")
@@ -163,7 +344,32 @@ def load_eval_authorization(
         or sha256_file(verification_path) != value.get("model_gate_verification_sha256")
     ):
         raise EvalAccessError("EVAL authorization lacks the accepted C2 head")
-    validate_frozen_selection_bindings(selection_path, selection)
+    recovery_path = recovery_receipt_path(path)
+    current_head = _current_head()
+    if recovery_path.exists():
+        overrides = _load_eval_recovery(
+            path,
+            authorization=value,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_output.resolve(),
+        )
+        validate_frozen_selection_bindings(
+            selection_path, selection, contract_overrides=overrides
+        )
+    elif candidate_head == current_head:
+        validate_frozen_selection_bindings(selection_path, selection)
+    else:
+        overrides = _load_eval_recovery(
+            path,
+            authorization=value,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_output.resolve(),
+        )
+        validate_frozen_selection_bindings(
+            selection_path, selection, contract_overrides=overrides
+        )
     return value
 
 
@@ -233,6 +439,8 @@ def validate_opened_eval_manifest(
     access_path = access_path.resolve()
     selection_path = selection_path.resolve()
     authorization_path = authorization_path.resolve()
+    if access_path != access_receipt_path(manifest_path):
+        raise EvalAccessError("EVAL access receipt path is not canonical")
     selection = load_frozen_selection(selection_path)
     authorization = load_eval_authorization(
         authorization_path,

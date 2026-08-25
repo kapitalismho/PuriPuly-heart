@@ -39,6 +39,31 @@ def _root_before_suffix(path: Path, relative: str | Path) -> Path:
     return path.parents[len(suffix.parts) - 1]
 
 
+def _sortformer_inference_audio(
+    source_receipt: dict[str, Any],
+    inference: dict[str, Any],
+    source_duration_samples: int,
+) -> tuple[Path, dict[str, Any]]:
+    binding = source_receipt.get("inference_audio")
+    if not isinstance(binding, dict):
+        raise ModelRunError("Sortformer inference audio binding is missing")
+    path = strict_regular_file(
+        Path(str(binding.get("path", ""))), "Sortformer inference audio"
+    )
+    expected = {
+        "path": str(path),
+        "sha256": sha256_file(path),
+        "size_bytes": path.stat().st_size,
+        "sample_count": source_duration_samples,
+        "source_start_sample": 0,
+        "source_end_sample": source_duration_samples,
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_window",
+    }
+    if binding != expected or inference.get("audio") != binding:
+        raise ModelRunError("Sortformer inference audio binding mismatch")
+    return path, binding
+
+
 def load_model_traces(
     receipt_path: Path,
     *,
@@ -185,6 +210,13 @@ def load_model_traces(
             resolved_backend = source_receipt.get("backend_resolved")
             inference = source_receipt.get("inference")
             bench = inference.get("bench") if isinstance(inference, dict) else None
+            if not isinstance(inference, dict):
+                raise ModelRunError(
+                    f"model inference receipt mismatch: {family}:{source_id}"
+                )
+            inference_audio_path, inference_audio = _sortformer_inference_audio(
+                source_receipt, inference, int(row["source_duration_samples"])
+            )
             bench_path = strict_regular_file(
                 Path(str(source_receipt.get("bench_path", ""))), "Sortformer bench"
             )
@@ -214,7 +246,25 @@ def load_model_traces(
                 or inference.get("bench_sha256") != sha256_file(raw_bench_path)
                 or load_json(raw_bench_path) != bench
                 or bench.get("model_path") != str(model_path)
-                or bench.get("sample_path") != str(waveform_path)
+                or bench.get("sample_path") != str(inference_audio_path)
+                or inference.get("command")
+                != [
+                    str(bench_path),
+                    "--model",
+                    str(model_path),
+                    "--sample",
+                    str(inference_audio_path),
+                    "--backend",
+                    str(family_config["backend"]),
+                    "--threads",
+                    str(family_config["threads"]),
+                    "--warmup",
+                    "0",
+                    "--iters",
+                    "1",
+                    "--json-out",
+                    str(raw_bench_path),
+                ]
             ):
                 raise ModelRunError(
                     f"model backend resolution mismatch: {family}:{source_id}"
@@ -257,6 +307,10 @@ def load_model_traces(
                 trace_path.parent / "run" / "bench.json"
             ):
                 raise TraceRuntimeError("Sortformer raw bench receipt root mismatch")
+            if family == "streaming_sortformer" and inference_audio_path != (
+                trace_path.parent / "input.wav"
+            ):
+                raise TraceRuntimeError("Sortformer inference audio root mismatch")
             trace_root = trace_path.parents[4]
             if family == "streaming_sortformer" and (
                 trace_root == inferred_research_root
@@ -299,6 +353,12 @@ def load_model_traces(
                     "source_commit": family_config["source_commit"],
                     "telemetry_patch_sha256": family_config[
                         "telemetry_patch_sha256"
+                    ],
+                    "inference_audio_path": inference_audio["path"],
+                    "inference_audio_sha256": inference_audio["sha256"],
+                    "inference_audio_sample_count": inference_audio["sample_count"],
+                    "inference_audio_materialization": inference_audio[
+                        "materialization"
                     ],
                     "bench_sha256": family_config["bench_sha256"],
                     "bench_relative_path": family_config["bench_relative_path"],

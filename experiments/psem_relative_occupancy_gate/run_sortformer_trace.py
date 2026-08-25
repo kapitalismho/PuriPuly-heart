@@ -6,6 +6,7 @@ import math
 import os
 import subprocess
 import time
+import wave
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -181,6 +182,7 @@ def _trace(
     probabilities: np.ndarray,
     source_start_sample: int,
     source_end_sample: int,
+    inference_audio: dict[str, Any],
 ) -> Trace:
     sample_count = source_end_sample - source_start_sample
     starts, ends, frontiers = sortformer_frame_geometry(
@@ -198,6 +200,10 @@ def _trace(
         "role": row["role"],
         "manifest_row_sha256": row["row_sha256"],
         "waveform_sha256": row["waveform_sha256"],
+        "inference_audio_path": inference_audio["path"],
+        "inference_audio_sha256": inference_audio["sha256"],
+        "inference_audio_sample_count": inference_audio["sample_count"],
+        "inference_audio_materialization": inference_audio["materialization"],
         "source_start_sample": source_start_sample,
         "source_end_sample": source_end_sample,
         "model_sha256": cfg["sortformer"]["model_sha256"],
@@ -267,6 +273,66 @@ def _telemetry_summary(
         },
         "compression_call_count": sum(bool(row["compression_called"]) for row in rows),
     }
+
+
+def _materialize_inference_audio(
+    source_root: Path,
+    row: dict[str, Any],
+    source_start_sample: int,
+    source_end_sample: int,
+) -> tuple[Path, dict[str, Any]]:
+    path = source_root / "input.wav"
+    write_waveform_slice(path, row, source_start_sample, source_end_sample)
+    return path, _inspect_inference_audio(path, source_start_sample, source_end_sample)
+
+
+def _inspect_inference_audio(
+    path: Path, source_start_sample: int, source_end_sample: int
+) -> dict[str, Any]:
+    try:
+        path = strict_regular_file(path, "Sortformer inference audio")
+        with wave.open(str(path), "rb") as reader:
+            valid = (
+                reader.getnchannels() == 1
+                and reader.getsampwidth() == 2
+                and reader.getframerate() == 16000
+                and reader.getnframes() == source_end_sample - source_start_sample
+            )
+    except (ExperimentError, EOFError, OSError, wave.Error) as exc:
+        raise SortformerTraceError("Sortformer inference audio is invalid") from exc
+    if not valid:
+        raise SortformerTraceError("Sortformer inference audio geometry is invalid")
+    return {
+        "path": str(path),
+        "sha256": sha256_file(path),
+        "size_bytes": path.stat().st_size,
+        "sample_count": source_end_sample - source_start_sample,
+        "source_start_sample": source_start_sample,
+        "source_end_sample": source_end_sample,
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_window",
+    }
+
+
+def _load_resume_inference_audio(
+    receipt_path: Path,
+    audio_path: Path,
+    source_start_sample: int,
+    source_end_sample: int,
+) -> dict[str, Any] | None:
+    if not receipt_path.is_file():
+        return None
+    receipt = load_json(receipt_path)
+    if not isinstance(receipt, dict):
+        raise SortformerTraceError("Sortformer resume receipt is invalid")
+    expected = receipt.get("inference_audio")
+    if expected is None:
+        return None
+    observed = _inspect_inference_audio(
+        audio_path, source_start_sample, source_end_sample
+    )
+    if not isinstance(expected, dict) or observed != expected:
+        raise SortformerTraceError("Sortformer resume inference audio binding mismatch")
+    return observed
 
 
 def _run_new_inference(
@@ -423,6 +489,7 @@ def _resume_receipt(
     bench: Path,
     model: Path,
     audio: Path,
+    inference_audio: dict[str, Any],
 ) -> dict[str, Any] | None:
     if not receipt_path.is_file():
         return None
@@ -453,6 +520,8 @@ def _resume_receipt(
         and receipt.get("usage") == expected_usage
         and receipt.get("manifest_row_sha256") == row["row_sha256"]
         and receipt.get("waveform_sha256") == row["waveform_sha256"]
+        and receipt.get("waveform_size_bytes") == row["waveform_size_bytes"]
+        and receipt.get("inference_audio") == inference_audio
         and receipt.get("source_start_sample") == source_start_sample
         and receipt.get("source_end_sample") == source_end_sample
         and receipt.get("model_sha256") == model_cfg["model_sha256"]
@@ -468,6 +537,7 @@ def _resume_receipt(
         )
         and isinstance(inference_receipt, dict)
         and inference_receipt.get("backend_resolved") == receipt.get("backend_resolved")
+        and inference_receipt.get("audio") == inference_audio
         and isinstance(bench_receipt, dict)
         and bench_receipt.get("backend") == receipt.get("backend_resolved")
         and receipt.get("threads") == model_cfg["threads"]
@@ -533,6 +603,10 @@ def _resume_receipt(
         "role": row["role"],
         "manifest_row_sha256": row["row_sha256"],
         "waveform_sha256": row["waveform_sha256"],
+        "inference_audio_path": inference_audio["path"],
+        "inference_audio_sha256": inference_audio["sha256"],
+        "inference_audio_sample_count": inference_audio["sample_count"],
+        "inference_audio_materialization": inference_audio["materialization"],
         "source_start_sample": source_start_sample,
         "source_end_sample": source_end_sample,
         "model_sha256": model_cfg["model_sha256"],
@@ -608,29 +682,37 @@ def run_traces(
         )
         source_root.mkdir(parents=True, exist_ok=True)
         receipt_path = source_root / "receipt.json"
-        if resume:
-            previous = _resume_receipt(
-                receipt_path,
-                row=row,
-                source_start_sample=source_start,
-                source_end_sample=source_end,
-                source_root=source_root,
-                bench=bench,
-                model=model,
-                audio=(
-                    Path(str(row["audio_path"])).resolve()
-                    if usage == "full_frozen_source"
-                    else source_root / "input.wav"
-                ),
+        audio = source_root / "input.wav"
+        inference_audio = (
+            _load_resume_inference_audio(
+                receipt_path, audio, source_start, source_end
             )
-            if previous is not None:
+            if resume
+            else None
+        )
+        if resume:
+            if inference_audio is not None:
+                previous = _resume_receipt(
+                    receipt_path,
+                    row=row,
+                    source_start_sample=source_start,
+                    source_end_sample=source_end,
+                    source_root=source_root,
+                    bench=bench,
+                    model=model,
+                    audio=audio,
+                    inference_audio=inference_audio,
+                )
+                if previous is None:
+                    raise SortformerTraceError(
+                        f"Sortformer resume receipt is invalid: {row['source_id']}"
+                    )
                 source_receipts.append(previous)
                 print(f"{row['source_id']}: resumed verified Sortformer trace", flush=True)
                 continue
-        audio = Path(str(row["audio_path"])).resolve()
-        if usage != "full_frozen_source":
-            audio = source_root / "input.wav"
-            write_waveform_slice(audio, row, source_start, source_end)
+        audio, inference_audio = _materialize_inference_audio(
+            source_root, row, source_start, source_end
+        )
         reused = None
         if reuse_r8_cache and usage == "full_frozen_source":
             reused = _reuse_r8(row=row, research=research)
@@ -643,11 +725,14 @@ def run_traces(
             )
         else:
             probabilities, telemetry, inference, telemetry_path = reused
+        inference = dict(inference)
+        inference["audio"] = inference_audio
         trace = _trace(
             row=row,
             probabilities=probabilities,
             source_start_sample=source_start,
             source_end_sample=source_end,
+            inference_audio=inference_audio,
         )
         trace_path = source_root / "posterior_trace.npz"
         trace_info = write_trace(trace_path, trace)
@@ -665,6 +750,7 @@ def run_traces(
             "waveform_path": str(Path(str(row["audio_path"])).resolve()),
             "waveform_sha256": row["waveform_sha256"],
             "waveform_size_bytes": row["waveform_size_bytes"],
+            "inference_audio": inference_audio,
             "source_start_sample": source_start,
             "source_end_sample": source_end,
             "model_path": str(model),
