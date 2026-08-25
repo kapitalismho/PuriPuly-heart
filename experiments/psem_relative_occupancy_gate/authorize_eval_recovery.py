@@ -7,24 +7,25 @@ from pathlib import Path
 from typing import Any
 
 from experiments.psem_relative_occupancy_gate.eval_access import (
-    EVAL_RECOVERY_ACCEPTED_C3_HEAD,
-    EVAL_RECOVERY_ALLOWED_PATHS,
-    EVAL_RECOVERY_EXTENSION_REASON,
-    EVAL_RECOVERY_EXTENSION_SCHEMA_VERSION,
-    EVAL_RECOVERY_REQUIRED_PATHS,
+    EVAL_RECOVERY_ACCEPTED_C4_HEAD,
+    EVAL_RECOVERY_FINALIZATION_ALLOWED_PATHS,
+    EVAL_RECOVERY_FINALIZATION_REASON,
+    EVAL_RECOVERY_FINALIZATION_REQUIRED_PATHS,
+    EVAL_RECOVERY_FINALIZATION_SCHEMA_VERSION,
     EvalAccessError,
     _current_head,
     _git_changed_paths,
     _git_file_sha256,
     _git_is_ancestor,
     _git_is_direct_child,
-    _load_eval_recovery_history,
+    _load_eval_recovery_extension_history,
     _tracked_worktree_is_clean,
     access_receipt_path,
     consumption_receipt_path,
     load_frozen_selection,
     recovery_extension_receipt_path,
-    recovery_receipt_path,
+    recovery_finalization_receipt_path,
+    validate_eval_result_directory,
     validate_frozen_selection_bindings,
 )
 from experiments.psem_relative_occupancy_gate.io_utils import (
@@ -35,6 +36,10 @@ from experiments.psem_relative_occupancy_gate.io_utils import (
     load_jsonl,
     safe_output_path,
     sha256_file,
+)
+from experiments.psem_relative_occupancy_gate.model_run_io import (
+    ModelRunError,
+    load_model_traces,
 )
 from experiments.psem_relative_occupancy_gate.provenance import load_frozen_dataset
 
@@ -109,7 +114,9 @@ def _validate_claim_and_access(
     claim_path = consumption_receipt_path(authorization_path)
     claim = _load_canonical(claim_path, "claim_sha256", "EVAL consumption receipt")
     if (
-        claim.get("authorization_sha256") != authorization["authorization_sha256"]
+        claim.get("schema_version") != "psem.relative_occupancy.eval_consumption.v1"
+        or claim.get("role") != "PSEM-STRATEGY-EVAL"
+        or claim.get("authorization_sha256") != authorization["authorization_sha256"]
         or claim.get("authorization_file_sha256") != sha256_file(authorization_path)
         or claim.get("accepted_c2_head") != authorization["accepted_c2_head"]
         or claim.get("manifest_output_path") != str(manifest_path)
@@ -161,9 +168,46 @@ def _contract_overrides(
     if set(result) != {
         "eval_access.py",
         "model_run_io.py",
+        "run_eval.py",
+        "run_eval_traces.py",
         "run_sortformer_trace.py",
+        "trace_runtime.py",
+        "verify_eval.py",
     }:
         raise EvalRecoveryAuthorizationError("recovery contract override scope is invalid")
+    return result
+
+
+def _validate_model_aggregates(
+    *,
+    manifest_path: Path,
+    manifest: list[dict[str, Any]],
+    access_path: Path,
+) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for family, name in (
+        ("streaming_sortformer", "sortformer_model_receipt.json"),
+        ("ls_eend", "lseend_model_receipt.json"),
+    ):
+        path = manifest_path.parent / name
+        try:
+            identity, traces = load_model_traces(
+                path,
+                manifest_path=manifest_path,
+                manifest=manifest,
+                family=family,
+                role="PSEM-STRATEGY-EVAL",
+                eval_access_path=access_path,
+            )
+        except ModelRunError as exc:
+            raise EvalRecoveryAuthorizationError(
+                f"completed EVAL model aggregate is invalid: {family}"
+            ) from exc
+        if len(traces) != len(manifest):
+            raise EvalRecoveryAuthorizationError(
+                f"completed EVAL model aggregate is incomplete: {family}"
+            )
+        result[name] = str(identity["receipt_sha256"])
     return result
 
 
@@ -175,8 +219,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     output = safe_output_path(Path(args.output))
     if access_path != access_receipt_path(manifest_path):
         raise EvalRecoveryAuthorizationError("EVAL access receipt path is not canonical")
-    prior_recovery_path = recovery_receipt_path(authorization_path)
-    expected_output = recovery_extension_receipt_path(authorization_path)
+    prior_recovery_path = recovery_extension_receipt_path(authorization_path)
+    expected_output = recovery_finalization_receipt_path(authorization_path)
     if output != expected_output:
         raise EvalRecoveryAuthorizationError("EVAL recovery output path is not canonical")
     if not prior_recovery_path.is_file():
@@ -201,7 +245,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     ):
         raise EvalRecoveryAuthorizationError("original EVAL authorization binding changed")
     try:
-        prior_recovery = _load_eval_recovery_history(
+        prior_recovery = _load_eval_recovery_extension_history(
             authorization_path,
             authorization=authorization,
             selection_path=selection_path,
@@ -218,14 +262,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     ):
         raise EvalRecoveryAuthorizationError("recovery candidate is not an exact clean commit")
     _validate_ancestor(args.accepted_c2_head, recovery_head)
-    if not _git_is_direct_child(EVAL_RECOVERY_ACCEPTED_C3_HEAD, recovery_head):
+    if not _git_is_direct_child(EVAL_RECOVERY_ACCEPTED_C4_HEAD, recovery_head):
         raise EvalRecoveryAuthorizationError(
-            "recovery head is not the direct C4 child of accepted C3"
+            "recovery head is not the direct finalization child of accepted C4"
         )
     changed_paths = _git_changed_paths(args.accepted_c2_head, recovery_head)
     if (
-        not EVAL_RECOVERY_REQUIRED_PATHS <= changed_paths
-        or not changed_paths <= EVAL_RECOVERY_ALLOWED_PATHS
+        not EVAL_RECOVERY_FINALIZATION_REQUIRED_PATHS <= changed_paths
+        or not changed_paths <= EVAL_RECOVERY_FINALIZATION_ALLOWED_PATHS
     ):
         raise EvalRecoveryAuthorizationError("recovery candidate changed disallowed paths")
     contract_overrides = _contract_overrides(selection, args.accepted_c2_head)
@@ -263,8 +307,27 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     existing_aggregates = sorted(
         name for name in aggregate_names if (manifest_path.parent / name).exists()
     )
-    if existing_aggregates:
-        raise EvalRecoveryAuthorizationError("EVAL aggregate already exists before recovery")
+    expected_aggregates = ["lseend_model_receipt.json", "sortformer_model_receipt.json"]
+    if existing_aggregates != expected_aggregates:
+        raise EvalRecoveryAuthorizationError(
+            "EVAL recovery requires exactly both completed model aggregates and no metrics"
+        )
+    try:
+        validate_eval_result_directory(
+            manifest_path=manifest_path,
+            authorization_path=authorization_path,
+            require_finalization=False,
+            allow_final_outputs=False,
+        )
+    except EvalAccessError as exc:
+        raise EvalRecoveryAuthorizationError(
+            "EVAL result directory is not in the exact pre-finalization state"
+        ) from exc
+    model_aggregates = _validate_model_aggregates(
+        manifest_path=manifest_path,
+        manifest=rows,
+        access_path=access_path,
+    )
     repo_root = PACKAGE_ROOT.parent.parent
     changed_files: dict[str, dict[str, str | None]] = {}
     for relative_path in sorted(changed_paths):
@@ -274,10 +337,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "after_sha256": sha256_file(current_path),
         }
     payload: dict[str, Any] = {
-        "schema_version": EVAL_RECOVERY_EXTENSION_SCHEMA_VERSION,
+        "schema_version": EVAL_RECOVERY_FINALIZATION_SCHEMA_VERSION,
         "role": "PSEM-STRATEGY-EVAL",
         "recovery_state": "authorized_for_same_opened_manifest_resume",
-        "recovery_reason": EVAL_RECOVERY_EXTENSION_REASON,
+        "recovery_reason": EVAL_RECOVERY_FINALIZATION_REASON,
         "accepted_c2_head": args.accepted_c2_head,
         "recovery_head": recovery_head,
         "authorization_sha256": authorization["authorization_sha256"],
@@ -292,19 +355,21 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "consumption_receipt_sha256": sha256_file(claim_path),
         "manifest_open_count": 1,
         "additional_manifest_derivations": 0,
-        "prior_eval_aggregate_count": 0,
+        "prior_eval_aggregate_count": 2,
+        "prior_model_aggregates": model_aggregates,
         "changed_files": changed_files,
         "contract_overrides": contract_overrides,
-        "recovery_sequence": 2,
+        "recovery_sequence": 3,
         "prior_recovery_path": str(prior_recovery_path),
         "prior_recovery_file_sha256": sha256_file(prior_recovery_path),
         "prior_recovery_sha256": prior_recovery["recovery_sha256"],
         "prior_recovery_head": prior_recovery["recovery_head"],
-        "prior_recovery_result": "failed_before_eval_aggregate",
-        "failed_family": "streaming_sortformer",
+        "prior_recovery_result": "failed_before_eval_metrics",
+        "failed_stage": "eval_trace_validation",
+        "failed_family": "ls_eend",
         "failed_source_id": "alimeeting_R1021_M1940",
-        "completed_sortformer_source_count": 2,
-        "lseend_started": False,
+        "completed_sortformer_source_count": 19,
+        "completed_lseend_source_count": 19,
     }
     payload["recovery_sha256"] = canonical_sha256(payload)
     _write_json_exclusive(output, payload)

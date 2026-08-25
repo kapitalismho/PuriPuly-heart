@@ -35,6 +35,15 @@ EVAL_RECOVERY_ACCEPTED_C3_SHA256 = (
 EVAL_RECOVERY_ACCEPTED_C3_FILE_SHA256 = (
     "b7ce28976cafb50abf2eeb7d947eb93864f47e3944f510284bae3eb71b9c31e5"
 )
+EVAL_RECOVERY_FINALIZATION_SCHEMA_VERSION = "psem.relative_occupancy.eval_recovery.v3"
+EVAL_RECOVERY_FINALIZATION_REASON = "lseend_unemitted_partial_terminal_audio"
+EVAL_RECOVERY_ACCEPTED_C4_HEAD = "cc757522886048bc4ab1d40072ce4fd3c0521899"
+EVAL_RECOVERY_ACCEPTED_C4_SHA256 = (
+    "3d708dfc0dc9b2a84d8558686bd81eb6be8ffdb37a75ed2dc8b10fd53da9b36d"
+)
+EVAL_RECOVERY_ACCEPTED_C4_FILE_SHA256 = (
+    "75a506fa64fc36419b239be13797f30de37427465bf98f9cc9587e614ed86524"
+)
 EVAL_RECOVERY_ALLOWED_PATHS = {
     "experiments/psem_relative_occupancy_gate/authorize_eval_recovery.py",
     "experiments/psem_relative_occupancy_gate/eval_access.py",
@@ -48,6 +57,18 @@ EVAL_RECOVERY_REQUIRED_PATHS = {
     "experiments/psem_relative_occupancy_gate/eval_access.py",
     "experiments/psem_relative_occupancy_gate/model_run_io.py",
     "experiments/psem_relative_occupancy_gate/run_sortformer_trace.py",
+}
+EVAL_RECOVERY_FINALIZATION_ALLOWED_PATHS = EVAL_RECOVERY_ALLOWED_PATHS | {
+    "experiments/psem_relative_occupancy_gate/run_eval.py",
+    "experiments/psem_relative_occupancy_gate/run_eval_traces.py",
+    "experiments/psem_relative_occupancy_gate/trace_runtime.py",
+    "experiments/psem_relative_occupancy_gate/verify_eval.py",
+}
+EVAL_RECOVERY_FINALIZATION_REQUIRED_PATHS = EVAL_RECOVERY_REQUIRED_PATHS | {
+    "experiments/psem_relative_occupancy_gate/run_eval.py",
+    "experiments/psem_relative_occupancy_gate/run_eval_traces.py",
+    "experiments/psem_relative_occupancy_gate/trace_runtime.py",
+    "experiments/psem_relative_occupancy_gate/verify_eval.py",
 }
 
 
@@ -91,6 +112,55 @@ def recovery_receipt_path(authorization_path: Path) -> Path:
 
 def recovery_extension_receipt_path(authorization_path: Path) -> Path:
     return authorization_path.with_name(f"{authorization_path.stem}_recovery_2.json")
+
+
+def recovery_finalization_receipt_path(authorization_path: Path) -> Path:
+    return authorization_path.with_name(f"{authorization_path.stem}_recovery_3.json")
+
+
+def validate_eval_result_directory(
+    *,
+    manifest_path: Path,
+    authorization_path: Path,
+    require_finalization: bool,
+    allow_final_outputs: bool,
+) -> None:
+    manifest_path = manifest_path.resolve()
+    authorization_path = authorization_path.resolve()
+    root = manifest_path.parent
+    if authorization_path.parent != root:
+        raise EvalAccessError("EVAL authorization and manifest directories differ")
+    required = {
+        manifest_path.name,
+        access_receipt_path(manifest_path).name,
+        authorization_path.name,
+        consumption_receipt_path(authorization_path).name,
+        recovery_receipt_path(authorization_path).name,
+        recovery_extension_receipt_path(authorization_path).name,
+        "sortformer_model_receipt.json",
+        "lseend_model_receipt.json",
+    }
+    if require_finalization:
+        required.add(recovery_finalization_receipt_path(authorization_path).name)
+    allowed = set(required)
+    if allow_final_outputs:
+        allowed.update(
+            {
+                "eval_metrics.json",
+                "product_frontiers.json",
+                "topology_slices.json",
+                "latency_breakdown.json",
+                "eval_verification.json",
+                "FINAL_DECISION.md",
+            }
+        )
+    observed: set[str] = set()
+    for entry in root.iterdir():
+        if entry.name not in allowed or _strict_file(entry, "EVAL result artifact") != entry.resolve():
+            raise EvalAccessError(f"unexpected EVAL result artifact: {entry.name}")
+        observed.add(entry.name)
+    if not required <= observed:
+        raise EvalAccessError("required EVAL result artifact is missing")
 
 
 def _current_head() -> str:
@@ -284,6 +354,8 @@ def _validate_recovery_file_set(
     authorization: dict[str, Any],
     selection: dict[str, Any],
     active: bool,
+    allowed_paths: set[str] | None = None,
+    required_paths: set[str] | None = None,
 ) -> dict[str, dict[str, str]]:
     recovery_head = str(value.get("recovery_head", ""))
     accepted_c2_head = str(authorization["accepted_c2_head"])
@@ -292,11 +364,13 @@ def _validate_recovery_file_set(
     changed_files = value.get("changed_files")
     if not isinstance(changed_files, dict) or not changed_files:
         raise EvalAccessError("EVAL recovery changed-file binding is missing")
+    allowed = EVAL_RECOVERY_ALLOWED_PATHS if allowed_paths is None else allowed_paths
+    required = EVAL_RECOVERY_REQUIRED_PATHS if required_paths is None else required_paths
     observed_paths = _git_changed_paths(accepted_c2_head, recovery_head)
     if (
         observed_paths != set(changed_files)
-        or not EVAL_RECOVERY_REQUIRED_PATHS <= observed_paths
-        or not observed_paths <= EVAL_RECOVERY_ALLOWED_PATHS
+        or not required <= observed_paths
+        or not observed_paths <= allowed
     ):
         raise EvalAccessError("EVAL recovery changed-file set mismatch")
     root = PACKAGE_ROOT.parent.parent
@@ -404,7 +478,7 @@ def _load_eval_recovery(
     )
 
 
-def _load_eval_recovery_extension(
+def _load_eval_recovery_extension_history(
     authorization_path: Path,
     *,
     authorization: dict[str, Any],
@@ -446,16 +520,116 @@ def _load_eval_recovery_extension(
         "lseend_started": False,
     }
     if (
-        any(value.get(field) != expected_value for field, expected_value in expected.items())
-        or value.get("recovery_head") != _current_head()
-        or not _tracked_worktree_is_clean(manifest_output.parent)
+        sha256_file(recovery_extension_receipt_path(authorization_path))
+        != EVAL_RECOVERY_ACCEPTED_C4_FILE_SHA256
+        or value.get("recovery_head") != EVAL_RECOVERY_ACCEPTED_C4_HEAD
+        or value.get("recovery_sha256") != EVAL_RECOVERY_ACCEPTED_C4_SHA256
+        or any(value.get(field) != expected_value for field, expected_value in expected.items())
         or not _git_is_direct_child(
             EVAL_RECOVERY_ACCEPTED_C3_HEAD, str(value.get("recovery_head", ""))
         )
     ):
         raise EvalAccessError("EVAL recovery extension binding mismatch")
+    _validate_recovery_file_set(
+        value, authorization=authorization, selection=selection, active=False
+    )
+    return value
+
+
+def _load_eval_recovery_extension(
+    authorization_path: Path,
+    *,
+    authorization: dict[str, Any],
+    selection_path: Path,
+    selection: dict[str, Any],
+    manifest_output: Path,
+) -> dict[str, dict[str, str]]:
+    value = _load_eval_recovery_extension_history(
+        authorization_path,
+        authorization=authorization,
+        selection_path=selection_path,
+        selection=selection,
+        manifest_output=manifest_output,
+    )
+    if (
+        value.get("recovery_head") != _current_head()
+        or not _tracked_worktree_is_clean(manifest_output.parent)
+    ):
+        raise EvalAccessError("EVAL recovery extension binding mismatch")
     return _validate_recovery_file_set(
         value, authorization=authorization, selection=selection, active=True
+    )
+
+
+def _load_eval_recovery_finalization(
+    authorization_path: Path,
+    *,
+    authorization: dict[str, Any],
+    selection_path: Path,
+    selection: dict[str, Any],
+    manifest_output: Path,
+) -> dict[str, dict[str, str]]:
+    prior_path = recovery_extension_receipt_path(authorization_path)
+    prior = _load_eval_recovery_extension_history(
+        authorization_path,
+        authorization=authorization,
+        selection_path=selection_path,
+        selection=selection,
+        manifest_output=manifest_output,
+    )
+    value = _load_recovery_value(
+        recovery_finalization_receipt_path(authorization_path),
+        "EVAL recovery finalization receipt",
+    )
+    expected = {
+        **_recovery_expected(
+            authorization_path=authorization_path,
+            authorization=authorization,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_output,
+        ),
+        "schema_version": EVAL_RECOVERY_FINALIZATION_SCHEMA_VERSION,
+        "recovery_reason": EVAL_RECOVERY_FINALIZATION_REASON,
+        "recovery_sequence": 3,
+        "prior_recovery_path": str(prior_path),
+        "prior_recovery_file_sha256": sha256_file(prior_path),
+        "prior_recovery_sha256": prior["recovery_sha256"],
+        "prior_recovery_head": prior["recovery_head"],
+        "prior_recovery_result": "failed_before_eval_metrics",
+        "failed_stage": "eval_trace_validation",
+        "failed_family": "ls_eend",
+        "failed_source_id": "alimeeting_R1021_M1940",
+        "completed_sortformer_source_count": 19,
+        "completed_lseend_source_count": 19,
+        "prior_eval_aggregate_count": 2,
+        "prior_model_aggregates": {
+            name: sha256_file(manifest_output.parent / name)
+            for name in ("lseend_model_receipt.json", "sortformer_model_receipt.json")
+        },
+    }
+    if (
+        any(value.get(field) != expected_value for field, expected_value in expected.items())
+        or value.get("recovery_head") != _current_head()
+        or not _tracked_worktree_is_clean(manifest_output.parent)
+        or not _git_is_direct_child(
+            EVAL_RECOVERY_ACCEPTED_C4_HEAD, str(value.get("recovery_head", ""))
+        )
+    ):
+        raise EvalAccessError("EVAL recovery finalization binding mismatch")
+    validate_eval_result_directory(
+        manifest_path=manifest_output,
+        authorization_path=authorization_path,
+        require_finalization=True,
+        allow_final_outputs=True,
+    )
+    return _validate_recovery_file_set(
+        value,
+        authorization=authorization,
+        selection=selection,
+        active=True,
+        allowed_paths=EVAL_RECOVERY_FINALIZATION_ALLOWED_PATHS,
+        required_paths=EVAL_RECOVERY_FINALIZATION_REQUIRED_PATHS,
     )
 
 
@@ -499,8 +673,20 @@ def load_eval_authorization(
         raise EvalAccessError("EVAL authorization lacks the accepted C2 head")
     recovery_path = recovery_receipt_path(path)
     recovery_extension_path = recovery_extension_receipt_path(path)
+    recovery_finalization_path = recovery_finalization_receipt_path(path)
     current_head = _current_head()
-    if recovery_extension_path.exists():
+    if recovery_finalization_path.exists():
+        overrides = _load_eval_recovery_finalization(
+            path,
+            authorization=value,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_output.resolve(),
+        )
+        validate_frozen_selection_bindings(
+            selection_path, selection, contract_overrides=overrides
+        )
+    elif recovery_extension_path.exists():
         overrides = _load_eval_recovery_extension(
             path,
             authorization=value,
@@ -624,6 +810,8 @@ def validate_opened_eval_manifest(
     claim_hash = claim_payload.pop("claim_sha256", None)
     if (
         claim_hash != canonical_sha256(claim_payload)
+        or claim.get("schema_version") != "psem.relative_occupancy.eval_consumption.v1"
+        or claim.get("role") != "PSEM-STRATEGY-EVAL"
         or claim.get("authorization_sha256") != authorization["authorization_sha256"]
         or claim.get("accepted_c2_head") != authorization["accepted_c2_head"]
         or claim.get("manifest_output_path") != str(manifest_path)

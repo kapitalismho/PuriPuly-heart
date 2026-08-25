@@ -79,6 +79,16 @@ def load_model_traces(
     role: str,
     eval_access_path: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Trace]]:
+    receipt_path = receipt_path.resolve()
+    manifest_path = manifest_path.resolve()
+    if role == "PSEM-STRATEGY-EVAL":
+        expected_name = (
+            "sortformer_model_receipt.json"
+            if family == "streaming_sortformer"
+            else "lseend_model_receipt.json"
+        )
+        if receipt_path != manifest_path.parent / expected_name:
+            raise ModelRunError(f"model EVAL receipt path is not canonical: {family}")
     receipt = load_json(receipt_path)
     if not isinstance(receipt, dict):
         raise ModelRunError("model receipt must be an object")

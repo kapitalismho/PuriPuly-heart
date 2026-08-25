@@ -7,6 +7,7 @@ from typing import Any
 
 from experiments.psem_relative_occupancy_gate.eval_access import (
     EvalAccessError,
+    recovery_finalization_receipt_path,
     validate_opened_eval_manifest,
 )
 from experiments.psem_relative_occupancy_gate.io_utils import (
@@ -59,12 +60,17 @@ def run(args: argparse.Namespace) -> None:
         selection_path=selection_path,
         authorization_path=authorization_path,
     )
+    if recovery_finalization_receipt_path(authorization_path).exists():
+        raise EvalTraceError("EVAL model traces are finalized and cannot be regenerated")
     research = research_root(Path(args.research_root) if args.research_root else None)
     ls_root = lseend_root(Path(args.lseend_root) if args.lseend_root else None)
     sortformer_output = safe_output_path(Path(args.sortformer_output))
     lseend_output = safe_output_path(Path(args.lseend_output))
-    if sortformer_output == lseend_output:
-        raise EvalTraceError("EVAL model receipt outputs must be distinct")
+    if (
+        sortformer_output != manifest_path.parent / "sortformer_model_receipt.json"
+        or lseend_output != manifest_path.parent / "lseend_model_receipt.json"
+    ):
+        raise EvalTraceError("EVAL model receipt outputs are not canonical")
     selection_sha256 = str(selection["selection_sha256"])
     sortformer = run_sortformer_traces(
         manifest=manifest_path,

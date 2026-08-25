@@ -74,6 +74,21 @@ def run(args: argparse.Namespace) -> None:
         selection_path=selection_path,
         authorization_path=authorization_path,
     )
+    outputs = {
+        "metrics": safe_output_path(Path(args.output)),
+        "product": safe_output_path(Path(args.product_output)),
+        "topology": safe_output_path(Path(args.topology_output)),
+        "latency": safe_output_path(Path(args.latency_output)),
+    }
+    if not getattr(args, "independent_verification", False):
+        expected_outputs = {
+            "metrics": manifest_path.parent / "eval_metrics.json",
+            "product": manifest_path.parent / "product_frontiers.json",
+            "topology": manifest_path.parent / "topology_slices.json",
+            "latency": manifest_path.parent / "latency_breakdown.json",
+        }
+        if outputs != expected_outputs:
+            raise EvalRunError("EVAL metric output paths are not canonical")
     rows_by_id = {str(value["source_id"]): value for value in manifest}
     receipt_paths = {
         "sortformer": Path(args.sortformer_receipt).resolve(),
@@ -386,12 +401,6 @@ def run(args: argparse.Namespace) -> None:
         "schema_version": "psem.relative_occupancy.latency_breakdown.v2",
         **common,
         "families": latency,
-    }
-    outputs = {
-        "metrics": safe_output_path(Path(args.output)),
-        "product": safe_output_path(Path(args.product_output)),
-        "topology": safe_output_path(Path(args.topology_output)),
-        "latency": safe_output_path(Path(args.latency_output)),
     }
     write_json(outputs["metrics"], metrics)
     write_json(outputs["product"], product)

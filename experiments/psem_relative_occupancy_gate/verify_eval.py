@@ -69,12 +69,22 @@ def _validate_semantics(
 
 
 def run(args: argparse.Namespace) -> None:
+    manifest_path = Path(args.manifest).resolve()
     paths = {
         "metrics": Path(args.metrics).resolve(),
         "product": Path(args.product).resolve(),
         "topology": Path(args.topology).resolve(),
         "latency": Path(args.latency).resolve(),
     }
+    expected_paths = {
+        "metrics": manifest_path.parent / "eval_metrics.json",
+        "product": manifest_path.parent / "product_frontiers.json",
+        "topology": manifest_path.parent / "topology_slices.json",
+        "latency": manifest_path.parent / "latency_breakdown.json",
+    }
+    output_path = Path(args.output).resolve()
+    if paths != expected_paths or output_path != manifest_path.parent / "eval_verification.json":
+        raise EvalVerificationError("EVAL verification paths are not canonical")
     artifacts = {name: _load_object(path) for name, path in paths.items()}
     selection = load_frozen_selection(Path(args.selection).resolve())
     validate_opened_eval_manifest(
@@ -110,6 +120,7 @@ def run(args: argparse.Namespace) -> None:
                 product_output=str(regenerated["product"]),
                 topology_output=str(regenerated["topology"]),
                 latency_output=str(regenerated["latency"]),
+                independent_verification=True,
             )
         )
         for name in paths:
@@ -128,8 +139,8 @@ def run(args: argparse.Namespace) -> None:
             name: sha256_file(path) for name, path in sorted(paths.items())
         },
     }
-    write_json(safe_output_path(Path(args.output)), receipt)
-    print({"output": str(Path(args.output).resolve()), "passed": True})
+    write_json(safe_output_path(output_path), receipt)
+    print({"output": str(output_path), "passed": True})
 
 
 def main() -> None:

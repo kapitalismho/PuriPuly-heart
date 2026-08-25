@@ -101,6 +101,8 @@ def validate_full_trace_geometry(
         ends = np.minimum(starts + 1280, source_end_sample)
         if frame_count != (sample_count + 1279) // 1280 or int(ends[-1]) != source_end_sample:
             raise TraceRuntimeError("Sortformer full-source frame count is incomplete")
+        if int(trace.evidence_frontier_samples[-1]) != source_end_sample:
+            raise TraceRuntimeError("full-source trace evidence frontier does not reach source end")
     elif family == "ls_eend":
         centers = np.asarray(
             [output_frame_center_16k(index) for index in range(frame_count)], dtype=np.int64
@@ -109,14 +111,15 @@ def validate_full_trace_geometry(
         ends = source_start_sample + np.minimum(centers + 800, sample_count)
         if int(ends[-1]) <= source_end_sample - 1600:
             raise TraceRuntimeError("LS-EEND full-source tail coverage is incomplete")
+        final_frontier = int(trace.evidence_frontier_samples[-1])
+        if not int(ends[-1]) <= final_frontier <= source_end_sample:
+            raise TraceRuntimeError("LS-EEND terminal evidence frontier is invalid")
     else:
         raise TraceRuntimeError(f"unsupported trace family: {family}")
     if not np.array_equal(trace.frame_start_samples, starts) or not np.array_equal(
         trace.frame_end_samples, ends
     ):
         raise TraceRuntimeError("full-source trace frame geometry mismatch")
-    if int(trace.evidence_frontier_samples[-1]) != source_end_sample:
-        raise TraceRuntimeError("full-source trace evidence frontier does not reach source end")
 
 
 def _validate_waveform(row: dict[str, Any]) -> None:

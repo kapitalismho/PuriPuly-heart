@@ -228,6 +228,21 @@ def test_opened_eval_manifest_binds_selection_and_access_receipt(
             selection_path=selection_path,
             authorization_path=authorization_path,
         )
+    claim["schema_version"] = "wrong"
+    claim.pop("claim_sha256")
+    claim["claim_sha256"] = canonical_sha256(claim)
+    write_json(claim_path, claim)
+    access["consumption_receipt_sha256"] = sha256_file(claim_path)
+    access.pop("access_sha256")
+    access["access_sha256"] = canonical_sha256(access)
+    write_json(access_path, access)
+    with pytest.raises(EvalAccessError, match="consumption binding mismatch"):
+        validate_opened_eval_manifest(
+            manifest_path=manifest_path,
+            access_path=access_path,
+            selection_path=selection_path,
+            authorization_path=authorization_path,
+        )
 
 
 def test_eval_recovery_accepts_only_bound_same_manifest_commit(
@@ -435,6 +450,17 @@ def test_eval_recovery_extension_binds_prior_recovery_chain(
         lambda *_args, **_kwargs: prior,
     )
     monkeypatch.setattr(eval_access, "_current_head", lambda: "c" * 40)
+    monkeypatch.setattr(eval_access, "EVAL_RECOVERY_ACCEPTED_C4_HEAD", "c" * 40)
+    monkeypatch.setattr(
+        eval_access,
+        "EVAL_RECOVERY_ACCEPTED_C4_SHA256",
+        extension["recovery_sha256"],
+    )
+    monkeypatch.setattr(
+        eval_access,
+        "EVAL_RECOVERY_ACCEPTED_C4_FILE_SHA256",
+        sha256_file(extension_path),
+    )
     monkeypatch.setattr(eval_access, "_tracked_worktree_is_clean", lambda _root: True)
     monkeypatch.setattr(eval_access, "_git_is_direct_child", lambda _base, _head: True)
     monkeypatch.setattr(
@@ -481,6 +507,117 @@ def test_eval_recovery_exclusive_creation_rejects_existing_file(tmp_path: Path) 
     ):
         authorize_eval_recovery._write_json_exclusive(path, {"sequence": 3})
     assert load_json(path) == {"sequence": 2}
+
+
+def test_eval_recovery_finalization_binds_completed_model_aggregates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    eval_root = tmp_path / "eval"
+    eval_root.mkdir()
+    authorization_path = eval_root / "eval_authorization.json"
+    selection_path = tmp_path / "dev" / "selection.json"
+    selection_path.parent.mkdir()
+    manifest_path = eval_root / "eval_manifest.jsonl"
+    access_path = eval_access.access_receipt_path(manifest_path)
+    claim_path = eval_access.consumption_receipt_path(authorization_path)
+    first_path = eval_access.recovery_receipt_path(authorization_path)
+    prior_path = eval_access.recovery_extension_receipt_path(authorization_path)
+    final_path = eval_access.recovery_finalization_receipt_path(authorization_path)
+    sortformer_path = eval_root / "sortformer_model_receipt.json"
+    lseend_path = eval_root / "lseend_model_receipt.json"
+    for path, value in (
+        (authorization_path, {"authorization": True}),
+        (selection_path, {"selection": True}),
+        (manifest_path, {"manifest": True}),
+        (access_path, {"access": True}),
+        (claim_path, {"claim": True}),
+        (first_path, {"first": True}),
+        (prior_path, {"prior": True}),
+        (sortformer_path, {"family": "streaming_sortformer"}),
+        (lseend_path, {"family": "ls_eend"}),
+    ):
+        write_json(path, value)
+    authorization = {
+        "accepted_c2_head": "a" * 40,
+        "authorization_sha256": "authorization",
+    }
+    selection = {"selection_sha256": "selection"}
+    prior = {"recovery_head": "c" * 40, "recovery_sha256": "prior-recovery"}
+    finalization = {
+        **eval_access._recovery_expected(
+            authorization_path=authorization_path,
+            authorization=authorization,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_path,
+        ),
+        "schema_version": eval_access.EVAL_RECOVERY_FINALIZATION_SCHEMA_VERSION,
+        "recovery_reason": eval_access.EVAL_RECOVERY_FINALIZATION_REASON,
+        "recovery_head": "d" * 40,
+        "recovery_sequence": 3,
+        "prior_recovery_path": str(prior_path),
+        "prior_recovery_file_sha256": sha256_file(prior_path),
+        "prior_recovery_sha256": prior["recovery_sha256"],
+        "prior_recovery_head": prior["recovery_head"],
+        "prior_recovery_result": "failed_before_eval_metrics",
+        "failed_stage": "eval_trace_validation",
+        "failed_family": "ls_eend",
+        "failed_source_id": "alimeeting_R1021_M1940",
+        "completed_sortformer_source_count": 19,
+        "completed_lseend_source_count": 19,
+        "prior_eval_aggregate_count": 2,
+        "prior_model_aggregates": {
+            "lseend_model_receipt.json": sha256_file(lseend_path),
+            "sortformer_model_receipt.json": sha256_file(sortformer_path),
+        },
+        "changed_files": {"contract.py": {}},
+        "contract_overrides": {},
+    }
+    finalization["recovery_sha256"] = canonical_sha256(finalization)
+    write_json(final_path, finalization)
+    overrides = {"trace_runtime.py": {"before_sha256": "1", "after_sha256": "2"}}
+    monkeypatch.setattr(
+        eval_access,
+        "_load_eval_recovery_extension_history",
+        lambda *_args, **_kwargs: prior,
+    )
+    monkeypatch.setattr(eval_access, "_current_head", lambda: "d" * 40)
+    monkeypatch.setattr(eval_access, "_tracked_worktree_is_clean", lambda _root: True)
+    monkeypatch.setattr(eval_access, "_git_is_direct_child", lambda _base, _head: True)
+    monkeypatch.setattr(
+        eval_access,
+        "_validate_recovery_file_set",
+        lambda *_args, **_kwargs: overrides,
+    )
+    assert (
+        eval_access._load_eval_recovery_finalization(
+            authorization_path,
+            authorization=authorization,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_path,
+        )
+        == overrides
+    )
+    write_json(lseend_path, {"family": "tampered"})
+    with pytest.raises(EvalAccessError, match="finalization binding mismatch"):
+        eval_access._load_eval_recovery_finalization(
+            authorization_path,
+            authorization=authorization,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_path,
+        )
+    write_json(lseend_path, {"family": "ls_eend"})
+    write_json(eval_root / "rogue_metrics.json", {"passed": True})
+    with pytest.raises(EvalAccessError, match="unexpected EVAL result artifact"):
+        eval_access._load_eval_recovery_finalization(
+            authorization_path,
+            authorization=authorization,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_path,
+        )
 
 
 def test_eval_recovery_cleanliness_whitelists_only_eval_outputs(

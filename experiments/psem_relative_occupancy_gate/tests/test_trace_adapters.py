@@ -138,6 +138,35 @@ def test_full_trace_geometry_rejects_truncation_and_gaps() -> None:
         )
 
 
+def test_lseend_full_trace_allows_unemitted_partial_terminal_audio() -> None:
+    trace = Trace(
+        source_id="source",
+        family="ls_eend",
+        slot_ids=("slot-0", "slot-1"),
+        probabilities=np.ones((2, 2), dtype=np.float32) * 0.5,
+        frame_start_samples=np.asarray([13631, 15231], dtype=np.int64),
+        frame_end_samples=np.asarray([15231, 16831], dtype=np.int64),
+        evidence_frontier_samples=np.asarray([16000, 16960], dtype=np.int64),
+        slot_alive=np.ones((2, 2), dtype=np.bool_),
+        state_reset=np.asarray([True, False], dtype=np.bool_),
+        metadata={"source_start_sample": 0, "source_end_sample": 17000},
+    )
+    validate_full_trace_geometry(
+        trace,
+        family="ls_eend",
+        source_start_sample=0,
+        source_end_sample=17000,
+    )
+    trace.evidence_frontier_samples[-1] = 16830
+    with pytest.raises(TraceRuntimeError, match="terminal evidence frontier"):
+        validate_full_trace_geometry(
+            trace,
+            family="ls_eend",
+            source_start_sample=0,
+            source_end_sample=17000,
+        )
+
+
 def test_trace_location_is_bound_to_family_backend_role(tmp_path: Path) -> None:
     valid = (
         tmp_path
