@@ -140,8 +140,6 @@
   "settings.managed_key.title": "Managed Key",
   "settings.managed_key.referral_id.label": "Talk Together Pass ID",
   "settings.managed_key.referral_id.empty": "—",
-  "settings.managed_key.referral_id.pending_helper": "完成 Discord 验证后会显示你的 Talk Together Pass ID。",
-  "settings.managed_key.referral_id.helper": "把 Pass ID 分享给朋友，一起获得额外使用量。",
   "settings.managed_key.invite_progress.label": "好友邀请",
   "settings.prompt_for": "提示词用于：{provider}",
   "settings.system_prompt": "系统提示词",

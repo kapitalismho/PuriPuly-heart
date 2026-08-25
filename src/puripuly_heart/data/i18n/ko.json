@@ -140,8 +140,6 @@
   "settings.managed_key.title": "매니지드 키",
   "settings.managed_key.referral_id.label": "Talk Together Pass ID",
   "settings.managed_key.referral_id.empty": "—",
-  "settings.managed_key.referral_id.pending_helper": "Discord 인증 후 내 Talk Together Pass ID가 표시돼요.",
-  "settings.managed_key.referral_id.helper": "친구에게 Pass ID를 공유하면 함께 추가 사용량을 받을 수 있어요.",
   "settings.managed_key.invite_progress.label": "친구 초대",
   "settings.prompt_for": "프롬프트: {provider}",
   "settings.system_prompt": "시스템 프롬프트",

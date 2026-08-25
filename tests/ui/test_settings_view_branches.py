@@ -339,7 +339,6 @@ def _make_llm_selection_view(
     view._managed_key_referral_id = None
     view._managed_key_referral_id_label = SimpleNamespace(value="")
     view._managed_key_referral_id_value = SimpleNamespace(value="")
-    view._managed_key_referral_helper_text = SimpleNamespace(value="")
     view._managed_key_pass_status = None
     view._managed_key_invite_progress_label = SimpleNamespace(value="", update=lambda: None)
     view._managed_key_invite_progress_value = SimpleNamespace(value="", update=lambda: None)
@@ -971,9 +970,6 @@ def test_managed_key_referral_row_shows_empty_state_without_copy_button(
     referral_row = _wrapped_card_column(view._managed_key_card).controls[4].controls[0]
     assert view._managed_key_referral_id_value in referral_row.controls
     assert not any(isinstance(control, ft.IconButton) for control in referral_row.controls)
-    assert view._managed_key_referral_helper_text.value == t(
-        "settings.managed_key.referral_id.pending_helper"
-    )
 
 
 def test_managed_key_referral_row_shows_owned_id_without_copy_button(
@@ -993,9 +989,6 @@ def test_managed_key_referral_row_shows_owned_id_without_copy_button(
     referral_row = _wrapped_card_column(view._managed_key_card).controls[4].controls[0]
     assert view._managed_key_referral_id_value in referral_row.controls
     assert not any(isinstance(control, ft.IconButton) for control in referral_row.controls)
-    assert view._managed_key_referral_helper_text.value == t(
-        "settings.managed_key.referral_id.helper"
-    )
 
 
 def test_set_managed_trial_usage_state_tracks_visible_and_remaining_percent(
@@ -1268,8 +1261,6 @@ def test_set_managed_key_state_repaints_mounted_pass_id_usage_and_invite_control
     )
     view._managed_key_referral_id_value.page = mounted_page
     view._managed_key_referral_id_value.update = lambda: updates.append("referral_value")
-    view._managed_key_referral_helper_text.page = mounted_page
-    view._managed_key_referral_helper_text.update = lambda: updates.append("referral_helper")
     view._managed_key_invite_progress_label.page = mounted_page
     view._managed_key_invite_progress_label.update = lambda: updates.append("invite_label")
     view._managed_key_invite_progress_value.page = mounted_page
@@ -1298,7 +1289,6 @@ def test_set_managed_key_state_repaints_mounted_pass_id_usage_and_invite_control
         "usage_remaining_text",
         "usage_fill_segments",
         "referral_value",
-        "referral_helper",
         "invite_label",
         "invite_value",
         "invite_row",
@@ -1376,7 +1366,7 @@ def test_set_managed_key_state_can_display_preview_referral_without_remembering(
     assert view._managed_key_invite_progress_row.visible is True
 
 
-def test_managed_key_invite_progress_row_appears_between_talk_together_pass_id_and_helper_text(
+def test_managed_key_invite_progress_row_appears_below_talk_together_pass_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     view, _ = _make_settings_view(monkeypatch)
@@ -1387,7 +1377,7 @@ def test_managed_key_invite_progress_row_appears_between_talk_together_pass_id_a
 
     assert view._managed_key_referral_id_label in referral_id_row.controls
     assert details_column.controls[1] is view._managed_key_invite_progress_row
-    assert details_column.controls[2] is view._managed_key_referral_helper_text
+    assert len(details_column.controls) == 2
 
 
 def test_set_managed_key_state_shows_invite_progress_placeholder_when_absent(

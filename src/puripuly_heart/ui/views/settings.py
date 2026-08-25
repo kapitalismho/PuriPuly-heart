@@ -1278,11 +1278,6 @@ class SettingsView(ft.Column):
             color=COLOR_ON_BACKGROUND,
             selectable=True,
         )
-        self._managed_key_referral_helper_text = ft.Text(
-            t("settings.managed_key.referral_id.pending_helper"),
-            size=14,
-            color=COLOR_SECONDARY,
-        )
         self._managed_key_invite_progress_label = ft.Text(
             t("settings.managed_key.invite_progress.label"),
             size=16,
@@ -1324,7 +1319,6 @@ class SettingsView(ft.Column):
                                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                             ),
                             self._managed_key_invite_progress_row,
-                            self._managed_key_referral_helper_text,
                         ],
                         spacing=4,
                     ),
@@ -3225,11 +3219,6 @@ class SettingsView(ft.Column):
         self._managed_key_referral_id_value.value = referral_id or t(
             "settings.managed_key.referral_id.empty"
         )
-        self._managed_key_referral_helper_text.value = t(
-            "settings.managed_key.referral_id.helper"
-            if referral_id is not None
-            else "settings.managed_key.referral_id.pending_helper"
-        )
 
     def _remember_managed_key_referral_id(self, referral_id: str | None) -> str | None:
         referral_id = normalize_owned_referral_id(referral_id)
@@ -3314,7 +3303,6 @@ class SettingsView(ft.Column):
         for control in (
             self._managed_trial_usage_bar,
             self._managed_key_referral_id_value,
-            self._managed_key_referral_helper_text,
             self._managed_key_invite_progress_label,
             self._managed_key_invite_progress_value,
             self._managed_key_invite_progress_row,

@@ -140,8 +140,6 @@
   "settings.managed_key.title": "Управляемый ключ",
   "settings.managed_key.referral_id.label": "ID пропуска Talk Together",
   "settings.managed_key.referral_id.empty": "—",
-  "settings.managed_key.referral_id.pending_helper": "Ваш ID пропуска появится после верификации Discord.",
-  "settings.managed_key.referral_id.helper": "Поделитесь ID пропуска с другом — вы оба получите бонус.",
   "settings.managed_key.invite_progress.label": "Приглашения друзей",
   "settings.prompt_for": "Промпт для: {provider}",
   "settings.system_prompt": "Системный промпт",
