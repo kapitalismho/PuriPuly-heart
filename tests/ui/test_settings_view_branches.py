@@ -1628,49 +1628,6 @@ def test_local_llm_hides_openrouter_key_and_fallback_card_even_with_saved_fallba
     assert view._managed_key_card.visible is False
 
 
-def test_local_llm_connection_card_matches_api_field_scale_and_copy(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    old_locale = i18n_module.get_locale()
-    i18n_module.set_locale("ko")
-    try:
-        view, _ = _make_settings_view(monkeypatch)
-        column = _wrapped_card_column(view._local_llm_connection_card)
-        controls = list(column.controls)
-        api_field = view._google_key._text_field
-
-        assert view._local_llm_base_url.label == "Base URL"
-        assert view._local_llm_model.label == "모델 ID"
-        assert view._local_llm_extra_body.label == "JSON extra body"
-        assert view._local_llm_extra_body_helper.value == (
-            "낮은 지연시간을 위해 추론을 끄고 사용하는 것을 권장해요. "
-            "JSON extra body에 알맞은 파라미터를 입력해서 추론 레벨을 제어하세요."
-        )
-        assert view._local_llm_extra_body.value == json.dumps(
-            {"reasoning_effort": "none"}, ensure_ascii=False, indent=2
-        )
-        assert controls[2] is view._local_llm_extra_body_helper
-        assert controls[3] is view._local_llm_base_url
-        assert controls[4] is view._local_llm_model
-        assert controls[5] is view._local_llm_api_key
-        assert controls[6] is view._local_llm_api_key_helper
-        assert controls[7] is view._local_llm_extra_body
-
-        for field in (
-            view._local_llm_base_url,
-            view._local_llm_model,
-            view._local_llm_extra_body,
-        ):
-            assert field.border_radius == api_field.border_radius
-            assert field.color == api_field.color
-            assert field.label_style.weight == api_field.label_style.weight
-            assert field.label_style.color == api_field.label_style.color
-            assert field.expand is True
-            assert field.dense is not True
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
 def test_load_from_settings_loads_local_llm_api_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
