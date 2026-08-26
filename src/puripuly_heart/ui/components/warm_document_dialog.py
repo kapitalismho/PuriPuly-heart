@@ -202,6 +202,7 @@ def open_warm_document_dialog(
 
     dialog = ft.AlertDialog(
         modal=True,
+        scrollable=True,
         content=modal_content,
         content_padding=0,
         bgcolor=ft.Colors.TRANSPARENT,
