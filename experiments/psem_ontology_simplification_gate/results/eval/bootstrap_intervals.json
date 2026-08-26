@@ -1,0 +1,2327 @@
+{
+  "anchor_overlap_source_sha256": "2515ad6eec3c6c3bcdd5f66b711c216e87871cb7c81d40ce617f6ba31bffa602",
+  "authority_snapshot_sha256": "71555b2d3afa3df581e3ec384c67f46d4a494449728be4c8876e546f60ec0814",
+  "causal_dependency_audit_sha256": "be6762a73f1cc42570fd5a066f016468af8de1b70ca9350534a06e40cdd7bf28",
+  "causal_interpretation": "fixed-issue-97-lifecycle-counterfactual-ablation",
+  "config_sha256": "4e61df08cf2c27b34b70b86c945d65b9f9abf9c95100cc16830ab855f38c8e72",
+  "evaluator_source_sha256": "015b2c1a7ef600c99885af5a4c1e86f386fec357e905ca9b1f572019682b41b4",
+  "new_model_inference_performed": false,
+  "predecessor_gate1_ledger_sha256": "920a967b507ce3ad10f6e44b05497fd5388bc382644a6cef588c6fade932c359",
+  "predecessor_gate2_ledger_sha256": "135b103d26e6ebfd262686d809e874c2282018ebe8341801d8b192586ec2c337",
+  "predecessor_manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+  "predecessor_model_receipt_sha256": {
+    "ls_eend": "aea66b589a7458b1609e927fed69e43ddcbd4bb5ad9ee03af892918806b86a4e",
+    "streaming_sortformer": "b402a194ca919f25cdf7d75e984ec99fd9cc303471c8e3b1d779482714e6ae42"
+  },
+  "predecessor_product_frontiers_sha256": "52b0743e2de188f0a401d7c10af5f528a000f3a8b04c9535e84b7a19062f023f",
+  "role": "PSEM-STRATEGY-EVAL",
+  "rows": [
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -787.290891441426,
+          "median": -399.036958968441,
+          "upper": -24.241244489415475
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 17.314473684210537,
+          "median": 52.68421052631579,
+          "upper": 92.42105263157895
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -40.73815789473683,
+          "median": -7.684210526315789,
+          "upper": 24.053947368421035
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.3042718446601942,
+          "median": 0.4680249988469166,
+          "upper": 0.621682858791843
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "r0_relative_occupancy",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -173.83406723446524,
+          "median": 122.53726972863772,
+          "upper": 424.796923523469
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -3.3157894736842106,
+          "median": 15.68421052631579,
+          "upper": 34.73684210526316
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -0.7368421052631579,
+          "median": 24.05263157894737,
+          "upper": 56.52763157894735
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.03675836713995949,
+          "median": 0.1585275519421861,
+          "upper": 0.285319271660412
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "simple_anchor",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -796.3214311369767,
+          "median": -426.4523141276409,
+          "upper": -87.2916336606685
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 16.156578947368434,
+          "median": 51.31578947368421,
+          "upper": 90.63157894736842
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -40.1578947368421,
+          "median": -9.078947368421051,
+          "upper": 19.736842105263158
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.3333333333333333,
+          "median": 0.48256998739908985,
+          "upper": 0.6342857142857142
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -357.78734967237114,
+          "median": -57.70314372559457,
+          "upper": 249.6448355761912
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 56.26315789473684,
+          "median": 88.6842105263158,
+          "upper": 128.15921052631577
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -6.157894736842105,
+          "median": 19.63157894736842,
+          "upper": 46.421052631578945
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.19120324954015944,
+          "median": 0.3601091024332499,
+          "upper": 0.5375884088278128
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "r0_relative_occupancy",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -46.60525765229204,
+          "median": 197.14550250745913,
+          "upper": 438.75852345148223
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -4.1592105263157775,
+          "median": 12.421052631578947,
+          "upper": 29.94736842105263
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 6.421052631578948,
+          "median": 26.973684210526315,
+          "upper": 53.473684210526315
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.01065900655452896,
+          "median": 0.11083123425692695,
+          "upper": 0.2326049743833074
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "simple_anchor",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -362.1866318512444,
+          "median": -89.10534044678727,
+          "upper": 176.44856316228214
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 53.78684210526318,
+          "median": 87.63157894736842,
+          "upper": 128.31578947368422
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -5.0,
+          "median": 19.36842105263158,
+          "upper": 43.68684210526312
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.23922039823597202,
+          "median": 0.39514540077511373,
+          "upper": 0.5671657468957731
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -172.7392476203237,
+          "median": 105.37586992976722,
+          "upper": 373.6147789543805
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 62.8421052631579,
+          "median": 91.57894736842105,
+          "upper": 125.52631578947368
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 4.315789473684211,
+          "median": 24.894736842105264,
+          "upper": 47.896052631578925
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.12647300001853123,
+          "median": 0.286944234558573,
+          "upper": 0.4577344429263445
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "r0_relative_occupancy",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 105.23180274274274,
+          "median": 303.43951564127303,
+          "upper": 497.6829315373723
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -13.369736842105251,
+          "median": 3.789473684210526,
+          "upper": 19.57894736842105
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 12.0,
+          "median": 27.31578947368421,
+          "upper": 46.473684210526315
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.014344507412346065,
+          "median": 0.04670086825778416,
+          "upper": 0.14425048928265885
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "simple_anchor",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -154.23422919033442,
+          "median": 99.8708547466881,
+          "upper": 341.67029088304326
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 61.26315789473684,
+          "median": 89.15789473684211,
+          "upper": 122.89605263157893
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 4.684210526315789,
+          "median": 24.842105263157894,
+          "upper": 47.421052631578945
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.15204308238951814,
+          "median": 0.31444776908135286,
+          "upper": 0.4776961079421459
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 1069.5155287370783,
+          "median": 1314.127773509425,
+          "upper": 1571.7224251091284
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 89.94605263157895,
+          "median": 122.26315789473684,
+          "upper": 157.31710526315788
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 55.94736842105263,
+          "median": 73.15789473684211,
+          "upper": 92.15921052631577
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.10964983022071306,
+          "median": -0.08193472919894215,
+          "upper": -0.05648498646320454
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "r0_relative_occupancy",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 437.2856173813961,
+          "median": 591.7404424109006,
+          "upper": 734.4695151016412
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -5.052631578947368,
+          "median": 10.526315789473685,
+          "upper": 25.264473684210508
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 21.105263157894736,
+          "median": 31.68421052631579,
+          "upper": 43.78947368421053
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.023226556639159786,
+          "median": -0.013745704467353952,
+          "upper": -0.004192216981132086
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "simple_anchor",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 1080.18510055742,
+          "median": 1332.3382908411952,
+          "upper": 1608.8103923187812
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 90.2092105263158,
+          "median": 121.89473684210526,
+          "upper": 156.52763157894734
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 56.997368421052656,
+          "median": 74.6842105263158,
+          "upper": 93.36842105263158
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.10594851023691948,
+          "median": -0.07765451664025357,
+          "upper": -0.04929395022987669
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 565.8882548102322,
+          "median": 726.4970925118737,
+          "upper": 898.1539390265651
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -58.47499999999999,
+          "median": -39.78947368421053,
+          "upper": -22.31578947368421
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 70.10526315789474,
+          "median": 99.6842105263158,
+          "upper": 138.57894736842104
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.4398834845757869,
+          "median": -0.39198412267291616,
+          "upper": -0.336032116581777
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "r0_relative_occupancy",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 930.5242428865794,
+          "median": 1239.6370209566883,
+          "upper": 1591.5467371563807
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -0.7368421052631579,
+          "median": 24.94736842105263,
+          "upper": 52.84342105263156
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 110.26315789473684,
+          "median": 149.8421052631579,
+          "upper": 195.89605263157893
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.5515605450422271,
+          "median": -0.4737883651738177,
+          "upper": -0.39148018883587304
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "simple_anchor",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 503.5707328873529,
+          "median": 678.0783401481084,
+          "upper": 871.5921381096244
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -50.84473684210524,
+          "median": -28.05263157894737,
+          "upper": -6.368421052631579
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 67.10394736842106,
+          "median": 96.78947368421052,
+          "upper": 135.94736842105263
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.3941479230908761,
+          "median": -0.34177215189873417,
+          "upper": -0.28021953965474106
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 742.6175658516814,
+          "median": 972.3919290372033,
+          "upper": 1224.9697485077188
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -24.896052631578936,
+          "median": -14.0,
+          "upper": -3.3684210526315788
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 76.3671052631579,
+          "median": 107.10526315789474,
+          "upper": 143.68815789473678
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.5306860992958502,
+          "median": -0.46595363379852056,
+          "upper": -0.40380047505938244
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "r0_relative_occupancy",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 1016.2667142225289,
+          "median": 1327.1757077007621,
+          "upper": 1661.5688319726398
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 1.1578947368421053,
+          "median": 25.42105263157895,
+          "upper": 52.68421052631579
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 101.36842105263158,
+          "median": 138.3684210526316,
+          "upper": 181.10526315789474
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.5550523432808001,
+          "median": -0.4830890427673723,
+          "upper": -0.40877588023175726
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "simple_anchor",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 683.3235841549043,
+          "median": 927.8253991064312,
+          "upper": 1192.6731360946476
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -18.053947368421042,
+          "median": -1.6842105263157894,
+          "upper": 14.894736842105264
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 75.26184210526316,
+          "median": 105.63157894736842,
+          "upper": 142.84342105263156
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.4669051878354204,
+          "median": -0.40877598152424943,
+          "upper": -0.3430088151413016
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 862.7075453045555,
+          "median": 1151.3137918352882,
+          "upper": 1439.8003882466094
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -11.368421052631579,
+          "median": -2.4210526315789473,
+          "upper": 6.105263157894737
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 73.42105263157895,
+          "median": 102.42105263157895,
+          "upper": 136.15921052631577
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.5312518126450115,
+          "median": -0.45707905559483386,
+          "upper": -0.3939393939393939
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "r0_relative_occupancy",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 1122.166810705289,
+          "median": 1393.423621336996,
+          "upper": 1704.8912662382745
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -4.896052631578935,
+          "median": 20.94736842105263,
+          "upper": 49.31710526315788
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 88.05263157894737,
+          "median": 120.94736842105263,
+          "upper": 156.73947368421048
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.5322968221562319,
+          "median": -0.45614035087719296,
+          "upper": -0.3801938744599098
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "simple_anchor",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 778.6602496584751,
+          "median": 1084.320261728105,
+          "upper": 1400.122246184769
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -6.421052631578948,
+          "median": 8.842105263157896,
+          "upper": 24.789473684210527
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 71.525,
+          "median": 100.63157894736842,
+          "upper": 132.84473684210522
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.4615423387096774,
+          "median": -0.399066479308955,
+          "upper": -0.3378334503334504
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 1125.9755507076597,
+          "median": 1391.449750556638,
+          "upper": 1690.7265197019549
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -5.578947368421052,
+          "median": 2.789473684210526,
+          "upper": 10.369736842105244
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 61.0,
+          "median": 83.78947368421052,
+          "upper": 107.10526315789474
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.5159258335788924,
+          "median": -0.41251003210272874,
+          "upper": -0.3257973296533504
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "r0_relative_occupancy",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 1243.9506793929088,
+          "median": 1521.4310481239177,
+          "upper": 1842.7479825684277
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 1.2105263157894737,
+          "median": 25.526315789473685,
+          "upper": 51.89473684210526
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 69.15789473684211,
+          "median": 94.05263157894737,
+          "upper": 121.05394736842103
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.47682462538529613,
+          "median": -0.39123503648151536,
+          "upper": -0.296358482539213
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "simple_anchor",
+      "comparison": "lseend_minus_streaming_sortformer",
+      "confidence": 0.95,
+      "family": "cross_family",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 977.1356266916047,
+          "median": 1280.0222111232079,
+          "upper": 1612.4073418395965
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -1.3171052631578832,
+          "median": 12.0,
+          "upper": 26.210526315789473
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 58.0513157894737,
+          "median": 80.36842105263158,
+          "upper": 103.58026315789472
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.4292737648530331,
+          "median": -0.34382884342846975,
+          "upper": -0.254165805785124
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -1580.5089717876501,
+          "median": -1030.321201759579,
+          "upper": -496.99013459262125
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 59.89473684210526,
+          "median": 87.3157894736842,
+          "upper": 123.94736842105263
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -147.3684210526316,
+          "median": -88.86842105263158,
+          "upper": -43.10526315789474
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.15744464845015663,
+          "median": 0.41980059614464127,
+          "upper": 0.6530292397660817
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 34.646446100253,
+          "median": 69.34182221847604,
+          "upper": 103.95791495617148
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -5.526315789473684,
+          "median": -2.526315789473684,
+          "upper": 0.0
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 3.263157894736842,
+          "median": 6.947368421052632,
+          "upper": 11.736842105263158
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.04268369285451648,
+          "median": -0.02387454176973743,
+          "upper": -0.008403008854548536
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -1610.7296300714202,
+          "median": -1094.7909564904994,
+          "upper": -613.3305315780207
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 63.10526315789474,
+          "median": 90.65789473684211,
+          "upper": 127.42105263157895
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -152.5802631578947,
+          "median": -95.84210526315789,
+          "upper": -53.0
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.2025868435953619,
+          "median": 0.4415695987860936,
+          "upper": 0.6702156885667524
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -1465.0995460028125,
+          "median": -969.312193781677,
+          "upper": -507.6679426594048
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 62.78947368421053,
+          "median": 89.71052631578948,
+          "upper": 128.58157894736837
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -119.00131578947368,
+          "median": -73.84210526315789,
+          "upper": -38.78947368421053
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.12351397319726695,
+          "median": 0.3595625149414296,
+          "upper": 0.5910515908481543
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 39.4100028153182,
+          "median": 77.69881968401688,
+          "upper": 123.6207155137786
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -6.052631578947368,
+          "median": -3.4210526315789473,
+          "upper": -1.0
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 2.5789473684210527,
+          "median": 5.7368421052631575,
+          "upper": 9.473684210526315
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.06443298969072164,
+          "median": -0.03550231205978187,
+          "upper": -0.011574074074074073
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -1509.104866721414,
+          "median": -1047.1681341880985,
+          "upper": -622.958822090769
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 66.10394736842106,
+          "median": 93.26315789473684,
+          "upper": 131.05263157894737
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -122.94868421052631,
+          "median": -79.36842105263158,
+          "upper": -46.36710526315792
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.18032380436255255,
+          "median": 0.39187742346200594,
+          "upper": 0.6089051642521569
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -1514.81096696226,
+          "median": -1066.8618055659304,
+          "upper": -621.0360885919405
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 57.47236842105264,
+          "median": 82.21052631578948,
+          "upper": 115.15789473684211
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -98.89473684210526,
+          "median": -65.05263157894737,
+          "upper": -36.63157894736842
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.1385400367704586,
+          "median": 0.33256593936439643,
+          "upper": 0.5309245707852518
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 28.014126674958995,
+          "median": 63.2561840827357,
+          "upper": 99.63307051605942
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -4.684210526315789,
+          "median": -2.210526315789474,
+          "upper": 0.3157894736842105
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 2.473684210526316,
+          "median": 5.315789473684211,
+          "upper": 8.789473684210526
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.04980860584467913,
+          "median": -0.023054755043227664,
+          "upper": -0.005424832277255867
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -1555.967516812343,
+          "median": -1127.4060024106138,
+          "upper": -708.8626909536646
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 59.8421052631579,
+          "median": 84.10526315789474,
+          "upper": 118.15789473684211
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -103.6842105263158,
+          "median": -70.36842105263158,
+          "upper": -42.78947368421053
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.17504314106756114,
+          "median": 0.35789473684210527,
+          "upper": 0.5485720456649182
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -300.18619554514544,
+          "median": -180.08640644456787,
+          "upper": -87.65797786687466
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 67.15789473684211,
+          "median": 101.26315789473684,
+          "upper": 142.26447368421051
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -20.73815789473683,
+          "median": -10.789473684210526,
+          "upper": -5.157894736842105
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.0078274064334638,
+          "median": 0.0196078431372549,
+          "upper": 0.029661201822107845
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 20.652269860087035,
+          "median": 53.76839209616677,
+          "upper": 91.58552964068822
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -5.842105263157895,
+          "median": -3.6315789473684212,
+          "upper": -1.631578947368421
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 1.0,
+          "median": 2.3684210526315788,
+          "upper": 4.105263157894737
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.007163666524999655,
+          "median": -0.0018975332068311196,
+          "upper": 0.0
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -348.6652556517507,
+          "median": -234.13929527241373,
+          "upper": -153.81814986222636
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 71.78947368421052,
+          "median": 105.21052631578948,
+          "upper": 145.05263157894737
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -23.31710526315788,
+          "median": -13.157894736842104,
+          "upper": -7.157894736842105
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.008901945151377553,
+          "median": 0.021666666666666667,
+          "upper": 0.033019084299809584
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -122.78301518890373,
+          "median": 0.300976283162084,
+          "upper": 95.61345449187091
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -50.05263157894737,
+          "median": -28.94736842105263,
+          "upper": -13.157894736842104
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -2.8947368421052633,
+          "median": -0.10526315789473684,
+          "upper": 3.6842105263157894
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.044857104740446456,
+          "median": -0.021683481895059913,
+          "upper": 0.0016706681812183933
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 26.46753219740202,
+          "median": 64.13669444929896,
+          "upper": 111.86602171938716
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -25.789473684210527,
+          "median": -13.789473684210526,
+          "upper": -5.7368421052631575
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 1.9473684210526316,
+          "median": 4.631578947368421,
+          "upper": 8.210526315789474
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.0364741641337386,
+          "median": -0.019985734664764623,
+          "upper": -0.006622151880269574
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -183.66210392571406,
+          "median": -63.86787129942116,
+          "upper": 14.38791384487127
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -26.894736842105264,
+          "median": -14.842105263157896,
+          "upper": -6.473684210526316
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -7.2631578947368425,
+          "median": -4.684210526315789,
+          "upper": -2.473684210526316
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.014663063993556992,
+          "median": -0.0018604667262016017,
+          "upper": 0.01467582315945245
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -149.59332740415147,
+          "median": 2.771576370478815,
+          "upper": 102.33560919380277
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -56.264473684210515,
+          "median": -33.21052631578947,
+          "upper": -15.157894736842104
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -4.0,
+          "median": -1.105263157894737,
+          "upper": 2.6842105263157894
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.04188531538269758,
+          "median": -0.021875,
+          "upper": -0.002331002331002331
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 27.261129592050867,
+          "median": 59.94285443986645,
+          "upper": 102.6167142823018
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -25.526315789473685,
+          "median": -14.052631578947368,
+          "upper": -6.157894736842105
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 2.0,
+          "median": 4.315789473684211,
+          "upper": 7.473684210526316
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.031446540880503145,
+          "median": -0.017817371937639197,
+          "upper": -0.0055451584989324185
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -214.5611045973686,
+          "median": -58.456663420467876,
+          "upper": 27.622061293234886
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -32.63157894736842,
+          "median": -18.842105263157894,
+          "upper": -8.894736842105264
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -8.369736842105251,
+          "median": -5.315789473684211,
+          "upper": -2.8421052631578947
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.013207547169811321,
+          "median": -0.004052689063898629,
+          "upper": 0.005899850184656119
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -124.29603659634546,
+          "median": 11.64473237743684,
+          "upper": 102.71475241327428
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -57.68421052631579,
+          "median": -33.68421052631579,
+          "upper": -15.789473684210526
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -3.4210526315789473,
+          "median": -0.3684210526315789,
+          "upper": 2.6842105263157894
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.028169014084507043,
+          "median": -0.013768286089108805,
+          "upper": 0.0
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 36.80743946471564,
+          "median": 79.45554395217403,
+          "upper": 139.1006993057088
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -23.894736842105264,
+          "median": -13.31578947368421,
+          "upper": -5.842105263157895
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 1.894736842105263,
+          "median": 4.2105263157894735,
+          "upper": 7.315789473684211
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.023853211009174313,
+          "median": -0.013991451783053648,
+          "upper": -0.004264165494714879
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -200.55074903780752,
+          "median": -70.98960651840589,
+          "upper": -5.859752671783029
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -35.05394736842104,
+          "median": -20.105263157894736,
+          "upper": -9.157894736842104
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -8.0,
+          "median": -4.526315789473684,
+          "upper": -2.210526315789474
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.011161026037509974,
+          "median": 0.0,
+          "upper": 0.012254901960784314
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -129.91030725347272,
+          "median": -5.466726460098204,
+          "upper": 86.53677630177388
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -55.578947368421055,
+          "median": -33.1578947368421,
+          "upper": -16.105263157894736
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -2.9473684210526314,
+          "median": 0.05263157894736842,
+          "upper": 4.0
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.02739781263809102,
+          "median": -0.011764705882352941,
+          "upper": 0.0045254010695187094
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 46.86909550085609,
+          "median": 108.95160622372751,
+          "upper": 186.47490271284724
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -20.31578947368421,
+          "median": -11.631578947368421,
+          "upper": -5.052631578947368
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 2.0,
+          "median": 4.315789473684211,
+          "upper": 7.578947368421052
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.034759579629564046,
+          "median": -0.017316017316017316,
+          "upper": -0.0025250935043126506
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "ls_eend",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -232.9255999581577,
+          "median": -114.51740991256068,
+          "upper": -37.980436762093255
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -35.73684210526316,
+          "median": -21.789473684210527,
+          "upper": -10.789473684210526
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -7.2105263157894735,
+          "median": -4.2105263157894735,
+          "upper": -1.7894736842105263
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.01144230365502907,
+          "median": 0.0054446460980036296,
+          "upper": 0.029197672765191005
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -649.8033946402971,
+          "median": -507.92381342950586,
+          "upper": -384.7341475142736
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 38.89473684210526,
+          "median": 51.21052631578947,
+          "upper": 64.15789473684211
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -78.10657894736842,
+          "median": -57.8421052631579,
+          "upper": -40.103947368421075
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.08771855862252596,
+          "median": 0.10980392156862745,
+          "upper": 0.1324200913242009
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 17.541409120111876,
+          "median": 40.058154274756504,
+          "upper": 63.54278723653121
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -5.947368421052632,
+          "median": -4.2105263157894735,
+          "upper": -2.736842105263158
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 2.6315789473684212,
+          "median": 5.421052631578948,
+          "upper": 8.68421052631579
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.019002859392750177,
+          "median": -0.007518796992481203,
+          "upper": 0.00346050797770088
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -683.320009782277,
+          "median": -547.7695989782721,
+          "upper": -430.6702866370615
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 43.10526315789474,
+          "median": 55.526315789473685,
+          "upper": 68.73684210526316
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -86.58026315789473,
+          "median": -63.36842105263158,
+          "upper": -44.20921052631581
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.09200885601512489,
+          "median": 0.11780463314925052,
+          "upper": 0.13949854084760735
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -865.606307489788,
+          "median": -715.2677246176163,
+          "upper": -575.8498549254059
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 6.630263157894749,
+          "median": 13.947368421052632,
+          "upper": 21.790789473684193
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -85.10526315789474,
+          "median": -65.52631578947368,
+          "upper": -49.893421052631595
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.0772826185283091,
+          "median": 0.10579774933159103,
+          "upper": 0.12909441233140656
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 29.021212083057417,
+          "median": 47.68928038421118,
+          "upper": 72.60737822397961
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -6.526315789473684,
+          "median": -4.578947368421052,
+          "upper": -2.8421052631578947
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 3.5789473684210527,
+          "median": 5.7894736842105265,
+          "upper": 8.578947368421053
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.012371346729250271,
+          "median": -0.0037174721189591076,
+          "upper": 0.005235602094240838
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -904.4673249019689,
+          "median": -763.6690249300186,
+          "upper": -629.0804326368749
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 11.421052631578947,
+          "median": 18.473684210526315,
+          "upper": 26.36842105263158
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -93.00131578947368,
+          "median": -71.15789473684211,
+          "upper": -54.20921052631581
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.07547169811320754,
+          "median": 0.1094017094017094,
+          "upper": 0.13822959398147477
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -1058.0605200560476,
+          "median": -865.1769449735247,
+          "upper": -710.5875423344446
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -12.421052631578947,
+          "median": -5.157894736842105,
+          "upper": -0.15789473684210525
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -80.05394736842105,
+          "median": -63.10526315789474,
+          "upper": -48.8421052631579
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.07435897435897436,
+          "median": 0.09761904761904762,
+          "upper": 0.12245000409802473
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 27.72343974166987,
+          "median": 55.62225119409666,
+          "upper": 82.27772577375309
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -6.842105263157895,
+          "median": -4.7894736842105265,
+          "upper": -2.9473684210526314
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 2.789473684210526,
+          "median": 5.052631578947368,
+          "upper": 7.526315789473684
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.0036169647164616004,
+          "median": 0.0039447731755424065,
+          "upper": 0.012567890032677621
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -1110.9422430951558,
+          "median": -920.1608945194916,
+          "upper": -766.8327181477115
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -6.7368421052631575,
+          "median": -0.47368421052631576,
+          "upper": 4.631578947368421
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -87.05263157894737,
+          "median": -68.1842105263158,
+          "upper": -52.1578947368421
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.07120569986659621,
+          "median": 0.09392805786508956,
+          "upper": 0.116751269035533
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -1087.634954705955,
+          "median": -903.218954189638,
+          "upper": -735.9824997599055
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -14.947368421052632,
+          "median": -9.526315789473685,
+          "upper": -5.631578947368421
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -67.10657894736842,
+          "median": -52.421052631578945,
+          "upper": -40.26315789473684
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.06521617000488521,
+          "median": 0.08776595744680851,
+          "upper": 0.10779466977380753
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 54.847864911792556,
+          "median": 78.3917131797173,
+          "upper": 102.84057298465203
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -5.894736842105263,
+          "median": -4.105263157894737,
+          "upper": -2.526315789473684
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 2.263157894736842,
+          "median": 3.9473684210526314,
+          "upper": 5.7368421052631575
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.007317520424592995,
+          "median": 0.0019047619047619048,
+          "upper": 0.01502226683280261
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s1_oracle_anchor",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -1161.834820001208,
+          "median": -982.4406230489681,
+          "upper": -818.3080589550243
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -9.736842105263158,
+          "median": -5.368421052631579,
+          "upper": -2.4210526315789473
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": -71.94736842105263,
+          "median": -56.421052631578945,
+          "upper": -43.1578947368421
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.062111293792879475,
+          "median": 0.08611355204061708,
+          "upper": 0.10734463276836158
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 334.1420566188897,
+          "median": 509.4753826720104,
+          "upper": 710.6982601433239
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 25.42105263157895,
+          "median": 35.473684210526315,
+          "upper": 46.578947368421055
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 35.89342105263159,
+          "median": 50.05263157894737,
+          "upper": 64.26315789473684
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.1691544951900029,
+          "median": -0.10098766034238893,
+          "upper": -0.05420796215197071
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 3.5759247016388342,
+          "median": 15.979973584417873,
+          "upper": 33.17430810003651
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -3.8421052631578947,
+          "median": -2.526315789473684,
+          "upper": -1.368421052631579
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 0.6842105263157895,
+          "median": 2.0526315789473686,
+          "upper": 3.6842105263157894
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.009578314909530882,
+          "median": 0.028985507246376812,
+          "upper": 0.057621649286437496
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 315.9854964887318,
+          "median": 491.2089813661301,
+          "upper": 705.0845517326475
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 27.736842105263158,
+          "median": 38.05263157894737,
+          "upper": 49.10526315789474
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 34.578947368421055,
+          "median": 48.05263157894737,
+          "upper": 62.10526315789474
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.203636838357465,
+          "median": -0.13020362417118747,
+          "upper": -0.07879924953095685
+        }
+      },
+      "replacement_confirm_ms": 100,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 245.9227553780836,
+          "median": 344.7537421067807,
+          "upper": 467.6862015392411
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 0.7368421052631579,
+          "median": 5.894736842105263,
+          "upper": 11.368421052631579
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 21.473684210526315,
+          "median": 30.42105263157895,
+          "upper": 39.68552631578945
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.07692307692307693,
+          "median": -0.037399974393444724,
+          "upper": -0.0021690800161516016
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 7.33724942853619,
+          "median": 18.088204411274454,
+          "upper": 35.69414395072546
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -3.473684210526316,
+          "median": -2.263157894736842,
+          "upper": -1.1578947368421053
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 1.7894736842105263,
+          "median": 3.0526315789473686,
+          "upper": 4.473684210526316
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.010581544824502574,
+          "median": 0.03756966920698605,
+          "upper": 0.0783412513658606
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 225.94557347895753,
+          "median": 326.42921802539195,
+          "upper": 451.8997787591756
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": 2.6315789473684212,
+          "median": 8.210526315789474,
+          "upper": 13.631578947368421
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 19.526315789473685,
+          "median": 27.42105263157895,
+          "upper": 35.68421052631579
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.12185130149620821,
+          "median": -0.07584302294881137,
+          "upper": -0.0443423193383649
+        }
+      },
+      "replacement_confirm_ms": 200,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 185.46595403387218,
+          "median": 253.60674836739133,
+          "upper": 340.4754505101663
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -16.63157894736842,
+          "median": -10.368421052631579,
+          "upper": -5.631578947368421
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 13.105263157894736,
+          "median": 18.36842105263158,
+          "upper": 24.36842105263158
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.04594609379620321,
+          "median": -0.011737089201877934,
+          "upper": 0.02158273381294964
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 10.150161247065457,
+          "median": 18.978573627872144,
+          "upper": 30.6046151448894
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -4.0,
+          "median": -2.4210526315789473,
+          "upper": -1.2105263157894737
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 1.2105263157894737,
+          "median": 2.4210526315789473,
+          "upper": 3.9473684210526314
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.02096406109613657,
+          "median": 0.043373493975903614,
+          "upper": 0.07832952006675459
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 168.6701850797237,
+          "median": 235.53507209366006,
+          "upper": 319.50715355656774
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -13.210526315789474,
+          "median": -7.894736842105263,
+          "upper": -3.526315789473684
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 11.314473684210538,
+          "median": 15.947368421052632,
+          "upper": 21.105263157894736
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.0921428738783065,
+          "median": -0.0547945205479452,
+          "upper": -0.030800821355236138
+        }
+      },
+      "replacement_confirm_ms": 300,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 71.84192942571406,
+          "median": 121.36113062576104,
+          "upper": 184.22197975641177
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -17.31578947368421,
+          "median": -11.157894736842104,
+          "upper": -6.421052631578948
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 6.052631578947368,
+          "median": 10.421052631578947,
+          "upper": 15.578947368421053
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.02826890816290109,
+          "median": 0.010816660816660818,
+          "upper": 0.06201598476542212
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "anchor_overlap",
+      "comparison": "anchor_overlap_minus_simple_anchor",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": -12.90124930149201,
+          "median": 1.403598781004566,
+          "upper": 14.97039939273434
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -3.9473684210526314,
+          "median": -2.4210526315789473,
+          "upper": -1.263157894736842
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 0.10526315789473684,
+          "median": 1.105263157894737,
+          "upper": 2.1578947368421053
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": 0.023584148115227677,
+          "median": 0.05174968198398798,
+          "upper": 0.09240993427073799
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    },
+    {
+      "arm": "s2_fixed_issue97_lifecycle",
+      "candidate": "simple_anchor",
+      "comparison": "simple_anchor_minus_r0",
+      "confidence": 0.95,
+      "family": "streaming_sortformer",
+      "intervals": {
+        "contamination_seconds_per_active_speech_hour_delta": {
+          "lower": 65.29214421038157,
+          "median": 120.32997976601914,
+          "upper": 183.68315889056512
+        },
+        "false_cut_count_per_session_delta": {
+          "lower": -14.105263157894736,
+          "median": -8.68421052631579,
+          "upper": -4.684210526315789
+        },
+        "missed_replacement_count_per_session_delta": {
+          "lower": 5.315789473684211,
+          "median": 9.31578947368421,
+          "upper": 13.947368421052632
+        },
+        "overlap_takeover_success_rate_delta": {
+          "lower": -0.07341479743344997,
+          "median": -0.040380047505938245,
+          "upper": -0.010598846940673265
+        }
+      },
+      "replacement_confirm_ms": 500,
+      "resamples": 10000,
+      "source_count": 19
+    }
+  ],
+  "schema_version": "psem.ontology_simplification.result_provenance.v1",
+  "simple_anchor_source_sha256": "8027a6b075b84caa9bb994908588bb57da6583288c5b72ea7a9edd33931b45c3",
+  "trace_reuse_receipt_sha256": "5edc64fb3e7aeaa2151a45883890ffe8b03b6cc1d6d9e2b848fd7baf727bc0d9"
+}

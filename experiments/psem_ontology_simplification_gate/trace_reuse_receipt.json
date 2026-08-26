@@ -1,0 +1,1094 @@
+{
+  "authority": {
+    "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/98",
+    "sha256": "7bec60b3c3d001d964c0e294eae0b1d66cc25410e6e27c65d5ed33696a205c16"
+  },
+  "missing_required_neutral_fields": [],
+  "new_model_inference_performed": false,
+  "new_model_inference_required": false,
+  "predecessor": {
+    "config_path": "experiments/psem_relative_occupancy_gate/config.json",
+    "config_sha256": "4d08c9f2216388dc30ff1c7134f0488a29cc45e4dce383b1ce6c2eae9a145ecb",
+    "eval_selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489",
+    "evaluation_status": "recovery-qualified-development-known",
+    "experiment_id": "psem-relative-occupancy-v0"
+  },
+  "reuse_decision": "derive every challenger view offline from exact issue-97 cached traces",
+  "roles": {
+    "dev": {
+      "derived_field_coverage": {
+        "causal_anchor_lifecycle": true,
+        "causal_selected_slot": true,
+        "oracle_anchor_mapping": true
+      },
+      "families": {
+        "ls_eend": {
+          "archive_members": [
+            "probabilities.npy",
+            "frame_start_samples.npy",
+            "frame_end_samples.npy",
+            "evidence_frontier_samples.npy",
+            "slot_alive.npy",
+            "state_reset.npy",
+            "slot_ids.npy",
+            "metadata_json.npy"
+          ],
+          "family": "ls_eend",
+          "field_coverage": {
+            "model_evidence_frontier_source_samples": true,
+            "native_frame_end_source_samples": true,
+            "native_frame_start_source_samples": true,
+            "reset_metadata": true,
+            "slot_validity_metadata": "slot_alive per frame; no native semantic validity flag",
+            "speaker_activity_probabilities": true,
+            "speaker_slot_or_attractor_ids": true
+          },
+          "model_pin": {
+            "backend": "CPUExecutionProvider",
+            "family": "ls_eend",
+            "model_sha256": "5a2b813ffe41170e40d0fc08a6eb1699e579e377af30c7962d07885608a6aa77",
+            "repository": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX",
+            "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+            "sidecar_sha256": "47f29718254995ec017636d5ff31fef8b20bf47dca30d883edcb91e022dc3353",
+            "variant": "L-AMI"
+          },
+          "model_receipt_path": "experiments\\psem_relative_occupancy_gate\\results\\dev\\lseend_model_receipt.json",
+          "model_receipt_sha256": "2d155fdcb72024e1089f74467bc198bf247b04fa912059524a6074acdcdb5049",
+          "role": "PSEM-STRATEGY-DEV",
+          "source_count": 10,
+          "sources": [
+            {
+              "frame_count": 17974,
+              "metadata_sha256": "90fcde8996a9056ce13cb70ff8bd8ec28958cc6167f452c7d7b08074f8235b84",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R1019_M1928",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-DEV\\alimeeting_R1019_M1928\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "3f2bdfc9b7f803e86ab6d58d021767aa86cb813a1b15486c5d24ce88faca1291",
+              "trace_size_bytes": 297431
+            },
+            {
+              "frame_count": 17758,
+              "metadata_sha256": "4ffa2e30b944d37fcc97dce9d99befc72f0905749f9a74002e2774c89e18701b",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R1021_M4073",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-DEV\\alimeeting_R1021_M4073\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "5be1864a98aaafb41564a778aef43487e15ae022302b1560f582bc642487e7a6",
+              "trace_size_bytes": 274394
+            },
+            {
+              "frame_count": 19731,
+              "metadata_sha256": "45b977baf7e16a2df6682b12f39793a615a0d71b012653dceba0463bcf3ad7d4",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R8009_M8019",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-DEV\\alimeeting_R8009_M8019\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "6590e0c343f6e9793ca0b1b641fa6857e3d19019ebcbd4d858c37d4d994241b0",
+              "trace_size_bytes": 308118
+            },
+            {
+              "frame_count": 53235,
+              "metadata_sha256": "9474d3eface216640eb00062e09529a30419b439bb5aa4e1524315499bb2ff34",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_EN2009d",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-DEV\\ami_EN2009d\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "3fa68f478d8ce8a0f5c0d44928a3270534c42c101709fc5166639aebc4a3f2c7",
+              "trace_size_bytes": 800170
+            },
+            {
+              "frame_count": 22789,
+              "metadata_sha256": "94a719fd98fce899c7f64c646a11864e1e20e7760874f7f19d52dd496d8d2789",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2002b",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-DEV\\ami_ES2002b\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "7a0958a438678728bcf2cd2ea9759a0938b2999fa49f638035952e3d5dc8b008",
+              "trace_size_bytes": 350127
+            },
+            {
+              "frame_count": 14014,
+              "metadata_sha256": "bf5666c3807fca7b070cfd7bbb8dcb36ce80f959ca17cf9cc931227541caba01",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2009a",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-DEV\\ami_ES2009a\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "d28a3112ca0ea6b8f04b1756341d0c7e7d281bb9eb08963ccecc4ff25d5aaf4d",
+              "trace_size_bytes": 223446
+            },
+            {
+              "frame_count": 14345,
+              "metadata_sha256": "33725b831f4ed003cea913b926b90d984571584a247efe10f7a5e80e7051e79c",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2009b",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-DEV\\ami_ES2009b\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "58c7cafe3b356884929644e798012e9bdaeec4d73a9d5dd0181dc69645af064f",
+              "trace_size_bytes": 207057
+            },
+            {
+              "frame_count": 19561,
+              "metadata_sha256": "c778b304a66adb9808ac0c31bc7bda04c2cbee387cf67bc83f6ab7e2121fbcc4",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2009c",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-DEV\\ami_ES2009c\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "1b88ad99fe691f1e8b7d160599a95671bb48b7b435e14b510eef73b65898d9bd",
+              "trace_size_bytes": 301149
+            },
+            {
+              "frame_count": 21141,
+              "metadata_sha256": "3caff5ed057ee303258a4eec6e12dbf2d2560fff7681fe742d791cac45e96ee6",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2009d",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-DEV\\ami_ES2009d\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "e3594f6cfe9f29f1fa72152abc73faa1f584a2a4466addcaffed8923f72618c9",
+              "trace_size_bytes": 328513
+            },
+            {
+              "frame_count": 19307,
+              "metadata_sha256": "e7a2c6388e1786fb24117a8dfda94bacd19147e20a77cc024ee5709e416b8ace",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2015d",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-DEV\\ami_ES2015d\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "eb485cabcc67ce80f9d934bfed15ba1d39f4d7ad8e35ac84f2c8b4bd59297d26",
+              "trace_size_bytes": 305003
+            }
+          ]
+        },
+        "streaming_sortformer": {
+          "archive_members": [
+            "probabilities.npy",
+            "frame_start_samples.npy",
+            "frame_end_samples.npy",
+            "evidence_frontier_samples.npy",
+            "slot_alive.npy",
+            "state_reset.npy",
+            "slot_ids.npy",
+            "metadata_json.npy"
+          ],
+          "family": "streaming_sortformer",
+          "field_coverage": {
+            "model_evidence_frontier_source_samples": true,
+            "native_frame_end_source_samples": true,
+            "native_frame_start_source_samples": true,
+            "reset_metadata": true,
+            "slot_validity_metadata": "slot_alive per frame; no native semantic validity flag",
+            "speaker_activity_probabilities": true,
+            "speaker_slot_or_attractor_ids": true
+          },
+          "model_pin": {
+            "backend": "vulkan",
+            "family": "streaming_sortformer",
+            "model_filename": "diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+            "model_repository": "handy-computer/diar_streaming_sortformer_4spk-v2.1-gguf",
+            "model_revision": "7ef0c15dc8f9d717e9d24fac29a6e6551e9c6ddf",
+            "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9"
+          },
+          "model_receipt_path": "experiments\\psem_relative_occupancy_gate\\results\\dev\\sortformer_model_receipt.json",
+          "model_receipt_sha256": "2131a251304da65006dd116d59ab4310311356c5909bc570e41ebb6978e5dc03",
+          "role": "PSEM-STRATEGY-DEV",
+          "source_count": 10,
+          "sources": [
+            {
+              "frame_count": 22478,
+              "metadata_sha256": "814ecefd2ef1581be0a36de1b40d0f552e1f2457d6279650a72cc323d8a1b4cf",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R1019_M1928",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-DEV\\alimeeting_R1019_M1928\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "eafef10e9cfaa1517b2403b32c28706755c6093ab6cc5eef33fdf5628b207060",
+              "trace_size_bytes": 317980
+            },
+            {
+              "frame_count": 22209,
+              "metadata_sha256": "78848b617e07830a50ed8bb1b8e392c67822f796307c724681cbefbcccf6fb2c",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R1021_M4073",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-DEV\\alimeeting_R1021_M4073\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "2ee4ba7f65c8d6856e0324354aa2eb602832bb0765bc68f4f55fc80e95660c20",
+              "trace_size_bytes": 302311
+            },
+            {
+              "frame_count": 24675,
+              "metadata_sha256": "b1490b912561348b750ca24743de7bc3d58e9cb0bd5b197c340c4918ef451e54",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R8009_M8019",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-DEV\\alimeeting_R8009_M8019\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "e1df6543774ff0875f49ff22dc9f14d77cb2383053b60337d37a8cdfc5e5a5df",
+              "trace_size_bytes": 342270
+            },
+            {
+              "frame_count": 66555,
+              "metadata_sha256": "7090d458832ed6851fd50ae0046527c12262477146b939d5accc5d86743fb10d",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_EN2009d",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-DEV\\ami_EN2009d\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "8df3debd90062b89782a0c922979667487988b0398ea93dc4713a1956da3ca54",
+              "trace_size_bytes": 1009952
+            },
+            {
+              "frame_count": 28497,
+              "metadata_sha256": "b6dde87a213f26bf4ecee84a5c37b9c376d8cea68c53c271c4893c27831f35c6",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2002b",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-DEV\\ami_ES2002b\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "8db464d2d9ab60c0347f60e925407b1029d0eacd56895750e6bdee282455fad8",
+              "trace_size_bytes": 417229
+            },
+            {
+              "frame_count": 17528,
+              "metadata_sha256": "bcebfc9ab56056906634b470ce04c56ca20b0aa5775be57ca9bb766b99748dca",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2009a",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-DEV\\ami_ES2009a\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "2726789b10af7c6fd995c7cc98cf108e81199a1041adbed19a583e435a135f9e",
+              "trace_size_bytes": 259912
+            },
+            {
+              "frame_count": 17942,
+              "metadata_sha256": "a6f4f738bf4bd95ac3c6ba6480d4bc76094b50cc1e05dee4b858908e161ee46c",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2009b",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-DEV\\ami_ES2009b\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "b3361e8e2bc3aab30e588f8cd08fe1dfabf28bfeb358881c31de75b8a359b8dc",
+              "trace_size_bytes": 265948
+            },
+            {
+              "frame_count": 24462,
+              "metadata_sha256": "b3ae44413029eab366f18e56b2d085c18e9ebfde63fe65aa37bee6ec894c2de6",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2009c",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-DEV\\ami_ES2009c\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "73e19b69c987950af0f97cd6f5ebb3978995f1cef1b531c39c5af33110a51832",
+              "trace_size_bytes": 362354
+            },
+            {
+              "frame_count": 26437,
+              "metadata_sha256": "a98602112e376358586a12fd8226de57ee98b59f62cdf6642f9ca7d9617f4f7c",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2009d",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-DEV\\ami_ES2009d\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "f4d8e8ea2e0a91efd571050f0ae75580224e187442962269da83325cd0c0eb2e",
+              "trace_size_bytes": 405579
+            },
+            {
+              "frame_count": 24145,
+              "metadata_sha256": "a0994bce9526bc61eb261ac2954a65b030bb9996de6c9e8a9b83a0eb56a87d15",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2015d",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\i97c2\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-DEV\\ami_ES2015d\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "f32d5e74e1c3b77fa2dcf33b6636b6a92943c7caebd45e7ba5b146fa9173c76c",
+              "trace_size_bytes": 376156
+            }
+          ]
+        }
+      },
+      "predecessor_artifacts": {
+        "gate1_event_ledger": {
+          "path": "experiments\\psem_relative_occupancy_gate\\results\\dev\\gate1_event_ledger.jsonl",
+          "row_count": 80,
+          "schema_version": "psem.relative_occupancy.gate_event_session.v1",
+          "sha256": "397b384fb2246259e38b834be2bac7fdc7017cb60429a792ae48ff95e514ba85"
+        },
+        "gate2_event_ledger": {
+          "path": "experiments\\psem_relative_occupancy_gate\\results\\dev\\gate2_event_ledger.jsonl",
+          "row_count": 80,
+          "schema_version": "psem.relative_occupancy.gate_event_session.v1",
+          "sha256": "3a7c811301f93f91234262d16df2bb2343b42fb242768f23d4efd90a0168522f"
+        },
+        "manifest": {
+          "path": "experiments\\psem_relative_occupancy_gate\\results\\dev\\relative_occupancy_manifest.jsonl",
+          "row_count": 10,
+          "schema_version": "psem.relative_occupancy.manifest.v1",
+          "sha256": "b5a6d1369fc1165adb98ce91508b7f8b171ad2a981495b33e0060a324e6176b9"
+        }
+      }
+    },
+    "eval": {
+      "derived_field_coverage": {
+        "causal_anchor_lifecycle": true,
+        "causal_selected_slot": true,
+        "oracle_anchor_mapping": true
+      },
+      "families": {
+        "ls_eend": {
+          "archive_members": [
+            "probabilities.npy",
+            "frame_start_samples.npy",
+            "frame_end_samples.npy",
+            "evidence_frontier_samples.npy",
+            "slot_alive.npy",
+            "state_reset.npy",
+            "slot_ids.npy",
+            "metadata_json.npy"
+          ],
+          "family": "ls_eend",
+          "field_coverage": {
+            "model_evidence_frontier_source_samples": true,
+            "native_frame_end_source_samples": true,
+            "native_frame_start_source_samples": true,
+            "reset_metadata": true,
+            "slot_validity_metadata": "slot_alive per frame; no native semantic validity flag",
+            "speaker_activity_probabilities": true,
+            "speaker_slot_or_attractor_ids": true
+          },
+          "model_pin": {
+            "backend": "CPUExecutionProvider",
+            "family": "ls_eend",
+            "model_sha256": "5a2b813ffe41170e40d0fc08a6eb1699e579e377af30c7962d07885608a6aa77",
+            "repository": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX",
+            "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+            "sidecar_sha256": "47f29718254995ec017636d5ff31fef8b20bf47dca30d883edcb91e022dc3353",
+            "variant": "L-AMI"
+          },
+          "model_receipt_path": "experiments\\psem_relative_occupancy_gate\\results\\eval\\lseend_model_receipt.json",
+          "model_receipt_sha256": "aea66b589a7458b1609e927fed69e43ddcbd4bb5ad9ee03af892918806b86a4e",
+          "role": "PSEM-STRATEGY-EVAL",
+          "source_count": 19,
+          "sources": [
+            {
+              "frame_count": 19688,
+              "metadata_sha256": "7f5407614eed254e298224f6d12cc53e25d9215a65846df55d69cd5bd30a1f1b",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R0004_M0012",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\alimeeting_R0004_M0012\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "3abe6759f9864f62cc9681132bb8a60ecd7fc759beec74698ce17249a54a7a3b",
+              "trace_size_bytes": 288620
+            },
+            {
+              "frame_count": 17920,
+              "metadata_sha256": "8abd635affcd1862d7f35a5ebc3fdd5951fb624082f301a1863bbf19855f7205",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R1019_M1960",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\alimeeting_R1019_M1960\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "1fce0ca7a147348d5bf1bf97d9edb8dd00610b25b86281f8f7a30d372875a968",
+              "trace_size_bytes": 292341
+            },
+            {
+              "frame_count": 17697,
+              "metadata_sha256": "73e180ebe957e9de11fe0acca26ea318188d1045bc4f8270f11effaaf7f2d4b0",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R1021_M1940",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1940\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "80b2af8fc4fa35505406ed2e0a26f3057bc8b241679f531b5208b6dc0b869e1d",
+              "trace_size_bytes": 298735
+            },
+            {
+              "frame_count": 17563,
+              "metadata_sha256": "037bea9f1a349d6f26cf4617f57e55a55ae9791006eb86bc788888b81aa7bed2",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R1021_M1944",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1944\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "deb2d18c2f73c62c15504aa93b5e593d965d10cf2839b436bca8118fad3dff79",
+              "trace_size_bytes": 262352
+            },
+            {
+              "frame_count": 17763,
+              "metadata_sha256": "95cb8c72ebca9f897761cfe89ed36c165a10104f99a871624122ab61ba56943a",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R1021_M4080",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M4080\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "72f567956e14035d2e76d5f2acf8b266dc544a57568d932644e27b57d49ef7f3",
+              "trace_size_bytes": 278051
+            },
+            {
+              "frame_count": 18486,
+              "metadata_sha256": "14575737744a762225931296a6b4f4d1a46c660f79ccca0c77ea6f71b0cace09",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R2105_M3318",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\alimeeting_R2105_M3318\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "11b69965cdce91d9b0386a65f48c220c6aea99b1d26a669b863bcea8f4f1905c",
+              "trace_size_bytes": 283254
+            },
+            {
+              "frame_count": 17929,
+              "metadata_sha256": "5eb99d496f21b10c3c339ff666ebeafac74636bd153291011cea12aba2ad4de7",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R2108_M3206",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\alimeeting_R2108_M3206\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "84dca4c5955b89dafa7b3e8a3a5103ccc70bb4771b08978cb16993c30fb2a660",
+              "trace_size_bytes": 281835
+            },
+            {
+              "frame_count": 16538,
+              "metadata_sha256": "6bdabfd1d0352b4e8b8a88b82e4ab0c2a21cc2ffe313fa76a4eb2ac386913072",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R8009_M8018",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\alimeeting_R8009_M8018\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "53c9a0f868fef052414f6d160c3d42d4f5fec3a1a7104a15d2163e195532ecd4",
+              "trace_size_bytes": 258549
+            },
+            {
+              "frame_count": 34448,
+              "metadata_sha256": "921516bab7648f3985db8e0c4a241075dd5d4bc2b578052de9c88ecf85c19890",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_EN2004a",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\ami_EN2004a\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "b8cd7a3a29e732f4ed1e897a56297770acce771f2c96ef993a7c616a72840ab3",
+              "trace_size_bytes": 522366
+            },
+            {
+              "frame_count": 35246,
+              "metadata_sha256": "a5fec42e7b6585227881a4015e9ba93d59462b7210a07d0c82a3518b9eb1c8bb",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_EN2006a",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\ami_EN2006a\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "04275c028ae86132a93eea8bf3c75b414295c59804d6ebad128324d710050393",
+              "trace_size_bytes": 548608
+            },
+            {
+              "frame_count": 11482,
+              "metadata_sha256": "ce689c2383e8e7625dd1ff9b385f60701cbba65f13611058625def7ff09b0599",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2014a",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\ami_ES2014a\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "96563cb3b0e2f7bfc0528be7c08ec0a0cc9cc50d972f46b5396869d55cba40c9",
+              "trace_size_bytes": 176039
+            },
+            {
+              "frame_count": 9651,
+              "metadata_sha256": "fdee42025e5959236f9e76c0cd5dd9e7f3e15b818a3c99fe402911a7b792d1dd",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_IS1007a",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\ami_IS1007a\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "5e2e6c6aa8697e43922fa12bb4ff654bed5d47eb38f5fc4bae6f445216297ab2",
+              "trace_size_bytes": 147485
+            },
+            {
+              "frame_count": 13018,
+              "metadata_sha256": "531f4265202fc6a450e04a26b32cb5a735191d83a90086b4932fa383b1a058e9",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_IS1007b",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\ami_IS1007b\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "1fb9bbb0267acacfc61802dc5ee7b8b9b60281e34f3d25921940514348990353",
+              "trace_size_bytes": 196632
+            },
+            {
+              "frame_count": 21123,
+              "metadata_sha256": "dc5392e0b717bc4b87e3495cedc1e6b248711da05a77e9e206c98a09ceb0cb91",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_IS1007c",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\ami_IS1007c\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "c9de661bfcc547f63cbf798db777ed02783e5a9ef6065f799e91d3825d1810b2",
+              "trace_size_bytes": 314627
+            },
+            {
+              "frame_count": 20282,
+              "metadata_sha256": "3396cc9dfa4593860fb5f45777a1fe341a54b997eaad7351704e034fca25238e",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_IS1007d",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\ami_IS1007d\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "f407f0fccd2e44b29c2347e2ae79b4459e60ee8f292afc9eb27216318d3ea750",
+              "trace_size_bytes": 305471
+            },
+            {
+              "frame_count": 10402,
+              "metadata_sha256": "6b1b8d7653b660b7fb85d2f4add2f08e0ac51a6c0a47714d66da3a9072f7b63b",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_TS3010a",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\ami_TS3010a\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "b563041e94d61bad5fe2e647df8fcc5be26171bd72d9df1e692bbd2154df57e9",
+              "trace_size_bytes": 149791
+            },
+            {
+              "frame_count": 20846,
+              "metadata_sha256": "c7f740c4c2dedd32a75152a99dc4fa3305858df2937ee2b766aeb6515f50f1da",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_TS3010b",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\ami_TS3010b\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "4b548f6d75ca4e6f16a62a67df1be114f526da722d119ab21345b1b64b3cbcaa",
+              "trace_size_bytes": 301501
+            },
+            {
+              "frame_count": 21411,
+              "metadata_sha256": "9d3a201b8d4b12a7d9fc3b6549200bbe4a9f4702d67ccc22990da921fa7cc78a",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_TS3010c",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\ami_TS3010c\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "9bd733d9e518c018678d1a70f88ac749c340d34a7beea78a04057d33562fdaa7",
+              "trace_size_bytes": 341324
+            },
+            {
+              "frame_count": 19198,
+              "metadata_sha256": "9427978e1adb4ba22cf7c007e4de6b6cdb6b82ff9873b372bbb05a4a88fbe65e",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_TS3010d",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\ls_eend\\CPUExecutionProvider\\PSEM-STRATEGY-EVAL\\ami_TS3010d\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "b235915b745ffbbb0bb1eeee5d5ac5a165c17ee09e13ba0ce0e02137fca33b5a",
+              "trace_size_bytes": 288226
+            }
+          ]
+        },
+        "streaming_sortformer": {
+          "archive_members": [
+            "probabilities.npy",
+            "frame_start_samples.npy",
+            "frame_end_samples.npy",
+            "evidence_frontier_samples.npy",
+            "slot_alive.npy",
+            "state_reset.npy",
+            "slot_ids.npy",
+            "metadata_json.npy"
+          ],
+          "family": "streaming_sortformer",
+          "field_coverage": {
+            "model_evidence_frontier_source_samples": true,
+            "native_frame_end_source_samples": true,
+            "native_frame_start_source_samples": true,
+            "reset_metadata": true,
+            "slot_validity_metadata": "slot_alive per frame; no native semantic validity flag",
+            "speaker_activity_probabilities": true,
+            "speaker_slot_or_attractor_ids": true
+          },
+          "model_pin": {
+            "backend": "vulkan",
+            "family": "streaming_sortformer",
+            "model_filename": "diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+            "model_repository": "handy-computer/diar_streaming_sortformer_4spk-v2.1-gguf",
+            "model_revision": "7ef0c15dc8f9d717e9d24fac29a6e6551e9c6ddf",
+            "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9"
+          },
+          "model_receipt_path": "experiments\\psem_relative_occupancy_gate\\results\\eval\\sortformer_model_receipt.json",
+          "model_receipt_sha256": "b402a194ca919f25cdf7d75e984ec99fd9cc303471c8e3b1d779482714e6ae42",
+          "role": "PSEM-STRATEGY-EVAL",
+          "source_count": 19,
+          "sources": [
+            {
+              "frame_count": 24621,
+              "metadata_sha256": "3ee104de729aec7813caadc56b5f5d100a1b9a5ca32adc862e1647ee3f45fccf",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R0004_M0012",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R0004_M0012\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "03165eda2f0ff869c8870e86a0adaabab1167172601b2f49f5828ab644553188",
+              "trace_size_bytes": 388091
+            },
+            {
+              "frame_count": 22412,
+              "metadata_sha256": "197e76518eb6c2bc3a0d33d50564697ca3ad24a060fa58d58f8de84f6b3c2207",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R1019_M1960",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1019_M1960\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "d5cfc2e2dc4ab6abd2b82891604dd12d4976bbed4f5add279bfc0e64612e52dc",
+              "trace_size_bytes": 305581
+            },
+            {
+              "frame_count": 22133,
+              "metadata_sha256": "2ddd59e76ffe48983e3f1978897302234a4a675e65d896f04eeebf9e16716661",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R1021_M1940",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1940\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "f6798b0a350379a4c91c571705bb7a41177849677582c50b6a8077fd2f3b4874",
+              "trace_size_bytes": 317337
+            },
+            {
+              "frame_count": 21965,
+              "metadata_sha256": "bd3d817aa256865e055d771a54fc1561a73abd8b89ae717ba69d3ef96b04c687",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R1021_M1944",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1944\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "010d3001dd8db3cb1b2d5e7f7cd0aab2e1339a505772cd0c620a6cf75a7e922f",
+              "trace_size_bytes": 314592
+            },
+            {
+              "frame_count": 22215,
+              "metadata_sha256": "9e6ad6c96e34621ed6f3d15709422da33cd9e8533f2ede9427edf575493b04d4",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R1021_M4080",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M4080\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "9b24df51ff351b97db1ecbded216396f94611b7597688644eb091858bf30e3b0",
+              "trace_size_bytes": 298652
+            },
+            {
+              "frame_count": 23119,
+              "metadata_sha256": "a0f344be595a955ba67dfe8861498e9f9cfdc8a23a0536aaf40be96ebf29ba19",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R2105_M3318",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2105_M3318\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "c198eb6913d290f83dbb8103bdd19d9e634959a99ec802873c57b72da5fb4c68",
+              "trace_size_bytes": 349190
+            },
+            {
+              "frame_count": 22423,
+              "metadata_sha256": "968c82ecce68661bfcb3acc241df7bbfeceb21f7eae980b58703f44aac62fe76",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R2108_M3206",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2108_M3206\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "ec8cd5f4ce9bd33332526d4f2263feadfcb52aa3c0fb482f6565cce147b2839a",
+              "trace_size_bytes": 329831
+            },
+            {
+              "frame_count": 20684,
+              "metadata_sha256": "a712ff05ddb3bb20e308dc6ce967c0b7e90797130dd39bac97c49ad1db0b9913",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "alimeeting_R8009_M8018",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R8009_M8018\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "514a7ed97cb39f8769f20e30d1700357b2c48dee13508e1e6ee58a436e8deb23",
+              "trace_size_bytes": 302110
+            },
+            {
+              "frame_count": 43071,
+              "metadata_sha256": "5a70fd6e1e3aa7486a25ef3907d302e3d4b8d97528fcded18d720fe2879c5e3b",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_EN2004a",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2004a\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "16baaa863491a3c9378ceb8e89059135fa755748402ccae6a50dd68a8e60edf4",
+              "trace_size_bytes": 664608
+            },
+            {
+              "frame_count": 44069,
+              "metadata_sha256": "7b18e2801981170e97b0b6e764b1194e2cbe97972dbea5038ba7afd1e0a1d418",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_EN2006a",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2006a\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "70c7cd4f24cfac5bfd9c8af969007ee72003688375aeb9bc7a606020c3da11b4",
+              "trace_size_bytes": 662980
+            },
+            {
+              "frame_count": 14363,
+              "metadata_sha256": "8577a76fdfedfa5bcbe5c88f52fa8bf2b8b598a290e67b9d0d053a6b6a797310",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_ES2014a",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_ES2014a\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "784950ecb9cb8163e04ba492ab83d05aa9dd95ee115daf3b5e6a9e890bbfbb3c",
+              "trace_size_bytes": 220858
+            },
+            {
+              "frame_count": 12075,
+              "metadata_sha256": "2be601c0e6143f4b221b4573f6d80fdca918fac6891015c82f6028556fd031a6",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_IS1007a",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007a\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "1a0c1d7e99acfe1a69d046d5cfb82157541270b81882f016ffec53cfc530396a",
+              "trace_size_bytes": 189203
+            },
+            {
+              "frame_count": 16284,
+              "metadata_sha256": "a5f9ad23a81f078b833aa9aae3d166cb08ed9fbe816f91621c8e0d1354a072ed",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_IS1007b",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007b\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "e8a040baefbe1ffedbcd88bb47d0d207ff5ae1d4b9cdf88101ee6dfa3172d3a8",
+              "trace_size_bytes": 253164
+            },
+            {
+              "frame_count": 26415,
+              "metadata_sha256": "a56448b187f39a3831b5e9e23bfb674a2836bdc24bb7800c8ebaf6955bac560a",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_IS1007c",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007c\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "b76a6420ff31aa01ba2fa3c4aed0a24feb140b1e9c7d850baf00c18fa80af02d",
+              "trace_size_bytes": 397252
+            },
+            {
+              "frame_count": 25364,
+              "metadata_sha256": "9d87f5b2918d3684a17e1c53afd7be532ee17d8c761ff3901e8a2042a374e6ac",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_IS1007d",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007d\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "04ca310df294c9d81ac72fea49be2de2b87238013b9df1b703ec84b6928926ee",
+              "trace_size_bytes": 393072
+            },
+            {
+              "frame_count": 13013,
+              "metadata_sha256": "ef7b3692265d46e48ea4fb0e0aa7ff7f465b28ed52c3032378623a93be96db76",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_TS3010a",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010a\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "ade9ebf98bfb8ec49bfc586fbea3ddbbf07351523aed8d5498fef88f8a637ef3",
+              "trace_size_bytes": 184498
+            },
+            {
+              "frame_count": 26069,
+              "metadata_sha256": "bdce6885ef3e590df299ca2d373890e2ebedfa38ba1d7dee3e1fc338a7fd455b",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_TS3010b",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010b\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "d1aff793be59f76339df9cd9f118545edbed0f57cd141d00a0ff751e902b6582",
+              "trace_size_bytes": 370218
+            },
+            {
+              "frame_count": 26775,
+              "metadata_sha256": "4457af6fe4adb6897b30457cad1fedfbc3f9bd454dfd5389cb7fc97502ec0d36",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_TS3010c",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010c\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "10bffa543abbe9ae00d6dff1048272b06267a3edbeea4b6186f2ec227f2238e7",
+              "trace_size_bytes": 392450
+            },
+            {
+              "frame_count": 24009,
+              "metadata_sha256": "6570dfc55816476884d9685f9eaeba4409601d07275e7ce81ad68cafc9e1d80c",
+              "slot_ids": [
+                "slot-0",
+                "slot-1",
+                "slot-2",
+                "slot-3"
+              ],
+              "source_id": "ami_TS3010d",
+              "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010d\\posterior_trace.npz",
+              "trace_schema_version": "psem.relative_occupancy.trace.v1",
+              "trace_sha256": "69358b16b745d191c95834c5f72bfb66aa770231946f50acfc57a70011aa1746",
+              "trace_size_bytes": 350342
+            }
+          ]
+        }
+      },
+      "predecessor_artifacts": {
+        "gate1_event_ledger": {
+          "path": "experiments\\psem_relative_occupancy_gate\\results\\eval\\gate1_event_ledger.jsonl",
+          "row_count": 152,
+          "schema_version": "psem.relative_occupancy.gate_event_session.v1",
+          "sha256": "920a967b507ce3ad10f6e44b05497fd5388bc382644a6cef588c6fade932c359"
+        },
+        "gate2_event_ledger": {
+          "path": "experiments\\psem_relative_occupancy_gate\\results\\eval\\gate2_event_ledger.jsonl",
+          "row_count": 152,
+          "schema_version": "psem.relative_occupancy.gate_event_session.v1",
+          "sha256": "135b103d26e6ebfd262686d809e874c2282018ebe8341801d8b192586ec2c337"
+        },
+        "manifest": {
+          "path": "experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+          "row_count": 19,
+          "schema_version": "psem.relative_occupancy.manifest.v1",
+          "sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30"
+        }
+      }
+    }
+  },
+  "schema_version": "psem.ontology_simplification.trace_reuse_receipt.v1"
+}

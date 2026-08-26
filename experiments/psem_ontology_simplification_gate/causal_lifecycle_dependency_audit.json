@@ -1,0 +1,37 @@
+{
+  "audited_sources": [
+    {
+      "path": "experiments\\psem_relative_occupancy_gate\\model_decode.py",
+      "sha256": "83469df925883cd5212a03bef6b9fd666b5f03f18ba8b65739b2a99ea0322fe4"
+    },
+    {
+      "path": "experiments\\psem_relative_occupancy_gate\\decoder.py",
+      "sha256": "b836be0cab5f401c38e294f4e7c48af90e431668c3ac8c5c6460bff371d6c5f8"
+    }
+  ],
+  "authority": {
+    "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/98",
+    "sha256": "7bec60b3c3d001d964c0e294eae0b1d66cc25410e6e27c65d5ed33696a205c16"
+  },
+  "conclusion": "material_dependency_present",
+  "dependencies": [
+    {
+      "material_dependency": true,
+      "mechanism": "a singleton candidate is rejected when any other alive slot exceeds other_low_threshold",
+      "surface": "causal enrollment"
+    },
+    {
+      "material_dependency": true,
+      "mechanism": "ReplacementDecoder ends the episode after the old OTHER_ONLY state persists",
+      "surface": "selected-slot episode termination"
+    },
+    {
+      "material_dependency": false,
+      "mechanism": "trace reset, slot validity, and silence reset are independent of other_present",
+      "surface": "reset and uncertainty"
+    }
+  ],
+  "native_simplified_ontology_runtime_claim_allowed": false,
+  "s2_label": "fixed-issue-97-lifecycle-counterfactual-ablation",
+  "schema_version": "psem.ontology_simplification.causal_dependency_audit.v1"
+}

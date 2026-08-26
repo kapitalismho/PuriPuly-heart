@@ -1,0 +1,27 @@
+{
+  "artifact_sha256": {
+    "PATH_DECISION.md": "aaf012cdf49730134ccf3fe87ca8940b0fd855706f2177e3aa2b2e58fca5d31e",
+    "anchor_dropout_slices.json": "6001cf3595fe429d156ea252a794a0c54ef3b8b2dcc52dff93eb788577a35e85",
+    "bootstrap_intervals.json": "429ad9565f40e3f1a81556b3d709b2662484cff1ac3f9b006f6cba0949a81709",
+    "global_overlap_diagnostic.json": "83d48ea1065dd196ef26b6e85f0f45c1bcb69a3a06aee2024c9512bb1f93903c",
+    "lseend_anchor_overlap_metrics.json": "08c41793db61eb67c24897de5d818c4e76a2f4371362f379e2bbb095faddd850",
+    "lseend_simple_anchor_metrics.json": "b92fe0782c5207404e005cd657131ea1fbb2828d15f55a81e146b6bcef823783",
+    "paired_session_deltas.json": "616e3d73efaae6afb31d60f96918878373b05a1a170c40a89fdf253f47302866",
+    "product_frontiers.json": "0bba2e38defc680488f9d13f0812c7ac362527386766287c407ca56bd5d551ba",
+    "production_vad_replay_receipt.json": "216314266492fd7165c8a63eb88e067c3cf27e1b21c7ff71a04480d55e000cc4",
+    "production_vad_sensitivity.json": "70f4d60d21cf734e53c9ddaae40fa8175308f803d909db3308053c948d930eef",
+    "production_vad_speech_gate.jsonl": "b822ae34df11493aa0bf79b47795bf9b145c6dfd33bbdee2b81c4516f87e60ca",
+    "sortformer_anchor_overlap_metrics.json": "84ad46441422e88679226b234ae0fb1d102602e3c89b445b76943cea81939caf",
+    "sortformer_simple_anchor_metrics.json": "f402ceb8114d73ed046cb5279bf4a8e65605f24b6a8400f213817b3cb2acd046"
+  },
+  "bootstrap_interval_row_count": 72,
+  "expected_results_manifest_sha256": "6739d5692b34d63a98c2a1c799e674b1e35a4b1efac29198bbab79c31d7eb166",
+  "paired_delta_row_count": 1368,
+  "passed": true,
+  "product_frontier_row_count": 192,
+  "production_vad_sensitivity_row_count": 32,
+  "r0_reconstruction_comparison_count": 16,
+  "role": "PSEM-STRATEGY-EVAL",
+  "schema_version": "psem.ontology_simplification.verification.v1",
+  "source_count": 19
+}

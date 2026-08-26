@@ -1,0 +1,71 @@
+{
+  "candidate_a_exact_action_equivalence": true,
+  "candidate_a_information_sufficient": true,
+  "candidate_b_exact_action_equivalence": true,
+  "candidate_b_ontology_verdict": "GREEN",
+  "cells": [
+    {
+      "anchor_episode_count": 3420,
+      "candidate_a_event_count": 2726,
+      "candidate_a_mismatch_count": 0,
+      "candidate_b_event_count": 2726,
+      "candidate_b_mismatch_count": 0,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "reference_event_count": 2726,
+      "replacement_confirm_ms": 100,
+      "source_count": 10
+    },
+    {
+      "anchor_episode_count": 3068,
+      "candidate_a_event_count": 2374,
+      "candidate_a_mismatch_count": 0,
+      "candidate_b_event_count": 2374,
+      "candidate_b_mismatch_count": 0,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "reference_event_count": 2374,
+      "replacement_confirm_ms": 200,
+      "source_count": 10
+    },
+    {
+      "anchor_episode_count": 2732,
+      "candidate_a_event_count": 2037,
+      "candidate_a_mismatch_count": 0,
+      "candidate_b_event_count": 2037,
+      "candidate_b_mismatch_count": 0,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "reference_event_count": 2037,
+      "replacement_confirm_ms": 300,
+      "source_count": 10
+    },
+    {
+      "anchor_episode_count": 2306,
+      "candidate_a_event_count": 1592,
+      "candidate_a_mismatch_count": 0,
+      "candidate_b_event_count": 1592,
+      "candidate_b_mismatch_count": 0,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "reference_event_count": 1592,
+      "replacement_confirm_ms": 500,
+      "source_count": 10
+    }
+  ],
+  "gate": "S0_perfect_state_ontology_sufficiency",
+  "provenance": {
+    "anchor_overlap_source_sha256": "2515ad6eec3c6c3bcdd5f66b711c216e87871cb7c81d40ce617f6ba31bffa602",
+    "authority_snapshot_sha256": "71555b2d3afa3df581e3ec384c67f46d4a494449728be4c8876e546f60ec0814",
+    "causal_dependency_audit_sha256": "be6762a73f1cc42570fd5a066f016468af8de1b70ca9350534a06e40cdd7bf28",
+    "config_sha256": "4e61df08cf2c27b34b70b86c945d65b9f9abf9c95100cc16830ab855f38c8e72",
+    "evaluator_source_sha256": "015b2c1a7ef600c99885af5a4c1e86f386fec357e905ca9b1f572019682b41b4",
+    "predecessor_gate0_oracle_events_sha256": "e56152d070b361beb53417542c473d6039f9d2496f6cda6fdf1fecad4d714d50",
+    "predecessor_gate0_oracle_metrics_sha256": "5892e5883b2d2d63392d4aebd0ac13666f0534d391c8ab78a59749771ef7ec24",
+    "predecessor_manifest_sha256": "b5a6d1369fc1165adb98ce91508b7f8b171ad2a981495b33e0060a324e6176b9",
+    "simple_anchor_source_sha256": "8027a6b075b84caa9bb994908588bb57da6583288c5b72ea7a9edd33931b45c3",
+    "trace_reuse_receipt_sha256": "5edc64fb3e7aeaa2151a45883890ffe8b03b6cc1d6d9e2b848fd7baf727bc0d9"
+  },
+  "schema_version": "psem.ontology_simplification.s0.v1",
+  "shared_action_authority": "issue-97 Gate 0 product-action oracle"
+}

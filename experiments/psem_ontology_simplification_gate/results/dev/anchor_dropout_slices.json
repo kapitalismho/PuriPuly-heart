@@ -1,0 +1,903 @@
+{
+  "anchor_overlap_source_sha256": "2515ad6eec3c6c3bcdd5f66b711c216e87871cb7c81d40ce617f6ba31bffa602",
+  "authority_snapshot_sha256": "71555b2d3afa3df581e3ec384c67f46d4a494449728be4c8876e546f60ec0814",
+  "causal_dependency_audit_sha256": "be6762a73f1cc42570fd5a066f016468af8de1b70ca9350534a06e40cdd7bf28",
+  "causal_interpretation": "fixed-issue-97-lifecycle-counterfactual-ablation",
+  "config_sha256": "4e61df08cf2c27b34b70b86c945d65b9f9abf9c95100cc16830ab855f38c8e72",
+  "evaluator_source_sha256": "015b2c1a7ef600c99885af5a4c1e86f386fec357e905ca9b1f572019682b41b4",
+  "families": {
+    "ls_eend": {
+      "anchor_threshold": 0.7,
+      "oracle_anchor_mapping_coverage": {
+        "continuity_invalid_episode_count": 1,
+        "continuity_invalid_support_seconds": 3.9,
+        "continuity_invalid_unmasked_active_speech_seconds": 3.3,
+        "episode_count": 3068,
+        "episode_support_seconds": 19147.7816875,
+        "mapped_episode_count": 2992,
+        "mapped_episode_fraction": 0.9752281616688396,
+        "per_source": [
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 278,
+            "episode_support_seconds": 1568.79,
+            "mapped_episode_count": 278,
+            "mapped_episode_fraction": 1.0,
+            "source_id": "alimeeting_R1019_M1928",
+            "unmapped_episode_count": 0,
+            "unmapped_episode_support_seconds": 0.0,
+            "unmapped_unmasked_active_speech_seconds": 0.0
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 102,
+            "episode_support_seconds": 1724.38,
+            "mapped_episode_count": 102,
+            "mapped_episode_fraction": 1.0,
+            "source_id": "alimeeting_R1021_M4073",
+            "unmapped_episode_count": 0,
+            "unmapped_episode_support_seconds": 0.0,
+            "unmapped_unmasked_active_speech_seconds": 0.0
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 226,
+            "episode_support_seconds": 1857.23,
+            "mapped_episode_count": 222,
+            "mapped_episode_fraction": 0.9823008849557522,
+            "source_id": "alimeeting_R8009_M8019",
+            "unmapped_episode_count": 4,
+            "unmapped_episode_support_seconds": 2.23,
+            "unmapped_unmasked_active_speech_seconds": 0.69
+          },
+          {
+            "continuity_invalid_episode_count": 1,
+            "continuity_invalid_support_seconds": 3.9,
+            "continuity_invalid_unmasked_active_speech_seconds": 3.3,
+            "episode_count": 775,
+            "episode_support_seconds": 4516.725,
+            "mapped_episode_count": 747,
+            "mapped_episode_fraction": 0.9638709677419355,
+            "source_id": "ami_EN2009d",
+            "unmapped_episode_count": 28,
+            "unmapped_episode_support_seconds": 20.112,
+            "unmapped_unmasked_active_speech_seconds": 5.384
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 262,
+            "episode_support_seconds": 1887.054,
+            "mapped_episode_count": 255,
+            "mapped_episode_fraction": 0.9732824427480916,
+            "source_id": "ami_ES2002b",
+            "unmapped_episode_count": 7,
+            "unmapped_episode_support_seconds": 4.189,
+            "unmapped_unmasked_active_speech_seconds": 1.396
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 217,
+            "episode_support_seconds": 1208.786,
+            "mapped_episode_count": 207,
+            "mapped_episode_fraction": 0.9539170506912442,
+            "source_id": "ami_ES2009a",
+            "unmapped_episode_count": 10,
+            "unmapped_episode_support_seconds": 9.527,
+            "unmapped_unmasked_active_speech_seconds": 1.335
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 165,
+            "episode_support_seconds": 1251.397,
+            "mapped_episode_count": 160,
+            "mapped_episode_fraction": 0.9696969696969697,
+            "source_id": "ami_ES2009b",
+            "unmapped_episode_count": 5,
+            "unmapped_episode_support_seconds": 3.484,
+            "unmapped_unmasked_active_speech_seconds": 1.168
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 240,
+            "episode_support_seconds": 1769.085,
+            "mapped_episode_count": 237,
+            "mapped_episode_fraction": 0.9875,
+            "source_id": "ami_ES2009c",
+            "unmapped_episode_count": 3,
+            "unmapped_episode_support_seconds": 3.27,
+            "unmapped_unmasked_active_speech_seconds": 0.31
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 371,
+            "episode_support_seconds": 1826.986,
+            "mapped_episode_count": 362,
+            "mapped_episode_fraction": 0.9757412398921833,
+            "source_id": "ami_ES2009d",
+            "unmapped_episode_count": 9,
+            "unmapped_episode_support_seconds": 7.713,
+            "unmapped_unmasked_active_speech_seconds": 1.111
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 432,
+            "episode_support_seconds": 1537.3486875,
+            "mapped_episode_count": 422,
+            "mapped_episode_fraction": 0.9768518518518519,
+            "source_id": "ami_ES2015d",
+            "unmapped_episode_count": 10,
+            "unmapped_episode_support_seconds": 7.903,
+            "unmapped_unmasked_active_speech_seconds": 1.808
+          }
+        ],
+        "source_count": 10,
+        "unmapped_episode_count": 76,
+        "unmapped_episode_support_seconds": 58.428,
+        "unmapped_unmasked_active_speech_seconds": 13.202
+      },
+      "s1_oracle_anchor": {
+        "gt_anchor_only": {
+          "below_threshold_run_count": 3020,
+          "episode_count": 2938,
+          "horizons_ms": {
+            "100": {
+              "affected_episode_count": 1868,
+              "affected_episode_fraction": 0.6358066712049013,
+              "affected_support_seconds": 2205.0,
+              "duration_weighted_probability": 0.16921967092337917,
+              "qualifying_run_count": 3020
+            },
+            "300": {
+              "affected_episode_count": 1409,
+              "affected_episode_fraction": 0.4795779441797141,
+              "affected_support_seconds": 2072.5,
+              "duration_weighted_probability": 0.15905114194499018,
+              "qualifying_run_count": 2075
+            },
+            "500": {
+              "affected_episode_count": 1061,
+              "affected_episode_fraction": 0.36113002042205583,
+              "affected_support_seconds": 1894.5,
+              "duration_weighted_probability": 0.14539077848722987,
+              "qualifying_run_count": 1557
+            }
+          },
+          "support_seconds": 13030.4
+        },
+        "gt_anchor_overlap": {
+          "below_threshold_run_count": 447,
+          "episode_count": 1473,
+          "horizons_ms": {
+            "100": {
+              "affected_episode_count": 388,
+              "affected_episode_fraction": 0.263408010862186,
+              "affected_support_seconds": 178.7,
+              "duration_weighted_probability": 0.16420104750528347,
+              "qualifying_run_count": 447
+            },
+            "300": {
+              "affected_episode_count": 243,
+              "affected_episode_fraction": 0.164969450101833,
+              "affected_support_seconds": 153.7,
+              "duration_weighted_probability": 0.1412294404116512,
+              "qualifying_run_count": 269
+            },
+            "500": {
+              "affected_episode_count": 140,
+              "affected_episode_fraction": 0.09504412763068568,
+              "affected_support_seconds": 112.8,
+              "duration_weighted_probability": 0.1036478912064688,
+              "qualifying_run_count": 152
+            }
+          },
+          "support_seconds": 1088.3
+        }
+      },
+      "s2_fixed_issue97_lifecycle": {
+        "100": {
+          "gt_anchor_only": {
+            "below_threshold_run_count": 561,
+            "episode_count": 1337,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 351,
+                "affected_episode_fraction": 0.262528047868362,
+                "affected_support_seconds": 198.8,
+                "duration_weighted_probability": 0.024880789977597278,
+                "qualifying_run_count": 561
+              },
+              "300": {
+                "affected_episode_count": 123,
+                "affected_episode_fraction": 0.09199700822737472,
+                "affected_support_seconds": 152.8,
+                "duration_weighted_probability": 0.019123665536100926,
+                "qualifying_run_count": 200
+              },
+              "500": {
+                "affected_episode_count": 82,
+                "affected_episode_fraction": 0.061331338818249814,
+                "affected_support_seconds": 127.1,
+                "duration_weighted_probability": 0.015907185141612747,
+                "qualifying_run_count": 125
+              }
+            },
+            "support_seconds": 7990.1
+          },
+          "gt_anchor_overlap": {
+            "below_threshold_run_count": 166,
+            "episode_count": 865,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 155,
+                "affected_episode_fraction": 0.1791907514450867,
+                "affected_support_seconds": 34.6,
+                "duration_weighted_probability": 0.040869359792109615,
+                "qualifying_run_count": 166
+              },
+              "300": {
+                "affected_episode_count": 40,
+                "affected_episode_fraction": 0.046242774566473986,
+                "affected_support_seconds": 20.0,
+                "duration_weighted_probability": 0.023623907394283016,
+                "qualifying_run_count": 41
+              },
+              "500": {
+                "affected_episode_count": 18,
+                "affected_episode_fraction": 0.020809248554913295,
+                "affected_support_seconds": 12.7,
+                "duration_weighted_probability": 0.015001181195369714,
+                "qualifying_run_count": 19
+              }
+            },
+            "support_seconds": 846.6
+          }
+        },
+        "200": {
+          "gt_anchor_only": {
+            "below_threshold_run_count": 598,
+            "episode_count": 1302,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 372,
+                "affected_episode_fraction": 0.2857142857142857,
+                "affected_support_seconds": 202.6,
+                "duration_weighted_probability": 0.025481712532072244,
+                "qualifying_run_count": 598
+              },
+              "300": {
+                "affected_episode_count": 142,
+                "affected_episode_fraction": 0.10906298003072197,
+                "affected_support_seconds": 147.0,
+                "duration_weighted_probability": 0.018488705539065252,
+                "qualifying_run_count": 219
+              },
+              "500": {
+                "affected_episode_count": 88,
+                "affected_episode_fraction": 0.06758832565284179,
+                "affected_support_seconds": 116.9,
+                "duration_weighted_probability": 0.014702922976304272,
+                "qualifying_run_count": 128
+              }
+            },
+            "support_seconds": 7950.8
+          },
+          "gt_anchor_overlap": {
+            "below_threshold_run_count": 205,
+            "episode_count": 853,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 185,
+                "affected_episode_fraction": 0.21688159437280188,
+                "affected_support_seconds": 45.1,
+                "duration_weighted_probability": 0.05313383600377003,
+                "qualifying_run_count": 205
+              },
+              "300": {
+                "affected_episode_count": 51,
+                "affected_episode_fraction": 0.059788980070339975,
+                "affected_support_seconds": 23.2,
+                "duration_weighted_probability": 0.027332704995287466,
+                "qualifying_run_count": 52
+              },
+              "500": {
+                "affected_episode_count": 18,
+                "affected_episode_fraction": 0.021101992966002344,
+                "affected_support_seconds": 12.1,
+                "duration_weighted_probability": 0.014255419415645617,
+                "qualifying_run_count": 19
+              }
+            },
+            "support_seconds": 848.8
+          }
+        },
+        "300": {
+          "gt_anchor_only": {
+            "below_threshold_run_count": 637,
+            "episode_count": 1283,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 400,
+                "affected_episode_fraction": 0.3117692907248636,
+                "affected_support_seconds": 220.6,
+                "duration_weighted_probability": 0.027890864035198623,
+                "qualifying_run_count": 637
+              },
+              "300": {
+                "affected_episode_count": 216,
+                "affected_episode_fraction": 0.16835541699142634,
+                "affected_support_seconds": 174.4,
+                "duration_weighted_probability": 0.02204971299972185,
+                "qualifying_run_count": 302
+              },
+              "500": {
+                "affected_episode_count": 91,
+                "affected_episode_fraction": 0.07092751363990647,
+                "affected_support_seconds": 119.0,
+                "duration_weighted_probability": 0.01504538903077351,
+                "qualifying_run_count": 132
+              }
+            },
+            "support_seconds": 7909.4
+          },
+          "gt_anchor_overlap": {
+            "below_threshold_run_count": 226,
+            "episode_count": 851,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 197,
+                "affected_episode_fraction": 0.23149236192714454,
+                "affected_support_seconds": 56.3,
+                "duration_weighted_probability": 0.06516203703703703,
+                "qualifying_run_count": 226
+              },
+              "300": {
+                "affected_episode_count": 90,
+                "affected_episode_fraction": 0.10575793184488837,
+                "affected_support_seconds": 38.1,
+                "duration_weighted_probability": 0.044097222222222225,
+                "qualifying_run_count": 93
+              },
+              "500": {
+                "affected_episode_count": 23,
+                "affected_episode_fraction": 0.02702702702702703,
+                "affected_support_seconds": 15.6,
+                "duration_weighted_probability": 0.018055555555555554,
+                "qualifying_run_count": 24
+              }
+            },
+            "support_seconds": 864.0
+          }
+        },
+        "500": {
+          "gt_anchor_only": {
+            "below_threshold_run_count": 672,
+            "episode_count": 1218,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 404,
+                "affected_episode_fraction": 0.33169129720853857,
+                "affected_support_seconds": 254.7,
+                "duration_weighted_probability": 0.032388509518178,
+                "qualifying_run_count": 672
+              },
+              "300": {
+                "affected_episode_count": 240,
+                "affected_episode_fraction": 0.19704433497536947,
+                "affected_support_seconds": 208.0,
+                "duration_weighted_probability": 0.02644998028967815,
+                "qualifying_run_count": 335
+              },
+              "500": {
+                "affected_episode_count": 160,
+                "affected_episode_fraction": 0.13136288998357964,
+                "affected_support_seconds": 162.6,
+                "duration_weighted_probability": 0.020676763437988785,
+                "qualifying_run_count": 203
+              }
+            },
+            "support_seconds": 7863.9
+          },
+          "gt_anchor_overlap": {
+            "below_threshold_run_count": 253,
+            "episode_count": 832,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 222,
+                "affected_episode_fraction": 0.2668269230769231,
+                "affected_support_seconds": 74.8,
+                "duration_weighted_probability": 0.08528103979021777,
+                "qualifying_run_count": 253
+              },
+              "300": {
+                "affected_episode_count": 126,
+                "affected_episode_fraction": 0.15144230769230768,
+                "affected_support_seconds": 58.7,
+                "duration_weighted_probability": 0.06692509405997035,
+                "qualifying_run_count": 130
+              },
+              "500": {
+                "affected_episode_count": 53,
+                "affected_episode_fraction": 0.06370192307692307,
+                "affected_support_seconds": 32.1,
+                "duration_weighted_probability": 0.03659787937521377,
+                "qualifying_run_count": 54
+              }
+            },
+            "support_seconds": 877.1
+          }
+        }
+      }
+    },
+    "streaming_sortformer": {
+      "anchor_threshold": 0.5,
+      "oracle_anchor_mapping_coverage": {
+        "continuity_invalid_episode_count": 0,
+        "continuity_invalid_support_seconds": 0.0,
+        "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+        "episode_count": 3068,
+        "episode_support_seconds": 19147.7816875,
+        "mapped_episode_count": 2992,
+        "mapped_episode_fraction": 0.9752281616688396,
+        "per_source": [
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 278,
+            "episode_support_seconds": 1568.79,
+            "mapped_episode_count": 278,
+            "mapped_episode_fraction": 1.0,
+            "source_id": "alimeeting_R1019_M1928",
+            "unmapped_episode_count": 0,
+            "unmapped_episode_support_seconds": 0.0,
+            "unmapped_unmasked_active_speech_seconds": 0.0
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 102,
+            "episode_support_seconds": 1724.38,
+            "mapped_episode_count": 102,
+            "mapped_episode_fraction": 1.0,
+            "source_id": "alimeeting_R1021_M4073",
+            "unmapped_episode_count": 0,
+            "unmapped_episode_support_seconds": 0.0,
+            "unmapped_unmasked_active_speech_seconds": 0.0
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 226,
+            "episode_support_seconds": 1857.23,
+            "mapped_episode_count": 222,
+            "mapped_episode_fraction": 0.9823008849557522,
+            "source_id": "alimeeting_R8009_M8019",
+            "unmapped_episode_count": 4,
+            "unmapped_episode_support_seconds": 2.23,
+            "unmapped_unmasked_active_speech_seconds": 0.69
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 775,
+            "episode_support_seconds": 4516.725,
+            "mapped_episode_count": 747,
+            "mapped_episode_fraction": 0.9638709677419355,
+            "source_id": "ami_EN2009d",
+            "unmapped_episode_count": 28,
+            "unmapped_episode_support_seconds": 20.112,
+            "unmapped_unmasked_active_speech_seconds": 5.384
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 262,
+            "episode_support_seconds": 1887.054,
+            "mapped_episode_count": 255,
+            "mapped_episode_fraction": 0.9732824427480916,
+            "source_id": "ami_ES2002b",
+            "unmapped_episode_count": 7,
+            "unmapped_episode_support_seconds": 4.189,
+            "unmapped_unmasked_active_speech_seconds": 1.396
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 217,
+            "episode_support_seconds": 1208.786,
+            "mapped_episode_count": 207,
+            "mapped_episode_fraction": 0.9539170506912442,
+            "source_id": "ami_ES2009a",
+            "unmapped_episode_count": 10,
+            "unmapped_episode_support_seconds": 9.527,
+            "unmapped_unmasked_active_speech_seconds": 1.335
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 165,
+            "episode_support_seconds": 1251.397,
+            "mapped_episode_count": 160,
+            "mapped_episode_fraction": 0.9696969696969697,
+            "source_id": "ami_ES2009b",
+            "unmapped_episode_count": 5,
+            "unmapped_episode_support_seconds": 3.484,
+            "unmapped_unmasked_active_speech_seconds": 1.168
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 240,
+            "episode_support_seconds": 1769.085,
+            "mapped_episode_count": 237,
+            "mapped_episode_fraction": 0.9875,
+            "source_id": "ami_ES2009c",
+            "unmapped_episode_count": 3,
+            "unmapped_episode_support_seconds": 3.27,
+            "unmapped_unmasked_active_speech_seconds": 0.31
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 371,
+            "episode_support_seconds": 1826.986,
+            "mapped_episode_count": 362,
+            "mapped_episode_fraction": 0.9757412398921833,
+            "source_id": "ami_ES2009d",
+            "unmapped_episode_count": 9,
+            "unmapped_episode_support_seconds": 7.713,
+            "unmapped_unmasked_active_speech_seconds": 1.111
+          },
+          {
+            "continuity_invalid_episode_count": 0,
+            "continuity_invalid_support_seconds": 0.0,
+            "continuity_invalid_unmasked_active_speech_seconds": 0.0,
+            "episode_count": 432,
+            "episode_support_seconds": 1537.3486875,
+            "mapped_episode_count": 422,
+            "mapped_episode_fraction": 0.9768518518518519,
+            "source_id": "ami_ES2015d",
+            "unmapped_episode_count": 10,
+            "unmapped_episode_support_seconds": 7.903,
+            "unmapped_unmasked_active_speech_seconds": 1.808
+          }
+        ],
+        "source_count": 10,
+        "unmapped_episode_count": 76,
+        "unmapped_episode_support_seconds": 58.428,
+        "unmapped_unmasked_active_speech_seconds": 13.202
+      },
+      "s1_oracle_anchor": {
+        "gt_anchor_only": {
+          "below_threshold_run_count": 2963,
+          "episode_count": 2939,
+          "horizons_ms": {
+            "100": {
+              "affected_episode_count": 1320,
+              "affected_episode_fraction": 0.4491323579448792,
+              "affected_support_seconds": 394.7,
+              "duration_weighted_probability": 0.030284197280790598,
+              "qualifying_run_count": 2963
+            },
+            "300": {
+              "affected_episode_count": 188,
+              "affected_episode_fraction": 0.0639673358285131,
+              "affected_support_seconds": 82.0,
+              "duration_weighted_probability": 0.006291624466746463,
+              "qualifying_run_count": 207
+            },
+            "500": {
+              "affected_episode_count": 48,
+              "affected_episode_fraction": 0.016332085743450152,
+              "affected_support_seconds": 29.9,
+              "duration_weighted_probability": 0.0022941411165331616,
+              "qualifying_run_count": 49
+            }
+          },
+          "support_seconds": 13033.2
+        },
+        "gt_anchor_overlap": {
+          "below_threshold_run_count": 483,
+          "episode_count": 1474,
+          "horizons_ms": {
+            "100": {
+              "affected_episode_count": 429,
+              "affected_episode_fraction": 0.291044776119403,
+              "affected_support_seconds": 80.8,
+              "duration_weighted_probability": 0.07423741271591326,
+              "qualifying_run_count": 483
+            },
+            "300": {
+              "affected_episode_count": 73,
+              "affected_episode_fraction": 0.04952510176390773,
+              "affected_support_seconds": 31.2,
+              "duration_weighted_probability": 0.02866593164277839,
+              "qualifying_run_count": 77
+            },
+            "500": {
+              "affected_episode_count": 21,
+              "affected_episode_fraction": 0.014246947082767978,
+              "affected_support_seconds": 12.3,
+              "duration_weighted_probability": 0.011300992282249173,
+              "qualifying_run_count": 21
+            }
+          },
+          "support_seconds": 1088.4
+        }
+      },
+      "s2_fixed_issue97_lifecycle": {
+        "100": {
+          "gt_anchor_only": {
+            "below_threshold_run_count": 2537,
+            "episode_count": 2106,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 1210,
+                "affected_episode_fraction": 0.5745489078822412,
+                "affected_support_seconds": 372.6,
+                "duration_weighted_probability": 0.037109336095452465,
+                "qualifying_run_count": 2537
+              },
+              "300": {
+                "affected_episode_count": 209,
+                "affected_episode_fraction": 0.09924026590693258,
+                "affected_support_seconds": 110.5,
+                "duration_weighted_probability": 0.011005318407266498,
+                "qualifying_run_count": 223
+              },
+              "500": {
+                "affected_episode_count": 91,
+                "affected_episode_fraction": 0.043209876543209874,
+                "affected_support_seconds": 67.7,
+                "duration_weighted_probability": 0.006742624942732506,
+                "qualifying_run_count": 92
+              }
+            },
+            "support_seconds": 10040.6
+          },
+          "gt_anchor_overlap": {
+            "below_threshold_run_count": 510,
+            "episode_count": 1298,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 483,
+                "affected_episode_fraction": 0.37211093990755006,
+                "affected_support_seconds": 90.9,
+                "duration_weighted_probability": 0.10761217000118385,
+                "qualifying_run_count": 510
+              },
+              "300": {
+                "affected_episode_count": 89,
+                "affected_episode_fraction": 0.06856702619414484,
+                "affected_support_seconds": 40.8,
+                "duration_weighted_probability": 0.048301172013732685,
+                "qualifying_run_count": 91
+              },
+              "500": {
+                "affected_episode_count": 31,
+                "affected_episode_fraction": 0.023882896764252697,
+                "affected_support_seconds": 20.3,
+                "duration_weighted_probability": 0.024032200781342487,
+                "qualifying_run_count": 31
+              }
+            },
+            "support_seconds": 844.7
+          }
+        },
+        "200": {
+          "gt_anchor_only": {
+            "below_threshold_run_count": 2512,
+            "episode_count": 1967,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 1157,
+                "affected_episode_fraction": 0.5882053889171327,
+                "affected_support_seconds": 367.2,
+                "duration_weighted_probability": 0.036886728010607946,
+                "qualifying_run_count": 2512
+              },
+              "300": {
+                "affected_episode_count": 199,
+                "affected_episode_fraction": 0.10116929334011185,
+                "affected_support_seconds": 107.0,
+                "duration_weighted_probability": 0.010748583597862339,
+                "qualifying_run_count": 216
+              },
+              "500": {
+                "affected_episode_count": 86,
+                "affected_episode_fraction": 0.043721403152008134,
+                "affected_support_seconds": 64.7,
+                "duration_weighted_probability": 0.006499377184875638,
+                "qualifying_run_count": 87
+              }
+            },
+            "support_seconds": 9954.8
+          },
+          "gt_anchor_overlap": {
+            "below_threshold_run_count": 540,
+            "episode_count": 1226,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 488,
+                "affected_episode_fraction": 0.39804241435562804,
+                "affected_support_seconds": 98.3,
+                "duration_weighted_probability": 0.11203555960793253,
+                "qualifying_run_count": 540
+              },
+              "300": {
+                "affected_episode_count": 98,
+                "affected_episode_fraction": 0.0799347471451876,
+                "affected_support_seconds": 45.1,
+                "duration_weighted_probability": 0.0514018691588785,
+                "qualifying_run_count": 101
+              },
+              "500": {
+                "affected_episode_count": 36,
+                "affected_episode_fraction": 0.02936378466557912,
+                "affected_support_seconds": 22.7,
+                "duration_weighted_probability": 0.02587189423296102,
+                "qualifying_run_count": 36
+              }
+            },
+            "support_seconds": 877.4
+          }
+        },
+        "300": {
+          "gt_anchor_only": {
+            "below_threshold_run_count": 2522,
+            "episode_count": 1826,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 1115,
+                "affected_episode_fraction": 0.6106243154435925,
+                "affected_support_seconds": 375.3,
+                "duration_weighted_probability": 0.038040117982140506,
+                "qualifying_run_count": 2522
+              },
+              "300": {
+                "affected_episode_count": 199,
+                "affected_episode_fraction": 0.10898138006571742,
+                "affected_support_seconds": 114.0,
+                "duration_weighted_probability": 0.011554951905046676,
+                "qualifying_run_count": 218
+              },
+              "500": {
+                "affected_episode_count": 91,
+                "affected_episode_fraction": 0.049835706462212484,
+                "affected_support_seconds": 72.6,
+                "duration_weighted_probability": 0.007358679897424462,
+                "qualifying_run_count": 92
+              }
+            },
+            "support_seconds": 9865.9
+          },
+          "gt_anchor_overlap": {
+            "below_threshold_run_count": 558,
+            "episode_count": 1162,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 488,
+                "affected_episode_fraction": 0.4199655765920826,
+                "affected_support_seconds": 101.2,
+                "duration_weighted_probability": 0.1134020618556701,
+                "qualifying_run_count": 558
+              },
+              "300": {
+                "affected_episode_count": 99,
+                "affected_episode_fraction": 0.08519793459552495,
+                "affected_support_seconds": 45.6,
+                "duration_weighted_probability": 0.051098162259076645,
+                "qualifying_run_count": 102
+              },
+              "500": {
+                "affected_episode_count": 36,
+                "affected_episode_fraction": 0.03098106712564544,
+                "affected_support_seconds": 23.3,
+                "duration_weighted_probability": 0.026109367996414164,
+                "qualifying_run_count": 36
+              }
+            },
+            "support_seconds": 892.4
+          }
+        },
+        "500": {
+          "gt_anchor_only": {
+            "below_threshold_run_count": 2500,
+            "episode_count": 1579,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 997,
+                "affected_episode_fraction": 0.6314122862571248,
+                "affected_support_seconds": 379.4,
+                "duration_weighted_probability": 0.038774029371787144,
+                "qualifying_run_count": 2500
+              },
+              "300": {
+                "affected_episode_count": 180,
+                "affected_episode_fraction": 0.11399620012666245,
+                "affected_support_seconds": 120.1,
+                "duration_weighted_probability": 0.012274014042044375,
+                "qualifying_run_count": 214
+              },
+              "500": {
+                "affected_episode_count": 84,
+                "affected_episode_fraction": 0.05319822672577581,
+                "affected_support_seconds": 78.2,
+                "duration_weighted_probability": 0.007991905895819069,
+                "qualifying_run_count": 86
+              }
+            },
+            "support_seconds": 9784.9
+          },
+          "gt_anchor_overlap": {
+            "below_threshold_run_count": 601,
+            "episode_count": 1025,
+            "horizons_ms": {
+              "100": {
+                "affected_episode_count": 470,
+                "affected_episode_fraction": 0.4585365853658537,
+                "affected_support_seconds": 108.9,
+                "duration_weighted_probability": 0.11601150527325024,
+                "qualifying_run_count": 601
+              },
+              "300": {
+                "affected_episode_count": 100,
+                "affected_episode_fraction": 0.0975609756097561,
+                "affected_support_seconds": 49.2,
+                "duration_weighted_probability": 0.05241291147331416,
+                "qualifying_run_count": 108
+              },
+              "500": {
+                "affected_episode_count": 37,
+                "affected_episode_fraction": 0.03609756097560975,
+                "affected_support_seconds": 25.7,
+                "duration_weighted_probability": 0.027378289123255566,
+                "qualifying_run_count": 37
+              }
+            },
+            "support_seconds": 938.7
+          }
+        }
+      }
+    }
+  },
+  "new_model_inference_performed": false,
+  "predecessor_gate1_ledger_sha256": "397b384fb2246259e38b834be2bac7fdc7017cb60429a792ae48ff95e514ba85",
+  "predecessor_gate2_ledger_sha256": "3a7c811301f93f91234262d16df2bb2343b42fb242768f23d4efd90a0168522f",
+  "predecessor_manifest_sha256": "b5a6d1369fc1165adb98ce91508b7f8b171ad2a981495b33e0060a324e6176b9",
+  "predecessor_model_receipt_sha256": {
+    "ls_eend": "2d155fdcb72024e1089f74467bc198bf247b04fa912059524a6074acdcdb5049",
+    "streaming_sortformer": "2131a251304da65006dd116d59ab4310311356c5909bc570e41ebb6978e5dc03"
+  },
+  "predecessor_product_frontiers_sha256": "c6b1ebfd3fe0a077f6ff33d8f6d46d6526698a994260fbcc6dedc22736a66eb9",
+  "role": "PSEM-STRATEGY-DEV",
+  "schema_version": "psem.ontology_simplification.result_provenance.v1",
+  "simple_anchor_source_sha256": "8027a6b075b84caa9bb994908588bb57da6583288c5b72ea7a9edd33931b45c3",
+  "trace_reuse_receipt_sha256": "5edc64fb3e7aeaa2151a45883890ffe8b03b6cc1d6d9e2b848fd7baf727bc0d9"
+}

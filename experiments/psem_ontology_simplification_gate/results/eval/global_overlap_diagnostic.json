@@ -1,0 +1,685 @@
+{
+  "anchor_overlap_source_sha256": "2515ad6eec3c6c3bcdd5f66b711c216e87871cb7c81d40ce617f6ba31bffa602",
+  "authority_snapshot_sha256": "71555b2d3afa3df581e3ec384c67f46d4a494449728be4c8876e546f60ec0814",
+  "causal_dependency_audit_sha256": "be6762a73f1cc42570fd5a066f016468af8de1b70ca9350534a06e40cdd7bf28",
+  "causal_interpretation": "fixed-issue-97-lifecycle-counterfactual-ablation",
+  "config_sha256": "4e61df08cf2c27b34b70b86c945d65b9f9abf9c95100cc16830ab855f38c8e72",
+  "evaluator_source_sha256": "015b2c1a7ef600c99885af5a4c1e86f386fec357e905ca9b1f572019682b41b4",
+  "families": {
+    "ls_eend": {
+      "coverage": {
+        "invalid_active_speech_seconds": 2.1,
+        "invalid_cell_count": 171,
+        "invalid_support_seconds": 17.1,
+        "per_source": [
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 19342,
+            "source_id": "alimeeting_R0004_M0012",
+            "total_unmasked_cell_count": 19351,
+            "total_unmasked_support_seconds": 1935.1
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 17827,
+            "source_id": "alimeeting_R1019_M1960",
+            "total_unmasked_cell_count": 17836,
+            "total_unmasked_support_seconds": 1783.56
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 17677,
+            "source_id": "alimeeting_R1021_M1940",
+            "total_unmasked_cell_count": 17686,
+            "total_unmasked_support_seconds": 1768.6
+          },
+          {
+            "invalid_active_speech_seconds": 0.4,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 17542,
+            "source_id": "alimeeting_R1021_M1944",
+            "total_unmasked_cell_count": 17551,
+            "total_unmasked_support_seconds": 1755.1
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 17725,
+            "source_id": "alimeeting_R1021_M4080",
+            "total_unmasked_cell_count": 17734,
+            "total_unmasked_support_seconds": 1773.39
+          },
+          {
+            "invalid_active_speech_seconds": 0.3,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 18475,
+            "source_id": "alimeeting_R2105_M3318",
+            "total_unmasked_cell_count": 18484,
+            "total_unmasked_support_seconds": 1848.361
+          },
+          {
+            "invalid_active_speech_seconds": 0.5,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 17901,
+            "source_id": "alimeeting_R2108_M3206",
+            "total_unmasked_cell_count": 17910,
+            "total_unmasked_support_seconds": 1791.0
+          },
+          {
+            "invalid_active_speech_seconds": 0.3,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 16506,
+            "source_id": "alimeeting_R8009_M8018",
+            "total_unmasked_cell_count": 16515,
+            "total_unmasked_support_seconds": 1651.486
+          },
+          {
+            "invalid_active_speech_seconds": 0.6,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 31301,
+            "source_id": "ami_EN2004a",
+            "total_unmasked_cell_count": 31310,
+            "total_unmasked_support_seconds": 3130.9746875
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 33629,
+            "source_id": "ami_EN2006a",
+            "total_unmasked_cell_count": 33638,
+            "total_unmasked_support_seconds": 3363.793375
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 10534,
+            "source_id": "ami_ES2014a",
+            "total_unmasked_cell_count": 10543,
+            "total_unmasked_support_seconds": 1054.3
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 8984,
+            "source_id": "ami_IS1007a",
+            "total_unmasked_cell_count": 8993,
+            "total_unmasked_support_seconds": 899.3
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 11704,
+            "source_id": "ami_IS1007b",
+            "total_unmasked_cell_count": 11713,
+            "total_unmasked_support_seconds": 1171.266625
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 20259,
+            "source_id": "ami_IS1007c",
+            "total_unmasked_cell_count": 20268,
+            "total_unmasked_support_seconds": 2026.766625
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 17800,
+            "source_id": "ami_IS1007d",
+            "total_unmasked_cell_count": 17809,
+            "total_unmasked_support_seconds": 1780.856
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 9800,
+            "source_id": "ami_TS3010a",
+            "total_unmasked_cell_count": 9809,
+            "total_unmasked_support_seconds": 980.9
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 20418,
+            "source_id": "ami_TS3010b",
+            "total_unmasked_cell_count": 20427,
+            "total_unmasked_support_seconds": 2042.682625
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 20083,
+            "source_id": "ami_TS3010c",
+            "total_unmasked_cell_count": 20092,
+            "total_unmasked_support_seconds": 2009.2
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 9,
+            "invalid_support_seconds": 0.9,
+            "scored_cell_count": 18362,
+            "source_id": "ami_TS3010d",
+            "total_unmasked_cell_count": 18371,
+            "total_unmasked_support_seconds": 1837.0999375
+          }
+        ],
+        "scored_cell_count": 345869,
+        "scored_support_fraction": 0.9995058337178505,
+        "source_count": 19,
+        "total_unmasked_cell_count": 346040,
+        "total_unmasked_support_seconds": 34603.736875
+      },
+      "global_overlap_auprc": 0.11224975745696972,
+      "global_overlap_pr_curve": [
+        {
+          "f1": 0.19595105526056894,
+          "fn_weight": 25232000.0,
+          "fp_weight": 22983595.0,
+          "precision": 0.20358438389406072,
+          "recall": 0.18886945787470424,
+          "threshold": 0.3,
+          "tn_weight": 499295395.0,
+          "tp_weight": 5875200.0
+        },
+        {
+          "f1": 0.17721925821173748,
+          "fn_weight": 26696000.0,
+          "fp_weight": 14264000.0,
+          "precision": 0.23620630568882797,
+          "recall": 0.1418063985186709,
+          "threshold": 0.5,
+          "tn_weight": 508014990.0,
+          "tp_weight": 4411200.0
+        },
+        {
+          "f1": 0.1437314472092938,
+          "fn_weight": 27969600.0,
+          "fp_weight": 9414400.0,
+          "precision": 0.24996813256851497,
+          "recall": 0.1008641086307993,
+          "threshold": 0.7,
+          "tn_weight": 512864590.0,
+          "tp_weight": 3137600.0
+        }
+      ],
+      "operating_points": [
+        {
+          "duration_weighted_confusion": {
+            "f1": 0.19595105526056894,
+            "fn_weight": 25232000.0,
+            "fp_weight": 22983595.0,
+            "precision": 0.20358438389406072,
+            "recall": 0.18886945787470424,
+            "threshold": 0.3,
+            "tn_weight": 499295395.0,
+            "tp_weight": 5875200.0
+          },
+          "false_overlap_duration_seconds": 1436.4746875,
+          "overlap_event_recall_by_duration_bucket": {
+            "500_to_1500ms": {
+              "event_count": 1303,
+              "event_recall": 0.31465848042977745,
+              "recalled_event_count": 410
+            },
+            "gte_1500ms": {
+              "event_count": 108,
+              "event_recall": 0.6944444444444444,
+              "recalled_event_count": 75
+            },
+            "lt_500ms": {
+              "event_count": 2875,
+              "event_recall": 0.13773913043478261,
+              "recalled_event_count": 396
+            }
+          },
+          "short_backchannel_overlap": {
+            "event_count": 3872,
+            "event_recall": 0.1637396694214876,
+            "recalled_event_count": 634
+          },
+          "threshold": 0.3
+        },
+        {
+          "duration_weighted_confusion": {
+            "f1": 0.17721925821173748,
+            "fn_weight": 26696000.0,
+            "fp_weight": 14264000.0,
+            "precision": 0.23620630568882797,
+            "recall": 0.1418063985186709,
+            "threshold": 0.5,
+            "tn_weight": 508014990.0,
+            "tp_weight": 4411200.0
+          },
+          "false_overlap_duration_seconds": 891.5,
+          "overlap_event_recall_by_duration_bucket": {
+            "500_to_1500ms": {
+              "event_count": 1303,
+              "event_recall": 0.25709900230237914,
+              "recalled_event_count": 335
+            },
+            "gte_1500ms": {
+              "event_count": 108,
+              "event_recall": 0.6851851851851852,
+              "recalled_event_count": 74
+            },
+            "lt_500ms": {
+              "event_count": 2875,
+              "event_recall": 0.09565217391304348,
+              "recalled_event_count": 275
+            }
+          },
+          "short_backchannel_overlap": {
+            "event_count": 3872,
+            "event_recall": 0.11880165289256199,
+            "recalled_event_count": 460
+          },
+          "threshold": 0.5
+        },
+        {
+          "duration_weighted_confusion": {
+            "f1": 0.1437314472092938,
+            "fn_weight": 27969600.0,
+            "fp_weight": 9414400.0,
+            "precision": 0.24996813256851497,
+            "recall": 0.1008641086307993,
+            "threshold": 0.7,
+            "tn_weight": 512864590.0,
+            "tp_weight": 3137600.0
+          },
+          "false_overlap_duration_seconds": 588.4,
+          "overlap_event_recall_by_duration_bucket": {
+            "500_to_1500ms": {
+              "event_count": 1303,
+              "event_recall": 0.1918649270913277,
+              "recalled_event_count": 250
+            },
+            "gte_1500ms": {
+              "event_count": 108,
+              "event_recall": 0.6296296296296297,
+              "recalled_event_count": 68
+            },
+            "lt_500ms": {
+              "event_count": 2875,
+              "event_recall": 0.06921739130434783,
+              "recalled_event_count": 199
+            }
+          },
+          "short_backchannel_overlap": {
+            "event_count": 3872,
+            "event_recall": 0.08341942148760331,
+            "recalled_event_count": 323
+          },
+          "threshold": 0.7
+        }
+      ],
+      "primary_threshold": 0.5,
+      "record_count": 345869,
+      "score": "second_highest_alive_speaker_activity_probability"
+    },
+    "streaming_sortformer": {
+      "coverage": {
+        "invalid_active_speech_seconds": 0.0,
+        "invalid_cell_count": 0,
+        "invalid_support_seconds": 0.0,
+        "per_source": [
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 19351,
+            "source_id": "alimeeting_R0004_M0012",
+            "total_unmasked_cell_count": 19351,
+            "total_unmasked_support_seconds": 1935.1
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 17836,
+            "source_id": "alimeeting_R1019_M1960",
+            "total_unmasked_cell_count": 17836,
+            "total_unmasked_support_seconds": 1783.56
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 17686,
+            "source_id": "alimeeting_R1021_M1940",
+            "total_unmasked_cell_count": 17686,
+            "total_unmasked_support_seconds": 1768.6
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 17551,
+            "source_id": "alimeeting_R1021_M1944",
+            "total_unmasked_cell_count": 17551,
+            "total_unmasked_support_seconds": 1755.1
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 17734,
+            "source_id": "alimeeting_R1021_M4080",
+            "total_unmasked_cell_count": 17734,
+            "total_unmasked_support_seconds": 1773.39
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 18484,
+            "source_id": "alimeeting_R2105_M3318",
+            "total_unmasked_cell_count": 18484,
+            "total_unmasked_support_seconds": 1848.361
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 17910,
+            "source_id": "alimeeting_R2108_M3206",
+            "total_unmasked_cell_count": 17910,
+            "total_unmasked_support_seconds": 1791.0
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 16515,
+            "source_id": "alimeeting_R8009_M8018",
+            "total_unmasked_cell_count": 16515,
+            "total_unmasked_support_seconds": 1651.486
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 31310,
+            "source_id": "ami_EN2004a",
+            "total_unmasked_cell_count": 31310,
+            "total_unmasked_support_seconds": 3130.9746875
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 33638,
+            "source_id": "ami_EN2006a",
+            "total_unmasked_cell_count": 33638,
+            "total_unmasked_support_seconds": 3363.793375
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 10543,
+            "source_id": "ami_ES2014a",
+            "total_unmasked_cell_count": 10543,
+            "total_unmasked_support_seconds": 1054.3
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 8993,
+            "source_id": "ami_IS1007a",
+            "total_unmasked_cell_count": 8993,
+            "total_unmasked_support_seconds": 899.3
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 11713,
+            "source_id": "ami_IS1007b",
+            "total_unmasked_cell_count": 11713,
+            "total_unmasked_support_seconds": 1171.266625
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 20268,
+            "source_id": "ami_IS1007c",
+            "total_unmasked_cell_count": 20268,
+            "total_unmasked_support_seconds": 2026.766625
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 17809,
+            "source_id": "ami_IS1007d",
+            "total_unmasked_cell_count": 17809,
+            "total_unmasked_support_seconds": 1780.856
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 9809,
+            "source_id": "ami_TS3010a",
+            "total_unmasked_cell_count": 9809,
+            "total_unmasked_support_seconds": 980.9
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 20427,
+            "source_id": "ami_TS3010b",
+            "total_unmasked_cell_count": 20427,
+            "total_unmasked_support_seconds": 2042.682625
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 20092,
+            "source_id": "ami_TS3010c",
+            "total_unmasked_cell_count": 20092,
+            "total_unmasked_support_seconds": 2009.2
+          },
+          {
+            "invalid_active_speech_seconds": 0.0,
+            "invalid_cell_count": 0,
+            "invalid_support_seconds": 0.0,
+            "scored_cell_count": 18371,
+            "source_id": "ami_TS3010d",
+            "total_unmasked_cell_count": 18371,
+            "total_unmasked_support_seconds": 1837.0999375
+          }
+        ],
+        "scored_cell_count": 346040,
+        "scored_support_fraction": 1.0,
+        "source_count": 19,
+        "total_unmasked_cell_count": 346040,
+        "total_unmasked_support_seconds": 34603.736875
+      },
+      "global_overlap_auprc": 0.7852934168057137,
+      "global_overlap_pr_curve": [
+        {
+          "f1": 0.7236851615390174,
+          "fn_weight": 7076800.0,
+          "fp_weight": 11273600.0,
+          "precision": 0.6806707455245864,
+          "recall": 0.7725028289270651,
+          "threshold": 0.3,
+          "tn_weight": 511278990.0,
+          "tp_weight": 24030400.0
+        },
+        {
+          "f1": 0.7092507179531806,
+          "fn_weight": 11547200.0,
+          "fp_weight": 4489600.0,
+          "precision": 0.8133191404430843,
+          "recall": 0.6287933340191338,
+          "threshold": 0.5,
+          "tn_weight": 518062990.0,
+          "tp_weight": 19560000.0
+        },
+        {
+          "f1": 0.6376128778955635,
+          "fn_weight": 15516800.0,
+          "fp_weight": 2204800.0,
+          "precision": 0.8761014206078044,
+          "recall": 0.5011830058635943,
+          "threshold": 0.7,
+          "tn_weight": 520347790.0,
+          "tp_weight": 15590400.0
+        }
+      ],
+      "operating_points": [
+        {
+          "duration_weighted_confusion": {
+            "f1": 0.7236851615390174,
+            "fn_weight": 7076800.0,
+            "fp_weight": 11273600.0,
+            "precision": 0.6806707455245864,
+            "recall": 0.7725028289270651,
+            "threshold": 0.3,
+            "tn_weight": 511278990.0,
+            "tp_weight": 24030400.0
+          },
+          "false_overlap_duration_seconds": 704.6,
+          "overlap_event_recall_by_duration_bucket": {
+            "500_to_1500ms": {
+              "event_count": 1303,
+              "event_recall": 0.9623944742900997,
+              "recalled_event_count": 1254
+            },
+            "gte_1500ms": {
+              "event_count": 108,
+              "event_recall": 1.0,
+              "recalled_event_count": 108
+            },
+            "lt_500ms": {
+              "event_count": 2875,
+              "event_recall": 0.7558260869565218,
+              "recalled_event_count": 2173
+            }
+          },
+          "short_backchannel_overlap": {
+            "event_count": 3872,
+            "event_recall": 0.8088842975206612,
+            "recalled_event_count": 3132
+          },
+          "threshold": 0.3
+        },
+        {
+          "duration_weighted_confusion": {
+            "f1": 0.7092507179531806,
+            "fn_weight": 11547200.0,
+            "fp_weight": 4489600.0,
+            "precision": 0.8133191404430843,
+            "recall": 0.6287933340191338,
+            "threshold": 0.5,
+            "tn_weight": 518062990.0,
+            "tp_weight": 19560000.0
+          },
+          "false_overlap_duration_seconds": 280.6,
+          "overlap_event_recall_by_duration_bucket": {
+            "500_to_1500ms": {
+              "event_count": 1303,
+              "event_recall": 0.9255564082885649,
+              "recalled_event_count": 1206
+            },
+            "gte_1500ms": {
+              "event_count": 108,
+              "event_recall": 1.0,
+              "recalled_event_count": 108
+            },
+            "lt_500ms": {
+              "event_count": 2875,
+              "event_recall": 0.5951304347826087,
+              "recalled_event_count": 1711
+            }
+          },
+          "short_backchannel_overlap": {
+            "event_count": 3872,
+            "event_recall": 0.6800103305785123,
+            "recalled_event_count": 2633
+          },
+          "threshold": 0.5
+        },
+        {
+          "duration_weighted_confusion": {
+            "f1": 0.6376128778955635,
+            "fn_weight": 15516800.0,
+            "fp_weight": 2204800.0,
+            "precision": 0.8761014206078044,
+            "recall": 0.5011830058635943,
+            "threshold": 0.7,
+            "tn_weight": 520347790.0,
+            "tp_weight": 15590400.0
+          },
+          "false_overlap_duration_seconds": 137.8,
+          "overlap_event_recall_by_duration_bucket": {
+            "500_to_1500ms": {
+              "event_count": 1303,
+              "event_recall": 0.8403683806600154,
+              "recalled_event_count": 1095
+            },
+            "gte_1500ms": {
+              "event_count": 108,
+              "event_recall": 0.9814814814814815,
+              "recalled_event_count": 106
+            },
+            "lt_500ms": {
+              "event_count": 2875,
+              "event_recall": 0.44521739130434784,
+              "recalled_event_count": 1280
+            }
+          },
+          "short_backchannel_overlap": {
+            "event_count": 3872,
+            "event_recall": 0.5433884297520661,
+            "recalled_event_count": 2104
+          },
+          "threshold": 0.7
+        }
+      ],
+      "primary_threshold": 0.5,
+      "record_count": 346040,
+      "score": "second_highest_alive_speaker_activity_probability"
+    }
+  },
+  "new_model_inference_performed": false,
+  "predecessor_gate1_ledger_sha256": "920a967b507ce3ad10f6e44b05497fd5388bc382644a6cef588c6fade932c359",
+  "predecessor_gate2_ledger_sha256": "135b103d26e6ebfd262686d809e874c2282018ebe8341801d8b192586ec2c337",
+  "predecessor_manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+  "predecessor_model_receipt_sha256": {
+    "ls_eend": "aea66b589a7458b1609e927fed69e43ddcbd4bb5ad9ee03af892918806b86a4e",
+    "streaming_sortformer": "b402a194ca919f25cdf7d75e984ec99fd9cc303471c8e3b1d779482714e6ae42"
+  },
+  "predecessor_product_frontiers_sha256": "52b0743e2de188f0a401d7c10af5f528a000f3a8b04c9535e84b7a19062f023f",
+  "role": "PSEM-STRATEGY-EVAL",
+  "schema_version": "psem.ontology_simplification.result_provenance.v1",
+  "simple_anchor_source_sha256": "8027a6b075b84caa9bb994908588bb57da6583288c5b72ea7a9edd33931b45c3",
+  "trace_reuse_receipt_sha256": "5edc64fb3e7aeaa2151a45883890ffe8b03b6cc1d6d9e2b848fd7baf727bc0d9"
+}

@@ -1,0 +1,84 @@
+{
+  "schema_version": "psem.ontology_simplification.config.v1",
+  "experiment_id": "psem-ontology-simplification-gate-v0",
+  "authority": {
+    "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/98",
+    "sha256": "7bec60b3c3d001d964c0e294eae0b1d66cc25410e6e27c65d5ed33696a205c16"
+  },
+  "predecessor": {
+    "experiment_id": "psem-relative-occupancy-v0",
+    "config_path": "experiments/psem_relative_occupancy_gate/config.json",
+    "config_sha256": "4d08c9f2216388dc30ff1c7134f0488a29cc45e4dce383b1ce6c2eae9a145ecb",
+    "eval_selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489",
+    "evaluation_status": "recovery-qualified-development-known"
+  },
+  "sample_rate_hz": 16000,
+  "evaluation_grid_ms": 100,
+  "gate0_enrollment_confirm_ms": 200,
+  "lifecycle_proxy_silence_reset_ms": 1200,
+  "product_event_alignment_tolerance_ms": 500,
+  "replacement_confirm_ms": [100, 200, 300, 500],
+  "candidate_a": {
+    "experiment_id": "psem-simple-anchor-v0",
+    "anchor_thresholds": {
+      "streaming_sortformer": [0.5],
+      "ls_eend": [0.7]
+    },
+    "threshold_source": "issue-97-frozen-gate1-dev-operating-point"
+  },
+  "candidate_b": {
+    "experiment_id": "psem-anchor-overlap-v0",
+    "proxy": "min(p_anchor,p_nonanchor_max)",
+    "primary_inconsistent_mapping": "pause_fail_closed",
+    "secondary_inconsistent_mapping": "strict_non_anchor",
+    "threshold_grids": {
+      "streaming_sortformer": {
+        "anchor": [0.4, 0.5, 0.6],
+        "anchor_overlap": [0.25, 0.35, 0.45],
+        "primary": [0.5, 0.35]
+      },
+      "ls_eend": {
+        "anchor": [0.6, 0.7, 0.8],
+        "anchor_overlap": [0.2, 0.3, 0.4],
+        "primary": [0.7, 0.3]
+      }
+    },
+    "threshold_source": "predeclared-coarse-grid-centered-on-issue-97-frozen-gate1-dev-thresholds"
+  },
+  "global_overlap_diagnostic": {
+    "score": "second_highest_alive_speaker_activity_probability",
+    "thresholds": [0.3, 0.5, 0.7],
+    "primary_threshold": 0.5,
+    "event_duration_buckets_ms": [[0, 500], [500, 1500], [1500, null]],
+    "short_backchannel_max_ms": 1000
+  },
+  "bootstrap": {
+    "enabled": true,
+    "resamples": 10000,
+    "seed": 98,
+    "confidence": 0.95,
+    "unit": "source-session"
+  },
+  "speech_gate": {
+    "primary": "gt_active_speaker_timeline",
+    "production_vad_status": "eligible-deterministic-exact-v2-replay",
+    "production_vad": {
+      "profile": "peer",
+      "model_version": "6.2.1",
+      "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+      "backend": "CPUExecutionProvider",
+      "speech_threshold": 0.5,
+      "start_debounce_chunks": 3,
+      "start_commit_chunks": 3,
+      "hangover_ms": 500,
+      "pre_roll_ms": 500,
+      "max_segment_ms": 7000,
+      "chunk_samples": 512,
+      "source_support": "pre_roll_plus_committed_chunks_through_speech_end_excluding_trailing_hangover"
+    }
+  },
+  "causal_arm": {
+    "interpretation": "fixed-issue-97-lifecycle-counterfactual-ablation",
+    "reason": "issue-97 enrollment uses other_low_threshold and lifecycle termination uses OTHER_ONLY derived from the old second primitive"
+  }
+}

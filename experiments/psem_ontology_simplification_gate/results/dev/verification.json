@@ -1,0 +1,27 @@
+{
+  "artifact_sha256": {
+    "anchor_dropout_slices.json": "5dfaa1286a9f1b73596c49ec38cb9a9d38ec24f12b75e8c489517591ca00c872",
+    "bootstrap_intervals.json": "665aa5917f28c6b4c280402b3c0562b621b76cfa26dd442234835644999dcfa7",
+    "global_overlap_diagnostic.json": "d317d5efcb5d29083176998dc831a536c8858a007b0e5a66aecbf23360624493",
+    "lseend_anchor_overlap_metrics.json": "e7a848cd9629a0496f27d73460906209057c4229a963c101145d28fecbe36864",
+    "lseend_simple_anchor_metrics.json": "7550652d391d747ff0f672ed80db9680c7e96930f958ae1d84761bbfe91f6032",
+    "ontology_sufficiency.json": "528979d5ee6e57004bdae9666fcacdcfb3a466dd01ccac178778579842d8fbd3",
+    "paired_session_deltas.json": "41f0b2e0e06b36eb5b0ba2e162c96f98ffbb52028a028c4d1089730b9c2a5716",
+    "product_frontiers.json": "b8cf7ef8a61b64876c37674e592551cdd2821bd0b583bda6bed883c9eaee27cf",
+    "production_vad_replay_receipt.json": "5084b469934855921bab0f72ead405729cfd1dcda5b76b64dcb630058277020f",
+    "production_vad_sensitivity.json": "d11ebe65e635fda6c629977e0cb09657c448e066e50d68d4bfe92d01306c3acb",
+    "production_vad_speech_gate.jsonl": "fbbe457658db27679bb3529889999eb1f446090869ac72ae07571aab0be4a4a7",
+    "sortformer_anchor_overlap_metrics.json": "a4a783aee87610b219495cdfbc5b47b2b0f5a6d498bfb52eb216171c6ef3f9c4",
+    "sortformer_simple_anchor_metrics.json": "4d58102f31921dc8477e4343531bdf8e471224f72033bde3e615179547d8a895"
+  },
+  "bootstrap_interval_row_count": 72,
+  "expected_results_manifest_sha256": "6739d5692b34d63a98c2a1c799e674b1e35a4b1efac29198bbab79c31d7eb166",
+  "paired_delta_row_count": 720,
+  "passed": true,
+  "product_frontier_row_count": 192,
+  "production_vad_sensitivity_row_count": 32,
+  "r0_reconstruction_comparison_count": 16,
+  "role": "PSEM-STRATEGY-DEV",
+  "schema_version": "psem.ontology_simplification.verification.v1",
+  "source_count": 10
+}
