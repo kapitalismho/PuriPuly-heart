@@ -44,7 +44,11 @@ from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
     DashboardTranslationIntents,
 )
-from puripuly_heart.ui.fonts import font_for_language, register_fonts
+from puripuly_heart.ui.fonts import (
+    font_for_language,
+    locale_body_letter_spacing,
+    register_fonts,
+)
 from puripuly_heart.ui.foundation.adapter import FletFoundationAdapter
 from puripuly_heart.ui.foundation.preview import FoundationPreviewSurface
 from puripuly_heart.ui.foundation.resources import DEFAULT_FOUNDATION_RESOURCES
@@ -426,7 +430,10 @@ class TranslatorApp:
         self.page.title = t("app.title")
         self.page.theme_mode = ft.ThemeMode.LIGHT
         register_fonts(self.page)
-        self.page.theme = get_app_theme(font_family=font_for_language(get_locale()))
+        self.page.theme = get_app_theme(
+            font_family=font_for_language(get_locale()),
+            body_letter_spacing=locale_body_letter_spacing(get_locale()),
+        )
         self.page.bgcolor = COLOR_BACKGROUND
         self.page.padding = 0
         self.page.window.frameless = FOUNDATION_DESIGN_TOKENS.window.frameless
@@ -1063,7 +1070,10 @@ class TranslatorApp:
 
     def apply_locale(self) -> None:
         self.page.title = t("app.title")
-        self.page.theme = get_app_theme(font_family=font_for_language(get_locale()))
+        self.page.theme = get_app_theme(
+            font_family=font_for_language(get_locale()),
+            body_letter_spacing=locale_body_letter_spacing(get_locale()),
+        )
         self.title_bar.set_title(t("app.title"))
         self.view_dashboard.apply_locale()
         self.view_settings.apply_locale()
