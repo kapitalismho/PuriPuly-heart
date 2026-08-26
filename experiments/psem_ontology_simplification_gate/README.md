@@ -23,6 +23,15 @@ uv run python -m experiments.psem_ontology_simplification_gate.evaluate_simplifi
 
 No speaker-model inference is performed by these commands. The EVAL evidence is recovery-qualified and development-known, matching issue #97.
 
+Run the isolated S2 replay without recomputing S0, S1, production VAD, or model inference:
+
+```powershell
+uv run python -m experiments.psem_ontology_simplification_gate.rerun_s2 --role dev
+uv run python -m experiments.psem_ontology_simplification_gate.rerun_s2 --role eval
+```
+
+Each `s2_replay.json` records per-family and per-persistence unmapped and continuity-invalid coverage, recomputes the complete fixed-issue-97-lifecycle S2 frontier, and checks exact equality with the previously committed S2 frontier.
+
 The bundled production peer-VAD path is pinned and eligible for deterministic exact-V2 sensitivity replay. Run its CPU inference separately, then derive the sensitivity result:
 
 ```powershell
