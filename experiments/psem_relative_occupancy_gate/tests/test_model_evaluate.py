@@ -13,6 +13,7 @@ from experiments.psem_relative_occupancy_gate.model_decode import (
 from experiments.psem_relative_occupancy_gate.model_evaluate import (
     AnnotatedCausalEpisode,
     PrimitiveRecord,
+    annotate_causal_episodes,
     causal_anchor_metrics,
     causal_product_metrics,
     count_causal_opportunities,
@@ -132,7 +133,7 @@ def test_primary_contamination_partitions_at_next_reference_replacement() -> Non
     assert result["exclusive_other_contamination_seconds"] == 2.0
 
 
-def test_causal_opportunities_count_once_per_unanchored_lifecycle() -> None:
+def test_causal_opportunities_count_every_outer_lifecycle_and_align_latest() -> None:
     episode = CausalAnchorEpisode("E1", 0, "slot-0", 0, 16000, 16000, "final")
     session = CausalSessionResult(
         source_id="source",
@@ -161,7 +162,19 @@ def test_causal_opportunities_count_once_per_unanchored_lifecycle() -> None:
         scored_end_sample=16000,
         enrollment_samples=1600,
         silence_reset_samples=1600,
-    ) == 1
+    ) == 3
+    annotations = annotate_causal_episodes(
+        session=session,
+        intervals=intervals,
+        cells=(),
+        slot_ids=("slot-0",),
+        scored_start_sample=0,
+        gt_enrollment_samples=1600,
+        silence_reset_samples=1600,
+    )
+    assert len(annotations) == 1
+    assert annotations[0].expected_anchor_speaker == "C"
+    assert annotations[0].opportunity_start_sample == 12800
 
 
 def test_causal_anchor_metrics_separate_unmatched_enrollments() -> None:

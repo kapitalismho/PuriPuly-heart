@@ -798,13 +798,14 @@ def annotate_causal_episodes(
     result: list[AnnotatedCausalEpisode] = []
     window_start = scored_start_sample
     for episode in session.episodes:
-        opportunity = first_gt_singleton_opportunity(
+        opportunities = gt_singleton_opportunities(
             intervals,
             start_sample=window_start,
             end_sample=max(episode.anchor_emit_sample, window_start + 1),
             enrollment_samples=gt_enrollment_samples,
             silence_reset_samples=silence_reset_samples,
         )
+        opportunity = opportunities[-1] if opportunities else None
         expected_speaker = opportunity[0] if opportunity is not None else None
         opportunity_start = opportunity[1] if opportunity is not None else None
         oracle_slot: int | None = None
@@ -921,28 +922,74 @@ def count_causal_opportunities(
     enrollment_samples: int,
     silence_reset_samples: int,
 ) -> int:
-    count = 0
+    return len(
+        causal_opportunity_ledger(
+            session=session,
+            intervals=intervals,
+            scored_start_sample=scored_start_sample,
+            scored_end_sample=scored_end_sample,
+            enrollment_samples=enrollment_samples,
+            silence_reset_samples=silence_reset_samples,
+        )
+    )
+
+
+def causal_opportunity_ledger(
+    *,
+    session: CausalSessionResult,
+    intervals: Sequence[ActivityInterval],
+    scored_start_sample: int,
+    scored_end_sample: int,
+    enrollment_samples: int,
+    silence_reset_samples: int,
+) -> tuple[dict[str, Any], ...]:
+    result: list[dict[str, Any]] = []
     window_start = scored_start_sample
     for episode in session.episodes:
         window_end = min(max(episode.anchor_emit_sample, window_start + 1), scored_end_sample)
-        if window_end > window_start and first_gt_singleton_opportunity(
+        if window_end > window_start:
+            opportunities = gt_singleton_opportunities(
+                intervals,
+                start_sample=window_start,
+                end_sample=window_end,
+                enrollment_samples=enrollment_samples,
+                silence_reset_samples=silence_reset_samples,
+            )
+            for index, (speaker, opportunity_start, opportunity_emit) in enumerate(
+                opportunities
+            ):
+                result.append(
+                    {
+                        "window_start_sample": window_start,
+                        "window_end_sample": window_end,
+                        "expected_anchor_speaker": speaker,
+                        "opportunity_start_sample": opportunity_start,
+                        "opportunity_emit_sample": opportunity_emit,
+                        "matched_anchor_episode_id": (
+                            episode.episode_id if index == len(opportunities) - 1 else None
+                        ),
+                    }
+                )
+        window_start = min(max(episode.end_emit_sample, window_start), scored_end_sample)
+    if window_start < scored_end_sample:
+        for speaker, opportunity_start, opportunity_emit in gt_singleton_opportunities(
             intervals,
             start_sample=window_start,
-            end_sample=window_end,
+            end_sample=scored_end_sample,
             enrollment_samples=enrollment_samples,
             silence_reset_samples=silence_reset_samples,
-        ) is not None:
-            count += 1
-        window_start = min(max(episode.end_emit_sample, window_start), scored_end_sample)
-    if window_start < scored_end_sample and first_gt_singleton_opportunity(
-        intervals,
-        start_sample=window_start,
-        end_sample=scored_end_sample,
-        enrollment_samples=enrollment_samples,
-        silence_reset_samples=silence_reset_samples,
-    ) is not None:
-        count += 1
-    return count
+        ):
+            result.append(
+                {
+                    "window_start_sample": window_start,
+                    "window_end_sample": scored_end_sample,
+                    "expected_anchor_speaker": speaker,
+                    "opportunity_start_sample": opportunity_start,
+                    "opportunity_emit_sample": opportunity_emit,
+                    "matched_anchor_episode_id": None,
+                }
+            )
+    return tuple(result)
 
 
 def causal_anchor_metrics(

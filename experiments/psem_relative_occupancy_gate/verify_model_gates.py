@@ -17,6 +17,11 @@ from experiments.psem_relative_occupancy_gate.io_utils import (
     sha256_file,
     write_json,
 )
+from experiments.psem_relative_occupancy_gate.model_evaluate import (
+    gt_reference_session,
+    gt_singleton_opportunities,
+    intervals_from_manifest,
+)
 from experiments.psem_relative_occupancy_gate.provenance import load_frozen_dataset
 from experiments.psem_relative_occupancy_gate.run_gate1 import run as run_gate1
 from experiments.psem_relative_occupancy_gate.run_gate2 import run as run_gate2
@@ -123,6 +128,197 @@ def _validate_exposure(value: dict[str, Any]) -> None:
         raise ModelGateVerificationError("fail-closed unknown exposure is inconsistent")
 
 
+def _assert_exposure_matches(
+    observed: dict[str, Any], expected: dict[str, float]
+) -> None:
+    for field, value in expected.items():
+        if field not in observed or abs(float(observed[field]) - value) > 1e-9:
+            raise ModelGateVerificationError(
+                f"fail-closed exposure replay mismatch: {field}"
+            )
+
+
+def _range_coverage(start: int, end: int, ranges: Sequence[tuple[int, int]]) -> int:
+    return sum(max(0, min(end, right) - max(start, left)) for left, right in ranges)
+
+
+def _gate1_exposure_replay(
+    row: dict[str, Any], manifest_row: dict[str, Any]
+) -> dict[str, float]:
+    cfg = config()
+    intervals = intervals_from_manifest(manifest_row)
+    reference = gt_reference_session(
+        manifest_row,
+        replacement_confirmation_samples=int(row["replacement_confirm_ms"]) * 16,
+        enrollment_samples=int(cfg["gate0_enrollment_confirm_ms"]) * 16,
+        silence_reset_samples=int(cfg["lifecycle_proxy_silence_reset_ms"]) * 16,
+    )
+    if row.get("reference_events") != [value.to_dict() for value in reference.events]:
+        raise ModelGateVerificationError("Gate 1 reference replay mismatch")
+    mapping_ids = {
+        str(value["anchor_episode_id"]) for value in row.get("oracle_mappings", [])
+    }
+    events = {
+        str(value["anchor_episode_id"]): value for value in row.get("events", [])
+    }
+    anchored_ranges: list[tuple[int, int]] = []
+    uncertain_ranges: list[tuple[int, int]] = []
+    reference_ids = {value.episode_id for value in reference.episodes}
+    if not mapping_ids <= reference_ids:
+        raise ModelGateVerificationError("Gate 1 mapping references an unknown episode")
+    for episode in reference.episodes:
+        if episode.episode_id not in mapping_ids:
+            uncertain_ranges.append((episode.anchor_emit_sample, episode.end_emit_sample))
+            continue
+        event = events.get(episode.episode_id)
+        end = min(
+            episode.end_emit_sample,
+            int(event["decoder_emit_sample"]) if event is not None else episode.end_emit_sample,
+        )
+        anchored_ranges.append((episode.anchor_emit_sample, end))
+    masked = 0
+    masked_active = 0
+    unanchored_active = 0
+    uncertain_active = 0
+    for interval in intervals:
+        duration = interval.end_sample - interval.start_sample
+        if interval.masked:
+            masked += duration
+            if interval.active_speakers:
+                masked_active += duration
+            continue
+        if not interval.active_speakers:
+            continue
+        anchored = _range_coverage(
+            interval.start_sample, interval.end_sample, anchored_ranges
+        )
+        uncertain = _range_coverage(
+            interval.start_sample, interval.end_sample, uncertain_ranges
+        )
+        uncertain_active += uncertain
+        unanchored_active += max(0, duration - anchored - uncertain)
+    exact = float(row["fail_closed_exposure"]["exclusive_other_contamination_seconds"])
+    return {
+        "masked_seconds": masked / 16000.0,
+        "masked_active_speech_seconds": masked_active / 16000.0,
+        "unanchored_active_speech_seconds": unanchored_active / 16000.0,
+        "anchor_uncertain_active_speech_seconds": uncertain_active / 16000.0,
+        "fail_closed_unknown_active_speech_seconds": (
+            masked_active + unanchored_active + uncertain_active
+        )
+        / 16000.0,
+        "exclusive_other_contamination_seconds": exact,
+        "exclusive_other_contamination_upper_bound_seconds": (
+            exact + unanchored_active / 16000.0 + uncertain_active / 16000.0
+        ),
+    }
+
+
+def _gate2_exposure_replay(row: dict[str, Any]) -> dict[str, float]:
+    masked = 0
+    masked_active = 0
+    unanchored_active = 0
+    uncertain_active = 0
+    for span in row["timeline"]:
+        duration = int(span["end_sample"]) - int(span["start_sample"])
+        if span.get("masked") is True:
+            masked += duration
+            if span.get("speech_present") is True:
+                masked_active += duration
+        elif span.get("state") is None and span.get("speech_present") is True:
+            if span.get("lifecycle") == "UNANCHORED":
+                unanchored_active += duration
+            elif span.get("lifecycle") == "ANCHOR_UNCERTAIN":
+                uncertain_active += duration
+    exact = float(row["fail_closed_exposure"]["exclusive_other_contamination_seconds"])
+    return {
+        "masked_seconds": masked / 16000.0,
+        "masked_active_speech_seconds": masked_active / 16000.0,
+        "unanchored_active_speech_seconds": unanchored_active / 16000.0,
+        "anchor_uncertain_active_speech_seconds": uncertain_active / 16000.0,
+        "fail_closed_unknown_active_speech_seconds": (
+            masked_active + unanchored_active + uncertain_active
+        )
+        / 16000.0,
+        "exclusive_other_contamination_seconds": exact,
+        "exclusive_other_contamination_upper_bound_seconds": (
+            exact + unanchored_active / 16000.0 + uncertain_active / 16000.0
+        ),
+    }
+
+
+def _causal_opportunity_replay(
+    row: dict[str, Any], manifest_row: dict[str, Any], cfg: dict[str, Any]
+) -> list[dict[str, Any]]:
+    intervals = intervals_from_manifest(manifest_row)
+    enrollment_samples = int(cfg["gate0_enrollment_confirm_ms"]) * 16
+    silence_reset_samples = int(cfg["lifecycle_proxy_silence_reset_ms"]) * 16
+    scored_start = int(manifest_row["scored_start_sample"])
+    scored_end = int(manifest_row["scored_end_sample"])
+    episodes = row["annotated_episodes"]
+    result: list[dict[str, Any]] = []
+    window_start = scored_start
+    for episode in episodes:
+        window_end = min(
+            max(int(episode["anchor_emit_sample"]), window_start + 1), scored_end
+        )
+        opportunities = gt_singleton_opportunities(
+            intervals,
+            start_sample=window_start,
+            end_sample=window_end,
+            enrollment_samples=enrollment_samples,
+            silence_reset_samples=silence_reset_samples,
+        )
+        for index, (speaker, opportunity_start, opportunity_emit) in enumerate(
+            opportunities
+        ):
+            result.append(
+                {
+                    "window_start_sample": window_start,
+                    "window_end_sample": window_end,
+                    "expected_anchor_speaker": speaker,
+                    "opportunity_start_sample": opportunity_start,
+                    "opportunity_emit_sample": opportunity_emit,
+                    "matched_anchor_episode_id": (
+                        str(episode["episode_id"])
+                        if index == len(opportunities) - 1
+                        else None
+                    ),
+                }
+            )
+        expected = opportunities[-1] if opportunities else None
+        if episode.get("expected_anchor_speaker") != (
+            expected[0] if expected is not None else None
+        ) or episode.get("opportunity_start_sample") != (
+            expected[1] if expected is not None else None
+        ):
+            raise ModelGateVerificationError(
+                "causal episode is not aligned to its latest lifecycle opportunity"
+            )
+        window_start = min(
+            max(int(episode["end_emit_sample"]), window_start), scored_end
+        )
+    if window_start < scored_end:
+        for speaker, opportunity_start, opportunity_emit in gt_singleton_opportunities(
+            intervals,
+            start_sample=window_start,
+            end_sample=scored_end,
+            enrollment_samples=enrollment_samples,
+            silence_reset_samples=silence_reset_samples,
+        ):
+            result.append(
+                {
+                    "window_start_sample": window_start,
+                    "window_end_sample": scored_end,
+                    "expected_anchor_speaker": speaker,
+                    "opportunity_start_sample": opportunity_start,
+                    "opportunity_emit_sample": opportunity_emit,
+                    "matched_anchor_episode_id": None,
+                }
+            )
+    return result
+
+
 def _validate_gate1_row(row: dict[str, Any], manifest_row: dict[str, Any]) -> None:
     confirmation_samples = int(row["replacement_confirm_ms"]) * 16
     source_id = str(row["source_id"])
@@ -149,10 +345,12 @@ def _validate_gate1_row(row: dict[str, Any], manifest_row: dict[str, Any]) -> No
     if len(event_ids) != len(set(event_ids)):
         raise ModelGateVerificationError("Gate 1 emitted duplicate episode events")
     _validate_exposure(exposure)
+    if "exclusive_other_contamination_seconds" in exposure:
+        _assert_exposure_matches(exposure, _gate1_exposure_replay(row, manifest_row))
 
 
 def _validate_gate2_row(
-    row: dict[str, Any], manifest_row: dict[str, Any]
+    row: dict[str, Any], manifest_row: dict[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, int]:
     confirmation_samples = int(row["replacement_confirm_ms"]) * 16
     source_id = str(row["source_id"])
@@ -209,6 +407,8 @@ def _validate_gate2_row(
     if enrollment_ids != episode_ids or len(enrollments) != len(episodes):
         raise ModelGateVerificationError("causal enrollment/episode identity mismatch")
     previous_end: int | None = None
+    scored_start = int(manifest_row["scored_start_sample"])
+    scored_end = int(manifest_row["scored_end_sample"])
     for span in timeline:
         try:
             start = int(span["start_sample"])
@@ -219,6 +419,8 @@ def _validate_gate2_row(
             previous_end is not None and start != previous_end
         ):
             raise ModelGateVerificationError("causal timeline is not contiguous")
+        if previous_end is None and start != scored_start:
+            raise ModelGateVerificationError("causal timeline does not start at scored start")
         previous_end = end
         if span.get("lifecycle") == "ANCHORED":
             anchor_id = span.get("anchor_id")
@@ -233,12 +435,21 @@ def _validate_gate2_row(
                 raise ModelGateVerificationError(
                     "ANCHORED timeline support precedes its anchor emission"
                 )
+    if previous_end != scored_end:
+        raise ModelGateVerificationError("causal timeline does not cover scored end")
     _validate_exposure(exposure)
+    if "exclusive_other_contamination_seconds" in exposure:
+        _assert_exposure_matches(exposure, _gate2_exposure_replay(row))
+    replayed_opportunities = _causal_opportunity_replay(
+        row, manifest_row, cfg or config()
+    )
+    if "expected_opportunities" in row and row["expected_opportunities"] != replayed_opportunities:
+        raise ModelGateVerificationError("causal opportunity ledger replay mismatch")
     expected = int(row.get("expected_opportunity_count", -1))
     matched = sum(value.get("opportunity_start_sample") is not None for value in episodes)
     total = len(episodes)
     wrong = sum(value.get("correct_anchor") is not True for value in episodes)
-    if expected < 0 or matched > expected:
+    if expected != len(replayed_opportunities) or matched > expected:
         raise ModelGateVerificationError("causal opportunity denominator is inconsistent")
     return {
         "expected": expected,
@@ -290,7 +501,7 @@ def _group_event_ledger(
         if gate == "gate1_oracle_anchor":
             _validate_gate1_row(row, manifest[key[3]])
         else:
-            _validate_gate2_row(row, manifest[key[3]])
+            _validate_gate2_row(row, manifest[key[3]], cfg)
     if observed_keys != expected_keys:
         raise ModelGateVerificationError("event-ledger session coverage mismatch")
     for values in grouped.values():

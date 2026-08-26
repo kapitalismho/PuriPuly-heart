@@ -575,6 +575,17 @@ def test_eval_recovery_finalization_binds_completed_model_aggregates(
     }
     finalization["recovery_sha256"] = canonical_sha256(finalization)
     write_json(final_path, finalization)
+    monkeypatch.setattr(eval_access, "EVAL_RECOVERY_ACCEPTED_C5_HEAD", "d" * 40)
+    monkeypatch.setattr(
+        eval_access,
+        "EVAL_RECOVERY_ACCEPTED_C5_SHA256",
+        finalization["recovery_sha256"],
+    )
+    monkeypatch.setattr(
+        eval_access,
+        "EVAL_RECOVERY_ACCEPTED_C5_FILE_SHA256",
+        sha256_file(final_path),
+    )
     overrides = {"trace_runtime.py": {"before_sha256": "1", "after_sha256": "2"}}
     monkeypatch.setattr(
         eval_access,
@@ -642,6 +653,15 @@ def test_eval_recovery_cleanliness_whitelists_only_eval_outputs(
     assert not eval_access._tracked_worktree_is_clean(eval_root)
     status(b" M experiments/psem_relative_occupancy_gate/eval_access.py\0")
     assert not eval_access._tracked_worktree_is_clean(eval_root)
+
+    status(
+        b" M experiments/psem_relative_occupancy_gate/results/eval/eval_metrics.json\0"
+        b"?? experiments/psem_relative_occupancy_gate/results/eval/"
+        b"eval_authorization_recovery_4.json\0"
+    )
+    assert eval_access._tracked_worktree_matches_terminal_recovery_outputs(eval_root)
+    status(b" M experiments/psem_relative_occupancy_gate/model_evaluate.py\0")
+    assert not eval_access._tracked_worktree_matches_terminal_recovery_outputs(eval_root)
 
 
 def test_eval_authorization_revalidates_accepted_dev_evidence(

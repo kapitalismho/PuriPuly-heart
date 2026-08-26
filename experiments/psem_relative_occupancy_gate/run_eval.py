@@ -4,7 +4,11 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from experiments.psem_relative_occupancy_gate.eval_access import validate_opened_eval_manifest
+from experiments.psem_relative_occupancy_gate.eval_access import (
+    claim_terminal_recovery_derivation,
+    validate_opened_eval_manifest,
+    validate_terminal_recovery_consumption,
+)
 from experiments.psem_relative_occupancy_gate.evaluate import (
     aggregate_gate0_metrics,
     gate0_session_metrics,
@@ -16,6 +20,7 @@ from experiments.psem_relative_occupancy_gate.io_utils import (
     safe_output_path,
     sha256_file,
     write_json,
+    write_jsonl,
 )
 from experiments.psem_relative_occupancy_gate.model_decode import (
     CausalEnrollmentConfig,
@@ -26,6 +31,7 @@ from experiments.psem_relative_occupancy_gate.model_decode import (
 )
 from experiments.psem_relative_occupancy_gate.model_evaluate import (
     annotate_causal_episodes,
+    causal_opportunity_ledger,
     causal_primitive_records,
     causal_product_metrics,
     count_causal_opportunities,
@@ -48,6 +54,12 @@ from experiments.psem_relative_occupancy_gate.run_gate2 import _aggregate_causal
 
 class EvalRunError(RuntimeError):
     pass
+
+
+EVENT_COMPUTE_LAG_UNAVAILABLE_REASON = (
+    "model receipts bind aggregate runtime but do not persist synchronized "
+    "per-event compute completion timestamps"
+)
 
 
 def _canonical_oracle_slots(
@@ -74,11 +86,25 @@ def run(args: argparse.Namespace) -> None:
         selection_path=selection_path,
         authorization_path=authorization_path,
     )
+    if getattr(args, "independent_verification", False):
+        validate_terminal_recovery_consumption(
+            authorization_path=authorization_path,
+            manifest_path=manifest_path,
+            selection=selection,
+        )
+    else:
+        claim_terminal_recovery_derivation(
+            authorization_path=authorization_path,
+            manifest_path=manifest_path,
+            selection=selection,
+        )
     outputs = {
         "metrics": safe_output_path(Path(args.output)),
         "product": safe_output_path(Path(args.product_output)),
         "topology": safe_output_path(Path(args.topology_output)),
         "latency": safe_output_path(Path(args.latency_output)),
+        "gate1_events": safe_output_path(Path(args.gate1_event_output)),
+        "gate2_events": safe_output_path(Path(args.gate2_event_output)),
     }
     if not getattr(args, "independent_verification", False):
         expected_outputs = {
@@ -86,6 +112,8 @@ def run(args: argparse.Namespace) -> None:
             "product": manifest_path.parent / "product_frontiers.json",
             "topology": manifest_path.parent / "topology_slices.json",
             "latency": manifest_path.parent / "latency_breakdown.json",
+            "gate1_events": manifest_path.parent / "gate1_event_ledger.jsonl",
+            "gate2_events": manifest_path.parent / "gate2_event_ledger.jsonl",
         }
         if outputs != expected_outputs:
             raise EvalRunError("EVAL metric output paths are not canonical")
@@ -147,6 +175,8 @@ def run(args: argparse.Namespace) -> None:
     family_results: dict[str, Any] = {}
     model_product_rows: list[dict[str, Any]] = []
     topology_rows: list[dict[str, Any]] = []
+    gate1_event_rows: list[dict[str, Any]] = []
+    gate2_event_rows: list[dict[str, Any]] = []
     latency: dict[str, Any] = {}
     shared_trace_root: str | None = None
     for family, family_key in FAMILIES:
@@ -231,7 +261,7 @@ def run(args: argparse.Namespace) -> None:
                     enrollment_samples=gt_enrollment_samples,
                     silence_reset_samples=silence_samples,
                 )
-                gate1_metrics, _, oracle_events = gate1_product_session(
+                gate1_metrics, oracle_mappings, oracle_events = gate1_product_session(
                     source_id=source_id,
                     reference=reference,
                     cells=cells_by_source[source_id],
@@ -273,6 +303,16 @@ def run(args: argparse.Namespace) -> None:
                     enrollment_samples=gt_enrollment_samples,
                     silence_reset_samples=silence_samples,
                 )
+                expected_opportunities = causal_opportunity_ledger(
+                    session=causal_session,
+                    intervals=intervals,
+                    scored_start_sample=int(row["scored_start_sample"]),
+                    scored_end_sample=int(row["scored_end_sample"]),
+                    enrollment_samples=gt_enrollment_samples,
+                    silence_reset_samples=silence_samples,
+                )
+                if expected_count != len(expected_opportunities):
+                    raise EvalRunError("causal opportunity ledger count mismatch")
                 causal_metrics = causal_product_metrics(
                     session=causal_session,
                     annotated=annotations,
@@ -291,6 +331,93 @@ def run(args: argparse.Namespace) -> None:
                     )
                 gate1_session_metrics.append(gate1_metrics)
                 gate2_session_metrics.append(causal_metrics)
+                event_compute_lag = {
+                    "availability": "unavailable_at_event_level",
+                    "reason": EVENT_COMPUTE_LAG_UNAVAILABLE_REASON,
+                    "model_receipt_sha256": receipt_identity["receipt_sha256"],
+                    "aggregate_runtime_artifact": "latency_breakdown.json",
+                }
+                gate1_event_row = {
+                    "schema_version": "psem.relative_occupancy.gate_event_session.v1",
+                    "role": "PSEM-STRATEGY-EVAL",
+                    "eval_status": "opened_once",
+                    "manifest_sha256": sha256_file(manifest_path),
+                    "selection_sha256": selection["selection_sha256"],
+                    "model_receipt_sha256": receipt_identity["receipt_sha256"],
+                    "gate": "gate1_oracle_anchor",
+                    "family": family,
+                    "source_id": source_id,
+                    "anchor_threshold": anchor_threshold,
+                    "other_threshold": other_threshold,
+                    "replacement_confirm_ms": int(replacement_ms),
+                    "oracle_mappings": [value.to_dict() for value in oracle_mappings],
+                    "events": [value.to_dict() for value in oracle_events],
+                    "reference_events": [value.to_dict() for value in reference.events],
+                    "fail_closed_exposure": {
+                        "exclusive_other_contamination_seconds": gate1_metrics[
+                            "exclusive_other_contamination_seconds"
+                        ],
+                        **{
+                            key: gate1_metrics[key]
+                            for key in (
+                                "masked_seconds",
+                                "masked_active_speech_seconds",
+                                "unanchored_active_speech_seconds",
+                                "anchor_uncertain_active_speech_seconds",
+                                "fail_closed_unknown_active_speech_seconds",
+                                "exclusive_other_contamination_upper_bound_seconds",
+                            )
+                        },
+                    },
+                    "event_compute_lag": event_compute_lag,
+                }
+                gate1_event_row["row_sha256"] = canonical_sha256(gate1_event_row)
+                gate1_event_rows.append(gate1_event_row)
+                gate2_event_row = {
+                    "schema_version": "psem.relative_occupancy.gate_event_session.v1",
+                    "role": "PSEM-STRATEGY-EVAL",
+                    "eval_status": "opened_once",
+                    "manifest_sha256": sha256_file(manifest_path),
+                    "selection_sha256": selection["selection_sha256"],
+                    "model_receipt_sha256": receipt_identity["receipt_sha256"],
+                    "gate": "gate2_causal_anchor",
+                    "family": family,
+                    "source_id": source_id,
+                    "anchor_threshold": anchor_threshold,
+                    "other_threshold": other_threshold,
+                    "causal_enrollment": enrollment,
+                    "replacement_confirm_ms": int(replacement_ms),
+                    "expected_opportunity_count": expected_count,
+                    "expected_opportunities": list(expected_opportunities),
+                    "enrollments": [value.to_dict() for value in causal_session.enrollments],
+                    "annotated_episodes": [value.to_dict() for value in annotations],
+                    "timeline": [value.to_dict() for value in causal_session.timeline],
+                    "uncertain_entry_count": causal_session.uncertain_entry_count,
+                    "final_reset_count": causal_session.final_reset_count,
+                    "events": [
+                        value.to_dict() for value in causal_session.replacement_events
+                    ],
+                    "reference_events": [value.to_dict() for value in reference.events],
+                    "fail_closed_exposure": {
+                        "exclusive_other_contamination_seconds": causal_metrics[
+                            "exclusive_other_contamination_seconds"
+                        ],
+                        **{
+                            key: causal_metrics[key]
+                            for key in (
+                                "masked_seconds",
+                                "masked_active_speech_seconds",
+                                "unanchored_active_speech_seconds",
+                                "anchor_uncertain_active_speech_seconds",
+                                "fail_closed_unknown_active_speech_seconds",
+                                "exclusive_other_contamination_upper_bound_seconds",
+                            )
+                        },
+                    },
+                    "event_compute_lag": event_compute_lag,
+                }
+                gate2_event_row["row_sha256"] = canonical_sha256(gate2_event_row)
+                gate2_event_rows.append(gate2_event_row)
                 gate1_events[source_id] = oracle_events
                 gate2_events[source_id] = causal_session.replacement_events
                 references[source_id] = reference
@@ -371,6 +498,8 @@ def run(args: argparse.Namespace) -> None:
             "fraction_enrolled_within_1000ms": gate2_products[0]["fraction_enrolled_within_1000ms"],
             "fraction_enrolled_within_1500ms": gate2_products[0]["fraction_enrolled_within_1500ms"],
         }
+    write_jsonl(outputs["gate1_events"], gate1_event_rows)
+    write_jsonl(outputs["gate2_events"], gate2_event_rows)
     common = {
         "role": "PSEM-STRATEGY-EVAL",
         "eval_status": "opened_once",
@@ -381,6 +510,8 @@ def run(args: argparse.Namespace) -> None:
         "selection_file_sha256": sha256_file(selection_path),
         "eval_access_receipt_sha256": sha256_file(Path(args.access_receipt)),
         "config_sha256": sha256_file(CONFIG_PATH),
+        "gate1_event_ledger_sha256": sha256_file(outputs["gate1_events"]),
+        "gate2_event_ledger_sha256": sha256_file(outputs["gate2_events"]),
     }
     metrics = {
         "schema_version": "psem.relative_occupancy.eval_metrics.v1",
@@ -421,6 +552,8 @@ def main() -> None:
     parser.add_argument("--product-output", required=True)
     parser.add_argument("--topology-output", required=True)
     parser.add_argument("--latency-output", required=True)
+    parser.add_argument("--gate1-event-output", required=True)
+    parser.add_argument("--gate2-event-output", required=True)
     run(parser.parse_args())
 
 

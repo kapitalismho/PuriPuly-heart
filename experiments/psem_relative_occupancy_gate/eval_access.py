@@ -44,6 +44,19 @@ EVAL_RECOVERY_ACCEPTED_C4_SHA256 = (
 EVAL_RECOVERY_ACCEPTED_C4_FILE_SHA256 = (
     "75a506fa64fc36419b239be13797f30de37427465bf98f9cc9587e614ed86524"
 )
+EVAL_TERMINAL_RECOVERY_SCHEMA_VERSION = "psem.relative_occupancy.eval_recovery.v4"
+EVAL_TERMINAL_RECOVERY_REASON = "terminal_structural_correctness_recalculation"
+EVAL_RECOVERY_ACCEPTED_C5_HEAD = "1edac159a8f7dfb4f7014d5cdec1292f0cfbbe83"
+EVAL_RECOVERY_ACCEPTED_C5_SHA256 = (
+    "9c98dc57892f24f5b6b1ba7d32536856bef013152ca2d68f161369cd2d61d29f"
+)
+EVAL_RECOVERY_ACCEPTED_C5_FILE_SHA256 = (
+    "a606fe9e8151473aded4bd20c46d0a6ca7e135251ea8358fed3c6eb818670916"
+)
+EVAL_PRE_REPAIR_TERMINAL_HEAD = "a9b8229ede486b7e090d50b763c0aa1d2c47af8d"
+EVAL_TERMINAL_AUTHORITY_PIN = (
+    "08cd431c7cf92050c60e28d3a94f57bf1035dc909eaeb94a219412c2b604ddb8"
+)
 EVAL_RECOVERY_ALLOWED_PATHS = {
     "experiments/psem_relative_occupancy_gate/authorize_eval_recovery.py",
     "experiments/psem_relative_occupancy_gate/eval_access.py",
@@ -69,6 +82,37 @@ EVAL_RECOVERY_FINALIZATION_REQUIRED_PATHS = EVAL_RECOVERY_REQUIRED_PATHS | {
     "experiments/psem_relative_occupancy_gate/run_eval_traces.py",
     "experiments/psem_relative_occupancy_gate/trace_runtime.py",
     "experiments/psem_relative_occupancy_gate/verify_eval.py",
+}
+EVAL_TERMINAL_RECOVERY_ALLOWED_PATHS = {
+    "experiments/psem_relative_occupancy_gate/authorize_terminal_recovery.py",
+    "experiments/psem_relative_occupancy_gate/eval_access.py",
+    "experiments/psem_relative_occupancy_gate/model_evaluate.py",
+    "experiments/psem_relative_occupancy_gate/run_eval.py",
+    "experiments/psem_relative_occupancy_gate/verify_eval.py",
+    "experiments/psem_relative_occupancy_gate/verify_model_gates.py",
+    "experiments/psem_relative_occupancy_gate/tests/test_model_evaluate.py",
+    "experiments/psem_relative_occupancy_gate/tests/test_model_gate_verifier.py",
+    "experiments/psem_relative_occupancy_gate/tests/test_provenance_sealing.py",
+}
+EVAL_TERMINAL_RECOVERY_REQUIRED_PATHS = {
+    "experiments/psem_relative_occupancy_gate/authorize_terminal_recovery.py",
+    "experiments/psem_relative_occupancy_gate/eval_access.py",
+    "experiments/psem_relative_occupancy_gate/model_evaluate.py",
+    "experiments/psem_relative_occupancy_gate/run_eval.py",
+    "experiments/psem_relative_occupancy_gate/verify_eval.py",
+    "experiments/psem_relative_occupancy_gate/verify_model_gates.py",
+    "experiments/psem_relative_occupancy_gate/tests/test_model_evaluate.py",
+    "experiments/psem_relative_occupancy_gate/tests/test_model_gate_verifier.py",
+}
+EVAL_TERMINAL_MUTABLE_OUTPUT_NAMES = {
+    "eval_metrics.json",
+    "product_frontiers.json",
+    "topology_slices.json",
+    "latency_breakdown.json",
+    "gate1_event_ledger.jsonl",
+    "gate2_event_ledger.jsonl",
+    "eval_verification.json",
+    "FINAL_DECISION.md",
 }
 
 
@@ -118,12 +162,23 @@ def recovery_finalization_receipt_path(authorization_path: Path) -> Path:
     return authorization_path.with_name(f"{authorization_path.stem}_recovery_3.json")
 
 
+def terminal_recovery_receipt_path(authorization_path: Path) -> Path:
+    return authorization_path.with_name(f"{authorization_path.stem}_recovery_4.json")
+
+
+def terminal_recovery_consumption_path(authorization_path: Path) -> Path:
+    return authorization_path.with_name(
+        f"{authorization_path.stem}_recovery_4_consumed.json"
+    )
+
+
 def validate_eval_result_directory(
     *,
     manifest_path: Path,
     authorization_path: Path,
     require_finalization: bool,
     allow_final_outputs: bool,
+    require_terminal_recovery: bool = False,
 ) -> None:
     manifest_path = manifest_path.resolve()
     authorization_path = authorization_path.resolve()
@@ -142,6 +197,8 @@ def validate_eval_result_directory(
     }
     if require_finalization:
         required.add(recovery_finalization_receipt_path(authorization_path).name)
+    if require_terminal_recovery:
+        required.add(terminal_recovery_receipt_path(authorization_path).name)
     allowed = set(required)
     if allow_final_outputs:
         allowed.update(
@@ -152,6 +209,10 @@ def validate_eval_result_directory(
                 "latency_breakdown.json",
                 "eval_verification.json",
                 "FINAL_DECISION.md",
+                "gate1_event_ledger.jsonl",
+                "gate2_event_ledger.jsonl",
+                terminal_recovery_receipt_path(authorization_path).name,
+                terminal_recovery_consumption_path(authorization_path).name,
             }
         )
     observed: set[str] = set()
@@ -190,6 +251,39 @@ def _tracked_worktree_is_clean(allowed_untracked_root: Path) -> bool:
         relative_path = record[3:].decode("utf-8", errors="surrogateescape")
         path = (repo_root / relative_path).resolve()
         if path != allowed_untracked_root and allowed_untracked_root not in path.parents:
+            return False
+    return True
+
+
+def _tracked_worktree_matches_terminal_recovery_outputs(eval_root: Path) -> bool:
+    repo_root = PACKAGE_ROOT.parent.parent.resolve()
+    eval_root = eval_root.resolve()
+    if repo_root not in eval_root.parents:
+        return False
+    output = subprocess.run(
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        check=True,
+        capture_output=True,
+    ).stdout
+    allowed_names = EVAL_TERMINAL_MUTABLE_OUTPUT_NAMES | {
+        terminal_recovery_receipt_path(eval_root / "eval_authorization.json").name,
+        terminal_recovery_consumption_path(eval_root / "eval_authorization.json").name,
+    }
+    for record in output.split(b"\0"):
+        if not record:
+            continue
+        if len(record) < 4 or record[:2] not in {
+            b"??",
+            b" M",
+            b"M ",
+            b"MM",
+            b" A",
+            b"A ",
+        }:
+            return False
+        relative_path = record[3:].decode("utf-8", errors="surrogateescape")
+        path = (repo_root / relative_path).resolve()
+        if path.parent != eval_root or path.name not in allowed_names:
             return False
     return True
 
@@ -561,7 +655,7 @@ def _load_eval_recovery_extension(
     )
 
 
-def _load_eval_recovery_finalization(
+def _load_eval_recovery_finalization_history(
     authorization_path: Path,
     *,
     authorization: dict[str, Any],
@@ -609,12 +703,45 @@ def _load_eval_recovery_finalization(
         },
     }
     if (
-        any(value.get(field) != expected_value for field, expected_value in expected.items())
-        or value.get("recovery_head") != _current_head()
-        or not _tracked_worktree_is_clean(manifest_output.parent)
+        sha256_file(recovery_finalization_receipt_path(authorization_path))
+        != EVAL_RECOVERY_ACCEPTED_C5_FILE_SHA256
+        or value.get("recovery_head") != EVAL_RECOVERY_ACCEPTED_C5_HEAD
+        or value.get("recovery_sha256") != EVAL_RECOVERY_ACCEPTED_C5_SHA256
+        or any(value.get(field) != expected_value for field, expected_value in expected.items())
         or not _git_is_direct_child(
             EVAL_RECOVERY_ACCEPTED_C4_HEAD, str(value.get("recovery_head", ""))
         )
+    ):
+        raise EvalAccessError("EVAL recovery finalization binding mismatch")
+    _validate_recovery_file_set(
+        value,
+        authorization=authorization,
+        selection=selection,
+        active=False,
+        allowed_paths=EVAL_RECOVERY_FINALIZATION_ALLOWED_PATHS,
+        required_paths=EVAL_RECOVERY_FINALIZATION_REQUIRED_PATHS,
+    )
+    return value
+
+
+def _load_eval_recovery_finalization(
+    authorization_path: Path,
+    *,
+    authorization: dict[str, Any],
+    selection_path: Path,
+    selection: dict[str, Any],
+    manifest_output: Path,
+) -> dict[str, dict[str, str]]:
+    value = _load_eval_recovery_finalization_history(
+        authorization_path,
+        authorization=authorization,
+        selection_path=selection_path,
+        selection=selection,
+        manifest_output=manifest_output,
+    )
+    if (
+        value.get("recovery_head") != _current_head()
+        or not _tracked_worktree_is_clean(manifest_output.parent)
     ):
         raise EvalAccessError("EVAL recovery finalization binding mismatch")
     validate_eval_result_directory(
@@ -631,6 +758,150 @@ def _load_eval_recovery_finalization(
         allowed_paths=EVAL_RECOVERY_FINALIZATION_ALLOWED_PATHS,
         required_paths=EVAL_RECOVERY_FINALIZATION_REQUIRED_PATHS,
     )
+
+
+def _terminal_prior_artifact_hashes(head: str) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for name in (
+        "eval_metrics.json",
+        "product_frontiers.json",
+        "topology_slices.json",
+        "latency_breakdown.json",
+        "eval_verification.json",
+        "FINAL_DECISION.md",
+    ):
+        relative_path = f"experiments/psem_relative_occupancy_gate/results/eval/{name}"
+        value = _git_file_sha256(head, relative_path)
+        if value is None:
+            raise EvalAccessError("pre-repair terminal artifact is missing")
+        result[name] = value
+    return result
+
+
+def _validate_terminal_repair_file_set(
+    value: dict[str, Any], selection: dict[str, Any], *, active: bool
+) -> dict[str, dict[str, str]]:
+    recovery_head = str(value.get("recovery_head", ""))
+    changed_files = value.get("repair_changed_files")
+    observed_paths = _git_changed_paths(EVAL_PRE_REPAIR_TERMINAL_HEAD, recovery_head)
+    if (
+        not isinstance(changed_files, dict)
+        or set(changed_files) != observed_paths
+        or not EVAL_TERMINAL_RECOVERY_REQUIRED_PATHS <= observed_paths
+        or not observed_paths <= EVAL_TERMINAL_RECOVERY_ALLOWED_PATHS
+    ):
+        raise EvalAccessError("terminal recovery changed-file set mismatch")
+    repo_root = PACKAGE_ROOT.parent.parent
+    for relative_path, binding in changed_files.items():
+        before_sha256 = _git_file_sha256(EVAL_PRE_REPAIR_TERMINAL_HEAD, relative_path)
+        after_sha256 = _git_file_sha256(recovery_head, relative_path)
+        current_path = (repo_root / relative_path).resolve()
+        if (
+            not isinstance(binding, dict)
+            or binding.get("before_sha256") != before_sha256
+            or binding.get("after_sha256") != after_sha256
+            or after_sha256 is None
+            or (
+                active
+                and (
+                    not current_path.is_file()
+                    or sha256_file(current_path) != after_sha256
+                )
+            )
+        ):
+            raise EvalAccessError("terminal recovery changed-file hash mismatch")
+    contracts = selection.get("artifact_bindings", {}).get("contract_files", {})
+    expected_overrides: dict[str, dict[str, str]] = {}
+    for name, before_sha256 in contracts.items():
+        relative_path = f"experiments/psem_relative_occupancy_gate/{name}"
+        after_sha256 = _git_file_sha256(recovery_head, relative_path)
+        if after_sha256 is None:
+            raise EvalAccessError("terminal recovery contract file is missing")
+        if after_sha256 != before_sha256:
+            expected_overrides[str(name)] = {
+                "before_sha256": str(before_sha256),
+                "after_sha256": after_sha256,
+            }
+    if value.get("contract_overrides") != expected_overrides:
+        raise EvalAccessError("terminal recovery contract override set mismatch")
+    return expected_overrides
+
+
+def _load_eval_terminal_recovery(
+    authorization_path: Path,
+    *,
+    authorization: dict[str, Any],
+    selection_path: Path,
+    selection: dict[str, Any],
+    manifest_output: Path,
+) -> dict[str, dict[str, str]]:
+    prior_path = recovery_finalization_receipt_path(authorization_path)
+    prior = _load_eval_recovery_finalization_history(
+        authorization_path,
+        authorization=authorization,
+        selection_path=selection_path,
+        selection=selection,
+        manifest_output=manifest_output,
+    )
+    value = _load_recovery_value(
+        terminal_recovery_receipt_path(authorization_path),
+        "EVAL terminal recovery receipt",
+    )
+    prior_model_aggregates = {
+        name: _git_file_sha256(
+            EVAL_PRE_REPAIR_TERMINAL_HEAD,
+            f"experiments/psem_relative_occupancy_gate/results/eval/{name}",
+        )
+        for name in ("lseend_model_receipt.json", "sortformer_model_receipt.json")
+    }
+    expected = {
+        **_recovery_expected(
+            authorization_path=authorization_path,
+            authorization=authorization,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_output,
+        ),
+        "schema_version": EVAL_TERMINAL_RECOVERY_SCHEMA_VERSION,
+        "recovery_reason": EVAL_TERMINAL_RECOVERY_REASON,
+        "recovery_sequence": 4,
+        "authority_pin": EVAL_TERMINAL_AUTHORITY_PIN,
+        "prior_recovery_path": str(prior_path),
+        "prior_recovery_file_sha256": sha256_file(prior_path),
+        "prior_recovery_sha256": prior["recovery_sha256"],
+        "prior_recovery_head": prior["recovery_head"],
+        "prior_recovery_result": "terminal_review_found_structural_correctness_defects",
+        "pre_repair_terminal_head": EVAL_PRE_REPAIR_TERMINAL_HEAD,
+        "prior_final_artifacts": _terminal_prior_artifact_hashes(
+            EVAL_PRE_REPAIR_TERMINAL_HEAD
+        ),
+        "prior_model_aggregates": prior_model_aggregates,
+        "manifest_open_count": 1,
+        "additional_manifest_derivations": 0,
+        "model_inference_authorized": False,
+        "dev_selection_mutation_authorized": False,
+        "derived_regeneration_use_limit": 1,
+        "derived_output_names": sorted(EVAL_TERMINAL_MUTABLE_OUTPUT_NAMES),
+    }
+    if (
+        any(value.get(field) != expected_value for field, expected_value in expected.items())
+        or value.get("recovery_head") != _current_head()
+        or not _git_is_direct_child(
+            EVAL_PRE_REPAIR_TERMINAL_HEAD, str(value.get("recovery_head", ""))
+        )
+        or not _tracked_worktree_matches_terminal_recovery_outputs(
+            manifest_output.parent
+        )
+    ):
+        raise EvalAccessError("EVAL terminal recovery binding mismatch")
+    validate_eval_result_directory(
+        manifest_path=manifest_output,
+        authorization_path=authorization_path,
+        require_finalization=True,
+        allow_final_outputs=True,
+        require_terminal_recovery=True,
+    )
+    return _validate_terminal_repair_file_set(value, selection, active=True)
 
 
 def load_eval_authorization(
@@ -674,8 +945,20 @@ def load_eval_authorization(
     recovery_path = recovery_receipt_path(path)
     recovery_extension_path = recovery_extension_receipt_path(path)
     recovery_finalization_path = recovery_finalization_receipt_path(path)
+    terminal_recovery_path = terminal_recovery_receipt_path(path)
     current_head = _current_head()
-    if recovery_finalization_path.exists():
+    if terminal_recovery_path.exists():
+        overrides = _load_eval_terminal_recovery(
+            path,
+            authorization=value,
+            selection_path=selection_path,
+            selection=selection,
+            manifest_output=manifest_output.resolve(),
+        )
+        validate_frozen_selection_bindings(
+            selection_path, selection, contract_overrides=overrides
+        )
+    elif recovery_finalization_path.exists():
         overrides = _load_eval_recovery_finalization(
             path,
             authorization=value,
@@ -721,6 +1004,82 @@ def load_eval_authorization(
         validate_frozen_selection_bindings(
             selection_path, selection, contract_overrides=overrides
         )
+    return value
+
+
+def _terminal_recovery_consumption_expected(
+    *, authorization_path: Path, manifest_path: Path, selection: dict[str, Any]
+) -> dict[str, Any]:
+    recovery_path = terminal_recovery_receipt_path(authorization_path)
+    recovery = _load_recovery_value(recovery_path, "EVAL terminal recovery receipt")
+    return {
+        "schema_version": "psem.relative_occupancy.eval_recovery_consumption.v1",
+        "role": "PSEM-STRATEGY-EVAL",
+        "consumption_state": "claimed_for_one_derived_regeneration",
+        "use_count": 1,
+        "recovery_path": str(recovery_path),
+        "recovery_file_sha256": sha256_file(recovery_path),
+        "recovery_sha256": recovery["recovery_sha256"],
+        "recovery_head": recovery["recovery_head"],
+        "authority_pin": EVAL_TERMINAL_AUTHORITY_PIN,
+        "manifest_sha256": sha256_file(manifest_path),
+        "selection_sha256": selection["selection_sha256"],
+        "prior_final_artifacts": recovery["prior_final_artifacts"],
+        "derived_output_names": recovery["derived_output_names"],
+    }
+
+
+def claim_terminal_recovery_derivation(
+    *, authorization_path: Path, manifest_path: Path, selection: dict[str, Any]
+) -> dict[str, Any]:
+    authorization_path = authorization_path.resolve()
+    manifest_path = manifest_path.resolve()
+    recovery = _load_recovery_value(
+        terminal_recovery_receipt_path(authorization_path),
+        "EVAL terminal recovery receipt",
+    )
+    root = manifest_path.parent
+    if recovery.get("recovery_head") != _current_head():
+        raise EvalAccessError("terminal recovery is not active at the current head")
+    for name, expected_hash in recovery["prior_final_artifacts"].items():
+        path = root / str(name)
+        if not path.is_file() or sha256_file(path) != expected_hash:
+            raise EvalAccessError("pre-repair EVAL artifact changed before regeneration")
+    if any((root / name).exists() for name in ("gate1_event_ledger.jsonl", "gate2_event_ledger.jsonl")):
+        raise EvalAccessError("terminal recovery event ledgers already exist")
+    payload = _terminal_recovery_consumption_expected(
+        authorization_path=authorization_path,
+        manifest_path=manifest_path,
+        selection=selection,
+    )
+    payload["consumption_sha256"] = canonical_sha256(payload)
+    path = terminal_recovery_consumption_path(authorization_path)
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+    except FileExistsError as exc:
+        raise EvalAccessError("terminal recovery regeneration was already claimed") from exc
+    with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+    return payload
+
+
+def validate_terminal_recovery_consumption(
+    *, authorization_path: Path, manifest_path: Path, selection: dict[str, Any]
+) -> dict[str, Any]:
+    path = _strict_file(
+        terminal_recovery_consumption_path(authorization_path.resolve()),
+        "EVAL terminal recovery consumption receipt",
+    )
+    value = load_json(path)
+    payload = dict(value) if isinstance(value, dict) else {}
+    observed_hash = payload.pop("consumption_sha256", None)
+    expected = _terminal_recovery_consumption_expected(
+        authorization_path=authorization_path.resolve(),
+        manifest_path=manifest_path.resolve(),
+        selection=selection,
+    )
+    if observed_hash != canonical_sha256(payload) or payload != expected:
+        raise EvalAccessError("terminal recovery consumption binding mismatch")
     return value
 
 
