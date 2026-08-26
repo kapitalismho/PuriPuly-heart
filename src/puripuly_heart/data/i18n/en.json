@@ -460,7 +460,7 @@
   "provider.managed_gemma_12b": "Gemma 4 12B",
   "provider.local_llm": "OpenAI-compatible API",
   "provider.local_cpu_auto": "Auto Select (CPU)",
-  "provider.local_cpu_auto.description": "Selects the local ASR model for your selected language",
+  "provider.local_cpu_auto.description": "Auto-selects the best local model for your language",
   "provider.local_cpu_auto.unavailable": "Available after all three CPU ASR models are installed",
   "provider.local_parakeet_v3": "Parakeet TDT 0.6B v3",
   "provider.local_parakeet_v3.description": "",
