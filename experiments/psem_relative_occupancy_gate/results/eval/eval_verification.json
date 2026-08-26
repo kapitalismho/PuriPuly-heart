@@ -1,14 +1,16 @@
 {
   "artifact_sha256": {
-    "latency": "2b9da6d2a39164078fd00376252fa255272179465bb5ce6c7626398c77fe0e1c",
-    "metrics": "efeb8e7696994a3ffc047c22395a3a33f6b974a7eea1ce72f135fe727346f3af",
-    "product": "f5d42bfe93be6927c9c3491d65d9a0fdf340558f642ec35c881e0542a42d51d8",
-    "topology": "ecf23c068b3f1c525925062811b3918482e70c5a0ed7da8e8b239d37ef470e3f"
+    "gate1_events": "920a967b507ce3ad10f6e44b05497fd5388bc382644a6cef588c6fade932c359",
+    "gate2_events": "135b103d26e6ebfd262686d809e874c2282018ebe8341801d8b192586ec2c337",
+    "latency": "cf1ced436c6a2706282241519cfa75d2f3a06b44e0c6ab6f4500ab3d6d69165e",
+    "metrics": "b5e683d20b3f55cebf73d5e93b2020eb6fcf6bc2bf1abb56891dd9f2a06cd3ac",
+    "product": "52b0743e2de188f0a401d7c10af5f528a000f3a8b04c9535e84b7a19062f023f",
+    "topology": "70f09326d475a4d8e68eac68e9db5958a7d5d09b62f657b7f83414b5e10dcb54"
   },
   "eval_status": "opened_once",
   "independent_regeneration": true,
   "passed": true,
   "role": "PSEM-STRATEGY-EVAL",
-  "schema_version": "psem.relative_occupancy.eval_verification.v1",
+  "schema_version": "psem.relative_occupancy.eval_verification.v2",
   "selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489"
 }

@@ -1,0 +1,131 @@
+{
+  "accepted_c2_head": "247aaa041b6bf6a2d482408dfb39f9f6bff58340",
+  "access_receipt_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest_access_receipt.json",
+  "access_receipt_sha256": "4f8dca664ce9ad216f58a8069b448c522098d38b8f0b6b381634260ae7f3cbeb",
+  "additional_manifest_derivations": 0,
+  "authority_pin": "08cd431c7cf92050c60e28d3a94f57bf1035dc909eaeb94a219412c2b604ddb8",
+  "authorization_file_sha256": "d447e0e6def62fe59d9102a6ca0dcfa2bd72b15929c79aa1520d32e642c9517b",
+  "authorization_sha256": "48b1c91556a078ebb5a1621ea3490ff238542adc252ecfe9505577a0a9b75b7c",
+  "consumption_receipt_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\eval_authorization_consumed.json",
+  "consumption_receipt_sha256": "278a5d62e4672e5ee85a86c02aee364b45b5c06886c2002e1491f7d6c6abe5be",
+  "contract_overrides": {
+    "eval_access.py": {
+      "after_sha256": "a545586edb7cef3df632af87b31b494fb84024d49f918b0e39ef348c207f5ae7",
+      "before_sha256": "dcba2656581874912384e8c92a1900a7100c564342f04ded8121d138805f9cde"
+    },
+    "model_evaluate.py": {
+      "after_sha256": "15cc61daab0faaa25ab7487798cfc45082802cf9f0ceca1f1345ed6bb81f0bcc",
+      "before_sha256": "7ed9ca8a685f37c47608df9169cd952110affe6f7920e1907bf2c46781481a5a"
+    },
+    "model_run_io.py": {
+      "after_sha256": "14a9cedc02ac919d89d20b6abdaddba3c8720efed5e4b25edb3a504832f763cf",
+      "before_sha256": "4ec65439e5de3cb7e967c96e75abc16cd779915644fc4db7c1bc025fdc7019bc"
+    },
+    "run_eval.py": {
+      "after_sha256": "0480bc4c8b6a1a20527230a012b19ce521aa799fd1705dba76f9a32edc2830bc",
+      "before_sha256": "5281e13028a05cd1b8088f5256390555df670c9d83dee9ab9eb4f80ebc65bc66"
+    },
+    "run_eval_traces.py": {
+      "after_sha256": "abc17f88a518e0411bb6ed998acf4a5277663a9e9ef06b915a15719d722aecd1",
+      "before_sha256": "a9333715ed6739f2eec5e48ecbe04946b3bb4424fae6e1fadecce22d6cbbed91"
+    },
+    "run_sortformer_trace.py": {
+      "after_sha256": "b9bb564082ac7b12dce2736524ec1158a367ae91d7ffd6f87716ef105aeab321",
+      "before_sha256": "3b78cd4671026a71250a66d7a9964bf74b85d949513190d898705a7d963358e7"
+    },
+    "trace_runtime.py": {
+      "after_sha256": "085ee35567d383c5fb7ef1971f9e929daf5a762838e2b794bcdad0d7d540fdc1",
+      "before_sha256": "15eb9676aec39d186ae088c977cc21f82f28a229ca31280396f3abaa1e9621b1"
+    },
+    "verify_eval.py": {
+      "after_sha256": "a02344914502a049769e0f7d1a05fbd1303fa06f2471f2a2d4e88cc472506942",
+      "before_sha256": "460a6826de9afcd1d3085e9cabc3a02a8342682a96270b570412e60aec6017ee"
+    },
+    "verify_model_gates.py": {
+      "after_sha256": "a48b3be849f38342899b5f452506ecd0a382685adfd15b056983b19166daa4d4",
+      "before_sha256": "1b3ea5cdf45f08011d657a9d378d06123e279bfea076ee175a03dbd511a74818"
+    }
+  },
+  "derived_output_names": [
+    "FINAL_DECISION.md",
+    "eval_metrics.json",
+    "eval_verification.json",
+    "gate1_event_ledger.jsonl",
+    "gate2_event_ledger.jsonl",
+    "latency_breakdown.json",
+    "product_frontiers.json",
+    "topology_slices.json"
+  ],
+  "derived_regeneration_use_limit": 1,
+  "dev_selection_mutation_authorized": false,
+  "manifest_open_count": 1,
+  "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+  "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+  "model_inference_authorized": false,
+  "pre_repair_terminal_head": "a9b8229ede486b7e090d50b763c0aa1d2c47af8d",
+  "prior_eval_aggregate_count": 0,
+  "prior_final_artifacts": {
+    "FINAL_DECISION.md": "f37dee441b115d9abde1a129ecfff199034d902ee9fd618da29c7797f1c1d1b2",
+    "eval_metrics.json": "efeb8e7696994a3ffc047c22395a3a33f6b974a7eea1ce72f135fe727346f3af",
+    "eval_verification.json": "1eda10f5801be10f6bf51afd7893fabc203335f5e979ba10c697cf37327f1d67",
+    "latency_breakdown.json": "2b9da6d2a39164078fd00376252fa255272179465bb5ce6c7626398c77fe0e1c",
+    "product_frontiers.json": "f5d42bfe93be6927c9c3491d65d9a0fdf340558f642ec35c881e0542a42d51d8",
+    "topology_slices.json": "ecf23c068b3f1c525925062811b3918482e70c5a0ed7da8e8b239d37ef470e3f"
+  },
+  "prior_model_aggregates": {
+    "lseend_model_receipt.json": "aea66b589a7458b1609e927fed69e43ddcbd4bb5ad9ee03af892918806b86a4e",
+    "sortformer_model_receipt.json": "b402a194ca919f25cdf7d75e984ec99fd9cc303471c8e3b1d779482714e6ae42"
+  },
+  "prior_recovery_file_sha256": "a606fe9e8151473aded4bd20c46d0a6ca7e135251ea8358fed3c6eb818670916",
+  "prior_recovery_head": "1edac159a8f7dfb4f7014d5cdec1292f0cfbbe83",
+  "prior_recovery_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\eval_authorization_recovery_3.json",
+  "prior_recovery_result": "terminal_review_found_structural_correctness_defects",
+  "prior_recovery_sha256": "9c98dc57892f24f5b6b1ba7d32536856bef013152ca2d68f161369cd2d61d29f",
+  "recovery_head": "ba776b70f85c5bb3222c20adb4b2f7a51861a794",
+  "recovery_reason": "terminal_structural_correctness_recalculation",
+  "recovery_sequence": 4,
+  "recovery_sha256": "95e19f1ee22f210660ee289ec5192c4fd4ba00229792b0a9b434f79fe786bc57",
+  "recovery_state": "authorized_for_same_opened_manifest_resume",
+  "repair_changed_files": {
+    "experiments/psem_relative_occupancy_gate/authorize_terminal_recovery.py": {
+      "after_sha256": "2382886f40c01bded8489786690f94cc0e190dd14488c65e34e85a51f7068dac",
+      "before_sha256": null
+    },
+    "experiments/psem_relative_occupancy_gate/eval_access.py": {
+      "after_sha256": "a545586edb7cef3df632af87b31b494fb84024d49f918b0e39ef348c207f5ae7",
+      "before_sha256": "302e3cefdd237d13bb59ef5557071e8a13fe819aba0c9123140fe83a4f8ca420"
+    },
+    "experiments/psem_relative_occupancy_gate/model_evaluate.py": {
+      "after_sha256": "15cc61daab0faaa25ab7487798cfc45082802cf9f0ceca1f1345ed6bb81f0bcc",
+      "before_sha256": "7ed9ca8a685f37c47608df9169cd952110affe6f7920e1907bf2c46781481a5a"
+    },
+    "experiments/psem_relative_occupancy_gate/run_eval.py": {
+      "after_sha256": "0480bc4c8b6a1a20527230a012b19ce521aa799fd1705dba76f9a32edc2830bc",
+      "before_sha256": "1c8ee36e87b9a61e276638329a8e70e1a4f9a6d5aabb15a5452ff7a9a245bd57"
+    },
+    "experiments/psem_relative_occupancy_gate/tests/test_model_evaluate.py": {
+      "after_sha256": "343ed9381b13862745e72a10f6927d54585f0ec2288df793923f72c9e5790767",
+      "before_sha256": "b65f5b50cb8960150baf88b799088fe4e2e0f6376466dde873101f53aac0faac"
+    },
+    "experiments/psem_relative_occupancy_gate/tests/test_model_gate_verifier.py": {
+      "after_sha256": "e90b2fa3d6529ac7888de8a18f60e99e2dfdfb4c859caa4a106c33121034c14f",
+      "before_sha256": "d298169f0146be3f04a5e17a7ecfaef5f10d64a56525b08af935b681f31736bb"
+    },
+    "experiments/psem_relative_occupancy_gate/tests/test_provenance_sealing.py": {
+      "after_sha256": "98ecca470c4f7bc021ee7c0f1b1b36642ab1432f591bbd51436d0d388c121c94",
+      "before_sha256": "d2bd40f8bff02f9d0253ced549052c335afc5035a663e0eec1bfd5273c808662"
+    },
+    "experiments/psem_relative_occupancy_gate/verify_eval.py": {
+      "after_sha256": "a02344914502a049769e0f7d1a05fbd1303fa06f2471f2a2d4e88cc472506942",
+      "before_sha256": "f83b96fcf35e90087ede007b92612bd78a8f7b5204f69bd595a2d305bcaf9357"
+    },
+    "experiments/psem_relative_occupancy_gate/verify_model_gates.py": {
+      "after_sha256": "a48b3be849f38342899b5f452506ecd0a382685adfd15b056983b19166daa4d4",
+      "before_sha256": "1b3ea5cdf45f08011d657a9d378d06123e279bfea076ee175a03dbd511a74818"
+    }
+  },
+  "role": "PSEM-STRATEGY-EVAL",
+  "schema_version": "psem.relative_occupancy.eval_recovery.v4",
+  "selection_file_sha256": "28a3ba705153882ebc59a9b2318a382576de899644d676a8df066d04ba0a7974",
+  "selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489"
+}

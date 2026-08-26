@@ -1,0 +1,32 @@
+{
+  "authority_pin": "08cd431c7cf92050c60e28d3a94f57bf1035dc909eaeb94a219412c2b604ddb8",
+  "consumption_sha256": "e53490aa66c4de460f7608ec598487cbdf704e75be69367958c56d1a84355d59",
+  "consumption_state": "claimed_for_one_derived_regeneration",
+  "derived_output_names": [
+    "FINAL_DECISION.md",
+    "eval_metrics.json",
+    "eval_verification.json",
+    "gate1_event_ledger.jsonl",
+    "gate2_event_ledger.jsonl",
+    "latency_breakdown.json",
+    "product_frontiers.json",
+    "topology_slices.json"
+  ],
+  "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+  "prior_final_artifacts": {
+    "FINAL_DECISION.md": "f37dee441b115d9abde1a129ecfff199034d902ee9fd618da29c7797f1c1d1b2",
+    "eval_metrics.json": "efeb8e7696994a3ffc047c22395a3a33f6b974a7eea1ce72f135fe727346f3af",
+    "eval_verification.json": "1eda10f5801be10f6bf51afd7893fabc203335f5e979ba10c697cf37327f1d67",
+    "latency_breakdown.json": "2b9da6d2a39164078fd00376252fa255272179465bb5ce6c7626398c77fe0e1c",
+    "product_frontiers.json": "f5d42bfe93be6927c9c3491d65d9a0fdf340558f642ec35c881e0542a42d51d8",
+    "topology_slices.json": "ecf23c068b3f1c525925062811b3918482e70c5a0ed7da8e8b239d37ef470e3f"
+  },
+  "recovery_file_sha256": "a7b921148f809534f0bb4b3fc94859dad4f8554b67426db980434a0fdece3c7f",
+  "recovery_head": "ba776b70f85c5bb3222c20adb4b2f7a51861a794",
+  "recovery_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\eval_authorization_recovery_4.json",
+  "recovery_sha256": "95e19f1ee22f210660ee289ec5192c4fd4ba00229792b0a9b434f79fe786bc57",
+  "role": "PSEM-STRATEGY-EVAL",
+  "schema_version": "psem.relative_occupancy.eval_recovery_consumption.v1",
+  "selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489",
+  "use_count": 1
+}

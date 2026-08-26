@@ -2,6 +2,8 @@
   "config_sha256": "4d08c9f2216388dc30ff1c7134f0488a29cc45e4dce383b1ce6c2eae9a145ecb",
   "eval_access_receipt_sha256": "4f8dca664ce9ad216f58a8069b448c522098d38b8f0b6b381634260ae7f3cbeb",
   "eval_status": "opened_once",
+  "gate1_event_ledger_sha256": "920a967b507ce3ad10f6e44b05497fd5388bc382644a6cef588c6fade932c359",
+  "gate2_event_ledger_sha256": "135b103d26e6ebfd262686d809e874c2282018ebe8341801d8b192586ec2c337",
   "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
   "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
   "role": "PSEM-STRATEGY-EVAL",

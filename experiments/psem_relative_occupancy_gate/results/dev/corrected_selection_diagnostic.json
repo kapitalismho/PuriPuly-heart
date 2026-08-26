@@ -1,0 +1,92 @@
+{
+  "artifact_role": "diagnostic",
+  "authority_pin": "08cd431c7cf92050c60e28d3a94f57bf1035dc909eaeb94a219412c2b604ddb8",
+  "corrected_artifacts": {
+    "dev_selection_receipt.json": {
+      "sha256": "dadc28bb8dc3fd9c18e85781f6c77f9bcb9f9848cf39926269f04e54248cf487",
+      "size_bytes": 7561
+    },
+    "gate2_event_ledger.jsonl": {
+      "sha256": "4cd35bd9cb789ce335057d8fe39200a4a1e4fea49db850ea29cc966120f3d754",
+      "size_bytes": 53556827
+    },
+    "gate2_metrics.json": {
+      "sha256": "c1de0a0d162a2d3c14327785275007df60c1027bbb84596b9ffd3994dc324903",
+      "size_bytes": 2026425
+    },
+    "latency_breakdown.json": {
+      "sha256": "4e854be1eddeb755ac8310cf7fd271ba081ca99734d2973f9c5a401a364c83bd",
+      "size_bytes": 2679
+    },
+    "product_frontiers.json": {
+      "sha256": "32c11cf8d2f4e1dbcafff39c7818afa3ea1d6039cfd7751b3019b44a692b3954",
+      "size_bytes": 37319
+    },
+    "topology_slices.json": {
+      "sha256": "0700bbe7e3c50820960ec7fcf0d279c3409e309e2e70d21c3e34ec4386b94b88",
+      "size_bytes": 50259
+    }
+  },
+  "corrected_selection_sha256": "9b8c44d89c03204a9f809ba26ab61ec33a7c8c2c3c8c0c4b29e5189c439aab90",
+  "diagnostic_runtime": {
+    "commit": "247aaa041b6bf6a2d482408dfb39f9f6bff58340",
+    "method": "historical_c2_loader_with_corrected_lifecycle_evaluator",
+    "model_run_io_sha256": "4ec65439e5de3cb7e967c96e75abc16cd779915644fc4db7c1bc025fdc7019bc",
+    "script_sha256": "ba2a16ab25f84cf55f6da896581861db51a9b159f6dcdee00df6298f6d9d3d25"
+  },
+  "diagnostic_sha256": "aeafdd95681506972f33e9d6a31c6c47048eddbf4f3c042aa4bf51e47f095fc7",
+  "diagnostic_status": "completed",
+  "eval_accessed": false,
+  "frozen_selection_file_sha256": "28a3ba705153882ebc59a9b2318a382576de899644d676a8df066d04ba0a7974",
+  "frozen_selection_preserved": true,
+  "frozen_selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489",
+  "manifest_sha256": "b5a6d1369fc1165adb98ce91508b7f8b171ad2a981495b33e0060a324e6176b9",
+  "model_inference_performed": false,
+  "model_receipts": {
+    "ls_eend": "2d155fdcb72024e1089f74467bc198bf247b04fa912059524a6074acdcdb5049",
+    "streaming_sortformer": "2131a251304da65006dd116d59ab4310311356c5909bc570e41ebb6978e5dc03"
+  },
+  "role": "PSEM-STRATEGY-DEV",
+  "schema_version": "psem.relative_occupancy.corrected_dev_diagnostic.v1",
+  "selected_settings": {
+    "ls_eend": {
+      "anchor_threshold": 0.7,
+      "causal_enrollment": {
+        "active_threshold": 0.7,
+        "confirmation_samples": 6400,
+        "other_low_threshold": 0.3
+      },
+      "other_threshold": 0.3,
+      "selection_order": [
+        "wrong_anchor_rate_ascending",
+        "fraction_enrolled_within_1500ms_descending",
+        "enrollment_failure_rate_ascending",
+        "enrollment_delay_p90_ascending",
+        "active_threshold_descending",
+        "other_low_threshold_ascending",
+        "confirm_ms_ascending"
+      ]
+    },
+    "streaming_sortformer": {
+      "anchor_threshold": 0.5,
+      "causal_enrollment": {
+        "active_threshold": 0.5,
+        "confirmation_samples": 6400,
+        "other_low_threshold": 0.4
+      },
+      "other_threshold": 0.35,
+      "selection_order": [
+        "wrong_anchor_rate_ascending",
+        "fraction_enrolled_within_1500ms_descending",
+        "enrollment_failure_rate_ascending",
+        "enrollment_delay_p90_ascending",
+        "active_threshold_descending",
+        "other_low_threshold_ascending",
+        "confirm_ms_ascending"
+      ]
+    }
+  },
+  "selected_settings_unchanged": true,
+  "source_count": 10,
+  "tuning_performed": false
+}
