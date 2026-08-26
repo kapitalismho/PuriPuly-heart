@@ -7,6 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Sequence
 
+from experiments.psem_relative_occupancy_gate.contracts import evaluation_cells
 from experiments.psem_relative_occupancy_gate.io_utils import (
     CONFIG_PATH,
     canonical_sha256,
@@ -349,6 +350,19 @@ def _validate_gate1_row(row: dict[str, Any], manifest_row: dict[str, Any]) -> No
         _assert_exposure_matches(exposure, _gate1_exposure_replay(row, manifest_row))
 
 
+def _expected_evaluation_timeline_end(
+    manifest_row: dict[str, Any], cfg: dict[str, Any]
+) -> int:
+    scored_start = int(manifest_row["scored_start_sample"])
+    canonical_cells = evaluation_cells(
+        intervals_from_manifest(manifest_row),
+        scored_start,
+        int(manifest_row["scored_end_sample"]),
+        int(cfg["evaluation_grid_ms"]) * 16,
+    )
+    return canonical_cells[-1].end_sample if canonical_cells else scored_start
+
+
 def _validate_gate2_row(
     row: dict[str, Any], manifest_row: dict[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, int]:
@@ -408,7 +422,6 @@ def _validate_gate2_row(
         raise ModelGateVerificationError("causal enrollment/episode identity mismatch")
     previous_end: int | None = None
     scored_start = int(manifest_row["scored_start_sample"])
-    scored_end = int(manifest_row["scored_end_sample"])
     for span in timeline:
         try:
             start = int(span["start_sample"])
@@ -435,8 +448,13 @@ def _validate_gate2_row(
                 raise ModelGateVerificationError(
                     "ANCHORED timeline support precedes its anchor emission"
                 )
-    if previous_end != scored_end:
-        raise ModelGateVerificationError("causal timeline does not cover scored end")
+    expected_timeline_end = _expected_evaluation_timeline_end(
+        manifest_row, cfg or config()
+    )
+    if previous_end != expected_timeline_end:
+        raise ModelGateVerificationError(
+            "causal timeline does not cover canonical evaluation cells"
+        )
     _validate_exposure(exposure)
     if "exclusive_other_contamination_seconds" in exposure:
         _assert_exposure_matches(exposure, _gate2_exposure_replay(row))

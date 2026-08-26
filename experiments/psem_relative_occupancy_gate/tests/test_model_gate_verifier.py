@@ -7,6 +7,7 @@ from experiments.psem_relative_occupancy_gate.io_utils import canonical_sha256
 from experiments.psem_relative_occupancy_gate.verify_model_gates import (
     ModelGateVerificationError,
     _causal_opportunity_replay,
+    _expected_evaluation_timeline_end,
     _validate_replacement_event,
     _validate_row_hash,
 )
@@ -76,3 +77,20 @@ def test_model_gate_verifier_replays_every_lifecycle_and_latest_alignment() -> N
     row["annotated_episodes"][0]["expected_anchor_speaker"] = "A"
     with pytest.raises(ModelGateVerificationError, match="latest lifecycle"):
         _causal_opportunity_replay(row, manifest, cfg)
+
+
+def test_model_gate_verifier_uses_canonical_terminal_cell_coverage() -> None:
+    cfg = {"evaluation_grid_ms": 100}
+    manifest = {
+        "scored_start_sample": 0,
+        "scored_end_sample": 16799,
+        "intervals": [
+            ActivityInterval(0, 16799, ("A",), False).to_dict(),
+        ],
+    }
+    assert _expected_evaluation_timeline_end(manifest, cfg) == 16000
+    manifest["scored_end_sample"] = 16801
+    manifest["intervals"] = [
+        ActivityInterval(0, 16801, ("A",), False).to_dict(),
+    ]
+    assert _expected_evaluation_timeline_end(manifest, cfg) == 16801

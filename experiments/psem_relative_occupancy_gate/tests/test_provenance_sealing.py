@@ -9,6 +9,7 @@ import pytest
 from experiments.psem_relative_occupancy_gate import (
     authorize_eval,
     authorize_eval_recovery,
+    authorize_verification_correction,
     derive_relative_occupancy,
     eval_access,
     preflight,
@@ -509,6 +510,32 @@ def test_eval_recovery_exclusive_creation_rejects_existing_file(tmp_path: Path) 
     assert load_json(path) == {"sequence": 2}
 
 
+def test_verification_correction_exclusive_creation_rejects_existing_file(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "verification_correction.json"
+    authorize_verification_correction._write_exclusive(path, {"sequence": 1})
+    assert load_json(path) == {"sequence": 1}
+    with pytest.raises(
+        authorize_verification_correction.VerificationCorrectionAuthorizationError,
+        match="already exists",
+    ):
+        authorize_verification_correction._write_exclusive(path, {"sequence": 2})
+    assert load_json(path) == {"sequence": 1}
+
+
+def test_verification_correction_receipt_rejects_tamper(tmp_path: Path) -> None:
+    path = tmp_path / "verification_correction.json"
+    value = {"correction_reason": "canonical_evaluation_grid_terminal_coverage"}
+    value["correction_sha256"] = canonical_sha256(value)
+    write_json(path, value)
+    assert eval_access._load_verification_correction_value(path) == value
+    value["correction_reason"] = "forged"
+    write_json(path, value)
+    with pytest.raises(EvalAccessError, match="hash is invalid"):
+        eval_access._load_verification_correction_value(path)
+
+
 def test_eval_recovery_finalization_binds_completed_model_aggregates(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -658,6 +685,8 @@ def test_eval_recovery_cleanliness_whitelists_only_eval_outputs(
         b" M experiments/psem_relative_occupancy_gate/results/eval/eval_metrics.json\0"
         b"?? experiments/psem_relative_occupancy_gate/results/eval/"
         b"eval_authorization_recovery_4.json\0"
+        b"?? experiments/psem_relative_occupancy_gate/results/eval/"
+        b"eval_verification_correction.json\0"
     )
     assert eval_access._tracked_worktree_matches_terminal_recovery_outputs(eval_root)
     status(b" M experiments/psem_relative_occupancy_gate/model_evaluate.py\0")
