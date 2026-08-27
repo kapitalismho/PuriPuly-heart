@@ -1,0 +1,54 @@
+diff --git a/src/arch/sortformer/model.cpp b/src/arch/sortformer/model.cpp
+--- a/src/arch/sortformer/model.cpp
++++ b/src/arch/sortformer/model.cpp
+@@ -414,5 +414,6 @@ struct StreamInferBuild {
+     ggml_cgraph * graph      = nullptr;
+     ggml_tensor * concat_in  = nullptr;
+     ggml_tensor * pos_emb_in = nullptr;
++    ggml_tensor * hidden     = nullptr;
+     ggml_tensor * preds      = nullptr;
+ };
+@@ -473,5 +474,6 @@ StreamInferBuild build_stream_infer_graph(ggml_context * ctx, SortformerModel &
+     b.graph      = graph;
+     b.concat_in  = concat_in;
+     b.pos_emb_in = pos_emb_in;
++    b.hidden     = t;
+     b.preds      = preds;
+     return b;
+@@ -724,2 +726,3 @@ static transcribe_status run_streaming(SortformerSession * pc, SortformerModel *
+     const int                    n_spk = pm->hparams.max_speakers;
++    const int                    hidden_dim = pm->hparams.tf_d_model;
+     const int                    sub   = pm->hparams.enc_subsampling_factor;
+@@ -728,2 +731,4 @@ static transcribe_status run_streaming(SortformerSession * pc, SortformerModel *
+     const int                    feat_len = mel_n_frames;
++    const char *                 hidden_path = std::getenv("TRANSCRIBE_SORTFORMER_HIDDEN_PATH");
++    std::vector<float>           hidden_total;
+
+@@ -840,2 +847,9 @@ static transcribe_status run_streaming(SortformerSession * pc, SortformerModel *
+                                 pc->stream_preds_host.size() * sizeof(float));
++        if (hidden_path != nullptr) {
++            std::vector<float> hidden_concat(static_cast<size_t>(T_concat) * hidden_dim);
++            ggml_backend_tensor_get(B.hidden, hidden_concat.data(), 0, hidden_concat.size() * sizeof(float));
++            const int C = T_diar - lc - rc;
++            const auto first = hidden_concat.begin() + static_cast<size_t>(S + F + lc) * hidden_dim;
++            hidden_total.insert(hidden_total.end(), first, first + static_cast<size_t>(C) * hidden_dim);
++        }
+
+@@ -867,4 +879,17 @@ static transcribe_status run_streaming(SortformerSession * pc, SortformerModel *
+     const int n_frames = (feat_len + sub - 1) / sub;
+     const int used_n   = std::min(pc->stream.total_n, n_frames);
++
++    if (hidden_path != nullptr) {
++        const size_t hidden_count = static_cast<size_t>(used_n) * hidden_dim;
++        std::FILE * hidden_file = std::fopen(hidden_path, "wb");
++        if (hidden_file == nullptr || hidden_total.size() < hidden_count ||
++            std::fwrite(hidden_total.data(), sizeof(float), hidden_count, hidden_file) != hidden_count) {
++            if (hidden_file != nullptr) {
++                std::fclose(hidden_file);
++            }
++            return TRANSCRIBE_ERR_GGUF;
++        }
++        std::fclose(hidden_file);
++    }
+
+     if (transcribe::debug::enabled()) {

@@ -1,0 +1,24 @@
+{
+  "comparison": "P-C minus S-probe at predeclared tiny_mlp threshold=0.5 confirmation=300ms",
+  "deltas": {
+    "contamination_seconds": {
+      "lower_95": -1.8908151315789332,
+      "point_mean": 92.54465789473686,
+      "upper_95": 190.2851671052631
+    },
+    "false_cut_count": {
+      "lower_95": 9.681578947368422,
+      "point_mean": 38.526315789473685,
+      "upper_95": 71.84210526315789
+    },
+    "missed_replacement_count": {
+      "lower_95": 1.3157894736842106,
+      "point_mean": 17.68421052631579,
+      "upper_95": 36.31578947368421
+    }
+  },
+  "resamples": 2000,
+  "schema_version": "psem.frozen_ceiling.paired_bootstrap.v1",
+  "source_count": 19,
+  "unit": "source_session"
+}

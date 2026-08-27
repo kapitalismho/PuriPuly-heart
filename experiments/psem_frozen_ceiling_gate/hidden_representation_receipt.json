@@ -1,0 +1,82 @@
+{
+  "schema_version": "psem.hidden_ceiling.representation_receipt.v1",
+  "authority": {
+    "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/99",
+    "sha256": "5ced0919f627b4022b3836d47d8fadcbaebb304f30c7d1dfe5d3339343c176f9"
+  },
+  "stage": "HIDDEN-CEILING-1",
+  "opened": true,
+  "hidden_config": {
+    "path": "experiments/psem_frozen_ceiling_gate/hidden_config.json",
+    "sha256": "96077e03e8d7cf8409224ecb22511e1d46daca103a8bb45af4a010bf72df6c8e"
+  },
+  "trigger": {
+    "rule": "P-C and P-NC remain clearly and consistently separated from the bounded G frontier across both held-out source families",
+    "gt_result_sha256": "69e8638592bebdfe9e0df6471569d5c710154ff103072e947d1d562e048efcda",
+    "posterior_causal_result_sha256": "d25d6b2be766fb662d8168ac31ae368e31618b1b6bf35f24e5dffab1aee98920",
+    "posterior_noncausal_result_sha256": "9d4710ed9a10d7a79410be3c2a19079c0a8234986368fdbe80498365d97c4c39",
+    "source_family_result_sha256": "017fdb9826bbedb050807dd07bab63287b51e0f80f829bcc6ccf68658bd340a5"
+  },
+  "representation": {
+    "id": "sortformer.last_shared_temporal.pre_diar_spk_head.v1",
+    "tensor": "t",
+    "dimension": 192,
+    "location": "output of the eighteenth post-LN temporal Transformer block before the ReLU/fc1/ReLU/single_spk_head diarization activity head",
+    "choice": "last shared temporal representation",
+    "rationale": "This is the closest single frozen point that separates the shared temporal backbone from the exported diarization activity head while retaining the authoritative streaming trajectory.",
+    "selected_before_hidden_scoring": true,
+    "layer_sweep": false,
+    "held_out_selection": false,
+    "dtype": "float32"
+  },
+  "runtime": {
+    "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+    "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+    "authoritative_telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+    "hidden_export_patch_path": "experiments/psem_frozen_ceiling_gate/sortformer_hidden_export.patch",
+    "hidden_export_patch_sha256": "c3fbeba8718cb8154f15f733b1a4d99952563292243a4c0eb04255ded66789ff",
+    "authoritative_bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+    "instrumented_bench_path": "C:/Users/salee/AppData/Local/puripuly-heart-research/speaker_representation_scd_v1/external/r8/transcribe.cpp/build-issue99-hidden-vulkan-short/bin/Release/transcribe-bench.exe",
+    "instrumented_bench_sha256": "dc222effb8635464d4e0957d396efab54e782d10814e5378bbdb58934bbe1775",
+    "model_path": "C:/Users/salee/AppData/Local/puripuly-heart-research/speaker_representation_scd_v1/models/r8/diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+    "model_repository": "handy-computer/diar_streaming_sortformer_4spk-v2.1-gguf",
+    "model_revision": "7ef0c15dc8f9d717e9d24fac29a6e6551e9c6ddf",
+    "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+    "backend": "vulkan",
+    "precision": "Q8_0",
+    "preset": "low_latency",
+    "threads": 8,
+    "native_frame_ms": 80,
+    "recorded_algorithmic_lookahead_ms": 1040,
+    "posterior_graph_changed": false,
+    "instrumentation_effect": "read back and persist the already-computed last shared temporal tensor"
+  },
+  "equivalence": {
+    "inputs": "the exact input WAV materialization recorded by each authoritative source receipt: the frozen DEV waveform or the zero-flush-padded EVAL input",
+    "comparison": "instrumented diar.probs against the authoritative cached posterior trace for every source",
+    "absolute_tolerance": 0.000001,
+    "relative_tolerance": 0.0,
+    "required_status": "equivalent",
+    "stop_on_mismatch": true
+  },
+  "probe": {
+    "target": "the identical oracle-bound live-speech-without-anchor replacement hazard used by the posterior ceiling",
+    "oracle_binding": "one frozen episode-level anchor slot mapping encoded as a four-way one-hot input",
+    "additional_inputs": [
+      "model evidence delay",
+      "stream reset marker"
+    ],
+    "causal_lag_frames": [0, 1, 3, 7],
+    "bounded_noncausal_future_frames": [1, 3, 5],
+    "bounded_noncausal_horizon_ms": 500,
+    "classes": ["linear", "tiny_mlp"],
+    "tiny_mlp_hidden_units": 8,
+    "source_split": "the frozen leave-one-corpus-device-family-out manifest",
+    "held_out_architecture_selection": false
+  },
+  "extraction": {
+    "external_output_root": "C:/Users/salee/AppData/Local/puripuly-heart-research/speaker_representation_scd_v1/results/issue99/psem_frozen_ceiling_gate/hidden_sortformer",
+    "feature_artifact_format": "compressed NPZ with float32 hidden rows and authoritative frame coordinates",
+    "large_features_in_git": false
+  }
+}

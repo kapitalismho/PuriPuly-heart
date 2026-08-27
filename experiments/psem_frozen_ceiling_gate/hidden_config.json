@@ -1,0 +1,16 @@
+{
+  "schema_version": "psem.hidden_ceiling.config.v1",
+  "representation_dimension": 192,
+  "posterior_equivalence_atol": 0.000001,
+  "train_fit_min_average_precision": 0.8,
+  "train_fit_min_accuracy": 0.7,
+  "reference_probe_class": "tiny_mlp",
+  "reference_threshold": 0.5,
+  "training_seed_offset": 100,
+  "success_reference_improvements": [
+    "exclusive_other_contamination_seconds_per_active_speech_hour",
+    "false_cut_count",
+    "missed_replacement_count"
+  ],
+  "source_family_min_improved_metrics": 2
+}
