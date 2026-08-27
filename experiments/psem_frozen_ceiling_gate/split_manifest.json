@@ -1,0 +1,409 @@
+{
+  "architecture_freeze_role": "PSEM-STRATEGY-DEV",
+  "folds": [
+    {
+      "evaluation_sources": [
+        "alimeeting_R0004_M0012",
+        "alimeeting_R1019_M1960",
+        "alimeeting_R1021_M1940",
+        "alimeeting_R1021_M1944",
+        "alimeeting_R1021_M4080",
+        "alimeeting_R2105_M3318",
+        "alimeeting_R2108_M3206",
+        "alimeeting_R8009_M8018"
+      ],
+      "held_out_family": "alimeeting_far_ch0",
+      "train_families": [
+        "ami_mix_headset"
+      ],
+      "training_sources": [
+        "ami_EN2009d",
+        "ami_ES2002b",
+        "ami_ES2009a",
+        "ami_ES2009b",
+        "ami_ES2009c",
+        "ami_ES2009d",
+        "ami_ES2015d"
+      ]
+    },
+    {
+      "evaluation_sources": [
+        "ami_EN2004a",
+        "ami_EN2006a",
+        "ami_ES2014a",
+        "ami_IS1007a",
+        "ami_IS1007b",
+        "ami_IS1007c",
+        "ami_IS1007d",
+        "ami_TS3010a",
+        "ami_TS3010b",
+        "ami_TS3010c",
+        "ami_TS3010d"
+      ],
+      "held_out_family": "ami_mix_headset",
+      "train_families": [
+        "alimeeting_far_ch0"
+      ],
+      "training_sources": [
+        "alimeeting_R1019_M1928",
+        "alimeeting_R1021_M4073",
+        "alimeeting_R8009_M8019"
+      ]
+    }
+  ],
+  "fresh_holdout": false,
+  "limitation": "all V2 sources are development-known path-selection evidence",
+  "schema_version": "psem.frozen_ceiling.split.v1",
+  "scoring_role": "PSEM-STRATEGY-EVAL",
+  "sources": [
+    {
+      "audio_ref": "alimeeting/far_ch0/R1019_M1928.wav",
+      "corpus": "AliMeeting",
+      "intervals_sha256": "b09b0844f293cbe05d0360d3ed94d085018f6e827be518b8dbc20064a18774e6",
+      "issue99_use": "architecture_freeze_only",
+      "old_v2_role": "PSEM-STRATEGY-DEV",
+      "row_sha256": "ad5ad861922eeecbfc7395144a9889b5d8ac1eaaaf7d817405215e906c9072b4",
+      "session_id": "R1019_M1928",
+      "source_family": "alimeeting_far_ch0",
+      "source_id": "alimeeting_R1019_M1928",
+      "waveform_sha256": "0bbafa526c8c0b42d05bcfc972dd31db771c579dc7db469bc4618582def84650"
+    },
+    {
+      "audio_ref": "alimeeting/far_ch0/R1021_M4073.wav",
+      "corpus": "AliMeeting",
+      "intervals_sha256": "c1f7f1bb1cb2fc5019a6a23f05f189a81b599c8b98f9bf1c56b9fe555f308717",
+      "issue99_use": "architecture_freeze_only",
+      "old_v2_role": "PSEM-STRATEGY-DEV",
+      "row_sha256": "075e99f04b08a16396cd255b7190799065e23875b23f6bf98dfaa975ea8a09d6",
+      "session_id": "R1021_M4073",
+      "source_family": "alimeeting_far_ch0",
+      "source_id": "alimeeting_R1021_M4073",
+      "waveform_sha256": "01891117bc955ea08ed3ed137d2a830ebac9508358f7f07821af199265aab730"
+    },
+    {
+      "audio_ref": "alimeeting/far_ch0/R8009_M8019.wav",
+      "corpus": "AliMeeting",
+      "intervals_sha256": "ede999e28bb62f45e14e69df894035a543a7cb01f30d2102981b0a908ce98302",
+      "issue99_use": "architecture_freeze_only",
+      "old_v2_role": "PSEM-STRATEGY-DEV",
+      "row_sha256": "bf70dc61db8fa881ae96d883ad5b68e7ef2bb35d763cdd75291c18510a20f75b",
+      "session_id": "R8009_M8019",
+      "source_family": "alimeeting_far_ch0",
+      "source_id": "alimeeting_R8009_M8019",
+      "waveform_sha256": "8fc9bc2f43c1e26db99bd0cf707271b0d82b9fc6d7020c44ddfcdb59fcc8d4bc"
+    },
+    {
+      "audio_ref": "ami/audio/EN2009d/EN2009d.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "f8c6a074cb66040bcfee860c79d0e334652123bdddf589453d67861168cd24e8",
+      "issue99_use": "architecture_freeze_only",
+      "old_v2_role": "PSEM-STRATEGY-DEV",
+      "row_sha256": "134f7d6f77bf550d4f15be14b04d1a3e6a252b6881e6d3add064e900bc36123a",
+      "session_id": "EN2009d",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_EN2009d",
+      "waveform_sha256": "eeb4a5ff47cadba8c75bdf32213b9264805027faa943c7f55eec0423c6ea4312"
+    },
+    {
+      "audio_ref": "ami/audio/ES2002b/ES2002b.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "b1a69f8871348812462d7d8c6f3fc5ee0ea089dce9d251537705b37dbdaa0fc4",
+      "issue99_use": "architecture_freeze_only",
+      "old_v2_role": "PSEM-STRATEGY-DEV",
+      "row_sha256": "29488d0bb67d2dca926d4f633f1f6169986f083f1d17383f5cf48d88f3c4e626",
+      "session_id": "ES2002b",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_ES2002b",
+      "waveform_sha256": "977fbf6cd473cfb1984b41755762eea4d7ffdad3fb15adcfdebcb8842163ec66"
+    },
+    {
+      "audio_ref": "ami/audio/ES2009a/ES2009a.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "adb598f554409d4d1a180c803371e3691570ece0a4eeb0085e502e4c839ebf60",
+      "issue99_use": "architecture_freeze_only",
+      "old_v2_role": "PSEM-STRATEGY-DEV",
+      "row_sha256": "ffe950fba6fe06c89d3193b601d393062a3b36ecdac9405005c51995a4e09b45",
+      "session_id": "ES2009a",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_ES2009a",
+      "waveform_sha256": "472adcae2cff535a251469bf5a9647ac9166de0f1bc049ce24504104cae9b1fc"
+    },
+    {
+      "audio_ref": "ami/audio/ES2009b/ES2009b.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "03b15b7110af12c85e813e38f86982caccc21ac5abf285cccd8e0e6a0603ac4e",
+      "issue99_use": "architecture_freeze_only",
+      "old_v2_role": "PSEM-STRATEGY-DEV",
+      "row_sha256": "7b8d6ebad406d54ee1305f83bfe486808e262489649b3379de4c5295cc0fbb0a",
+      "session_id": "ES2009b",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_ES2009b",
+      "waveform_sha256": "7bef2999aa6dc63c516f8ef4260a0e6354cb63bf0fd34df894af6f716f78c359"
+    },
+    {
+      "audio_ref": "ami/audio/ES2009c/ES2009c.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "5c92a76e12a6680c9f2231769a2b478e6608484244840934fe021ce4c1c60eb9",
+      "issue99_use": "architecture_freeze_only",
+      "old_v2_role": "PSEM-STRATEGY-DEV",
+      "row_sha256": "54cb68ac5eed51f5ec45d302fffa6c5c3d22bcdc00ab10dbd712bc2a96584f75",
+      "session_id": "ES2009c",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_ES2009c",
+      "waveform_sha256": "350661f98c86a8a5973f1131e36444d93c0f44d07db5b12e174a49cb97f620a4"
+    },
+    {
+      "audio_ref": "ami/audio/ES2009d/ES2009d.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "b7eb6a7a4a0afa89d7157e6614ba11cfdc70f031597de978f22f55f74de17520",
+      "issue99_use": "architecture_freeze_only",
+      "old_v2_role": "PSEM-STRATEGY-DEV",
+      "row_sha256": "945ca0b00100b02038541ec556c421440658a7dab75828c27baa44224e07d0c0",
+      "session_id": "ES2009d",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_ES2009d",
+      "waveform_sha256": "b5ef423361ce67c804042ec479c6aeaf2cb8c19f73a779d61fabb7501e9e9b10"
+    },
+    {
+      "audio_ref": "ami/audio/ES2015d/ES2015d.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "c27f1df6a7459e7a0702a933b20240f5314e837cdda4c1cb2dc44c5db210990e",
+      "issue99_use": "architecture_freeze_only",
+      "old_v2_role": "PSEM-STRATEGY-DEV",
+      "row_sha256": "874b1d2c82f103c2adee83de2f19b69ea21540f31c67519522dec47e760c3e6c",
+      "session_id": "ES2015d",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_ES2015d",
+      "waveform_sha256": "0e7a2c371f73c461bfca6244f491760fa76047f7b64dc74cbecfff67af921222"
+    },
+    {
+      "audio_ref": "alimeeting/far_ch0/R0004_M0012.wav",
+      "corpus": "AliMeeting",
+      "intervals_sha256": "9ad27e59e4de4f8e13861216e1e987e663405ddd8c4e765317eb5c61f89a68d8",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "a1b2fba26c92016d41acc01d2d7b15071ce70b86e7855729a02a4613ef5e3ec1",
+      "session_id": "R0004_M0012",
+      "source_family": "alimeeting_far_ch0",
+      "source_id": "alimeeting_R0004_M0012",
+      "waveform_sha256": "23e93504d0f1b154e6401ef9fda74a984b4febe55ca2f01f238117d294d1cfd1"
+    },
+    {
+      "audio_ref": "alimeeting/far_ch0/R1019_M1960.wav",
+      "corpus": "AliMeeting",
+      "intervals_sha256": "dac1e79a4dec7cdcf60ff48c73618a73d1c011f4fe0a6ec0a642c27089d1eb33",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "6fc46d9434d03cef30521b727181f4a8dfea8a9cf168cf0c1e4f105f2edf2741",
+      "session_id": "R1019_M1960",
+      "source_family": "alimeeting_far_ch0",
+      "source_id": "alimeeting_R1019_M1960",
+      "waveform_sha256": "a842b222d0fda40bfaff7e636103c22cc7b87c9a2bea6124fa1d4ab2cd38a565"
+    },
+    {
+      "audio_ref": "alimeeting/far_ch0/R1021_M1940.wav",
+      "corpus": "AliMeeting",
+      "intervals_sha256": "9553c0c311973125527d7afdb0bf881aaacd92f97c9ef30650e43ae77a0f3c03",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "00572f9974f0e5d76e61a05f120d4d327d7e8192cfb89a22ed5cdf338d31f92f",
+      "session_id": "R1021_M1940",
+      "source_family": "alimeeting_far_ch0",
+      "source_id": "alimeeting_R1021_M1940",
+      "waveform_sha256": "a70684449b1156585f4da76c8cdf69abced0cdb37f7a7d54aba894d5aa784f69"
+    },
+    {
+      "audio_ref": "alimeeting/far_ch0/R1021_M1944.wav",
+      "corpus": "AliMeeting",
+      "intervals_sha256": "44660e31bb5657ab84ac57f30a0857dc16c72d769932a9dbcc7d07ce43ad5d30",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "ae8e04269ea330eccdc50f673f3bae029699255a40c13b1cc0a5815101158245",
+      "session_id": "R1021_M1944",
+      "source_family": "alimeeting_far_ch0",
+      "source_id": "alimeeting_R1021_M1944",
+      "waveform_sha256": "c96b364c2f0e6ee10824c5991b2c783787a266f3be0bf1d93f9540a9f0023037"
+    },
+    {
+      "audio_ref": "alimeeting/far_ch0/R1021_M4080.wav",
+      "corpus": "AliMeeting",
+      "intervals_sha256": "6459c6d16adb6cf90e2d7581ea5128c06ca645fb434a50258337d9794b094d78",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "70a750b139acdd9805e9ea9b24c790ee7405d197c2d9c88058c35604f771ef56",
+      "session_id": "R1021_M4080",
+      "source_family": "alimeeting_far_ch0",
+      "source_id": "alimeeting_R1021_M4080",
+      "waveform_sha256": "d61134736b67d96567e772a62ca8bc8f022b8fc3e6dfd2d30ea978317c64a88c"
+    },
+    {
+      "audio_ref": "alimeeting/far_ch0/R2105_M3318.wav",
+      "corpus": "AliMeeting",
+      "intervals_sha256": "7a93e5da1d411a72c7cb5245dee2b93ca93023af434b25585624ce3a9c8f36fa",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "f53605574dbd765adece7dd7c9baa28833169c507076864f24c58f19becec80b",
+      "session_id": "R2105_M3318",
+      "source_family": "alimeeting_far_ch0",
+      "source_id": "alimeeting_R2105_M3318",
+      "waveform_sha256": "4f829675f5bebfdcdfaa262e0352f9774a3a82125cba0a1261571516260975fe"
+    },
+    {
+      "audio_ref": "alimeeting/far_ch0/R2108_M3206.wav",
+      "corpus": "AliMeeting",
+      "intervals_sha256": "9c11c4c757ecef46e96bed7e7bdee63cf41a80affaa540515f805bf6874c4de5",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "d7b54a79eb94a7630d948904c4f463cfa9ac1859b524fb345fce014cb6fdcc0e",
+      "session_id": "R2108_M3206",
+      "source_family": "alimeeting_far_ch0",
+      "source_id": "alimeeting_R2108_M3206",
+      "waveform_sha256": "d560c607ce9408fec72dd7c758ce844eb2674b19b7020e83e5e10ac6dc16232c"
+    },
+    {
+      "audio_ref": "alimeeting/far_ch0/R8009_M8018.wav",
+      "corpus": "AliMeeting",
+      "intervals_sha256": "aeba119f1803f03b5a63767e9b727f2f05d404e70f0ff66a9be5b6d2b0933d06",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "c2aefbeb050eb4330a9934840f970fd7e243550aff2c656857ad44cebb84b58a",
+      "session_id": "R8009_M8018",
+      "source_family": "alimeeting_far_ch0",
+      "source_id": "alimeeting_R8009_M8018",
+      "waveform_sha256": "f16e70756914e46803d7df87e7d8406cef809aa9aff0b553b8bac9732b884ef3"
+    },
+    {
+      "audio_ref": "ami/audio/EN2004a/EN2004a.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "990ce29a48965d5ba4dfd1abae809da1c4244b468173f05529932fbfc8d22eac",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "27f30bf658b94959e23c6d310425b8488f7a0e91494236a13c569fe8e4c694e1",
+      "session_id": "EN2004a",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_EN2004a",
+      "waveform_sha256": "d188219aff66264adc8d6a8192f272ca4155b483cf7eaa9498a8f0f6ac0ed9dc"
+    },
+    {
+      "audio_ref": "ami/audio/EN2006a/EN2006a.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "69151618ebff92511eb032bf19de0fade155c20ee6907bca504f58616bf836ea",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "f162eec379de38d83f7da746c9848f08ef675777aba52fc8730c39bfc0473ddf",
+      "session_id": "EN2006a",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_EN2006a",
+      "waveform_sha256": "4e10dd0209c661af4769e2fa9c34a3b4804c852e8ba098d9dc9026127261e211"
+    },
+    {
+      "audio_ref": "ami/audio/ES2014a/ES2014a.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "49ad1fc4a936f2d4c7bfc8e4ad2bb14b0143cf3261dce03a0c69dd40fa428f5b",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "0174facb194fe601f0c999e69deb5ba3764b8122cc92166cd249473b6d147d56",
+      "session_id": "ES2014a",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_ES2014a",
+      "waveform_sha256": "9d29e308566b8c7be4c328f4a2998e371e5f506384f111042ec91b465f7f792c"
+    },
+    {
+      "audio_ref": "ami/audio/IS1007a/IS1007a.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "ffb60f406f5b688956d15d7cacdc6132aac3a616f2876ae2429e731c74d2e8d8",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "3583c2326f448918f0b50957d0c64f2976f737845b7c4625320ae976bb7398cf",
+      "session_id": "IS1007a",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_IS1007a",
+      "waveform_sha256": "df2cee040ad065649ce4285d1f3244579dd06ece2f0e16d0c8091d4698e39fc4"
+    },
+    {
+      "audio_ref": "ami/audio/IS1007b/IS1007b.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "14a6af33e3c257fb88aad72f1a278304ff5550e92609b43ec0fd7daaed9def0d",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "bc1608365c06dff1eef0c9ff4ce2345db71b8153d0e7749f42af41876b83a317",
+      "session_id": "IS1007b",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_IS1007b",
+      "waveform_sha256": "eea0adb204e18b68e2197fa26fd13a2d9a3d464ad36bbfe76164a6dc1b67a00f"
+    },
+    {
+      "audio_ref": "ami/audio/IS1007c/IS1007c.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "2397a128f38bbd7752085ab42aa61214ff2d179aca94520f50152b60a772276a",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "84c78ee3f538812650a7b112614c70e81875755cc71b2c3ae02ec023b1e0ebb0",
+      "session_id": "IS1007c",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_IS1007c",
+      "waveform_sha256": "ccc56bb3980c1027e8ff313e018a8b53c2bd730f1a378f4870e3371616e2ed1f"
+    },
+    {
+      "audio_ref": "ami/audio/IS1007d/IS1007d.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "a124965d238d468f19dca0f9d5ec8ff1a0d4969f834d92c6abf3afb9a22fffea",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "f34a4e805c2e08583764b04a9fc54d90f9c7c9b5b549fd0ce534797e4dea4dce",
+      "session_id": "IS1007d",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_IS1007d",
+      "waveform_sha256": "470b25ca979716d23c05fa30e854b11d22670754dd236da7634b7e8fda221c73"
+    },
+    {
+      "audio_ref": "ami/audio/TS3010a/TS3010a.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "5a8f40ff85b0af421293ec2e37082dd41d976268bde92163ed486930549936b3",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "d75f575167d502fd356e1f4d2bea759f6df9c6ed6b4901f45ef6eee5bdd39697",
+      "session_id": "TS3010a",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_TS3010a",
+      "waveform_sha256": "d3a7d934b73fa5b9cfcff54ce3909ba59b544ef43c248c931082aa62056c1625"
+    },
+    {
+      "audio_ref": "ami/audio/TS3010b/TS3010b.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "e77e0759ec326e94a8d2ce5e4c977d2810f93ce0c7b9a28f6c2b08dc88499b22",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "a0d179a7c0cdcbe46f795d3cad8701a35db8fb9683de3af05f2b8aebb96d3667",
+      "session_id": "TS3010b",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_TS3010b",
+      "waveform_sha256": "b973b8dcd69c01ff782f77da7ada6979f7999e063b8de30d89f5b8dd1d53a043"
+    },
+    {
+      "audio_ref": "ami/audio/TS3010c/TS3010c.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "68c3467678acaf595597a93909c2bfed9feefdb4c7c464a1323747dc6eb315ce",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "3fa3afcfb81b65641d4225ff550a928d982bd6ff4c5f5fa03507be2bb4adbb31",
+      "session_id": "TS3010c",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_TS3010c",
+      "waveform_sha256": "6fae7327a367f3ea11ee91c35da708d5484c5924f51b309669409043a9c30a56"
+    },
+    {
+      "audio_ref": "ami/audio/TS3010d/TS3010d.Mix-Headset.wav",
+      "corpus": "AMI",
+      "intervals_sha256": "ba9686a28fb477faaa4d8c8449e58119bac4df4c8162ff8b66b5db4ef36c4d34",
+      "issue99_use": "source_held_out_scoring",
+      "old_v2_role": "PSEM-STRATEGY-EVAL",
+      "row_sha256": "7c52b707e5e03f45cfaa0a3203774bf8bbfe48d91937b0a490a59300ef8ea2cf",
+      "session_id": "TS3010d",
+      "source_family": "ami_mix_headset",
+      "source_id": "ami_TS3010d",
+      "waveform_sha256": "ff642ecea1b3709a8e8cd71414a8ddd37c04cac46319fea6db63be4ff40fdaf8"
+    }
+  ],
+  "strategy": "leave-one-corpus-device-family-out"
+}

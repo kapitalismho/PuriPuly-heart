@@ -1,0 +1,39 @@
+{
+  "schema_version": "psem.frozen_ceiling.config.v1",
+  "experiment_id": "psem-frozen-ceiling-1-v0",
+  "authority": {
+    "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/99",
+    "sha256": "5ced0919f627b4022b3836d47d8fadcbaebb304f30c7d1dfe5d3339343c176f9"
+  },
+  "repository_baseline": "fb92cf10bbbba96f25207358b65b21c49f63d68f",
+  "sample_rate_hz": 16000,
+  "enrollment_ms": 200,
+  "silence_reset_ms": 1200,
+  "maximum_decision_latency_ms": 1000,
+  "oracle_mapping_confirmation_ms": [500],
+  "action_reference_confirmation_ms": 500,
+  "gap_reference_confirmation_ms": 500,
+  "gt_confirmation_ms": [100, 200, 300, 500, 700, 1000],
+  "probe_confirmation_ms": [100, 300, 500],
+  "probe_thresholds": [0.35, 0.5, 0.65],
+  "current_anchor_threshold": 0.5,
+  "current_confirmation_ms": [100, 200, 300, 500],
+  "causal_lag_frames": [0, 1, 3, 7],
+  "noncausal_future_frames": [1, 3, 5],
+  "noncausal_horizon_ms": 500,
+  "probe_classes": ["linear", "tiny_mlp"],
+  "tiny_mlp_hidden_units": 8,
+  "training_epochs": 8,
+  "training_batch_size": 4096,
+  "training_sample_cap": 200000,
+  "training_seed": 99,
+  "split": {
+    "architecture_freeze_role": "PSEM-STRATEGY-DEV",
+    "scoring_role": "PSEM-STRATEGY-EVAL",
+    "strategy": "leave-one-corpus-device-family-out",
+    "families": ["alimeeting_far_ch0", "ami_mix_headset"]
+  },
+  "product_event_alignment_tolerance_ms": 500,
+  "vad_pre_roll_ms": 500,
+  "bootstrap_resamples": 2000
+}

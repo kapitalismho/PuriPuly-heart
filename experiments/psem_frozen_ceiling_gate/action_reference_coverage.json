@@ -1,0 +1,25 @@
+{
+  "confirmation_ms": 500,
+  "dev_gate0_events_sha256": "e56152d070b361beb53417542c473d6039f9d2496f6cda6fdf1fecad4d714d50",
+  "dev_gate0_exact_event_match": true,
+  "episode_count": 6868,
+  "issue98_reference_event_counts": {
+    "dev": 1592,
+    "eval": 2798
+  },
+  "ledger_sha256": "0294d0fe35964e138fd9f4a295adbb913056bccc0a0ab2ffa9c6b015b772ae19",
+  "per_role": {
+    "dev": {
+      "episode_count": 2306,
+      "reference_event_count": 1592,
+      "source_count": 10
+    },
+    "eval": {
+      "episode_count": 4562,
+      "reference_event_count": 2798,
+      "source_count": 19
+    }
+  },
+  "reference_event_count": 4390,
+  "schema_version": "psem.frozen_ceiling.action_reference_coverage.v1"
+}

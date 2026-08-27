@@ -1,0 +1,15 @@
+{
+  "episode_count": 6868,
+  "ledger_sha256": "43064f16b2fc2419b681a99c81a31cd8e2cb95362624f35d99360665902c5525",
+  "mapped_episode_count": 6730,
+  "mapped_episode_fraction": 0.9799068142108328,
+  "per_confirmation": {
+    "500": {
+      "episode_count": 6868,
+      "unmapped_episode_count": 138
+    }
+  },
+  "schema_version": "psem.frozen_ceiling.oracle_mapping_coverage.v1",
+  "unmapped_episode_count": 138,
+  "unmapped_support_seconds": 178.49
+}
