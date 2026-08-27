@@ -51,6 +51,7 @@ class SessionExamples:
     episode_speakers: np.ndarray
     starts: np.ndarray
     ends: np.ndarray
+    posterior_centers: np.ndarray
     frontiers: np.ndarray
     probabilities: np.ndarray
     alive: np.ndarray
@@ -194,6 +195,7 @@ def load_sessions(
                 speakers: list[str] = []
                 starts: list[int] = []
                 ends: list[int] = []
+                posterior_centers: list[int] = []
                 frontiers: list[int] = []
                 probabilities: list[list[float]] = []
                 alive: list[list[bool]] = []
@@ -262,6 +264,7 @@ def load_sessions(
                         speakers.append(episode.anchor_speaker)
                         starts.append(start)
                         ends.append(end)
+                        posterior_centers.append(cell.center_sample)
                         frontiers.append(max(posterior.evidence_frontier_sample, end))
                         probabilities.append(
                             [float(posterior.probabilities[index]) for index in order]
@@ -289,6 +292,7 @@ def load_sessions(
                         episode_speakers=np.asarray(speakers),
                         starts=np.asarray(starts, dtype=np.int64),
                         ends=np.asarray(ends, dtype=np.int64),
+                        posterior_centers=np.asarray(posterior_centers, dtype=np.int64),
                         frontiers=np.asarray(frontiers, dtype=np.int64),
                         probabilities=np.asarray(probabilities, dtype=np.float32),
                         alive=np.asarray(alive, dtype=np.bool_),

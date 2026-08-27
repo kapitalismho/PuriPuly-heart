@@ -129,7 +129,7 @@ def hidden_base(session: SessionExamples, receipt: dict[str, Any]) -> np.ndarray
         starts = np.asarray(extracted["frame_start_samples"], dtype=np.int64)
         ends = np.asarray(extracted["frame_end_samples"], dtype=np.int64)
         frontiers = np.asarray(extracted["evidence_frontier_samples"], dtype=np.int64)
-    centers = session.starts + (session.ends - session.starts) // 2
+    centers = session.posterior_centers
     indices = np.searchsorted(ends, centers, side="right")
     if (
         np.any(indices >= len(ends))

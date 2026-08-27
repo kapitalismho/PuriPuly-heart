@@ -57,6 +57,7 @@ def test_pre_roll_cannot_accumulate_confirmation_and_future_moves_frontier() -> 
         episode_speakers=np.asarray(["A", "A", "A"]),
         starts=np.asarray([0, 1600, 3200]),
         ends=np.asarray([1600, 3200, 4800]),
+        posterior_centers=np.asarray([800, 2400, 4000]),
         frontiers=np.asarray([2000, 3600, 5200]),
         probabilities=np.zeros((3, 4), dtype=np.float32),
         alive=np.ones((3, 4), dtype=np.bool_),
@@ -212,6 +213,7 @@ def test_hidden_rows_align_to_authoritative_frames_and_oracle_slots(tmp_path: Pa
         episode_speakers=np.asarray(["A", "B"]),
         starts=np.asarray([1600, 3200]),
         ends=np.asarray([3200, 4800]),
+        posterior_centers=np.asarray([1920, 4480]),
         frontiers=np.asarray([17960, 20520]),
         probabilities=np.zeros((2, 4), dtype=np.float32),
         alive=np.ones((2, 4), dtype=np.bool_),
@@ -245,6 +247,48 @@ def test_hidden_source_input_supports_authoritative_dev_and_eval_materialization
     assert dev_input["expected_sha256"] == dev["waveform_sha256"]
     assert eval_input["native_frame_count"] > eval_input["retained_frame_count"]
     assert eval_input["expected_sha256"] == eval_source["inference_audio"]["sha256"]
+
+
+def test_hidden_base_preserves_original_frame_after_episode_boundary_clipping(
+    tmp_path: Path,
+) -> None:
+    feature_path = tmp_path / "hidden.npz"
+    values = np.arange(3 * 192, dtype=np.float32).reshape(3, 192)
+    np.savez_compressed(
+        feature_path,
+        hidden=values,
+        frame_start_samples=np.asarray([0, 1280, 2560]),
+        frame_end_samples=np.asarray([1280, 2560, 3840]),
+        evidence_frontier_samples=np.asarray([16680, 16680, 19240]),
+    )
+    session = SessionExamples(
+        role="eval",
+        source_id="source",
+        source_family="family",
+        confirmation_ms=500,
+        manifest={},
+        reference=None,
+        mapping_records=(
+            {"status": "mapped", "anchor_episode_id": "a", "slot_index": 0},
+            {"status": "mapped", "anchor_episode_id": "b", "slot_index": 0},
+        ),
+        episode_ids=np.asarray(["a", "b"]),
+        episode_speakers=np.asarray(["A", "B"]),
+        starts=np.asarray([1000, 1000]),
+        ends=np.asarray([1600, 1400]),
+        posterior_centers=np.asarray([640, 1920]),
+        frontiers=np.asarray([16680, 16680]),
+        probabilities=np.zeros((2, 4), dtype=np.float32),
+        alive=np.ones((2, 4), dtype=np.bool_),
+        reset=np.asarray([False, False]),
+        valid=np.ones(2, dtype=np.bool_),
+        masked=np.zeros(2, dtype=np.bool_),
+        speech_present=np.ones(2, dtype=np.bool_),
+        anchor_present=np.zeros(2, dtype=np.bool_),
+        overlap=np.zeros(2, dtype=np.bool_),
+    )
+    base = hidden_base(session, {"hidden_features_path": str(feature_path)})
+    assert np.array_equal(base[:, :192], values[[0, 1]])
 
 
 def test_hidden_posterior_dump_rejects_non_finite_values(tmp_path: Path) -> None:

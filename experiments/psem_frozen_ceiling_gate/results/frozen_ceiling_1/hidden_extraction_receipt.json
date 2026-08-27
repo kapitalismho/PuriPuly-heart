@@ -1,0 +1,483 @@
+{
+  "extractor_sha256": "b2a1d5af9ddfbc329870862729d8112d142aa203e2d725b2b5b7edabf485fcaf",
+  "hidden_config_sha256": "96077e03e8d7cf8409224ecb22511e1d46daca103a8bb45af4a010bf72df6c8e",
+  "hidden_export_patch_sha256": "c3fbeba8718cb8154f15f733b1a4d99952563292243a4c0eb04255ded66789ff",
+  "instrumented_bench_sha256": "dc222effb8635464d4e0957d396efab54e782d10814e5378bbdb58934bbe1775",
+  "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+  "posterior_equivalence": {
+    "absolute_tolerance": 1e-06,
+    "maximum_absolute_error": 0.0,
+    "status": "equivalent"
+  },
+  "representation_receipt_sha256": "bcd670ec31108e54139efb2ad719b58a303290ed3d96549f8fb131ce5686da6b",
+  "schema_version": "psem.hidden_ceiling.extraction_receipt.v1",
+  "source_count": 29,
+  "source_receipts": [
+    {
+      "extraction_contract_sha256": "4a9aab4cd8bd30d18a4560f97cbfdb099b773c58665a9d69db689ad63ab4a963",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R0004_M0012\\hidden_features.npz",
+      "hidden_features_sha256": "bb058eadeb18b7ddfcb311010990743e0cc89cae49536f03f0e293aa38db422d",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 98484,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R0004_M0012\\receipt.json",
+      "receipt_sha256": "6143db15607e4e86223cae9a590b96bffedc2cc59c94ee52b31eb10471d7cbb2",
+      "source_id": "alimeeting_R0004_M0012"
+    },
+    {
+      "extraction_contract_sha256": "9e308b7e4c06e77db932f61e384b6fddc256b981cd71db93bf25cee1bfcab0b7",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R1019_M1928\\hidden_features.npz",
+      "hidden_features_sha256": "dc196e2c3bc182fce0c35ab09c486bbd1a574ddf93bb23dea1ef3a795f238719",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 89912,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R1019_M1928\\receipt.json",
+      "receipt_sha256": "539915f7ccca1dfe5b1cdd0dcff066843ef6779aeb44f3317c353cc82ab5b29a",
+      "source_id": "alimeeting_R1019_M1928"
+    },
+    {
+      "extraction_contract_sha256": "64087f5e249d51e7e8de33d68afb36732f90b82ceda2ff62821879855fa44501",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R1019_M1960\\hidden_features.npz",
+      "hidden_features_sha256": "33126ea397eea00eb3c1c26279353a1f96c174ca0da690a290cf641cf53dd481",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 89648,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R1019_M1960\\receipt.json",
+      "receipt_sha256": "5744596c5db067969166dd2f0357780e3411013a7d2e64c7f951cc99b1f2bdac",
+      "source_id": "alimeeting_R1019_M1960"
+    },
+    {
+      "extraction_contract_sha256": "38211270df571afc880db7ddbd8cd8af209caaf89c398fb4785ab6322b337ab7",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R1021_M1940\\hidden_features.npz",
+      "hidden_features_sha256": "8246cf19d19deb2331f197bbc746bdce00faf5ac5a6d9840ba3de37dda18c9ae",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 88532,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R1021_M1940\\receipt.json",
+      "receipt_sha256": "f23dc95a13c69830e20afb54f1206948f27b9db84afd82e85495fcaadbc5b8bb",
+      "source_id": "alimeeting_R1021_M1940"
+    },
+    {
+      "extraction_contract_sha256": "838ea43f399438cf74297ccb568325a1ad702dce4a0ab54e1de11cf5f6caa76f",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R1021_M1944\\hidden_features.npz",
+      "hidden_features_sha256": "3c2f2a6b0f5605c87ae580496d734b04bfcba2317e9263308ee7d4349670703d",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 87860,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R1021_M1944\\receipt.json",
+      "receipt_sha256": "ed135b2feff4d7b1ca699f64cefee4fd9f3e6175418efb5b614cd32f29253a4b",
+      "source_id": "alimeeting_R1021_M1944"
+    },
+    {
+      "extraction_contract_sha256": "09a0487e9a7f9763da14eb7e06f032cd9d9a4c6e4c916887affa5ec31038b647",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R1021_M4073\\hidden_features.npz",
+      "hidden_features_sha256": "a7954b224130655e2975e8449b472488dc24fe9941ea4d033c2faf7dc40ded0a",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 88836,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R1021_M4073\\receipt.json",
+      "receipt_sha256": "094ac24e517ba8c7adc8499bbe1d4b68f20edcd1ec1baa4467052bf3fe00588f",
+      "source_id": "alimeeting_R1021_M4073"
+    },
+    {
+      "extraction_contract_sha256": "8a3f966280cc78b2fe2c0f4b3e60dcdfbb8d6e00cfe94be9da80439832cfe3e2",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R1021_M4080\\hidden_features.npz",
+      "hidden_features_sha256": "dd65db524d0c63cfa9d605938aad3e32a853202a5d514367c454640ddcf228cd",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 88860,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R1021_M4080\\receipt.json",
+      "receipt_sha256": "00e17fadd3eaa1913848f04db226adb9c0fd3d5c3ca1e66f11bdef4454f04130",
+      "source_id": "alimeeting_R1021_M4080"
+    },
+    {
+      "extraction_contract_sha256": "0a052e91534eeffc7f49075d777507ff1e0474fac64c43acb6b8538164ee7df3",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R2105_M3318\\hidden_features.npz",
+      "hidden_features_sha256": "6d0646d46faed69d11d5fa270106a161ffc71c1efeae1d05384846de1883b506",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 92476,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R2105_M3318\\receipt.json",
+      "receipt_sha256": "f7de5f647544b66fad36d3b5deea364093fd427516d508f2d7f8bc2fa676c2e9",
+      "source_id": "alimeeting_R2105_M3318"
+    },
+    {
+      "extraction_contract_sha256": "a8a32e211e756a2306a3cc91a044327b6f436ade5a45b64c0f3c8aab97cc819c",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R2108_M3206\\hidden_features.npz",
+      "hidden_features_sha256": "ac7c10caf321a924ee1143d8a9ddd8f10676ac5ea38a009e421ed3427a319041",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 89692,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R2108_M3206\\receipt.json",
+      "receipt_sha256": "fd50eda5b165d26fc8a8c88e6c17379d4fb0f6a27e2c9c0e6bf173ab36202a55",
+      "source_id": "alimeeting_R2108_M3206"
+    },
+    {
+      "extraction_contract_sha256": "42300b38d2ab4299f428e2b6f24221b8dfdd5046c5fb54561cd402242c36ab4f",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R8009_M8018\\hidden_features.npz",
+      "hidden_features_sha256": "7433a9276c9d5fe29c5ff52b3bfb433b7c1e6f682eea29e9aec03e2c40e95371",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 82736,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R8009_M8018\\receipt.json",
+      "receipt_sha256": "56cda71f1d784940f448625003d66324a9c280850d10f8a6a8e9e03b01cb557b",
+      "source_id": "alimeeting_R8009_M8018"
+    },
+    {
+      "extraction_contract_sha256": "062c9f45f2a3218ea34316f2273db1507571e37e19b4f511ee3ddb62dcdfc044",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R8009_M8019\\hidden_features.npz",
+      "hidden_features_sha256": "17a46c6a74b9bff5d55a6c31c0448eebf12e102ae376ac8cf692b1e87afa5c06",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 98700,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\alimeeting_R8009_M8019\\receipt.json",
+      "receipt_sha256": "6cb1723da31fc9e9fc88633f3030b945f0707a712978c48810c000ea396541a9",
+      "source_id": "alimeeting_R8009_M8019"
+    },
+    {
+      "extraction_contract_sha256": "e8ba7bc033d663d4d28b9c992b319535364157281d04a0df8d6ab532e56a1ac7",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_EN2004a\\hidden_features.npz",
+      "hidden_features_sha256": "c3893fb5bc8e1701ffaff9f331a3c9499ef8b687a322e7cc9b2d6486b7a2864e",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 172284,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_EN2004a\\receipt.json",
+      "receipt_sha256": "d97db7a0061a023194bba8c718892217da60a32f76ebd4ae9abf38e55791bb7a",
+      "source_id": "ami_EN2004a"
+    },
+    {
+      "extraction_contract_sha256": "ce6fb5fc1efdbd5dea7b303f75557fc29cb135c7eaf8b67faac59cd900731d7b",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_EN2006a\\hidden_features.npz",
+      "hidden_features_sha256": "3d1d2830c9876ab4e8bc8509da0b12cc03427f88f75f845bac48c8ceef1eed78",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 176276,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_EN2006a\\receipt.json",
+      "receipt_sha256": "88a3f8fed8757c0922cefc1120f70c2d1b4eb64589ee5799527931c6b7b872ab",
+      "source_id": "ami_EN2006a"
+    },
+    {
+      "extraction_contract_sha256": "801cea0fb236c6b171037603c31bb26ba7cd8ccd07ffabf5d993aa3e0ff7bcb4",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_EN2009d\\hidden_features.npz",
+      "hidden_features_sha256": "9cac9044a74ff78fe5d0aa2732eb9206cc14144df20fe961e8b80c8f47c678b8",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 266220,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_EN2009d\\receipt.json",
+      "receipt_sha256": "4953b7c8802132e9e3b75898947eb79c61365d2c3b1d40c2dc48e0d751ea948e",
+      "source_id": "ami_EN2009d"
+    },
+    {
+      "extraction_contract_sha256": "94bc9bf9584229041fd1654fe8e4a6181b3745174c9dcfea91f8a6e7ab1d4451",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2002b\\hidden_features.npz",
+      "hidden_features_sha256": "f757828f34d87e0abbd383ed69648ea492fc2746b1abda70fb0b133426e4d186",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 113988,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2002b\\receipt.json",
+      "receipt_sha256": "cc75062fd68b1f99e7dd2a69eff0480e0a4143f645c07230f3efab406330567d",
+      "source_id": "ami_ES2002b"
+    },
+    {
+      "extraction_contract_sha256": "008246e3e972c815bb68fb18cdfc13f3bf562c96e285730a452b6e8705cc0296",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2009a\\hidden_features.npz",
+      "hidden_features_sha256": "bba9b845d35a99dbd3943b6ad8b02502769493c53d32bd6c8477244ccf8d58cf",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 70112,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2009a\\receipt.json",
+      "receipt_sha256": "23da2b2947ffd7b1b0303b6ccbb2805ee758fcd318ba9093eddeca829cdb7f8e",
+      "source_id": "ami_ES2009a"
+    },
+    {
+      "extraction_contract_sha256": "177502b52dba09886d51f5df0e2a5e847e986d07e427c03c8d2e85564b020dfc",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2009b\\hidden_features.npz",
+      "hidden_features_sha256": "0b4df3c2eaf01d1890529f8650d1bb9977b34e15be0e79e722a247151473937b",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 71768,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2009b\\receipt.json",
+      "receipt_sha256": "95177b2393f32dcdb527200bbdb3ae31cbd9af22a577ae55659b891cf8e56fd2",
+      "source_id": "ami_ES2009b"
+    },
+    {
+      "extraction_contract_sha256": "9fe5c8ac152ae3f4fa39daea0c812b652e116ec83f429c5345dc5a7b8b2bfe86",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2009c\\hidden_features.npz",
+      "hidden_features_sha256": "c9ee36d79402d0d0883b4bdfb928f7df628d3df80fc025ca5a74d7f4cd496074",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 97848,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2009c\\receipt.json",
+      "receipt_sha256": "69cc3e9bf5dc91f2f3dbd9c2422bf00d881055eda7ad2b6fdaf6885d46c38bf5",
+      "source_id": "ami_ES2009c"
+    },
+    {
+      "extraction_contract_sha256": "2456728b75af421598024b6e91ff7fccd8a7afa9f6c0cfaa3ba66dd64363bbe2",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2009d\\hidden_features.npz",
+      "hidden_features_sha256": "8398f9a04962e43e7e1b67e3f6d948d356c95c3c31fe37d31991ad3e102fce78",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 105748,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2009d\\receipt.json",
+      "receipt_sha256": "f0188a71c0265ec7ebda54f9237cd267e9d169092d621abd28e6e7d0eecbb54c",
+      "source_id": "ami_ES2009d"
+    },
+    {
+      "extraction_contract_sha256": "2cc5b45526d36b927b7b4980bdc6735b843727700862fd1bfb220436d573b1bb",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2014a\\hidden_features.npz",
+      "hidden_features_sha256": "3e076d65516a875346856c021d0ae177a32a929a913b04ad45d11c442d92afcb",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 57452,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2014a\\receipt.json",
+      "receipt_sha256": "022f2bdd6e3c2044dc75eb45dfdd10cd4d46ef660958966ba6509ad34d6531f0",
+      "source_id": "ami_ES2014a"
+    },
+    {
+      "extraction_contract_sha256": "006e867ae8f669b7670d9790ee406615e6ea8860dced52fffde7126df18f1529",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2015d\\hidden_features.npz",
+      "hidden_features_sha256": "5a339c08db0e2005b5fdc90bcaccc10e8dfca090133be7c6f90db7b007f7dbdd",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 96580,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_ES2015d\\receipt.json",
+      "receipt_sha256": "f5b9df8bbefd8b3333c8aad02a1df481fcf15e0c737f3b03d6d9a2067740026f",
+      "source_id": "ami_ES2015d"
+    },
+    {
+      "extraction_contract_sha256": "41450e03a9d643cc4675ded38a22cbdf3b6794a06e52897eb6b9a825734b8c79",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_IS1007a\\hidden_features.npz",
+      "hidden_features_sha256": "44d896472bfff38b6d839f36da00e7c058b2acb4801e9383298896d7565fe859",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 48300,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_IS1007a\\receipt.json",
+      "receipt_sha256": "f41598410c64f9f230455dacc0b45908e45b30cd2c8e401539bb7500e82c4203",
+      "source_id": "ami_IS1007a"
+    },
+    {
+      "extraction_contract_sha256": "6a68b732f50e8c1662acc77df60d8d7149ce8c02e15331b8a80e433a532d9825",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_IS1007b\\hidden_features.npz",
+      "hidden_features_sha256": "907de69d51b7660b69caa76624d88467f56f252e9942afa2d0ade7f0eafdb0ca",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 65136,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_IS1007b\\receipt.json",
+      "receipt_sha256": "8277c25cc2b557912d3ded08dc08eb28050eb69d7ade856237aaf7730d9fcc32",
+      "source_id": "ami_IS1007b"
+    },
+    {
+      "extraction_contract_sha256": "c900b127c76a6f364484b03be5f5f56ff78306272e0f484b13b7c7f2b67f3cb5",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_IS1007c\\hidden_features.npz",
+      "hidden_features_sha256": "1124892a9e2a088a2406b7a29adbb9b3724667de11ba93ce770eb87d82ce3215",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 105660,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_IS1007c\\receipt.json",
+      "receipt_sha256": "28e6162b934c10c731de6326d5cf9731b1f6b89248759e82441b64a8b13fcfad",
+      "source_id": "ami_IS1007c"
+    },
+    {
+      "extraction_contract_sha256": "94a5f879c0178f8de1d75e4f915d97c1d6b8160ca9c0b30bce04be4988ee5098",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_IS1007d\\hidden_features.npz",
+      "hidden_features_sha256": "d222eabc281b0fa0271d4f542e97276e900741543ca016e109f8d3bbe0f2a2f7",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 101456,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_IS1007d\\receipt.json",
+      "receipt_sha256": "b4c6d76016c32436d1ccb4e3efa92f987ce7784c48386815829da8486ac79800",
+      "source_id": "ami_IS1007d"
+    },
+    {
+      "extraction_contract_sha256": "44681c35fbc1620741afd402b96e888ac1696b3a3faa1a033dee822143b73cbf",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_TS3010a\\hidden_features.npz",
+      "hidden_features_sha256": "3769900aaa27895f7ac226a4087d9f7e6ed95ca297862ff17fcd5cbf5bfbe362",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 52052,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_TS3010a\\receipt.json",
+      "receipt_sha256": "56b8f70c2a41c23e1ef2ce89776fed694a92c0361491c4da1a1b0d881c0ef4d9",
+      "source_id": "ami_TS3010a"
+    },
+    {
+      "extraction_contract_sha256": "5b15f03a6c9db26f3d5d60c4fa1150a2e7fb674e51aec01ad5cbc4acae19b266",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_TS3010b\\hidden_features.npz",
+      "hidden_features_sha256": "3ba5ec29722340325969e6df8544f117b6aa96b7fcee66ac3bf09d31cbe08137",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 104276,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_TS3010b\\receipt.json",
+      "receipt_sha256": "5c2d19e6f2c503aadcecec2091b1d8e6ff79a17217b3249d2f040a84e5a77921",
+      "source_id": "ami_TS3010b"
+    },
+    {
+      "extraction_contract_sha256": "8658e4cee4fb3bf5b87bf4d711899730eba7c09626f1acbfac482ae721dc57b5",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_TS3010c\\hidden_features.npz",
+      "hidden_features_sha256": "9533912c6954f61369f926a6737053641b7ce32420dfde55f3e0a8bfc7dcebae",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 107100,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_TS3010c\\receipt.json",
+      "receipt_sha256": "42bf53fe5a46a6c9a020251096324b810ad133fc7893adc5e790a5f86c901c4a",
+      "source_id": "ami_TS3010c"
+    },
+    {
+      "extraction_contract_sha256": "29d310d447e42d18c92cfbeb04087b92ab234c9d4dc077ad4a9324b1782be947",
+      "hidden_features_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_TS3010d\\hidden_features.npz",
+      "hidden_features_sha256": "eace4a3706f4ce79745f5c654c72876138173db4aab0128fb9c5696ed7371cf8",
+      "posterior_equivalence": {
+        "absolute_tolerance": 1e-06,
+        "compared_element_count": 96036,
+        "exact_element_fraction": 1.0,
+        "maximum_absolute_error": 0.0,
+        "mean_absolute_error": 0.0,
+        "status": "equivalent"
+      },
+      "receipt_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue99\\psem_frozen_ceiling_gate\\hidden_sortformer\\ami_TS3010d\\receipt.json",
+      "receipt_sha256": "1a43d4aabb77992066f4901d3ec640549c5b6e872a2b75de87ab1e4279a60e8b",
+      "source_id": "ami_TS3010d"
+    }
+  ],
+  "split_manifest_sha256": "f3d10d6a0268e42c7f5aeda21958cecc53512267a6ef2c843f9acfa25a4c7b46",
+  "status": "complete"
+}
