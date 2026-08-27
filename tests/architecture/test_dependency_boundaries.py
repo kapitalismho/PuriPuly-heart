@@ -352,14 +352,6 @@ EXTERNAL_MODULE_LAYERS = {
 
 KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
     {
-        ImportViolation(
-            rule_id="adapters-avoid-ui-and-migration-internals",
-            importer="src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="adapters",
-            imported_layer="migration/serialization",
-            reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
-        ),
         *(
             ImportViolation(
                 rule_id="adapters-avoid-ui-and-migration-internals",
@@ -1670,6 +1662,7 @@ def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -
     expected_current.pop("src/puripuly_heart/ui/desktop_overlay_surface/contract.py")
     expected_current.pop("src/puripuly_heart/ui/desktop_overlay_surface/renderer.py")
     expected_current.pop("src/puripuly_heart/ui/views/settings.py")
+    expected_current.pop("src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py")
     expected_current["src/puripuly_heart/app/wiring/wiring_llm_factory.py"] -= {
         "OpenRouterProviderRouting",
         "OpenRouterRoutingMode",
@@ -1720,11 +1713,27 @@ def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
     assert occurrences == set()
 
 
-def test_a06_settings_view_boundary_reduces_dependency_debt_to_17() -> None:
-    assert len(KNOWN_ALLOWED_VIOLATIONS) == 17
-    assert len(_dependency_violations()) == 17
+def test_a07_managed_broker_boundary_reduces_dependency_debt_to_16() -> None:
+    assert len(KNOWN_ALLOWED_VIOLATIONS) == 16
+    assert len(_dependency_violations()) == 16
     assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 2
     assert len(_settings_runtime_confinement_violations()) == 2
+
+
+def test_a07_managed_broker_uses_the_pure_provider_value_owner() -> None:
+    broker_path = (
+        SOURCE_PACKAGE_ROOT / "core" / "openrouter" / "managed_openrouter_broker_client.py"
+    )
+    imported_modules = set(
+        _imported_modules(
+            _module_name_for_path(broker_path),
+            broker_path,
+            _internal_module_names(),
+        )
+    )
+
+    assert "puripuly_heart.config.settings" not in imported_modules
+    assert "puripuly_heart.config.provider_values" in imported_modules
 
 
 def test_a04_overlay_ui_uses_the_pure_canonical_value_owner() -> None:
