@@ -242,7 +242,7 @@ describe('broker direct deploy automation', () => {
     );
     const remoteD1BackupIndex = workflow.indexOf('wrangler d1 export');
     const remoteD1BackupUploadIndex = workflow.indexOf(
-      'actions/upload-artifact@v4',
+      'actions/upload-artifact@v7',
     );
     const openRouterGuardrailPatchIndex = workflow.indexOf(
       'PATCH "$guardrail_url"',

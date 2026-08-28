@@ -6,6 +6,7 @@ import pytest
 
 pytest.importorskip("flet")
 
+from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.config.settings import (
     AppSettings,
@@ -34,10 +35,11 @@ def _make_settings_view(monkeypatch):
     monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
-    monkeypatch.setattr(
-        settings_view, "create_secret_store", lambda *args, **kwargs: DummySecretStore()
+    view = settings_view.SettingsView()
+    view._settings_secrets = SettingsSecretsOwner(
+        secret_store_factory=DummySecretStore,
     )
-    return settings_view.SettingsView()
+    return view
 
 
 def test_settings_view_loads_qwen_prompt(monkeypatch) -> None:

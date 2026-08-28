@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping
-from dataclasses import replace
 from datetime import date
 from typing import Any
 
@@ -49,7 +48,6 @@ from puripuly_heart.config.settings_vnext.schema import (
     TranslationIntent,
     UiIntent,
     UserIntentSettings,
-    is_safe_compatibility_extension_key,
     new_anonymous_telemetry_identifier,
     normalize_managed_claim_sources,
     with_telemetry_enabled,
@@ -59,10 +57,6 @@ from puripuly_heart.config.settings_vnext.schema import (
 
 def is_vnext_shape_dict(data: Mapping[str, Any]) -> bool:
     return isinstance(data, Mapping) and ("intent" in data or "state" in data)
-
-
-def is_legacy_shape_dict(data: Mapping[str, Any]) -> bool:
-    return isinstance(data, Mapping) and not is_vnext_shape_dict(data)
 
 
 def is_vnext_settings_dict(data: Mapping[str, Any]) -> bool:
@@ -165,22 +159,6 @@ _FALLBACK_FIELDS_ALIAS: dict[tuple[bool, str, str], str] = {
     (True, "gemma4_31b_cerebras", "official_byok"): "cerebras_gemma4_31b",
     (True, "deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
 }
-_LEGACY_OPEN_MAPPING_PATHS = frozenset(
-    {
-        ("translation", "connection_history"),
-        ("stt", "custom_terms"),
-        ("local_llm", "extra_body"),
-        ("custom_stt", "extra"),
-        ("system_prompts",),
-    }
-)
-_LEGACY_RETIRED_COMPATIBILITY_PATHS = frozenset(
-    {
-        ("peer_qwen_asr_stt",),
-        ("peer_soniox_stt",),
-        ("provider", "peer_soniox_stt"),
-    }
-)
 
 
 def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
@@ -529,15 +507,6 @@ def _migrate_canonical_local_qwen_provider(intent: dict[str, Any], key: str) -> 
         intent[key] = block
 
 
-def _migrate_legacy_local_qwen_providers(data: dict[str, Any]) -> None:
-    provider = data.get("provider")
-    if not isinstance(provider, dict):
-        return
-    for key in ("stt", "peer_stt"):
-        if provider.get(key) == _LOCAL_QWEN_PROVIDER:
-            provider[key] = _LOCAL_CPU_AUTO_PROVIDER
-
-
 def _capture_target_from_legacy_output_device(value: object) -> CaptureTargetIntent:
     if isinstance(value, str) and value.strip():
         return CaptureTargetIntent.named_output_device(value)
@@ -677,135 +646,17 @@ def _fallback_intent_from_legacy_translation_data(
     )
 
 
-def _fallback_intent_from_legacy_raw_dict(data: Mapping[str, Any]) -> TranslationFallbackIntent:
-    translation_data = data.get("translation")
-    openrouter_data = data.get("openrouter")
-    return _fallback_intent_from_legacy_translation_data(
-        translation_data,
-        openrouter_data=openrouter_data,
-    )
-
-
-def _telemetry_enabled_from_legacy_raw_dict(data: Mapping[str, Any]) -> bool:
-    telemetry_value = data.get("telemetry")
-    if "telemetry" in data and not isinstance(telemetry_value, Mapping):
-        return False
-    telemetry = telemetry_value if isinstance(telemetry_value, Mapping) else {}
-    if telemetry.get("consent") == "decline":
-        return False
-    if isinstance(telemetry.get("enabled"), bool):
-        return telemetry["enabled"]
-    if "enabled" in telemetry:
-        return False
-    return _legacy_telemetry_enabled(
-        telemetry.get("consent"),
-        missing="consent" not in telemetry,
-    )
-
-
-def _telemetry_state_from_legacy_raw_dict(
-    data: Mapping[str, Any],
-    *,
-    enabled: bool,
-) -> TelemetryOperationalState:
-    telemetry_state = (
-        data.get("telemetry_state") if isinstance(data.get("telemetry_state"), Mapping) else {}
-    )
-    if not telemetry_state:
-        telemetry = data.get("telemetry") if isinstance(data.get("telemetry"), Mapping) else {}
-        telemetry_state = {
-            "anonymous_id": telemetry.get("identifier"),
-            "sent_translation_success_dates_utc": telemetry.get("sent_utc_dates", ()),
-        }
-    return TelemetryOperationalState(
-        anonymous_id=telemetry_state.get("anonymous_id") if enabled else None,
-        last_sent_date_utc=(
-            _latest_telemetry_sent_date(
-                telemetry_state.get(
-                    "last_sent_date_utc",
-                    telemetry_state.get("sent_translation_success_dates_utc", ()),
-                )
-            )
-            if enabled
-            else None
-        ),
-    )
-
-
 def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
-    """Read either canonical vNext settings or an accepted legacy settings dict."""
-
     if not isinstance(data, Mapping):
         raise ValueError("settings must be a JSON object")
-    if is_vnext_settings_dict(data):
-        _validate_vnext_top_level_shape(data)
-        return with_translation_runtime_policy(
-            serialization.from_dict(_prepare_vnext_migration_dict(data))
-        )
-
-    # Legacy compatibility belongs here: use the public legacy migration chain first, then
-    # project the normalized AppSettings values into canonical vNext intent/state values.
-    from puripuly_heart.config import settings as legacy_settings
-
-    fallback_intent = _fallback_intent_from_legacy_raw_dict(data)
-    telemetry_enabled = _telemetry_enabled_from_legacy_raw_dict(data)
-    telemetry_state = _telemetry_state_from_legacy_raw_dict(data, enabled=telemetry_enabled)
-    prepared_legacy = dict(copy.deepcopy(data))
-    _migrate_legacy_local_qwen_providers(prepared_legacy)
-    managed_identity = prepared_legacy.get("managed_identity")
-    if isinstance(managed_identity, dict):
-        pending_delivery_ack_id = managed_identity.get("pending_delivery_ack_id")
-        if (
-            pending_delivery_ack_id is not None
-            and "pending_delivery_ack_delivery_id" not in managed_identity
-        ):
-            managed_identity["pending_delivery_ack_delivery_id"] = pending_delivery_ack_id
-    migrated, _changed = legacy_settings._migrate_settings_dict(prepared_legacy)
-    settings = from_legacy_app_settings(
-        legacy_settings.from_dict(migrated),
-        fallback_intent=fallback_intent,
-        preserve_provider_verification=True,
+    if not is_vnext_settings_dict(data):
+        raise ValueError("canonical settings must contain intent and state")
+    _validate_vnext_top_level_shape(data)
+    _validate_supported_vnext_version(data)
+    serialization._validate_persisted_types(data)
+    return with_translation_runtime_policy(
+        serialization.from_dict(_prepare_vnext_migration_dict(data))
     )
-    settings = replace(settings, state=replace(settings.state, telemetry=telemetry_state))
-    legacy_template = legacy_settings.to_dict(legacy_settings.AppSettings())
-    legacy_extensions = _extract_unknown_legacy_values(migrated, legacy_template, path=())
-    if legacy_extensions:
-        settings = replace(
-            settings,
-            compatibility_extensions={"legacy_compatibility": legacy_extensions},
-        )
-    prepared = serialization.to_dict(settings)
-    prepared["settings_version"] = _MULTI_MODEL_GEMMA_MIGRATION_VERSION - 1
-    migrated_settings = serialization.from_dict(_prepare_vnext_migration_dict(prepared))
-    return with_telemetry_enabled(migrated_settings, telemetry_enabled)
-
-
-def _extract_unknown_legacy_values(
-    raw: Mapping[str, Any],
-    template: Mapping[str, Any],
-    *,
-    path: tuple[str, ...],
-) -> dict[str, Any]:
-    extensions: dict[str, Any] = {}
-    for key, value in raw.items():
-        child_path = (*path, key)
-        if key == "settings_version":
-            continue
-        if child_path in _LEGACY_RETIRED_COMPATIBILITY_PATHS:
-            continue
-        if not is_safe_compatibility_extension_key(key):
-            continue
-        if key not in template:
-            extensions[key] = copy.deepcopy(value)
-            continue
-        template_value = template[key]
-        if isinstance(value, Mapping) and isinstance(template_value, Mapping):
-            if child_path in _LEGACY_OPEN_MAPPING_PATHS:
-                continue
-            nested = _extract_unknown_legacy_values(value, template_value, path=child_path)
-            if nested:
-                extensions[key] = nested
-    return extensions
 
 
 def from_legacy_app_settings(
@@ -1129,6 +980,14 @@ def _validate_vnext_top_level_shape(data: Mapping[str, Any]) -> None:
             raise ValueError(f"vNext settings top-level {section!r} must be a JSON object")
 
 
+def _validate_supported_vnext_version(data: Mapping[str, Any]) -> None:
+    version = data.get("settings_version")
+    if type(version) is not int or version < 1:
+        raise ValueError("canonical settings_version must be a positive integer")
+    if version > VNEXT_SETTINGS_SCHEMA_VERSION:
+        raise ValueError(f"unsupported canonical settings_version: {version}")
+
+
 def _provider_verification_state(
     raw_verification: Mapping[str, Any],
     *,
@@ -1433,7 +1292,6 @@ def _is_evidence_bound_verified_entry(
 __all__ = [
     "from_dict",
     "from_legacy_app_settings",
-    "is_legacy_shape_dict",
     "is_vnext_shape_dict",
     "is_vnext_settings_dict",
     "to_legacy_dict",

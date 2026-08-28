@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Any
 
 from pythonosc.dispatcher import Dispatcher
@@ -14,26 +13,15 @@ from puripuly_heart.core.osc.control_schema import (
     OSC_MUTE_SELF_ADDRESS,
     is_puripuly_parameter_address,
 )
+from puripuly_heart.core.osc.receiver_contract import (
+    VRC_OSC_RECEIVER_HOST,
+    VRC_OSC_RECEIVER_PORT,
+    VrcMicState,
+)
 
 logger = logging.getLogger(__name__)
 
-VRC_OSC_RECEIVER_HOST = "127.0.0.1"
-VRC_OSC_RECEIVER_PORT = 9001
 VRC_OSC_MUTE_ADDRESS = OSC_MUTE_SELF_ADDRESS
-
-
-@dataclass(slots=True)
-class VrcMicState:
-    muted: bool | None = None
-
-    def update(self, muted: bool) -> bool:
-        if self.muted == muted:
-            return False
-        self.muted = muted
-        return True
-
-    def reset(self) -> None:
-        self.muted = None
 
 
 class VrcOscReceiver:

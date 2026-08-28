@@ -5,9 +5,9 @@ import json
 import httpx
 import pytest
 
-from puripuly_heart.config.settings import AppSettings, with_telemetry_enabled
 from puripuly_heart.core.telemetry import (
     AppActiveDayTelemetryService,
+    AppActiveDayTelemetryState,
     HttpAppActiveDayTelemetryClient,
 )
 
@@ -34,17 +34,20 @@ class FakeTelemetryClient:
 class PersistRecorder:
     def __init__(self, *, result: bool = True) -> None:
         self.result = result
-        self.calls: list[AppSettings] = []
+        self.calls: list[AppActiveDayTelemetryState] = []
 
-    async def __call__(self, settings: AppSettings) -> bool:
+    async def __call__(self, settings: AppActiveDayTelemetryState) -> bool:
         self.calls.append(settings)
         return self.result
 
 
-def _enabled_settings(identifier: str = "anon-id") -> AppSettings:
-    settings = AppSettings()
-    settings.telemetry_state.anonymous_id = identifier
-    return with_telemetry_enabled(settings, True)
+def _enabled_settings(identifier: str | None = "anon-id") -> AppActiveDayTelemetryState:
+    return AppActiveDayTelemetryState(
+        enabled=True,
+        anonymous_id=identifier,
+        last_sent_date_utc=None,
+        broker_base_url="https://broker.example.test",
+    )
 
 
 @pytest.mark.asyncio
@@ -71,7 +74,12 @@ async def test_http_client_posts_only_anonymous_id_and_utc_date() -> None:
 
 @pytest.mark.asyncio
 async def test_disabled_reporting_skips_without_client_call() -> None:
-    settings = with_telemetry_enabled(AppSettings(), False)
+    settings = AppActiveDayTelemetryState(
+        enabled=False,
+        anonymous_id=None,
+        last_sent_date_utc=None,
+        broker_base_url="https://broker.example.test",
+    )
     client = FakeTelemetryClient()
     persist = PersistRecorder()
     events: list[tuple[str, dict[str, object]]] = []
@@ -81,7 +89,9 @@ async def test_disabled_reporting_skips_without_client_call() -> None:
     )
 
     result = await service.record_app_active_day(
-        settings, active_date_utc="2026-08-28", persist_sent_date=persist
+        settings,
+        active_date_utc="2026-08-28",
+        persist_sent_date=persist,
     )
 
     assert result.status == "skipped_disabled"
@@ -93,14 +103,15 @@ async def test_disabled_reporting_skips_without_client_call() -> None:
 
 @pytest.mark.asyncio
 async def test_enabled_missing_identifier_skips_without_client_call() -> None:
-    settings = AppSettings()
-    settings.telemetry_state.anonymous_id = None
+    settings = _enabled_settings(None)
     client = FakeTelemetryClient()
     persist = PersistRecorder()
     service = AppActiveDayTelemetryService(client)
 
     result = await service.record_app_active_day(
-        settings, active_date_utc="2026-08-28", persist_sent_date=persist
+        settings,
+        active_date_utc="2026-08-28",
+        persist_sent_date=persist,
     )
 
     assert result.status == "skipped_missing_identifier"
@@ -110,14 +121,20 @@ async def test_enabled_missing_identifier_skips_without_client_call() -> None:
 
 @pytest.mark.asyncio
 async def test_already_sent_date_skips_without_client_call() -> None:
-    settings = _enabled_settings()
-    settings.telemetry_state.last_sent_date_utc = "2026-08-28"
+    settings = AppActiveDayTelemetryState(
+        enabled=True,
+        anonymous_id="anon-id",
+        last_sent_date_utc="2026-08-28",
+        broker_base_url="https://broker.example.test",
+    )
     client = FakeTelemetryClient()
     persist = PersistRecorder()
     service = AppActiveDayTelemetryService(client)
 
     result = await service.record_app_active_day(
-        settings, active_date_utc="2026-08-28", persist_sent_date=persist
+        settings,
+        active_date_utc="2026-08-28",
+        persist_sent_date=persist,
     )
 
     assert result.status == "skipped_already_sent"
@@ -128,13 +145,14 @@ async def test_already_sent_date_skips_without_client_call() -> None:
 @pytest.mark.asyncio
 async def test_success_sends_once_to_current_broker_and_persists_utc_date() -> None:
     settings = _enabled_settings()
-    settings.openrouter.broker_base_url = "https://broker.example.test"
     client = FakeTelemetryClient(result=True)
     persist = PersistRecorder()
     service = AppActiveDayTelemetryService(client)
 
     result = await service.record_app_active_day(
-        settings, active_date_utc="2026-08-28", persist_sent_date=persist
+        settings,
+        active_date_utc="2026-08-28",
+        persist_sent_date=persist,
     )
 
     assert result.status == "sent"
@@ -142,8 +160,8 @@ async def test_success_sends_once_to_current_broker_and_persists_utc_date() -> N
     assert result.persisted is True
     assert client.calls == [("anon-id", "2026-08-28", "https://broker.example.test")]
     assert len(persist.calls) == 1
-    assert persist.calls[0].telemetry_state.last_sent_date_utc == "2026-08-28"
-    assert settings.telemetry_state.last_sent_date_utc is None
+    assert persist.calls[0].last_sent_date_utc == "2026-08-28"
+    assert settings.last_sent_date_utc is None
 
 
 @pytest.mark.asyncio
@@ -154,14 +172,16 @@ async def test_failed_send_does_not_persist_or_mark_date() -> None:
     service = AppActiveDayTelemetryService(client)
 
     result = await service.record_app_active_day(
-        settings, active_date_utc="2026-08-28", persist_sent_date=persist
+        settings,
+        active_date_utc="2026-08-28",
+        persist_sent_date=persist,
     )
 
     assert result.status == "send_failed"
     assert result.attempted_send is True
     assert len(client.calls) == 1
     assert persist.calls == []
-    assert settings.telemetry_state.last_sent_date_utc is None
+    assert settings.last_sent_date_utc is None
 
 
 @pytest.mark.asyncio
@@ -172,7 +192,9 @@ async def test_client_exception_returns_safe_diagnostics_without_persisting() ->
     service = AppActiveDayTelemetryService(client)
 
     result = await service.record_app_active_day(
-        settings, active_date_utc="2026-08-28", persist_sent_date=persist
+        settings,
+        active_date_utc="2026-08-28",
+        persist_sent_date=persist,
     )
 
     assert result.status == "send_failed"
@@ -192,10 +214,12 @@ async def test_successful_send_with_failed_persistence_does_not_report_persisted
     service = AppActiveDayTelemetryService(client)
 
     result = await service.record_app_active_day(
-        settings, active_date_utc="2026-08-28", persist_sent_date=persist
+        settings,
+        active_date_utc="2026-08-28",
+        persist_sent_date=persist,
     )
 
     assert result.status == "persist_failed"
     assert result.attempted_send is True
     assert result.persisted is False
-    assert persist.calls[0].telemetry_state.last_sent_date_utc == "2026-08-28"
+    assert persist.calls[0].last_sent_date_utc == "2026-08-28"

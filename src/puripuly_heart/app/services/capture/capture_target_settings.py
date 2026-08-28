@@ -6,8 +6,11 @@ from puripuly_heart.app.ports.canonical_settings_persistence import (
     CanonicalSettingsPersistenceError,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import compose_settings_owner
-from puripuly_heart.config.settings import AppSettings
-from puripuly_heart.config.settings_vnext.schema import CaptureTargetIntent
+from puripuly_heart.config.settings_vnext.defaults import new_settings_for_first_run
+from puripuly_heart.config.settings_vnext.schema import (
+    AppSettingsVNext,
+    CaptureTargetIntent,
+)
 
 
 class CaptureTargetSettingsError(RuntimeError):
@@ -18,9 +21,8 @@ class CaptureTargetSettingsError(RuntimeError):
 
 def persist_desktop_audio_capture_target(
     path: Path,
-    settings: AppSettings,
     capture_target: CaptureTargetIntent,
-) -> AppSettings:
+) -> AppSettingsVNext:
     owner = compose_settings_owner(path)
     if path.exists():
         try:
@@ -31,18 +33,18 @@ def persist_desktop_audio_capture_target(
             raise CaptureTargetSettingsError("load_failed") from None
     else:
         try:
-            owner.project(
-                settings,
-                authoritative=False,
-            )
+            owner.canonical = new_settings_for_first_run()
         except Exception:
             raise CaptureTargetSettingsError("migration_failed") from None
     try:
-        return owner.update_capture_target(settings, capture_target)
+        owner.apply_capture_target(capture_target)
     except CanonicalSettingsPersistenceError as exc:
         raise CaptureTargetSettingsError(exc.status) from None
     except Exception:
         raise CaptureTargetSettingsError("save_failed") from None
+    if owner.canonical is None:
+        raise CaptureTargetSettingsError("save_failed")
+    return owner.canonical
 
 
 __all__ = ["CaptureTargetSettingsError", "persist_desktop_audio_capture_target"]

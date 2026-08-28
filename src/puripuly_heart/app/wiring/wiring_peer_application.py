@@ -13,6 +13,7 @@ from puripuly_heart.app.adapters.peer_capture_inventory import (
     WindowsLoopbackDeviceInventoryAdapter,
     WindowsProcessCaptureInventoryAdapter,
 )
+from puripuly_heart.app.ports.settings_view import GeneralSettingsSnapshot
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.peer_application import (
@@ -22,13 +23,13 @@ from puripuly_heart.app.services.peer_application import (
 from puripuly_heart.app.services.peer_capture_target_application import (
     PeerCaptureTargetApplicationOwner,
 )
-from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
 )
 
-from .wiring_stt_factory import build_peer_capture_session_config
+from .wiring_stt_factory import build_peer_capture_session_config_from_vnext
 from .wiring_translation_runtime_configuration import (
     replace_translation_runtime_effective_flags,
 )
@@ -37,16 +38,18 @@ from .wiring_translation_runtime_configuration import (
 @dataclass(frozen=True, slots=True)
 class PeerApplicationRuntime:
     state: PeerApplicationStateAdapter
-    state_for: Callable[[AppSettings | None], PeerApplicationState]
+    state_for: Callable[[PeerApplicationSettings | None], PeerApplicationState]
     owner: PeerApplicationOwner
     target: PeerCaptureTargetApplicationOwner
 
 
 def compose_peer_application(
     *,
-    settings_provider: Callable[[], AppSettings | None],
+    settings_provider: Callable[[], PeerApplicationSettings | None],
     settings_owner: SettingsOwner,
-    canonical_settings: Callable[[AppSettings], object],
+    canonical_settings: Callable[[], AppSettingsVNext],
+    peer_intent_sink: Callable[[bool], None],
+    overlay_intent_sink: Callable[[bool], None],
     runtime_provider: Callable[[], LocalASRProviderRuntimePort | None],
     translation_runtime_configuration_provider: Callable[
         [],
@@ -64,35 +67,20 @@ def compose_peer_application(
     disclosure_sink: Callable[[], None],
     superseded_sink: Callable[[], None],
     localize: Callable[[str], str],
-    settings_presentation_sink: Callable[[AppSettings], None],
+    settings_presentation_sink: Callable[[GeneralSettingsSnapshot], None],
     log_basic: Callable[..., object],
     log_detailed: Callable[..., object],
     translation_demand_sink: Callable[[], Awaitable[None]] | None = None,
 ) -> PeerApplicationRuntime:
-    def application_settings(
-        settings: AppSettings | None,
-    ) -> PeerApplicationSettings | None:
-        if settings is None:
-            return None
-        return PeerApplicationSettings(
-            intent_enabled=settings.ui.peer_translation_enabled,
-            eula_accepted=settings.ui.peer_translation_eula_accepted,
-            overlay_intent_enabled=settings.ui.overlay_enabled,
-            provider_id=settings.provider.peer_stt.value,
-        )
-
     state = PeerApplicationStateAdapter(
-        settings_provider=lambda: application_settings(settings_provider()),
+        settings_provider=settings_provider,
         runtime_provider=runtime_provider,
         overlay_owner_provider=overlay_provider,
         ingress_frozen_provider=ingress_frozen,
     )
 
-    def current_settings() -> AppSettings:
-        settings = settings_provider()
-        if settings is None:
-            raise RuntimeError("Peer application requires settings")
-        return settings
+    def require_canonical() -> AppSettingsVNext:
+        return canonical_settings()
 
     def effective_sink(
         peer_translation_enabled: bool,
@@ -109,20 +97,9 @@ def compose_peer_application(
 
     owner = PeerApplicationOwner(
         state_provider=state.state,
-        config_factory=lambda: build_peer_capture_session_config(
-            current_settings(),
-            canonical_settings=canonical_settings(current_settings()),
-        ),
-        peer_intent_sink=lambda enabled: setattr(
-            current_settings().ui,
-            "peer_translation_enabled",
-            enabled,
-        ),
-        overlay_intent_sink=lambda enabled: setattr(
-            current_settings().ui,
-            "overlay_enabled",
-            enabled,
-        ),
+        config_factory=lambda: build_peer_capture_session_config_from_vnext(require_canonical()),
+        peer_intent_sink=peer_intent_sink,
+        overlay_intent_sink=overlay_intent_sink,
         persist_manual_fallback=persist_manual_fallback,
         ensure_local_ready=ensure_local_ready,
         clear_cpu_pending=clear_cpu_pending,
@@ -150,9 +127,7 @@ def compose_peer_application(
         devices=WindowsLoopbackDeviceInventoryAdapter(),
         runtime_effects=PeerCaptureTargetRuntimeEffectsAdapter(
             refresh_peer=owner.refresh_runtime,
-            sync_effective_flags=lambda settings: owner.sync_effective_flags(
-                state.state(application_settings(settings))
-            ),
+            sync_effective_flags=lambda _settings: owner.sync_effective_flags(state.state()),
             refresh_presentation=presentation_changed,
         ),
         settings_presentation_sink=settings_presentation_sink,
@@ -160,7 +135,7 @@ def compose_peer_application(
     )
     return PeerApplicationRuntime(
         state=state,
-        state_for=lambda settings: state.state(application_settings(settings)),
+        state_for=state.state,
         owner=owner,
         target=target,
     )

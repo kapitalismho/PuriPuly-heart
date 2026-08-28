@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import pytest
+from puripuly_heart.app.services.settings_application import osc_control_presentation_state
 
 from puripuly_heart.app.ports.osc_control import ASR_ID_BY_PROVIDER, OSC_PARAMETER_DEFINITIONS
 from puripuly_heart.app.ports.oscquery import (
@@ -18,9 +19,6 @@ from puripuly_heart.app.ports.ui_models import (
 )
 from puripuly_heart.app.services.osc import control_runtime as control_runtime_module
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
-from puripuly_heart.app.services.osc.presentation_state import (
-    presentation_state_from_settings,
-)
 from puripuly_heart.app.services.osc.state_publisher import (
     OscCanonicalState,
     state_from_settings,
@@ -304,7 +302,7 @@ async def test_in_process_complete_control_matrix_projects_final_canonical_state
     def presentation_state(
         control: OscControlPresentationName,
     ) -> OscControlPresentationState:
-        return presentation_state_from_settings(
+        return osc_control_presentation_state(
             current[0],
             canonical_state=canonical_state(),
             changed_control=control,
@@ -389,7 +387,7 @@ async def test_normalized_asr_rejection_projects_the_committed_canonical_fallbac
         state_provider=canonical_state,
         language_state_provider=lambda: ("ko", "en", "en", "ko"),
         translation_model_normalizer=materialize_translation_settings,
-        ui_state_provider=lambda control: presentation_state_from_settings(
+        ui_state_provider=lambda control: osc_control_presentation_state(
             current[0],
             canonical_state=canonical_state(),
             changed_control=control,

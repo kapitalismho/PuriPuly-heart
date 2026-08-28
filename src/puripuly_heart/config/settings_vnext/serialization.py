@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import copy
 import json
+import math
+import types
 from collections.abc import Mapping
 from dataclasses import asdict, fields, is_dataclass, replace
-from typing import Any, Final
+from typing import Any, Final, Literal, Union, get_args, get_origin, get_type_hints
 
 from puripuly_heart.config.settings_vnext.schema import (
     DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
@@ -131,7 +133,12 @@ def to_dict(settings: AppSettingsVNext) -> dict[str, Any]:
 
 
 def to_json_text(settings: AppSettingsVNext) -> str:
-    return json.dumps(to_persisted_dict(settings), ensure_ascii=False, indent=2)
+    return json.dumps(
+        to_persisted_dict(settings),
+        ensure_ascii=False,
+        indent=2,
+        allow_nan=False,
+    )
 
 
 def to_persisted_dict(settings: AppSettingsVNext) -> dict[str, Any]:
@@ -154,8 +161,7 @@ def normalize_persisted_dict(data: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
-    if not isinstance(data, Mapping):
-        raise ValueError("vNext settings must be a JSON object")
+    _validate_persisted_types(data)
     default = AppSettingsVNext(settings_version=VNEXT_SETTINGS_SCHEMA_VERSION)
     compatible_data = _with_current_settings_version(
         _project_legacy_translation_fallback_fields(
@@ -174,6 +180,13 @@ def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
         merged.intent.telemetry.enabled,
     )
     return with_translation_runtime_policy(merged)
+
+
+def _validate_persisted_types(data: Mapping[str, Any]) -> None:
+    if not isinstance(data, Mapping):
+        raise ValueError("vNext settings must be a JSON object")
+    _validate_finite_json_value(data, path="settings")
+    _validate_raw_value_type(data, AppSettingsVNext, path="settings")
 
 
 def _extract_compatible_extensions(
@@ -405,6 +418,7 @@ def _merge_dataclass(default: object, raw: object, *, path: str) -> object:
         raise ValueError(f"{path} must be a JSON object")
 
     kwargs: dict[str, object] = {}
+    type_hints = get_type_hints(type(default))
     for field in fields(default):
         default_value = getattr(default, field.name)
         child_path = f"{path}.{field.name}"
@@ -412,6 +426,7 @@ def _merge_dataclass(default: object, raw: object, *, path: str) -> object:
             kwargs[field.name] = copy.deepcopy(default_value)
             continue
         raw_value = raw[field.name]
+        _validate_raw_value_type(raw_value, type_hints[field.name], path=child_path)
         if is_dataclass(default_value) and not isinstance(default_value, type):
             kwargs[field.name] = _merge_dataclass(default_value, raw_value, path=child_path)
         elif isinstance(default_value, dict):
@@ -430,6 +445,105 @@ def _merge_dataclass(default: object, raw: object, *, path: str) -> object:
     if callable(validate):
         validate()
     return merged
+
+
+def _validate_raw_value_type(value: object, expected: object, *, path: str) -> None:
+    if expected is Any or expected is object:
+        _validate_finite_json_value(value, path=path)
+        return
+    origin = get_origin(expected)
+    args = get_args(expected)
+    if origin in (types.UnionType, Union):
+        for option in args:
+            try:
+                _validate_raw_value_type(value, option, path=path)
+            except ValueError:
+                continue
+            return
+        raise ValueError(f"{path} has an invalid type")
+    if origin is Literal:
+        if any(type(value) is type(option) and value == option for option in args):
+            return
+        raise ValueError(f"{path} has an unsupported value")
+    if origin is list:
+        if not isinstance(value, list):
+            raise ValueError(f"{path} must be a JSON array")
+        item_type = args[0] if args else object
+        for index, item in enumerate(value):
+            _validate_raw_value_type(item, item_type, path=f"{path}[{index}]")
+        return
+    if origin is tuple:
+        if not isinstance(value, list | tuple):
+            raise ValueError(f"{path} must be a JSON array")
+        if args and args[-1] is Ellipsis:
+            for index, item in enumerate(value):
+                _validate_raw_value_type(item, args[0], path=f"{path}[{index}]")
+        elif args:
+            if len(value) != len(args):
+                raise ValueError(f"{path} has an invalid array length")
+            for index, (item, item_type) in enumerate(zip(value, args, strict=True)):
+                _validate_raw_value_type(item, item_type, path=f"{path}[{index}]")
+        return
+    if origin in (dict, Mapping):
+        if not isinstance(value, Mapping):
+            raise ValueError(f"{path} must be a JSON object")
+        key_type, value_type = args if len(args) == 2 else (object, object)
+        for key, item in value.items():
+            _validate_raw_value_type(key, key_type, path=f"{path}.<key>")
+            _validate_raw_value_type(item, value_type, path=f"{path}.{key}")
+        return
+    if isinstance(expected, type) and is_dataclass(expected):
+        if not isinstance(value, Mapping):
+            raise ValueError(f"{path} must be a JSON object")
+        type_hints = get_type_hints(expected)
+        for field in fields(expected):
+            if field.name in value:
+                _validate_raw_value_type(
+                    value[field.name],
+                    type_hints[field.name],
+                    path=f"{path}.{field.name}",
+                )
+        return
+    if not _raw_value_matches_type(value, expected):
+        raise ValueError(f"{path} has an invalid type")
+    _validate_finite_json_value(value, path=path)
+
+
+def _raw_value_matches_type(value: object, expected: object) -> bool:
+    origin = get_origin(expected)
+    if origin in (types.UnionType, Union):
+        return any(_raw_value_matches_type(value, option) for option in get_args(expected))
+    if origin is Literal:
+        return any(type(value) is type(option) and value == option for option in get_args(expected))
+    if expected is None or expected is type(None):
+        return value is None
+    if expected is bool:
+        return type(value) is bool
+    if expected is int:
+        return type(value) is int
+    if expected is float:
+        return type(value) in (int, float) and not isinstance(value, bool)
+    if expected is str:
+        return isinstance(value, str)
+    if expected is Any or expected is object:
+        return True
+    if isinstance(expected, type) and is_dataclass(expected):
+        return isinstance(value, Mapping)
+    if isinstance(expected, type):
+        return isinstance(value, expected)
+    return True
+
+
+def _validate_finite_json_value(value: object, *, path: str) -> None:
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError(f"{path} must contain a finite number")
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            _validate_finite_json_value(key, path=f"{path}.<key>")
+            _validate_finite_json_value(item, path=f"{path}.{key}")
+    elif isinstance(value, list | tuple):
+        for index, item in enumerate(value):
+            _validate_finite_json_value(item, path=f"{path}[{index}]")
 
 
 __all__ = [

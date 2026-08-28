@@ -142,6 +142,8 @@ managed authentication
 | Overlay         | `OverlaySink`, overlay protocol                      | Desktop overlay, native VR overlay       |
 | GPU worker      | `GpuWorkerClientPort`, `GpuWorkerProcessFactoryPort` | Native worker process adapter            |
 | Secrets         | `SecretStore`                                        | Keyring, encrypted file, memory          |
+| Settings secrets | `SettingsSecretsPort`                               | Typed settings projection and mutation owner over the configured secret store |
+| Settings UI      | `ProviderSettingsSnapshot`, `GeneralSettingsSnapshot`, `PromptSettingsSnapshot`, `OverlaySettingsSnapshot`, and typed settings intents | Flet settings presentation and `UiApplicationBoundary` |
 | Shutdown        | Runtime shutdown ports                               | Application shutdown adapter             |
 | OSC control ABI | Stable parameter schema and codec contract           | Control schema and codec                |
 | OSC integration | `OscControlApplicationPort`, `OscQueryServicePort`    | OSC control adapter, OSCQuery adapter   |
@@ -204,6 +206,11 @@ Do not retain references across replacement unless the API explicitly allows it.
 - Canonical schema: `AppSettingsVNext`
 - Compatibility projection: `AppSettings`
 - Owner: canonical settings persistence service
+- Desktop overlay defaults, limits, presets, ordering, and visual values: `config/desktop_overlay_values.py`
+- Provider selection enums and normalization values: `config/provider_values.py`
+- Translation model and connection values: `config/translation_values.py`
+
+`SettingsView` consumes only frozen surface snapshots and emits focused typed intents. The settings application owner projects the compatibility model and replays those intents onto the latest canonical settings before persistence and runtime application.
 
 Contains user selections, not active runtime resources.
 

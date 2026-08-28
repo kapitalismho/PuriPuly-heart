@@ -18,6 +18,7 @@ from puripuly_heart.config.settings import (
     TranslationModel,
     materialize_translation_settings,
 )
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.core.language import get_llm_language_name
 
 
@@ -76,7 +77,7 @@ def _components(
         self_capture_owner=lambda: SimpleNamespace(),
         peer=lambda: SimpleNamespace(),
         peer_desired=lambda _settings: False,
-        canonical_settings=lambda _settings: SimpleNamespace(),
+        canonical_settings=from_legacy_app_settings,
         clear_local_pending=lambda: None,
         sync_local_notice=lambda: None,
         managed_pending_sink=lambda _value: None,
@@ -116,7 +117,7 @@ async def test_provider_is_installed_without_preparing_when_translation_is_off(
             events.append("prepare")
             raise AssertionError("rebuild must not prepare managed Gemma while translation is off")
 
-    def create_backend(_settings: AppSettings, **kwargs: object) -> object:
+    def create_backend(**kwargs: object) -> object:
         events.append("create")
         assert kwargs["managed_gemma_runtime"] is activation_runtime
         assert kwargs["managed_gemma_release"] is wiring_provider_runtime.noop_managed_gemma_release
@@ -171,7 +172,7 @@ async def test_provider_waits_for_readiness_when_translation_is_on(
             await ready.wait()
             return SimpleNamespace(runtime=activation_runtime, release=release)
 
-    def create_backend(_settings: AppSettings, **kwargs: object) -> object:
+    def create_backend(**kwargs: object) -> object:
         events.append("create")
         assert kwargs["managed_gemma_runtime"] is activation_runtime
         assert kwargs["managed_gemma_release"] is wiring_provider_runtime.noop_managed_gemma_release
@@ -216,7 +217,7 @@ async def test_provider_prepares_when_peer_translation_is_on(
             events.append("prepare")
             return SimpleNamespace(runtime=activation_runtime, release=lambda: None)
 
-    def create_backend(_settings: AppSettings, **kwargs: object) -> object:
+    def create_backend(**kwargs: object) -> object:
         events.append("create")
         assert kwargs["managed_gemma_runtime"] is activation_runtime
         assert kwargs["managed_gemma_release"] is wiring_provider_runtime.noop_managed_gemma_release
@@ -255,7 +256,7 @@ async def test_provider_construction_failure_keeps_demand_owned_activation(
         async def prepare(self, _selection: ManagedGemmaTranslationSelection) -> object:
             return SimpleNamespace(runtime=object(), release=release)
 
-    def fail_backend(_settings: AppSettings, **_kwargs: object) -> object:
+    def fail_backend(**_kwargs: object) -> object:
         raise RuntimeError("provider construction failed")
 
     monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", fail_backend)

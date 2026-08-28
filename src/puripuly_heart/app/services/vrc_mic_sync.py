@@ -6,6 +6,11 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from puripuly_heart.core.osc.receiver_contract import (
+    OscReceiverPort,
+    VrcMicState,
+    VrcOscReceiverFactory,
+)
 from puripuly_heart.core.runtime.receiver import VrcMicReceiverRuntime
 
 
@@ -19,9 +24,9 @@ class VrcMicAudioGatePort(Protocol):
 
 @dataclass(slots=True)
 class VrcMicSyncOwner:
-    state_provider: Callable[[], object | None]
+    state_provider: Callable[[], VrcMicState | None]
     gate_provider: Callable[[], VrcMicAudioGatePort | None]
-    receiver_factory: Callable[..., object]
+    receiver_factory: VrcOscReceiverFactory
     diagnostics_sink: Callable[[str, Mapping[str, object]], None]
     error_sink: Callable[[str], None]
     host: str
@@ -43,7 +48,7 @@ class VrcMicSyncOwner:
         default=None,
         repr=False,
     )
-    _receiver: object | None = field(
+    _receiver: OscReceiverPort | None = field(
         init=False,
         default=None,
         repr=False,
@@ -72,14 +77,8 @@ class VrcMicSyncOwner:
         self._runtime = runtime
 
     @property
-    def receiver(self) -> object | None:
+    def receiver(self) -> OscReceiverPort | None:
         return self._receiver
-
-    @receiver.setter
-    def receiver(self, receiver: object | None) -> None:
-        if receiver is not None and not self._accepting_ingress:
-            return
-        self._receiver = receiver
 
     @property
     def last_enabled(self) -> bool | None:
@@ -98,7 +97,7 @@ class VrcMicSyncOwner:
         runtime = self._runtime
         if runtime is None:
             return self.port
-        return int(getattr(runtime, "effective_port", self.port))
+        return runtime.effective_port
 
     @property
     def lock(self) -> asyncio.Lock:
@@ -179,12 +178,13 @@ class VrcMicSyncOwner:
             if (endpoint_changed or force_restart) and self._receiver is not None:
                 await self._stop_locked()
             runtime = self._runtime
-            configure_endpoint = getattr(runtime, "configure_endpoint", None)
-            if callable(configure_endpoint) and self._receiver is None:
-                configure_endpoint(self.host, self.port)
+            if runtime is not None and (
+                self._receiver is None or endpoint_changed or force_restart
+            ):
+                runtime.configure_endpoint(self.host, self.port)
             await self._reconcile_locked()
 
-    async def ensure_receiver(self) -> object | None:
+    async def ensure_receiver(self) -> OscReceiverPort | None:
         async with self.lock:
             if not self._accepting_ingress:
                 return None
@@ -196,10 +196,12 @@ class VrcMicSyncOwner:
         async with self.lock:
             await self._stop_locked()
 
-    def sync_runtime_receiver(self, runtime: object | None = None) -> None:
-        owner = runtime or self._runtime
-        receiver = getattr(owner, "receiver", None) if owner is not None else None
-        self.receiver = receiver
+    def sync_runtime_receiver(self, runtime: VrcMicReceiverRuntime | None = None) -> None:
+        owner = runtime if runtime is not None else self._runtime
+        receiver = owner.receiver if owner is not None else None
+        if receiver is not None and not self._accepting_ingress:
+            return
+        self._receiver = receiver
 
     async def configure(self, *, enabled: bool) -> None:
         async with self.lock:
@@ -221,24 +223,14 @@ class VrcMicSyncOwner:
             with contextlib.suppress(Exception):
                 await runtime.stop(strict_runtime_errors=False)
             self.sync_runtime_receiver(runtime)
-        elif self._receiver is not None:
-            with contextlib.suppress(Exception):
-                stop = getattr(self._receiver, "stop", None)
-                if callable(stop):
-                    stop()
+        else:
             self._receiver = None
         gate = self.gate_provider()
         if gate is not None:
             gate.set_receiver_active(False)
 
-    async def _start_locked(self) -> object | None:
-        if self._receiver is not None:
-            return self._receiver
-        state = self.state_provider()
-        if state is None:
-            self._set_receiver_active(False)
-            return None
-        runtime = self.get_runtime()
+    async def _start_locked(self) -> OscReceiverPort | None:
+        runtime = self._runtime or self.get_runtime()
         if runtime is None:
             self._set_receiver_active(False)
             return None
@@ -287,19 +279,13 @@ class VrcMicSyncOwner:
 
         runtime = self._runtime
         if runtime is None:
-            receiver = self._receiver
-            if receiver is None:
-                return
-            stop = getattr(receiver, "stop", None)
-            if callable(stop):
-                stop()
             self._receiver = None
             return
 
         try:
             await runtime.close()
         except Exception:
-            self._receiver = getattr(runtime, "receiver", self._receiver)
+            self._receiver = runtime.receiver
             raise
 
         if self._runtime is runtime:

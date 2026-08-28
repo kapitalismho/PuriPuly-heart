@@ -32,6 +32,7 @@ G14_PROVIDER_INTENT_FIELDS = (
     "secret_cleared",
     "local_llm_secret_changed",
     "gpu_discovery_requested",
+    "settings_secrets",
     "custom_stt_secret_changed",
 )
 G14_OWNED_VIEW_CALLBACKS = (
@@ -158,6 +159,34 @@ def test_settings_state_sink_protocol_covers_every_settings_view_push() -> None:
     }
     for name in sink_methods:
         assert callable(getattr(SettingsView, name, None)), name
+
+
+def test_a06_settings_view_has_no_whole_settings_escape_hatch() -> None:
+    path = SOURCE_ROOT / "ui" / "views" / "settings.py"
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    imported = _imported_modules(path)
+    names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+    attributes = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+
+    assert "puripuly_heart.config.settings" not in imported
+    assert "AppSettings" not in names
+    assert "SettingsSnapshot" not in names
+    assert "_settings" not in attributes
+    assert "_provider_settings_draft" not in attributes
+
+
+def test_a06_settings_presentation_sinks_do_not_carry_whole_settings() -> None:
+    source = (
+        SOURCE_ROOT / "app" / "services" / "capture" / "peer_capture_target_application.py"
+    ).read_text(encoding="utf-8")
+
+    assert "SettingsPresentationSink = Callable[[GeneralSettingsSnapshot], None]" in source
+    assert "settings_presentation_sink(next_settings)" not in source
+    wiring_source = (SOURCE_ROOT / "app" / "wiring" / "wiring_peer_application.py").read_text(
+        encoding="utf-8"
+    )
+    assert "settings_presentation_sink: Callable[[GeneralSettingsSnapshot], None]" in wiring_source
 
 
 def test_production_settings_surface_uses_an_external_slot_provider() -> None:

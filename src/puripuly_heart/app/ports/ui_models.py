@@ -88,7 +88,13 @@ class OscControlPresentationState:
     peer_asr_setting: str
     custom_stt_mode: str
     custom_stt_compatibility: str
+    custom_vocabulary_enabled: bool
+    custom_vocabulary_terms: tuple[str, ...]
+    custom_vocabulary_other_languages_have_terms: bool
     llm_provider: str
+    openrouter_llm_model: str
+    openrouter_selected_source: str
+    openrouter_selection_alias: str | None
     translation_model: str
     translation_connection: str
     translation_connection_history: tuple[tuple[str, str], ...]

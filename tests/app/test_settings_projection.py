@@ -4,6 +4,7 @@ import copy
 from pathlib import Path
 from types import SimpleNamespace
 
+from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
 from puripuly_heart.app.services.settings_projection import SettingsProjectionOwner
 
 from puripuly_heart.config.settings import AppSettings
@@ -13,9 +14,9 @@ def test_projection_rebases_view_change_onto_current_settings() -> None:
     displayed = AppSettings()
     displayed.languages.source_language = "en"
     current = copy.deepcopy(displayed)
-    rendered: list[AppSettings] = []
+    rendered: list[dict[str, object]] = []
     presentation = SimpleNamespace(
-        render_settings=lambda settings, **_kwargs: rendered.append(settings) or True,
+        render_settings=lambda **kwargs: rendered.append(kwargs) or True,
     )
     owner = SettingsProjectionOwner(
         presentation=presentation,
@@ -31,7 +32,7 @@ def test_projection_rebases_view_change_onto_current_settings() -> None:
 
     merged = owner.merge_with_current(change)
 
-    assert rendered == [displayed]
+    assert rendered[0]["general"].effective_peer_source_language == "en"
     assert merged.languages.source_language == "ja"
     assert merged.overlay.show_translation is False
 
@@ -63,10 +64,10 @@ def test_failed_render_preserves_previous_projection_baseline() -> None:
 
 def test_pkce_refresh_uses_specialized_projection_path() -> None:
     settings = AppSettings()
-    refreshes: list[tuple[AppSettings, Path]] = []
+    refreshes: list[tuple[object, object, Path]] = []
 
-    def refresh(updated: AppSettings, *, config_path: Path) -> bool:
-        refreshes.append((updated, config_path))
+    def refresh(*, provider, prompt, config_path: Path) -> bool:
+        refreshes.append((provider, prompt, config_path))
         return True
 
     owner = SettingsProjectionOwner(
@@ -77,9 +78,17 @@ def test_pkce_refresh_uses_specialized_projection_path() -> None:
         current_settings=lambda: settings,
     )
 
-    assert owner.refresh_after_openrouter_pkce_success(settings) is True
+    provider, _general, prompt, _overlay = settings_view_surface_snapshots(settings)
+    assert (
+        owner.refresh_after_openrouter_pkce_success(
+            provider=provider,
+            prompt=prompt,
+            compatibility_settings=settings,
+        )
+        is True
+    )
     captured = owner.capture(copy.deepcopy(settings))
 
-    assert refreshes == [(settings, Path("settings.json"))]
+    assert refreshes == [(provider, prompt, Path("settings.json"))]
     assert captured.can_rebase is True
     assert captured.values_by_path == {}

@@ -76,6 +76,9 @@ class FakeSessionRuntimeLogging:
         if self.close_error is not None:
             raise self.close_error
 
+    def close_terminal_owner(self) -> None:
+        self.close()
+
 
 class _FallbackCapture(logging.Handler):
     def __init__(self) -> None:
@@ -180,6 +183,24 @@ def test_runtime_logging_service_exposes_lifecycle_inventory() -> None:
 
     assert_lifecycle_structure(snapshot)
     assert snapshot["owner"] == "RuntimeLoggingService"
+
+
+def test_runtime_logging_owner_requires_exactly_one_adapter_boundary() -> None:
+    session = FakeSessionRuntimeLogging()
+    factory_calls: list[FakeSessionRuntimeLogging] = []
+
+    with pytest.raises(ValueError, match="adapter or factory"):
+        RuntimeLoggingService()
+
+    with pytest.raises(ValueError, match="either session_service or session_factory"):
+        RuntimeLoggingService(session_service=session, session_factory=lambda: session)
+
+    service = RuntimeLoggingService(
+        session_factory=lambda: factory_calls.append(session) or session
+    )
+
+    assert service.mode is SessionLoggingMode.BASIC
+    assert factory_calls == [session]
 
 
 def test_final_shutdown_summary_is_metadata_only_and_emitted_before_close() -> None:

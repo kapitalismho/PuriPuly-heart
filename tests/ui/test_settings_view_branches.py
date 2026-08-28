@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import copy
 import json
 import logging
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,10 +11,18 @@ import pytest
 
 pytest.importorskip("flet")
 
+from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
+from puripuly_heart.app.ports.settings_view import (
+    CustomSttEndpointEdit,
+    ManagedReferralEdit,
+    SystemPromptEdit,
+    TranslationSelectionEdit,
+)
 from puripuly_heart.app.ports.ui_models import OscControlPresentationName
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
+from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.settings import (
     LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
@@ -59,8 +67,13 @@ class DummySecretStore:
         self.values = dict(values or {})
         self.set_calls: list[tuple[str, str]] = []
         self.delete_calls: list[str] = []
+        self.get_calls: list[str] = []
+        self.get_failure_key: str | None = None
 
     def get(self, key: str) -> str | None:
+        self.get_calls.append(key)
+        if key == self.get_failure_key:
+            raise OSError("unavailable")
         return self.values.get(key)
 
     def set(self, key: str, value: str) -> None:
@@ -81,8 +94,8 @@ def _make_settings_view(
     monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
     store = store or DummySecretStore()
-    monkeypatch.setattr(settings_view, "create_secret_store", lambda *_args, **_kwargs: store)
     view = settings_view.SettingsView()
+    view._settings_secrets = SettingsSecretsOwner(secret_store_factory=lambda: store)
     if settings is not None:
         view._settings = settings
     return view, store
@@ -100,13 +113,26 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         "_update_api_visibility",
         lambda: api_visibility_updates.append(None),
     )
-    draft = copy.deepcopy(baseline)
-    draft.translation.model = TranslationModel.LOCAL_LLM
-    draft.translation.connection = TranslationConnection.OLLAMA
-    materialize_translation_settings(draft)
-    draft.system_prompt = "unsaved prompt"
-    draft.custom_stt.endpoint = "https://draft.invalid/v1/audio/transcriptions"
-    view._provider_settings_draft = draft
+    assert view._provider_snapshot is not None
+    draft_translation = replace(
+        view._provider_snapshot.translation,
+        model=TranslationModel.LOCAL_LLM,
+        connection=TranslationConnection.OLLAMA,
+    )
+    view._provider_draft = replace(
+        view._provider_snapshot,
+        translation=draft_translation,
+        custom_stt_endpoint="https://draft.invalid/v1/audio/transcriptions",
+    )
+    view._record_provider_edit(
+        TranslationSelectionEdit(
+            draft_translation,
+            ((draft_translation.model, draft_translation.connection),),
+        )
+    )
+    view._record_provider_edit(CustomSttEndpointEdit(view._provider_draft.custom_stt_endpoint))
+    view._prompt_editor.value = "unsaved prompt"
+    view._stage_prompt_draft("unsaved prompt")
     view._custom_vocab_tag_editor._input_field.value = "unsubmitted vocabulary"
     emitted: list[str] = []
     view.on_settings_changed = lambda _settings: emitted.append("settings")
@@ -129,6 +155,8 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
     canonical.translation.fallback.enabled = True
     canonical.translation.fallback.model = TranslationModel.DEEPSEEK_V4_FLASH
     canonical.translation.fallback.connection = TranslationConnection.OFFICIAL_BYOK
+    canonical.stt.custom_terms = {"en": ["existing"], "ja": ["osc-term"]}
+    canonical.stt.custom_vocabulary_enabled = True
     canonical_state = state_from_settings(
         canonical,
         peer_capture=True,
@@ -143,8 +171,9 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         )
     )
 
-    assert draft.translation.model == TranslationModel.LOCAL_LLM
-    assert draft.translation.connection == TranslationConnection.OLLAMA
+    assert view._provider_draft is not None
+    assert view._provider_draft.translation.model == TranslationModel.LOCAL_LLM
+    assert view._provider_draft.translation.connection == TranslationConnection.OLLAMA
 
     controls: tuple[OscControlPresentationName, ...] = (
         "PuriPuly_Talk",
@@ -171,40 +200,51 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
             )
         )
 
-    for projected_settings in (view._settings, view._provider_settings_draft):
-        assert projected_settings is not None
-        assert projected_settings.languages.source_language == "ja"
-        assert projected_settings.languages.target_language == "fr"
-        assert projected_settings.languages.peer_source_language == "de"
-        assert projected_settings.languages.peer_target_language == "ko"
-        assert projected_settings.languages.peer_source_mode == "auto"
-        assert projected_settings.ui.peer_translation_enabled is True
-        assert projected_settings.ui.overlay_enabled is True
-        assert projected_settings.osc.vrc_mic_intercept is True
-        assert projected_settings.osc.chatbox_include_source is False
-        assert projected_settings.provider.stt == STTProviderName.SONIOX
-        assert projected_settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
-        assert projected_settings.custom_stt.mode == canonical.custom_stt.mode
-        assert projected_settings.custom_stt.compatibility == canonical.custom_stt.compatibility
-        assert projected_settings.provider.llm == canonical.provider.llm
-        assert projected_settings.translation.model == TranslationModel.GEMINI_37_FLASH
-        assert projected_settings.translation.connection == TranslationConnection.OFFICIAL_BYOK
-        assert projected_settings.translation.fallback.enabled is True
-        assert projected_settings.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH
-        assert (
-            projected_settings.translation.fallback.connection
-            == TranslationConnection.OFFICIAL_BYOK
-        )
-    assert view._provider_settings_draft.system_prompt == "unsaved prompt"
+    for projected in (view._provider_snapshot, view._provider_draft):
+        assert projected is not None
+        assert projected.stt_provider == STTProviderName.SONIOX
+        assert projected.peer_stt_provider == STTProviderName.LOCAL_QWEN_GPU
+        assert projected.custom_stt_mode == canonical.custom_stt.mode
+        assert projected.custom_stt_compatibility == canonical.custom_stt.compatibility
+        assert projected.llm_provider == canonical.provider.llm
+        assert projected.translation.model == TranslationModel.GEMINI_37_FLASH
+        assert projected.translation.connection == TranslationConnection.OFFICIAL_BYOK
+        assert projected.translation.fallback.enabled is True
+        assert projected.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH
+        assert projected.translation.fallback.connection == TranslationConnection.OFFICIAL_BYOK
+    assert view._provider_draft is not None
     assert (
-        view._provider_settings_draft.custom_stt.endpoint
-        == "https://draft.invalid/v1/audio/transcriptions"
+        view._provider_draft.custom_stt_endpoint == "https://draft.invalid/v1/audio/transcriptions"
     )
+    assert view._prompt_snapshot is not None
+    assert view._prompt_snapshot.source_language == "ja"
+    assert view._prompt_snapshot.custom_vocabulary_terms == ("osc-term",)
+    assert view._prompt_snapshot.custom_vocabulary_other_languages_have_terms is True
+    assert view._prompt_editor.value == "unsaved prompt"
+    assert view._provider_edits[SystemPromptEdit] == SystemPromptEdit("unsaved prompt")
+    assert view._provider_edits[CustomSttEndpointEdit].endpoint == (
+        "https://draft.invalid/v1/audio/transcriptions"
+    )
+    assert view._provider_edits[TranslationSelectionEdit].selection.model == (
+        TranslationModel.GEMINI_37_FLASH
+    )
+    assert view._custom_vocab_tag_editor._terms == ["osc-term"]
     assert view._custom_vocab_tag_editor._input_field.value == "unsubmitted vocabulary"
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
     assert view._chatbox_source_text.content.value == t("settings.chatbox_source.off")
     assert len(api_visibility_updates) == 4
     assert emitted == []
+
+
+def test_settings_rejects_malformed_osc_ports_without_mutating_snapshot() -> None:
+    view = settings_view.SettingsView.__new__(settings_view.SettingsView)
+    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(AppSettings())
+    view._general_snapshot = general
+
+    view._on_osc_connection_selected("manual", "invalid", "9001")
+    view._on_osc_connection_selected("manual", "9000", object())
+
+    assert view._general_snapshot == general
 
 
 def test_cpu_auto_option_is_disabled_until_all_models_are_available(
@@ -235,14 +275,13 @@ def test_telemetry_card_loads_state_and_toggles_enabled(monkeypatch: pytest.Monk
     assert view._telemetry_enabled_text.content.value == t("settings.telemetry.state.on")
     view._on_telemetry_enabled_click(None)
     assert calls[-1] is False
-    assert view._settings.telemetry.enabled is False
-    assert view._settings.telemetry_state.anonymous_id is None
-    assert view._settings.telemetry_state.last_sent_date_utc is None
+    assert view._general_snapshot.telemetry_enabled is False
+    assert settings.telemetry.enabled is True
+    assert settings.telemetry_state.last_sent_date_utc == "2026-07-03"
 
     view._on_telemetry_enabled_click(None)
     assert calls[-1] is True
-    assert view._settings.telemetry.enabled is True
-    assert view._settings.telemetry_state.anonymous_id
+    assert view._general_snapshot.telemetry_enabled is True
 
 
 def test_telemetry_card_uses_callback_instead_of_send(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -575,24 +614,6 @@ def _container_text_size(control: ft.Container) -> int | None:
     return control.content.size
 
 
-def test_load_secret_value_prefers_existing_value() -> None:
-    store = DummySecretStore({"new_key": "new", "old_key": "old"})
-
-    value = settings_view._load_secret_value(store, "new_key", legacy_keys=("old_key",))
-
-    assert value == "new"
-    assert store.set_calls == []
-
-
-def test_load_secret_value_migrates_legacy_value() -> None:
-    store = DummySecretStore({"old_key": "legacy"})
-
-    value = settings_view._load_secret_value(store, "new_key", legacy_keys=("old_key",))
-
-    assert value == "legacy"
-    assert store.set_calls == [("new_key", "legacy")]
-
-
 def test_peer_language_card_removed_from_general_tab(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -647,7 +668,7 @@ def test_clipboard_auto_translate_selection_updates_settings_and_emits_change(
     view.load_from_settings(settings, config_path=Path("settings.json"))
     view._on_clipboard_auto_translate_selected("on")
 
-    assert settings.ui.clipboard_auto_translate_enabled is True
+    assert view._settings.ui.clipboard_auto_translate_enabled is True
     assert view._clipboard_auto_translate_text.content.value == t(
         "settings.clipboard_auto_translate.on"
     )
@@ -665,7 +686,7 @@ def test_clipboard_auto_translate_click_toggles_immediately_without_modal(
     view.load_from_settings(settings, config_path=Path("settings.json"))
     view._on_clipboard_auto_translate_click(None)
 
-    assert settings.ui.clipboard_auto_translate_enabled is True
+    assert view._settings.ui.clipboard_auto_translate_enabled is True
     assert view._clipboard_auto_translate_text.content.value == t(
         "settings.clipboard_auto_translate.on"
     )
@@ -673,7 +694,7 @@ def test_clipboard_auto_translate_click_toggles_immediately_without_modal(
 
     view._on_clipboard_auto_translate_click(None)
 
-    assert settings.ui.clipboard_auto_translate_enabled is False
+    assert view._settings.ui.clipboard_auto_translate_enabled is False
     assert view._clipboard_auto_translate_text.content.value == t(
         "settings.clipboard_auto_translate.off"
     )
@@ -719,11 +740,11 @@ def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
 
-    def raise_store(*_args, **_kwargs):
+    def raise_store():
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(settings_view, "create_secret_store", raise_store)
     view = settings_view.SettingsView()
+    view._settings_secrets = SettingsSecretsOwner(secret_store_factory=raise_store)
     view.runtime_log_basic = lambda message, *, level=logging.INFO: basic_messages.append(message)
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
@@ -731,6 +752,34 @@ def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch) -> Non
     assert view._deepgram_key.value == ""
     assert view._soniox_key.value == ""
     assert basic_messages == ["Failed to load secrets: boom"]
+
+
+def test_load_secrets_projects_the_same_prefix_before_read_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    store = DummySecretStore(
+        {
+            "google_api_key": "google-secret",
+            "openrouter_api_key": "openrouter-secret",
+            "deepseek_api_key": "deepseek-secret",
+            "cerebras_api_key": "cerebras-secret",
+        }
+    )
+    store.get_failure_key = "deepgram_api_key"
+    view, _ = _make_settings_view(monkeypatch, store)
+    view._deepgram_key.value = "unchanged-deepgram"
+    view._soniox_key.value = "unchanged-soniox"
+
+    with pytest.raises(OSError, match="unavailable"):
+        view._load_secrets(settings, Path("settings.json"))
+
+    assert view._google_key.value == "google-secret"
+    assert view._openrouter_key.value == "openrouter-secret"
+    assert view._deepseek_key.value == "deepseek-secret"
+    assert view._cerebras_key.value == "cerebras-secret"
+    assert view._deepgram_key.value == "unchanged-deepgram"
+    assert view._soniox_key.value == "unchanged-soniox"
 
 
 def test_restore_api_key_icons_sets_idle_success_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -745,7 +794,8 @@ def test_restore_api_key_icons_sets_idle_success_error(monkeypatch: pytest.Monke
     view._alibaba_key_beijing.value = ""
     view._alibaba_key_singapore.value = ""
 
-    view._restore_api_key_icons(settings)
+    provider, _general, _prompt, _overlay = settings_view_surface_snapshots(settings)
+    view._restore_api_key_icons(provider)
 
     assert view._deepgram_key._current_status == "success"
     assert view._deepgram_key._last_verified_hash
@@ -769,6 +819,7 @@ def test_update_api_visibility_tracks_provider_and_region(monkeypatch: pytest.Mo
 
     settings.qwen.region = QwenRegion.SINGAPORE
     settings.provider.llm = LLMProviderName.QWEN
+    view._settings = settings
     view._update_api_visibility()
 
     assert view._google_key.visible is False
@@ -1052,6 +1103,8 @@ def test_set_managed_key_state_updates_card_controls_and_api_section_repaint(
     assert view._managed_trial_usage_bar.percent == 64
     assert view._managed_key_referral_id == "7KQ9M2"
     assert view._managed_key_referral_id_value.value == "7KQ9M2"
+    assert view._provider_edits[ManagedReferralEdit] == ManagedReferralEdit("7KQ9M2")
+    assert view.has_provider_changes is True
     assert "api_keys_column" in updates
 
 
@@ -1364,6 +1417,7 @@ def test_set_managed_key_state_can_display_preview_referral_without_remembering(
     assert view._managed_key_referral_id == "7KQ9M2"
     assert view._managed_key_referral_id_value.value == "7KQ9M2"
     assert view._managed_key_invite_progress_row.visible is True
+    assert ManagedReferralEdit not in view._provider_edits
 
 
 def test_managed_key_invite_progress_row_appears_below_talk_together_pass_id(
@@ -1656,13 +1710,11 @@ def test_order22_live_settings_view_audio_change_emits_copied_draft(
 
     view._on_audio_change()
 
-    assert settings.audio.input_device == "Headset Mic"
+    assert settings.audio.input_device == "Built-in Mic"
     assert view._settings is not None
-    assert view._settings is settings
     assert view._settings.audio.input_device == "Headset Mic"
     assert len(emitted) == 1
     assert emitted[0] is not settings
-    assert emitted[0] is not view._settings
     assert emitted[0].audio.input_device == "Headset Mic"
 
 
@@ -2522,6 +2574,42 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
     assert view.has_provider_changes is True
 
 
+def test_translation_selection_preserves_all_staged_history_and_unrelated_latest_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMMA4,
+        connection=TranslationConnection.MANAGED,
+        connection_history={
+            TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
+            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA,
+            TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
+        },
+    )
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+
+    view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
+    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
+    view._on_translation_connection_selected(TranslationConnection.OFFICIAL_BYOK.value)
+    settings.translation.connection_history[TranslationModel.GEMINI_37_FLASH.value] = (
+        TranslationConnection.OPENROUTER
+    )
+
+    pending = view.build_provider_apply_settings()
+
+    assert pending is not None
+    assert pending.translation.connection_history[TranslationModel.GEMMA4.value] == (
+        TranslationConnection.OPENROUTER
+    )
+    assert pending.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value] == (
+        TranslationConnection.OFFICIAL_BYOK
+    )
+    assert pending.translation.connection_history[TranslationModel.GEMINI_37_FLASH.value] == (
+        TranslationConnection.OPENROUTER
+    )
+
+
 def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2617,8 +2705,8 @@ def test_on_llm_selected_invalid_value_is_noop(
 
     pending = view.build_provider_apply_settings()
 
-    assert pending is settings
-    assert view._provider_settings_draft is None
+    assert to_dict(pending) == to_dict(settings)
+    assert view._provider_draft is None
     assert pending.translation.model == TranslationModel.GEMINI_37_FLASH
     assert pending.translation.connection == TranslationConnection.OFFICIAL_BYOK
     assert pending.provider.llm == LLMProviderName.GEMINI
@@ -3333,16 +3421,17 @@ def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
     settings.system_prompts = {"gemini": "G", "openrouter": "O", "qwen": "Q"}
     settings.system_prompt = "G"
     view, _ = _make_settings_view(monkeypatch, settings=settings)
-    requested: list[AppSettings] = []
+    requested: list[object] = []
     view.on_request_openrouter_pkce = requested.append
 
     view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
     view._on_openrouter_pkce_click(None)
 
-    assert requested[0].provider.llm == LLMProviderName.OPENROUTER
-    assert requested[0].openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert requested[0].openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
+    assert requested[0].selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
     assert requested[0].system_prompt == "G"
+    assert any(
+        isinstance(edit, TranslationSelectionEdit) for edit in requested[0].provider_intent.edits
+    )
 
 
 def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
@@ -3357,6 +3446,9 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
 
     view, _ = _make_settings_view(monkeypatch, store)
     view.load_from_settings(initial, config_path=Path("settings.json"))
+    store.values["alibaba_api_key"] = "unrelated-legacy-secret"
+    store.get_calls.clear()
+    store.set_calls.clear()
     view._custom_vocab_tag_editor._input_field.value = "VRChat"  # noqa: SLF001
     view._google_key.value = "typed-google-draft"
 
@@ -3380,6 +3472,12 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
     assert view._llm_text.content.value == view._get_llm_display_label(updated)
     assert view.has_provider_changes is False
     assert view.has_pending_prompt_changes is False
+    assert store.get_calls == [
+        "openrouter_api_key",
+        "deepseek_api_key",
+        "cerebras_api_key",
+    ]
+    assert store.set_calls == []
 
 
 def test_hidden_legacy_deepseek_china_fallback_displays_safe_current_value(
@@ -3491,13 +3589,14 @@ def test_on_ui_and_region_selection_emit_changes(monkeypatch: pytest.MonkeyPatch
     view._on_ui_selected("ko")
     view._on_qwen_region_selected(QwenRegion.SINGAPORE.value)
 
-    assert settings.ui.locale == "ko"
+    assert settings.ui.locale == "en"
     assert settings.qwen.region == QwenRegion.BEIJING
     pending = view.build_provider_apply_settings()
     assert pending is not None
     assert pending.qwen.region == QwenRegion.SINGAPORE
     assert view.has_provider_changes is True
     assert len(changed) == 1
+    assert changed[0].ui.locale == "ko"
     assert changed[0].qwen.region == QwenRegion.BEIJING
 
 
@@ -3579,10 +3678,6 @@ def test_audio_and_vad_handlers_update_state(
     assert view._settings.audio.input_device == "Mic 2"
     assert view._settings.stt.vad_speech_threshold == 0.72
     assert view._settings.desktop_audio.vad_speech_threshold == 0.61
-    assert settings.audio.input_host_api == "MME"
-    assert settings.audio.input_device == "Mic 2"
-    assert settings.stt.vad_speech_threshold == 0.72
-    assert settings.desktop_audio.vad_speech_threshold == 0.61
 
 
 def test_peer_vad_slider_change_skips_hidden_field_update_when_view_is_mounted(
@@ -3655,9 +3750,6 @@ def test_audio_change_messages_use_basic_runtime_log(
     assert view._settings.audio.input_host_api == "MME"
     assert view._settings.audio.input_device == "New Mic"
     assert view._settings.desktop_audio.output_device == "New Speakers"
-    assert settings.audio.input_host_api == "MME"
-    assert settings.audio.input_device == "New Mic"
-    assert settings.desktop_audio.output_device == "New Speakers"
     assert len(changed) == 1
     assert changed[0] is not settings
     assert changed[0].audio.input_host_api == "MME"
@@ -3855,6 +3947,7 @@ def test_peer_auto_detection_languages_card_is_visible_only_for_peer_soniox(
 
     settings.provider.peer_stt = STTProviderName.SONIOX
     settings.languages.peer_expected_languages = ["ja"]
+    view._settings = settings
     view._update_api_visibility()
 
     assert view._peer_auto_languages_card.visible is True
@@ -3876,9 +3969,12 @@ def test_overlay_display_toggles_update_persistent_settings(
     view._on_overlay_peer_original_click(None)
     view._on_desktop_overlay_swap_caption_languages_click(None)
 
-    assert settings.overlay.show_translation is False
-    assert settings.overlay.show_peer_original is False
+    assert settings.overlay.show_translation is True
+    assert settings.overlay.show_peer_original is True
     assert settings.overlay.desktop_flet.swap_caption_languages is False
+    assert view._settings.overlay.show_translation is False
+    assert view._settings.overlay.show_peer_original is False
+    assert view._settings.overlay.desktop_flet.swap_caption_languages is True
     assert len(settings_calls) == 3
     assert all(incoming is not settings for incoming in settings_calls)
     assert settings_calls[-1].overlay.show_translation is False
@@ -3949,11 +4045,13 @@ def test_overlay_text_scale_modal_selection_updates_settings_immediately(
 
     view._on_overlay_text_scale_selected("large")
 
-    assert settings.overlay.calibration.text_scale == 1.2
+    assert settings.overlay.calibration.text_scale == 1.0
+    assert view._settings.overlay.calibration.text_scale == 1.2
     assert view._overlay_text_scale_text.content.value == t(
         "settings.overlay.calibration.text_scale.large"
     )
-    assert changed == [settings]
+    assert len(changed) == 1
+    assert changed[0].overlay.calibration.text_scale == 1.2
 
 
 def test_desktop_gui_caption_location_selector_updates_settings_with_localized_choices(
@@ -3996,9 +4094,11 @@ def test_desktop_gui_caption_location_selector_updates_settings_with_localized_c
     assert callable(captured_on_select)
     captured_on_select("desktop")
 
-    assert settings.overlay.target == "desktop"
+    assert settings.overlay.target == "steamvr"
+    assert view._settings.overlay.target == "desktop"
     assert view._overlay_target_button.content.value == t("settings.overlay.target.desktop")
-    assert changed == [settings]
+    assert len(changed) == 1
+    assert changed[0].overlay.target == "desktop"
 
 
 def test_desktop_gui_product_standard_cards_show_current_values_and_desktop_only_controls(
@@ -4128,7 +4228,6 @@ def test_desktop_overlay_swap_caption_languages_emits_copy_without_mutating_load
     assert changed
     assert changed[-1] is not settings
     assert changed[-1].overlay.desktop_flet.swap_caption_languages is True
-    assert view._settings is not changed[-1]
     assert view._settings is not None
     assert view._settings.overlay.desktop_flet.swap_caption_languages is True
 
@@ -4150,7 +4249,6 @@ def test_desktop_gui_background_alpha_emits_copy_without_mutating_loaded_setting
     assert changed
     assert changed[-1] is not settings
     assert changed[-1].overlay.desktop_flet.visual.background_alpha == pytest.approx(0.4)
-    assert view._settings is not changed[-1]
     assert view._settings.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.4)
 
 
@@ -4170,7 +4268,9 @@ def test_desktop_gui_background_transparency_card_clamps_to_zero_and_one(
     assert view._settings.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.0)
     assert view._desktop_overlay_background_alpha_value_text.value == "100%"
 
-    view._settings.overlay.desktop_flet.visual.background_alpha = 0.95
+    current = view._settings
+    current.overlay.desktop_flet.visual.background_alpha = 0.95
+    view._settings = current
     view._sync_desktop_overlay_main_controls()
     view._on_desktop_overlay_background_alpha_step(-0.1)
     view._on_desktop_overlay_background_alpha_step(-0.1)
@@ -4192,11 +4292,13 @@ def test_desktop_gui_size_selection_persists_and_emits_settings(
 
     view._on_desktop_overlay_size_selected("xlarge")
 
-    assert settings.overlay.desktop_flet.size_preset == "xlarge"
+    assert settings.overlay.desktop_flet.size_preset == "medium"
+    assert view._settings.overlay.desktop_flet.size_preset == "xlarge"
     assert view._desktop_overlay_size_button.content.value == t(
         "settings.overlay.desktop.size.option.xlarge"
     )
-    assert changed == [settings]
+    assert len(changed) == 1
+    assert changed[0].overlay.desktop_flet.size_preset == "xlarge"
 
 
 def test_desktop_gui_size_selection_uses_runtime_callback_when_available(
@@ -4464,7 +4566,8 @@ def test_overlay_position_reset_card_separates_vr_and_desktop_reset_actions(
 
     view._on_overlay_position_reset(None)
 
-    assert settings.overlay.calibration.distance == OverlayCalibration().distance
+    assert settings.overlay.calibration.distance == 1.2
+    assert view._settings.overlay.calibration.distance == OverlayCalibration().distance
     assert settings.overlay.desktop_flet.position.x == 80
     assert settings.overlay.desktop_flet.position.y == 90
     assert settings.overlay.desktop_flet.size_preset == "large"
@@ -4473,12 +4576,16 @@ def test_overlay_position_reset_card_separates_vr_and_desktop_reset_actions(
 
     view._on_desktop_overlay_position_reset(None)
 
-    assert settings.overlay.calibration.offset_y == OverlayCalibration().offset_y
-    assert settings.overlay.desktop_flet.position.x is None
-    assert settings.overlay.desktop_flet.position.y is None
+    assert settings.overlay.calibration.offset_y == 0.5
+    assert settings.overlay.desktop_flet.position.x == 80
+    assert settings.overlay.desktop_flet.position.y == 90
     assert settings.overlay.desktop_flet.size_preset == "large"
-    assert settings.overlay.desktop_flet.locked is False
+    assert settings.overlay.desktop_flet.locked is True
     assert settings.overlay.desktop_flet.visual.background_alpha == 0.44
+    assert view._settings.overlay.calibration.offset_y == OverlayCalibration().offset_y
+    assert view._settings.overlay.desktop_flet.position.x is None
+    assert view._settings.overlay.desktop_flet.position.y is None
+    assert view._settings.overlay.desktop_flet.locked is False
     assert view._desktop_overlay_lock_button.content.value == t(
         "settings.overlay.desktop.lock.value.move"
     )
@@ -4616,10 +4723,6 @@ def test_audio_change_updates_desktop_loopback_controls(monkeypatch: pytest.Monk
     assert view._settings.desktop_audio.vad_speech_threshold == 0.72
     assert view._settings.desktop_audio.vad_hangover_ms == 950
     assert view._settings.desktop_audio.vad_pre_roll_ms == 420
-    assert settings.desktop_audio.output_device == "Speakers (Loopback)"
-    assert settings.desktop_audio.vad_speech_threshold == 0.72
-    assert settings.desktop_audio.vad_hangover_ms == 950
-    assert settings.desktop_audio.vad_pre_roll_ms == 420
     assert len(changed) == 4
     assert all(incoming is not settings for incoming in changed)
     assert changed[-1].desktop_audio.output_device == "Speakers (Loopback)"
@@ -5022,7 +5125,7 @@ def test_overlay_distance_step_buttons_apply_immediately(
     view._on_overlay_distance_step(0.05)
     view._on_overlay_distance_step(0.20)
 
-    assert settings.overlay.calibration.distance == 1.35
+    assert view._settings.overlay.calibration.distance == 1.35
     assert view._overlay_distance_value_text.value == "1.35"
 
 
@@ -5036,8 +5139,8 @@ def test_overlay_offset_step_buttons_apply_immediately(
     view._on_overlay_offset_x_step(0.05)
     view._on_overlay_offset_y_step(-0.05)
 
-    assert settings.overlay.calibration.offset_x == 0.05
-    assert settings.overlay.calibration.offset_y == -0.50
+    assert view._settings.overlay.calibration.offset_x == 0.05
+    assert view._settings.overlay.calibration.offset_y == -0.50
     assert view._overlay_offset_x_value_text.value == "0.05"
     assert view._overlay_offset_y_value_text.value == "-0.50"
 
@@ -5066,8 +5169,8 @@ def test_overlay_reset_card_restores_defaults_immediately(
 
     view._on_overlay_position_reset(None)
 
-    assert settings.overlay.calibration.distance == defaults.distance
-    assert settings.overlay.calibration.offset_y == -0.45
+    assert view._settings.overlay.calibration.distance == defaults.distance
+    assert view._settings.overlay.calibration.offset_y == -0.45
     assert view._overlay_distance_value_text.value == view._format_overlay_calibration_number(
         defaults.distance
     )
@@ -5378,8 +5481,10 @@ def test_refresh_prompt_if_empty_stages_default_for_apply(
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
-    view._settings.system_prompt = ""
-    view._settings.system_prompts = {}
+    blank_prompt_settings = view._settings
+    blank_prompt_settings.system_prompt = ""
+    blank_prompt_settings.system_prompts = {}
+    view._settings = blank_prompt_settings
     view._provider_settings_draft = None
     view.has_provider_changes = False
     view.has_pending_prompt_changes = False
@@ -5450,9 +5555,11 @@ def test_on_vrc_mic_click_toggles_without_page(monkeypatch: pytest.MonkeyPatch) 
 
     view._on_vrc_mic_click(None)
 
-    assert settings.osc.vrc_mic_intercept is True
+    assert settings.osc.vrc_mic_intercept is False
+    assert view._settings.osc.vrc_mic_intercept is True
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
-    assert changed == [settings]
+    assert len(changed) == 1
+    assert changed[0].osc.vrc_mic_intercept is True
     assert modal_calls == []
 
 
@@ -5481,9 +5588,11 @@ def test_on_vrc_mic_click_toggles_immediately_without_modal(
 
     view._on_vrc_mic_click(None)
 
-    assert settings.osc.vrc_mic_intercept is False
+    assert settings.osc.vrc_mic_intercept is True
+    assert view._settings.osc.vrc_mic_intercept is False
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.off")
-    assert changed == [settings]
+    assert len(changed) == 1
+    assert changed[0].osc.vrc_mic_intercept is False
     assert modal_calls == []
 
 
@@ -5500,9 +5609,11 @@ def test_on_vrc_mic_selected_updates_setting_label_and_emits_change(
 
     view._on_vrc_mic_selected("on")
 
-    assert settings.osc.vrc_mic_intercept is True
+    assert settings.osc.vrc_mic_intercept is False
+    assert view._settings.osc.vrc_mic_intercept is True
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
-    assert changed == [settings]
+    assert len(changed) == 1
+    assert changed[0].osc.vrc_mic_intercept is True
 
 
 def test_on_vrc_mic_selected_without_settings_returns_early(
@@ -5820,14 +5931,14 @@ def test_custom_vocabulary_token_input_persists_unique_space_terms_and_emits_onc
 
     assert view._custom_vocab_tag_editor.on_add_terms is not None
     assert view._custom_vocab_tag_editor._input_field.value == ""  # noqa: SLF001
-    assert settings.stt.custom_vocabulary_enabled is True
-    assert settings.stt.custom_terms == {
+    assert view._settings.stt.custom_vocabulary_enabled is True
+    assert view._settings.stt.custom_terms == {
         "ko": ["Puripuly", "VRChat", "Soniox"],
         "en": ["Avatar"],
     }
     assert _custom_vocab_chip_terms(view) == ["Puripuly", "VRChat", "Soniox"]
     assert len(changed) == 1
-    assert changed[-1].stt.custom_terms == settings.stt.custom_terms
+    assert changed[-1].stt.custom_terms == view._settings.stt.custom_terms
     assert changed[-1].stt.custom_vocabulary_enabled is True
     assert detailed_messages == ["[Settings] Custom vocabulary applied: language=ko, terms=3"]
 
@@ -5848,7 +5959,7 @@ def test_custom_vocabulary_add_normalizes_direct_raw_terms_exact_case_sensitive(
     view._on_custom_vocabulary_add_terms([" puripuly Puripuly\nPURIPULY ", " "])
 
     assert view._custom_vocab_tag_editor._input_field.value == ""  # noqa: SLF001
-    assert settings.stt.custom_terms == {
+    assert view._settings.stt.custom_terms == {
         "ko": ["Puripuly", "puripuly", "PURIPULY"],
         "en": ["Avatar"],
     }
@@ -5922,11 +6033,11 @@ def test_custom_vocabulary_remove_control_persists_current_bucket_and_emits_once
     chip = view._custom_vocab_tag_editor._chips_wrap.controls[0]  # noqa: SLF001
     chip.on_click(None)
 
-    assert settings.stt.custom_vocabulary_enabled is True
-    assert settings.stt.custom_terms == {"ko": ["VRChat"], "en": ["Avatar"]}
+    assert view._settings.stt.custom_vocabulary_enabled is True
+    assert view._settings.stt.custom_terms == {"ko": ["VRChat"], "en": ["Avatar"]}
     assert _custom_vocab_chip_terms(view) == ["VRChat"]
     assert len(changed) == 1
-    assert changed[-1].stt.custom_terms == settings.stt.custom_terms
+    assert changed[-1].stt.custom_terms == view._settings.stt.custom_terms
     assert detailed_messages == ["[Settings] Custom vocabulary applied: language=ko, terms=1"]
 
 
@@ -5945,8 +6056,8 @@ def test_custom_vocabulary_remove_last_term_derives_disabled_state(
 
     view._on_custom_vocabulary_remove_term("Puripuly")
 
-    assert settings.stt.custom_terms == {"ko": [], "en": []}
-    assert settings.stt.custom_vocabulary_enabled is False
+    assert view._settings.stt.custom_terms == {"ko": [], "en": []}
+    assert view._settings.stt.custom_vocabulary_enabled is False
     assert _custom_vocab_chip_terms(view) == []
     assert len(changed) == 1
     assert changed[-1].stt.custom_vocabulary_enabled is False
@@ -5974,11 +6085,11 @@ def test_custom_vocabulary_add_caps_partial_terms_and_shows_snackbar(
 
     view._on_custom_vocabulary_add_terms(["fits overflow"])
 
-    assert settings.stt.custom_terms == {
+    assert view._settings.stt.custom_terms == {
         "ko": [*existing_terms, "fits"],
         "en": ["Avatar"],
     }
-    assert settings.stt.custom_vocabulary_enabled is True
+    assert view._settings.stt.custom_vocabulary_enabled is True
     assert _custom_vocab_chip_terms(view)[-1] == "fits"
     assert len(changed) == 1
     assert snackbars == [

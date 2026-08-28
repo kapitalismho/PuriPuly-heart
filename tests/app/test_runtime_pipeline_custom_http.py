@@ -19,6 +19,7 @@ from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
     PrebuiltLocalASRProviderRuntimeFactory,
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from tests.helpers.runtime_pipeline import pipeline_inputs_from_legacy
 
 
 class RecordingRelease:
@@ -92,9 +93,6 @@ async def test_custom_http_pipeline_skips_managed_rebuild_and_owns_backend_close
     created: list[object] = []
 
     monkeypatch.setattr(
-        runtime_module, "create_secret_store", lambda *_a, **_k: InMemorySecretStore()
-    )
-    monkeypatch.setattr(
         runtime_module,
         "create_translation_backend",
         lambda *_a, **_k: (created.append(backend), backend)[1],
@@ -103,7 +101,8 @@ async def test_custom_http_pipeline_skips_managed_rebuild_and_owns_backend_close
     monkeypatch.setattr(runtime_module, "ChatboxPaginator", lambda *_a, **_k: RecordingChatbox())
 
     pipeline = await compose_runtime_pipeline(
-        settings=settings,
+        inputs=pipeline_inputs_from_legacy(settings),
+        secrets=InMemorySecretStore(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
         runtime_logging=None,

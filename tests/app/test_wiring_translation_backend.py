@@ -2,11 +2,25 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import get_type_hints
 
 import pytest
 
 from puripuly_heart.app.wiring import wiring_translation_backend as wiring_module
+from puripuly_heart.app.wiring.root import (
+    create_llm_provider as create_exported_llm_provider,
+)
+from puripuly_heart.app.wiring.root import (
+    create_llm_provider_from_resolved_config as create_exported_llm_provider_from_resolved_config,
+)
+from puripuly_heart.app.wiring.wiring_llm_factory import (
+    create_llm_provider,
+    llm_factory_extras_from_vnext,
+    runtime_resolution_input_from_vnext,
+)
+from puripuly_heart.app.wiring.wiring_provider_runtime import compose_provider_runtime
 from puripuly_heart.app.wiring.wiring_provider_runtime_policy import build_llm_provider_signature
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import compose_runtime_pipeline
 from puripuly_heart.app.wiring.wiring_translation_backend import create_translation_backend
 from puripuly_heart.config.settings import (
     AppSettings,
@@ -14,7 +28,10 @@ from puripuly_heart.config.settings import (
     TranslationModel,
     TranslationSettings,
 )
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
+from puripuly_heart.core.observability import ProviderObservationPort
+from puripuly_heart.core.orchestrator.ports import TranslationRuntimeLoggingPort
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.translation_backend import LlmTranslationBackend
 from puripuly_heart.providers.extensions.http_extension_backend import (
@@ -71,9 +88,11 @@ async def test_custom_http_factory_creates_only_the_extension_backend(
     )
 
     backend = create_translation_backend(
-        settings,
+        translation_model=settings.translation.model,
         secrets=InMemorySecretStore(),
         http_extensions=registry,
+        http_extension_id=settings.translation.http_extension_id,
+        concurrency_limit=settings.llm.concurrency_limit,
         managed_release_service=pytest.fail,
     )
 
@@ -88,9 +107,10 @@ def test_custom_http_factory_rejects_missing_selected_extension(tmp_path: Path) 
 
     with pytest.raises(ValueError, match="selected HTTP extension is unavailable"):
         create_translation_backend(
-            settings,
+            translation_model=settings.translation.model,
             secrets=InMemorySecretStore(),
             http_extensions=_registry(tmp_path),
+            http_extension_id=settings.translation.http_extension_id,
         )
 
 
@@ -98,35 +118,58 @@ def test_llm_factory_path_remains_delegated(monkeypatch: pytest.MonkeyPatch) -> 
     settings = AppSettings()
     expected = object()
     calls: list[object] = []
+    runtime_input = runtime_resolution_input_from_vnext(from_legacy_app_settings(settings))
 
-    def create_llm(settings_value: object, **_kwargs: object) -> object:
-        calls.append(settings_value)
+    def create_llm(runtime_input_value: object, **_kwargs: object) -> object:
+        calls.append(runtime_input_value)
         return expected
 
     monkeypatch.setattr(wiring_module, "create_llm_provider", create_llm)
 
     result = create_translation_backend(
-        settings,
+        translation_model=settings.translation.model,
         secrets=InMemorySecretStore(),
         http_extensions=HttpExtensionRegistry(Path("unused")),
+        runtime_input=runtime_input,
+        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
     )
 
     assert isinstance(result, LlmTranslationBackend)
     assert result.provider is expected
-    assert calls == [settings]
+    assert calls == [runtime_input]
+
+
+def test_provider_observation_capability_is_typed_through_production_composition() -> None:
+    provider_observation = ProviderObservationPort | None
+
+    assert get_type_hints(create_llm_provider)["runtime_logging"] == provider_observation
+    assert get_type_hints(create_exported_llm_provider)["runtime_logging"] == provider_observation
+    assert (
+        get_type_hints(create_exported_llm_provider_from_resolved_config)["runtime_logging"]
+        == provider_observation
+    )
+    assert get_type_hints(create_translation_backend)["runtime_logging"] == provider_observation
+    assert get_type_hints(compose_provider_runtime)["runtime_logging"] is ProviderObservationPort
+    assert (
+        get_type_hints(compose_runtime_pipeline)["runtime_logging"] is TranslationRuntimeLoggingPort
+    )
 
 
 def test_custom_http_definition_fingerprint_rebuilds_runtime_signature(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
     settings = _custom_settings()
 
-    before = build_llm_provider_signature(settings, http_extensions=registry)
+    before = build_llm_provider_signature(
+        from_legacy_app_settings(settings), http_extensions=registry
+    )
     extension_path = tmp_path / "libretranslate.json"
     changed = json.loads(extension_path.read_text(encoding="utf-8"))
     changed["description"] = "Changed local definition"
     extension_path.write_text(json.dumps(changed), encoding="utf-8")
     registry.reload()
-    after = build_llm_provider_signature(settings, http_extensions=registry)
+    after = build_llm_provider_signature(
+        from_legacy_app_settings(settings), http_extensions=registry
+    )
 
     assert before != after
     assert "local-secret" not in repr(after)

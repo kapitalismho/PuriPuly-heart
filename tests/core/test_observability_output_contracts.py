@@ -51,6 +51,21 @@ def test_observability_contracts_are_import_safe_protocol_sinks() -> None:
         _assert_protocol_method_is_async(sink, method_name)
 
 
+def test_provider_observation_port_exposes_only_basic_observation() -> None:
+    observability = importlib.import_module("puripuly_heart.core.observability")
+    port = observability.ProviderObservationPort
+
+    assert getattr(port, "_is_protocol", False)
+    assert not inspect.iscoroutinefunction(port.emit_basic)
+    assert {
+        name
+        for name, value in port.__dict__.items()
+        if callable(value) and not name.startswith("_")
+    } == {"emit_basic"}
+    hints = get_type_hints(port.emit_basic)
+    assert hints == {"message": str, "level": int, "return": type(None)}
+
+
 def test_structured_observability_events_use_safe_message_contracts() -> None:
     observability = importlib.import_module("puripuly_heart.core.observability")
     diagnostic = messages.ErrorDiagnostics(

@@ -1152,7 +1152,7 @@ def test_shared_setup_action_installs_pinned_uv_and_uses_frozen_sync() -> None:
         encoding="utf-8"
     )
 
-    assert "uses: actions/setup-python@v5" in action
+    assert "uses: actions/setup-python@v7" in action
     assert "cache-dependency-path: uv.lock" in action
     assert '"uv==${{ inputs.uv-version }}"' in action
     assert "uv sync ${{ inputs.sync-args }} --frozen" in action

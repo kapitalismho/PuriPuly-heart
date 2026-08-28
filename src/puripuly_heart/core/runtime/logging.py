@@ -7,16 +7,16 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Protocol
 
-from puripuly_heart.core.runtime_logging import SessionLoggingMode, SessionRuntimeLoggingService
+from puripuly_heart.core.observability import RealtimeLogSink, SessionLoggingMode
 
 
-class _SessionRuntimeLogging(Protocol):
+class RuntimeLoggingAdapterPort(Protocol):
     mode: SessionLoggingMode
     log_file: Path
 
     def set_mode(self, mode: SessionLoggingMode | str) -> None: ...
 
-    def attach_realtime_sink(self, sink: object) -> None: ...
+    def attach_realtime_sink(self, sink: RealtimeLogSink) -> None: ...
 
     def detach_realtime_sink(self) -> None: ...
 
@@ -33,7 +33,7 @@ class _SessionRuntimeLogging(Protocol):
 
     def emit_persisted(self, message: str, *, level: int = logging.INFO) -> None: ...
 
-    def close(self) -> None: ...
+    def close_terminal_owner(self) -> None: ...
 
 
 class RuntimeLoggingCloseError(RuntimeError):
@@ -69,15 +69,15 @@ class RuntimeLoggingService:
     def __init__(
         self,
         *,
-        session_service: _SessionRuntimeLogging | None = None,
-        session_factory: Callable[[], _SessionRuntimeLogging] | None = None,
+        session_service: RuntimeLoggingAdapterPort | None = None,
+        session_factory: Callable[[], RuntimeLoggingAdapterPort] | None = None,
         fallback_logger: logging.Logger | None = None,
     ) -> None:
         if session_service is not None and session_factory is not None:
             raise ValueError("Provide either session_service or session_factory, not both")
-        self._session = session_service or (
-            session_factory() if session_factory is not None else SessionRuntimeLoggingService()
-        )
+        if session_service is None and session_factory is None:
+            raise ValueError("A runtime logging adapter or factory is required")
+        self._session = session_service if session_service is not None else session_factory()
         self._fallback_logger = fallback_logger
         self._closed = False
         self._mode = self._session.mode
@@ -115,7 +115,7 @@ class RuntimeLoggingService:
             return
         self._session.set_mode(self._mode)
 
-    def attach_realtime_sink(self, sink: object) -> None:
+    def attach_realtime_sink(self, sink: RealtimeLogSink) -> None:
         if self._closed:
             return
         self._session.attach_realtime_sink(sink)
@@ -181,7 +181,7 @@ class RuntimeLoggingService:
             close_failures.append(exc)
         finally:
             self._closed = True
-            self._mode = getattr(self._session, "mode", self._mode)
+            self._mode = self._session.mode
 
         if close_failures:
             self._emit_close_failure_diagnostic(close_failures)
@@ -200,11 +200,7 @@ class RuntimeLoggingService:
         )
 
     def _close_session_as_logging_owner(self) -> None:
-        close_terminal_owner = getattr(self._session, "close_terminal_owner", None)
-        if callable(close_terminal_owner):
-            close_terminal_owner()
-            return
-        self._session.close()
+        self._session.close_terminal_owner()
 
     def _emit_fallback(
         self,

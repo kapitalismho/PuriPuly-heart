@@ -16,6 +16,7 @@ from puripuly_heart.app.adapters.peer_capture_target_resolver import (
 from puripuly_heart.app.services.peer_capture_target_application import (
     PeerCaptureTargetApplicationOwner,
 )
+from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
 
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import AppSettings
@@ -480,7 +481,7 @@ def test_loopback_summary_prefers_localized_process_name() -> None:
         executable_identity=r"c:\vrchat\vrchat.exe",
     )
     set_locale("en")
-    assert owner.summary(settings) == t("settings.desktop_audio.process.vrchat")
+    assert owner.summary() == t("settings.desktop_audio.process.vrchat")
     for channel, basename, key in (
         ("stable", "Discord.exe", "settings.desktop_audio.process.discord_stable"),
         ("ptb", "DiscordPTB.exe", "settings.desktop_audio.process.discord_ptb"),
@@ -492,13 +493,13 @@ def test_loopback_summary_prefers_localized_process_name() -> None:
             discord_channel=channel,
             executable_basename=basename,
         )
-        assert owner.summary(settings) == t(key)
+        assert owner.summary() == t(key)
     settings.desktop_audio.runtime_capture_target = ResolvedDesktopAudioCaptureTarget(
         kind="process",
         process_kind="generic_executable",
         executable_identity=r"c:\apps\game\game.exe",
     )
-    assert owner.summary(settings) == "game"
+    assert owner.summary() == "game"
 
 
 def test_list_options_preserves_saved_process_when_stopped() -> None:
@@ -544,17 +545,56 @@ def test_settings_capture_target_refresh_preserves_unrelated_drafts() -> None:
     view.on_loopback_capture_summary = lambda: "VRChat"
     saved = AppSettings()
     saved.desktop_audio.output_device = "Saved device"
+    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(saved)
+    provider_before = view._provider_snapshot
+    provider_draft_before = view._provider_draft
 
-    view.refresh_loopback_capture_target(saved)
+    view.refresh_loopback_capture_target(general)
 
-    assert view._settings is baseline_settings
-    assert view._provider_settings_draft is provider_draft
-    assert view._provider_settings_draft.system_prompt == "provider draft"
+    assert view._provider_snapshot == provider_before
+    assert view._provider_draft == provider_draft_before
     assert view.has_provider_changes is True
     assert view.has_pending_prompt_changes is True
     assert view._desktop_overlay_pending_size_preset == "large"
     assert view._audio_settings.desktop_output_device == "Saved device"
     assert view._loopback_audio_text.content.value == "VRChat"
+
+
+@pytest.mark.asyncio
+async def test_capture_target_owner_publishes_general_snapshot_after_apply() -> None:
+    current = AppSettings()
+    next_settings = copy.deepcopy(current)
+    next_settings.desktop_audio.output_device = "Headset"
+    projections: list[AppSettings] = []
+    presented: list[object] = []
+    settings = SimpleNamespace(
+        current=current,
+        authoritative=False,
+        update_capture_target=lambda _current, _intent: next_settings,
+        remember_projection=lambda value: projections.append(value),
+    )
+
+    async def apply_capture_target(_settings: AppSettings) -> None:
+        return None
+
+    owner = PeerCaptureTargetApplicationOwner(
+        settings=settings,
+        localize=t,
+        processes=SimpleNamespace(candidates=lambda: ()),
+        devices=SimpleNamespace(names=lambda: ()),
+        runtime_effects=SimpleNamespace(apply_capture_target=apply_capture_target),
+        settings_presentation_sink=presented.append,
+        warning_reset=lambda: None,
+    )
+
+    await owner.apply("device:Headset")
+
+    assert settings.current is next_settings
+    assert settings.authoritative is True
+    assert projections == [next_settings]
+    assert len(presented) == 1
+    assert presented[0].output_device == "Headset"
+    assert not isinstance(presented[0], AppSettings)
 
 
 @pytest.mark.parametrize(
@@ -610,17 +650,18 @@ def test_settings_capture_target_rebase_updates_all_retained_apply_sources(
     committed = AppSettings()
     committed.desktop_audio.output_device = committed_output
     committed.desktop_audio.runtime_capture_target = committed_target
+    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(committed)
+    provider_before = view._provider_snapshot
+    provider_draft_before = view._provider_draft
+    prompt_before = view._prompt_snapshot
 
-    view.refresh_loopback_capture_target(committed)
-    view.refresh_loopback_capture_target(committed)
+    view.refresh_loopback_capture_target(general)
+    view.refresh_loopback_capture_target(general)
 
-    for rebased in (retained, draft):
-        assert rebased.desktop_audio.output_device == committed_output
-        assert rebased.desktop_audio.runtime_capture_target == committed_target
-    assert retained.stt.vad_speech_threshold == 0.31
-    assert draft.stt.vad_speech_threshold == 0.73
-    assert retained.system_prompt == "retained prompt"
-    assert draft.system_prompt == "draft prompt"
+    assert view._general_snapshot.output_device == committed_output
+    assert view._provider_snapshot == provider_before
+    assert view._provider_draft == provider_draft_before
+    assert view._prompt_snapshot == prompt_before
     assert view.has_provider_changes is True
     assert view.has_pending_prompt_changes is True
 

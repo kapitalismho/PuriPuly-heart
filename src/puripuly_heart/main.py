@@ -265,15 +265,8 @@ def _verify_desktop_overlay_repro(*, output_dir: Path) -> int:
 def _load_settings_or_default(
     path: Path,
 ) -> AppSettingsVNext:
-    from dataclasses import replace
-
-    from puripuly_heart.config.settings import detect_system_locale, resolve_first_run_ui_locale
+    from puripuly_heart.config.settings_vnext.defaults import new_settings_for_first_run
     from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
-    from puripuly_heart.config.settings_vnext.schema import (
-        DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
-        AppSettingsVNext,
-        TranslationFallbackIntent,
-    )
 
     if path.exists():
         result = load_vnext_settings(path)
@@ -283,44 +276,7 @@ def _load_settings_or_default(
             )
         return result.settings
 
-    settings = AppSettingsVNext()
-    system_locale = detect_system_locale()
-    locale_value = resolve_first_run_ui_locale(system_locale)
-    translation = replace(
-        settings.intent.translation,
-        fallback=TranslationFallbackIntent(
-            selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
-        ),
-    )
-    if locale_value == "zh-CN":
-        translation = replace(
-            translation,
-            model="deepseek_v4_flash",
-            connection="managed_china",
-            openrouter_model="deepseek/deepseek-v4-flash-0731",
-            openrouter_selection_alias="deepseek_v4_flash_managed",
-            openrouter_provider_routing="deepseek_only",
-        )
-    settings = replace(settings, intent=replace(settings.intent, translation=translation))
-    if locale_value:
-        settings = replace(
-            settings,
-            intent=replace(settings.intent, ui=replace(settings.intent.ui, locale=locale_value)),
-        )
-
-    if not settings.intent.prompts.system_prompt:
-        from puripuly_heart.config.prompts import load_prompt_for_provider
-        from puripuly_heart.config.settings import LLMProviderName
-
-        default_prompt = load_prompt_for_provider(LLMProviderName.GEMINI.value)
-        settings = replace(
-            settings,
-            intent=replace(
-                settings.intent,
-                prompts=replace(settings.intent.prompts, system_prompt=default_prompt),
-            ),
-        )
-    return settings
+    return new_settings_for_first_run()
 
 
 def _settings_config_path(args: argparse.Namespace) -> tuple[Path, bool]:

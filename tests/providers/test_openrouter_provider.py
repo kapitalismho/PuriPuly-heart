@@ -13,7 +13,10 @@ from puripuly_heart.config.runtime_resolution import (
     TranslationRuntimeIntent,
     resolve_llm_config,
 )
-from puripuly_heart.config.settings import OpenRouterProviderRouting, OpenRouterRoutingMode
+from puripuly_heart.core.openrouter_routing import (
+    OpenRouterProviderRouting,
+    OpenRouterRoutingMode,
+)
 from puripuly_heart.providers.llm.openrouter import (
     HttpxOpenRouterClient,
     OpenRouterClient,

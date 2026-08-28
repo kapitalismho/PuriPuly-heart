@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,6 +12,7 @@ pytest.importorskip("flet")
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
+from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -75,13 +77,14 @@ def _view(
     monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
-    monkeypatch.setattr(settings_view, "create_secret_store", lambda *_args, **_kwargs: store)
-    return settings_view.SettingsView(
+    view = settings_view.SettingsView(
         http_extension_registry=HttpExtensionRegistryService(
             registry,
             directory_opener,
         )
     )
+    view._settings_secrets = SettingsSecretsOwner(secret_store_factory=lambda: store)
+    return view
 
 
 def _custom_settings() -> AppSettings:
@@ -232,7 +235,10 @@ def test_custom_http_reload_uses_active_engine_with_unsaved_llm_draft(
     view.load_from_settings(settings, config_path=tmp_path / "settings.json")
 
     draft = view._ensure_provider_settings_draft()
-    draft.translation.model = TranslationModel.QWEN_35_PLUS
+    view._provider_draft = replace(
+        draft,
+        translation=replace(draft.translation, model=TranslationModel.QWEN_35_PLUS),
+    )
     changed: list[bool] = []
     view.on_providers_changed = lambda: changed.append(True)
 
@@ -245,8 +251,8 @@ def test_custom_http_reload_uses_active_engine_with_unsaved_llm_draft(
 
     assert changed == [True]
     assert view.consume_http_extension_runtime_reload() is True
-    assert view._settings.translation.model is TranslationModel.CUSTOM_HTTP
-    assert view._provider_settings_draft.translation.model is TranslationModel.QWEN_35_PLUS
+    assert view._provider_snapshot.translation.model is TranslationModel.CUSTOM_HTTP
+    assert view._provider_draft.translation.model is TranslationModel.QWEN_35_PLUS
 
 
 def test_custom_http_card_surfaces_missing_selected_extension_without_fallback(

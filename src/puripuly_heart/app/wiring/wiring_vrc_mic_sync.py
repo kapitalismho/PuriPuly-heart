@@ -15,16 +15,17 @@ from puripuly_heart.app.services.vrc_mic_sync import (
     VrcMicSyncOwner,
 )
 from puripuly_heart.core.osc.oscquery import ZeroconfOscQueryService
-from puripuly_heart.core.osc.receiver import (
+from puripuly_heart.core.osc.receiver import VrcOscReceiver
+from puripuly_heart.core.osc.receiver_contract import (
     VRC_OSC_RECEIVER_HOST,
     VRC_OSC_RECEIVER_PORT,
-    VrcOscReceiver,
+    VrcMicState,
 )
 
 
 def compose_vrc_mic_sync(
     *,
-    state_provider: Callable[[], object | None],
+    state_provider: Callable[[], VrcMicState | None],
     gate_provider: Callable[[], VrcMicAudioGatePort | None],
     log_detailed: Callable[[str, int], None],
     error_sink: Callable[[str], None],
@@ -33,10 +34,12 @@ def compose_vrc_mic_sync(
     application_provider: Callable[[], object | None],
     sender_provider: Callable[[], object | None],
     osc_state_provider: Callable[[], OscCanonicalState],
-    ui_state_provider: Callable[[OscControlPresentationName], OscControlPresentationState],
-    ui_state_sink: Callable[[OscControlPresentationState], None],
     language_state_provider: Callable[[], tuple[str, str, str, str]],
     translation_model_normalizer: Callable[[object], object],
+    ui_state_provider: (
+        Callable[[OscControlPresentationName], OscControlPresentationState] | None
+    ) = None,
+    ui_state_sink: Callable[[OscControlPresentationState], None] | None = None,
     query_service: OscQueryServicePort | None = None,
 ) -> OscControlIntegrationOwner:
     def diagnostics_sink(event: str, metadata: Mapping[str, object]) -> None:
@@ -48,7 +51,7 @@ def compose_vrc_mic_sync(
     receiver_owner = VrcMicSyncOwner(
         state_provider=state_provider,
         gate_provider=gate_provider,
-        receiver_factory=lambda **kwargs: VrcOscReceiver(**kwargs),
+        receiver_factory=VrcOscReceiver,
         diagnostics_sink=diagnostics_sink,
         error_sink=error_sink,
         host=VRC_OSC_RECEIVER_HOST,

@@ -10,6 +10,7 @@ import json
 import logging
 import math
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Callable, Mapping
 
@@ -17,11 +18,74 @@ import flet as ft
 from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
+from puripuly_heart.app.ports.settings_secrets import (
+    SettingsSecretKey,
+    SettingsSecretLoadResult,
+    SettingsSecretMutation,
+    SettingsSecretSnapshot,
+    SettingsSecretsPort,
+)
+from puripuly_heart.app.ports.settings_view import (
+    AudioInputSettingsIntent,
+    AudioSettingsIntent,
+    ChatboxSourceSettingsIntent,
+    ClipboardSettingsIntent,
+    CustomSttEndpointEdit,
+    CustomSttExtraEdit,
+    CustomSttModelEdit,
+    CustomVocabularySettingsIntent,
+    DesktopAudioOutputSettingsIntent,
+    DesktopOverlayBackgroundAlphaIntent,
+    DesktopOverlayPositionResetIntent,
+    DesktopOverlaySizeIntent,
+    DesktopOverlaySwapCaptionLanguagesIntent,
+    GeneralSettingsSnapshot,
+    ImmediateSettingsIntent,
+    LlmGpuDeviceEdit,
+    LocaleSettingsIntent,
+    LocalLlmBaseUrlEdit,
+    LocalLlmExtraBodyEdit,
+    LocalLlmModelEdit,
+    ManagedReferralEdit,
+    OpenRouterPkceTarget,
+    OscConnectionSettingsIntent,
+    OverlayCalibrationSettingsIntent,
+    OverlayCalibrationSnapshot,
+    OverlayPeerOriginalSettingsIntent,
+    OverlaySettingsSnapshot,
+    OverlayTargetSettingsIntent,
+    OverlayTranslationSettingsIntent,
+    PeerExpectedLanguagesIntent,
+    PeerSttProviderEdit,
+    PeerVadHangoverIntent,
+    PeerVadPreRollIntent,
+    PeerVadSpeechThresholdIntent,
+    PromptApplyIntent,
+    PromptSettingsSnapshot,
+    ProviderApplyIntent,
+    ProviderSettingsEdit,
+    ProviderSettingsSnapshot,
+    QwenRegionEdit,
+    SelfSttProviderEdit,
+    SelfVadSettingsIntent,
+    SttGpuDeviceEdit,
+    SystemPromptEdit,
+    TranslationFallbackEdit,
+    TranslationFallbackSnapshot,
+    TranslationHttpExtensionEdit,
+    TranslationSelectionEdit,
+    TranslationSelectionSnapshot,
+    VrcMicInterceptSettingsIntent,
+)
 from puripuly_heart.app.ports.ui_models import OscControlPresentationState
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
-from puripuly_heart.app.wiring import create_secret_store
+from puripuly_heart.config.desktop_overlay_values import (
+    DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
+    DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER,
+    DESKTOP_FLET_SIZE_PRESET_ORDER,
+)
 from puripuly_heart.config.llm_profiles import (
     profile_for_alias,
 )
@@ -30,33 +94,30 @@ from puripuly_heart.config.overlay_calibration import (
     OverlayCalibration,
 )
 from puripuly_heart.config.prompts import load_prompt_for_provider
-from puripuly_heart.config.settings import (
-    DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
-    DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER,
-    DESKTOP_FLET_SIZE_PRESET_ORDER,
+from puripuly_heart.config.provider_values import (
     LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
     LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS,
     MAX_CUSTOM_VOCAB_TERMS,
-    OVERLAY_TARGET_DESKTOP,
-    OVERLAY_TARGET_STEAMVR,
-    AppSettings,
     LLMProviderName,
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
     QwenRegion,
     STTProviderName,
-    TranslationConnection,
-    TranslationFallbackSettings,
-    TranslationModel,
-    _normalize_local_llm_base_url,
-    default_translation_connection,
     display_stt_provider,
     is_custom_stt_provider,
-    materialize_translation_settings,
+    normalize_local_llm_base_url,
     normalize_owned_referral_id,
+)
+from puripuly_heart.config.resolved import (
+    OVERLAY_TARGET_DESKTOP,
+    OVERLAY_TARGET_STEAMVR,
+)
+from puripuly_heart.config.translation_values import (
+    TranslationConnection,
+    TranslationModel,
+    default_translation_connection,
     supported_translation_connections,
-    with_telemetry_enabled,
 )
 from puripuly_heart.core.http_extensions import http_extension_secret_key
 from puripuly_heart.core.language import get_stt_compatibility_warning
@@ -240,15 +301,19 @@ _TRANSLATION_MODELS_WITHOUT_PROVIDER_FALLBACK = frozenset(
         TranslationModel.LOCAL_LLM,
     }
 )
-_TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str], ...] = (
+_TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSnapshot, str], ...] = (
     (
         "none",
-        TranslationFallbackSettings(enabled=False),
+        TranslationFallbackSnapshot(
+            enabled=False,
+            model=TranslationModel.DEEPSEEK_V4_FLASH,
+            connection=TranslationConnection.OFFICIAL_BYOK,
+        ),
         "settings.fallback.none",
     ),
     (
         "deepseek_v4_flash_official",
-        TranslationFallbackSettings(
+        TranslationFallbackSnapshot(
             enabled=True,
             model=TranslationModel.DEEPSEEK_V4_FLASH,
             connection=TranslationConnection.OFFICIAL_BYOK,
@@ -257,7 +322,7 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str
     ),
     (
         "openrouter_deepseek_v4_flash",
-        TranslationFallbackSettings(
+        TranslationFallbackSnapshot(
             enabled=True,
             model=TranslationModel.DEEPSEEK_V4_FLASH,
             connection=TranslationConnection.OPENROUTER,
@@ -266,7 +331,7 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str
     ),
     (
         "openrouter_gemma4_26b_31b",
-        TranslationFallbackSettings(
+        TranslationFallbackSnapshot(
             enabled=True,
             model=TranslationModel.GEMMA4_26B_31B,
             connection=TranslationConnection.OPENROUTER,
@@ -275,7 +340,7 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str
     ),
     (
         "openrouter_gemma4_31b",
-        TranslationFallbackSettings(
+        TranslationFallbackSnapshot(
             enabled=True,
             model=TranslationModel.GEMMA4_31B,
             connection=TranslationConnection.OPENROUTER,
@@ -284,7 +349,7 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str
     ),
     (
         "openrouter_gemma4_26b_a4b",
-        TranslationFallbackSettings(
+        TranslationFallbackSnapshot(
             enabled=True,
             model=TranslationModel.GEMMA4,
             connection=TranslationConnection.OPENROUTER,
@@ -293,7 +358,7 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str
     ),
     (
         "cerebras_gemma4_31b",
-        TranslationFallbackSettings(
+        TranslationFallbackSnapshot(
             enabled=True,
             model=TranslationModel.GEMMA4_31B,
             connection=TranslationConnection.CEREBRAS,
@@ -373,20 +438,6 @@ def _make_overlay_anchor_dropdown(value: str, on_change) -> ft.Dropdown:
     )
 
 
-def _load_secret_value(store, key: str, *, legacy_keys: tuple[str, ...] = ()) -> str:
-    """Load secret value with legacy key fallback."""
-    value = store.get(key) or ""
-    if value or not legacy_keys:
-        return value
-    for legacy_key in legacy_keys:
-        legacy_value = store.get(legacy_key) or ""
-        if legacy_value:
-            with contextlib.suppress(Exception):
-                store.set(key, legacy_value)
-            return legacy_value
-    return ""
-
-
 def _weighted_len(text: str) -> int:
     return sum(2 if ord(char) >= _CJK_START else 1 for char in text)
 
@@ -429,12 +480,12 @@ class SettingsView(ft.Column):
         super().__init__(expand=True, spacing=16)
 
         # Callbacks (assigned by App)
-        self.on_settings_changed: Callable[[AppSettings], None] | None = None
-        self.on_prompt_apply_settings: Callable[[AppSettings], None] | None = None
+        self.on_settings_changed: Callable[[ImmediateSettingsIntent], None] | None = None
+        self.on_prompt_apply_settings: Callable[[PromptApplyIntent], None] | None = None
         self.on_providers_changed: Callable[[], None] | None = None
         self.on_local_llm_secret_changed: Callable[[], None] | None = None
         self.on_custom_stt_secret_changed: Callable[[], None] | None = None
-        self.on_request_openrouter_pkce: Callable[[AppSettings], None] | None = None
+        self.on_request_openrouter_pkce: Callable[[OpenRouterPkceTarget], None] | None = None
         self.on_verify_api_key: Callable[[str, str], object] | None = None
         self.on_provider_secret_change: Callable[[str, str], object] | None = None
         self.on_secret_cleared: Callable[[str], None] | None = None  # key name
@@ -462,6 +513,7 @@ class SettingsView(ft.Column):
         self.show_snackbar: Callable[[str, str], None] | None = None
         self.runtime_log_basic: Callable[..., None] | None = None
         self.runtime_log_detailed: Callable[..., None] | None = None
+        self._settings_secrets: SettingsSecretsPort | None = None
 
         self._http_extensions = (
             http_extension_registry
@@ -475,8 +527,12 @@ class SettingsView(ft.Column):
         self._http_extension_runtime_reload_pending = False
 
         # State
-        self._settings: AppSettings | None = None
-        self._provider_settings_draft: AppSettings | None = None
+        self._provider_snapshot: ProviderSettingsSnapshot | None = None
+        self._provider_draft: ProviderSettingsSnapshot | None = None
+        self._provider_edits: dict[type, ProviderSettingsEdit] = {}
+        self._general_snapshot: GeneralSettingsSnapshot | None = None
+        self._prompt_snapshot: PromptSettingsSnapshot | None = None
+        self._overlay_snapshot: OverlaySettingsSnapshot | None = None
         self._config_path: Path | None = None
         self.has_provider_changes: bool = False
         self.has_pending_prompt_changes: bool = False
@@ -581,6 +637,7 @@ class SettingsView(ft.Column):
         self.on_local_llm_secret_changed = provider.local_llm_secret_changed
         self.on_custom_stt_secret_changed = provider.custom_stt_secret_changed
         self.on_gpu_discovery_requested = provider.gpu_discovery_requested
+        self._settings_secrets = provider.settings_secrets
         self.on_start_microphone_test = general.start_microphone_test
         self.on_telemetry_enabled_change = general.telemetry_enabled_change
         self.on_list_loopback_capture_options = general.list_loopback_capture_options
@@ -765,8 +822,8 @@ class SettingsView(ft.Column):
             loopback_summary or default_label,
         )
 
-    def _sync_osc_connection_card(self, settings: AppSettings) -> None:
-        mode = settings.osc.connection_mode
+    def _sync_osc_connection_card(self, settings: GeneralSettingsSnapshot) -> None:
+        mode = settings.osc_connection_mode
         if mode not in {"automatic", "manual", "off"}:
             mode = "automatic"
         self._set_unit_card_value_text(
@@ -774,9 +831,9 @@ class SettingsView(ft.Column):
             t(f"settings.osc.mode.{mode}"),
         )
 
-    def refresh_loopback_capture_target(self, settings: AppSettings) -> None:
-        self._rebase_retained_loopback_capture_target(settings)
-        self._audio_settings.desktop_output_device = settings.desktop_audio.output_device
+    def refresh_loopback_capture_target(self, settings: GeneralSettingsSnapshot) -> None:
+        self._general_snapshot = settings
+        self._audio_settings.desktop_output_device = settings.output_device
         summary = (
             self.on_loopback_capture_summary()
             if callable(getattr(self, "on_loopback_capture_summary", None))
@@ -788,15 +845,6 @@ class SettingsView(ft.Column):
         )
         if is_control_mounted(self._loopback_audio_text):
             self._loopback_audio_text.update()
-
-    def _rebase_retained_loopback_capture_target(self, settings: AppSettings) -> None:
-        for retained in (self._settings, self._provider_settings_draft):
-            if retained is None:
-                continue
-            retained.desktop_audio.output_device = settings.desktop_audio.output_device
-            retained.desktop_audio.runtime_capture_target = (
-                settings.desktop_audio.runtime_capture_target
-            )
 
     def _on_text_hover(self, e: ft.ControlEvent) -> None:
         """Handle hover effect on clickable text."""
@@ -2506,13 +2554,13 @@ class SettingsView(ft.Column):
         )
         self.controls = [self._settings_subtab_shell]
 
-    def _gpu_asr_selected(self, settings: AppSettings) -> bool:
+    def _gpu_asr_selected(self, settings: ProviderSettingsSnapshot) -> bool:
         return (
-            settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-            or settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
+            settings.stt_provider == STTProviderName.LOCAL_QWEN_GPU
+            or settings.peer_stt_provider == STTProviderName.LOCAL_QWEN_GPU
         )
 
-    def _gpu_llm_selected(self, settings: AppSettings) -> bool:
+    def _gpu_llm_selected(self, settings: ProviderSettingsSnapshot) -> bool:
         model = settings.translation.model
         if model == TranslationModel.MANAGED_GEMMA_12B:
             return True
@@ -2521,7 +2569,7 @@ class SettingsView(ft.Column):
             and settings.translation.connection == TranslationConnection.GPU
         )
 
-    def _gpu_selected(self, settings: AppSettings | None = None) -> bool:
+    def _gpu_selected(self, settings: ProviderSettingsSnapshot | None = None) -> bool:
         current = settings or self._build_settings_with_provider_draft()
         return bool(
             current is not None
@@ -2547,7 +2595,7 @@ class SettingsView(ft.Column):
         if not hasattr(self, "_gpu_device_text"):
             return
         settings = self._build_settings_with_provider_draft()
-        asr_selected = settings.stt.gpu_device_id if settings is not None else "auto"
+        asr_selected = settings.stt_gpu_device_id if settings is not None else "auto"
         llm_selected = settings.translation.gpu_device_id if settings is not None else "auto"
         asr_label = self._gpu_column_label(asr_selected, getattr(self, "_gpu_devices", ()))
         llm_label = self._gpu_column_label(llm_selected, getattr(self, "_llm_gpu_devices", ()))
@@ -2626,7 +2674,7 @@ class SettingsView(ft.Column):
         if not is_control_mounted(self):
             return
         settings = self._build_settings_with_provider_draft()
-        selected = settings.stt.gpu_device_id if settings is not None else "auto"
+        selected = settings.stt_gpu_device_id if settings is not None else "auto"
         self._open_gpu_column_modal(
             title=t("settings.gpu_device.asr"),
             selected=selected,
@@ -2651,18 +2699,21 @@ class SettingsView(ft.Column):
             self.on_gpu_discovery_requested()
 
     def _on_gpu_device_selected(self, value: str) -> None:
-        if self._settings is None:
+        if self._provider_snapshot is None:
             return
         draft = self._ensure_provider_settings_draft()
-        draft.stt.gpu_device_id = value or "auto"
+        self._provider_draft = replace(draft, stt_gpu_device_id=value or "auto")
+        self._record_provider_edit(SttGpuDeviceEdit(self._provider_draft.stt_gpu_device_id))
         self.has_provider_changes = True
         self._sync_gpu_device_card()
 
     def _on_llm_gpu_device_selected(self, value: str) -> None:
-        if self._settings is None:
+        if self._provider_snapshot is None:
             return
         draft = self._ensure_provider_settings_draft()
-        draft.translation.gpu_device_id = value or "auto"
+        translation = replace(draft.translation, gpu_device_id=value or "auto")
+        self._provider_draft = replace(draft, translation=translation)
+        self._record_provider_edit(LlmGpuDeviceEdit(translation.gpu_device_id))
         self.has_provider_changes = True
         self._sync_gpu_device_card()
 
@@ -2696,22 +2747,26 @@ class SettingsView(ft.Column):
         self._http_extension_secret_fields = {}
         self._http_extension_secret_dirty.clear()
         secret_values: dict[str, str] = {}
-        if extension is not None and self._settings is not None and self._config_path is not None:
-            try:
-                store = create_secret_store(
-                    self._settings.secrets,
-                    config_path=self._config_path,
-                )
-            except Exception as exc:
-                self._emit_runtime_basic(
-                    f"Failed to load HTTP extension secrets: {exc}",
-                    level=logging.WARNING,
-                )
-            else:
+        if extension is not None and self._settings_secrets is not None:
+            keys = tuple(
+                http_extension_secret_key(extension.id, secret.id) for secret in extension.secrets
+            )
+            result = self._settings_secrets.load_values(keys)
+            if result.error_message is not None:
+                self._emit_runtime_basic(result.error_message, level=logging.WARNING)
+            if result.snapshot is not None:
                 secret_values = {
-                    secret.id: store.get(http_extension_secret_key(extension.id, secret.id)) or ""
+                    secret.id: result.snapshot.get(
+                        http_extension_secret_key(extension.id, secret.id)
+                    )
+                    or ""
                     for secret in extension.secrets
                 }
+            if result.read_error is not None:
+                self._emit_runtime_basic(
+                    f"Failed to load HTTP extension secrets: {result.read_error}",
+                    level=logging.WARNING,
+                )
         controls: list[ft.Control] = []
         if extension is not None:
             for secret in extension.secrets:
@@ -2767,7 +2822,7 @@ class SettingsView(ft.Column):
 
     def _sync_http_extension_card(
         self,
-        settings: AppSettings | None = None,
+        settings: ProviderSettingsSnapshot | None = None,
         *,
         force_credentials: bool = False,
     ) -> None:
@@ -2811,12 +2866,14 @@ class SettingsView(ft.Column):
         ).open(selected)
 
     def _on_http_extension_selected(self, value: str) -> None:
-        if self._settings is None:
+        if self._provider_snapshot is None:
             return
         draft = self._ensure_provider_settings_draft()
-        draft.translation.http_extension_id = value or ""
+        translation = replace(draft.translation, http_extension_id=value or "")
+        self._provider_draft = replace(draft, translation=translation)
+        self._record_provider_edit(TranslationHttpExtensionEdit(translation.http_extension_id))
         self.has_provider_changes = True
-        self._sync_http_extension_card(draft, force_credentials=True)
+        self._sync_http_extension_card(self._provider_draft, force_credentials=True)
 
     def _on_http_extension_secret_blur(self, secret_id: str) -> None:
         http_extension_id = self._http_extension_selected_id
@@ -2862,7 +2919,7 @@ class SettingsView(ft.Column):
     def _on_http_extension_reload(self, _event) -> None:
         settings = self._build_settings_with_provider_draft()
         previous_snapshot = self._http_extension_snapshot
-        active_settings = self._settings
+        active_settings = self._provider_snapshot
         selected_id = (
             active_settings.translation.http_extension_id
             if active_settings is not None
@@ -2903,7 +2960,7 @@ class SettingsView(ft.Column):
         self._http_extension_runtime_reload_pending = False
         return pending
 
-    def _get_llm_modal_value(self, settings: AppSettings) -> str:
+    def _get_llm_modal_value(self, settings: ProviderSettingsSnapshot) -> str:
         model = settings.translation.model
         if model == TranslationModel.MANAGED_GEMMA:
             connection = settings.translation.connection
@@ -2929,46 +2986,46 @@ class SettingsView(ft.Column):
         text_control.value = text
         text_control.size = 28
 
-    def _sync_translation_connection_title(self, settings: AppSettings) -> None:
+    def _sync_translation_connection_title(self, settings: ProviderSettingsSnapshot) -> None:
         title = getattr(self, "_translation_connection_title", None)
         if title is None:
             return
         title.value = t("settings.translation_connection")
 
     def _stored_openrouter_selection_alias(
-        self, settings: AppSettings
+        self, settings: ProviderSettingsSnapshot
     ) -> OpenRouterSelectionAlias | None:
-        if settings.openrouter.selection_alias is None:
-            if settings.openrouter.selected_source == OpenRouterCredentialSource.NONE:
+        if settings.openrouter_selection_alias is None:
+            if settings.openrouter_selected_source == OpenRouterCredentialSource.NONE:
                 return None
             return _derive_openrouter_selection_alias(
-                settings.openrouter.llm_model,
-                settings.openrouter.selected_source,
+                settings.openrouter_llm_model,
+                settings.openrouter_selected_source,
             )
         try:
-            profile_for_alias(settings.openrouter.selection_alias.value)
-            return settings.openrouter.selection_alias
+            profile_for_alias(settings.openrouter_selection_alias.value)
+            return settings.openrouter_selection_alias
         except KeyError:
-            if settings.openrouter.selected_source == OpenRouterCredentialSource.NONE:
+            if settings.openrouter_selected_source == OpenRouterCredentialSource.NONE:
                 return None
             return _derive_openrouter_selection_alias(
-                settings.openrouter.llm_model,
-                settings.openrouter.selected_source,
+                settings.openrouter_llm_model,
+                settings.openrouter_selected_source,
             )
 
     def _display_openrouter_selection_alias(
-        self, settings: AppSettings
+        self, settings: ProviderSettingsSnapshot
     ) -> OpenRouterSelectionAlias:
         stored_alias = self._stored_openrouter_selection_alias(settings)
         if stored_alias is not None:
             return stored_alias
-        if settings.openrouter.llm_model == OpenRouterLLMModel.QWEN_35_FLASH_02_23:
+        if settings.openrouter_llm_model == OpenRouterLLMModel.QWEN_35_FLASH_02_23:
             return OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
-        if settings.openrouter.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH:
+        if settings.openrouter_llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH:
             return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
         return OpenRouterSelectionAlias.GEMMA4_MANAGED
 
-    def _openrouter_selection_profile(self, settings: AppSettings | None):
+    def _openrouter_selection_profile(self, settings: ProviderSettingsSnapshot | None):
         if settings is None:
             return None
         try:
@@ -2976,7 +3033,7 @@ class SettingsView(ft.Column):
         except KeyError:
             return None
 
-    def _translation_fallback_preset_value(self, fallback: TranslationFallbackSettings) -> str:
+    def _translation_fallback_preset_value(self, fallback: TranslationFallbackSnapshot) -> str:
         for value, preset, _label_key in _TRANSLATION_FALLBACK_PRESETS:
             if (
                 preset.enabled == fallback.enabled
@@ -2993,7 +3050,7 @@ class SettingsView(ft.Column):
 
     def _translation_fallback_display_label(
         self,
-        fallback: TranslationFallbackSettings,
+        fallback: TranslationFallbackSnapshot,
     ) -> str:
         preset_value = self._translation_fallback_preset_value(fallback)
         label_key = _TRANSLATION_FALLBACK_LABEL_KEY_BY_VALUE.get(preset_value)
@@ -3004,7 +3061,7 @@ class SettingsView(ft.Column):
         return f"{model_label} · {connection_label}"
 
     def _openrouter_fallback_source(
-        self, settings: AppSettings | None
+        self, settings: ProviderSettingsSnapshot | None
     ) -> OpenRouterCredentialSource:
         if settings is None or not self._translation_uses_provider_fallback(settings):
             return OpenRouterCredentialSource.NONE
@@ -3026,7 +3083,7 @@ class SettingsView(ft.Column):
     def _openrouter_profile_display_description(self, profile) -> str:
         return t(profile.description_key, default="")
 
-    def _get_llm_display_label(self, settings: AppSettings) -> str:
+    def _get_llm_display_label(self, settings: ProviderSettingsSnapshot) -> str:
         model = settings.translation.model
         if model == TranslationModel.MANAGED_GEMMA:
             if settings.translation.connection == TranslationConnection.GPU:
@@ -3034,30 +3091,45 @@ class SettingsView(ft.Column):
             return t("provider.managed_gemma_cpu")
         return self._translation_model_display_label(model)
 
-    def _get_translation_connection_display_label(self, settings: AppSettings | None) -> str:
+    def _get_translation_connection_display_label(
+        self,
+        settings: ProviderSettingsSnapshot | None,
+    ) -> str:
         if settings is None:
             return self._translation_connection_display_label(TranslationConnection.MANAGED)
         return self._translation_connection_display_label(settings.translation.connection)
 
-    def _get_openrouter_fallback_display_label(self, settings: AppSettings | None) -> str:
+    def _get_openrouter_fallback_display_label(
+        self,
+        settings: ProviderSettingsSnapshot | None,
+    ) -> str:
         if settings is None:
             return t("settings.fallback.none")
         return self._translation_fallback_display_label(settings.translation.fallback)
 
-    def _get_openrouter_fallback_helper_text(self, settings: AppSettings | None) -> str:
+    def _get_openrouter_fallback_helper_text(
+        self,
+        settings: ProviderSettingsSnapshot | None,
+    ) -> str:
         if settings is None:
             return t("settings.fallback.inactive_helper")
         if not settings.translation.fallback.enabled:
             return t("settings.fallback.none.description")
         return t("settings.fallback.active_helper")
 
-    def _telemetry_enabled_display_label(self, settings: AppSettings | None) -> str:
-        enabled = bool(getattr(getattr(settings, "telemetry", None), "enabled", True))
+    def _telemetry_enabled_display_label(
+        self,
+        settings: GeneralSettingsSnapshot | None,
+    ) -> str:
+        enabled = settings.telemetry_enabled if settings is not None else True
         return t("settings.telemetry.state.on" if enabled else "settings.telemetry.state.off")
 
-    def _sync_telemetry_enabled_card(self, settings: AppSettings | None = None) -> None:
+    def _sync_telemetry_enabled_card(
+        self,
+        settings: GeneralSettingsSnapshot | None = None,
+    ) -> None:
         if settings is None:
-            settings = self._settings
+            settings = self._general_snapshot
         self._set_unit_card_value_text(
             self._telemetry_enabled_text,
             self._telemetry_enabled_display_label(settings),
@@ -3068,7 +3140,10 @@ class SettingsView(ft.Column):
         text_control.value = text
         text_control.size = 28
 
-    def _sync_openrouter_fallback_card(self, settings: AppSettings | None = None) -> None:
+    def _sync_openrouter_fallback_card(
+        self,
+        settings: ProviderSettingsSnapshot | None = None,
+    ) -> None:
         if settings is None:
             settings = self._build_settings_with_provider_draft()
         self._set_openrouter_fallback_text(self._get_openrouter_fallback_display_label(settings))
@@ -3076,38 +3151,42 @@ class SettingsView(ft.Column):
             settings
         )
 
-    def _active_prompt_key_for_settings(self, settings: AppSettings | None) -> str:
+    def _active_prompt_key_for_settings(
+        self,
+        settings: ProviderSettingsSnapshot | None,
+    ) -> str:
         if settings is None:
             return "gemini"
-        if settings.provider.llm == LLMProviderName.GEMINI:
+        if settings.llm_provider == LLMProviderName.GEMINI:
             return "gemini"
-        if settings.provider.llm == LLMProviderName.OPENROUTER:
+        if settings.llm_provider == LLMProviderName.OPENROUTER:
             return "openrouter"
-        if settings.provider.llm == LLMProviderName.DEEPSEEK:
+        if settings.llm_provider == LLMProviderName.DEEPSEEK:
             return "deepseek"
-        if settings.provider.llm == LLMProviderName.LOCAL_LLM:
+        if settings.llm_provider == LLMProviderName.LOCAL_LLM:
             return "local_llm"
-        if settings.provider.llm == LLMProviderName.MANAGED_GEMMA:
+        if settings.llm_provider == LLMProviderName.MANAGED_GEMMA:
             return "managed_gemma"
         return "qwen"
 
     def _active_prompt_key(self) -> str:
         return self._active_prompt_key_for_settings(self._build_settings_with_provider_draft())
 
-    def _ensure_provider_prompt_value(self, settings: AppSettings, provider_name: str) -> str:
-        prompt = settings.system_prompt
+    def _ensure_provider_prompt_value(
+        self,
+        settings: ProviderSettingsSnapshot,
+        provider_name: str,
+    ) -> str:
+        prompt = self._prompt_editor.value
         if prompt.strip():
-            settings.system_prompts = {}
             return prompt
         prompt = load_prompt_for_provider(provider_name)
-        settings.system_prompt = prompt
-        settings.system_prompts = {}
         return prompt
 
     def _current_source_language(self) -> str:
-        if not self._settings:
+        if self._prompt_snapshot is None:
             return "en"
-        return self._settings.languages.source_language
+        return self._prompt_snapshot.source_language
 
     def _prompt_provider_copy(self) -> str:
         return t(
@@ -3151,48 +3230,51 @@ class SettingsView(ft.Column):
                         control.update()
 
     def _sync_custom_vocabulary_editor_from_settings(self) -> None:
-        if not self._settings:
+        if self._prompt_snapshot is None:
             self._custom_vocab_tag_editor.set_terms([])
             self._custom_vocab_tag_editor.clear_input()
             return
 
-        source_language = self._current_source_language()
-        self._custom_vocab_tag_editor.set_terms(
-            list(self._settings.stt.custom_terms.get(source_language, []))
-        )
+        self._custom_vocab_tag_editor.set_terms(list(self._prompt_snapshot.custom_vocabulary_terms))
         self._custom_vocab_tag_editor.clear_input()
 
-    def _sync_peer_auto_languages_editor(self, settings: AppSettings | None = None) -> None:
+    def _sync_peer_auto_languages_editor(
+        self,
+        settings: GeneralSettingsSnapshot | None = None,
+    ) -> None:
         if not hasattr(self, "_peer_auto_languages_editor"):
             return
-        settings = settings or self._settings
-        languages = [] if settings is None else settings.languages.peer_expected_languages
+        settings = settings or self._general_snapshot
+        languages = () if settings is None else settings.peer_expected_languages
         self._peer_auto_languages_editor.set_terms(list(languages))
 
     def _set_peer_auto_languages(self, languages: list[str]) -> None:
-        if self._settings is None:
+        if self._general_snapshot is None:
             return
         normalized = list(
             dict.fromkeys(language.strip() for language in languages if language.strip())
         )
-        if self._settings.languages.peer_expected_languages == normalized:
+        if self._general_snapshot.peer_expected_languages == tuple(normalized):
             return
-        self._settings.languages.peer_expected_languages = normalized
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            peer_expected_languages=tuple(normalized),
+        )
         self._sync_peer_auto_languages_editor()
-        self._emit_settings_changed()
+        self._emit_settings_changed(PeerExpectedLanguagesIntent(tuple(normalized)))
 
     def _on_peer_auto_languages_add(self, language: str) -> None:
-        if self._settings is None:
+        if self._general_snapshot is None:
             return
-        self._set_peer_auto_languages([*self._settings.languages.peer_expected_languages, language])
+        self._set_peer_auto_languages([*self._general_snapshot.peer_expected_languages, language])
 
     def _on_peer_auto_languages_remove(self, language: str) -> None:
-        if self._settings is None:
+        if self._general_snapshot is None:
             return
         self._set_peer_auto_languages(
             [
                 current
-                for current in self._settings.languages.peer_expected_languages
+                for current in self._general_snapshot.peer_expected_languages
                 if current != language
             ]
         )
@@ -3213,13 +3295,19 @@ class SettingsView(ft.Column):
             "remaining_percent": self._managed_trial_usage_remaining_percent,
         }
 
-    def _translation_uses_provider_fallback(self, settings: AppSettings | None) -> bool:
+    def _translation_uses_provider_fallback(
+        self,
+        settings: ProviderSettingsSnapshot | None,
+    ) -> bool:
         return bool(
             settings is not None
             and settings.translation.model not in _TRANSLATION_MODELS_WITHOUT_PROVIDER_FALLBACK
         )
 
-    def _is_managed_translation_connection_selected(self, settings: AppSettings | None) -> bool:
+    def _is_managed_translation_connection_selected(
+        self,
+        settings: ProviderSettingsSnapshot | None,
+    ) -> bool:
         if settings is None:
             return False
         if not self._translation_uses_provider_fallback(settings):
@@ -3233,7 +3321,10 @@ class SettingsView(ft.Column):
             )
         )
 
-    def _managed_key_card_visible_for(self, settings: AppSettings | None) -> bool:
+    def _managed_key_card_visible_for(
+        self,
+        settings: ProviderSettingsSnapshot | None,
+    ) -> bool:
         return self._is_managed_translation_connection_selected(settings)
 
     def _sync_managed_key_referral_row_value(self, referral_id: str | None) -> None:
@@ -3249,10 +3340,23 @@ class SettingsView(ft.Column):
         if referral_id is None:
             return None
 
-        if self._settings is not None:
-            self._settings.managed_identity.referral_id = referral_id
-        if self._provider_settings_draft is not None:
-            self._provider_settings_draft.managed_identity.referral_id = referral_id
+        referral_changed = (
+            self._provider_snapshot is not None
+            and self._provider_snapshot.managed_referral_id != referral_id
+        )
+        if self._provider_snapshot is not None:
+            self._provider_snapshot = replace(
+                self._provider_snapshot,
+                managed_referral_id=referral_id,
+            )
+        if self._provider_draft is not None:
+            self._provider_draft = replace(
+                self._provider_draft,
+                managed_referral_id=referral_id,
+            )
+        if referral_changed:
+            self._record_provider_edit(ManagedReferralEdit(referral_id))
+            self.has_provider_changes = True
         return referral_id
 
     def _sync_managed_key_invite_progress_row(
@@ -3286,15 +3390,19 @@ class SettingsView(ft.Column):
         )
         self._managed_key_invite_progress_row.visible = True
 
-    def _sync_managed_key_referral_row(self, settings: AppSettings | None) -> None:
-        referral_id = None
-        if settings is not None:
-            referral_id = normalize_owned_referral_id(
-                getattr(settings.managed_identity, "referral_id", None)
-            )
+    def _sync_managed_key_referral_row(
+        self,
+        settings: ProviderSettingsSnapshot | None,
+    ) -> None:
+        referral_id = (
+            None if settings is None else normalize_owned_referral_id(settings.managed_referral_id)
+        )
         self._sync_managed_key_referral_row_value(referral_id)
 
-    def _sync_managed_key_card(self, settings: AppSettings | None = None) -> None:
+    def _sync_managed_key_card(
+        self,
+        settings: ProviderSettingsSnapshot | None = None,
+    ) -> None:
         if settings is None:
             settings = self._build_settings_with_provider_draft()
         visible = self._managed_key_card_visible_for(settings)
@@ -3382,47 +3490,35 @@ class SettingsView(ft.Column):
         )
         self._repaint_managed_key_card()
 
-    def _copy_provider_draft_fields(self, source: AppSettings, target: AppSettings) -> None:
-        target.provider.stt = source.provider.stt
-        target.provider.peer_stt = source.provider.peer_stt
-        target.stt.gpu_device_id = source.stt.gpu_device_id
-        target.provider.llm = source.provider.llm
-        target.translation = copy.deepcopy(source.translation)
-        target.gemini.llm_model = source.gemini.llm_model
-        target.openrouter.llm_model = source.openrouter.llm_model
-        target.openrouter.routing_mode = source.openrouter.routing_mode
-        target.openrouter.provider_routing = source.openrouter.provider_routing
-        target.openrouter.selected_source = source.openrouter.selected_source
-        target.openrouter.selection_alias = source.openrouter.selection_alias
-        target.qwen.llm_model = source.qwen.llm_model
-        target.qwen.region = source.qwen.region
-        target.deepseek.llm_model = source.deepseek.llm_model
-        target.local_llm = copy.deepcopy(source.local_llm)
-        target.custom_stt = copy.deepcopy(source.custom_stt)
-        if source.openrouter.selected_source == OpenRouterCredentialSource.MANAGED:
-            target.managed_identity.verified_hardware_hash = (
-                source.managed_identity.verified_hardware_hash
-            )
-            target.managed_identity.verified_hardware_hash_salt_version = (
-                source.managed_identity.verified_hardware_hash_salt_version
-            )
-        target.system_prompt = source.system_prompt
-        target.system_prompts = {}
+    def _build_settings_with_provider_draft(self) -> ProviderSettingsSnapshot | None:
+        return self._provider_draft or self._provider_snapshot
 
-    def _build_settings_with_provider_draft(self) -> AppSettings | None:
-        if self._settings is None:
-            return None
-        if self._provider_settings_draft is None:
-            return self._settings
-        merged = copy.deepcopy(self._settings)
-        self._copy_provider_draft_fields(self._provider_settings_draft, merged)
-        return merged
+    def _ensure_provider_settings_draft(self) -> ProviderSettingsSnapshot:
+        assert self._provider_snapshot is not None
+        if self._provider_draft is None:
+            self._provider_draft = self._provider_snapshot
+        return self._provider_draft
 
-    def _ensure_provider_settings_draft(self) -> AppSettings:
-        assert self._settings is not None
-        if self._provider_settings_draft is None:
-            self._provider_settings_draft = copy.deepcopy(self._settings)
-        return self._provider_settings_draft
+    def _record_provider_edit(self, edit: ProviderSettingsEdit) -> None:
+        self._provider_edits[type(edit)] = edit
+
+    def _translation_selection_edit(
+        self,
+        selection: TranslationSelectionSnapshot,
+    ) -> TranslationSelectionEdit:
+        committed_history = (
+            {}
+            if self._provider_snapshot is None
+            else dict(self._provider_snapshot.translation.connection_history)
+        )
+        return TranslationSelectionEdit(
+            selection,
+            tuple(
+                (model, connection)
+                for model, connection in selection.connection_history
+                if committed_history.get(model) != connection
+            ),
+        )
 
     def _stt_provider_display_label(
         self,
@@ -3435,10 +3531,13 @@ class SettingsView(ft.Column):
     def _normalized_peer_stt_provider(self, provider: STTProviderName) -> STTProviderName:
         return provider
 
-    def _effective_peer_stt_provider(self, settings: AppSettings | None) -> STTProviderName:
+    def _effective_peer_stt_provider(
+        self,
+        settings: ProviderSettingsSnapshot | None,
+    ) -> STTProviderName:
         if settings is None:
             return STTProviderName.LOCAL_CPU_AUTO
-        return self._normalized_peer_stt_provider(settings.provider.peer_stt)
+        return self._normalized_peer_stt_provider(settings.peer_stt_provider)
 
     def _peer_stt_option_item(self, provider: STTProviderName) -> OptionItem:
         return self._stt_option_item(provider)
@@ -3502,10 +3601,10 @@ class SettingsView(ft.Column):
 
     def _on_local_llm_field_change(self, e) -> None:
         _ = e
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
-        current = self._provider_settings_draft or self._settings
-        if current.provider.llm != LLMProviderName.LOCAL_LLM:
+        current = self._provider_draft or self._provider_snapshot
+        if current.llm_provider != LLMProviderName.LOCAL_LLM:
             return
         self._ensure_provider_settings_draft()
         self.has_provider_changes = True
@@ -3521,11 +3620,11 @@ class SettingsView(ft.Column):
 
     def _on_local_llm_base_url_change_end(self, e) -> None:
         _ = e
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
         raw_value = self._local_llm_base_url.value or ""
         try:
-            normalized = _normalize_local_llm_base_url(raw_value)
+            normalized = normalize_local_llm_base_url(raw_value)
         except ValueError:
             self._local_llm_base_url.error = t("settings.local_llm.base_url.invalid")
             _update_control_if_mounted(self._local_llm_base_url)
@@ -3533,16 +3632,17 @@ class SettingsView(ft.Column):
 
         self._local_llm_base_url.error = None
         self._local_llm_base_url.value = normalized
-        current = self._provider_settings_draft or self._settings
-        if current.local_llm.base_url != normalized:
+        current = self._provider_draft or self._provider_snapshot
+        if current.local_llm_base_url != normalized:
             draft = self._ensure_provider_settings_draft()
-            draft.local_llm.base_url = normalized
+            self._provider_draft = replace(draft, local_llm_base_url=normalized)
+            self._record_provider_edit(LocalLlmBaseUrlEdit(self._provider_draft.local_llm_base_url))
             self.has_provider_changes = True
         _update_control_if_mounted(self._local_llm_base_url)
 
     def _on_local_llm_model_change_end(self, e) -> None:
         _ = e
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
         model = (self._local_llm_model.value or "").strip()
         if not model:
@@ -3552,16 +3652,17 @@ class SettingsView(ft.Column):
 
         self._local_llm_model.error = None
         self._local_llm_model.value = model
-        current = self._provider_settings_draft or self._settings
-        if current.local_llm.model != model:
+        current = self._provider_draft or self._provider_snapshot
+        if current.local_llm_model != model:
             draft = self._ensure_provider_settings_draft()
-            draft.local_llm.model = model
+            self._provider_draft = replace(draft, local_llm_model=model)
+            self._record_provider_edit(LocalLlmModelEdit(self._provider_draft.local_llm_model))
             self.has_provider_changes = True
         _update_control_if_mounted(self._local_llm_model)
 
     def _on_local_llm_extra_body_change_end(self, e) -> None:
         _ = e
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
         raw = (self._local_llm_extra_body.value or "").strip()
         try:
@@ -3602,119 +3703,104 @@ class SettingsView(ft.Column):
             return
 
         normalized = copy.deepcopy(parsed)
-        current = self._provider_settings_draft or self._settings
-        if current.local_llm.extra_body != normalized:
-            draft = self._ensure_provider_settings_draft()
-            draft.local_llm.extra_body = normalized
-            self.has_provider_changes = True
-        self._local_llm_extra_body.value = json.dumps(
+        normalized_text = json.dumps(
             normalized,
             ensure_ascii=False,
             indent=2,
             allow_nan=False,
         )
+        current = self._provider_draft or self._provider_snapshot
+        if current.local_llm_extra_body_json != normalized_text:
+            draft = self._ensure_provider_settings_draft()
+            self._provider_draft = replace(draft, local_llm_extra_body_json=normalized_text)
+            self._record_provider_edit(
+                LocalLlmExtraBodyEdit(self._provider_draft.local_llm_extra_body_json)
+            )
+            self.has_provider_changes = True
+        self._local_llm_extra_body.value = normalized_text
         self._clear_local_llm_extra_body_error()
         _update_control_if_mounted(self._local_llm_extra_body)
 
     def _commit_local_llm_fields_from_controls(self) -> None:
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
-        current = self._provider_settings_draft or self._settings
-        if current.provider.llm != LLMProviderName.LOCAL_LLM:
+        current = self._provider_draft or self._provider_snapshot
+        if current.llm_provider != LLMProviderName.LOCAL_LLM:
             return
         self._on_local_llm_base_url_change_end(None)
         self._on_local_llm_model_change_end(None)
         self._on_local_llm_extra_body_change_end(None)
 
-    def _settings_with_desktop_overlay_runtime_state(
-        self,
-        settings: AppSettings | None,
-    ) -> AppSettings | None:
-        if settings is None:
-            return None
-        pending_position_reset = getattr(self, "_desktop_overlay_pending_position_reset", False)
-        desktop_settings = settings.overlay.desktop_flet
-        size_preset = self._current_desktop_overlay_size_preset()
-        needs_copy = desktop_settings.size_preset != size_preset or pending_position_reset
-        if not needs_copy:
-            return settings
-
-        updated = copy.deepcopy(settings)
-        updated_desktop = updated.overlay.desktop_flet
-        updated_desktop.size_preset = size_preset
-        if pending_position_reset:
-            updated_desktop.position.x = None
-            updated_desktop.position.y = None
-            updated_desktop.locked = False
-        updated_desktop.validate()
-        return updated
-
-    def _sanitize_provider_apply_settings(self, settings: AppSettings | None) -> AppSettings | None:
-        if settings is not None:
-            settings.system_prompts = {}
-        return settings
-
     def _stage_prompt_draft(self, value: str) -> None:
-        if not self._settings:
+        if self._prompt_snapshot is None:
             return
         committed_prompt = self._committed_prompt_value()
-        draft = self._ensure_provider_settings_draft()
-        draft.system_prompt = value
-        draft.system_prompts = {}
         self.has_pending_prompt_changes = value != committed_prompt
-        if not self.has_pending_prompt_changes and not self.has_provider_changes:
-            self._provider_settings_draft = None
+        if self.has_pending_prompt_changes:
+            self._record_provider_edit(SystemPromptEdit(value))
+        else:
+            self._provider_edits.pop(SystemPromptEdit, None)
 
     def _committed_prompt_value(self) -> str:
-        if not self._settings:
+        if self._prompt_snapshot is None:
             return ""
-        return self._settings.system_prompt
+        return self._prompt_snapshot.system_prompt
 
-    def build_provider_apply_settings(self) -> AppSettings | None:
+    def _build_provider_apply_intent(self) -> ProviderApplyIntent | None:
         self._commit_local_llm_fields_from_controls()
-        return self._sanitize_provider_apply_settings(
-            self._settings_with_desktop_overlay_runtime_state(
-                self._build_settings_with_provider_draft()
-            )
-        )
-
-    def consume_provider_apply_settings(self) -> AppSettings | None:
-        settings = self.build_provider_apply_settings()
-        if settings is None:
+        if self._provider_snapshot is None:
             return None
-        self._settings = settings
-        self._provider_settings_draft = None
+        return ProviderApplyIntent(tuple(self._provider_edits.values()))
+
+    def build_provider_apply_settings(self) -> ProviderApplyIntent | None:
+        return self._build_provider_apply_intent()
+
+    def consume_provider_apply_settings(self) -> ProviderApplyIntent | None:
+        intent = self.build_provider_apply_settings()
+        if intent is None:
+            return None
+        if self._provider_draft is not None:
+            self._provider_snapshot = self._provider_draft
+        if self._prompt_snapshot is not None and self.has_pending_prompt_changes:
+            self._prompt_snapshot = replace(
+                self._prompt_snapshot,
+                system_prompt=self._prompt_editor.value,
+            )
+        self._provider_draft = None
+        self._provider_edits.clear()
         self.has_provider_changes = False
         self.has_pending_prompt_changes = False
-        return settings
+        return intent
 
-    def consume_prompt_apply_settings(self) -> AppSettings | None:
+    def consume_prompt_apply_settings(self) -> PromptApplyIntent | None:
         if not self.has_pending_prompt_changes:
             return None
-        settings = self._sanitize_provider_apply_settings(
-            self._settings_with_desktop_overlay_runtime_state(
-                self._build_settings_with_provider_draft()
-            )
-        )
-        if settings is None:
+        if self._prompt_snapshot is None:
             return None
-        self._settings = settings
+        value = self._prompt_editor.value
+        self._prompt_snapshot = replace(self._prompt_snapshot, system_prompt=value)
         self.has_pending_prompt_changes = False
-        if not self.has_provider_changes:
-            self._provider_settings_draft = None
-        return settings
+        self._provider_edits.pop(SystemPromptEdit, None)
+        return PromptApplyIntent(value)
 
     # --- Load Settings ---
     def load_from_settings(
         self,
-        settings: AppSettings,
         *,
+        provider: ProviderSettingsSnapshot,
+        general: GeneralSettingsSnapshot,
+        prompt: PromptSettingsSnapshot,
+        overlay: OverlaySettingsSnapshot,
         config_path: Path,
         preserve_custom_vocab_draft: bool = False,
     ) -> None:
         """Load current settings into the UI."""
-        self._settings = settings
-        self._provider_settings_draft = None
+        self._provider_snapshot = provider
+        self._provider_draft = None
+        self._provider_edits.clear()
+        self._general_snapshot = general
+        self._prompt_snapshot = prompt
+        self._overlay_snapshot = overlay
         self._config_path = config_path
         self._http_extension_runtime_reload_pending = False
         self._http_extension_secret_dirty.clear()
@@ -3726,24 +3812,24 @@ class SettingsView(ft.Column):
         self._desktop_overlay_captions_locked = False
         if self._overlay_state == "off":
             self._overlay_runtime_target = self._current_overlay_target()
-        self._sync_clickable_text_control_fonts(font_for_language(settings.ui.locale))
+        self._sync_clickable_text_control_fonts(font_for_language(general.locale))
 
         # UI Language
-        self._ui_text.content.value = locale_label(settings.ui.locale)
+        self._ui_text.content.value = locale_label(general.locale)
 
         # STT Provider
         self._set_unit_card_value_text(
             self._stt_text,
             self._stt_provider_display_label(
-                settings.provider.stt,
-                custom_mode=settings.custom_stt.mode,
+                provider.stt_provider,
+                custom_mode=provider.custom_stt_mode,
             ),
         )
         self._set_unit_card_value_text(
             self._peer_stt_text,
             self._stt_provider_display_label(
-                self._effective_peer_stt_provider(settings),
-                custom_mode=settings.custom_stt.mode,
+                self._effective_peer_stt_provider(provider),
+                custom_mode=provider.custom_stt_mode,
             ),
         )
         self._update_api_visibility()
@@ -3752,68 +3838,63 @@ class SettingsView(ft.Column):
         # LLM Provider
         self._set_unit_card_value_text(
             self._llm_text,
-            self._get_llm_display_label(settings),
+            self._get_llm_display_label(provider),
         )
         self._set_translation_connection_text(
-            self._get_translation_connection_display_label(settings),
+            self._get_translation_connection_display_label(provider),
         )
-        self._sync_translation_connection_title(settings)
-        self._sync_openrouter_fallback_card(settings)
-        self._local_llm_base_url.value = settings.local_llm.base_url
+        self._sync_translation_connection_title(provider)
+        self._sync_openrouter_fallback_card(provider)
+        self._local_llm_base_url.value = provider.local_llm_base_url
         self._local_llm_base_url.error = None
-        self._local_llm_model.value = settings.local_llm.model
+        self._local_llm_model.value = provider.local_llm_model
         self._local_llm_model.error = None
-        self._local_llm_extra_body.value = json.dumps(
-            settings.local_llm.extra_body,
-            ensure_ascii=False,
-            indent=2,
-        )
+        self._local_llm_extra_body.value = provider.local_llm_extra_body_json
         self._clear_local_llm_extra_body_error()
-        self._sync_custom_stt_card(settings)
+        self._sync_custom_stt_card(provider)
 
         # Qwen Region
-        region_label = t(f"region.{settings.qwen.region.value}")
+        region_label = t(f"region.{provider.qwen_region.value}")
         _set_text_button_label(self._qwen_region_btn, f"{t('settings.qwen_region')} {region_label}")
 
         # Audio Settings
-        self._audio_settings.host_api = settings.audio.input_host_api
-        self._audio_settings.microphone = settings.audio.input_device
-        self._audio_settings.desktop_output_device = settings.desktop_audio.output_device
+        self._audio_settings.host_api = general.input_host_api
+        self._audio_settings.microphone = general.input_device
+        self._audio_settings.desktop_output_device = general.output_device
         self._sync_general_audio_card_texts()
 
         # VAD
-        self._vad_slider.value = settings.stt.vad_speech_threshold
-        self._vad_slider.label = f"{settings.stt.vad_speech_threshold:.2f}"
-        self._peer_vad_slider.value = settings.desktop_audio.vad_speech_threshold
-        self._peer_vad_slider.label = f"{settings.desktop_audio.vad_speech_threshold:.2f}"
-        self._peer_vad_field.value = f"{settings.desktop_audio.vad_speech_threshold:.2f}"
-        self._peer_hangover_field.value = str(settings.desktop_audio.vad_hangover_ms)
-        self._peer_pre_roll_field.value = str(settings.desktop_audio.vad_pre_roll_ms)
+        self._vad_slider.value = general.self_vad_speech_threshold
+        self._vad_slider.label = f"{general.self_vad_speech_threshold:.2f}"
+        self._peer_vad_slider.value = general.peer_vad_speech_threshold
+        self._peer_vad_slider.label = f"{general.peer_vad_speech_threshold:.2f}"
+        self._peer_vad_field.value = f"{general.peer_vad_speech_threshold:.2f}"
+        self._peer_hangover_field.value = str(general.peer_vad_hangover_ms)
+        self._peer_pre_roll_field.value = str(general.peer_vad_pre_roll_ms)
         # --- 新增：读取 VRChat 同步开关状态 ---
         self._vrc_mic_text.content.value = t(
-            "settings.vrc_mic.on" if settings.osc.vrc_mic_intercept else "settings.vrc_mic.off"
+            "settings.vrc_mic.on" if general.vrc_mic_intercept else "settings.vrc_mic.off"
         )
-        self._sync_osc_connection_card(settings)
+        self._sync_osc_connection_card(general)
         self._chatbox_source_text.content.value = t(
             "settings.chatbox_source.on"
-            if settings.osc.chatbox_include_source
+            if general.chatbox_include_source
             else "settings.chatbox_source.off"
         )
         self._clipboard_auto_translate_text.content.value = t(
             "settings.clipboard_auto_translate.on"
-            if settings.ui.clipboard_auto_translate_enabled
+            if general.clipboard_auto_translate_enabled
             else "settings.clipboard_auto_translate.off"
         )
-        self._sync_telemetry_enabled_card(settings)
+        self._sync_telemetry_enabled_card(general)
         # Prompt
         provider_name = self._active_prompt_key()
         self._prompt_editor.set_provider(provider_name)
-        settings.system_prompts = {}
-        if settings.system_prompt.strip():
-            self._prompt_editor.value = settings.system_prompt
+        if prompt.system_prompt.strip():
+            self._prompt_editor.value = prompt.system_prompt
         else:
             self._prompt_editor.load_default_prompt(emit_change=False)
-            settings.system_prompt = self._prompt_editor.value
+            self._prompt_snapshot = replace(prompt, system_prompt=self._prompt_editor.value)
 
         _ = preserve_custom_vocab_draft
         self._sync_custom_vocabulary_editor_from_settings()
@@ -3821,24 +3902,33 @@ class SettingsView(ft.Column):
         self._overlay_peer_contract = None
         self._sync_overlay_controls()
         self.set_overlay_calibration(
-            settings.overlay.calibration,
+            OverlayCalibration(
+                anchor=overlay.calibration.anchor,
+                distance=overlay.calibration.distance,
+                offset_x=overlay.calibration.offset_x,
+                offset_y=overlay.calibration.offset_y,
+                text_scale=overlay.calibration.text_scale,
+            ),
             preserve_draft=self._overlay_calibration_session_active,
         )
 
         # Load secrets
-        self._load_secrets(settings, config_path)
+        self._load_secrets(provider, config_path)
 
         if is_control_mounted(self):
             self.update()
 
     def refresh_after_openrouter_pkce_success(
         self,
-        settings: AppSettings,
         *,
+        provider: ProviderSettingsSnapshot,
+        prompt: PromptSettingsSnapshot,
         config_path: Path,
     ) -> None:
-        self._settings = settings
-        self._provider_settings_draft = None
+        self._provider_snapshot = provider
+        self._provider_draft = None
+        self._provider_edits.clear()
+        self._prompt_snapshot = prompt
         self._config_path = config_path
         self.has_provider_changes = False
         self.has_pending_prompt_changes = False
@@ -3849,53 +3939,76 @@ class SettingsView(ft.Column):
 
         self._set_unit_card_value_text(
             self._llm_text,
-            self._get_llm_display_label(settings),
+            self._get_llm_display_label(provider),
         )
         self._set_translation_connection_text(
-            self._get_translation_connection_display_label(settings),
+            self._get_translation_connection_display_label(provider),
         )
-        self._sync_openrouter_fallback_card(settings)
+        self._sync_openrouter_fallback_card(provider)
         self._update_api_visibility()
 
         provider_name = self._active_prompt_key()
         self._prompt_editor.set_provider(provider_name)
-        settings.system_prompts = {}
-        if settings.system_prompt.strip():
-            self._prompt_editor.value = settings.system_prompt
+        if prompt.system_prompt.strip():
+            self._prompt_editor.value = prompt.system_prompt
         else:
             self._prompt_editor.load_default_prompt(emit_change=False)
-            settings.system_prompt = self._prompt_editor.value
+            self._prompt_snapshot = replace(prompt, system_prompt=self._prompt_editor.value)
         self._sync_custom_vocabulary_editor_from_settings()
         self._sync_prompt_tab_copy()
 
-        try:
-            store = create_secret_store(settings.secrets, config_path=config_path)
-        except Exception as exc:
-            self._emit_runtime_basic(f"Failed to load secrets: {exc}", level=logging.WARNING)
-        else:
-            self._openrouter_key.value = store.get("openrouter_api_key") or ""
-            self._deepseek_key.value = store.get("deepseek_api_key") or ""
-            self._cerebras_key.value = store.get("cerebras_api_key") or ""
-            self._restore_api_key_icons(settings)
+        result = (
+            self._settings_secrets.load_openrouter_pkce()
+            if self._settings_secrets is not None
+            else None
+        )
+        if result is not None:
+            if result.error_message is not None:
+                self._emit_runtime_basic(result.error_message, level=logging.WARNING)
+            snapshot = result.snapshot
+            if snapshot is not None:
+                if snapshot.openrouter_api_key is not None:
+                    self._openrouter_key.value = snapshot.openrouter_api_key
+                if snapshot.deepseek_api_key is not None:
+                    self._deepseek_key.value = snapshot.deepseek_api_key
+                if snapshot.cerebras_api_key is not None:
+                    self._cerebras_key.value = snapshot.cerebras_api_key
+            if result.read_error is not None:
+                raise result.read_error
+            if snapshot is not None:
+                self._restore_api_key_icons(provider)
 
         if is_control_mounted(self):
             self.update()
 
-    def sync_telemetry_settings(self, settings: AppSettings) -> None:
-        self._settings = settings
+    def sync_telemetry_settings(self, settings: GeneralSettingsSnapshot) -> None:
+        self._general_snapshot = settings
         self._sync_telemetry_enabled_card(settings)
         if is_control_mounted(self):
             _update_control_if_mounted(self._telemetry_enabled_card)
 
     def project_osc_control_state(self, state: OscControlPresentationState) -> None:
-        if self._settings is None:
-            return
         control = state.changed_control
         if control in {"PuriPuly_Talk", "PuriPuly_Trans"}:
             return
-        self._apply_osc_control_state(self._settings, state)
-        if self._provider_settings_draft is not None:
-            self._apply_osc_control_state(self._provider_settings_draft, state)
+
+        if control == "PuriPuly_SelfSrcLang" and self._prompt_snapshot is not None:
+            self._prompt_snapshot = replace(
+                self._prompt_snapshot,
+                source_language=state.self_source_language,
+                custom_vocabulary_enabled=state.custom_vocabulary_enabled,
+                custom_vocabulary_terms=state.custom_vocabulary_terms,
+                custom_vocabulary_other_languages_have_terms=(
+                    state.custom_vocabulary_other_languages_have_terms
+                ),
+            )
+            self._custom_vocab_tag_editor.set_terms(list(state.custom_vocabulary_terms))
+        if control in {"PuriPuly_PeerAuto", "PuriPuly_PeerSrcLang"}:
+            if self._general_snapshot is not None:
+                self._general_snapshot = replace(
+                    self._general_snapshot,
+                    effective_peer_source_language=state.peer_source_language,
+                )
         if control in {
             "PuriPuly_PeerAuto",
             "PuriPuly_SelfSrcLang",
@@ -3904,6 +4017,30 @@ class SettingsView(ft.Column):
             "PuriPuly_PeerDstLang",
         }:
             return
+
+        if self._provider_snapshot is not None:
+            self._provider_snapshot = self._project_osc_provider_snapshot(
+                self._provider_snapshot,
+                state,
+            )
+        if self._provider_draft is not None:
+            self._provider_draft = self._project_osc_provider_snapshot(
+                self._provider_draft,
+                state,
+            )
+            self._rebase_provider_edits_after_osc(control)
+        if self._general_snapshot is not None:
+            if control == "PuriPuly_MuteSync":
+                self._general_snapshot = replace(
+                    self._general_snapshot,
+                    vrc_mic_intercept=state.mute_sync,
+                )
+            elif control == "PuriPuly_ChatboxSource":
+                self._general_snapshot = replace(
+                    self._general_snapshot,
+                    chatbox_include_source=state.chatbox_source,
+                )
+
         display_settings = self._build_settings_with_provider_draft()
         if display_settings is None:
             return
@@ -3911,15 +4048,15 @@ class SettingsView(ft.Column):
             self._set_unit_card_value_text(
                 self._stt_text,
                 self._stt_provider_display_label(
-                    display_settings.provider.stt,
-                    custom_mode=display_settings.custom_stt.mode,
+                    display_settings.stt_provider,
+                    custom_mode=display_settings.custom_stt_mode,
                 ),
             )
             self._set_unit_card_value_text(
                 self._peer_stt_text,
                 self._stt_provider_display_label(
                     self._effective_peer_stt_provider(display_settings),
-                    custom_mode=display_settings.custom_stt.mode,
+                    custom_mode=display_settings.custom_stt_mode,
                 ),
             )
             self._sync_custom_stt_card(display_settings)
@@ -3962,92 +4099,130 @@ class SettingsView(ft.Column):
             self._sync_overlay_controls()
 
     @staticmethod
-    def _apply_osc_control_state(
-        settings: AppSettings,
+    def _project_osc_provider_snapshot(
+        snapshot: ProviderSettingsSnapshot,
         state: OscControlPresentationState,
-    ) -> None:
+    ) -> ProviderSettingsSnapshot:
         control = state.changed_control
-        if control == "PuriPuly_SelfSrcLang":
-            settings.languages.source_language = state.self_source_language
-        elif control == "PuriPuly_SelfDstLang":
-            settings.languages.target_language = state.self_target_language
-        elif control == "PuriPuly_PeerSrcLang":
-            settings.languages.peer_source_language = state.peer_source_language
-        elif control == "PuriPuly_PeerDstLang":
-            settings.languages.peer_target_language = state.peer_target_language
-        elif control == "PuriPuly_PeerAuto":
-            settings.languages.peer_source_mode = state.peer_source_mode
-        elif control == "PuriPuly_Listen":
-            settings.ui.peer_translation_enabled = state.peer_capture
-        elif control == "PuriPuly_Captions":
-            settings.ui.overlay_enabled = state.captions
-        elif control == "PuriPuly_MuteSync":
-            settings.osc.vrc_mic_intercept = state.mute_sync
-        elif control == "PuriPuly_ChatboxSource":
-            settings.osc.chatbox_include_source = state.chatbox_source
-        elif control in {"PuriPuly_SelfASR", "PuriPuly_PeerASR"}:
+        if control in {"PuriPuly_SelfASR", "PuriPuly_PeerASR"}:
             if control == "PuriPuly_SelfASR":
-                settings.provider.stt = STTProviderName(state.self_asr_setting)
-            else:
-                settings.provider.peer_stt = STTProviderName(state.peer_asr_setting)
-            settings.custom_stt.mode = state.custom_stt_mode
-            settings.custom_stt.compatibility = state.custom_stt_compatibility
-        elif control == "PuriPuly_Translator":
-            settings.provider.llm = LLMProviderName(state.llm_provider)
-            settings.translation.model = TranslationModel(state.translation_model)
-            settings.translation.connection = TranslationConnection(state.translation_connection)
-            settings.translation.connection_history = {
-                model: TranslationConnection(connection)
-                for model, connection in state.translation_connection_history
-            }
-            settings.translation.http_extension_id = state.translation_http_extension_id
-            settings.translation.previous_llm_model = (
-                None
-                if state.translation_previous_model is None
-                else TranslationModel(state.translation_previous_model)
+                return replace(
+                    snapshot,
+                    stt_provider=STTProviderName(state.self_asr_setting),
+                    custom_stt_mode=state.custom_stt_mode,
+                    custom_stt_compatibility=state.custom_stt_compatibility,
+                )
+            return replace(
+                snapshot,
+                peer_stt_provider=STTProviderName(state.peer_asr_setting),
+                custom_stt_mode=state.custom_stt_mode,
+                custom_stt_compatibility=state.custom_stt_compatibility,
             )
-            materialize_translation_settings(settings)
-        elif control == "PuriPuly_Fallback":
-            settings.translation.fallback.enabled = state.fallback_enabled
-            settings.translation.fallback.model = TranslationModel(state.fallback_model)
-            settings.translation.fallback.connection = TranslationConnection(
-                state.fallback_connection
+        if control == "PuriPuly_Translator":
+            translation = replace(
+                snapshot.translation,
+                model=TranslationModel(state.translation_model),
+                connection=TranslationConnection(state.translation_connection),
+                connection_history=tuple(
+                    (TranslationModel(model), TranslationConnection(connection))
+                    for model, connection in state.translation_connection_history
+                ),
+                http_extension_id=state.translation_http_extension_id,
+                previous_llm_model=(
+                    None
+                    if state.translation_previous_model is None
+                    else TranslationModel(state.translation_previous_model)
+                ),
             )
+            return replace(
+                snapshot,
+                llm_provider=LLMProviderName(state.llm_provider),
+                translation=translation,
+                openrouter_llm_model=OpenRouterLLMModel(state.openrouter_llm_model),
+                openrouter_selected_source=OpenRouterCredentialSource(
+                    state.openrouter_selected_source
+                ),
+                openrouter_selection_alias=(
+                    None
+                    if state.openrouter_selection_alias is None
+                    else OpenRouterSelectionAlias(state.openrouter_selection_alias)
+                ),
+            )
+        if control == "PuriPuly_Fallback":
+            fallback = TranslationFallbackSnapshot(
+                enabled=state.fallback_enabled,
+                model=TranslationModel(state.fallback_model),
+                connection=TranslationConnection(state.fallback_connection),
+            )
+            return replace(
+                snapshot,
+                translation=replace(snapshot.translation, fallback=fallback),
+            )
+        return snapshot
 
-    def _load_secrets(self, settings: AppSettings, config_path: Path) -> None:
-        """Load secret values into fields."""
-        try:
-            store = create_secret_store(settings.secrets, config_path=config_path)
-        except Exception as exc:
-            self._emit_runtime_basic(f"Failed to load secrets: {exc}", level=logging.WARNING)
+    def _rebase_provider_edits_after_osc(self, control: str) -> None:
+        draft = self._provider_draft
+        if draft is None:
             return
+        if control == "PuriPuly_SelfASR" and SelfSttProviderEdit in self._provider_edits:
+            self._record_provider_edit(SelfSttProviderEdit(draft.stt_provider))
+        if control == "PuriPuly_PeerASR" and PeerSttProviderEdit in self._provider_edits:
+            self._record_provider_edit(PeerSttProviderEdit(draft.peer_stt_provider))
+        if control == "PuriPuly_Translator" and (TranslationSelectionEdit in self._provider_edits):
+            self._record_provider_edit(self._translation_selection_edit(draft.translation))
+        if control == "PuriPuly_Fallback" and TranslationFallbackEdit in self._provider_edits:
+            self._record_provider_edit(TranslationFallbackEdit(draft.translation.fallback))
 
-        self._google_key.value = store.get("google_api_key") or ""
-        self._openrouter_key.value = store.get("openrouter_api_key") or ""
-        self._deepseek_key.value = store.get("deepseek_api_key") or ""
-        self._cerebras_key.value = store.get("cerebras_api_key") or ""
-        self._deepgram_key.value = store.get("deepgram_api_key") or ""
-        self._soniox_key.value = store.get("soniox_api_key") or ""
-        self._local_llm_api_key.value = store.get("local_llm_api_key") or ""
-        self._custom_stt_api_key.value = store.get("custom_stt_api_key") or ""
+    def _load_secrets(self, settings: ProviderSettingsSnapshot, config_path: Path) -> None:
+        """Load secret values into fields."""
+        _ = config_path
+        result = self._load_secret_snapshot()
+        if result is None or result.snapshot is None:
+            return
+        snapshot = result.snapshot
 
-        # Alibaba keys with legacy fallback
-        beijing_key = _load_secret_value(
-            store, "alibaba_api_key_beijing", legacy_keys=("alibaba_api_key",)
-        )
-        singapore_key = _load_secret_value(
-            store, "alibaba_api_key_singapore", legacy_keys=("alibaba_api_key",)
-        )
+        if snapshot.google_api_key is not None:
+            self._google_key.value = snapshot.google_api_key
+        if snapshot.openrouter_api_key is not None:
+            self._openrouter_key.value = snapshot.openrouter_api_key
+        if snapshot.deepseek_api_key is not None:
+            self._deepseek_key.value = snapshot.deepseek_api_key
+        if snapshot.cerebras_api_key is not None:
+            self._cerebras_key.value = snapshot.cerebras_api_key
+        if snapshot.deepgram_api_key is not None:
+            self._deepgram_key.value = snapshot.deepgram_api_key
+        if snapshot.soniox_api_key is not None:
+            self._soniox_key.value = snapshot.soniox_api_key
+        if snapshot.local_llm_api_key is not None:
+            self._local_llm_api_key.value = snapshot.local_llm_api_key
+        if snapshot.custom_stt_api_key is not None:
+            self._custom_stt_api_key.value = snapshot.custom_stt_api_key
+        if (
+            snapshot.alibaba_api_key_beijing is not None
+            and snapshot.alibaba_api_key_singapore is not None
+        ):
+            self._alibaba_key_beijing.value = snapshot.alibaba_api_key_beijing
+            self._alibaba_key_singapore.value = snapshot.alibaba_api_key_singapore
 
-        self._alibaba_key_beijing.value = beijing_key
-        self._alibaba_key_singapore.value = singapore_key
+        if result.read_error is not None:
+            raise result.read_error
 
         # Restore verification status icons from saved settings
         self._restore_api_key_icons(settings)
 
-    def _restore_api_key_icons(self, settings: AppSettings) -> None:
+    def _load_secret_snapshot(
+        self,
+    ) -> SettingsSecretLoadResult[SettingsSecretSnapshot] | None:
+        if self._settings_secrets is None:
+            return None
+        result = self._settings_secrets.load()
+        if result.error_message is not None:
+            self._emit_runtime_basic(result.error_message, level=logging.WARNING)
+        return result
+
+    def _restore_api_key_icons(self, settings: ProviderSettingsSnapshot) -> None:
         """Restore API key field icons based on saved verification status."""
-        verified = settings.api_key_verified
+        verified = settings.verified
 
         # Map field -> (has_key, is_verified)
         field_map = [
@@ -4078,13 +4253,14 @@ class SettingsView(ft.Column):
                 field._last_verified_hash = ""
         self._sync_openrouter_pkce_button_state(settings)
 
-    def _sync_openrouter_pkce_button_state(self, settings: AppSettings | None = None) -> None:
+    def _sync_openrouter_pkce_button_state(
+        self,
+        settings: ProviderSettingsSnapshot | None = None,
+    ) -> None:
         if settings is None:
             settings = self._build_settings_with_provider_draft()
         authenticated = bool(
-            settings is not None
-            and settings.api_key_verified.openrouter
-            and self._openrouter_key.value
+            settings is not None and settings.verified.openrouter and self._openrouter_key.value
         )
         _set_text_button_label(
             self._openrouter_pkce_button,
@@ -4104,7 +4280,10 @@ class SettingsView(ft.Column):
             self._openrouter_pkce_button.update()
 
     # --- Visibility Updates ---
-    def _sync_managed_trial_usage_bar(self, settings: AppSettings | None = None) -> None:
+    def _sync_managed_trial_usage_bar(
+        self,
+        settings: ProviderSettingsSnapshot | None = None,
+    ) -> None:
         if settings is None:
             settings = self._build_settings_with_provider_draft()
         managed_key_visible = self._managed_key_card_visible_for(settings)
@@ -4121,8 +4300,8 @@ class SettingsView(ft.Column):
         if settings is None:
             return
 
-        stt = settings.provider.stt
-        llm = settings.provider.llm
+        stt = settings.stt_provider
+        llm = settings.llm_provider
         is_custom_http = settings.translation.model == TranslationModel.CUSTOM_HTTP
         peer_stt = self._effective_peer_stt_provider(settings)
         fallback = settings.translation.fallback
@@ -4133,7 +4312,7 @@ class SettingsView(ft.Column):
         peer_auto_languages_card = getattr(self, "_peer_auto_languages_card", None)
         if peer_auto_languages_card is not None:
             peer_auto_languages_card.visible = peer_stt == STTProviderName.SONIOX
-            self._sync_peer_auto_languages_editor(settings)
+            self._sync_peer_auto_languages_editor()
             if is_control_mounted(self):
                 try:
                     peer_auto_languages_card.update()
@@ -4151,7 +4330,7 @@ class SettingsView(ft.Column):
         openrouter_byok_selected = bool(
             not is_custom_http
             and llm == LLMProviderName.OPENROUTER
-            and settings.openrouter.selected_source == OpenRouterCredentialSource.BYOK
+            and settings.openrouter_selected_source == OpenRouterCredentialSource.BYOK
         )
         self._openrouter_key.visible = bool(
             not is_custom_http
@@ -4211,7 +4390,7 @@ class SettingsView(ft.Column):
             or (not is_custom_http and llm == LLMProviderName.QWEN)
             or peer_stt == STTProviderName.QWEN_ASR
         ):
-            qwen_regions.add(settings.qwen.region)
+            qwen_regions.add(settings.qwen_region)
 
         self._qwen_region_btn.visible = (
             stt == STTProviderName.QWEN_ASR
@@ -4255,8 +4434,8 @@ class SettingsView(ft.Column):
         display_settings = self._build_settings_with_provider_draft()
         current = (
             display_stt_provider(
-                display_settings.provider.stt,
-                custom_mode=display_settings.custom_stt.mode,
+                display_settings.stt_provider,
+                custom_mode=display_settings.custom_stt_mode,
             ).value
             if display_settings is not None
             else STTProviderName.LOCAL_CPU_AUTO.value
@@ -4274,21 +4453,22 @@ class SettingsView(ft.Column):
 
     def _on_stt_selected(self, value: str) -> None:
         """Handle STT provider selection from modal."""
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
         provider = STTProviderName(value)
         if provider == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available:
             return
-        old_provider = current_settings.provider.stt.value
+        old_provider = current_settings.stt_provider.value
         if old_provider == provider.value:
             return
         self._emit_runtime_basic(
             f"[Settings] STT provider changed: {old_provider} -> {provider.value}"
         )
         draft = self._ensure_provider_settings_draft()
-        draft.provider.stt = provider
+        self._provider_draft = replace(draft, stt_provider=provider)
+        self._record_provider_edit(SelfSttProviderEdit(self._provider_draft.stt_provider))
         if (
             provider == STTProviderName.LOCAL_QWEN_GPU
             and self.on_gpu_discovery_requested is not None
@@ -4301,7 +4481,7 @@ class SettingsView(ft.Column):
         # Update text
         self._set_unit_card_value_text(self._stt_text, provider_label(provider.value))
 
-        source_lang = self._settings.languages.source_language
+        source_lang = self._current_source_language()
         selection = resolve_local_asr_selection(provider.value, source_lang)
         if selection.fallback_applied:
             self._show_stt_selection_notice(t("local_stt.language_fallback_qwen"))
@@ -4335,14 +4515,14 @@ class SettingsView(ft.Column):
         ]
         display_settings = self._build_settings_with_provider_draft()
         current_provider = (
-            display_settings.provider.peer_stt
+            display_settings.peer_stt_provider
             if display_settings is not None
             else STTProviderName.LOCAL_CPU_AUTO
         )
         current = display_stt_provider(
             self._normalized_peer_stt_provider(current_provider),
             custom_mode=(
-                display_settings.custom_stt.mode if display_settings is not None else "offline"
+                display_settings.custom_stt_mode if display_settings is not None else "offline"
             ),
         ).value
         SettingsModal(
@@ -4356,17 +4536,18 @@ class SettingsView(ft.Column):
         ).open(current)
 
     def _on_peer_stt_selected(self, value: str) -> None:
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
         provider = STTProviderName(value)
         if provider == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available:
             return
-        if current_settings.provider.peer_stt == provider:
+        if current_settings.peer_stt_provider == provider:
             return
         draft = self._ensure_provider_settings_draft()
-        draft.provider.peer_stt = provider
+        self._provider_draft = replace(draft, peer_stt_provider=provider)
+        self._record_provider_edit(PeerSttProviderEdit(self._provider_draft.peer_stt_provider))
         if (
             provider == STTProviderName.LOCAL_QWEN_GPU
             and self.on_gpu_discovery_requested is not None
@@ -4374,7 +4555,11 @@ class SettingsView(ft.Column):
             self.on_gpu_discovery_requested()
         selection = resolve_local_asr_selection(
             provider.value,
-            current_settings.languages.effective_peer_source,
+            (
+                self._general_snapshot.effective_peer_source_language
+                if self._general_snapshot is not None
+                else "en"
+            ),
         )
         if selection.fallback_applied:
             self._show_stt_selection_notice(t("local_stt.language_fallback_qwen"))
@@ -4471,19 +4656,14 @@ class SettingsView(ft.Column):
     def _restore_translation_connection_for_model(
         self,
         model: TranslationModel,
-        history: dict[str, TranslationConnection],
+        history: tuple[tuple[TranslationModel, TranslationConnection], ...],
     ) -> TranslationConnection:
-        connection = history.get(model.value)
-        if not isinstance(connection, TranslationConnection):
-            try:
-                connection = TranslationConnection(str(connection))
-            except (TypeError, ValueError):
-                connection = None
+        connection = dict(history).get(model)
         if connection in supported_translation_connections(model):
             return connection
         return default_translation_connection(model)
 
-    def _sync_translation_selection_controls(self, settings: AppSettings) -> None:
+    def _sync_translation_selection_controls(self, settings: ProviderSettingsSnapshot) -> None:
         self._set_unit_card_value_text(
             self._llm_text,
             self._get_llm_display_label(settings),
@@ -4494,12 +4674,118 @@ class SettingsView(ft.Column):
         self._sync_translation_connection_title(settings)
         self._sync_openrouter_fallback_card(settings)
 
+    def _provider_snapshot_with_translation(
+        self,
+        settings: ProviderSettingsSnapshot,
+        selection: TranslationSelectionSnapshot,
+    ) -> ProviderSettingsSnapshot:
+        model = selection.model
+        connection = selection.connection
+        llm_provider = settings.llm_provider
+        openrouter_model = settings.openrouter_llm_model
+        openrouter_source = settings.openrouter_selected_source
+        openrouter_alias = settings.openrouter_selection_alias
+        if model == TranslationModel.GEMMA4_26B_31B:
+            llm_provider = LLMProviderName.OPENROUTER
+            openrouter_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+            openrouter_source = (
+                OpenRouterCredentialSource.MANAGED
+                if connection == TranslationConnection.MANAGED
+                else OpenRouterCredentialSource.BYOK
+            )
+            openrouter_alias = (
+                OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
+                if openrouter_source == OpenRouterCredentialSource.MANAGED
+                else OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
+            )
+        elif model == TranslationModel.GEMMA4_31B:
+            llm_provider = (
+                LLMProviderName.CEREBRAS
+                if connection == TranslationConnection.CEREBRAS
+                else LLMProviderName.OPENROUTER
+            )
+            if llm_provider == LLMProviderName.OPENROUTER:
+                openrouter_model = OpenRouterLLMModel.GEMMA_4_31B_IT
+                openrouter_source = (
+                    OpenRouterCredentialSource.MANAGED
+                    if connection == TranslationConnection.MANAGED
+                    else OpenRouterCredentialSource.BYOK
+                )
+                openrouter_alias = (
+                    OpenRouterSelectionAlias.GEMMA4_31B_MANAGED
+                    if openrouter_source == OpenRouterCredentialSource.MANAGED
+                    else OpenRouterSelectionAlias.GEMMA4_31B_BYOK
+                )
+        elif model == TranslationModel.GEMMA4:
+            llm_provider = LLMProviderName.OPENROUTER
+            openrouter_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+            openrouter_source = (
+                OpenRouterCredentialSource.MANAGED
+                if connection == TranslationConnection.MANAGED
+                else OpenRouterCredentialSource.BYOK
+            )
+            openrouter_alias = (
+                OpenRouterSelectionAlias.GEMMA4_MANAGED
+                if openrouter_source == OpenRouterCredentialSource.MANAGED
+                else OpenRouterSelectionAlias.GEMMA4_BYOK
+            )
+        elif model == TranslationModel.DEEPSEEK_V4_FLASH:
+            llm_provider = (
+                LLMProviderName.DEEPSEEK
+                if connection == TranslationConnection.OFFICIAL_BYOK
+                else LLMProviderName.OPENROUTER
+            )
+            if llm_provider == LLMProviderName.OPENROUTER:
+                openrouter_model = OpenRouterLLMModel.DEEPSEEK_V4_FLASH
+                openrouter_source = (
+                    OpenRouterCredentialSource.MANAGED
+                    if connection
+                    in {TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA}
+                    else OpenRouterCredentialSource.BYOK
+                )
+                openrouter_alias = (
+                    OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
+                    if openrouter_source == OpenRouterCredentialSource.MANAGED
+                    else OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK
+                )
+        elif model in {
+            TranslationModel.GEMINI_37_FLASH,
+            TranslationModel.GEMINI_31_FLASH_LITE,
+        }:
+            llm_provider = (
+                LLMProviderName.GEMINI
+                if connection == TranslationConnection.OFFICIAL_BYOK
+                else LLMProviderName.OPENROUTER
+            )
+            if llm_provider == LLMProviderName.OPENROUTER:
+                openrouter_source = OpenRouterCredentialSource.BYOK
+                if model == TranslationModel.GEMINI_37_FLASH:
+                    openrouter_model = OpenRouterLLMModel.GEMINI_37_FLASH
+                    openrouter_alias = OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK
+                else:
+                    openrouter_model = OpenRouterLLMModel.GEMINI_31_FLASH_LITE
+                    openrouter_alias = OpenRouterSelectionAlias.GEMINI31_FLASH_LITE_BYOK
+        elif model == TranslationModel.QWEN_35_PLUS:
+            llm_provider = LLMProviderName.QWEN
+        elif model in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}:
+            llm_provider = LLMProviderName.MANAGED_GEMMA
+        elif model == TranslationModel.LOCAL_LLM:
+            llm_provider = LLMProviderName.LOCAL_LLM
+        return replace(
+            settings,
+            llm_provider=llm_provider,
+            translation=selection,
+            openrouter_llm_model=openrouter_model,
+            openrouter_selected_source=openrouter_source,
+            openrouter_selection_alias=openrouter_alias,
+        )
+
     def _apply_translation_selection(
         self,
         model: TranslationModel,
         connection: TranslationConnection,
     ) -> None:
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
         if connection not in supported_translation_connections(model):
             return
@@ -4508,24 +4794,32 @@ class SettingsView(ft.Column):
         assert current_settings is not None
         old_model = current_settings.translation.model
         old_connection = current_settings.translation.connection
-        old_provider = current_settings.provider.llm
+        old_provider = current_settings.llm_provider
         if old_model == model and old_connection == connection:
             return
 
         draft = self._ensure_provider_settings_draft()
-        draft.translation = copy.deepcopy(current_settings.translation)
-        draft.translation.model = model
-        draft.translation.connection = connection
-        draft.translation.connection_history = copy.deepcopy(
-            current_settings.translation.connection_history
-        )
-        draft.translation.connection_history[model.value] = connection
+        history = dict(current_settings.translation.connection_history)
+        history[model] = connection
+        previous_llm_model = current_settings.translation.previous_llm_model
         if model == TranslationModel.CUSTOM_HTTP and old_model != TranslationModel.CUSTOM_HTTP:
-            draft.translation.previous_llm_model = old_model
+            previous_llm_model = old_model
         elif model != TranslationModel.CUSTOM_HTTP:
-            draft.translation.previous_llm_model = None
-        materialize_translation_settings(draft)
-        new_provider = draft.provider.llm
+            previous_llm_model = None
+        selection = replace(
+            current_settings.translation,
+            model=model,
+            connection=connection,
+            connection_history=tuple(
+                (candidate, history[candidate])
+                for candidate in TranslationModel
+                if candidate in history
+            ),
+            previous_llm_model=previous_llm_model,
+        )
+        self._provider_draft = self._provider_snapshot_with_translation(draft, selection)
+        self._record_provider_edit(self._translation_selection_edit(selection))
+        new_provider = self._provider_draft.llm_provider
 
         changes: list[str] = []
         if old_model != model:
@@ -4545,7 +4839,7 @@ class SettingsView(ft.Column):
         self.has_provider_changes = True
         self._update_api_visibility()
         if (
-            self._gpu_llm_selected(draft)
+            self._gpu_llm_selected(self._provider_draft)
             and not self._gpu_llm_selected(current_settings)
             and self.on_gpu_discovery_requested is not None
         ):
@@ -4563,12 +4857,12 @@ class SettingsView(ft.Column):
         assert display_settings is not None
         self._sync_translation_selection_controls(display_settings)
 
-        if old_provider != display_settings.provider.llm:
+        if old_provider != display_settings.llm_provider:
             provider_name = self._active_prompt_key()
             self._prompt_editor.set_provider(provider_name)
-            next_prompt = self._ensure_provider_prompt_value(draft, provider_name)
+            next_prompt = self._ensure_provider_prompt_value(self._provider_draft, provider_name)
             self._prompt_editor.value = next_prompt
-            draft.system_prompt = next_prompt
+            self._stage_prompt_draft(next_prompt)
         self._sync_prompt_tab_copy()
 
         if is_control_mounted(self):
@@ -4583,7 +4877,7 @@ class SettingsView(ft.Column):
 
     def _on_llm_selected(self, value: str) -> None:
         """Handle LLM provider selection from modal."""
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
@@ -4610,7 +4904,7 @@ class SettingsView(ft.Column):
                     return
             else:
                 return
-        history = copy.deepcopy(current_settings.translation.connection_history)
+        history = current_settings.translation.connection_history
         if connection is None:
             connection = self._restore_translation_connection_for_model(model, history)
         self._apply_translation_selection(model, connection)
@@ -4654,7 +4948,7 @@ class SettingsView(ft.Column):
         modal.open(current)
 
     def _on_translation_connection_selected(self, value: str) -> None:
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
@@ -4700,7 +4994,7 @@ class SettingsView(ft.Column):
         modal.open(current)
 
     def _on_openrouter_fallback_selected(self, value: str) -> None:
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
 
         current_settings = self._build_settings_with_provider_draft()
@@ -4724,8 +5018,9 @@ class SettingsView(ft.Column):
             f"{new_value.enabled}:{new_value.model.value}:{new_value.connection.value}"
         )
         draft = self._ensure_provider_settings_draft()
-        draft.translation = copy.deepcopy(current_settings.translation)
-        draft.translation.fallback = copy.deepcopy(new_value)
+        translation = replace(current_settings.translation, fallback=new_value)
+        self._provider_draft = replace(draft, translation=translation)
+        self._record_provider_edit(TranslationFallbackEdit(translation.fallback))
         self.has_provider_changes = True
         self._update_api_visibility()
 
@@ -4743,7 +5038,7 @@ class SettingsView(ft.Column):
         if not is_control_mounted(self):
             return
         options = [OptionItem(value=code, label=locale_label(code)) for code in available_locales()]
-        current = self._settings.ui.locale if self._settings else "en"
+        current = self._general_snapshot.locale if self._general_snapshot else "en"
         modal = SettingsModal(
             self.page,
             t("settings.section.ui"),
@@ -4755,17 +5050,17 @@ class SettingsView(ft.Column):
 
     def _on_ui_selected(self, value: str) -> None:
         """Handle UI language selection from modal."""
-        if not self._settings:
+        if self._general_snapshot is None:
             return
-        old_locale = self._settings.ui.locale
+        old_locale = self._general_snapshot.locale
         self._emit_runtime_basic(f"[Settings] Language changed: {old_locale} -> {value}")
-        self._settings.ui.locale = value
+        self._general_snapshot = replace(self._general_snapshot, locale=value)
 
         # Update text
         self._ui_text.content.value = locale_label(value)
         if is_control_mounted(self):
             self._ui_text.update()
-        self._emit_settings_changed()
+        self._emit_settings_changed(LocaleSettingsIntent(value))
 
     def _on_qwen_region_click(self, e) -> None:
         """Open Qwen region selection modal."""
@@ -4774,7 +5069,7 @@ class SettingsView(ft.Column):
         options = [OptionItem(value=r.value, label=t(f"region.{r.value}")) for r in QwenRegion]
         display_settings = self._build_settings_with_provider_draft()
         current = (
-            display_settings.qwen.region.value
+            display_settings.qwen_region.value
             if display_settings is not None
             else QwenRegion.BEIJING.value
         )
@@ -4788,17 +5083,18 @@ class SettingsView(ft.Column):
         modal.open(current)
 
     def _on_qwen_region_selected(self, value: str) -> None:
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
 
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
-        old_region = current_settings.qwen.region.value
+        old_region = current_settings.qwen_region.value
         if old_region == value:
             return
         self._emit_runtime_detailed(f"[Settings] Qwen region changed: {old_region} -> {value}")
         draft = self._ensure_provider_settings_draft()
-        draft.qwen.region = QwenRegion(value)
+        self._provider_draft = replace(draft, qwen_region=QwenRegion(value))
+        self._record_provider_edit(QwenRegionEdit(self._provider_draft.qwen_region))
         self.has_provider_changes = True
 
         # Update text
@@ -4817,66 +5113,73 @@ class SettingsView(ft.Column):
         settings = self._build_settings_with_provider_draft()
         if settings is None or self.on_request_openrouter_pkce is None:
             return
-        if settings.api_key_verified.openrouter and self._openrouter_key.value:
+        if settings.verified.openrouter and self._openrouter_key.value:
             return
-        if settings.provider.llm != LLMProviderName.OPENROUTER:
+        if settings.llm_provider != LLMProviderName.OPENROUTER:
             return
-        if settings.openrouter.selected_source != OpenRouterCredentialSource.BYOK:
+        if settings.openrouter_selected_source != OpenRouterCredentialSource.BYOK:
             return
         profile = self._openrouter_selection_profile(settings)
         if profile is None or profile.openrouter_source != OpenRouterCredentialSource.BYOK.value:
             return
+        provider_intent = self._build_provider_apply_intent()
+        if provider_intent is None:
+            return
 
-        target = copy.deepcopy(settings)
-        target.provider.llm = LLMProviderName.OPENROUTER
-        target.openrouter.selection_alias = OpenRouterSelectionAlias(profile.alias)
-        target.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-        assert profile.openrouter_model is not None
-        target.openrouter.llm_model = OpenRouterLLMModel(profile.openrouter_model)
-        target.system_prompt = self._ensure_provider_prompt_value(target, "openrouter")
-        self.on_request_openrouter_pkce(target)
+        self.on_request_openrouter_pkce(
+            OpenRouterPkceTarget(
+                OpenRouterSelectionAlias(profile.alias),
+                provider_intent=provider_intent,
+                system_prompt=self._ensure_provider_prompt_value(settings, "openrouter"),
+            )
+        )
 
     def _write_secret_value(self, key: str, value: str) -> bool:
-        if not self._settings or not self._config_path:
+        if (
+            self._provider_snapshot is None
+            or not self._config_path
+            or self._settings_secrets is None
+        ):
             return False
 
         try:
-            store = create_secret_store(self._settings.secrets, config_path=self._config_path)
-            if value:
-                store.set(key, value)
-            else:
-                store.delete(key)
-            return True
-        except Exception as exc:
+            secret_key = SettingsSecretKey(key)
+        except ValueError:
+            return False
+        result = self._settings_secrets.mutate(SettingsSecretMutation(key=secret_key, value=value))
+        if not result.succeeded:
             self._emit_runtime_basic(
-                f"Failed to update secret {key}: {type(exc).__name__}",
+                f"Failed to update secret {key}: {result.error_type or 'unknown'}",
                 level=logging.WARNING,
             )
             return False
+        return True
 
-    def _sync_custom_stt_card(self, settings: AppSettings | None = None) -> None:
+    def _sync_custom_stt_card(
+        self,
+        settings: ProviderSettingsSnapshot | None = None,
+    ) -> None:
         if getattr(self, "_custom_stt_connection_card", None) is None:
             return
         current = settings or self._build_settings_with_provider_draft()
         if current is None:
             return
-        custom = current.custom_stt
-        self._custom_stt_endpoint.value = custom.endpoint
+        self._custom_stt_endpoint.value = current.custom_stt_endpoint
         self._custom_stt_endpoint.error = None
-        self._custom_stt_model.value = custom.model
-        self._custom_stt_extra.value = _custom_stt_extra_to_text(custom.extra)
+        self._custom_stt_model.value = current.custom_stt_model
+        self._custom_stt_extra.value = current.custom_stt_extra_json
         self._clear_custom_stt_extra_error()
         if is_control_mounted(self):
             _update_control_if_mounted(self._custom_stt_connection_card)
 
     def _on_custom_stt_field_change(self, e) -> None:
         _ = e
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
         current = self._build_settings_with_provider_draft()
         if current is None or not (
-            is_custom_stt_provider(current.provider.stt)
-            or is_custom_stt_provider(current.provider.peer_stt)
+            is_custom_stt_provider(current.stt_provider)
+            or is_custom_stt_provider(current.peer_stt_provider)
         ):
             return
         self._ensure_provider_settings_draft()
@@ -4884,26 +5187,30 @@ class SettingsView(ft.Column):
 
     def _on_custom_stt_endpoint_change_end(self, e) -> None:
         _ = e
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
         endpoint = (self._custom_stt_endpoint.value or "").strip()
-        current = self._provider_settings_draft or self._settings
-        if current.custom_stt.endpoint != endpoint:
+        current = self._provider_draft or self._provider_snapshot
+        if current.custom_stt_endpoint != endpoint:
             draft = self._ensure_provider_settings_draft()
-            draft.custom_stt.endpoint = endpoint
+            self._provider_draft = replace(draft, custom_stt_endpoint=endpoint)
+            self._record_provider_edit(
+                CustomSttEndpointEdit(self._provider_draft.custom_stt_endpoint)
+            )
             self.has_provider_changes = True
         self._custom_stt_endpoint.value = endpoint
         _update_control_if_mounted(self._custom_stt_endpoint)
 
     def _on_custom_stt_model_change_end(self, e) -> None:
         _ = e
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
         model = (self._custom_stt_model.value or "").strip()
-        current = self._provider_settings_draft or self._settings
-        if current.custom_stt.model != model:
+        current = self._provider_draft or self._provider_snapshot
+        if current.custom_stt_model != model:
             draft = self._ensure_provider_settings_draft()
-            draft.custom_stt.model = model
+            self._provider_draft = replace(draft, custom_stt_model=model)
+            self._record_provider_edit(CustomSttModelEdit(self._provider_draft.custom_stt_model))
             self.has_provider_changes = True
         self._custom_stt_model.value = model
         _update_control_if_mounted(self._custom_stt_model)
@@ -4937,7 +5244,7 @@ class SettingsView(ft.Column):
 
     def _on_custom_stt_extra_change_end(self, e) -> None:
         _ = e
-        if not self._settings:
+        if self._provider_snapshot is None:
             return
         raw = (self._custom_stt_extra.value or "").strip()
         try:
@@ -4956,12 +5263,16 @@ class SettingsView(ft.Column):
                 key=str(exc),
             )
             return
-        current = self._provider_settings_draft or self._settings
-        if current.custom_stt.extra != normalized:
+        normalized_text = _custom_stt_extra_to_text(normalized)
+        current = self._provider_draft or self._provider_snapshot
+        if current.custom_stt_extra_json != normalized_text:
             draft = self._ensure_provider_settings_draft()
-            draft.custom_stt.extra = normalized
+            self._provider_draft = replace(draft, custom_stt_extra_json=normalized_text)
+            self._record_provider_edit(
+                CustomSttExtraEdit(self._provider_draft.custom_stt_extra_json)
+            )
             self.has_provider_changes = True
-        self._custom_stt_extra.value = _custom_stt_extra_to_text(normalized)
+        self._custom_stt_extra.value = normalized_text
         self._clear_custom_stt_extra_error()
         _update_control_if_mounted(self._custom_stt_extra)
 
@@ -4993,7 +5304,7 @@ class SettingsView(ft.Column):
             self.on_local_llm_secret_changed()
 
     def _on_secret_change(self, key: str, value: str) -> object:
-        if not self._settings or not self._config_path:
+        if self._provider_snapshot is None or not self._config_path:
             return False
         if self.on_provider_secret_change is not None:
             return self.on_provider_secret_change(key, value)
@@ -5008,15 +5319,15 @@ class SettingsView(ft.Column):
         return True
 
     def _on_audio_change(self) -> None:
-        if not self._settings:
+        if self._general_snapshot is None:
             return
 
         new_host = self._audio_settings.host_api
         new_device = self._audio_settings.microphone
         new_desktop_output = self._audio_settings.desktop_output_device
-        old_host = self._settings.audio.input_host_api
-        old_device = self._settings.audio.input_device
-        old_desktop_output = self._settings.desktop_audio.output_device
+        old_host = self._general_snapshot.input_host_api
+        old_device = self._general_snapshot.input_device
+        old_desktop_output = self._general_snapshot.output_device
 
         if old_host != new_host:
             self._emit_runtime_basic(f"[Settings] Audio Host changed: {old_host} -> {new_host}")
@@ -5027,10 +5338,19 @@ class SettingsView(ft.Column):
                 f"[Settings] Desktop loopback output changed: {old_desktop_output} -> {new_desktop_output}"
             )
 
-        self._settings.audio.input_host_api = new_host
-        self._settings.audio.input_device = new_device
-        self._settings.desktop_audio.output_device = new_desktop_output
-        self._emit_settings_changed()
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            input_host_api=new_host,
+            input_device=new_device,
+            output_device=new_desktop_output,
+        )
+        changes = []
+        if old_host != new_host or old_device != new_device:
+            changes.append(AudioInputSettingsIntent(new_host, new_device))
+        if old_desktop_output != new_desktop_output:
+            changes.append(DesktopAudioOutputSettingsIntent(new_desktop_output))
+        if changes:
+            self._emit_settings_changed(AudioSettingsIntent(tuple(changes)))
 
     def _on_mic_host_api_click(self, e) -> None:
         if not is_control_mounted(self):
@@ -5164,9 +5484,9 @@ class SettingsView(ft.Column):
         return OVERLAY_TARGET_DESKTOP if value == OVERLAY_TARGET_DESKTOP else OVERLAY_TARGET_STEAMVR
 
     def _current_overlay_target(self) -> str:
-        if self._settings is None:
+        if self._overlay_snapshot is None:
             return OVERLAY_TARGET_STEAMVR
-        return self._normalized_overlay_target(self._settings.overlay.target)
+        return self._normalized_overlay_target(self._overlay_snapshot.target)
 
     def _overlay_target_label_for(self, target: object) -> str:
         normalized_target = self._normalized_overlay_target(target)
@@ -5178,7 +5498,7 @@ class SettingsView(ft.Column):
             self._overlay_target_label_for(self._current_overlay_target()),
             size=28,
         )
-        self._overlay_target_button.disabled = self._settings is None
+        self._overlay_target_button.disabled = self._overlay_snapshot is None
 
     def _sync_overlay_target_specific_visibility(self) -> None:
         desktop_selected = self._current_overlay_target() == OVERLAY_TARGET_DESKTOP
@@ -5218,17 +5538,17 @@ class SettingsView(ft.Column):
         pending_size_preset = getattr(self, "_desktop_overlay_pending_size_preset", None)
         if pending_size_preset is not None:
             return pending_size_preset
-        if self._settings is None:
+        if self._overlay_snapshot is None:
             return "medium"
         return self._normalize_desktop_overlay_size_preset(
-            self._settings.overlay.desktop_flet.size_preset
+            self._overlay_snapshot.desktop_size_preset
         )
 
     def _current_desktop_overlay_background_alpha(self) -> float:
-        if self._settings is None:
+        if self._overlay_snapshot is None:
             return DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA
         return self._normalize_desktop_overlay_background_alpha(
-            self._settings.overlay.desktop_flet.visual.background_alpha
+            self._overlay_snapshot.desktop_background_alpha
         )
 
     def _desktop_overlay_lock_label_for(self, locked: bool) -> str:
@@ -5239,7 +5559,7 @@ class SettingsView(ft.Column):
         )
 
     def _current_desktop_overlay_locked(self) -> bool:
-        if self._settings is None:
+        if self._overlay_snapshot is None:
             return False
         if getattr(self, "_desktop_overlay_pending_position_reset", False):
             return False
@@ -5282,7 +5602,7 @@ class SettingsView(ft.Column):
                 self._current_desktop_overlay_background_alpha()
             )
         )
-        disabled = self._settings is None
+        disabled = self._overlay_snapshot is None
         self._desktop_overlay_size_button.disabled = disabled
         self._desktop_overlay_background_alpha_decrease_button.disabled = disabled
         self._desktop_overlay_background_alpha_increase_button.disabled = disabled
@@ -5363,7 +5683,7 @@ class SettingsView(ft.Column):
 
     def _on_overlay_target_click(self, e) -> None:
         _ = e
-        if not is_control_mounted(self) or not self._settings:
+        if not is_control_mounted(self) or self._overlay_snapshot is None:
             return
         options = [
             OptionItem(
@@ -5385,22 +5705,22 @@ class SettingsView(ft.Column):
         modal.open(self._current_overlay_target())
 
     def _on_overlay_target_selected(self, value: str) -> None:
-        if not self._settings:
+        if self._overlay_snapshot is None:
             return
         target = self._normalized_overlay_target(value)
         if self._current_overlay_target() == target:
             return
-        self._settings.overlay.target = target
+        self._overlay_snapshot = replace(self._overlay_snapshot, target=target)
         if self._overlay_state == "off":
             self._overlay_runtime_target = target
         self._sync_overlay_controls()
-        self._emit_settings_changed()
+        self._emit_settings_changed(OverlayTargetSettingsIntent(self._overlay_snapshot.target))
 
     def _on_desktop_overlay_size_click(self, e) -> None:
         _ = e
         if (
             not is_control_mounted(self)
-            or not self._settings
+            or self._overlay_snapshot is None
             or self._desktop_overlay_size_button.disabled
         ):
             return
@@ -5421,7 +5741,7 @@ class SettingsView(ft.Column):
         modal.open(self._current_desktop_overlay_size_preset())
 
     def _on_desktop_overlay_size_selected(self, value: str) -> None:
-        if not self._settings:
+        if self._overlay_snapshot is None:
             return
         size_preset = self._normalize_desktop_overlay_size_preset(value)
         if self._current_desktop_overlay_size_preset() == size_preset:
@@ -5431,44 +5751,51 @@ class SettingsView(ft.Column):
             self._sync_desktop_overlay_main_controls()
             self.on_desktop_overlay_size_change(size_preset)
             return
-        self._settings.overlay.desktop_flet.size_preset = size_preset
+        self._overlay_snapshot = replace(
+            self._overlay_snapshot,
+            desktop_size_preset=size_preset,
+        )
         self._desktop_overlay_pending_size_preset = None
         self._sync_desktop_overlay_main_controls()
-        self._emit_settings_changed()
+        self._emit_settings_changed(DesktopOverlaySizeIntent(size_preset))
 
     def _current_desktop_overlay_swap_caption_languages(self) -> bool:
-        if self._settings is None:
+        if self._overlay_snapshot is None:
             return False
-        return bool(self._settings.overlay.desktop_flet.swap_caption_languages)
+        return self._overlay_snapshot.desktop_swap_caption_languages
 
     def _on_desktop_overlay_swap_caption_languages_click(self, e) -> None:
-        if not self._settings or self._desktop_overlay_swap_caption_languages_button.disabled:
+        if (
+            self._overlay_snapshot is None
+            or self._desktop_overlay_swap_caption_languages_button.disabled
+        ):
             return
         next_value = "off" if self._current_desktop_overlay_swap_caption_languages() else "on"
         self._on_desktop_overlay_swap_caption_languages_selected(next_value)
 
     def _on_desktop_overlay_swap_caption_languages_selected(self, value: str) -> None:
-        if not self._settings:
+        if self._overlay_snapshot is None:
             return
         enabled = value == "on"
         if self._current_desktop_overlay_swap_caption_languages() == enabled:
             self._sync_desktop_overlay_main_controls()
             return
-        updated = copy.deepcopy(self._settings)
-        updated.overlay.desktop_flet.swap_caption_languages = enabled
-        self._settings = updated
+        self._overlay_snapshot = replace(
+            self._overlay_snapshot,
+            desktop_swap_caption_languages=enabled,
+        )
         self._sync_desktop_overlay_main_controls()
-        self._emit_settings_changed()
+        self._emit_settings_changed(DesktopOverlaySwapCaptionLanguagesIntent(enabled))
 
     def _on_desktop_overlay_lock_click(self, e) -> None:
         _ = e
-        if not self._settings or self._desktop_overlay_lock_button.disabled:
+        if self._overlay_snapshot is None or self._desktop_overlay_lock_button.disabled:
             return
         next_value = "move" if self._current_desktop_overlay_locked() else "locked"
         self._on_desktop_overlay_lock_selected(next_value)
 
     def _on_desktop_overlay_lock_selected(self, value: str) -> None:
-        if not self._settings:
+        if self._overlay_snapshot is None:
             return
         locked = value == "locked"
         if self._current_desktop_overlay_locked() == locked:
@@ -5487,7 +5814,10 @@ class SettingsView(ft.Column):
         self._sync_desktop_overlay_main_controls()
 
     def _on_desktop_overlay_background_alpha_step(self, delta: float) -> None:
-        if not self._settings or self._desktop_overlay_background_alpha_decrease_button.disabled:
+        if (
+            self._overlay_snapshot is None
+            or self._desktop_overlay_background_alpha_decrease_button.disabled
+        ):
             return
         current = self._current_desktop_overlay_background_alpha()
         current_transparency = 1.0 - current
@@ -5502,15 +5832,14 @@ class SettingsView(ft.Column):
             if is_control_mounted(self):
                 self.update()
             return
-        updated = copy.deepcopy(self._settings)
-        desktop_visual = updated.overlay.desktop_flet.visual
-        desktop_visual.background_alpha = next_alpha
-        desktop_visual.validate()
-        self._settings = updated
+        self._overlay_snapshot = replace(
+            self._overlay_snapshot,
+            desktop_background_alpha=next_alpha,
+        )
         self._sync_desktop_overlay_main_controls()
         if is_control_mounted(self):
             self.update()
-        self._emit_settings_changed()
+        self._emit_settings_changed(DesktopOverlayBackgroundAlphaIntent(next_alpha))
 
     def _on_desktop_overlay_primary_action(self, e) -> None:
         _ = e
@@ -5535,6 +5864,17 @@ class SettingsView(ft.Column):
     ) -> None:
         calibration.validate()
         self._overlay_calibration = calibration.copy()
+        if self._overlay_snapshot is not None:
+            self._overlay_snapshot = replace(
+                self._overlay_snapshot,
+                calibration=OverlayCalibrationSnapshot(
+                    anchor=calibration.anchor,
+                    distance=calibration.distance,
+                    offset_x=calibration.offset_x,
+                    offset_y=calibration.offset_y,
+                    text_scale=calibration.text_scale,
+                ),
+            )
 
         if preserve_draft and self._overlay_calibration_session_active:
             self._sync_overlay_calibration_controls(self._overlay_calibration_draft)
@@ -5614,15 +5954,25 @@ class SettingsView(ft.Column):
         self._overlay_calibration = calibration.copy()
         self._overlay_calibration_draft = calibration.copy()
         self._overlay_calibration_session_active = False
-        if self._settings is not None:
-            self._settings.overlay.calibration = calibration.copy()
+        calibration_snapshot = OverlayCalibrationSnapshot(
+            anchor=calibration.anchor,
+            distance=calibration.distance,
+            offset_x=calibration.offset_x,
+            offset_y=calibration.offset_y,
+            text_scale=calibration.text_scale,
+        )
+        if self._overlay_snapshot is not None:
+            self._overlay_snapshot = replace(
+                self._overlay_snapshot,
+                calibration=calibration_snapshot,
+            )
         self._sync_overlay_calibration_controls(self._overlay_calibration)
 
         if is_control_mounted(self):
             self.update()
 
         if self.on_overlay_calibration_apply is None:
-            self._emit_settings_changed()
+            self._emit_settings_changed(OverlayCalibrationSettingsIntent(calibration_snapshot))
 
         return calibration.copy()
 
@@ -5645,7 +5995,7 @@ class SettingsView(ft.Column):
         self._apply_overlay_calibration_field_immediately("distance", round(next_value, 2))
 
     def _on_overlay_anchor_click(self, e) -> None:
-        if not is_control_mounted(self) or not self._settings:
+        if not is_control_mounted(self) or self._overlay_snapshot is None:
             return
         options = [
             OptionItem(
@@ -5679,7 +6029,7 @@ class SettingsView(ft.Column):
         self._apply_overlay_calibration_field_immediately("offset_y", current + delta)
 
     def _on_overlay_text_scale_click(self, e) -> None:
-        if not is_control_mounted(self) or not self._settings:
+        if not is_control_mounted(self) or self._overlay_snapshot is None:
             return
         options = [
             OptionItem(
@@ -5711,7 +6061,7 @@ class SettingsView(ft.Column):
 
     def _on_desktop_overlay_position_reset(self, e) -> None:
         _ = e
-        if not self._settings or self._overlay_desktop_reset_button.disabled:
+        if self._overlay_snapshot is None or self._overlay_desktop_reset_button.disabled:
             return
         if self.on_desktop_overlay_position_reset:
             self._desktop_overlay_pending_position_reset = True
@@ -5719,18 +6069,13 @@ class SettingsView(ft.Column):
             self._sync_desktop_overlay_main_controls()
             self.on_desktop_overlay_position_reset()
             return
-        desktop_settings = self._settings.overlay.desktop_flet
-        desktop_settings.position.x = None
-        desktop_settings.position.y = None
-        desktop_settings.locked = False
-        desktop_settings.validate()
         self._desktop_overlay_captions_locked = False
         self._desktop_overlay_pending_position_reset = False
         self._sync_desktop_overlay_main_controls()
-        self._emit_settings_changed()
+        self._emit_settings_changed(DesktopOverlayPositionResetIntent())
 
-    def sync_desktop_overlay_settings(self, settings: AppSettings) -> None:
-        self._settings = settings
+    def sync_desktop_overlay_settings(self, settings: OverlaySettingsSnapshot) -> None:
+        self._overlay_snapshot = settings
         self._desktop_overlay_pending_size_preset = None
         self._desktop_overlay_pending_position_reset = False
         self._desktop_overlay_pending_locked = None
@@ -5741,9 +6086,7 @@ class SettingsView(ft.Column):
 
     def set_overlay_peer_contract(self, contract: OverlayPeerConsumerContract) -> None:
         self._overlay_peer_contract = contract
-        if self._settings is not None:
-            self._settings.ui.overlay_enabled = contract.overlay.intent_enabled
-            self._settings.ui.peer_translation_enabled = contract.peer.intent_enabled
+        if self._provider_snapshot is not None:
             self._update_api_visibility()
             if is_control_mounted(self):
                 self._api_keys_column.update()
@@ -5751,10 +6094,10 @@ class SettingsView(ft.Column):
 
     def _sync_overlay_controls(self) -> None:
         overlay_translation_enabled = bool(
-            self._settings and self._settings.overlay.show_translation
+            self._overlay_snapshot and self._overlay_snapshot.show_translation
         )
         overlay_peer_original_enabled = bool(
-            self._settings and self._settings.overlay.show_peer_original
+            self._overlay_snapshot and self._overlay_snapshot.show_peer_original
         )
         self._set_unit_card_value_text(
             self._overlay_translation_button,
@@ -5769,20 +6112,21 @@ class SettingsView(ft.Column):
         self._sync_desktop_overlay_main_controls()
         self._sync_desktop_overlay_status_control()
 
-        self._overlay_translation_button.disabled = self._settings is None
-        self._overlay_peer_original_button.disabled = self._settings is None
-        self._overlay_target_button.disabled = self._settings is None
-        self._overlay_anchor_button.disabled = self._settings is None
-        self._overlay_distance_decrease_button.disabled = self._settings is None
-        self._overlay_distance_increase_button.disabled = self._settings is None
-        self._overlay_offset_x_decrease_button.disabled = self._settings is None
-        self._overlay_offset_x_increase_button.disabled = self._settings is None
-        self._overlay_offset_y_decrease_button.disabled = self._settings is None
-        self._overlay_offset_y_increase_button.disabled = self._settings is None
-        self._desktop_overlay_background_alpha_decrease_button.disabled = self._settings is None
-        self._desktop_overlay_background_alpha_increase_button.disabled = self._settings is None
-        self._overlay_vr_reset_button.disabled = self._settings is None
-        self._overlay_desktop_reset_button.disabled = self._settings is None
+        disabled = self._overlay_snapshot is None
+        self._overlay_translation_button.disabled = disabled
+        self._overlay_peer_original_button.disabled = disabled
+        self._overlay_target_button.disabled = disabled
+        self._overlay_anchor_button.disabled = disabled
+        self._overlay_distance_decrease_button.disabled = disabled
+        self._overlay_distance_increase_button.disabled = disabled
+        self._overlay_offset_x_decrease_button.disabled = disabled
+        self._overlay_offset_x_increase_button.disabled = disabled
+        self._overlay_offset_y_decrease_button.disabled = disabled
+        self._overlay_offset_y_increase_button.disabled = disabled
+        self._desktop_overlay_background_alpha_decrease_button.disabled = disabled
+        self._desktop_overlay_background_alpha_increase_button.disabled = disabled
+        self._overlay_vr_reset_button.disabled = disabled
+        self._overlay_desktop_reset_button.disabled = disabled
         if is_control_mounted(self):
             self.update()
 
@@ -5819,78 +6163,94 @@ class SettingsView(ft.Column):
             self.update()
 
     def _on_overlay_translation_click(self, e) -> None:
-        if not self._settings or self._overlay_translation_button.disabled:
+        if self._overlay_snapshot is None or self._overlay_translation_button.disabled:
             return
-        next_value = "off" if self._settings.overlay.show_translation else "on"
+        next_value = "off" if self._overlay_snapshot.show_translation else "on"
         self._on_overlay_translation_selected(next_value)
 
     def _on_overlay_translation_selected(self, value: str) -> None:
-        if not self._settings:
+        if self._overlay_snapshot is None:
             return
-        self._settings.overlay.show_translation = value == "on"
+        self._overlay_snapshot = replace(
+            self._overlay_snapshot,
+            show_translation=value == "on",
+        )
         self._sync_overlay_controls()
-        self._emit_settings_changed()
+        self._emit_settings_changed(
+            OverlayTranslationSettingsIntent(self._overlay_snapshot.show_translation)
+        )
 
     def _on_overlay_peer_original_click(self, e) -> None:
-        if not self._settings or self._overlay_peer_original_button.disabled:
+        if self._overlay_snapshot is None or self._overlay_peer_original_button.disabled:
             return
-        next_value = "off" if self._settings.overlay.show_peer_original else "on"
+        next_value = "off" if self._overlay_snapshot.show_peer_original else "on"
         self._on_overlay_peer_original_selected(next_value)
 
     def _on_overlay_peer_original_selected(self, value: str) -> None:
-        if not self._settings:
+        if self._overlay_snapshot is None:
             return
-        self._settings.overlay.show_peer_original = value == "on"
+        self._overlay_snapshot = replace(
+            self._overlay_snapshot,
+            show_peer_original=value == "on",
+        )
         self._sync_overlay_controls()
-        self._emit_settings_changed()
+        self._emit_settings_changed(
+            OverlayPeerOriginalSettingsIntent(self._overlay_snapshot.show_peer_original)
+        )
 
     def _handle_vad_visual_change(self, e) -> None:
         self._vad_slider.label = f"{float(e.control.value):.2f}"
         _update_control_if_mounted(self._vad_slider)
 
     def _handle_vad_change(self, e) -> None:
-        if not self._settings:
+        if self._general_snapshot is None:
             return
 
         new_vad = float(e.control.value)
-        old_vad = self._settings.stt.vad_speech_threshold
+        old_vad = self._general_snapshot.self_vad_speech_threshold
 
         if abs(old_vad - new_vad) > 0.001:
             self._emit_runtime_detailed(
                 f"[Settings] VAD sensitivity changed: {old_vad:.2f} -> {new_vad:.2f}"
             )
 
-        self._settings.stt.vad_speech_threshold = new_vad
-        self._emit_settings_changed()
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            self_vad_speech_threshold=new_vad,
+        )
+        self._emit_settings_changed(SelfVadSettingsIntent(new_vad))
 
     def _handle_peer_vad_visual_change(self, e) -> None:
         self._peer_vad_slider.label = f"{float(e.control.value):.2f}"
         _update_control_if_mounted(self._peer_vad_slider)
 
     def _handle_peer_vad_change(self, e) -> None:
-        if not self._settings:
+        if self._general_snapshot is None:
             return
 
         new_vad = float(e.control.value)
-        old_vad = self._settings.desktop_audio.vad_speech_threshold
+        old_vad = self._general_snapshot.peer_vad_speech_threshold
 
         if abs(old_vad - new_vad) > 0.001:
             self._emit_runtime_detailed(
                 f"[Settings] Peer VAD threshold changed: {old_vad:.2f} -> {new_vad:.2f}"
             )
 
-        self._settings.desktop_audio.vad_speech_threshold = new_vad
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            peer_vad_speech_threshold=new_vad,
+        )
         self._peer_vad_field.value = f"{new_vad:.2f}"
         self._peer_vad_slider.label = f"{new_vad:.2f}"
         _update_control_if_mounted(self._peer_vad_field)
         _update_control_if_mounted(self._peer_vad_slider)
-        self._emit_settings_changed()
+        self._emit_settings_changed(PeerVadSpeechThresholdIntent(new_vad))
 
     def _on_peer_vad_threshold_change(self, e) -> None:
-        if not self._settings:
+        if self._general_snapshot is None:
             return
 
-        old_value = self._settings.desktop_audio.vad_speech_threshold
+        old_value = self._general_snapshot.peer_vad_speech_threshold
         new_value = self._parse_setting_float(
             e.control.value,
             fallback=old_value,
@@ -5902,16 +6262,19 @@ class SettingsView(ft.Column):
                 f"[Settings] Peer VAD threshold changed: {old_value:.2f} -> {new_value:.2f}"
             )
 
-        self._settings.desktop_audio.vad_speech_threshold = new_value
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            peer_vad_speech_threshold=new_value,
+        )
         self._peer_vad_field.value = f"{new_value:.2f}"
         _update_control_if_mounted(self._peer_vad_field)
-        self._emit_settings_changed()
+        self._emit_settings_changed(PeerVadSpeechThresholdIntent(new_value))
 
     def _on_peer_hangover_change(self, e) -> None:
-        if not self._settings:
+        if self._general_snapshot is None:
             return
 
-        old_value = self._settings.desktop_audio.vad_hangover_ms
+        old_value = self._general_snapshot.peer_vad_hangover_ms
         new_value = self._parse_setting_int(
             e.control.value,
             fallback=old_value,
@@ -5922,16 +6285,19 @@ class SettingsView(ft.Column):
                 f"[Settings] Peer hangover changed: {old_value} -> {new_value}"
             )
 
-        self._settings.desktop_audio.vad_hangover_ms = new_value
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            peer_vad_hangover_ms=new_value,
+        )
         self._peer_hangover_field.value = str(new_value)
         _update_control_if_mounted(self._peer_hangover_field)
-        self._emit_settings_changed()
+        self._emit_settings_changed(PeerVadHangoverIntent(new_value))
 
     def _on_peer_pre_roll_change(self, e) -> None:
-        if not self._settings:
+        if self._general_snapshot is None:
             return
 
-        old_value = self._settings.desktop_audio.vad_pre_roll_ms
+        old_value = self._general_snapshot.peer_vad_pre_roll_ms
         new_value = self._parse_setting_int(
             e.control.value,
             fallback=old_value,
@@ -5942,16 +6308,19 @@ class SettingsView(ft.Column):
                 f"[Settings] Peer pre-roll changed: {old_value} -> {new_value}"
             )
 
-        self._settings.desktop_audio.vad_pre_roll_ms = new_value
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            peer_vad_pre_roll_ms=new_value,
+        )
         self._peer_pre_roll_field.value = str(new_value)
         _update_control_if_mounted(self._peer_pre_roll_field)
-        self._emit_settings_changed()
+        self._emit_settings_changed(PeerVadPreRollIntent(new_value))
 
     def _on_vrc_mic_click(self, e) -> None:
         """Toggle VRC mic intercept immediately from the unit card."""
-        if not self._settings:
+        if self._general_snapshot is None:
             return
-        next_value = "off" if self._settings.osc.vrc_mic_intercept else "on"
+        next_value = "off" if self._general_snapshot.vrc_mic_intercept else "on"
         self._on_vrc_mic_selected(next_value)
 
     def _on_microphone_test_click(self, e) -> None:
@@ -5965,18 +6334,21 @@ class SettingsView(ft.Column):
 
         Handle VRC mic intercept selection result.
         """
-        if not self._settings:
+        if self._general_snapshot is None:
             return
         new_value = value == "on"
         self._emit_runtime_basic(f"[Settings] VRC mic intercept toggled: {new_value}")
-        self._settings.osc.vrc_mic_intercept = new_value
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            vrc_mic_intercept=new_value,
+        )
 
         self._vrc_mic_text.content.value = t(
             "settings.vrc_mic.on" if new_value else "settings.vrc_mic.off"
         )
         if is_control_mounted(self):
             self._vrc_mic_text.update()
-        self._emit_settings_changed()
+        self._emit_settings_changed(VrcMicInterceptSettingsIntent(new_value))
 
     def _on_chatbox_source_click(self, e) -> None:
         """Open chatbox source inclusion selection modal."""
@@ -5986,7 +6358,9 @@ class SettingsView(ft.Column):
             OptionItem(value="on", label=t("settings.chatbox_source.on")),
             OptionItem(value="off", label=t("settings.chatbox_source.off")),
         ]
-        current = "on" if self._settings.osc.chatbox_include_source else "off"
+        if self._general_snapshot is None:
+            return
+        current = "on" if self._general_snapshot.chatbox_include_source else "off"
         modal = SettingsModal(
             self.page,
             t("settings.chatbox_include_source"),
@@ -5998,22 +6372,25 @@ class SettingsView(ft.Column):
 
     def _on_chatbox_source_selected(self, value: str) -> None:
         """Handle chatbox source inclusion selection result."""
-        if not self._settings:
+        if self._general_snapshot is None:
             return
         new_value = value == "on"
         self._emit_runtime_basic(f"[Settings] Chatbox include source toggled: {new_value}")
-        self._settings.osc.chatbox_include_source = new_value
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            chatbox_include_source=new_value,
+        )
 
         self._chatbox_source_text.content.value = t(
             "settings.chatbox_source.on" if new_value else "settings.chatbox_source.off"
         )
         if is_control_mounted(self):
             self._chatbox_source_text.update()
-        self._emit_settings_changed()
+        self._emit_settings_changed(ChatboxSourceSettingsIntent(new_value))
 
     def _on_osc_connection_click(self, e) -> None:
         _ = e
-        if not self._settings or not is_control_mounted(self):
+        if self._general_snapshot is None or not is_control_mounted(self):
             return
         self._osc_connection_modal = OscConnectionModal(
             self.page,
@@ -6021,46 +6398,57 @@ class SettingsView(ft.Column):
             effective_ports_provider=self.on_osc_effective_ports,
         )
         self._osc_connection_modal.open(
-            self._settings.osc.connection_mode,
-            int(self._settings.osc.send_port or self._settings.osc.port),
-            int(self._settings.osc.receive_port),
+            self._general_snapshot.osc_connection_mode,
+            int(self._general_snapshot.osc_send_port or self._general_snapshot.osc_port),
+            int(self._general_snapshot.osc_receive_port),
         )
 
     def _on_osc_connection_selected(self, mode: str, send_port: int, receive_port: int) -> None:
-        if not self._settings:
+        if self._general_snapshot is None:
             return
         if mode not in {"automatic", "manual", "off"}:
             return
-        candidate = copy.deepcopy(self._settings)
-        candidate.osc.connection_mode = mode
-        candidate.osc.send_port = int(send_port)
-        candidate.osc.receive_port = int(receive_port)
         try:
-            candidate.osc.validate()
+            send_port = int(send_port)
+            receive_port = int(receive_port)
         except (TypeError, ValueError):
             return
-        self._settings.osc.connection_mode = mode
-        self._settings.osc.send_port = int(send_port)
-        self._settings.osc.receive_port = int(receive_port)
-        self._sync_osc_connection_card(self._settings)
+        if not 1 <= send_port <= 65535 or not 1 <= receive_port <= 65535:
+            return
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            osc_connection_mode=mode,
+            osc_send_port=send_port,
+            osc_receive_port=receive_port,
+        )
+        self._sync_osc_connection_card(self._general_snapshot)
         if is_control_mounted(self):
             self._osc_connection_text.update()
-        self._emit_settings_changed()
+        self._emit_settings_changed(
+            OscConnectionSettingsIntent(
+                connection_mode=self._general_snapshot.osc_connection_mode,
+                send_port=self._general_snapshot.osc_send_port,
+                receive_port=self._general_snapshot.osc_receive_port,
+            )
+        )
 
     def _on_clipboard_auto_translate_click(self, e) -> None:
         """Toggle clipboard auto-translate immediately from the unit card."""
-        if not self._settings:
+        if self._general_snapshot is None:
             return
-        next_value = "off" if self._settings.ui.clipboard_auto_translate_enabled else "on"
+        next_value = "off" if self._general_snapshot.clipboard_auto_translate_enabled else "on"
         self._on_clipboard_auto_translate_selected(next_value)
 
     def _on_clipboard_auto_translate_selected(self, value: str) -> None:
         """Handle clipboard auto-translate selection result."""
-        if not self._settings:
+        if self._general_snapshot is None:
             return
         new_value = value == "on"
         self._emit_runtime_basic(f"[Settings] Clipboard auto translate toggled: {new_value}")
-        self._settings.ui.clipboard_auto_translate_enabled = new_value
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            clipboard_auto_translate_enabled=new_value,
+        )
         self._clipboard_auto_translate_text.content.value = t(
             "settings.clipboard_auto_translate.on"
             if new_value
@@ -6068,21 +6456,24 @@ class SettingsView(ft.Column):
         )
         if is_control_mounted(self):
             self._clipboard_auto_translate_text.update()
-        self._emit_settings_changed()
+        self._emit_settings_changed(ClipboardSettingsIntent(new_value))
 
     def _on_telemetry_enabled_click(self, e) -> None:
         _ = e
-        if not is_control_mounted(self) or not self._settings:
+        if not is_control_mounted(self) or self._general_snapshot is None:
             return
 
-        enabled = not self._settings.telemetry.enabled
-        updated = with_telemetry_enabled(self._settings, enabled)
-        self._settings = updated
-        self._sync_telemetry_enabled_card(updated)
+        enabled = not self._general_snapshot.telemetry_enabled
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            telemetry_enabled=enabled,
+        )
+        self._sync_telemetry_enabled_card(self._general_snapshot)
         if self.on_telemetry_enabled_change is not None:
             self.on_telemetry_enabled_change(enabled)
 
     def _on_prompt_change(self, value: str) -> None:
+        self._prompt_editor.value = value
         self._stage_prompt_draft(value)
 
     def _on_prompt_commit(self, value: str) -> None:
@@ -6112,32 +6503,40 @@ class SettingsView(ft.Column):
             )
 
     def _set_custom_vocabulary_terms_for_current_language(self, next_terms: list[str]) -> None:
-        if not self._settings:
+        if self._prompt_snapshot is None:
             return
 
         source_language = self._current_source_language()
-        updated_terms = dict(self._settings.stt.custom_terms)
-        current_terms = list(updated_terms.get(source_language, []))
+        current_terms = list(self._prompt_snapshot.custom_vocabulary_terms)
         applied_terms = list(next_terms)
-        updated_terms[source_language] = applied_terms
-        next_enabled = any(bool(terms) for terms in updated_terms.values())
+        next_enabled = bool(applied_terms) or (
+            self._prompt_snapshot.custom_vocabulary_other_languages_have_terms
+        )
 
         if (
             current_terms == applied_terms
-            and self._settings.stt.custom_vocabulary_enabled == next_enabled
+            and self._prompt_snapshot.custom_vocabulary_enabled == next_enabled
         ):
             return
 
-        self._settings.stt.custom_terms = updated_terms
-        self._settings.stt.custom_vocabulary_enabled = next_enabled
+        self._prompt_snapshot = replace(
+            self._prompt_snapshot,
+            custom_vocabulary_enabled=next_enabled,
+            custom_vocabulary_terms=tuple(applied_terms),
+        )
         self._custom_vocab_tag_editor.set_terms(applied_terms)
         self._emit_runtime_detailed(
             f"[Settings] Custom vocabulary applied: language={source_language}, terms={len(applied_terms)}"
         )
-        self._emit_settings_changed()
+        self._emit_settings_changed(
+            CustomVocabularySettingsIntent(
+                source_language=source_language,
+                terms=tuple(applied_terms),
+            )
+        )
 
     def _on_custom_vocabulary_add_terms(self, raw_terms: list[str]) -> None:
-        if not self._settings:
+        if self._prompt_snapshot is None:
             return
 
         raw_values = [str(term) for term in raw_terms]
@@ -6148,7 +6547,7 @@ class SettingsView(ft.Column):
             return
 
         source_language = self._current_source_language()
-        current_terms = list(self._settings.stt.custom_terms.get(source_language, []))
+        current_terms = list(self._prompt_snapshot.custom_vocabulary_terms)
         next_terms = list(current_terms)
         seen_terms = set(current_terms)
         unique_requested_count = len(current_terms)
@@ -6164,12 +6563,12 @@ class SettingsView(ft.Column):
                 continue
             next_terms.append(term)
 
-        updated_terms = dict(self._settings.stt.custom_terms)
-        updated_terms[source_language] = list(next_terms)
-        next_enabled = any(bool(terms) for terms in updated_terms.values())
+        next_enabled = bool(next_terms) or (
+            self._prompt_snapshot.custom_vocabulary_other_languages_have_terms
+        )
         will_change = (
             current_terms != next_terms
-            or self._settings.stt.custom_vocabulary_enabled != next_enabled
+            or self._prompt_snapshot.custom_vocabulary_enabled != next_enabled
         )
         if cap_exceeded:
             if will_change:
@@ -6183,11 +6582,10 @@ class SettingsView(ft.Column):
         self._set_custom_vocabulary_terms_for_current_language(next_terms)
 
     def _on_custom_vocabulary_remove_term(self, term: str) -> None:
-        if not self._settings:
+        if self._prompt_snapshot is None:
             return
 
-        source_language = self._current_source_language()
-        current_terms = list(self._settings.stt.custom_terms.get(source_language, []))
+        current_terms = list(self._prompt_snapshot.custom_vocabulary_terms)
         try:
             current_terms.remove(term)
         except ValueError:
@@ -6198,29 +6596,27 @@ class SettingsView(ft.Column):
         """Verify API key."""
         if self.on_verify_api_key:
             result = await self.on_verify_api_key(provider, key)
-            if provider == "openrouter":
+            if provider == "openrouter" and self._provider_snapshot is not None:
+                current = self._provider_draft or self._provider_snapshot
+                updated = replace(
+                    current,
+                    verified=replace(current.verified, openrouter=bool(result[0])),
+                )
+                if self._provider_draft is None:
+                    self._provider_snapshot = updated
+                else:
+                    self._provider_draft = updated
                 self._sync_openrouter_pkce_button_state()
             return result
         return False, "Verification not available"
 
-    def _emit_settings_changed(self) -> None:
-        if self._settings and self.on_settings_changed:
-            settings = copy.deepcopy(self._settings)
-            self.on_settings_changed(
-                self._sanitize_provider_apply_settings(
-                    self._settings_with_desktop_overlay_runtime_state(settings)
-                )
-            )
-
-    def _emit_prompt_apply_settings(self, settings: AppSettings) -> None:
-        sanitized = self._sanitize_provider_apply_settings(settings)
-        if sanitized is None:
-            return
-        if self.on_prompt_apply_settings:
-            self.on_prompt_apply_settings(sanitized)
-            return
+    def _emit_settings_changed(self, intent: ImmediateSettingsIntent) -> None:
         if self.on_settings_changed:
-            self.on_settings_changed(sanitized)
+            self.on_settings_changed(intent)
+
+    def _emit_prompt_apply_settings(self, intent: PromptApplyIntent) -> None:
+        if self.on_prompt_apply_settings:
+            self.on_prompt_apply_settings(intent)
 
     # --- Locale ---
     def apply_locale(self) -> None:
@@ -6362,15 +6758,15 @@ class SettingsView(ft.Column):
             self._set_unit_card_value_text(
                 self._stt_text,
                 self._stt_provider_display_label(
-                    display_settings.provider.stt,
-                    custom_mode=display_settings.custom_stt.mode,
+                    display_settings.stt_provider,
+                    custom_mode=display_settings.custom_stt_mode,
                 ),
             )
             self._set_unit_card_value_text(
                 self._peer_stt_text,
                 self._stt_provider_display_label(
                     self._effective_peer_stt_provider(display_settings),
-                    custom_mode=display_settings.custom_stt.mode,
+                    custom_mode=display_settings.custom_stt_mode,
                 ),
             )
             self._set_unit_card_value_text(
@@ -6388,24 +6784,29 @@ class SettingsView(ft.Column):
                 self._managed_key_referral_id,
                 self._managed_key_pass_status,
             )
-            self._ui_text.content.value = locale_label(display_settings.ui.locale)
+            if self._general_snapshot is not None:
+                self._ui_text.content.value = locale_label(self._general_snapshot.locale)
             self._vrc_mic_text.content.value = t(
                 "settings.vrc_mic.on"
-                if display_settings.osc.vrc_mic_intercept
+                if self._general_snapshot is not None and self._general_snapshot.vrc_mic_intercept
                 else "settings.vrc_mic.off"
             )
-            self._sync_osc_connection_card(display_settings)
+            if self._general_snapshot is not None:
+                self._sync_osc_connection_card(self._general_snapshot)
             self._chatbox_source_text.content.value = t(
                 "settings.chatbox_source.on"
-                if display_settings.osc.chatbox_include_source
+                if self._general_snapshot is not None
+                and self._general_snapshot.chatbox_include_source
                 else "settings.chatbox_source.off"
             )
             self._clipboard_auto_translate_text.content.value = t(
                 "settings.clipboard_auto_translate.on"
-                if display_settings.ui.clipboard_auto_translate_enabled
+                if self._general_snapshot is not None
+                and self._general_snapshot.clipboard_auto_translate_enabled
                 else "settings.clipboard_auto_translate.off"
             )
-            self._sync_telemetry_enabled_card(display_settings)
+            if self._general_snapshot is not None:
+                self._sync_telemetry_enabled_card(self._general_snapshot)
             self._set_unit_card_value_text(
                 self._microphone_test_text,
                 t("settings.microphone_test.action"),
@@ -6415,7 +6816,7 @@ class SettingsView(ft.Column):
 
         # Qwen Region label
         if display_settings:
-            region_val = display_settings.qwen.region.value
+            region_val = display_settings.qwen_region.value
             _set_text_button_label(
                 self._qwen_region_btn,
                 f"{t('settings.qwen_region')} {t(f'region.{region_val}')}",

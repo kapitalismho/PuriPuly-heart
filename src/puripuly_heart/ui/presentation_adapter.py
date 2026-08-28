@@ -7,6 +7,12 @@ from typing import Any
 
 import flet as ft
 
+from puripuly_heart.app.ports.settings_view import (
+    GeneralSettingsSnapshot,
+    OverlaySettingsSnapshot,
+    PromptSettingsSnapshot,
+    ProviderSettingsSnapshot,
+)
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
     OscControlPresentationState,
@@ -307,8 +313,11 @@ class FletUiPresentationAdapter:
 
     def render_settings(
         self,
-        settings: object,
         *,
+        provider: ProviderSettingsSnapshot,
+        general: GeneralSettingsSnapshot,
+        prompt: PromptSettingsSnapshot,
+        overlay: OverlaySettingsSnapshot,
         config_path: Path,
         preserve_custom_vocab_draft: bool = False,
     ) -> bool:
@@ -317,7 +326,10 @@ class FletUiPresentationAdapter:
         if not callable(loader):
             return False
         loader(
-            settings,
+            provider=provider,
+            general=general,
+            prompt=prompt,
+            overlay=overlay,
             config_path=config_path,
             preserve_custom_vocab_draft=preserve_custom_vocab_draft,
         )
@@ -325,15 +337,16 @@ class FletUiPresentationAdapter:
 
     def refresh_settings_after_openrouter_pkce_success(
         self,
-        settings: object,
         *,
+        provider: ProviderSettingsSnapshot,
+        prompt: PromptSettingsSnapshot,
         config_path: Path,
     ) -> bool:
         settings_view = getattr(self._app, "view_settings", None)
         refresh = getattr(settings_view, "refresh_after_openrouter_pkce_success", None)
         if not callable(refresh):
             return False
-        refresh(settings, config_path=config_path)
+        refresh(provider=provider, prompt=prompt, config_path=config_path)
         return True
 
     def set_settings_overlay_calibration(self, calibration: object) -> None:
@@ -342,11 +355,11 @@ class FletUiPresentationAdapter:
         if callable(setter):
             setter(calibration)
 
-    def refresh_settings_loopback_capture_target(self, settings: object) -> None:
+    def refresh_settings_loopback_capture_target(self, general: GeneralSettingsSnapshot) -> None:
         settings_view = getattr(self._app, "view_settings", None)
         refresh = getattr(settings_view, "refresh_loopback_capture_target", None)
         if callable(refresh):
-            refresh(settings)
+            refresh(general)
 
     def set_settings_local_cpu_auto_available(self, available: bool) -> None:
         settings_view = getattr(self._app, "view_settings", None)

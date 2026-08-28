@@ -13,7 +13,7 @@ from puripuly_heart.app.services.settings_mutation_legacy import (
     build_ui_prompt_clipboard_state_settings_path_patch,
     settings_path_mutation_validator_for_command,
 )
-from puripuly_heart.config.settings import AppSettings, TranslationConnection
+from puripuly_heart.config.translation_values import TranslationConnection
 from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -80,8 +80,6 @@ def compose_github_star_prompt_owner(
             return
 
     async def persist_state(base: object, committed: object) -> bool:
-        if not isinstance(base, AppSettings) or not isinstance(committed, AppSettings):
-            raise TypeError("GitHub star prompt requires AppSettings compatibility values")
         patch_values = build_ui_prompt_clipboard_state_settings_path_patch(base, committed)
         if not patch_values:
             return True
@@ -111,13 +109,21 @@ def compose_github_star_prompt_owner(
         }
 
     def connection_for(value: object | None) -> TranslationConnection | None:
-        if not isinstance(value, AppSettings):
+        if value is None:
             return None
-        connection = value.translation.connection
-        if isinstance(connection, TranslationConnection):
-            return connection
+        translation = getattr(value, "translation", None)
+        raw_connection = getattr(translation, "connection", None)
+        if raw_connection is None:
+            intent = getattr(value, "intent", None)
+            raw_connection = getattr(
+                getattr(intent, "translation", None),
+                "connection",
+                None,
+            )
+        if isinstance(raw_connection, TranslationConnection):
+            return raw_connection
         try:
-            return TranslationConnection(connection)
+            return TranslationConnection(raw_connection)
         except (TypeError, ValueError):
             return None
 
@@ -134,7 +140,8 @@ def compose_github_star_prompt_owner(
                 and remaining_percent <= GITHUB_STAR_PROMPT_MANAGED_REMAINING_PERCENT_THRESHOLD
             )
         if connection in _USER_OWNED_CLOUD_CONNECTIONS and current is not None:
-            return bool(current.ui.github_star_prompt_translation_success_observed)
+            ui = getattr(current, "ui", None)
+            return bool(getattr(ui, "github_star_prompt_translation_success_observed", False))
         return False
 
     return GithubStarPromptOwner(

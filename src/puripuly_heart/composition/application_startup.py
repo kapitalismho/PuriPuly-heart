@@ -18,6 +18,7 @@ from puripuly_heart.app.services.manual_local_asr_fallback import (
 from puripuly_heart.app.services.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
 )
+from puripuly_heart.app.wiring import create_secret_store, runtime_pipeline_inputs_from_vnext
 from puripuly_heart.app.wiring_runtime_pipeline import (
     RuntimePipelineHandle,
     RuntimePipelineLauncher,
@@ -116,7 +117,14 @@ class ApplicationStartupAdapter:
         settings = state.settings
         self.sync_runtime_signatures(settings)
         await self.pipeline_launcher.launch(
-            settings,
+            runtime_pipeline_inputs_from_vnext(
+                self.settings.project(settings, authoritative=self.settings.authoritative),
+                peer_translation_enabled=settings.ui.peer_translation_enabled,
+            ),
+            secrets=create_secret_store(
+                settings.secrets,
+                config_path=self.pipeline_launcher.config_path,
+            ),
             vrc_mic_state=self.pipeline.vrc_mic_state,
             vrc_mic_audio_gate=self.pipeline.vrc_mic_audio_gate,
             receiver_active=self.receiver_active(),

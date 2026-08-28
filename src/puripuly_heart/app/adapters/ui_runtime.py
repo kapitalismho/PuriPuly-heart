@@ -1,10 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.ports.settings_view import (
+    GeneralSettingsSnapshot,
+    ImmediateSettingsIntent,
+    OpenRouterPkceTarget,
+    OverlaySettingsSnapshot,
+    PromptApplyIntent,
+    ProviderApplyIntent,
+    TranslationSelectionEdit,
+)
 from puripuly_heart.app.ports.ui_models import (
     GpuDeviceOption,
     GpuNoticeAction,
@@ -41,7 +51,13 @@ from puripuly_heart.app.services.provider_settings import (
 from puripuly_heart.app.services.self_capture_application import (
     SelfCaptureApplicationOwner,
 )
-from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
+from puripuly_heart.app.services.settings_application import (
+    SettingsApplicationOwner,
+    materialize_immediate_settings_intent,
+    materialize_prompt_apply_intent,
+    materialize_provider_apply_intent,
+    settings_view_surface_snapshots,
+)
 from puripuly_heart.app.services.settings_projection import (
     SettingsProjectionOwner,
 )
@@ -57,6 +73,7 @@ from puripuly_heart.core.local_translation.devices import list_llama_vulkan_devi
 from puripuly_heart.core.telemetry import (
     AppActiveDayTelemetryResult,
     AppActiveDayTelemetryService,
+    AppActiveDayTelemetryState,
 )
 
 
@@ -240,9 +257,14 @@ class UiSettingsRuntimeAdapter:
         settings = self.settings.current
         if settings is None:
             return False
+        provider, general, prompt, overlay = settings_view_surface_snapshots(settings)
         return bool(
-            self.projection.render(
-                settings,
+            self.projection.render_surfaces(
+                provider=provider,
+                general=general,
+                prompt=prompt,
+                overlay=overlay,
+                compatibility_settings=settings,
                 preserve_custom_vocab_draft=preserve_custom_vocab_draft,
             )
         )
@@ -251,7 +273,14 @@ class UiSettingsRuntimeAdapter:
         settings = self.settings.current
         if settings is None:
             return False
-        return bool(self.projection.refresh_after_openrouter_pkce_success(settings))
+        provider, _general, prompt, _overlay = settings_view_surface_snapshots(settings)
+        return bool(
+            self.projection.refresh_after_openrouter_pkce_success(
+                provider=provider,
+                prompt=prompt,
+                compatibility_settings=settings,
+            )
+        )
 
     def merge_settings_tab_apply_with_current_languages(
         self,
@@ -268,6 +297,40 @@ class UiSettingsRuntimeAdapter:
             return None
         await self.application.apply(self.telemetry_enabled_settings(settings, enabled))
         return self.settings.current
+
+    async def apply_settings_intent(self, intent: ImmediateSettingsIntent) -> object:
+        settings = self.settings.current
+        if settings is None:
+            return False
+        return await self.application.apply(materialize_immediate_settings_intent(settings, intent))
+
+    async def apply_prompt_intent(self, intent: PromptApplyIntent) -> object:
+        settings = self.settings.current
+        if settings is None:
+            return False
+        return await self.application.apply(materialize_prompt_apply_intent(settings, intent))
+
+    def materialize_provider_intent(self, intent: ProviderApplyIntent) -> object:
+        settings = self.settings.current
+        if settings is None:
+            raise RuntimeError("settings owner has no compatibility settings")
+        return materialize_provider_apply_intent(
+            settings,
+            intent,
+            materialize_translation=self.settings.materialize_translation,
+        )
+
+    def overlay_snapshot(self) -> OverlaySettingsSnapshot | None:
+        settings = self.settings.current
+        if settings is None:
+            return None
+        return settings_view_surface_snapshots(settings)[3]
+
+    def general_snapshot(self) -> GeneralSettingsSnapshot | None:
+        settings = self.settings.current
+        if settings is None:
+            return None
+        return settings_view_surface_snapshots(settings)[1]
 
 
 @dataclass(slots=True)
@@ -319,19 +382,39 @@ class UiProviderRuntimeAdapter:
     async def connect_openrouter_via_pkce(
         self,
         *,
-        target_settings: object,
+        target: OpenRouterPkceTarget,
         launch_source: str,
     ) -> bool:
         return await self.managed.pkce.connect(
-            target_settings=target_settings,
+            target=target,
             launch_source=launch_source,
         )
 
     def reopen_openrouter_pkce_authorization_url(self) -> object:
         return self.managed.pkce_flow.reopen_authorization_url()
 
-    def build_managed_openrouter_byok_target_settings(self) -> object | None:
-        return self.build_byok_target_settings(self.settings.current)
+    def build_managed_openrouter_byok_target(self) -> OpenRouterPkceTarget | None:
+        target_settings = self.build_byok_target_settings(self.settings.current)
+        if target_settings is None or target_settings.openrouter.selection_alias is None:
+            return None
+        provider, _general, _prompt, _overlay = settings_view_surface_snapshots(target_settings)
+        return OpenRouterPkceTarget(
+            target_settings.openrouter.selection_alias,
+            provider_intent=ProviderApplyIntent(
+                (
+                    TranslationSelectionEdit(
+                        provider.translation,
+                        (
+                            (
+                                provider.translation.model,
+                                provider.translation.connection,
+                            ),
+                        ),
+                    ),
+                )
+            ),
+            system_prompt=target_settings.system_prompt,
+        )
 
     async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
         return await self.credential_verification.verify(provider, key)
@@ -401,16 +484,27 @@ class UiEngagementRuntimeAdapter:
         self,
         active_date_utc: str,
     ) -> AppActiveDayTelemetryResult:
-        settings = self.settings.current
-        if settings is None:
+        canonical = self.settings.canonical
+        if canonical is None:
             return AppActiveDayTelemetryResult(status="skipped_no_settings")
+        state = AppActiveDayTelemetryState(
+            enabled=canonical.intent.telemetry.enabled,
+            anonymous_id=canonical.state.telemetry.anonymous_id,
+            last_sent_date_utc=canonical.state.telemetry.last_sent_date_utc,
+            broker_base_url=(canonical.intent.translation.openrouter_broker_base_url),
+        )
 
-        async def persist(updated: object) -> bool:
-            await self.settings_application.apply(updated)
+        async def persist(updated: AppActiveDayTelemetryState) -> bool:
+            current = self.settings.current
+            if current is None:
+                return False
+            next_settings = copy.deepcopy(current)
+            next_settings.telemetry_state.last_sent_date_utc = updated.last_sent_date_utc
+            await self.settings_application.apply(next_settings)
             return self.settings_application.results.committed()
 
         return await self.telemetry.record_app_active_day(
-            settings,
+            state,
             active_date_utc=active_date_utc,
             persist_sent_date=persist,
         )
