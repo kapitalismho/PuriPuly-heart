@@ -888,8 +888,8 @@ class ManagedAuthRuntimeAdapter:
     ingress_provider: ManagedAuthIngressProvider
 
     def state(self) -> ManagedAuthState:
-        canonical = self.settings.canonical
         current = self.settings.current
+        canonical = self.settings.projected_canonical()
         runtime_owner_available, runtime_available = self.runtime_presence_provider()
         if canonical is None or current is None:
             return ManagedAuthState(
@@ -1286,7 +1286,7 @@ class ManagedTranslationRuntimeAdapter:
     persist_settings: ManagedTranslationPersistSettings
 
     def state(self) -> TranslationEnableState:
-        canonical = self.settings.canonical
+        canonical = self.settings.projected_canonical()
         runtime_available, translation_enabled, llm = self.runtime_snapshot_provider()
         auth_state = self.auth.state()
         is_custom_http = (

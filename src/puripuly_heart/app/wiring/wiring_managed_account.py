@@ -141,11 +141,11 @@ class ManagedOpenRouterReleaseRuntime:
     )
 
     def selected(self, settings: AppSettingsVNext | None = None) -> bool:
-        current = settings if settings is not None else self.settings.canonical
+        current = settings if settings is not None else self.settings.projected_canonical()
         return current is not None and managed_openrouter_selected_from_vnext(current)
 
     def release_settings(self) -> AppSettingsVNext | None:
-        current = self.settings.canonical
+        current = self.settings.projected_canonical()
         return current if self.selected(current) else None
 
     async def rebuild(self, *, secrets: object) -> ManagedOpenRouterReleaseService | None:
@@ -275,7 +275,7 @@ class ManagedUsageRuntimeAdapter:
     ingress_provider: Callable[[], bool]
 
     def state(self) -> ManagedUsageState:
-        canonical = self.settings.canonical
+        canonical = self.settings.projected_canonical()
         if canonical is None:
             return ManagedUsageState(
                 settings_available=False,

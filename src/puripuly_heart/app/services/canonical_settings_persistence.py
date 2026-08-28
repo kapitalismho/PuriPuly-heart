@@ -402,6 +402,12 @@ class SettingsOwner:
             self.canonical = projected
         return projected
 
+    def projected_canonical(self) -> AppSettingsVNext | None:
+        current = self.current
+        if current is not None:
+            return self.project(current, authoritative=True)
+        return self.canonical
+
     def apply_legacy_delta(
         self,
         base_settings: AppSettings | None,
