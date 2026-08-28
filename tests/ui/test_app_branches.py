@@ -837,26 +837,19 @@ def test_translator_app_mounts_debug_preview_when_enabled(
     assert app.debug_ui_preview is True
     assert app.debug_preview_panel is not None
     assert set(seen["callbacks"]) == {
-        "on_brake_notice",
-        "on_revoked_notice",
-        "on_github_star_snackbar",
+        "on_display_turn_cycle",
         "on_telemetry_consent",
-        "on_founder_letter",
-        "on_pkce_failure",
+        "on_peer_translation_eula",
         "on_discord_auth",
         "on_qq_auth",
         "on_qq_auth_recoverable_error",
         "on_qq_auth_translation_gated",
         "on_discord_callback_page",
-        "on_peer_translation_eula",
+        "on_founder_letter",
         "on_local_qwen_hallucination_modal",
+        "on_github_star_snackbar",
         "on_talk_together_pass_invite_progress",
-        "on_capture_fault_cycle",
-        "on_stt_fault_cycle",
-        "on_audio_fault_clear",
-        "on_gpu_state_cycle",
         "on_foundation_primitives",
-        "on_stt_loading_button_cycle",
         "on_http_extension_form",
     }
     discord_callback = seen["callbacks"]["on_discord_auth"]
@@ -1035,79 +1028,6 @@ def test_debug_preview_local_qwen_modal_opens_production_dialog_without_state_or
     assert app.controller._local_qwen_hallucination_detection_count == 1
     assert app.controller._local_qwen_hallucination_modal_shown is False
     assert app.page.tasks == []
-
-
-def test_debug_preview_panel_wires_audio_fault_actions(monkeypatch) -> None:
-    _patch_app_construction(monkeypatch)
-    captured_kwargs: dict[str, object] = {}
-    snackbars: list[tuple[str, object]] = []
-
-    class FakeDebugPreviewPanel(ft.Container):
-        def __init__(self, **kwargs):
-            captured_kwargs.update(kwargs)
-            super().__init__()
-
-    monkeypatch.setattr(app_module, "DebugPreviewPanel", FakeDebugPreviewPanel)
-    app = app_module.TranslatorApp(
-        DummyPage(),
-        config_path=Path("settings.json"),
-        application_factory=_construction_application_factory,
-        debug_ui_preview=True,
-    )
-    monkeypatch.setattr(
-        app, "_show_snackbar", lambda message, color=None: snackbars.append((message, color))
-    )
-
-    assert callable(captured_kwargs["on_capture_fault_cycle"])
-    assert callable(captured_kwargs["on_stt_fault_cycle"])
-    assert callable(captured_kwargs["on_audio_fault_clear"])
-    captured_kwargs["on_capture_fault_cycle"]()
-    captured_kwargs["on_stt_fault_cycle"]()
-    captured_kwargs["on_audio_fault_clear"]()
-    assert app.controller.capture_fault_cycled is True
-    assert app.controller.stt_fault_cycled is True
-    assert app.controller.audio_faults_cleared is True
-    assert snackbars[0][0] == app_module.t(
-        "debug_preview.capture_fault_snackbar", profile="capture_attenuate_40db"
-    )
-    assert snackbars[1][0] == app_module.t(
-        "debug_preview.stt_fault_snackbar", profile="stt_input_low_snr_vad_pass"
-    )
-    assert snackbars[2][0] == app_module.t("debug_preview.audio_fault_clear")
-
-
-def test_debug_audio_fault_actions_do_not_call_persistence_or_providers(monkeypatch) -> None:
-    _patch_app_construction(monkeypatch)
-    forbidden_calls: list[str] = []
-    monkeypatch.setattr(
-        ConstructionDummyController,
-        "_save_settings",
-        lambda self: forbidden_calls.append("save_settings"),
-    )
-    monkeypatch.setattr(
-        ConstructionDummyController,
-        "persist_settings",
-        lambda self: forbidden_calls.append("persist_settings"),
-    )
-    monkeypatch.setattr(
-        app_module,
-        "webbrowser",
-        SimpleNamespace(open=lambda *args, **kwargs: forbidden_calls.append("webbrowser.open")),
-    )
-
-    app = app_module.TranslatorApp(
-        DummyPage(),
-        config_path=Path("settings.json"),
-        application_factory=_construction_application_factory,
-        debug_ui_preview=True,
-    )
-    monkeypatch.setattr(app, "_show_snackbar", lambda *_args, **_kwargs: None)
-
-    app._preview_capture_fault_cycle()
-    app._preview_stt_fault_cycle()
-    app._preview_audio_fault_clear()
-
-    assert forbidden_calls == []
 
 
 def test_local_qwen_guidance_modal_open_guide_opens_github_api_key_guide_safely(
@@ -1645,44 +1565,6 @@ async def test_main_gui_forwards_debug_ui_preview_flag(
     assert seen["check"][0] is page
 
 
-def test_debug_preview_gpu_states_cycle_in_memory() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.debug_ui_preview = True
-    app.page = DummyPage()
-    app.view_settings = SimpleNamespace(
-        devices=[],
-        set_gpu_devices=lambda **kwargs: app.view_settings.devices.append(kwargs["devices"]),
-    )
-    app.view_dashboard = SimpleNamespace(
-        notices=[],
-        set_gpu_notice=lambda notice: app.view_dashboard.notices.append(notice),
-    )
-    for _ in range(8):
-        app._cycle_debug_preview_gpu_state()
-
-    assert [notice.status for notice in app.view_dashboard.notices] == [
-        "discovery_failed",
-        "not_installed",
-        "invalid",
-        "installing",
-        "install_failed",
-        "unsupported",
-        "unavailable_device",
-        "activation_failed",
-    ]
-    assert [notice.action for notice in app.view_dashboard.notices] == [
-        "rediscover",
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        "restart",
-    ]
-    assert len(app.view_settings.devices) == 8
-
-
 class PreviewDashboard:
     def __init__(self) -> None:
         self.managed_trial_calls: list[dict[str, object]] = []
@@ -1692,24 +1574,30 @@ class PreviewDashboard:
         raise AssertionError("debug preview must not write removed Dashboard trial-card state")
 
 
-def test_debug_preview_surviving_managed_actions_are_snackbar_only() -> None:
+def test_debug_preview_retired_actions_are_gone() -> None:
+    retired_handlers = (
+        "_preview_brake_notice",
+        "_preview_revoked_notice",
+        "_preview_pkce_failure",
+        "_preview_capture_fault_cycle",
+        "_preview_stt_fault_cycle",
+        "_preview_audio_fault_clear",
+        "_cycle_debug_preview_gpu_state",
+        "_cycle_debug_preview_stt_loading_button",
+    )
+
+    for handler in retired_handlers:
+        assert not hasattr(TranslatorApp, handler), handler
+
+
+def test_debug_preview_surviving_managed_actions_do_not_touch_dashboard_trial_state() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.view_dashboard = PreviewDashboard()
-    snackbar_calls: list[tuple[str, object]] = []
-    app._show_snackbar = lambda message, bgcolor: snackbar_calls.append((message, bgcolor))
 
     assert not hasattr(app, "_set_debug_managed_trial_preview")
     assert not hasattr(app, "_preview_managed_normal")
     assert not hasattr(app, "_preview_managed_exhausted")
     assert not hasattr(app, "_preview_clear")
-
-    app._preview_brake_notice()
-    app._preview_revoked_notice()
-
-    assert snackbar_calls == [
-        (app_module.t("managed_release.brake"), ft.Colors.ORANGE_700),
-        (app_module.t("managed_release.revoked_contact"), ft.Colors.ORANGE_700),
-    ]
     assert app.view_dashboard.managed_trial_calls == []
 
 
@@ -1795,29 +1683,6 @@ def test_founder_readme_url_for_locale_uses_origin_readme_pages() -> None:
     assert resolver(None) == (
         "https://github.com/kapitalismho/PuriPuly-heart/blob/main/README.md#using-your-own-api-keys"
     )
-
-
-def test_debug_preview_pkce_failure_only_shows_failure_snackbar(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    seen: list[tuple[str, object]] = []
-
-    monkeypatch.setattr(
-        app,
-        "_on_request_openrouter_pkce",
-        lambda *_args, **_kwargs: pytest.fail("debug preview must not launch PKCE"),
-        raising=False,
-    )
-    monkeypatch.setattr(
-        app,
-        "_show_snackbar",
-        lambda message, bgcolor: seen.append((message, bgcolor)),
-    )
-
-    app._preview_pkce_failure()
-
-    assert seen == [(app_module.t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)]
 
 
 def test_debug_preview_peer_translation_eula_opens_preview_safe_dialog(

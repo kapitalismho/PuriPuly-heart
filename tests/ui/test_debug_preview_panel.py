@@ -18,12 +18,9 @@ import puripuly_heart.ui.components.debug_preview_panel as panel_module  # noqa:
 DEBUG_PREVIEW_I18N_KEYS = {
     "debug_preview.button",
     "debug_preview.tooltip",
-    "debug_preview.brake_notice",
-    "debug_preview.revoked_notice",
     "debug_preview.github_star_snackbar",
     "debug_preview.telemetry_consent",
     "debug_preview.founder_letter",
-    "debug_preview.pkce_failure",
     "debug_preview.discord_auth",
     "debug_preview.qq_auth",
     "debug_preview.qq_auth_recoverable_error",
@@ -32,20 +29,14 @@ DEBUG_PREVIEW_I18N_KEYS = {
     "debug_preview.peer_translation_eula",
     "debug_preview.local_qwen_hallucination_modal",
     "debug_preview.talk_together_pass_invite_progress",
-    "debug_preview.capture_fault_cycle",
-    "debug_preview.stt_fault_cycle",
-    "debug_preview.stt_loading_button_cycle",
-    "debug_preview.audio_fault_clear",
-    "debug_preview.gpu_state_cycle",
     "debug_preview.foundation_primitives",
     "debug_preview.http_extension_form",
+    "debug_preview.display_turn_cycle",
     "foundation.preview.title",
     "foundation.preview.body",
     "foundation.preview.ready",
     "foundation.preview.action",
     "foundation.preview.unavailable",
-    "debug_preview.capture_fault_snackbar",
-    "debug_preview.stt_fault_snackbar",
     "peer_translation_eula.body",
     "peer_translation_eula.accept",
     "peer_translation_eula.cancel",
@@ -53,56 +44,25 @@ DEBUG_PREVIEW_I18N_KEYS = {
 }
 
 ACTION_KEYS = [
-    "brake_notice",
-    "revoked_notice",
-    "github_star_snackbar",
+    "display_turn_cycle",
     "telemetry_consent",
-    "founder_letter",
-    "pkce_failure",
+    "peer_translation_eula",
     "discord_auth",
     "qq_auth",
     "qq_auth_recoverable_error",
     "qq_auth_translation_gated",
     "discord_callback_page",
-    "peer_translation_eula",
+    "founder_letter",
     "local_qwen_hallucination_modal",
+    "github_star_snackbar",
     "talk_together_pass_invite_progress",
-    "capture_fault_cycle",
-    "stt_fault_cycle",
-    "audio_fault_clear",
-    "gpu_state_cycle",
-    "stt_loading_button_cycle",
     "foundation_primitives",
     "http_extension_form",
 ]
 
 
 def _callbacks(seen: list[str]):
-    return {
-        "on_brake_notice": lambda: seen.append("brake_notice"),
-        "on_revoked_notice": lambda: seen.append("revoked_notice"),
-        "on_github_star_snackbar": lambda: seen.append("github_star_snackbar"),
-        "on_telemetry_consent": lambda: seen.append("telemetry_consent"),
-        "on_founder_letter": lambda: seen.append("founder_letter"),
-        "on_pkce_failure": lambda: seen.append("pkce_failure"),
-        "on_discord_auth": lambda: seen.append("discord_auth"),
-        "on_qq_auth": lambda: seen.append("qq_auth"),
-        "on_qq_auth_recoverable_error": lambda: seen.append("qq_auth_recoverable_error"),
-        "on_qq_auth_translation_gated": lambda: seen.append("qq_auth_translation_gated"),
-        "on_discord_callback_page": lambda: seen.append("discord_callback_page"),
-        "on_peer_translation_eula": lambda: seen.append("peer_translation_eula"),
-        "on_local_qwen_hallucination_modal": lambda: seen.append("local_qwen_hallucination_modal"),
-        "on_talk_together_pass_invite_progress": lambda: seen.append(
-            "talk_together_pass_invite_progress"
-        ),
-        "on_capture_fault_cycle": lambda: seen.append("capture_fault_cycle"),
-        "on_stt_fault_cycle": lambda: seen.append("stt_fault_cycle"),
-        "on_audio_fault_clear": lambda: seen.append("audio_fault_clear"),
-        "on_gpu_state_cycle": lambda: seen.append("gpu_state_cycle"),
-        "on_foundation_primitives": lambda: seen.append("foundation_primitives"),
-        "on_stt_loading_button_cycle": lambda: seen.append("stt_loading_button_cycle"),
-        "on_http_extension_form": lambda: seen.append("http_extension_form"),
-    }
+    return {f"on_{key}": (lambda key=key: seen.append(key)) for key in ACTION_KEYS}
 
 
 def _button_label(button) -> str:
@@ -171,37 +131,8 @@ def test_debug_preview_panel_apply_locale_refreshes_labels(
 
     assert _button_label(panel._toggle_button) == "label:debug_preview.button"
     assert panel._toggle_button.tooltip == "label:debug_preview.tooltip"
-    assert (
-        _button_label(panel._action_buttons["brake_notice"]) == "label:debug_preview.brake_notice"
-    )
-    assert (
-        _button_label(panel._action_buttons["discord_auth"]) == "label:debug_preview.discord_auth"
-    )
-    assert _button_label(panel._action_buttons["qq_auth"]) == "label:debug_preview.qq_auth"
-    assert (
-        _button_label(panel._action_buttons["qq_auth_recoverable_error"])
-        == "label:debug_preview.qq_auth_recoverable_error"
-    )
-    assert (
-        _button_label(panel._action_buttons["qq_auth_translation_gated"])
-        == "label:debug_preview.qq_auth_translation_gated"
-    )
-    assert (
-        _button_label(panel._action_buttons["discord_callback_page"])
-        == "label:debug_preview.discord_callback_page"
-    )
-    assert (
-        _button_label(panel._action_buttons["peer_translation_eula"])
-        == "label:debug_preview.peer_translation_eula"
-    )
-    assert (
-        _button_label(panel._action_buttons["local_qwen_hallucination_modal"])
-        == "label:debug_preview.local_qwen_hallucination_modal"
-    )
-    assert (
-        _button_label(panel._action_buttons["talk_together_pass_invite_progress"])
-        == "label:debug_preview.talk_together_pass_invite_progress"
-    )
+    for key in ACTION_KEYS:
+        assert _button_label(panel._action_buttons[key]) == f"label:debug_preview.{key}"
 
 
 def test_debug_preview_panel_uses_flet_086_text_button_content_api(

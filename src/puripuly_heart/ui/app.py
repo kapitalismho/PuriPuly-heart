@@ -50,8 +50,6 @@ from puripuly_heart.ui.foundation.preview import FoundationPreviewSurface
 from puripuly_heart.ui.foundation.resources import DEFAULT_FOUNDATION_RESOURCES
 from puripuly_heart.ui.foundation.runtime import FletFoundationRuntime
 from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
-from puripuly_heart.ui.gpu_device import GpuDeviceOption
-from puripuly_heart.ui.gpu_notice import GpuDashboardNotice
 from puripuly_heart.ui.i18n import (
     get_locale,
     language_name,
@@ -485,27 +483,20 @@ class TranslatorApp:
 
     def _build_debug_preview_panel(self) -> DebugPreviewPanel:
         return DebugPreviewPanel(
-            on_brake_notice=self._preview_brake_notice,
-            on_revoked_notice=self._preview_revoked_notice,
-            on_founder_letter=self._preview_founder_letter,
-            on_pkce_failure=self._preview_pkce_failure,
+            on_display_turn_cycle=self._cycle_debug_preview_display_turn,
+            on_telemetry_consent=self._preview_telemetry_consent,
+            on_peer_translation_eula=self._preview_peer_translation_eula,
             on_discord_auth=self._preview_discord_auth,
             on_qq_auth=self._preview_qq_auth,
             on_qq_auth_recoverable_error=self._preview_qq_auth_recoverable_error,
             on_qq_auth_translation_gated=self._preview_qq_auth_translation_gated,
             on_discord_callback_page=self._preview_discord_callback_page,
-            on_peer_translation_eula=self._preview_peer_translation_eula,
+            on_founder_letter=self._preview_founder_letter,
             on_local_qwen_hallucination_modal=self._preview_local_qwen_hallucination_modal,
+            on_github_star_snackbar=self._preview_github_star_snackbar,
             on_talk_together_pass_invite_progress=(
                 self._preview_talk_together_pass_invite_progress
             ),
-            on_capture_fault_cycle=self._preview_capture_fault_cycle,
-            on_stt_fault_cycle=self._preview_stt_fault_cycle,
-            on_audio_fault_clear=self._preview_audio_fault_clear,
-            on_gpu_state_cycle=self._cycle_debug_preview_gpu_state,
-            on_github_star_snackbar=self._preview_github_star_snackbar,
-            on_telemetry_consent=self._preview_telemetry_consent,
-            on_stt_loading_button_cycle=self._cycle_debug_preview_stt_loading_button,
             on_foundation_primitives=self._preview_foundation_primitives,
             on_http_extension_form=self._preview_http_extension_form,
         )
@@ -778,12 +769,6 @@ class TranslatorApp:
         self._telemetry_consent_dialog = dialog
         dialog.open()
 
-    def _preview_brake_notice(self) -> None:
-        self._show_snackbar(t("managed_release.brake"), ft.Colors.ORANGE_700)
-
-    def _preview_revoked_notice(self) -> None:
-        self._show_snackbar(t("managed_release.revoked_contact"), ft.Colors.ORANGE_700)
-
     def _debug_preview_noop(self) -> None:
         return None
 
@@ -791,9 +776,6 @@ class TranslatorApp:
         dialog = FounderLetterDialog(self.page, on_readme=self._on_founder_letter_readme)
         self._founder_letter_dialog = dialog
         dialog.open()
-
-    def _preview_pkce_failure(self) -> None:
-        self._show_snackbar(t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)
 
     def _preview_discord_auth(self) -> None:
         self.show_discord_managed_auth_dialog(preview=True)
@@ -845,22 +827,6 @@ class TranslatorApp:
                 bonus_translations_per_friend=200,
             ),
         )
-
-    def _preview_capture_fault_cycle(self) -> None:
-        profile = self.application.cycle_debug_capture_fault_profile()
-        self._show_snackbar(
-            t("debug_preview.capture_fault_snackbar", profile=profile), ft.Colors.ORANGE_700
-        )
-
-    def _preview_stt_fault_cycle(self) -> None:
-        profile = self.application.cycle_debug_stt_fault_profile()
-        self._show_snackbar(
-            t("debug_preview.stt_fault_snackbar", profile=profile), ft.Colors.ORANGE_700
-        )
-
-    def _preview_audio_fault_clear(self) -> None:
-        self.application.clear_debug_audio_fault_profiles()
-        self._show_snackbar(t("debug_preview.audio_fault_clear"), ft.Colors.GREEN_700)
 
     def _preview_foundation_primitives(self) -> None:
         if not self._foundation_adapter.debug_preview_enabled:
@@ -1092,58 +1058,33 @@ class TranslatorApp:
             foundation_preview_dialog.content = FoundationPreviewSurface(get_locale())
         self.page.update()
 
-    def _cycle_debug_preview_stt_loading_button(self) -> None:
-        states = ("off", "starting", "on")
-        index = int(getattr(self, "_debug_preview_stt_loading_button_index", -1)) + 1
-        index %= len(states)
-        self._debug_preview_stt_loading_button_index = index
-        state = states[index]
-        self.view_dashboard.stt_button.set_state(
-            state == "on",
-            is_starting=state == "starting",
+    def _cycle_debug_preview_display_turn(self) -> None:
+        dashboard = getattr(self, "view_dashboard", None)
+        if dashboard is None:
+            return
+        steps = (
+            ("source", "ko", "오늘 같이 뭐 하고 놀까?"),
+            ("translation", "en", "What should we do together today?"),
+            (
+                "source",
+                "ko",
+                "아까 말한 그 월드 이름이 뭐였지? 다시 가보고 싶은데 검색해도 안 나오더라.",
+            ),
+            (
+                "translation",
+                "en",
+                "What was the name of that world you mentioned earlier? "
+                "I want to visit again but searching turns up nothing.",
+            ),
         )
-
-    def _cycle_debug_preview_gpu_state(self) -> None:
-        states = (
-            "discovery_failed",
-            "not_installed",
-            "invalid",
-            "installing",
-            "install_failed",
-            "unsupported",
-            "unavailable_device",
-            "activation_failed",
-        )
-        index = int(getattr(self, "_debug_preview_gpu_state_index", -1)) + 1
-        index %= len(states)
-        self._debug_preview_gpu_state_index = index
-        devices = (
-            GpuDeviceOption("vulkan-index-0", "Debug GPU 0", "Vulkan0"),
-            GpuDeviceOption("vulkan-index-1", "Debug GPU 1", "Vulkan1"),
-        )
-        set_devices = getattr(self.view_settings, "set_gpu_devices", None)
-        if callable(set_devices):
-            set_devices(devices=devices)
-        action_by_state = {
-            "discovery_failed": "rediscover",
-            "activation_failed": "restart",
-        }
-        notice = GpuDashboardNotice(
-            status=states[index],
-            progress_percent=42 if states[index] == "installing" else None,
-            action=action_by_state.get(states[index]),
-        )
-        set_notice = getattr(getattr(self, "view_dashboard", None), "set_gpu_notice", None)
-        if callable(set_notice):
-            set_notice(notice)
-        else:
-            legacy_setter = getattr(self.view_settings, "set_gpu_runtime_state", None)
-            if callable(legacy_setter):
-                legacy_setter(
-                    states[index],
-                    devices=devices,
-                    progress_percent=notice.progress_percent,
-                )
+        index = int(getattr(self, "_debug_preview_display_turn_index", -1)) + 1
+        index %= len(steps)
+        self._debug_preview_display_turn_index = index
+        kind, language_code, text = steps[index]
+        if kind == "source":
+            dashboard.set_display_text(text, language_code=language_code)
+            return
+        dashboard.set_display_translation_text(text, language_code=language_code)
 
     def refresh_overlay_peer_contract(self) -> None:
         presentation = getattr(self, "_presentation_adapter", None)

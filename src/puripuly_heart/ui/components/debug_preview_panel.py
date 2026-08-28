@@ -14,6 +14,8 @@ from puripuly_heart.ui.theme import (
 )
 
 DEBUG_PREVIEW_PANEL_DATA_KEY = "debug-preview-panel"
+DEBUG_PREVIEW_ACTION_ROW_HEIGHT = 44
+DEBUG_PREVIEW_POPOVER_MAX_HEIGHT = 620
 
 
 def _make_text_button(label: str, **kwargs) -> ft.TextButton:
@@ -35,43 +37,37 @@ class DebugPreviewPanel(ft.Container):
     def __init__(
         self,
         *,
-        on_brake_notice: Callable[[], None],
-        on_revoked_notice: Callable[[], None],
-        on_founder_letter: Callable[[], None],
-        on_pkce_failure: Callable[[], None],
+        on_display_turn_cycle: Callable[[], None],
+        on_telemetry_consent: Callable[[], None],
+        on_peer_translation_eula: Callable[[], None],
         on_discord_auth: Callable[[], None],
         on_qq_auth: Callable[[], None],
         on_qq_auth_recoverable_error: Callable[[], None],
         on_qq_auth_translation_gated: Callable[[], None],
         on_discord_callback_page: Callable[[], None],
-        on_peer_translation_eula: Callable[[], None],
+        on_founder_letter: Callable[[], None],
         on_local_qwen_hallucination_modal: Callable[[], None],
-        on_talk_together_pass_invite_progress: Callable[[], None],
-        on_capture_fault_cycle: Callable[[], None],
-        on_stt_fault_cycle: Callable[[], None],
-        on_audio_fault_clear: Callable[[], None],
-        on_gpu_state_cycle: Callable[[], None],
         on_github_star_snackbar: Callable[[], None],
-        on_telemetry_consent: Callable[[], None],
+        on_talk_together_pass_invite_progress: Callable[[], None],
         on_foundation_primitives: Callable[[], None],
-        on_stt_loading_button_cycle: Callable[[], None] | None = None,
         on_http_extension_form: Callable[[], None] | None = None,
     ) -> None:
         actions = [
-            _PreviewAction("brake_notice", "debug_preview.brake_notice", on_brake_notice),
-            _PreviewAction("revoked_notice", "debug_preview.revoked_notice", on_revoked_notice),
             _PreviewAction(
-                "github_star_snackbar",
-                "debug_preview.github_star_snackbar",
-                on_github_star_snackbar,
+                "display_turn_cycle",
+                "debug_preview.display_turn_cycle",
+                on_display_turn_cycle,
             ),
             _PreviewAction(
                 "telemetry_consent",
                 "debug_preview.telemetry_consent",
                 on_telemetry_consent,
             ),
-            _PreviewAction("founder_letter", "debug_preview.founder_letter", on_founder_letter),
-            _PreviewAction("pkce_failure", "debug_preview.pkce_failure", on_pkce_failure),
+            _PreviewAction(
+                "peer_translation_eula",
+                "debug_preview.peer_translation_eula",
+                on_peer_translation_eula,
+            ),
             _PreviewAction("discord_auth", "debug_preview.discord_auth", on_discord_auth),
             _PreviewAction("qq_auth", "debug_preview.qq_auth", on_qq_auth),
             _PreviewAction(
@@ -89,15 +85,16 @@ class DebugPreviewPanel(ft.Container):
                 "debug_preview.discord_callback_page",
                 on_discord_callback_page,
             ),
-            _PreviewAction(
-                "peer_translation_eula",
-                "debug_preview.peer_translation_eula",
-                on_peer_translation_eula,
-            ),
+            _PreviewAction("founder_letter", "debug_preview.founder_letter", on_founder_letter),
             _PreviewAction(
                 "local_qwen_hallucination_modal",
                 "debug_preview.local_qwen_hallucination_modal",
                 on_local_qwen_hallucination_modal,
+            ),
+            _PreviewAction(
+                "github_star_snackbar",
+                "debug_preview.github_star_snackbar",
+                on_github_star_snackbar,
             ),
             _PreviewAction(
                 "talk_together_pass_invite_progress",
@@ -105,48 +102,19 @@ class DebugPreviewPanel(ft.Container):
                 on_talk_together_pass_invite_progress,
             ),
             _PreviewAction(
-                "capture_fault_cycle",
-                "debug_preview.capture_fault_cycle",
-                on_capture_fault_cycle,
-            ),
-            _PreviewAction(
-                "stt_fault_cycle",
-                "debug_preview.stt_fault_cycle",
-                on_stt_fault_cycle,
-            ),
-            _PreviewAction(
-                "audio_fault_clear",
-                "debug_preview.audio_fault_clear",
-                on_audio_fault_clear,
-            ),
-            _PreviewAction(
-                "gpu_state_cycle",
-                "debug_preview.gpu_state_cycle",
-                on_gpu_state_cycle,
-            ),
-        ]
-        if on_stt_loading_button_cycle is not None:
-            actions.append(
-                _PreviewAction(
-                    "stt_loading_button_cycle",
-                    "debug_preview.stt_loading_button_cycle",
-                    on_stt_loading_button_cycle,
-                )
-            )
-        actions.append(
-            _PreviewAction(
                 "foundation_primitives",
                 "debug_preview.foundation_primitives",
                 on_foundation_primitives,
+            ),
+        ]
+        if on_http_extension_form is not None:
+            actions.append(
+                _PreviewAction(
+                    "http_extension_form",
+                    "debug_preview.http_extension_form",
+                    on_http_extension_form,
+                )
             )
-        )
-        actions.append(
-            _PreviewAction(
-                "http_extension_form",
-                "debug_preview.http_extension_form",
-                on_http_extension_form,
-            )
-        )
         self._actions = tuple(actions)
         self._toggle_button = _make_text_button(
             t("debug_preview.button"),
@@ -165,7 +133,11 @@ class DebugPreviewPanel(ft.Container):
             content=ft.Column(
                 controls=list(self._action_buttons.values()),
                 spacing=2,
-                tight=True,
+                scroll=ft.ScrollMode.AUTO,
+                height=min(
+                    len(self._actions) * DEBUG_PREVIEW_ACTION_ROW_HEIGHT,
+                    DEBUG_PREVIEW_POPOVER_MAX_HEIGHT,
+                ),
             ),
         )
 
