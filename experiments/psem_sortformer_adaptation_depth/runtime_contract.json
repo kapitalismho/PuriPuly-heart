@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "runtime_contract_version": "issue-107-runtime-v1",
+  "streaming": {
+    "sample_rate_hz": 16000,
+    "native_frame_samples": 1280,
+    "slot_count": 4,
+    "chunk_len_frames": 6,
+    "chunk_right_context_frames": 7,
+    "chunk_left_context_frames": 1,
+    "fifo_len_frames": 188,
+    "speaker_cache_update_period_frames": 144,
+    "speaker_cache_len_frames": 188,
+    "algorithmic_evidence_delay_samples": 16640,
+    "slot_alive_policy": "issue_99_all_four_stable_columns_alive"
+  },
+  "evidence_taps": {
+    "final_temporal_hidden": "sortformer.transformer_encoder.output",
+    "speaker_activity_logits": "sortformer.sortformer_modules.single_hidden_to_spks.output_pre_sigmoid"
+  },
+  "dependency_lock": {
+    "schema_version": 1,
+    "artifact_role": "nemo_dependency_lock",
+    "nemo_revision": "1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6",
+    "lock_kind": "complete_installed_distribution_inventory",
+    "platform_identity_fields": ["system", "release", "machine"],
+    "required_exact_packages": ["hydra-core", "lightning", "numpy", "omegaconf", "torch", "torchaudio"],
+    "all_installed_distributions_must_match": true,
+    "all_loaded_nemo_modules_must_resolve_under_checkout": true
+  },
+  "sampling": {
+    "manifest_epochs": 8,
+    "windows_per_epoch": 4096,
+    "window_samples": 480000,
+    "warmup_samples": 32000,
+    "source_time_uniform_per_epoch": 2048,
+    "replacement_positive_per_epoch": 1024,
+    "hard_negative_per_epoch": 1024,
+    "training_sequence_start_is_declared_reset": true,
+    "target_recipe_version": "issue-107-oracle-anchor-frame-targets-v1",
+    "augmentation_recipe_version": "issue-107-waveform-augmentation-v1"
+  },
+  "overfit": {
+    "source_rule_version": "issue-107-overfit-source-v1",
+    "window_rule_version": "issue-107-overfit-window-v1",
+    "sources_per_corpus": 2,
+    "windows_per_source": 15,
+    "duration_minutes": 30,
+    "maximum_optimizer_steps": 500
+  },
+  "prediction_coordinates": {
+    "source_frame_support": "zero_based_half_open_16khz_samples",
+    "evidence_frontier": "frame_start_plus_16640_samples",
+    "required_fields": [
+      "anchor_episode_id",
+      "oracle_anchor_slot",
+      "slot_alive",
+      "state_reset",
+      "raw_sortformer_activity_logits",
+      "raw_anchor_present_logit",
+      "raw_replacement_evidence_logit"
+    ],
+    "final_frame_policy": "waveform_length_must_be_divisible_by_1280_and_output_count_must_equal_length_div_1280",
+    "lineage_source_coverage": "zero_to_largest_complete_1280_sample_frame_with_explicit_excluded_tail",
+    "state_reset_policy": "first_frame_only",
+    "lifecycle_fields_are_binary": true,
+    "logits_must_be_finite": true
+  },
+  "lineage_numeric_evidence": {
+    "float_prediction_set_hash_recomputed_from_external_artifacts": true,
+    "q8_prediction_set_sha256": "27b7eaaa5c2ee332c3b81c048f8e2666499da9a3a4d7e46e8c994876c6ddcee8",
+    "paired_bootstrap_algorithm": "paired_source_bootstrap_v1",
+    "paired_bootstrap_resamples_minimum": 2000,
+    "replicate_hash_and_interval_recomputed": true
+  },
+  "material_training_gate": {
+    "fail_closed": true,
+    "required_receipts": [
+      "runtime_preflight",
+      "data_split_receipt",
+      "sampling_manifest_validation",
+      "train_class_weight_receipt",
+      "trainable_checkpoint_lineage",
+      "evaluator_reconstruction_contract",
+      "model_graph_receipt",
+      "parameter_inventory",
+      "gradient_canary_receipt",
+      "update_canary_receipt",
+      "overfit_canary",
+      "staged_execution_state"
+    ],
+    "checkpoint_selection_role": "PSEM-STRATEGY-DEV",
+    "eval_open_count_before_candidate_freeze": 0,
+    "conditional_arm": "TA-ALL-TEMPORAL",
+    "confirmation_seed": 7302
+  }
+}

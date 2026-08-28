@@ -17,6 +17,8 @@ PACKAGE_ROOT = Path(__file__).resolve().parent
 REPOSITORY_ROOT = PACKAGE_ROOT.parents[1]
 CONTRACT_PATH = PACKAGE_ROOT / "contract.json"
 CONFIG_PATH = PACKAGE_ROOT / "config.json"
+DATA_SPLIT_RECEIPT_PATH = PACKAGE_ROOT / "data_split_receipt.json"
+RUNTIME_CONTRACT_PATH = PACKAGE_ROOT / "runtime_contract.json"
 SOURCE_MANIFEST_PATH = (
     REPOSITORY_ROOT
     / "experiments"
@@ -30,6 +32,12 @@ EXPECTED_CONTRACT_CANONICAL_SHA256 = (
 )
 EXPECTED_CONFIG_CANONICAL_SHA256 = (
     "c0f4fa8143d363b9bd9c7c22a28c94000eb51c4b69d8a2fd02c89a9c1f52fa10"
+)
+EXPECTED_DATA_SPLIT_RECEIPT_CANONICAL_SHA256 = (
+    "872879a463077416b12527359527b0b74ab609aebddb5631fa7a55afb8592287"
+)
+EXPECTED_RUNTIME_CONTRACT_CANONICAL_SHA256 = (
+    "06a723bb8f26ecd572bbb15a01104325462e2ebb902c8ab5b4e305e719f81ae9"
 )
 EXPECTED_ARTIFACTS = {
     "freeze": (
@@ -155,6 +163,8 @@ def _source_rows() -> list[dict[str, Any]]:
 def static_checks() -> list[dict[str, Any]]:
     contract = load_json(CONTRACT_PATH)
     config = load_json(CONFIG_PATH)
+    data_split_receipt = load_json(DATA_SPLIT_RECEIPT_PATH)
+    runtime_contract = load_json(RUNTIME_CONTRACT_PATH)
     contract_hash = canonical_sha256(contract)
     config_hash = canonical_sha256(config)
     checks = [
@@ -169,6 +179,18 @@ def static_checks() -> list[dict[str, Any]]:
             config_hash == EXPECTED_CONFIG_CANONICAL_SHA256,
             EXPECTED_CONFIG_CANONICAL_SHA256,
             config_hash,
+        ),
+        check(
+            "data_split_receipt.controls_exact",
+            canonical_sha256(data_split_receipt) == EXPECTED_DATA_SPLIT_RECEIPT_CANONICAL_SHA256,
+            EXPECTED_DATA_SPLIT_RECEIPT_CANONICAL_SHA256,
+            canonical_sha256(data_split_receipt),
+        ),
+        check(
+            "runtime_contract.controls_exact",
+            canonical_sha256(runtime_contract) == EXPECTED_RUNTIME_CONTRACT_CANONICAL_SHA256,
+            EXPECTED_RUNTIME_CONTRACT_CANONICAL_SHA256,
+            canonical_sha256(runtime_contract),
         ),
     ]
     for artifact_id, (relative_path, expected_hash) in EXPECTED_ARTIFACTS.items():
