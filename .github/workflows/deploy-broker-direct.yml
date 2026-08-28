@@ -166,7 +166,7 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: refs/heads/dev
 
@@ -205,12 +205,12 @@ jobs:
           PY
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           run_install: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -271,7 +271,7 @@ jobs:
           echo "backup_path=$backup_path" >> "$GITHUB_OUTPUT"
 
       - name: Upload pre-migration D1 backup
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: puripuly-heart-broker-pre-migration-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.d1_backup.outputs.backup_path }}
