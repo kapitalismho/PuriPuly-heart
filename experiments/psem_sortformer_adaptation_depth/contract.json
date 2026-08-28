@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "experiment_id": "psem_sortformer_adaptation_depth_v1",
+  "contract_version": "issue-107-v1",
+  "authority": {
+    "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/107",
+    "sha256": "eba82c5a39421b7c8d619cfd971720d8b35b19c8d198605e6e5c0dd09fcd0a97"
+  },
+  "predecessor": {
+    "authority_ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/99",
+    "authority_sha256": "5ced0919f627b4022b3836d47d8fadcbaebb304f30c7d1dfe5d3339343c176f9",
+    "final_decision_path": "experiments/psem_frozen_ceiling_gate/results/frozen_ceiling_1/FINAL_DECISION.md",
+    "final_decision_sha256": "7950943a5ea05f52cea69502a4e243541e3eb1bbc856d55620800d594bd7acf1"
+  },
+  "dataset": {
+    "id": "PSEM-STRATEGY-DATA-v2",
+    "authority_ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/86",
+    "authority_sha256": "90078d66026f1374b065a5b9022788c40fac076cd4cf307df87b5027ea3fcb63",
+    "freeze_path": "experiments/psem_training_strategy_gate/data/v2/dataset_freeze.json",
+    "freeze_sha256": "bc7e63bb201c2a33a9b2d69b2364fed8f03839278098f0bd175d6833b330a41e",
+    "split_manifest_path": "experiments/psem_training_strategy_gate/data/v2/split_manifest.json",
+    "split_manifest_sha256": "dce084ca8394f70e4f7fe4c72687bbfd95998d26e9ce43e600ef2eb8a65490b4",
+    "source_manifest_path": "experiments/psem_training_strategy_gate/data/v2/source_manifest.jsonl",
+    "source_manifest_sha256": "76d5a6640ffabbc3cf91c25f5a94284f9869ad266e621ee06f48a987d5d7c6de",
+    "annotation_manifest_path": "experiments/psem_training_strategy_gate/data/v2/annotation_manifest.jsonl",
+    "annotation_manifest_sha256": "e2c5b917019000172b08c90d366697d3b5388c4aafbed1b23cd4b8159b6966b2",
+    "topology_manifest_path": "experiments/psem_training_strategy_gate/data/v2/topology_manifest.jsonl",
+    "topology_manifest_sha256": "728c33d17d239dedf08eed9e014cd7e42f4b980c9bcb5b7826c67449f897d7cd"
+  },
+  "deployment_baseline": {
+    "repository": "handy-computer/diar_streaming_sortformer_4spk-v2.1-gguf",
+    "revision": "7ef0c15dc8f9d717e9d24fac29a6e6551e9c6ddf",
+    "filename": "diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+    "sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+    "runtime_source_revision": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+    "backend": "vulkan",
+    "preset": "low_latency",
+    "native_frame_ms": 80,
+    "algorithmic_evidence_delay_ms": 1040
+  },
+  "trainable_checkpoint": {
+    "repository": "nvidia/diar_streaming_sortformer_4spk-v2.1",
+    "revision": "fafaab5faa1617a0ca52d38dd3dc4bd636800d3d",
+    "filename": "diar_streaming_sortformer_4spk-v2.1.nemo",
+    "sha256": "8abd32832159c6ac1148c926b7276f35ba34582c444e559dce1f1253fea42ef8",
+    "size_bytes": 471367680
+  },
+  "nemo": {
+    "repository": "https://github.com/NVIDIA-NeMo/NeMo.git",
+    "revision": "1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6",
+    "compatibility_status": "must_pass_runtime_preflight"
+  },
+  "decision": "select the shallowest stable Sortformer temporal adaptation depth or stop with outcome D",
+  "required_arms": ["F0-FROZEN-FLOAT", "H-HEAD", "T2-TOP"],
+  "conditional_arm": "TA-ALL-TEMPORAL",
+  "allowed_outcomes": ["A", "B", "C", "D"],
+  "non_goals": [
+    "student_kd",
+    "scratch_student_training",
+    "native_causal_anchor_lifecycle",
+    "production_vad_execution",
+    "nest_or_acoustic_encoder_unfreezing",
+    "lora_or_adapters",
+    "architecture_or_hyperparameter_sweeps",
+    "new_corpora",
+    "quantization_or_deployment_benchmarking",
+    "production_readiness_claims"
+  ]
+}

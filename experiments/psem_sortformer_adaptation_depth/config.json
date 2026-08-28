@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "experiment_id": "psem_sortformer_adaptation_depth_v1",
+  "sample_rate_hz": 16000,
+  "native_frame_ms": 80,
+  "slot_count": 4,
+  "hidden_dimension": 192,
+  "psem_input": {
+    "dimension": 208,
+    "field_order": [
+      "final_temporal_hidden_192",
+      "speaker_activity_logits_4",
+      "slot_alive_4",
+      "oracle_anchor_slot_one_hot_4",
+      "selected_anchor_logit_1",
+      "maximum_alive_non_anchor_logit_1",
+      "state_reset_1",
+      "model_evidence_delay_seconds_1"
+    ],
+    "model_evidence_delay_seconds": 1.04
+  },
+  "psem_head": {
+    "input_layer_norm": true,
+    "gru_layers": 1,
+    "gru_hidden_size": 64,
+    "causal": true,
+    "outputs": ["anchor_present", "replacement_evidence"]
+  },
+  "arms": {
+    "F0-FROZEN-FLOAT": {
+      "trainable": []
+    },
+    "H-HEAD": {
+      "trainable": ["psem_head"]
+    },
+    "T2-TOP": {
+      "trainable": ["psem_head", "transformer_encoder.layers.16", "transformer_encoder.layers.17", "sortformer_activity_head"]
+    },
+    "TA-ALL-TEMPORAL": {
+      "trainable": ["psem_head", "transformer_encoder.layers.0:17", "sortformer_activity_head"]
+    }
+  },
+  "streaming": {
+    "sequence_seconds": 30,
+    "loss_warmup_seconds": 2,
+    "chunk_audio_ms": 480,
+    "algorithmic_evidence_delay_ms": 1040,
+    "state_reset_policy": "declared_source_or_reset_boundary_only",
+    "additional_future_context_allowed": false
+  },
+  "loss": {
+    "replacement_weight": 1.0,
+    "anchor_weight": 0.5,
+    "native_sortformer_weight": 0.5,
+    "psem_kind": "train_class_weighted_bce_with_logits",
+    "native_kind": "checkpoint_arrival_order_four_slot_loss"
+  },
+  "sampling": {
+    "source_time_uniform_fraction": 0.5,
+    "replacement_positive_fraction": 0.25,
+    "hard_negative_fraction": 0.25,
+    "positive_families": ["clean_direct_different_speaker_handoff", "silence_gap_different_speaker_handoff", "overlap_takeover"],
+    "hard_negative_families": ["stable_anchor_continuation", "same_speaker_silence_gap_resume", "overlap_return", "overlap_continuation"]
+  },
+  "augmentation": ["global_gain", "additive_non_speech_noise", "light_reverberation", "band_limitation"],
+  "optimization": {
+    "optimizer": "AdamW",
+    "weight_decay": 0.0001,
+    "gradient_clip_norm": 1.0,
+    "maximum_epochs": 8,
+    "early_stopping_patience": 2,
+    "warmup_fraction": 0.05,
+    "seeds": [7301, 7302],
+    "learning_rates": {
+      "psem_head": 0.001,
+      "sortformer_activity_head": 0.0001,
+      "temporal_transformer": 0.00001
+    },
+    "checkpoint_metric": "dev_total_loss",
+    "checkpoint_tiebreak": "dev_duration_weighted_replacement_average_precision"
+  },
+  "overfit_canary": {
+    "duration_minutes": 30,
+    "source_count_by_corpus": {"AMI": 2, "AliMeeting": 2},
+    "maximum_optimizer_steps": 500,
+    "minimum_replacement_loss_reduction": 0.3,
+    "minimum_replacement_average_precision": 0.85
+  },
+  "evaluation": {
+    "replacement_thresholds": [0.35, 0.5, 0.65],
+    "replacement_confirmation_ms": [100, 300, 500],
+    "primary_threshold": 0.5,
+    "primary_confirmation_ms": 500,
+    "bootstrap_resamples": 2000,
+    "bootstrap_unit": "source_or_meeting",
+    "eval_threshold_selection_allowed": false
+  }
+}

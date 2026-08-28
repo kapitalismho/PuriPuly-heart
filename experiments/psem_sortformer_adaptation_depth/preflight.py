@@ -1,0 +1,388 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import platform
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from experiments.psem_training_strategy_gate.data.forced_alignment_reference import (
+    validate_reference_checkout,
+)
+
+PACKAGE_ROOT = Path(__file__).resolve().parent
+REPOSITORY_ROOT = PACKAGE_ROOT.parents[1]
+CONTRACT_PATH = PACKAGE_ROOT / "contract.json"
+CONFIG_PATH = PACKAGE_ROOT / "config.json"
+SOURCE_MANIFEST_PATH = (
+    REPOSITORY_ROOT
+    / "experiments"
+    / "psem_training_strategy_gate"
+    / "data"
+    / "v2"
+    / "source_manifest.jsonl"
+)
+EXPECTED_CONTRACT_CANONICAL_SHA256 = (
+    "905a6d2c5c4626efabe06ea24d1d89551bdf354f3ecd75cb91b785fcb86c1252"
+)
+EXPECTED_CONFIG_CANONICAL_SHA256 = (
+    "c0f4fa8143d363b9bd9c7c22a28c94000eb51c4b69d8a2fd02c89a9c1f52fa10"
+)
+EXPECTED_ARTIFACTS = {
+    "freeze": (
+        "experiments/psem_training_strategy_gate/data/v2/dataset_freeze.json",
+        "bc7e63bb201c2a33a9b2d69b2364fed8f03839278098f0bd175d6833b330a41e",
+    ),
+    "split_manifest": (
+        "experiments/psem_training_strategy_gate/data/v2/split_manifest.json",
+        "dce084ca8394f70e4f7fe4c72687bbfd95998d26e9ce43e600ef2eb8a65490b4",
+    ),
+    "source_manifest": (
+        "experiments/psem_training_strategy_gate/data/v2/source_manifest.jsonl",
+        "76d5a6640ffabbc3cf91c25f5a94284f9869ad266e621ee06f48a987d5d7c6de",
+    ),
+    "annotation_manifest": (
+        "experiments/psem_training_strategy_gate/data/v2/annotation_manifest.jsonl",
+        "e2c5b917019000172b08c90d366697d3b5388c4aafbed1b23cd4b8159b6966b2",
+    ),
+    "topology_manifest": (
+        "experiments/psem_training_strategy_gate/data/v2/topology_manifest.jsonl",
+        "728c33d17d239dedf08eed9e014cd7e42f4b980c9bcb5b7826c67449f897d7cd",
+    ),
+    "predecessor_decision": (
+        "experiments/psem_frozen_ceiling_gate/results/frozen_ceiling_1/FINAL_DECISION.md",
+        "7950943a5ea05f52cea69502a4e243541e3eb1bbc856d55620800d594bd7acf1",
+    ),
+}
+EXPECTED_ROLES = {
+    "PSEM-STRATEGY-TRAIN": {"AMI": 50, "AliMeeting": 14},
+    "PSEM-STRATEGY-DEV": {"AMI": 7, "AliMeeting": 3},
+    "PSEM-STRATEGY-EVAL": {"AMI": 11, "AliMeeting": 8},
+}
+EXPECTED_SOURCE_COUNT = 93
+EXPECTED_CHECKPOINT_SHA256 = "8abd32832159c6ac1148c926b7276f35ba34582c444e559dce1f1253fea42ef8"
+EXPECTED_CHECKPOINT_SIZE = 471367680
+EXPECTED_REFERENCE = {
+    "repository": "https://github.com/nttcslab-sp/diar-forced-alignment",
+    "commit": "9527b7c64846fb38316a610f32e9d3466bd6d8b7",
+}
+
+
+class PreflightError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class PreflightPaths:
+    checkpoint: Path | None
+    corpus_root: Path | None
+    reference_root: Path | None
+    output_root: Path | None
+
+
+def load_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(1 << 20):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def canonical_sha256(value: Any) -> str:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def check(check_id: str, passed: bool, expected: Any, observed: Any) -> dict[str, Any]:
+    return {"id": check_id, "passed": bool(passed), "expected": expected, "observed": observed}
+
+
+def _path(value: Path | None, environment_name: str) -> Path | None:
+    raw = value if value is not None else os.environ.get(environment_name)
+    return Path(raw).expanduser().resolve() if raw else None
+
+
+def resolve_paths(
+    *,
+    checkpoint: Path | None = None,
+    corpus_root: Path | None = None,
+    reference_root: Path | None = None,
+    output_root: Path | None = None,
+) -> PreflightPaths:
+    return PreflightPaths(
+        _path(checkpoint, "PSEM_SORTFORMER_NEMO_PATH"),
+        _path(corpus_root, "PSEM_CORPUS_ROOT"),
+        _path(reference_root, "PSEM_REFERENCE_ROOT"),
+        _path(output_root, "PSEM_ADAPTATION_OUTPUT_ROOT"),
+    )
+
+
+def _git_state() -> dict[str, Any]:
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    dirty = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    return {"head": head, "dirty": dirty}
+
+
+def _source_rows() -> list[dict[str, Any]]:
+    rows = []
+    for line in SOURCE_MANIFEST_PATH.read_text(encoding="utf-8").splitlines():
+        row = json.loads(line)
+        if not isinstance(row, dict):
+            raise ValueError("source manifest row must be an object")
+        rows.append(row)
+    return rows
+
+
+def static_checks() -> list[dict[str, Any]]:
+    contract = load_json(CONTRACT_PATH)
+    config = load_json(CONFIG_PATH)
+    contract_hash = canonical_sha256(contract)
+    config_hash = canonical_sha256(config)
+    checks = [
+        check(
+            "contract.controls_exact",
+            contract_hash == EXPECTED_CONTRACT_CANONICAL_SHA256,
+            EXPECTED_CONTRACT_CANONICAL_SHA256,
+            contract_hash,
+        ),
+        check(
+            "config.controls_exact",
+            config_hash == EXPECTED_CONFIG_CANONICAL_SHA256,
+            EXPECTED_CONFIG_CANONICAL_SHA256,
+            config_hash,
+        ),
+    ]
+    for artifact_id, (relative_path, expected_hash) in EXPECTED_ARTIFACTS.items():
+        path = REPOSITORY_ROOT / relative_path
+        observed = sha256_file(path) if path.is_file() else None
+        checks.append(
+            check(f"artifact.{artifact_id}", observed == expected_hash, expected_hash, observed)
+        )
+    freeze_path = REPOSITORY_ROOT / EXPECTED_ARTIFACTS["freeze"][0]
+    split_path = REPOSITORY_ROOT / EXPECTED_ARTIFACTS["split_manifest"][0]
+    freeze = load_json(freeze_path)
+    split = load_json(split_path)
+    source_rows = _source_rows()
+    source_assignments = split.get("assignments", {}).get("sources", [])
+    component_assignments = split.get("assignments", {}).get("components", [])
+    official_roles = freeze.get("official_roles")
+    role_set = set(EXPECTED_ROLES)
+    source_roles = [row.get("role") for row in source_assignments]
+    component_roles = [row.get("role") for row in component_assignments]
+    assignment_source_ids = [row.get("source_id") for row in source_assignments]
+    manifest_source_ids = [row.get("source_id") for row in source_rows]
+    split_semantics = (
+        official_roles == list(EXPECTED_ROLES)
+        and len(source_assignments) == EXPECTED_SOURCE_COUNT
+        and len(set(assignment_source_ids)) == len(assignment_source_ids)
+        and set(assignment_source_ids) == set(manifest_source_ids)
+        and len(manifest_source_ids) == EXPECTED_SOURCE_COUNT
+        and len(set(manifest_source_ids)) == len(manifest_source_ids)
+        and set(source_roles) == role_set
+        and set(component_roles) == role_set
+        and all(role in role_set for role in source_roles + component_roles)
+    )
+    checks.append(
+        check(
+            "dataset.split_roles_exact",
+            split_semantics,
+            {
+                "official_roles": list(EXPECTED_ROLES),
+                "source_count": EXPECTED_SOURCE_COUNT,
+                "assignment_roles": sorted(EXPECTED_ROLES),
+                "source_identity_set": "exact",
+            },
+            {
+                "official_roles": official_roles,
+                "source_count": len(source_assignments),
+                "source_roles": sorted(set(source_roles), key=str),
+                "component_roles": sorted(set(component_roles), key=str),
+                "source_identity_set_exact": set(assignment_source_ids) == set(manifest_source_ids),
+            },
+        )
+    )
+    observed_roles = {
+        role: {
+            corpus: sum(
+                row.get("role") == role and row.get("corpus") == corpus
+                for row in source_assignments
+            )
+            for corpus in ("AMI", "AliMeeting")
+        }
+        for role in EXPECTED_ROLES
+    }
+    checks.append(
+        check(
+            "dataset.role_counts", observed_roles == EXPECTED_ROLES, EXPECTED_ROLES, observed_roles
+        )
+    )
+    checks.append(
+        check(
+            "dataset.identity",
+            freeze.get("dataset_freeze_id") == "PSEM-STRATEGY-DATA-v2"
+            and freeze.get("freeze_status") == "frozen",
+            {"id": "PSEM-STRATEGY-DATA-v2", "status": "frozen"},
+            {"id": freeze.get("dataset_freeze_id"), "status": freeze.get("freeze_status")},
+        )
+    )
+    return checks
+
+
+def _safe_external_output_root(path: Path | None) -> bool:
+    if path is None or not path.is_absolute() or not path.is_dir():
+        return False
+    resolved = path.resolve()
+    return (
+        resolved != Path(resolved.anchor)
+        and resolved != REPOSITORY_ROOT
+        and not resolved.is_relative_to(REPOSITORY_ROOT)
+    )
+
+
+def _bound_waveform_check(corpus_root: Path | None) -> dict[str, Any]:
+    failures: list[str] = []
+    verified = 0
+    try:
+        rows = _source_rows()
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        rows = []
+        failures.append(f"{type(exc).__name__}: {exc}")
+    if corpus_root is None or not corpus_root.is_dir():
+        failures.append("PSEM_CORPUS_ROOT is unavailable")
+    else:
+        root = corpus_root.resolve()
+        for index, row in enumerate(rows):
+            source_id = str(row.get("source_id", f"row-{index}"))
+            try:
+                relative = Path(row["audio_ref"])
+                path = (root / relative).resolve()
+                valid = (
+                    not relative.is_absolute()
+                    and ".." not in relative.parts
+                    and path.is_relative_to(root)
+                    and path.is_file()
+                    and path.stat().st_size == row["waveform_size_bytes"]
+                    and sha256_file(path) == row["waveform_sha256"]
+                )
+            except (KeyError, OSError, TypeError, ValueError):
+                valid = False
+            if valid:
+                verified += 1
+            else:
+                failures.append(source_id)
+    return check(
+        "runtime.bound_waveforms_exact",
+        len(rows) == EXPECTED_SOURCE_COUNT and verified == EXPECTED_SOURCE_COUNT and not failures,
+        {"source_count": EXPECTED_SOURCE_COUNT, "byte_identity_verified": True},
+        {"source_count": len(rows), "verified": verified, "failures": failures},
+    )
+
+
+def _reference_check(reference_root: Path | None) -> dict[str, Any]:
+    try:
+        observed = validate_reference_checkout(reference_root) if reference_root else None
+    except Exception as exc:
+        observed = {"error_type": type(exc).__name__, "error": str(exc)}
+    passed = (
+        isinstance(observed, dict)
+        and observed.get("repository") == EXPECTED_REFERENCE["repository"]
+        and observed.get("commit") == EXPECTED_REFERENCE["commit"]
+    )
+    return check("runtime.reference_checkout_exact", passed, EXPECTED_REFERENCE, observed)
+
+
+def runtime_checks(paths: PreflightPaths) -> list[dict[str, Any]]:
+    checkpoint_exists = paths.checkpoint is not None and paths.checkpoint.is_file()
+    observed_hash = sha256_file(paths.checkpoint) if checkpoint_exists else None
+    observed_size = paths.checkpoint.stat().st_size if checkpoint_exists else None
+    return [
+        check("runtime.platform", platform.system() == "Linux", "Linux", platform.system()),
+        check(
+            "runtime.checkpoint_path",
+            checkpoint_exists,
+            "existing regular file",
+            str(paths.checkpoint) if paths.checkpoint else None,
+        ),
+        check(
+            "runtime.checkpoint_sha256",
+            observed_hash == EXPECTED_CHECKPOINT_SHA256,
+            EXPECTED_CHECKPOINT_SHA256,
+            observed_hash,
+        ),
+        check(
+            "runtime.checkpoint_size",
+            observed_size == EXPECTED_CHECKPOINT_SIZE,
+            EXPECTED_CHECKPOINT_SIZE,
+            observed_size,
+        ),
+        check(
+            "runtime.corpus_root",
+            paths.corpus_root is not None and paths.corpus_root.is_dir(),
+            "existing directory",
+            str(paths.corpus_root) if paths.corpus_root else None,
+        ),
+        check(
+            "runtime.reference_root",
+            paths.reference_root is not None and paths.reference_root.is_dir(),
+            "existing directory",
+            str(paths.reference_root) if paths.reference_root else None,
+        ),
+        check(
+            "runtime.output_root",
+            _safe_external_output_root(paths.output_root),
+            "existing absolute non-root directory outside the repository",
+            str(paths.output_root) if paths.output_root else None,
+        ),
+        check(
+            "runtime.eval_sealed",
+            os.environ.get("PSEM_ALLOW_EVAL") is None,
+            "PSEM_ALLOW_EVAL absent",
+            os.environ.get("PSEM_ALLOW_EVAL"),
+        ),
+        _bound_waveform_check(paths.corpus_root),
+        _reference_check(paths.reference_root),
+    ]
+
+
+def build_preflight(paths: PreflightPaths, *, static_only: bool = False) -> dict[str, Any]:
+    git = _git_state()
+    checks = static_checks()
+    checks.append(check("git.worktree_clean", not git["dirty"], [], git["dirty"]))
+    if not static_only:
+        checks.extend(runtime_checks(paths))
+    all_passed = all(row["passed"] for row in checks)
+    payload = {
+        "schema_version": 1,
+        "artifact_role": "psem_sortformer_adaptation_preflight",
+        "mode": "static" if static_only else "runtime",
+        "binding": {
+            "git_head": git["head"],
+            "contract_canonical_sha256": canonical_sha256(load_json(CONTRACT_PATH)),
+            "config_canonical_sha256": canonical_sha256(load_json(CONFIG_PATH)),
+        },
+        "checks": checks,
+        "ready_for_runtime_audit": not static_only and all_passed,
+        "static_contract_valid": all_passed
+        if static_only
+        else all(row["passed"] for row in checks if not row["id"].startswith("runtime.")),
+    }
+    return {**payload, "payload_sha256": canonical_sha256(payload)}
