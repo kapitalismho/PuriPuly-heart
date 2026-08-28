@@ -124,11 +124,6 @@ class FletUiPresentationAdapter:
                 "on_github_star_translation_success",
                 None,
             ),
-            on_telemetry_translation_success=getattr(
-                self._app,
-                "on_telemetry_translation_success",
-                None,
-            ),
             on_overlay_state_changed=getattr(self._app, "on_overlay_state_changed", None),
         )
 
@@ -429,11 +424,6 @@ class FletUiPresentationAdapter:
 
     def on_github_star_translation_success(self) -> None:
         callback = getattr(self._app, "on_github_star_translation_success", None)
-        if callable(callback):
-            callback()
-
-    def on_telemetry_translation_success(self) -> None:
-        callback = getattr(self._app, "on_telemetry_translation_success", None)
         if callable(callback):
             callback()
 

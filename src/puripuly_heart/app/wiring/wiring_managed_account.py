@@ -50,7 +50,6 @@ from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEClient
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
 )
-from puripuly_heart.core.telemetry import TranslationSuccessTelemetryClientPort
 
 from .wiring_managed_auth_factory import (
     ManagedAuthRuntimeAdapter,
@@ -138,10 +137,6 @@ class ManagedOpenRouterReleaseRuntime:
         repr=False,
     )
     service: ManagedOpenRouterReleaseService | None = field(default=None, repr=False)
-    telemetry_client: TranslationSuccessTelemetryClientPort | None = field(
-        default=None,
-        repr=False,
-    )
     _retired_services: list[ManagedOpenRouterReleaseService] = field(
         default_factory=list,
         repr=False,
@@ -162,10 +157,9 @@ class ManagedOpenRouterReleaseRuntime:
 
     async def rebuild(self, *, secrets: object) -> ManagedOpenRouterReleaseService | None:
         await self.retry_retired()
-        replacement, telemetry_client = self._create(secrets=secrets)
+        replacement = self._create(secrets=secrets)
         previous = self.service
         self.service = replacement
-        self.telemetry_client = telemetry_client
         if previous is not None and previous is not replacement:
             try:
                 await previous.close()
@@ -204,14 +198,11 @@ class ManagedOpenRouterReleaseRuntime:
         self,
         *,
         secrets: object,
-    ) -> tuple[
-        ManagedOpenRouterReleaseService | None,
-        TranslationSuccessTelemetryClientPort | None,
-    ]:
+    ) -> ManagedOpenRouterReleaseService | None:
         current = self.settings.current
         release_settings = self.release_settings()
         if current is None or release_settings is None:
-            return None, None
+            return None
 
         from puripuly_heart import __version__
 
@@ -219,7 +210,6 @@ class ManagedOpenRouterReleaseRuntime:
             client = HttpManagedOpenRouterBrokerClient(
                 base_url=current.openrouter.broker_base_url,
             )
-            telemetry_client: TranslationSuccessTelemetryClientPort | None = client
         except ValueError as exc:
             logger.warning(
                 "[Managed OpenRouter] Invalid broker base URL %r; using unavailable fallback: %s",
@@ -227,22 +217,18 @@ class ManagedOpenRouterReleaseRuntime:
                 exc,
             )
             client = UnavailableManagedOpenRouterReleaseClient()
-            telemetry_client = None
 
-        return (
-            ManagedOpenRouterReleaseService(
-                openrouter_config=build_openrouter_release_runtime_config(release_settings),
-                managed_state=build_managed_identity_state_port(
-                    current,
-                    self.settings.managed_identity_persistence_callback(current),
-                ),
-                secrets=secrets,
-                client=client,
-                raw_hardware_fingerprint_provider=get_raw_hardware_fingerprint,
-                app_version=__version__,
-                on_discord_callback_received=self.callback_received,
+        return ManagedOpenRouterReleaseService(
+            openrouter_config=build_openrouter_release_runtime_config(release_settings),
+            managed_state=build_managed_identity_state_port(
+                current,
+                self.settings.managed_identity_persistence_callback(current),
             ),
-            telemetry_client,
+            secrets=secrets,
+            client=client,
+            raw_hardware_fingerprint_provider=get_raw_hardware_fingerprint,
+            app_version=__version__,
+            on_discord_callback_received=self.callback_received,
         )
 
     async def close(self) -> None:
@@ -261,7 +247,6 @@ class ManagedOpenRouterReleaseRuntime:
             else:
                 if self.service is service:
                     self.service = None
-                    self.telemetry_client = None
         try:
             await self.retry_retired()
         except BaseException as exc:

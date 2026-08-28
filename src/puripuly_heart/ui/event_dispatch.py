@@ -377,7 +377,6 @@ class UIEventBridge:
         clear_managed_auth_pending: object | None = None,
         show_snackbar: object | None = None,
         on_github_star_translation_success: object | None = None,
-        on_telemetry_translation_success: object | None = None,
         on_overlay_state_changed: object | None = None,
     ):
         self.event_queue = event_queue
@@ -386,7 +385,6 @@ class UIEventBridge:
         self._is_translation_enabled_callback = is_translation_enabled
         self._get_stt_state_callback = get_stt_state
         self._github_star_translation_success_callback = on_github_star_translation_success
-        self._telemetry_translation_success_callback = on_telemetry_translation_success
         self._overlay_state_changed_callback = on_overlay_state_changed
         self.dashboard_destination = dashboard_destination
         self.history_destination = history_destination
@@ -472,14 +470,6 @@ class UIEventBridge:
             return
         with contextlib.suppress(Exception):
             self._github_star_translation_success_callback()
-
-    def _schedule_telemetry_translation_success(self, translation: Translation) -> None:
-        if not translation.text.strip():
-            return
-        if not callable(self._telemetry_translation_success_callback):
-            return
-        with contextlib.suppress(Exception):
-            self._telemetry_translation_success_callback()
 
     def report_overlay_state(
         self,
@@ -588,7 +578,6 @@ class UIEventBridge:
                 )
             if isinstance(mapped.payload, Translation):
                 self._schedule_github_star_prompt_translation_success(mapped.payload)
-                self._schedule_telemetry_translation_success(mapped.payload)
             return
 
         if mapped.kind == "osc" and isinstance(mapped.payload, OSCMessage):

@@ -575,6 +575,40 @@ jobs:
               raise SystemExit('daily summary v2 config finalization did not remove includeZeroActivity')
           PY
 
+      - name: Finalize app active-day runtime config
+        working-directory: broker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          pnpm exec wrangler d1 execute
+          puripuly-heart-broker --remote --config
+          "${{ steps.render.outputs.config_path }}" --file
+          deploy/finalize-app-active-day.sql --yes
+
+      - name: Verify app active-day runtime config finalization
+        shell: bash
+        working-directory: broker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          finalization_json="$(pnpm exec wrangler d1 execute \
+            puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
+            --command "SELECT json_type(value, '$.telemetryTranslationSuccessDayIp') AS legacy_type FROM broker_config WHERE key = 'abuse_controls';" \
+            --json)"
+
+          python3 - <<'PY' "$finalization_json"
+          import json
+          import sys
+
+          payload = json.loads(sys.argv[1])
+          results = payload[0].get('results', [])
+
+          if len(results) != 1 or results[0].get('legacy_type') is not None:
+              raise SystemExit('app active-day config finalization did not remove telemetryTranslationSuccessDayIp')
+          PY
+
       - name: Run deployed broker production QQ issuance smoke test
         timeout-minutes: 10
         env:

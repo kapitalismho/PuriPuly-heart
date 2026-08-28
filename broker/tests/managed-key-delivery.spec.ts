@@ -29,13 +29,16 @@ describe('managed key delivery ACK foundation', () => {
   it('orders migration 0012 after telemetry 0011 and creates delivery ACK schema', () => {
     const env = createTestBrokerEnv();
 
-    expect(BROKER_MIGRATION_FILENAMES.at(-4)).toBe('0011_add_telemetry_active_days.sql');
-    expect(BROKER_MIGRATION_FILENAMES.at(-3)).toBe('0012_add_managed_key_delivery_ack.sql');
-    expect(BROKER_MIGRATION_FILENAMES.at(-2)).toBe(
-      '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
+    expect(BROKER_MIGRATION_FILENAMES).toEqual(
+      expect.arrayContaining([
+        '0011_add_telemetry_active_days.sql',
+        '0012_add_managed_key_delivery_ack.sql',
+      ]),
     );
-    expect(BROKER_MIGRATION_FILENAMES.at(-1)).toBe(
-      '0014_simplify_abuse_incidents.sql',
+    expect(
+      BROKER_MIGRATION_FILENAMES.indexOf('0012_add_managed_key_delivery_ack.sql'),
+    ).toBe(
+      BROKER_MIGRATION_FILENAMES.indexOf('0011_add_telemetry_active_days.sql') + 1,
     );
 
     env.__db

@@ -1,4 +1,4 @@
-import type { TelemetryUsageDailyMetrics } from './telemetry';
+import type { AppUsageDailyMetrics } from './telemetry';
 
 const DAILY_HEARTBEAT_COLOR_OK = 0x5865f2;
 const DAILY_HEARTBEAT_COLOR_ACTIVE = 0xfee75c;
@@ -29,7 +29,7 @@ export interface DailyReportPayload {
   report_date_utc: string;
   window_start: string;
   window_end: string;
-  summary: TelemetryUsageDailyMetrics & {
+  summary: AppUsageDailyMetrics & {
     keys_delivered_total: number;
     keys_delivered_discord: number;
     keys_delivered_qq: number;
@@ -108,13 +108,11 @@ export async function sendDailyReport(
           inline: true,
         },
         {
-          name: 'Translation usage',
+          name: 'App usage',
           value: [
-            `dau=${summary.translated_dau}`,
-            `wau=${summary.translated_wau}`,
-            `mau=${summary.translated_mau}`,
-            `first_observed=${summary.first_observed_translators}`,
-            `returning=${summary.returning_translators}`,
+            `dau=${summary.app_dau}`,
+            `wau=${summary.app_wau}`,
+            `mau=${summary.app_mau}`,
           ].join('\n'),
           inline: true,
         },

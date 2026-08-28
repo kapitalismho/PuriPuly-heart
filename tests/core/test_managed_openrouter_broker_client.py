@@ -667,29 +667,6 @@ async def test_acknowledge_managed_key_delivery_maps_broker_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_record_translation_success_day_posts_telemetry_payload() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        assert request.method == "POST"
-        assert request.url.path == "/v1/telemetry/translation-success-day"
-        assert json.loads(request.content) == {
-            "signal": "translation_success_day",
-            "telemetry_identifier": "anon-telemetry-id-123456",
-            "active_date_utc": "2026-07-03",
-        }
-        return httpx.Response(200, json={"ok": True})
-
-    client, _transport = _build_client(handler)
-
-    result = await client.record_translation_success_day(
-        "anon-telemetry-id-123456",
-        "2026-07-03",
-    )
-
-    assert result is True
-    await client.close()
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("error_payload", "expected_subcode"),
     [

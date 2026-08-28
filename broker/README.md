@@ -20,10 +20,10 @@ Use `pnpm --filter @puripuly-heart/broker run verify:config` to exercise the pin
 
 - `broker/scripts/render-production-wrangler-config.mjs` renders a temporary deploy-time Wrangler config from `broker/wrangler.jsonc`, injects the production D1 `database_id`, and fails if the checked-in worker name stops being the canonical `puripuly-heart-broker`.
 - `broker/deploy/fingerprint-bootstrap.template.sql` plus `broker/scripts/render-fingerprint-bootstrap-sql.mjs` render guarded bootstrap SQL for `wrangler d1 execute --file ... --yes`. The rendered SQL only replaces the migration placeholder and fails before mutating `broker_config` if the placeholder is already gone.
-- `.github/workflows/deploy-broker-direct.yml` is the manual `workflow_dispatch` path for the first canonical deploy. It exports the remote production D1 database to a restricted seven-day workflow artifact before applying migrations, bootstraps the fingerprint salt, reconciles the production OpenRouter guardrail through `PATCH /api/v1/guardrails/{id}`, syncs the OpenRouter, Discord, and QQ worker secrets needed for managed child-key issuance and QQ production issuance, deploys the canonical worker, verifies health, removes the transitional `includeZeroActivity` field with `broker/deploy/finalize-daily-summary-v2.sql`, and runs `broker/tests/deploy-smoke/canonical-production.spec.ts` against the canonical `workers.dev` URL.
+- `.github/workflows/deploy-broker-direct.yml` is the manual `workflow_dispatch` path for the first canonical deploy. It exports the remote production D1 database to a restricted seven-day workflow artifact before applying migrations, bootstraps the fingerprint salt, reconciles the production OpenRouter guardrail through `PATCH /api/v1/guardrails/{id}`, syncs the OpenRouter, Discord, and QQ worker secrets needed for managed child-key issuance and QQ production issuance, deploys the canonical worker, verifies health, removes transitional runtime fields with `broker/deploy/finalize-daily-summary-v2.sql` and `broker/deploy/finalize-app-active-day.sql`, and runs `broker/tests/deploy-smoke/canonical-production.spec.ts` against the canonical `workers.dev` URL.
 - `OPENROUTER_MANAGED_API_KEY_PRODUCTION` remains transitional runtime compatibility only; `OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION` drives managed child-key creation / cleanup, `OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION` assigns the production guardrail to each issued key, and `OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION` is copied into the runtime secret `OPENROUTER_MANAGED_USER_HMAC_SECRET` so the worker can derive a deterministic versioned managed OpenRouter user id per installation or QQ subject.
 - `QQ_AUTH_HMAC_PSK_PRODUCTION` is copied into the runtime secret `QQ_AUTH_HMAC_PSK` for `POST /v1/auth/qq/assert`. The endpoint is production issuance-capable when runtime issuance configuration is present (`QQ_AUTH_HMAC_PSK`, `OPENROUTER_MANAGEMENT_API_KEY`, and `OPENROUTER_MANAGED_GUARDRAIL_ID` are all non-blank). The issuance-disabled verification-only behavior preserves `verified` / `already_verified` compatibility without touching `qq_managed_entitlements`; when issuance is enabled, OpenRouter, guardrail, cleanup, or D1 failures return a bounded retryable/internal error envelope instead of falling back to verification-only success. The PSK value, raw QQ identity, raw credential, and raw key-bearing payloads must stay out of source, docs, logs, and test output.
-- `TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION` is copied into the runtime secret `TELEMETRY_SUBJECT_HMAC_SECRET` for `POST /v1/telemetry/translation-success-day`. Production migration rollout must take a D1 backup before applying `0011_add_telemetry_active_days.sql` and `0013_add_telemetry_subjects_and_daily_summary_v2.sql`, then apply the forward-only migrations that create isolated active-day and durable subject-history tables without joining telemetry to managed identities.
+- `TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION` is copied into the runtime secret `TELEMETRY_SUBJECT_HMAC_SECRET` for `POST /v1/telemetry/app-active-day`. Production migration rollout must take a D1 backup before applying `0015_add_app_active_days.sql`; that forward-only migration creates the isolated minimal app active-day table while preserving the previous Worker's required abuse-control shape and the previous translation telemetry tables and rows. After the new Worker passes health verification, `broker/deploy/finalize-app-active-day.sql` removes the obsolete telemetry endpoint rate-limit setting.
 - `DISCORD_CLIENT_ID_PRODUCTION`, `DISCORD_CLIENT_SECRET_PRODUCTION`, `DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION`, and `DISCORD_USER_REF_SECRET_PRODUCTION` are copied into the runtime secrets `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI_ALLOWLIST`, and `DISCORD_USER_REF_SECRET` for Discord OAuth onboarding.
 - `DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION` is copied into the runtime secrets `DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL` and `DISCORD_DAILY_REPORT_WEBHOOK_URL` so the broker can send real-time alerts and the `puripuly_daily_summary.v2` report. The minute-resolution cron consults `abuse_controls.dailyReport` and the v2 delivery ledger, then sends at 00:05 UTC for the last completed UTC date.
 - The deploy reconcile step sets `allowed_models` to `google/gemma-4-26b-a4b-it`, `google/gemma-4-31b-it`, `deepseek/deepseek-v4-flash-0731`, and `deepseek/deepseek-v4-flash`, clears provider restrictions inside the guardrail (`allowed_providers` / `ignored_providers`), and sets `enforce_zdr = false` before smoke.
@@ -113,19 +113,21 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
   - duplicate active, cleanup-required, or revoked QQ entitlements return `qq_lifetime_used`; concurrent current issuance returns `qq_already_issuing`; invalid credentials return `qq_credential_invalid`
   - QQ uses the base Managed trial budget, expiry, allowed-model policy, OpenRouter child-key creation, and configured guardrail; it does not run Discord referral reservation/rewards, owned Referral ID, Talk Together Pass, or referral bonus budget paths
   - QQ lifetime, monitoring, and cleanup use `qq_subject_ref` / `issue_ref` metadata and must not create fake installation rows or pass raw QQ identity to OpenRouter child-key names
-- `POST /v1/telemetry/translation-success-day`
-  - request: `signal: "translation_success_day"`, `telemetry_identifier`, `active_date_utc` as `YYYY-MM-DD`
-  - accepts only the single active-day telemetry shape; malformed JSON, invalid identifiers/dates, unsupported signals, and additional telemetry fields return the existing public `invalid_request` envelope
-  - derives `subject_ref = ph-telemetry-subject-v1_ + HMAC-SHA256-HEX(TELEMETRY_SUBJECT_HMAC_SECRET, telemetry_identifier)` and persists only that derived reference, durable first/last active UTC dates, per-day activity, and receipt timestamps
-  - duplicate same-subject same-date payloads update `last_received_at` on the same row and cannot inflate active-day counts
-  - per-IP rate limiting uses `abuse_controls.telemetryTranslationSuccessDayIp`; the endpoint does not collect installation, Discord, QQ, hardware, provider, model, language, output-route, or content identity
+- `POST /v1/telemetry/app-active-day`
+  - request: `anonymous_id` and `active_date_utc` as `YYYY-MM-DD`
+  - accepts only those two fields and only the current or immediately previous UTC date; malformed JSON, invalid values, stale dates, and additional metadata return the existing public `invalid_request` envelope
+  - derives `subject_ref = ph-app-subject-v1_ + HMAC-SHA256-HEX(TELEMETRY_SUBJECT_HMAC_SECRET, anonymous_id)` and persists only that derived reference and UTC active date
+  - duplicate same-subject same-date payloads are no-ops and cannot inflate active-user counts
+  - has no endpoint rate limit, does not read or persist IP addresses, and does not write request events
+  - app-version, operating-system, installation, Discord, QQ, hardware, provider, model, language, output-route, translation-content, receipt-timestamp, and other metadata are neither accepted nor stored
+  - active-day rows older than the rolling 35-day retention window are deleted by the scheduled job
 
 ## Daily summary v2
 
 - `puripuly_daily_summary.v2` is generated at 00:05 UTC for the last completed UTC date.
 - `window_start <= observed_at < window_end` is used for both Discord and QQ delivered-key rows, so UTC midnight belongs to exactly one report.
 - DAU covers `report_date_utc`; WAU and MAU cover the seven and thirty completed UTC dates ending on that date.
-- The report contains only delivered-key total/Discord/QQ counts and translated DAU/WAU/MAU plus first-observed/returning counts.
+- The report contains only delivered-key total/Discord/QQ counts and app-launch DAU/WAU/MAU calculated from `app_active_days`.
 - Healthy-state security fields, legacy challenge/verify funnel metrics, ASN analysis, stickiness, and D1/D7/D30 cohort rows are excluded.
 - A per-report-date D1 lease prevents overlapping cron invocations from posting the same report twice. Failed dates remain pending across UTC midnight, retries keep their original fixed window, and later completed dates catch up in order without allowing retention to delete unreported issue events.
 - Delivery ACK finalization atomically commits the source owner, one idempotent issue-success event, and the acknowledgement ledger before evaluating immediate incidents. Stale reconciliation promotes already-finalized pending rows to acknowledged; otherwise it acquires a durable cleanup claim, recovers abandoned claims only after the scheduled invocation limit, and atomically terminalizes the owner and delivery ledger.
@@ -153,6 +155,7 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
 - `0012_add_managed_key_delivery_ack.sql` adds the shared Discord/QQ delivery acknowledgement ledger and delivery-pending lifecycle states.
 - `0013_add_telemetry_subjects_and_daily_summary_v2.sql` creates and backfills `telemetry_subjects`, keeps it synchronized for the previous Worker during rollout, creates the v2 delivery ledger, preserves existing active-day rows, sets the daily report schedule to 00:05 UTC, and raises issue-event retention to the report-safe two-day minimum without replacing unrelated operator-tuned controls. It intentionally retains `includeZeroActivity` while the previous Worker may still run; the deploy workflow removes that dead field only after the new Worker passes its health check.
 - `0014_simplify_abuse_incidents.sql` additively derives the `warning` and `brake` thresholds, the ordered warning observation state, and the request-event safety margin from existing persisted controls. It also adds a QQ child-key-creation-start marker so ambiguous post-provider failures cannot be stale-reclaimed into a second key. Legacy alert/ASN JSON fields remain during the migration-before-deploy compatibility window; unused physical columns and indexes require a separate forward migration after stabilization.
+- `0015_add_app_active_days.sql` creates `app_active_days` with only HMAC-derived subject and UTC-date columns while retaining the previous Worker's required abuse-control shape and preserving the legacy translation telemetry tables and rows without mixing them into app usage metrics. The deploy workflow removes `telemetryTranslationSuccessDayIp` with `broker/deploy/finalize-app-active-day.sql` only after the new Worker passes its health check.
 
 - `broker_config`
   - columns: `key`, `value`, `updated_at`
@@ -167,7 +170,6 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
     - `POST /v1/providers/openrouter/issue`: per `installation_id`, `3` requests / `15` minutes
     - `GET /v1/trial/status`: per `installation_id`, `30` requests / `15` minutes
     - `POST /v1/auth/qq/assert`: per IP via `qqAuthAssertIp`, `20` requests / `15` minutes
-    - `POST /v1/telemetry/translation-success-day`: per IP via `telemetryTranslationSuccessDayIp`, `60` requests / `15` minutes
     - global UTC-day cap on new active entitlements, counted by `issued_at` semantics even if an entitlement is later revoked, stored as a runtime-configurable broker value
 - `broker_issue_success_events`
   - append-only successful issue observations recorded only after child-key creation and entitlement persistence both succeed
@@ -182,15 +184,14 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
   - columns: `id`, `endpoint`, `ip`, `installation_id`, `observed_at`
   - indexes cover endpoint-scoped and subject-scoped sliding-window lookups
   - retention is calculated at cleanup time from the longest configured endpoint rate-limit window and longest active, unexpired velocity-hook window, plus the explicit `requestEventSafetyMarginDays` margin; the default margin is one day
-- `telemetry_subjects`
-  - durable anonymous subject rows keyed by HMAC-derived `subject_ref`
-  - columns: `subject_ref`, `first_active_date_utc`, and `last_active_date_utc`
-  - remains independent of active-day retention so first-observed and returning classifications keep their meaning
-  - raw telemetry identifiers and managed Discord/QQ/installation identities are never stored or joined
-- `telemetry_active_days`
-  - active-day telemetry rows keyed by `(subject_ref, active_date_utc)`
-  - columns: HMAC-derived `subject_ref`, UTC active date, `first_received_at`, and `last_received_at`
-  - raw telemetry identifiers, account identities, Discord/QQ/hardware identities, provider payloads, model/language/output-route values, and Translation content do not belong in this table
+- `telemetry_subjects` and `telemetry_active_days`
+  - legacy translation-success telemetry tables retained unchanged for forward-migration safety
+  - no new app active-day writes or app DAU/WAU/MAU reads use these tables, so old-version translation activity cannot enter the new app usage metrics
+  - destructive deletion of the legacy rows remains a separate operator decision
+- `app_active_days`
+  - app-launch active-day rows keyed by `(subject_ref, active_date_utc)`
+  - the only columns are HMAC-derived `subject_ref` and UTC active date; there are no IP, receipt timestamp, metadata, or raw anonymous-ID columns
+  - scheduled retention keeps only the 35-day window needed for rolling thirty-day MAU reporting
 - `broker_daily_summary_deliveries`
   - one row per `report_date_utc` coordinates the v2 send with a bounded lease and records the delivered outcome
   - columns: `report_date_utc`, `status`, `lease_token`, `lease_expires_at`, `attempted_at`, and `delivered_at`

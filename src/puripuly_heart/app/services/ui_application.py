@@ -79,7 +79,7 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "persist_github_star_prompt_opened",
         "persist_provider_secret_change",
         "prepare_runtime_after_launch",
-        "record_telemetry_translation_success_day",
+        "record_app_active_day",
         "refresh_openrouter_usage_after_launch",
         "reopen_discord_managed_auth_browser",
         "reopen_openrouter_pkce_authorization_url",
@@ -534,8 +534,8 @@ class UiApplicationBoundary:
     def schedule_github_star_prompt_translation_success_observed(self) -> None:
         self._engagement.schedule_github_star_prompt_translation_success_observed()
 
-    async def record_telemetry_translation_success_day(self, active_date_utc: str) -> None:
-        await self._engagement.record_telemetry_translation_success_day(active_date_utc)
+    async def record_app_active_day(self, active_date_utc: str) -> object:
+        return await self._engagement.record_app_active_day(active_date_utc)
 
     def should_show_github_star_prompt(self) -> bool:
         return bool(self._engagement.should_show_github_star_prompt())

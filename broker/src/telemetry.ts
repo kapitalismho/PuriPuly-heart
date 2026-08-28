@@ -1,150 +1,88 @@
 import type { Context } from 'hono';
 
-import {
-  checkEndpointRateLimit,
-  recordRequestEvent,
-  resolveClientIp,
-} from './abuse-controls';
 import { errorResponse as publicErrorResponse } from './broker-error';
 import type { BrokerEnv } from './contract';
 
-export const TELEMETRY_TRANSLATION_SUCCESS_DAY_ENDPOINT =
-  'POST /v1/telemetry/translation-success-day';
-export const TELEMETRY_SIGNAL_KIND = 'translation_success_day';
-export const TELEMETRY_SUBJECT_REF_PREFIX = 'ph-telemetry-subject-v1_';
+export const APP_ACTIVE_DAY_ENDPOINT = 'POST /v1/telemetry/app-active-day';
+export const APP_SUBJECT_REF_PREFIX = 'ph-app-subject-v1_';
 
-const TELEMETRY_IDENTIFIER_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
+const ANONYMOUS_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
 const ACTIVE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
+const APP_ACTIVE_DAY_RETENTION_DAYS = 35;
 
-interface TelemetryTranslationSuccessDayRequestBody {
-  signal?: unknown;
-  telemetry_identifier?: unknown;
+interface AppActiveDayRequestBody {
+  anonymous_id?: unknown;
   active_date_utc?: unknown;
 }
 
-interface TelemetryActiveDayRecordInput {
+interface AppActiveDayRecordInput {
   subjectRef: string;
   activeDateUtc: string;
-  receivedAt: string;
 }
 
-export interface TelemetryActiveDayRetentionResult {
+export interface AppActiveDayRetentionResult {
   deleted: number;
   cutoffDateUtc: string;
 }
 
-export interface TelemetryUsageDailyMetrics {
-  translated_dau: number;
-  translated_wau: number;
-  translated_mau: number;
-  first_observed_translators: number;
-  returning_translators: number;
+export interface AppUsageDailyMetrics {
+  app_dau: number;
+  app_wau: number;
+  app_mau: number;
 }
 
 interface CountRow {
   count: number;
 }
 
-const TELEMETRY_ACTIVE_DAY_RETENTION_DAYS = 400;
-
-export async function handleTelemetryTranslationSuccessDay(
-  c: Context<BrokerEnv>,
-): Promise<Response> {
+export async function handleAppActiveDay(c: Context<BrokerEnv>): Promise<Response> {
   const now = new Date();
-  const requestContext = {
-    endpoint: TELEMETRY_TRANSLATION_SUCCESS_DAY_ENDPOINT,
-    ip: resolveClientIp(c),
-    installationId: null,
-    hardwareHash: null,
-    now,
-  };
-  await recordRequestEvent(c.env.BROKER_DB, requestContext);
-
-  const rateLimitDecision = await checkEndpointRateLimit(
-    c.env.BROKER_DB,
-    requestContext,
-  );
-  if (rateLimitDecision) {
-    return publicErrorResponse(c, rateLimitDecision.status, {
-      code: rateLimitDecision.code,
-      class: rateLimitDecision.class,
-      subcode: rateLimitDecision.subcode,
-      retryAfterMs: rateLimitDecision.retryAfterMs,
-      message: rateLimitDecision.message,
-    });
-  }
-
-  const body = await readJsonBody<TelemetryTranslationSuccessDayRequestBody>(c);
+  const body = await readJsonBody<AppActiveDayRequestBody>(c);
   if (!body.ok) {
     return invalidTelemetryRequest(c, body.reason);
   }
 
-  const validation = validateTelemetryTranslationSuccessDayRequest(body.value);
+  const validation = validateAppActiveDayRequest(body.value, now);
   if (!validation.ok) {
     return invalidTelemetryRequest(c, validation.reason);
   }
 
-  const subjectRef = await deriveTelemetrySubjectRef(
+  const subjectRef = await deriveAppSubjectRef(
     c.env.TELEMETRY_SUBJECT_HMAC_SECRET,
-    validation.telemetryIdentifier,
+    validation.anonymousId,
   );
-
-  await recordTelemetryActiveDay(c.env.BROKER_DB, {
+  await recordAppActiveDay(c.env.BROKER_DB, {
     subjectRef,
     activeDateUtc: validation.activeDateUtc,
-    receivedAt: now.toISOString(),
   });
 
   return c.json({ ok: true });
 }
 
-export async function recordTelemetryActiveDay(
+export async function recordAppActiveDay(
   db: D1Database,
-  input: TelemetryActiveDayRecordInput,
+  input: AppActiveDayRecordInput,
 ): Promise<void> {
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO telemetry_subjects (
-            subject_ref,
-            first_active_date_utc,
-            last_active_date_utc
-          ) VALUES (?, ?, ?)
-          ON CONFLICT(subject_ref) DO UPDATE SET
-            first_active_date_utc = MIN(first_active_date_utc, excluded.first_active_date_utc),
-            last_active_date_utc = MAX(last_active_date_utc, excluded.last_active_date_utc)`,
-      )
-      .bind(input.subjectRef, input.activeDateUtc, input.activeDateUtc),
-    db
-      .prepare(
-        `INSERT INTO telemetry_active_days (
-            subject_ref,
-            active_date_utc,
-            first_received_at,
-            last_received_at
-          ) VALUES (?, ?, ?, ?)
-          ON CONFLICT(subject_ref, active_date_utc) DO UPDATE SET
-            last_received_at = excluded.last_received_at`,
-      )
-      .bind(
-        input.subjectRef,
-        input.activeDateUtc,
-        input.receivedAt,
-        input.receivedAt,
-      ),
-  ]);
+  await db
+    .prepare(
+      `INSERT INTO app_active_days (subject_ref, active_date_utc)
+       VALUES (?, ?)
+       ON CONFLICT(subject_ref, active_date_utc) DO NOTHING`,
+    )
+    .bind(input.subjectRef, input.activeDateUtc)
+    .run();
 }
 
-export async function applyTelemetryActiveDayRetention(
+export async function applyAppActiveDayRetention(
   db: D1Database,
   now: Date,
-): Promise<TelemetryActiveDayRetentionResult> {
+): Promise<AppActiveDayRetentionResult> {
   const cutoffDateUtc = toUtcDateString(
-    addUtcDays(startOfUtcDate(now), -TELEMETRY_ACTIVE_DAY_RETENTION_DAYS),
+    addUtcDays(startOfUtcDate(now), -APP_ACTIVE_DAY_RETENTION_DAYS),
   );
   const result = await db
     .prepare(
-      `DELETE FROM telemetry_active_days
+      `DELETE FROM app_active_days
         WHERE active_date_utc < ?`,
     )
     .bind(cutoffDateUtc)
@@ -156,48 +94,33 @@ export async function applyTelemetryActiveDayRetention(
   };
 }
 
-export async function getTelemetryUsageDailyMetrics(
+export async function getAppUsageDailyMetrics(
   db: D1Database,
   reportDateUtc: string,
-): Promise<TelemetryUsageDailyMetrics> {
+): Promise<AppUsageDailyMetrics> {
   if (!isValidUtcDate(reportDateUtc)) {
-    throw new Error('invalid telemetry report date');
+    throw new Error('invalid app usage report date');
   }
   const reportDate = new Date(`${reportDateUtc}T00:00:00.000Z`);
   const sevenDayStartUtc = toUtcDateString(addUtcDays(reportDate, -6));
   const thirtyDayStartUtc = toUtcDateString(addUtcDays(reportDate, -29));
 
-  const [translatedDau, translatedWau, translatedMau, classificationRow] =
-    await Promise.all([
-      countDistinctActiveSubjects(db, reportDateUtc, reportDateUtc),
-      countDistinctActiveSubjects(db, sevenDayStartUtc, reportDateUtc),
-      countDistinctActiveSubjects(db, thirtyDayStartUtc, reportDateUtc),
-      db
-        .prepare(
-          `SELECT
-             COALESCE(SUM(CASE WHEN subjects.first_active_date_utc = ? THEN 1 ELSE 0 END), 0) AS first_observed,
-             COALESCE(SUM(CASE WHEN subjects.first_active_date_utc < ? THEN 1 ELSE 0 END), 0) AS returning_count
-           FROM telemetry_active_days AS active_day
-           JOIN telemetry_subjects AS subjects
-             ON subjects.subject_ref = active_day.subject_ref
-          WHERE active_day.active_date_utc = ?`,
-        )
-        .bind(reportDateUtc, reportDateUtc, reportDateUtc)
-        .first<{ first_observed: number; returning_count: number }>(),
-    ]);
+  const [appDau, appWau, appMau] = await Promise.all([
+    countDistinctActiveSubjects(db, reportDateUtc, reportDateUtc),
+    countDistinctActiveSubjects(db, sevenDayStartUtc, reportDateUtc),
+    countDistinctActiveSubjects(db, thirtyDayStartUtc, reportDateUtc),
+  ]);
 
   return {
-    translated_dau: translatedDau,
-    translated_wau: translatedWau,
-    translated_mau: translatedMau,
-    first_observed_translators: Number(classificationRow?.first_observed ?? 0),
-    returning_translators: Number(classificationRow?.returning_count ?? 0),
+    app_dau: appDau,
+    app_wau: appWau,
+    app_mau: appMau,
   };
 }
 
-export async function deriveTelemetrySubjectRef(
+export async function deriveAppSubjectRef(
   hmacSecret: string,
-  telemetryIdentifier: string,
+  anonymousId: string,
 ): Promise<string> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -210,35 +133,31 @@ export async function deriveTelemetrySubjectRef(
   const signature = await crypto.subtle.sign(
     'HMAC',
     key,
-    encoder.encode(telemetryIdentifier),
+    encoder.encode(anonymousId),
   );
-  return `${TELEMETRY_SUBJECT_REF_PREFIX}${toHex(signature)}`;
+  return `${APP_SUBJECT_REF_PREFIX}${toHex(signature)}`;
 }
 
-function validateTelemetryTranslationSuccessDayRequest(
-  request: TelemetryTranslationSuccessDayRequestBody,
+function validateAppActiveDayRequest(
+  request: AppActiveDayRequestBody,
+  now: Date,
 ):
-  | { ok: true; telemetryIdentifier: string; activeDateUtc: string }
+  | { ok: true; anonymousId: string; activeDateUtc: string }
   | { ok: false; reason: string } {
   const keys = Object.keys(request);
   if (
-    keys.length !== 3 ||
-    !keys.includes('signal') ||
-    !keys.includes('telemetry_identifier') ||
+    keys.length !== 2 ||
+    !keys.includes('anonymous_id') ||
     !keys.includes('active_date_utc')
   ) {
     return { ok: false, reason: 'telemetry request has unsupported shape' };
   }
 
-  if (request.signal !== TELEMETRY_SIGNAL_KIND) {
-    return { ok: false, reason: 'unsupported telemetry signal' };
-  }
-
   if (
-    typeof request.telemetry_identifier !== 'string' ||
-    !TELEMETRY_IDENTIFIER_PATTERN.test(request.telemetry_identifier)
+    typeof request.anonymous_id !== 'string' ||
+    !ANONYMOUS_ID_PATTERN.test(request.anonymous_id)
   ) {
-    return { ok: false, reason: 'invalid telemetry identifier' };
+    return { ok: false, reason: 'invalid anonymous identifier' };
   }
 
   if (
@@ -248,9 +167,18 @@ function validateTelemetryTranslationSuccessDayRequest(
     return { ok: false, reason: 'invalid active date' };
   }
 
+  const todayUtc = toUtcDateString(startOfUtcDate(now));
+  const previousDateUtc = toUtcDateString(addUtcDays(startOfUtcDate(now), -1));
+  if (
+    request.active_date_utc !== todayUtc &&
+    request.active_date_utc !== previousDateUtc
+  ) {
+    return { ok: false, reason: 'active date must be today or the previous UTC date' };
+  }
+
   return {
     ok: true,
-    telemetryIdentifier: request.telemetry_identifier,
+    anonymousId: request.anonymous_id,
     activeDateUtc: request.active_date_utc,
   };
 }
@@ -308,7 +236,7 @@ async function countDistinctActiveSubjects(
   const row = await db
     .prepare(
       `SELECT COUNT(DISTINCT subject_ref) AS count
-         FROM telemetry_active_days
+         FROM app_active_days
         WHERE active_date_utc >= ?
           AND active_date_utc <= ?`,
     )

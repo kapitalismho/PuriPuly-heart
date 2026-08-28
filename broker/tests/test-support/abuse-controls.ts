@@ -55,12 +55,6 @@ export interface StoredAbuseControls {
     maxRequests: number;
     windowMinutes: number;
   };
-  telemetryTranslationSuccessDayIp: {
-    endpoint: string;
-    scope: 'ip';
-    maxRequests: number;
-    windowMinutes: number;
-  };
   pendingDiscordOAuthSessions: {
     maxPerInstallation: number;
     maxPerIp: number;
@@ -180,12 +174,6 @@ export const TEST_DEFAULT_ABUSE_CONTROLS: StoredAbuseControls = {
     endpoint: 'POST /v1/auth/qq/assert',
     scope: 'ip',
     maxRequests: 20,
-    windowMinutes: 15,
-  },
-  telemetryTranslationSuccessDayIp: {
-    endpoint: 'POST /v1/telemetry/translation-success-day',
-    scope: 'ip',
-    maxRequests: 60,
     windowMinutes: 15,
   },
   pendingDiscordOAuthSessions: {

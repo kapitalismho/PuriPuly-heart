@@ -35,6 +35,10 @@ const dailySummaryV2Finalizer = new URL(
   '../deploy/finalize-daily-summary-v2.sql',
   import.meta.url,
 );
+const appActiveDayFinalizer = new URL(
+  '../deploy/finalize-app-active-day.sql',
+  import.meta.url,
+);
 
 const tempDirs: string[] = [];
 
@@ -462,7 +466,7 @@ describe('broker direct deploy automation', () => {
     expect(readme).toContain('TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION');
     expect(readme).toContain('TELEMETRY_SUBJECT_HMAC_SECRET');
     expect(readme).toContain('POST /v1/auth/qq/assert');
-    expect(readme).toContain('POST /v1/telemetry/translation-success-day');
+    expect(readme).toContain('POST /v1/telemetry/app-active-day');
     expect(readme).toContain('production issuance-capable when runtime issuance configuration is present');
     expect(readme).toContain('issuance-disabled verification-only behavior');
     expect(readme).toContain('bounded retryable/internal error envelope');
@@ -499,6 +503,19 @@ describe('broker direct deploy automation', () => {
     );
     expect(readFileSync(dailySummaryV2Finalizer, 'utf8')).toContain(
       "json_remove(value, '$.dailyReport.includeZeroActivity')",
+    );
+    expect(workflow).toContain('deploy/finalize-app-active-day.sql');
+    expect(workflow).toContain(
+      "json_type(value, '$.telemetryTranslationSuccessDayIp') AS legacy_type",
+    );
+    expect(workflow.indexOf('pnpm exec wrangler deploy')).toBeLessThan(
+      workflow.indexOf('deploy/finalize-app-active-day.sql'),
+    );
+    expect(workflow.indexOf('deploy/finalize-app-active-day.sql')).toBeLessThan(
+      workflow.indexOf('broker/tests/deploy-smoke/canonical-production.spec.ts'),
+    );
+    expect(readFileSync(appActiveDayFinalizer, 'utf8')).toContain(
+      "json_remove(value, '$.telemetryTranslationSuccessDayIp')",
     );
     expect(readme).toContain('three-month expiry');
     expect(readme).not.toContain('six-month expiry');

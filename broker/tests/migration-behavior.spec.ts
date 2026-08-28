@@ -67,6 +67,12 @@ describe('broker migration behavior', () => {
       expect(rows.map(({ value }) => JSON.parse(value))).toEqual([
         {
           ...TEST_DEFAULT_ABUSE_CONTROLS,
+          telemetryTranslationSuccessDayIp: {
+            endpoint: 'POST /v1/telemetry/translation-success-day',
+            scope: 'ip',
+            maxRequests: 60,
+            windowMinutes: 15,
+          },
           immediateAlerts: {
             warn1: 10,
             warn2: 25,
@@ -766,10 +772,10 @@ describe('broker migration behavior', () => {
       const rowBefore = db
         .prepare('SELECT value FROM broker_config WHERE key = ?')
         .get('abuse_controls') as { value: string };
-      const tunedControls = JSON.parse(rowBefore.value) as typeof TEST_DEFAULT_ABUSE_CONTROLS;
+      const tunedControls = JSON.parse(rowBefore.value) as Record<string, any>;
       tunedControls.trialChallenge.maxRequests = 14;
       tunedControls.qqAuthAssertIp.maxRequests = 9;
-      delete (tunedControls as Partial<typeof TEST_DEFAULT_ABUSE_CONTROLS>).telemetryTranslationSuccessDayIp;
+      delete tunedControls.telemetryTranslationSuccessDayIp;
 
       db.prepare('UPDATE broker_config SET value = ?, updated_at = ? WHERE key = ?').run(
         JSON.stringify(tunedControls),
@@ -792,8 +798,12 @@ describe('broker migration behavior', () => {
         .get('abuse_controls') as { value: string };
       expect(JSON.parse(migratedRow.value)).toEqual({
         ...tunedControls,
-        telemetryTranslationSuccessDayIp:
-          TEST_DEFAULT_ABUSE_CONTROLS.telemetryTranslationSuccessDayIp,
+        telemetryTranslationSuccessDayIp: {
+          endpoint: 'POST /v1/telemetry/translation-success-day',
+          scope: 'ip',
+          maxRequests: 60,
+          windowMinutes: 15,
+        },
       });
     } finally {
       db.close();
@@ -1593,6 +1603,81 @@ describe('broker migration behavior', () => {
         db
           .prepare("SELECT COUNT(*) AS count FROM pragma_table_info('qq_managed_entitlements') WHERE name = 'child_key_creation_started_at'")
           .get(),
+      ).toEqual({ count: 1 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('adds minimal app active-day storage and defers legacy rate-limit removal until post-deploy finalization', () => {
+    const db = new DatabaseSync(':memory:');
+
+    try {
+      applyBrokerMigrations(db, {
+        through: '0014_simplify_abuse_incidents.sql',
+      });
+      const legacySubject = `ph-telemetry-subject-v1_${'d'.repeat(64)}`;
+      db.prepare(
+        `INSERT INTO telemetry_active_days (
+          subject_ref,
+          active_date_utc,
+          first_received_at,
+          last_received_at
+        ) VALUES (?, ?, ?, ?)`,
+      ).run(
+        legacySubject,
+        '2026-08-27',
+        '2026-08-27T01:00:00.000Z',
+        '2026-08-27T01:00:00.000Z',
+      );
+      const controlsRow = db
+        .prepare("SELECT value FROM broker_config WHERE key = 'abuse_controls'")
+        .get() as { value: string };
+      const controls = JSON.parse(controlsRow.value) as Record<string, any>;
+      expect(controls.telemetryTranslationSuccessDayIp).toBeDefined();
+      controls.trialChallenge.maxRequests = 19;
+      db.prepare("UPDATE broker_config SET value = ? WHERE key = 'abuse_controls'").run(
+        JSON.stringify(controls),
+      );
+
+      applyBrokerMigrations(db, {
+        after: '0014_simplify_abuse_incidents.sql',
+        through: '0015_add_app_active_days.sql',
+      });
+
+      expect(
+        db
+          .prepare("SELECT name FROM pragma_table_info('app_active_days') ORDER BY cid")
+          .all(),
+      ).toEqual([{ name: 'subject_ref' }, { name: 'active_date_utc' }]);
+      const migratedControls = JSON.parse(
+        (db
+          .prepare("SELECT value FROM broker_config WHERE key = 'abuse_controls'")
+          .get() as { value: string }).value,
+      ) as Record<string, any>;
+      expect(migratedControls.telemetryTranslationSuccessDayIp).toBeDefined();
+      expect(migratedControls.trialChallenge.maxRequests).toBe(19);
+      db.exec(
+        readFileSync(
+          new URL('../deploy/finalize-app-active-day.sql', import.meta.url),
+          'utf8',
+        ),
+      );
+      const finalizedControls = JSON.parse(
+        (db
+          .prepare("SELECT value FROM broker_config WHERE key = 'abuse_controls'")
+          .get() as { value: string }).value,
+      ) as Record<string, any>;
+      expect(finalizedControls.telemetryTranslationSuccessDayIp).toBeUndefined();
+      expect(finalizedControls.trialChallenge.maxRequests).toBe(19);
+      expect(
+        db.prepare('SELECT COUNT(*) AS count FROM app_active_days').get(),
+      ).toEqual({ count: 0 });
+      expect(
+        db.prepare('SELECT COUNT(*) AS count FROM telemetry_active_days').get(),
+      ).toEqual({ count: 1 });
+      expect(
+        db.prepare('SELECT COUNT(*) AS count FROM telemetry_subjects').get(),
       ).toEqual({ count: 1 });
     } finally {
       db.close();

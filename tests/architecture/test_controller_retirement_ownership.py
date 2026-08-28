@@ -39,7 +39,6 @@ CASES = [
                 "_discord_managed_auth_in_progress",
                 "_discord_managed_auth_callback_received_hook",
                 "last_discord_managed_auth_referral_bonus_applied",
-                "telemetry_client",
                 "_managed_openrouter_release_service",
                 "_managed_auth_runtime_adapter",
                 "_managed_auth_owner",

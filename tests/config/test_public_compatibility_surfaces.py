@@ -1105,7 +1105,7 @@ def test_broker_v1_snapshot_freezes_request_success_and_error_envelopes() -> Non
         "discord_issue",
         "trial_status",
         "managed_key_delivery_ack",
-        "telemetry_translation_success_day",
+        "app_active_day",
     )
 
     assert tuple(operations) == expected_operation_names
@@ -1143,6 +1143,11 @@ def test_broker_v1_snapshot_freezes_request_success_and_error_envelopes() -> Non
     qq_auth_source = _broker_source("qq-auth.ts")
     assert tuple(operations["qq_auth_assert"]["request_body_fields"]) == (
         _typescript_interface_fields(qq_auth_source, "QqAuthAssertRequestBody")
+    )
+
+    telemetry_source = _broker_source("telemetry.ts")
+    assert tuple(operations["app_active_day"]["request_body_fields"]) == (
+        _typescript_interface_fields(telemetry_source, "AppActiveDayRequestBody")
     )
 
     assert tuple(operations["verify"]["request_body_fields"]) == _return_dict_keys(

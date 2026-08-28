@@ -249,22 +249,6 @@ class HttpManagedOpenRouterBrokerClient:
                 fields={"payload_valid": False, "reason": _safe_field_label(str(exc))},
             )
 
-    async def record_translation_success_day(
-        self,
-        identifier: str,
-        active_date_utc: str,
-    ) -> bool:
-        payload = await self._post_json(
-            path="/v1/telemetry/translation-success-day",
-            request_body={
-                "signal": "translation_success_day",
-                "telemetry_identifier": identifier,
-                "active_date_utc": active_date_utc,
-            },
-            operation="telemetry_translation_success_day",
-        )
-        return payload.get("ok") is True
-
     async def acknowledge_managed_key_delivery(
         self,
         request: ManagedKeyDeliveryAckRequest,

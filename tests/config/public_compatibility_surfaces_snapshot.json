@@ -126,7 +126,6 @@
       "/v1/providers/openrouter/discord/issue",
       "/v1/providers/openrouter/issue",
       "/v1/providers/openrouter/managed-key-delivery/ack",
-      "/v1/telemetry/translation-success-day",
       "/v1/trial/challenge",
       "/v1/trial/challenge/verify",
       "/v1/trial/status"
@@ -158,7 +157,7 @@
       },
       {
         "method": "POST",
-        "path": "/v1/telemetry/translation-success-day"
+        "path": "/v1/telemetry/app-active-day"
       },
       {
         "method": "POST",
@@ -450,12 +449,11 @@
           "pass_status"
         ]
       },
-      "telemetry_translation_success_day": {
+      "app_active_day": {
         "method": "POST",
-        "path": "/v1/telemetry/translation-success-day",
+        "path": "/v1/telemetry/app-active-day",
         "request_body_fields": [
-          "signal",
-          "telemetry_identifier",
+          "anonymous_id",
           "active_date_utc"
         ],
         "success_response_fields": [
@@ -463,7 +461,7 @@
         ],
         "success_response_source": {
           "file": "telemetry.ts",
-          "function": "handleTelemetryTranslationSuccessDay",
+          "function": "handleAppActiveDay",
           "kind": "c_json_object"
         }
       }

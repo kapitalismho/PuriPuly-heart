@@ -62,7 +62,6 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
         clear_managed_auth_pending_state=lambda: events.append(("clear-auth",)),
         show_snackbar=lambda *args, **kwargs: events.append(("snackbar", args, kwargs)),
         on_github_star_translation_success=lambda: events.append(("star",)),
-        on_telemetry_translation_success=lambda: events.append(("telemetry",)),
         on_overlay_state_changed=lambda **kwargs: events.append(("overlay", kwargs)),
         on_desktop_overlay_state_changed=lambda *args, **kwargs: events.append(
             ("desktop-overlay", args, kwargs)
@@ -96,7 +95,6 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
     adapter.clear_managed_auth_pending_state()
     adapter.show_snackbar("message", "orange")
     adapter.on_github_star_translation_success()
-    adapter.on_telemetry_translation_success()
     adapter.on_overlay_state_changed(state="connected")
     adapter.on_desktop_overlay_state_changed("connected", interaction_mode="locked")
     adapter.show_qq_managed_auth_dialog()
@@ -111,7 +109,6 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
         ("clear-auth",),
         ("snackbar", ("message", "orange"), {}),
         ("star",),
-        ("telemetry",),
         ("overlay", {"state": "connected"}),
         ("desktop-overlay", ("connected",), {"interaction_mode": "locked"}),
         ("qq",),
@@ -169,7 +166,6 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
         clear_managed_auth_pending_state=lambda: None,
         show_snackbar=lambda *args, **kwargs: None,
         on_github_star_translation_success=lambda: None,
-        on_telemetry_translation_success=lambda: None,
         on_overlay_state_changed=lambda **kwargs: None,
     )
     adapter = FletUiPresentationAdapter(host)
@@ -264,7 +260,6 @@ def test_presentation_adapter_owns_ui_event_bridge_composition() -> None:
         clear_managed_auth_pending_state=lambda: None,
         show_snackbar=lambda *args: None,
         on_github_star_translation_success=lambda: None,
-        on_telemetry_translation_success=lambda: None,
         on_overlay_state_changed=lambda **kwargs: None,
     )
     adapter = FletUiPresentationAdapter(host)

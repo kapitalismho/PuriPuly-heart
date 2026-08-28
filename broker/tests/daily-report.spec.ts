@@ -7,8 +7,8 @@ import {
   runDailyReport,
 } from '../src/scheduled';
 import {
-  applyTelemetryActiveDayRetention,
-  recordTelemetryActiveDay,
+  applyAppActiveDayRetention,
+  recordAppActiveDay,
 } from '../src/telemetry';
 import {
   updateAbuseControls,
@@ -38,11 +38,9 @@ describe('PuriPuly daily summary v2', () => {
         keys_delivered_total: 0,
         keys_delivered_discord: 0,
         keys_delivered_qq: 0,
-        translated_dau: 0,
-        translated_wau: 0,
-        translated_mau: 0,
-        first_observed_translators: 0,
-        returning_translators: 0,
+        app_dau: 0,
+        app_wau: 0,
+        app_mau: 0,
       },
     });
     expect(sent.sent).toBe(true);
@@ -85,8 +83,8 @@ describe('PuriPuly daily summary v2', () => {
         inline: true,
       },
       {
-        name: 'Translation usage',
-        value: 'dau=0\nwau=0\nmau=0\nfirst_observed=0\nreturning=0',
+        name: 'App usage',
+        value: 'dau=0\nwau=0\nmau=0',
         inline: true,
       },
     ]);
@@ -284,7 +282,7 @@ describe('PuriPuly daily summary v2', () => {
         report_date_utc: string;
         window_start: string;
         window_end: string;
-        summary: { translated_dau: number };
+        summary: { app_dau: number };
       },
     );
     expect(
@@ -310,7 +308,7 @@ describe('PuriPuly daily summary v2', () => {
         window_end: '2026-04-21T00:00:00.000Z',
       },
     ]);
-    expect(sentPackets.map((packet) => packet.summary.translated_dau)).toEqual([0, 1, 0]);
+    expect(sentPackets.map((packet) => packet.summary.app_dau)).toEqual([0, 1, 0]);
     expect(readDailySummaryDeliveries(env)).toEqual([
       expect.objectContaining({
         report_date_utc: '2026-04-19',
@@ -382,7 +380,7 @@ describe('PuriPuly daily summary v2', () => {
         .get('2025-01-01 12:00:00'),
     ).toEqual({ count: 0 });
     expect(
-      env.__db.prepare('SELECT COUNT(*) AS count FROM telemetry_active_days').get(),
+      env.__db.prepare('SELECT COUNT(*) AS count FROM app_active_days').get(),
     ).toEqual({ count: 0 });
     expect(
       env.__db
@@ -517,7 +515,7 @@ describe('PuriPuly daily summary v2', () => {
     expect(serialized).not.toContain('credential');
   });
 
-  it('calculates completed-day DAU, WAU, MAU, and durable first/returning classes', async () => {
+  it('calculates completed-day app DAU, WAU, and MAU', async () => {
     const env = createTestBrokerEnv();
     await recordActiveDay(env, 'new-on-report-date', '2026-04-19');
     await recordActiveDay(env, 'new-on-report-date', '2026-04-19');
@@ -534,63 +532,45 @@ describe('PuriPuly daily summary v2', () => {
     );
 
     expect(packet.summary).toMatchObject({
-      translated_dau: 2,
-      translated_wau: 3,
-      translated_mau: 4,
-      first_observed_translators: 1,
-      returning_translators: 1,
+      app_dau: 2,
+      app_wau: 3,
+      app_mau: 4,
     });
     const activeDayCount = env.__db
       .prepare(
         `SELECT COUNT(*) AS count
-           FROM telemetry_active_days
+           FROM app_active_days
           WHERE subject_ref = ?
             AND active_date_utc = ?`,
       )
-      .get(validTelemetrySubjectRef('new-on-report-date'), '2026-04-19') as {
+      .get(validAppSubjectRef('new-on-report-date'), '2026-04-19') as {
       count: number;
     };
     expect(activeDayCount.count).toBe(1);
   });
 
-  it('keeps first-observed meaning after active-day retention deletes history', async () => {
+  it('retains only the 35-day app activity window', async () => {
     const env = createTestBrokerEnv();
-    const subjectRef = validTelemetrySubjectRef('retention-independent');
-    await recordActiveDay(env, 'retention-independent', '2025-01-01');
-    await recordActiveDay(env, 'retention-independent', '2026-04-19');
+    await recordActiveDay(env, 'expired-activity', '2026-03-15');
+    await recordActiveDay(env, 'cutoff-activity', '2026-03-16');
+    await recordActiveDay(env, 'recent-activity', '2026-04-19');
 
-    await applyTelemetryActiveDayRetention(
+    const result = await applyAppActiveDayRetention(
       env.BROKER_DB,
       new Date('2026-04-20T00:05:00.000Z'),
     );
 
-    const historicalDay = env.__db
-      .prepare(
-        'SELECT COUNT(*) AS count FROM telemetry_active_days WHERE active_date_utc = ?',
-      )
-      .get('2025-01-01') as { count: number };
-    const subject = env.__db
-      .prepare(
-        `SELECT first_active_date_utc, last_active_date_utc
-           FROM telemetry_subjects
-          WHERE subject_ref = ?`,
-      )
-      .get(subjectRef) as {
-      first_active_date_utc: string;
-      last_active_date_utc: string;
-    };
-    const packet = await buildDailySummaryPacket(
-      env.BROKER_DB,
-      new Date('2026-04-20T00:05:00.000Z'),
-    );
-
-    expect(historicalDay.count).toBe(0);
-    expect(subject).toEqual({
-      first_active_date_utc: '2025-01-01',
-      last_active_date_utc: '2026-04-19',
-    });
-    expect(packet.summary.first_observed_translators).toBe(0);
-    expect(packet.summary.returning_translators).toBe(1);
+    expect(result).toEqual({ deleted: 1, cutoffDateUtc: '2026-03-16' });
+    expect(
+      env.__db
+        .prepare(
+          'SELECT active_date_utc FROM app_active_days ORDER BY active_date_utc',
+        )
+        .all(),
+    ).toEqual([
+      { active_date_utc: '2026-03-16' },
+      { active_date_utc: '2026-04-19' },
+    ]);
   });
 });
 
@@ -677,17 +657,16 @@ async function recordActiveDay(
   label: string,
   activeDateUtc: string,
 ): Promise<void> {
-  await recordTelemetryActiveDay(env.BROKER_DB, {
-    subjectRef: validTelemetrySubjectRef(label),
+  await recordAppActiveDay(env.BROKER_DB, {
+    subjectRef: validAppSubjectRef(label),
     activeDateUtc,
-    receivedAt: `${activeDateUtc}T12:00:00.000Z`,
   });
 }
 
-function validTelemetrySubjectRef(label: string): string {
+function validAppSubjectRef(label: string): string {
   let hash = 0;
   for (const character of label) {
     hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
   }
-  return `ph-telemetry-subject-v1_${hash.toString(16).padStart(64, '0')}`;
+  return `ph-app-subject-v1_${hash.toString(16).padStart(64, '0')}`;
 }

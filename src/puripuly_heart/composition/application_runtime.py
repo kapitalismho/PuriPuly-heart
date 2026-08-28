@@ -244,7 +244,10 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionSnapshot,
     SelfCaptureSessionState,
 )
-from puripuly_heart.core.telemetry import TranslationSuccessTelemetryService
+from puripuly_heart.core.telemetry import (
+    AppActiveDayTelemetryService,
+    HttpAppActiveDayTelemetryClient,
+)
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 STT_RESET_DEADLINE_S = 300.0
@@ -1394,9 +1397,9 @@ def compose_application_runtime(
             level=logging.INFO,
         )
 
-    def telemetry_service() -> TranslationSuccessTelemetryService:
-        return TranslationSuccessTelemetryService(
-            require_runtime_components().managed_account.release.telemetry_client,
+    def telemetry_service() -> AppActiveDayTelemetryService:
+        return AppActiveDayTelemetryService(
+            HttpAppActiveDayTelemetryClient(),
             diagnostics_sink=telemetry_diagnostic,
         )
 

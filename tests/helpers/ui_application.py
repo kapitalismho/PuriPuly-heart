@@ -136,14 +136,13 @@ class UiApplicationRuntimeStub:
         if callable(clear):
             clear(provider)
 
-    async def record_telemetry_translation_success_day(self, active_date_utc: str) -> None:
+    async def record_app_active_day(self, active_date_utc: str) -> object | None:
         record = getattr(
             self._backend,
-            "record_telemetry_translation_success_day",
+            "record_app_active_day",
             None,
         )
-        if callable(record):
-            await record(active_date_utc)
+        return await record(active_date_utc) if callable(record) else None
 
     def should_show_github_star_prompt(self) -> bool:
         should_show = getattr(self._backend, "should_show_github_star_prompt", None)

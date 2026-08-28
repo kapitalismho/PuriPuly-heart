@@ -225,9 +225,6 @@ class DummyApp:
         if callable(scheduler):
             scheduler()
 
-    def on_telemetry_translation_success(self) -> None:
-        self.telemetry_translation_success_called = True
-
     def _show_snackbar(self, message: str, bgcolor, duration: int = 4000) -> None:
         _ = duration
         self.snackbar_calls.append((message, bgcolor))
@@ -315,10 +312,6 @@ def make_bridge(app: object, **kwargs: object) -> UIEventBridge:
         on_github_star_translation_success=kwargs.pop(
             "on_github_star_translation_success",
             getattr(app, "on_github_star_translation_success", None),
-        ),
-        on_telemetry_translation_success=kwargs.pop(
-            "on_telemetry_translation_success",
-            getattr(app, "on_telemetry_translation_success", None),
         ),
         on_overlay_state_changed=kwargs.pop(
             "on_overlay_state_changed", getattr(app, "on_overlay_state_changed", None)
@@ -650,7 +643,6 @@ async def test_event_bridge_routes_translation_and_osc_history_by_language_mode(
     )
 
     assert app.view_dashboard.translation_calls == [("translated", "en")]
-    assert app.telemetry_translation_success_called is True
     assert ("Mic", "translated", True, "en") in app.history
     assert ("VRChat", "hello", False, "en") in app.history
     assert ("VRChat", "bye", False, "ko") in app.history

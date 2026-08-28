@@ -73,7 +73,7 @@ def _managed_settings() -> AppSettings:
 
 
 @pytest.mark.asyncio
-async def test_release_runtime_owns_selection_broker_fallback_and_telemetry(
+async def test_release_runtime_owns_selection_and_broker_fallback(
     tmp_path,
 ) -> None:
     owner = compose_settings_owner(tmp_path / "settings.json")
@@ -91,7 +91,6 @@ async def test_release_runtime_owns_selection_broker_fallback_and_telemetry(
     assert isinstance(service, ManagedOpenRouterReleaseService)
     assert isinstance(service.client, HttpManagedOpenRouterBrokerClient)
     assert service.client.base_url == "https://broker.example.test"
-    assert runtime.telemetry_client is service.client
     assert service.raw_hardware_fingerprint_provider is get_raw_hardware_fingerprint
 
     owner.current.openrouter.broker_base_url = "https://broker.example.test/prefix"
@@ -99,7 +98,6 @@ async def test_release_runtime_owns_selection_broker_fallback_and_telemetry(
 
     assert isinstance(service, ManagedOpenRouterReleaseService)
     assert isinstance(service.client, UnavailableManagedOpenRouterReleaseClient)
-    assert runtime.telemetry_client is None
 
     owner.current.translation.connection = TranslationConnection.OPENROUTER
     assert await runtime.rebuild(secrets=SecretStore()) is None
@@ -125,7 +123,6 @@ async def test_release_runtime_awaits_replacement_and_shutdown(tmp_path) -> None
 
     assert closed == ["closed"]
     assert runtime.service is None
-    assert runtime.telemetry_client is None
 
 
 @pytest.mark.asyncio
@@ -338,9 +335,9 @@ async def test_release_runtime_retains_failed_replacement_cleanup_for_retry(
         _runtime: ManagedOpenRouterReleaseRuntime,
         *,
         secrets: object,
-    ) -> tuple[ManagedOpenRouterReleaseService, None]:
+    ) -> ManagedOpenRouterReleaseService:
         _ = secrets
-        return cast(ManagedOpenRouterReleaseService, replacement), None
+        return cast(ManagedOpenRouterReleaseService, replacement)
 
     monkeypatch.setattr(
         ManagedOpenRouterReleaseRuntime,

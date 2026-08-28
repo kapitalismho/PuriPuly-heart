@@ -104,6 +104,7 @@ FOUNDER_README_DEFAULT_API_KEYS_ANCHOR = "using-your-own-api-keys"
 DEBUG_PREVIEW_TALK_TOGETHER_PASS_ID = "7KQ9M2"
 GITHUB_STAR_REPOSITORY_URL = "https://github.com/kapitalismho/PuriPuly-heart"
 GITHUB_STAR_PROMPT_DELAY_S = 2.5
+APP_ACTIVE_DAY_RETRY_DELAY_S = 60.0
 GITHUB_STAR_PROMPT_DURATION_MS = 8000
 
 
@@ -203,6 +204,7 @@ class TranslatorApp:
         self._qq_managed_auth_task_handle = None
         self._github_star_prompt_launch_pending = True
         self._after_launch_task_handle = None
+        self._app_active_day_retry_task_handle = None
         self._launch_high_priority_feedback_shown = False
         self._launch_high_priority_feedback_reason: str | None = None
         self._launch_high_priority_snackbar = None
@@ -593,6 +595,7 @@ class TranslatorApp:
         handle = getattr(self, "_after_launch_task_handle", None)
         if handle is not None and not handle.done():
             return
+        self._schedule_app_active_day_report()
         self._after_launch_task_handle = self._run_page_task(self._run_after_launch_tasks)
 
     async def _run_after_launch_tasks(self) -> None:
@@ -670,25 +673,30 @@ class TranslatorApp:
                 level=logging.WARNING,
             )
 
+    async def _close_ui_task_handle(self, attribute_name: str) -> None:
+        handle = getattr(self, attribute_name, None)
+        if handle is None:
+            return
+        if not handle.done():
+            handle.cancel()
+        try:
+            if isinstance(handle, asyncio.Future):
+                await asyncio.gather(handle, return_exceptions=True)
+            elif inspect.isawaitable(handle):
+                await handle
+            else:
+                await asyncio.wrap_future(handle)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
+        finally:
+            if getattr(self, attribute_name, None) is handle:
+                setattr(self, attribute_name, None)
+
     async def _close_after_launch_ui_tasks(self) -> None:
-        handle = getattr(self, "_after_launch_task_handle", None)
-        if handle is not None:
-            if not handle.done():
-                handle.cancel()
-            try:
-                if isinstance(handle, asyncio.Future):
-                    await asyncio.gather(handle, return_exceptions=True)
-                elif inspect.isawaitable(handle):
-                    await handle
-                else:
-                    await asyncio.wrap_future(handle)
-            except asyncio.CancelledError:
-                pass
-            except Exception:
-                pass
-            finally:
-                if self._after_launch_task_handle is handle:
-                    self._after_launch_task_handle = None
+        await self._close_ui_task_handle("_after_launch_task_handle")
+        await self._close_ui_task_handle("_app_active_day_retry_task_handle")
         self._github_star_prompt_launch_pending = False
 
     async def close_after_launch_tasks(self) -> None:
@@ -1999,13 +2007,47 @@ class TranslatorApp:
     def on_github_star_translation_success(self) -> None:
         self.application.schedule_github_star_prompt_translation_success_observed()
 
-    def on_telemetry_translation_success(self) -> None:
+    def _schedule_app_active_day_report(self) -> None:
         active_date_utc = datetime.now(timezone.utc).date().isoformat()
 
-        async def _task() -> None:
-            await self.application.record_telemetry_translation_success_day(active_date_utc)
+        async def _send() -> None:
+            result = await self.application.record_app_active_day(active_date_utc)
+            if getattr(result, "status", None) == "send_failed":
+                self._schedule_app_active_day_retry(active_date_utc)
 
-        self._queue_settings_mutation_task(_task)
+        self._queue_settings_mutation_task(_send)
+
+    def _schedule_app_active_day_retry(self, active_date_utc: str) -> None:
+        existing = getattr(self, "_app_active_day_retry_task_handle", None)
+        if existing is not None and not existing.done():
+            return
+        if getattr(self, "_shutting_down", False):
+            return
+
+        handle = None
+
+        async def _retry_after_delay() -> None:
+            try:
+                await asyncio.sleep(APP_ACTIVE_DAY_RETRY_DELAY_S)
+                if getattr(self, "_shutting_down", False):
+                    return
+                if datetime.now(timezone.utc).date().isoformat() != active_date_utc:
+                    return
+
+                async def _retry() -> None:
+                    if getattr(self, "_shutting_down", False):
+                        return
+                    if datetime.now(timezone.utc).date().isoformat() != active_date_utc:
+                        return
+                    await self.application.record_app_active_day(active_date_utc)
+
+                self._queue_settings_mutation_task(_retry)
+            finally:
+                if getattr(self, "_app_active_day_retry_task_handle", None) is handle:
+                    self._app_active_day_retry_task_handle = None
+
+        handle = self._run_page_task(_retry_after_delay)
+        self._app_active_day_retry_task_handle = handle
 
     def on_overlay_state_changed(
         self,

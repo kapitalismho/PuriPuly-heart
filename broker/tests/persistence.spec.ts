@@ -21,6 +21,10 @@ const DAILY_SUMMARY_V2_FINALIZER = new URL(
   '../deploy/finalize-daily-summary-v2.sql',
   import.meta.url,
 );
+const APP_ACTIVE_DAY_FINALIZER = new URL(
+  '../deploy/finalize-app-active-day.sql',
+  import.meta.url,
+);
 
 describe('broker persistent state model', () => {
   it('defines the D1 table contract, runtime config keys, and minimal release-session state', async () => {
@@ -507,7 +511,7 @@ describe('broker persistent state model', () => {
         telemetrySubjects: {
           name: 'telemetry_subjects',
           purpose:
-            'durable first-observed and last-active date bounds for anonymous subjects',
+            'legacy translation-success subject bounds preserved but unused by app usage aggregation',
           primaryKey: 'subject_ref',
           columns: ['subject_ref', 'first_active_date_utc', 'last_active_date_utc'],
           indexed: ['last_active_date_utc'],
@@ -516,7 +520,8 @@ describe('broker persistent state model', () => {
         },
         telemetryActiveDays: {
           name: 'telemetry_active_days',
-          purpose: 'retained anonymous active dates for completed-day usage aggregation',
+          purpose:
+            'legacy translation-success dates preserved but unused by app usage aggregation',
           primaryKey: ['subject_ref', 'active_date_utc'],
           columns: [
             'subject_ref',
@@ -525,6 +530,15 @@ describe('broker persistent state model', () => {
             'last_received_at',
           ],
           indexed: ['active_date_utc', 'last_received_at'],
+          rawTelemetryIdentifierStorage: false,
+          joinedToManagedIdentity: false,
+        },
+        appActiveDays: {
+          name: 'app_active_days',
+          purpose: 'retained anonymous app-launch dates for completed-day usage aggregation',
+          primaryKey: ['subject_ref', 'active_date_utc'],
+          columns: ['subject_ref', 'active_date_utc'],
+          indexed: ['active_date_utc'],
           rawTelemetryIdentifierStorage: false,
           joinedToManagedIdentity: false,
         },
@@ -646,6 +660,7 @@ describe('broker persistent state model', () => {
       '0012_add_managed_key_delivery_ack.sql',
       '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
       '0014_simplify_abuse_incidents.sql',
+      '0015_add_app_active_days.sql',
     ]);
     expect(existsSync(FIRST_BROKER_MIGRATION)).toBe(true);
     expect(existsSync(LATEST_BROKER_MIGRATION)).toBe(true);
@@ -699,10 +714,14 @@ describe('broker persistent state model', () => {
     const simplifiedAbuseIncidentsMigration = readBrokerMigrationSql(
       '0014_simplify_abuse_incidents.sql',
     );
+    const appActiveDaysMigration = readBrokerMigrationSql(
+      '0015_add_app_active_days.sql',
+    );
     const dailySummaryV2Finalizer = readFileSync(
       DAILY_SUMMARY_V2_FINALIZER,
       'utf8',
     );
+    const appActiveDayFinalizer = readFileSync(APP_ACTIVE_DAY_FINALIZER, 'utf8');
 
     expect(migration).toContain('CREATE TABLE broker_config');
     expect(migration).toContain('CREATE TABLE installations');
@@ -887,6 +906,19 @@ describe('broker persistent state model', () => {
     expect(telemetryActiveDaysMigration).toContain('POST /v1/telemetry/translation-success-day');
     expect(telemetryActiveDaysMigration).not.toContain('telemetry_identifier');
     expect(telemetryActiveDaysMigration).not.toContain('translation_text');
+    expect(appActiveDaysMigration).toContain('CREATE TABLE app_active_days');
+    expect(appActiveDaysMigration).toContain('subject_ref TEXT NOT NULL');
+    expect(appActiveDaysMigration).toContain('active_date_utc TEXT NOT NULL');
+    expect(appActiveDaysMigration).toContain('PRIMARY KEY (subject_ref, active_date_utc)');
+    expect(appActiveDaysMigration).toContain("'ph-app-subject-v1_'");
+    expect(appActiveDaysMigration).not.toContain('telemetryTranslationSuccessDayIp');
+    expect(appActiveDayFinalizer).toContain(
+      "json_remove(value, '$.telemetryTranslationSuccessDayIp')",
+    );
+    expect(appActiveDaysMigration).not.toContain('anonymous_id');
+    expect(appActiveDaysMigration).not.toContain('received_at');
+    expect(appActiveDaysMigration).not.toContain('ip TEXT');
+    expect(appActiveDaysMigration).not.toContain('metadata');
     expect(dailySummaryV2Migration).toContain('CREATE TABLE telemetry_subjects');
     expect(dailySummaryV2Migration).toContain('MIN(active_date_utc)');
     expect(dailySummaryV2Migration).toContain('MAX(active_date_utc)');

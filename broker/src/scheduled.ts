@@ -22,8 +22,8 @@ import {
   reconcileStaleReferralRewards,
 } from './referral';
 import {
-  applyTelemetryActiveDayRetention,
-  getTelemetryUsageDailyMetrics,
+  applyAppActiveDayRetention,
+  getAppUsageDailyMetrics,
 } from './telemetry';
 
 const DAILY_REPORT_LEASE_MS = 15 * 60_000;
@@ -114,7 +114,7 @@ async function applyScheduledRetention(db: D1Database, now: Date): Promise<void>
     );
   }
   await runScheduledPhase(failures, () =>
-    applyTelemetryActiveDayRetention(db, now),
+    applyAppActiveDayRetention(db, now),
   );
   throwFirstScheduledFailure(failures);
 }
@@ -616,7 +616,7 @@ async function buildDailySummaryPacketForWindow(
   db: BrokerBindings['BROKER_DB'],
   window: DailyReportWindow,
 ): Promise<DailyReportPayload> {
-  const [sourceCountsResult, translationUsage] = await Promise.all([
+  const [sourceCountsResult, appUsage] = await Promise.all([
     db
       .prepare(
         `SELECT issue_source,
@@ -631,7 +631,7 @@ async function buildDailySummaryPacketForWindow(
       )
       .bind(window.windowStart, window.windowEnd)
       .all<SourceCountRow>(),
-    getTelemetryUsageDailyMetrics(db, window.reportDateUtc),
+    getAppUsageDailyMetrics(db, window.reportDateUtc),
   ]);
   const sourceCounts = Object.fromEntries(
     sourceCountsResult.results.map((row) => [row.issue_source, Number(row.count)]),
@@ -648,7 +648,7 @@ async function buildDailySummaryPacketForWindow(
       keys_delivered_total: keysDeliveredDiscord + keysDeliveredQq,
       keys_delivered_discord: keysDeliveredDiscord,
       keys_delivered_qq: keysDeliveredQq,
-      ...translationUsage,
+      ...appUsage,
     },
   };
 }

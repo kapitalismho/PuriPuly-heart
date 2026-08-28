@@ -48,15 +48,6 @@ describe('Discord OAuth managed OpenRouter schema contract', () => {
     });
   });
 
-  it('rate limits telemetry translation success-day attempts by IP by default', () => {
-    expect(DEFAULT_BROKER_ABUSE_CONTROLS.telemetryTranslationSuccessDayIp).toEqual({
-      endpoint: 'POST /v1/telemetry/translation-success-day',
-      scope: 'ip',
-      maxRequests: 60,
-      windowMinutes: 15,
-    });
-  });
-
   it('migrates Discord OAuth session, identity, and entitlement issuance columns', () => {
     const env = createTestBrokerEnv();
 

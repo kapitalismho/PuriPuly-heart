@@ -78,7 +78,6 @@ export interface BrokerAbuseControlsConfigValue {
   discordOpenrouterIssueIp: BrokerEndpointRateLimitConfig;
   discordOpenrouterIssueInstallation: BrokerEndpointRateLimitConfig;
   qqAuthAssertIp: BrokerEndpointRateLimitConfig;
-  telemetryTranslationSuccessDayIp: BrokerEndpointRateLimitConfig;
   pendingDiscordOAuthSessions: BrokerPendingDiscordOAuthSessionsConfig;
   newActiveEntitlementsPerDay: BrokerDailyIssuanceCapConfig;
   immediateAlerts: BrokerImmediateAlertsConfig;
@@ -140,12 +139,6 @@ export const DEFAULT_BROKER_ABUSE_CONTROLS: BrokerAbuseControlsConfigValue = {
     endpoint: 'POST /v1/auth/qq/assert',
     scope: 'ip',
     maxRequests: 20,
-    windowMinutes: 15,
-  },
-  telemetryTranslationSuccessDayIp: {
-    endpoint: 'POST /v1/telemetry/translation-success-day',
-    scope: 'ip',
-    maxRequests: 60,
     windowMinutes: 15,
   },
   pendingDiscordOAuthSessions: {
@@ -495,6 +488,11 @@ export interface TelemetrySubjectRecord {
   subject_ref: string;
   first_active_date_utc: string;
   last_active_date_utc: string;
+}
+
+export interface AppActiveDayRecord {
+  subject_ref: string;
+  active_date_utc: string;
 }
 
 export interface BrokerDailySummaryDeliveryRecord {
@@ -1004,7 +1002,8 @@ export const BROKER_PERSISTENCE_MODEL = {
     },
     telemetrySubjects: {
       name: 'telemetry_subjects',
-      purpose: 'durable first-observed and last-active date bounds for anonymous subjects',
+      purpose:
+        'legacy translation-success subject bounds preserved but unused by app usage aggregation',
       primaryKey: 'subject_ref',
       columns: ['subject_ref', 'first_active_date_utc', 'last_active_date_utc'],
       indexed: ['last_active_date_utc'],
@@ -1013,7 +1012,8 @@ export const BROKER_PERSISTENCE_MODEL = {
     },
     telemetryActiveDays: {
       name: 'telemetry_active_days',
-      purpose: 'retained anonymous active dates for completed-day usage aggregation',
+      purpose:
+        'legacy translation-success dates preserved but unused by app usage aggregation',
       primaryKey: ['subject_ref', 'active_date_utc'],
       columns: [
         'subject_ref',
@@ -1022,6 +1022,15 @@ export const BROKER_PERSISTENCE_MODEL = {
         'last_received_at',
       ],
       indexed: ['active_date_utc', 'last_received_at'],
+      rawTelemetryIdentifierStorage: false,
+      joinedToManagedIdentity: false,
+    },
+    appActiveDays: {
+      name: 'app_active_days',
+      purpose: 'retained anonymous app-launch dates for completed-day usage aggregation',
+      primaryKey: ['subject_ref', 'active_date_utc'],
+      columns: ['subject_ref', 'active_date_utc'],
+      indexed: ['active_date_utc'],
       rawTelemetryIdentifierStorage: false,
       joinedToManagedIdentity: false,
     },

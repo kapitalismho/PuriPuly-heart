@@ -55,8 +55,8 @@ from puripuly_heart.core.http_extensions import (
 )
 from puripuly_heart.core.local_translation.devices import list_llama_vulkan_devices
 from puripuly_heart.core.telemetry import (
-    TranslationSuccessTelemetryResult,
-    TranslationSuccessTelemetryService,
+    AppActiveDayTelemetryResult,
+    AppActiveDayTelemetryService,
 )
 
 
@@ -382,7 +382,7 @@ class UiEngagementRuntimeAdapter:
     settings: SettingsOwner
     settings_application: SettingsApplicationOwner
     github_prompt: GithubStarPromptOwner
-    telemetry: TranslationSuccessTelemetryService
+    telemetry: AppActiveDayTelemetryService
     after_launch: ApplicationAfterLaunchOwner
 
     def get_event_language_codes(self) -> tuple[str | None, str | None]:
@@ -397,19 +397,19 @@ class UiEngagementRuntimeAdapter:
     def schedule_github_star_prompt_translation_success_observed(self) -> None:
         self.github_prompt.schedule_translation_success_observed()
 
-    async def record_telemetry_translation_success_day(
+    async def record_app_active_day(
         self,
         active_date_utc: str,
-    ) -> TranslationSuccessTelemetryResult:
+    ) -> AppActiveDayTelemetryResult:
         settings = self.settings.current
         if settings is None:
-            return TranslationSuccessTelemetryResult(status="skipped_no_settings")
+            return AppActiveDayTelemetryResult(status="skipped_no_settings")
 
         async def persist(updated: object) -> bool:
             await self.settings_application.apply(updated)
             return self.settings_application.results.committed()
 
-        return await self.telemetry.record_translation_success_day(
+        return await self.telemetry.record_app_active_day(
             settings,
             active_date_utc=active_date_utc,
             persist_sent_date=persist,

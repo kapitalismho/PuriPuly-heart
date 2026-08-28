@@ -690,8 +690,6 @@ function getEndpointRateLimitConfigs(
       ];
     case 'POST /v1/auth/qq/assert':
       return [controls.qqAuthAssertIp];
-    case 'POST /v1/telemetry/translation-success-day':
-      return [controls.telemetryTranslationSuccessDayIp];
     default:
       return [];
   }
@@ -925,11 +923,6 @@ function validateBrokerAbuseControlsConfig(
     'POST /v1/auth/qq/assert',
     'ip',
   );
-  const telemetryTranslationSuccessDayIp = validateEndpointRateLimitConfig(
-    value.telemetryTranslationSuccessDayIp,
-    'POST /v1/telemetry/translation-success-day',
-    'ip',
-  );
   const pendingDiscordOAuthSessions = validatePendingDiscordOAuthSessionsConfig(
     value.pendingDiscordOAuthSessions,
   );
@@ -951,7 +944,6 @@ function validateBrokerAbuseControlsConfig(
     !discordOpenrouterIssueIp ||
     !discordOpenrouterIssueInstallation ||
     !qqAuthAssertIp ||
-    !telemetryTranslationSuccessDayIp ||
     !pendingDiscordOAuthSessions ||
     !newActiveEntitlementsPerDay ||
     !immediateAlerts ||
@@ -972,7 +964,6 @@ function validateBrokerAbuseControlsConfig(
     discordOpenrouterIssueIp,
     discordOpenrouterIssueInstallation,
     qqAuthAssertIp,
-    telemetryTranslationSuccessDayIp,
     pendingDiscordOAuthSessions,
     newActiveEntitlementsPerDay,
     immediateAlerts,
