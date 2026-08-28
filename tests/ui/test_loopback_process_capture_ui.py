@@ -481,7 +481,7 @@ def test_loopback_summary_prefers_localized_process_name() -> None:
         executable_identity=r"c:\vrchat\vrchat.exe",
     )
     set_locale("en")
-    assert owner.summary(settings) == t("settings.desktop_audio.process.vrchat")
+    assert owner.summary() == t("settings.desktop_audio.process.vrchat")
     for channel, basename, key in (
         ("stable", "Discord.exe", "settings.desktop_audio.process.discord_stable"),
         ("ptb", "DiscordPTB.exe", "settings.desktop_audio.process.discord_ptb"),
@@ -493,13 +493,13 @@ def test_loopback_summary_prefers_localized_process_name() -> None:
             discord_channel=channel,
             executable_basename=basename,
         )
-        assert owner.summary(settings) == t(key)
+        assert owner.summary() == t(key)
     settings.desktop_audio.runtime_capture_target = ResolvedDesktopAudioCaptureTarget(
         kind="process",
         process_kind="generic_executable",
         executable_identity=r"c:\apps\game\game.exe",
     )
-    assert owner.summary(settings) == "game"
+    assert owner.summary() == "game"
 
 
 def test_list_options_preserves_saved_process_when_stopped() -> None:

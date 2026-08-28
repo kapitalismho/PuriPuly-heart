@@ -13,8 +13,10 @@ from puripuly_heart.app.ports.settings_view import GeneralSettingsSnapshot
 from puripuly_heart.app.ports.ui_models import OptionItem
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
+from puripuly_heart.config.capture_target_resolution import (
+    resolve_desktop_audio_capture_target,
+)
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
-from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.config.settings_vnext.schema import (
     CaptureTargetIntent,
     ProcessCaptureTargetIntent,
@@ -42,11 +44,10 @@ class PeerCaptureTargetApplicationOwner:
         repr=False,
     )
 
-    def summary(self, settings: AppSettings | None = None) -> str:
-        resolved_settings = settings or self.settings.current
-        if resolved_settings is None:
+    def summary(self) -> str:
+        target = self._resolve_target()
+        if target is None:
             return self.localize("settings.default_option")
-        target = self._resolve_target(resolved_settings)
         if target.kind == "named_output_device":
             return target.device_name or self.localize("settings.default_option")
         if target.kind == "process":
@@ -107,34 +108,43 @@ class PeerCaptureTargetApplicationOwner:
             ],
         ]
 
-    def current_value(self, settings: AppSettings | None = None) -> str:
-        resolved_settings = settings or self.settings.current
-        if resolved_settings is None:
+    def current_value(self) -> str:
+        target = self._resolve_target()
+        if target is None:
             return "device:"
-        target = self._resolve_target(resolved_settings)
         if target.kind == "process":
             return self.encode_process_option(self._process_target_from_resolved(target))
         if target.kind == "named_output_device":
             return f"device:{target.device_name or ''}"
         return "device:"
 
-    def _resolve_target(
-        self,
-        settings: AppSettings,
-    ) -> ResolvedDesktopAudioCaptureTarget:
+    def _resolve_target(self) -> ResolvedDesktopAudioCaptureTarget | None:
+        canonical = getattr(self.settings, "canonical", None)
+        if canonical is not None:
+            return resolve_desktop_audio_capture_target(
+                canonical.intent.desktop_audio.capture_target
+            )
+        current = self.settings.current
+        if current is None:
+            return None
+        desktop_audio = current.desktop_audio
         return self._target_resolution.resolve(
-            legacy_output_device=settings.desktop_audio.output_device,
-            persisted_capture_target=settings.desktop_audio.runtime_capture_target,
+            legacy_output_device=desktop_audio.output_device,
+            persisted_capture_target=desktop_audio.runtime_capture_target,
         )
 
     async def apply(self, value: str) -> None:
         current = self.settings.current
         if current is None:
             return
-        next_settings = self.settings.update_capture_target(
-            current,
-            self.decode_option(value),
-        )
+        apply_capture_target = getattr(self.settings, "apply_capture_target", None)
+        if apply_capture_target is not None:
+            next_settings = apply_capture_target(self.decode_option(value))
+        else:
+            next_settings = self.settings.update_capture_target(
+                current,
+                self.decode_option(value),
+            )
         next_settings.ui.overlay_enabled = current.ui.overlay_enabled
         next_settings.ui.peer_translation_enabled = current.ui.peer_translation_enabled
         self.settings.current = next_settings

@@ -1788,7 +1788,11 @@ def test_resolve_overlay_config_maps_desktop_flet_to_resolved_desktop_options() 
     settings.overlay.desktop_flet.locked = True
     settings.overlay.desktop_flet.visual.background_alpha = 0.44
 
-    resolved = wiring_module.resolve_overlay_config(settings)
+    resolved = wiring_module.resolve_overlay_config_from_vnext(
+        from_legacy_app_settings(settings),
+        enabled=settings.ui.overlay_enabled,
+        locked=settings.overlay.desktop_flet.locked,
+    )
 
     assert resolved.enabled is True
     assert resolved.target == "desktop"

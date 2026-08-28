@@ -12,6 +12,8 @@ from typing import Literal, cast
 from puripuly_heart.app.adapters.application_runtime_shutdown import (
     ApplicationRuntimeShutdownAdapter,
 )
+from puripuly_heart.app.adapters.local_asr_application import LocalASRApplicationSettings
+from puripuly_heart.app.adapters.peer_application_state import PeerApplicationSettings
 from puripuly_heart.app.adapters.system_directory_opener import SystemDirectoryOpener
 from puripuly_heart.app.adapters.ui_runtime import (
     UiDiagnosticsRuntimeAdapter,
@@ -147,7 +149,7 @@ from puripuly_heart.app.wiring import (
     create_secret_store,
     create_self_capture_admission_adapter,
     create_sync_secret_store_adapter,
-    resolve_overlay_config,
+    resolve_overlay_config_from_vnext,
     runtime_pipeline_inputs_from_vnext,
 )
 from puripuly_heart.app.wiring.wiring_managed_gemma import (
@@ -180,7 +182,10 @@ from puripuly_heart.app.wiring_managed_account import (
     ManagedTranslationRuntimeAccess,
     compose_managed_account,
 )
-from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
+from puripuly_heart.app.wiring_microphone_test import (
+    MicrophoneTestAudioSettings,
+    MicrophoneTestRuntime,
+)
 from puripuly_heart.app.wiring_peer_application import (
     PeerApplicationRuntime,
     compose_peer_application,
@@ -426,6 +431,35 @@ def compose_application_runtime(
     def canonical_settings(value: AppSettings) -> AppSettingsVNext:
         return settings.project(value, authoritative=settings.authoritative)
 
+    def peer_application_settings(
+        value: AppSettings | None = None,
+    ) -> PeerApplicationSettings | None:
+        resolved = current_settings() if value is None else value
+        if resolved is None:
+            return None
+        return PeerApplicationSettings(
+            intent_enabled=resolved.ui.peer_translation_enabled,
+            eula_accepted=resolved.ui.peer_translation_eula_accepted,
+            overlay_intent_enabled=resolved.ui.overlay_enabled,
+            provider_id=resolved.provider.peer_stt.value,
+        )
+
+    def microphone_audio_settings(
+        value: AppSettings | None = None,
+    ) -> MicrophoneTestAudioSettings | None:
+        resolved = current_settings() if value is None else value
+        if resolved is None:
+            return None
+        return MicrophoneTestAudioSettings(
+            input_host_api=resolved.audio.input_host_api,
+            input_device=resolved.audio.input_device,
+            internal_sample_rate_hz=resolved.audio.internal_sample_rate_hz,
+            internal_channels=resolved.audio.internal_channels,
+        )
+
+    def current_canonical() -> AppSettingsVNext:
+        return canonical_settings(cast(AppSettings, current_settings()))
+
     def log_basic(message: str, *, level: int = logging.INFO) -> None:
         runtime_logging.emit_basic(message, level=level)
 
@@ -558,7 +592,7 @@ def compose_application_runtime(
         if resolved is None:
             return
         runtime = require_peer()
-        runtime.owner.sync_effective_flags(runtime.state_for(resolved))
+        runtime.owner.sync_effective_flags(runtime.state_for(peer_application_settings(resolved)))
 
     async def refresh_overlay_runtime_dependencies(
         *,
@@ -613,8 +647,10 @@ def compose_application_runtime(
             calibration_owner = require_calibration()
             overlay = OverlayApplicationOwner(
                 state_provider=overlay_state,
-                config_provider=lambda: resolve_overlay_config(
-                    cast(AppSettings, current_settings())
+                config_provider=lambda: resolve_overlay_config_from_vnext(
+                    current_canonical(),
+                    enabled=cast(AppSettings, current_settings()).ui.overlay_enabled,
+                    locked=cast(AppSettings, current_settings()).overlay.desktop_flet.locked,
                 ),
                 overlay_intent_sink=lambda enabled: setattr(
                     cast(AppSettings, current_settings()).ui,
@@ -651,20 +687,25 @@ def compose_application_runtime(
             )
         return overlay
 
-    def peer_activation_requested(value: AppSettings) -> bool:
+    def peer_activation_requested(value: AppSettings | None = None) -> bool:
+        settings = peer_application_settings(value)
+        if settings is None:
+            return False
         runtime = require_peer()
         return runtime.owner.activation_requested(
-            intent_enabled=value.ui.peer_translation_enabled,
-            eula_accepted=value.ui.peer_translation_eula_accepted,
+            intent_enabled=settings.intent_enabled,
+            eula_accepted=settings.eula_accepted,
         )
 
-    def peer_runtime_desired(value: AppSettings) -> bool:
+    def peer_runtime_desired(value: AppSettings | None = None) -> bool:
         runtime = require_peer()
-        return runtime.owner.desired_active(runtime.state_for(value))
+        return runtime.owner.desired_active(runtime.state_for(peer_application_settings(value)))
 
     def peer_local_stt_requested(value: AppSettings | None = None) -> bool:
         runtime = require_peer()
-        return runtime.owner.local_stt_requested(runtime.state_for(value))
+        return runtime.owner.local_stt_requested(
+            runtime.state_for(peer_application_settings(value))
+        )
 
     def enqueue_peer_disclosure() -> None:
         output_projection = pipeline.translation_output_projection
@@ -678,9 +719,19 @@ def compose_application_runtime(
         nonlocal peer
         if peer is None:
             peer = compose_peer_application(
-                settings_provider=current_settings,
+                settings_provider=peer_application_settings,
                 settings_owner=settings,
-                canonical_settings=canonical_settings,
+                canonical_settings=current_canonical,
+                peer_intent_sink=lambda enabled: setattr(
+                    cast(AppSettings, current_settings()).ui,
+                    "peer_translation_enabled",
+                    enabled,
+                ),
+                overlay_intent_sink=lambda enabled: setattr(
+                    cast(AppSettings, current_settings()).ui,
+                    "overlay_enabled",
+                    enabled,
+                ),
                 runtime_provider=lambda: pipeline.local_asr_runtime,
                 translation_runtime_configuration_provider=(
                     lambda: pipeline.translation_runtime_configuration
@@ -854,13 +905,28 @@ def compose_application_runtime(
     def require_local_asr() -> LocalASRApplicationRuntime:
         nonlocal local_asr
         if local_asr is None:
+
+            def local_asr_application_settings() -> LocalASRApplicationSettings | None:
+                value = current_settings()
+                if value is None:
+                    return None
+                return LocalASRApplicationSettings(
+                    locale=value.ui.locale,
+                    self_provider=value.provider.stt.value,
+                    peer_provider=value.provider.peer_stt.value,
+                    self_source_language=value.languages.source_language,
+                    peer_source_language=value.languages.effective_peer_source,
+                    self_gpu_provider=value.provider.stt == STTProviderName.LOCAL_QWEN_GPU,
+                    peer_gpu_provider=value.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU,
+                    peer_requested=peer_local_stt_requested(value),
+                    peer_activation_requested=peer_activation_requested(value),
+                )
+
             local_asr = compose_local_asr_application(
-                settings_provider=current_settings,
+                settings_provider=local_asr_application_settings,
                 runtime_provider=lambda: pipeline.local_asr_runtime,
                 self_capture_provider=lambda: pipeline.self_capture,
                 peer_provider=lambda: require_peer().owner,
-                peer_requested=peer_local_stt_requested,
-                peer_activation_requested=peer_activation_requested,
                 provisioning_provider=require_provisioning,
                 gpu_state_provider=lambda: require_gpu().snapshot.ui_state,
                 retain_gpu_pending=lambda channel: require_gpu().retain_pending(
@@ -1039,7 +1105,7 @@ def compose_application_runtime(
         nonlocal microphone
         if microphone is None:
             microphone = MicrophoneTestRuntime(
-                settings_provider=current_settings,
+                audio_provider=microphone_audio_settings,
                 self_capture_provider=lambda: pipeline.self_capture,
                 local_pending_provider=lambda: require_local_asr().self_pending,
                 disable_self_capture=stop_self_capture,
@@ -1278,7 +1344,9 @@ def compose_application_runtime(
         )
 
     def sync_non_provider_signatures(value: AppSettings) -> None:
-        effects_state.microphone_audio_signature = MicrophoneTestRuntime.audio_signature(value)
+        effects_state.microphone_audio_signature = MicrophoneTestRuntime.audio_signature(
+            microphone_audio_settings(value)
+        )
 
     def sync_signature_caches(value: AppSettings) -> None:
         signatures.sync(
@@ -1543,7 +1611,7 @@ def compose_application_runtime(
         return gpu_recovery
 
     capture_factory = CaptureOwnerFactory(
-        settings_provider=current_settings,
+        canonical_provider=lambda: None if current_settings() is None else current_canonical(),
         self_admission=create_self_capture_admission_adapter(
             state_provider=(require_local_asr().adapters.state.self_admission),
             validate_gpu_activation=validate_gpu_activation,
@@ -1744,7 +1812,7 @@ def compose_application_runtime(
         previous_self_capture=lambda: pipeline.self_capture,
         component_sink=install_pipeline,
         peer_application=lambda: require_peer().owner,
-        configure_vrc_mic=lambda *, enabled: require_vrc_mic_sync().configure(enabled=enabled),
+        configure_vrc_mic=lambda *, enabled: (require_vrc_mic_sync().configure(enabled=enabled)),
         stt_failure_sink=log_error,
         cleanup_failure_sink=lambda message, exc: log_error(f"{message}: {exc}"),
         managed_gemma=managed_gemma,

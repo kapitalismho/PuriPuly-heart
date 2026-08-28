@@ -27,7 +27,10 @@ from puripuly_heart.app.services.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
-from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
+from puripuly_heart.app.wiring_microphone_test import (
+    MicrophoneTestAudioSettings,
+    MicrophoneTestRuntime,
+)
 from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
 from puripuly_heart.app.wiring_provider_runtime import (
     ProviderRuntimeSignatures,
@@ -143,6 +146,19 @@ class SettingsRuntimeEffectsAdapter:
         self._replace_self_stt = replace_self_stt
         self._rebuild_managed_gemma = rebuild_managed_gemma
 
+    @staticmethod
+    def _microphone_audio(
+        settings: AppSettings | None,
+    ) -> MicrophoneTestAudioSettings | None:
+        if settings is None:
+            return None
+        return MicrophoneTestAudioSettings(
+            input_host_api=settings.audio.input_host_api,
+            input_device=settings.audio.input_device,
+            internal_sample_rate_hz=settings.audio.internal_sample_rate_hz,
+            internal_channels=settings.audio.internal_channels,
+        )
+
     async def preserve_before_replace(self, settings: AppSettings) -> None:
         await self._github_prompt().preserve_before_settings_replace(settings)
 
@@ -165,9 +181,11 @@ class SettingsRuntimeEffectsAdapter:
         previous_microphone_signature = (
             self._state.microphone_audio_signature
             or (microphone_owner.audio_signature if microphone_owner is not None else None)
-            or self._microphone.audio_signature(current_settings)
+            or self._microphone.audio_signature(self._microphone_audio(current_settings))
         )
-        next_microphone_signature = self._microphone.audio_signature(next_settings)
+        next_microphone_signature = self._microphone.audio_signature(
+            self._microphone_audio(next_settings)
+        )
         if (
             previous_microphone_signature is not None
             and previous_microphone_signature != next_microphone_signature
@@ -349,7 +367,9 @@ class SettingsRuntimeEffectsAdapter:
         transition: SettingsRuntimeTransition[AppSettings],
     ) -> None:
         settings = transition.settings
-        self._state.microphone_audio_signature = self._microphone.audio_signature(settings)
+        self._state.microphone_audio_signature = self._microphone.audio_signature(
+            self._microphone_audio(settings)
+        )
         self._calibration.sync_from_settings(settings)
         self._desktop_overlay.sync_from_settings(settings)
 
@@ -369,9 +389,7 @@ class SettingsRuntimeEffectsAdapter:
         self._calibration.sync_from_settings(restored_settings)
         config_owner = self._pipeline.translation_runtime_configuration
         if config_owner is not None:
-            peer_enabled = self._peer.owner.effective_enabled(
-                self._peer.state_for(restored_settings)
-            )
+            peer_enabled = self._peer.owner.effective_enabled(self._peer.state_for(None))
             replace_translation_runtime_settings(
                 config_owner,
                 project_translation_runtime_settings_from_vnext(
@@ -398,7 +416,7 @@ class SettingsRuntimeEffectsAdapter:
                 local_asr_runtime is not None
                 and local_asr_runtime.snapshot.channel_for("self").provider_id is not None
             ),
-            peer_stt_desired=self._peer.owner.desired_active(self._peer.state_for(settings)),
+            peer_stt_desired=self._peer.owner.desired_active(self._peer.state_for(None)),
             peer_stt_available=(
                 local_asr_runtime is not None
                 and local_asr_runtime.snapshot.channel_for("peer").provider_id is not None
@@ -436,7 +454,7 @@ class SettingsRuntimeEffectsAdapter:
         config_owner = self._pipeline.translation_runtime_configuration
         config_change: TranslationRuntimeConfigChange | None = None
         if config_owner is not None:
-            peer_enabled = self._peer.owner.effective_enabled(self._peer.state_for(settings))
+            peer_enabled = self._peer.owner.effective_enabled(self._peer.state_for(None))
             config_change = replace_translation_runtime_settings(
                 config_owner,
                 project_translation_runtime_settings_from_vnext(self._canonical_settings(settings)),
@@ -596,10 +614,12 @@ class SettingsRuntimeEffectsAdapter:
             canonical=self._canonical_settings(settings),
             peer=self._peer.owner,
         )
-        self._state.microphone_audio_signature = self._microphone.audio_signature(settings)
+        self._state.microphone_audio_signature = self._microphone.audio_signature(
+            self._microphone_audio(settings)
+        )
 
     def _sync_effective_translation_flags(self, settings: AppSettings) -> None:
-        self._peer.owner.sync_effective_flags(self._peer.state_for(settings))
+        self._peer.owner.sync_effective_flags(self._peer.state_for(None))
 
     @staticmethod
     def _effective_peer_language(language: str, peer_language: str) -> str:

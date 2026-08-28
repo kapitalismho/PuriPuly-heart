@@ -1,43 +1,70 @@
 from __future__ import annotations
 
-import copy
-
+from puripuly_heart.config.desktop_overlay_values import DESKTOP_FLET_DEFAULT_TEXT_SCALE
 from puripuly_heart.config.resolved import ResolvedOverlayConfig
 from puripuly_heart.config.runtime_resolution import OverlayRuntimeIntent
 from puripuly_heart.config.runtime_resolution import (
     resolve_overlay_config as resolve_overlay_runtime_config,
 )
-from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, DesktopFletOverlayIntent
 
 
-def _desktop_overlay_options_from_settings(settings: AppSettings) -> dict[str, object]:
-    desktop_settings = copy.deepcopy(settings.overlay.desktop_flet)
-    desktop_settings.validate()
-    visual = desktop_settings.visual
+def _desktop_overlay_options_from_vnext(
+    desktop: DesktopFletOverlayIntent,
+    *,
+    locked: bool,
+) -> dict[str, object]:
+    visual = desktop.visual
     return {
-        "size_preset": desktop_settings.size_preset,
+        "size_preset": desktop.size_preset,
         "position": {
-            "x": desktop_settings.position.x,
-            "y": desktop_settings.position.y,
+            "x": desktop.position.x,
+            "y": desktop.position.y,
         },
-        "locked": desktop_settings.locked,
-        "swap_caption_languages": desktop_settings.swap_caption_languages,
+        "locked": locked,
+        "swap_caption_languages": desktop.swap_caption_languages,
         "visual": {
-            "text_scale": visual.text_scale,
+            "text_scale": DESKTOP_FLET_DEFAULT_TEXT_SCALE,
             "background_alpha": visual.background_alpha,
-            "outline_width": visual.outline_width,
+            "outline_width": None,
         },
     }
 
 
-def resolve_overlay_config(settings: AppSettings) -> ResolvedOverlayConfig:
-    return resolve_overlay_runtime_config(
-        OverlayRuntimeIntent(
-            enabled=settings.ui.overlay_enabled,
-            target=settings.overlay.target,
-            show_translation=settings.overlay.show_translation,
-            show_peer_original=settings.overlay.show_peer_original,
-            calibration=settings.overlay.calibration.to_dict(),
-            desktop_overlay_options=_desktop_overlay_options_from_settings(settings),
+def overlay_runtime_intent_from_vnext(
+    settings: AppSettingsVNext,
+    *,
+    enabled: bool,
+    locked: bool = False,
+) -> OverlayRuntimeIntent:
+    overlay = settings.intent.overlay
+    return OverlayRuntimeIntent(
+        enabled=enabled,
+        target=overlay.target,
+        show_translation=overlay.show_translation,
+        show_peer_original=overlay.show_peer_original,
+        calibration=overlay.calibration.to_dict(),
+        desktop_overlay_options=_desktop_overlay_options_from_vnext(
+            overlay.desktop_flet,
+            locked=locked,
+        ),
+    )
+
+
+def resolve_overlay_config(intent: OverlayRuntimeIntent) -> ResolvedOverlayConfig:
+    return resolve_overlay_runtime_config(intent)
+
+
+def resolve_overlay_config_from_vnext(
+    settings: AppSettingsVNext,
+    *,
+    enabled: bool,
+    locked: bool = False,
+) -> ResolvedOverlayConfig:
+    return resolve_overlay_config(
+        overlay_runtime_intent_from_vnext(
+            settings,
+            enabled=enabled,
+            locked=locked,
         )
     )

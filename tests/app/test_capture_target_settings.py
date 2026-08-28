@@ -33,10 +33,10 @@ def _process_target() -> CaptureTargetIntent:
 def test_capture_target_persistence_creates_an_absent_settings_file(tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
 
-    saved = persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
+    saved = persist_desktop_audio_capture_target(path, _process_target())
 
     assert path.is_file()
-    assert saved.desktop_audio.runtime_capture_target.kind == "process"
+    assert saved.intent.desktop_audio.capture_target.kind == "process"
     loaded = load_vnext_settings(path)
     assert loaded.ok
     assert loaded.settings is not None
@@ -47,9 +47,9 @@ def test_capture_target_persistence_updates_valid_canonical_settings(tmp_path: P
     path = tmp_path / "settings.json"
     save_vnext_settings(path, from_legacy_app_settings(AppSettings()))
 
-    saved = persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
+    saved = persist_desktop_audio_capture_target(path, _process_target())
 
-    assert saved.desktop_audio.runtime_capture_target.kind == "process"
+    assert saved.intent.desktop_audio.capture_target.kind == "process"
     loaded = load_vnext_settings(path)
     assert loaded.ok
     assert loaded.settings is not None
@@ -64,7 +64,7 @@ def test_capture_target_persistence_rejects_malformed_existing_settings_without_
     path.write_bytes(original_bytes)
 
     with pytest.raises(CaptureTargetSettingsError) as raised:
-        persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
+        persist_desktop_audio_capture_target(path, _process_target())
 
     assert raised.value.status == "parse_failed"
     assert "JSON" not in str(raised.value)
@@ -85,7 +85,7 @@ def test_capture_target_persistence_rejects_unreadable_existing_settings_without
     monkeypatch.setattr(persistence_adapter, "load_vnext_settings", fail_load)
 
     with pytest.raises(CaptureTargetSettingsError) as raised:
-        persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
+        persist_desktop_audio_capture_target(path, _process_target())
 
     assert raised.value.status == "load_failed"
     assert "raw unreadable settings detail" not in str(raised.value)
@@ -115,7 +115,7 @@ def test_capture_target_persistence_never_overwrites_a_failed_existing_load(
     monkeypatch.setattr(persistence_adapter, "load_vnext_settings", lambda _path: failure)
 
     with pytest.raises(CaptureTargetSettingsError) as raised:
-        persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
+        persist_desktop_audio_capture_target(path, _process_target())
 
     assert raised.value.status == status.value
     assert "raw secret failure detail" not in str(raised.value)
@@ -131,10 +131,13 @@ def test_capture_target_persistence_rejects_absent_file_migration_failure_withou
     def fail_projection(*_args, **_kwargs):
         raise RuntimeError("raw migration failure")
 
-    monkeypatch.setattr(SettingsVNextCanonicalPersistenceAdapter, "project", fail_projection)
+    monkeypatch.setattr(
+        "puripuly_heart.app.services.capture.capture_target_settings.new_settings_for_first_run",
+        fail_projection,
+    )
 
     with pytest.raises(CaptureTargetSettingsError) as raised:
-        persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
+        persist_desktop_audio_capture_target(path, _process_target())
 
     assert raised.value.status == "migration_failed"
     assert "raw migration failure" not in str(raised.value)
@@ -156,7 +159,7 @@ def test_capture_target_persistence_loads_existing_file_once(
 
     monkeypatch.setattr(persistence_adapter, "load_vnext_settings", counted_load)
 
-    persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
+    persist_desktop_audio_capture_target(path, _process_target())
 
     assert loads == [path]
 
@@ -185,7 +188,7 @@ def test_capture_target_projection_failure_does_not_change_persisted_state(
     )
 
     with pytest.raises(CaptureTargetSettingsError) as raised:
-        persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
+        persist_desktop_audio_capture_target(path, _process_target())
 
     assert raised.value.status == "save_failed"
     assert "raw projection failure" not in str(raised.value)

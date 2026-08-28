@@ -12,6 +12,7 @@ from puripuly_heart.app.wiring_capture_runtime import CaptureOwnerFactory
 from puripuly_heart.app.wiring_stt_factory import build_self_capture_session_config
 
 from puripuly_heart.config.settings import AppSettings, STTProviderName
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.core.self_capture import SelfCaptureProviderStatus
 
 
@@ -93,7 +94,7 @@ async def test_replace_provider_propagates_updated_config_by_capture_activity(
     )
 
     factory = CaptureOwnerFactory(
-        settings_provider=lambda: settings,
+        canonical_provider=lambda: from_legacy_app_settings(settings),
         self_admission=cast(Any, None),
         ensure_peer_local_ready=cast(Any, None),
         clock=cast(Any, None),

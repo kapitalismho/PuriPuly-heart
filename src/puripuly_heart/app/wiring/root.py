@@ -78,7 +78,11 @@ from .wiring_managed_auth_factory import (
     build_openrouter_credential_runtime_config,
     build_openrouter_release_runtime_config,
 )
-from .wiring_overlay_factory import resolve_overlay_config
+from .wiring_overlay_factory import (
+    overlay_runtime_intent_from_vnext,
+    resolve_overlay_config,
+    resolve_overlay_config_from_vnext,
+)
 from .wiring_secrets_factory import (
     SECRETS_PASSPHRASE_ENV,
     create_secret_store,
@@ -283,7 +287,9 @@ __all__ = (
     "create_stt_backend_from_resolved_config",
     "require_secret",
     "require_secret_any",
+    "overlay_runtime_intent_from_vnext",
     "resolve_overlay_config",
+    "resolve_overlay_config_from_vnext",
     "resolve_peer_stt_config",
     "resolve_peer_stt_runtime_config",
     "resolve_peer_stt_runtime_config_from_vnext",

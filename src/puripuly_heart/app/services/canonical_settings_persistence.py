@@ -205,9 +205,9 @@ class LegacySettingsPatchRepository:
         )
 
 
-def compose_canonical_settings_persistence() -> (
-    CanonicalSettingsPersistencePort[AppSettings, AppSettingsVNext]
-):
+def compose_canonical_settings_persistence() -> CanonicalSettingsPersistencePort[
+    AppSettings, AppSettingsVNext
+]:
     return SettingsVNextCanonicalPersistenceAdapter()
 
 
@@ -444,6 +444,19 @@ class SettingsOwner:
             provider_verification_binding=provider_verification_binding,
             save_failure_sink=save_failure_sink,
         )
+
+    def apply_capture_target(self, capture_target: CaptureTargetIntent) -> AppSettings:
+        if self.canonical is None:
+            self.canonical = new_settings_for_first_run()
+        snapshot = self.persistence.snapshot(self.canonical)
+        self.canonical = with_capture_target(self.canonical, capture_target)
+        try:
+            projected = self.compatibility_projection()
+            self.persist()
+        except Exception:
+            self.canonical = self.persistence.rollback(snapshot)
+            raise
+        return projected
 
     def update_capture_target(
         self,
