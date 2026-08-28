@@ -18,17 +18,17 @@ This report is generated only after the scored artifacts exist. It is developmen
 
 7. No; the posterior result does not yet authorize native S2.
 
-8. opened; causal and non-causal hidden ceilings failed with train-fit sanity, but the predeclared neural/acoustic concentration check failed: {'per_source_family': {'alimeeting_far_ch0': {'overlap_masking': True, 'competitor_separation': False}, 'ami_mix_headset': {'overlap_masking': False, 'competitor_separation': False}}, 'status': 'failed'}
+8. opened; causal and bounded non-causal hidden ceilings both failed despite passing train-fit sanity: {'train_fit_sanity': {'H-C': {'status': 'passed', 'reference_probe_class': 'tiny_mlp', 'fold_count': 2, 'minimum_average_precision': 0.8116016984776114, 'minimum_accuracy': 0.9457091999728517}, 'H-NC': {'status': 'passed', 'reference_probe_class': 'tiny_mlp', 'fold_count': 2, 'minimum_average_precision': 0.8047884575857124, 'minimum_accuracy': 0.9253816447157331}}, 'hidden_causal_over_posterior_causal': {'status': 'failed', 'frontier_comparison': {'left_dominates': 4, 'right_dominates': 2, 'tradeoff': 12}, 'reference_cell_improvements': {'exclusive_other_contamination_seconds_per_active_speech_hour': True, 'false_cut_count': True, 'missed_replacement_count': False}, 'source_family_improved_metric_counts': {'alimeeting_far_ch0': 3, 'ami_mix_headset': 1}}, 'hidden_noncausal_over_hidden_causal': {'status': 'failed', 'frontier_comparison': {'left_dominates': 0, 'right_dominates': 8, 'tradeoff': 10}, 'reference_cell_improvements': {'exclusive_other_contamination_seconds_per_active_speech_hour': False, 'false_cut_count': False, 'missed_replacement_count': False}, 'source_family_improved_metric_counts': {'alimeeting_far_ch0': 0, 'ami_mix_headset': 2}}, 'neural_acoustic_failure_concentration': {'per_source_family': {'alimeeting_far_ch0': {'overlap_masking': True, 'competitor_separation': False}, 'ami_mix_headset': {'overlap_masking': False, 'competitor_separation': False}}, 'source_family_domain': {'status': 'passed', 'minimum_improved_metrics': 2, 'improved_metric_counts': {'alimeeting_far_ch0': 3, 'ami_mix_headset': 1}, 'passing_families': ['alimeeting_far_ch0'], 'failing_families': ['ami_mix_headset']}, 'status': 'passed'}}
 
-9. Selected path: unresolved; hidden failure is not localized to the required neural/acoustic slices.
+9. Selected path: D. Sortformer task adaptation / full FT -> KD.
 
-10. Full Sortformer adaptation remains unauthorized until the residual failure is localized.
+10. Further decoder proliferation and direct scalar-posterior distillation are rejected; task adaptation is now justified.
 
 11. The corrected committed-live-only replay changed contamination seconds per active speech hour from 1885.250 to 2149.283; this is integration hygiene, not teacher selection.
 
 12. Actual persistent-state VAD gating remains deferred until a viable oracle-binding path and native S2 pass. The recorded duty-cycle split supports a later A/B but cannot validate the gated model trajectory.
 
-13. Single next issue: hidden failure attribution repair within this issue.
+13. Single next issue: Sortformer task adaptation.
 
 ## Nested gap attribution at 500 ms / 0.5
 
@@ -144,7 +144,21 @@ This report is generated only after the scored artifacts exist. It is developmen
           "overlap_masking": false
         }
       },
-      "status": "failed"
+      "source_family_domain": {
+        "failing_families": [
+          "ami_mix_headset"
+        ],
+        "improved_metric_counts": {
+          "alimeeting_far_ch0": 3,
+          "ami_mix_headset": 1
+        },
+        "minimum_improved_metrics": 2,
+        "passing_families": [
+          "alimeeting_far_ch0"
+        ],
+        "status": "passed"
+      },
+      "status": "passed"
     },
     "train_fit_sanity": {
       "H-C": {
