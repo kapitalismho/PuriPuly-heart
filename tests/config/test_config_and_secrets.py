@@ -498,7 +498,7 @@ def test_local_llm_settings_default_and_roundtrip() -> None:
     assert settings.local_llm.backend == LocalLLMBackend.OLLAMA
     assert settings.local_llm.base_url == "http://127.0.0.1:11434/v1"
     assert settings.local_llm.model == "llama3.1:8b"
-    assert settings.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert settings.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
 
     settings.translation = TranslationSettings(
         model=TranslationModel.LOCAL_LLM,
@@ -735,7 +735,7 @@ def test_from_dict_defaults_malformed_local_llm_settings() -> None:
     assert loaded.local_llm.backend == LocalLLMBackend.OLLAMA
     assert loaded.local_llm.base_url == "http://127.0.0.1:11434/v1"
     assert loaded.local_llm.model == "llama3.1:8b"
-    assert loaded.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert loaded.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
 
 
 @pytest.mark.parametrize(
@@ -756,7 +756,7 @@ def test_from_dict_defaults_local_llm_non_standard_json_constants_extra_body(val
         }
     )
 
-    assert loaded.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert loaded.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
 
 
 def test_schema21_migration_adds_local_llm_defaults(tmp_path: Path) -> None:
@@ -770,7 +770,7 @@ def test_schema21_migration_adds_local_llm_defaults(tmp_path: Path) -> None:
     persisted = legacy_projected_settings_file(path)
 
     assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
-    assert loaded.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert loaded.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
     assert persisted["local_llm"]["base_url"] == "http://127.0.0.1:11434/v1"
 
@@ -793,8 +793,8 @@ def test_schema22_repair_persists_malformed_local_llm(tmp_path: Path) -> None:
 
     assert loaded.local_llm.base_url == "http://127.0.0.1:11434/v1"
     assert loaded.local_llm.model == "llama3.1:8b"
-    assert loaded.local_llm.extra_body == {"reasoning_effort": "none"}
-    assert persisted["local_llm"]["extra_body"] == {"reasoning_effort": "none"}
+    assert loaded.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert persisted["local_llm"]["extra_body"] == {"reasoning_effort": "none", "temperature": 0.6}
 
 
 @pytest.mark.parametrize(
@@ -816,8 +816,8 @@ def test_schema22_repair_persists_default_for_local_llm_non_standard_json_consta
     loaded = load_settings(path)
     persisted = legacy_projected_settings_file(path)
 
-    assert loaded.local_llm.extra_body == {"reasoning_effort": "none"}
-    assert persisted["local_llm"]["extra_body"] == {"reasoning_effort": "none"}
+    assert loaded.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert persisted["local_llm"]["extra_body"] == {"reasoning_effort": "none", "temperature": 0.6}
 
 
 def test_schema22_repair_persists_missing_local_llm(tmp_path: Path) -> None:
@@ -833,12 +833,12 @@ def test_schema22_repair_persists_missing_local_llm(tmp_path: Path) -> None:
     assert loaded.local_llm.backend == LocalLLMBackend.OLLAMA
     assert loaded.local_llm.base_url == "http://127.0.0.1:11434/v1"
     assert loaded.local_llm.model == "llama3.1:8b"
-    assert loaded.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert loaded.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert persisted["local_llm"] == {
         "backend": "ollama",
         "base_url": "http://127.0.0.1:11434/v1",
         "model": "llama3.1:8b",
-        "extra_body": {"reasoning_effort": "none"},
+        "extra_body": {"reasoning_effort": "none", "temperature": 0.6},
     }
 
 

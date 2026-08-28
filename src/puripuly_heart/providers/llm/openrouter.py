@@ -388,6 +388,7 @@ class HttpxOpenRouterClient:
                 {"role": "user", "content": user_message},
             ],
             "reasoning": {"effort": "none"},
+            "temperature": 0.6,
             "provider": _build_provider_preferences(
                 self.provider_routing,
                 model=self.model,

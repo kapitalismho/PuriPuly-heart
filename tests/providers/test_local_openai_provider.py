@@ -140,7 +140,7 @@ async def test_httpx_local_client_builds_minimal_request_and_merges_extra_body(m
         base_url="http://127.0.0.1:11434/v1/",
         model="llama3.1:8b",
         api_key="",
-        extra_body={"think": False},
+        extra_body={"think": False, "temperature": 0.1},
     )
 
     result = await client.translate(
@@ -158,6 +158,7 @@ async def test_httpx_local_client_builds_minimal_request_and_merges_extra_body(m
     assert body["model"] == "llama3.1:8b"
     assert "max_tokens" not in body
     assert body["think"] is False
+    assert body["temperature"] == 0.1
     assert body["messages"][0] == {"role": "system", "content": "SYSTEM ko->en"}
     assert body["messages"][1]["role"] == "user"
     user_content = body["messages"][1]["content"]
@@ -185,6 +186,7 @@ async def test_httpx_local_client_defaults_to_openai_reasoning_effort_none(monke
 
     body = fake_client.last_request["json"]
     assert body["reasoning_effort"] == "none"
+    assert body["temperature"] == 0.6
     assert "think" not in body
 
 
@@ -341,14 +343,14 @@ async def test_local_verify_connection_allows_empty_key(monkeypatch) -> None:
         base_url="http://localhost:11434/v1",
         model="llama3.1:8b",
         api_key="",
-        extra_body={"think": False},
     )
 
     assert ok is True
     assert fake_client.last_request["json"]["messages"][0] == {"role": "system", "content": ""}
     assert "ping" in fake_client.last_request["json"]["messages"][1]["content"]
     assert fake_client.last_request["json"]["max_tokens"] == 1
-    assert fake_client.last_request["json"]["think"] is False
+    assert fake_client.last_request["json"]["reasoning_effort"] == "none"
+    assert fake_client.last_request["json"]["temperature"] == 0.6
 
 
 @pytest.mark.asyncio

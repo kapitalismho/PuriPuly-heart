@@ -381,7 +381,9 @@ class HttpxLocalOpenAIClient:
     base_url: str = _DEFAULT_BASE_URL
     model: str = "llama3.1:8b"
     api_key: str = ""
-    extra_body: Mapping[str, object] = field(default_factory=lambda: {"reasoning_effort": "none"})
+    extra_body: Mapping[str, object] = field(
+        default_factory=lambda: {"reasoning_effort": "none", "temperature": 0.6}
+    )
     max_tokens: int | None = None
     timeout: httpx.Timeout | float = field(default_factory=_default_timeout)
     runtime_logging: SessionRuntimeLoggingService | None = None
@@ -529,7 +531,9 @@ class LocalOpenAICompatibleLLMProvider:
     base_url: str = _DEFAULT_BASE_URL
     model: str = "llama3.1:8b"
     api_key: str = ""
-    extra_body: Mapping[str, object] = field(default_factory=lambda: {"reasoning_effort": "none"})
+    extra_body: Mapping[str, object] = field(
+        default_factory=lambda: {"reasoning_effort": "none", "temperature": 0.6}
+    )
     max_tokens: int | None = None
     timeout: httpx.Timeout | float = field(default_factory=_default_timeout)
     runtime_logging: SessionRuntimeLoggingService | None = None
@@ -600,7 +604,11 @@ class LocalOpenAICompatibleLLMProvider:
                 base_url=base_url,
                 model=model,
                 api_key=api_key,
-                extra_body=extra_body if extra_body is not None else {"reasoning_effort": "none"},
+                extra_body=(
+                    extra_body
+                    if extra_body is not None
+                    else {"reasoning_effort": "none", "temperature": 0.6}
+                ),
                 max_tokens=1,
                 timeout=httpx.Timeout(connect=3.0, read=10.0, write=5.0, pool=3.0),
             )

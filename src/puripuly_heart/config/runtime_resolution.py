@@ -692,7 +692,11 @@ class DirectProviderRuntimeIntent:
     local_llm_base_url: str = LOCAL_LLM_DEFAULT_BASE_URL
     local_llm_model: str = LOCAL_LLM_DEFAULT_MODEL
     cerebras_model: str = CEREBRAS_MODEL_GEMMA_4_31B
-    local_llm_extra_body: Mapping[str, ResolvedOptionValue] = field(default_factory=_empty_options)
+    local_llm_extra_body: Mapping[str, ResolvedOptionValue] = field(
+        default_factory=lambda: _freeze_option_mapping(
+            {"reasoning_effort": "none", "temperature": 0.6}
+        )
+    )
 
     def __post_init__(self) -> None:
         qwen_region = _normalize_allowed(

@@ -257,6 +257,7 @@ class HttpxDeepSeekClient:
                 {"role": "user", "content": user_message},
             ],
             "thinking": {"type": "disabled"},
+            "temperature": 0.6,
         }
         return request_body
 

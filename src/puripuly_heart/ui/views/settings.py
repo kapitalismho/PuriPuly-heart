@@ -2184,7 +2184,11 @@ class SettingsView(ft.Column):
         )
         self._local_llm_extra_body = ft.TextField(
             label=t("settings.local_llm.extra_body"),
-            value=json.dumps({"reasoning_effort": "none"}, ensure_ascii=False, indent=2),
+            value=json.dumps(
+                {"reasoning_effort": "none", "temperature": 0.6},
+                ensure_ascii=False,
+                indent=2,
+            ),
             multiline=True,
             min_lines=3,
             max_lines=6,
@@ -3542,7 +3546,7 @@ class SettingsView(ft.Column):
         raw = (self._local_llm_extra_body.value or "").strip()
         try:
             parsed = (
-                {"reasoning_effort": "none"}
+                {"reasoning_effort": "none", "temperature": 0.6}
                 if not raw
                 else json.loads(raw, parse_constant=_reject_json_constant)
             )

@@ -235,6 +235,7 @@ class GoogleGenaiGeminiClient:
             contents=user_message,
             config=types.GenerateContentConfig(
                 system_instruction=formatted_system_prompt,
+                temperature=0.6,
                 thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             ),

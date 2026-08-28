@@ -168,6 +168,7 @@ async def test_httpx_cerebras_client_builds_reasoning_disabled_request(monkeypat
     assert body["model"] == "gemma-4-31b"
     assert body["stream"] is False
     assert body["reasoning_effort"] == "none"
+    assert body["temperature"] == 0.6
     assert body["max_completion_tokens"] == 100
     assert "max_tokens" not in body
     assert body["messages"][0] == {"role": "system", "content": "SYSTEM ko->en"}

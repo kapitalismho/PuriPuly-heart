@@ -257,6 +257,7 @@ async def test_httpx_openrouter_client_builds_reasoning_disabled_request_with_la
     assert body["model"] == "google/gemma-4-26b-a4b-it"
     assert body["max_tokens"] == 100
     assert body["reasoning"] == {"effort": "none"}
+    assert body["temperature"] == 0.6
     assert body["user"] == "managed-user-123"
     assert body["provider"] == {
         "order": ["wafer", "cloudflare", "deepinfra"],

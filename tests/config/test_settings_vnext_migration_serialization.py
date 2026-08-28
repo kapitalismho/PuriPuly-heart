@@ -2106,7 +2106,10 @@ def test_secret_bearing_legacy_local_llm_extra_body_is_repaired_before_vnext_out
     serialized = serialization.to_dict(migration.from_dict(raw))
     encoded = json.dumps(serialized, ensure_ascii=False)
 
-    assert serialized["intent"]["local_llm"]["extra_body"] == {"reasoning_effort": "none"}
+    assert serialized["intent"]["local_llm"]["extra_body"] == {
+        "reasoning_effort": "none",
+        "temperature": 0.6,
+    }
     assert "raw-local-llm-secret" not in encoded
 
 

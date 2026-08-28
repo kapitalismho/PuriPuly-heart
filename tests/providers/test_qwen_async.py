@@ -258,8 +258,11 @@ async def test_httpx_qwen_client_uses_runtime_logging_for_basic_translate_payloa
         def json() -> dict[str, object]:
             return {"choices": [{"message": {"content": "OK"}}]}
 
+    seen: dict[str, dict[str, object]] = {}
+
     class FakeAsyncClient:
-        async def post(self, _url: str, **_kwargs):
+        async def post(self, _url: str, **kwargs):
+            seen["json"] = kwargs["json"]
             return FakeResponse()
 
     monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: FakeAsyncClient())
@@ -282,6 +285,7 @@ async def test_httpx_qwen_client_uses_runtime_logging_for_basic_translate_payloa
         )
 
     assert result == "OK"
+    assert seen["json"]["temperature"] == 0.6
     assert runtime_logging.basic_messages == [
         ("[Basic][LLM] Qwen request [translate][context=yes] ko -> en: 'hello'", logging.INFO),
         ("[Basic][LLM] Qwen response [translate]: 'OK'", logging.INFO),

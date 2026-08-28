@@ -221,7 +221,7 @@ class HttpxManagedGemmaTransport:
         body: dict[str, object] = {
             "prompt": prompt,
             "stream": False,
-            "temperature": 0.2,
+            "temperature": 0.6,
             "cache_prompt": True,
             "id_slot": slot_id,
         }

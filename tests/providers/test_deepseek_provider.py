@@ -164,6 +164,7 @@ async def test_httpx_deepseek_client_builds_non_thinking_request(monkeypatch) ->
     assert body["model"] == "deepseek-v4-flash"
     assert "max_tokens" not in body
     assert body["thinking"] == {"type": "disabled"}
+    assert body["temperature"] == 0.6
     assert "reasoning" not in body
     assert "reasoning_effort" not in body
     assert body["messages"][0] == {"role": "system", "content": "SYSTEM"}

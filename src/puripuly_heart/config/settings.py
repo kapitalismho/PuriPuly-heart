@@ -115,7 +115,7 @@ LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS = frozenset(
 
 
 def _default_local_llm_extra_body() -> dict[str, object]:
-    return {"reasoning_effort": "none"}
+    return {"reasoning_effort": "none", "temperature": 0.6}
 
 
 def _default_custom_terms() -> dict[str, list[str]]:

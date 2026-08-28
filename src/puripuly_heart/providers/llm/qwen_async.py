@@ -285,6 +285,7 @@ class HttpxQwenClient:
                 {"role": "user", "content": user_message},
             ],
             "enable_thinking": False,
+            "temperature": 0.6,
         }
         return request_body
 

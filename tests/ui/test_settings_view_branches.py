@@ -1942,7 +1942,7 @@ def test_local_llm_extra_body_invalid_json_does_not_save(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body.value == "{invalid-json"
     assert view._local_llm_extra_body_error.visible is True
@@ -1960,7 +1960,7 @@ def test_local_llm_blank_extra_body_uses_current_default(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
 
 
 @pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
@@ -1976,7 +1976,7 @@ def test_local_llm_extra_body_rejects_non_standard_json_constants(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body.value == f'{{"temperature": {constant}}}'
     assert view._local_llm_extra_body_error.visible is True
@@ -1994,7 +1994,7 @@ def test_local_llm_extra_body_non_object_json_does_not_save(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body.value == '["not", "an", "object"]'
     assert view._local_llm_extra_body_error.visible is True
@@ -2015,7 +2015,7 @@ def test_local_llm_extra_body_non_serializable_value_does_not_save(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body_error.visible is True
     assert view._local_llm_extra_body_error.value == t(
@@ -2036,7 +2036,7 @@ def test_local_llm_extra_body_reserved_key_does_not_save(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body_error.visible is True
     assert view._local_llm_extra_body_error.value == t(
@@ -2057,7 +2057,7 @@ def test_local_llm_extra_body_sensitive_key_does_not_save(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body_error.visible is True
     assert view._local_llm_extra_body_error.value == t(

@@ -257,7 +257,7 @@ def test_vnext_schema_default_tree_excludes_raw_provider_api_key_fields() -> Non
         if path.rsplit(".", maxsplit=1)[-1] in forbidden_field_names
     }
     intent = schema.LocalLLMIntent(extra_body={"api_key": "not-a-real-secret"})
-    assert intent.extra_body == {"reasoning_effort": "none"}
+    assert intent.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
 
 
 def test_provider_verification_entry_defaults_to_unknown_without_bound_evidence() -> None:
@@ -377,12 +377,15 @@ def test_vnext_schema_excludes_deferred_vnext_only_operational_leaves() -> None:
 @pytest.mark.parametrize(
     ("extra_body", "expected"),
     [
-        ({"model": "reserved"}, {"reasoning_effort": "none"}),
-        ({"api-key": "secret alias"}, {"reasoning_effort": "none"}),
-        ({"nested": {"authorization": "Bearer token"}}, {"nested": {"reasoning_effort": "none"}}),
-        ({"temperature": math.nan}, {"reasoning_effort": "none"}),
-        ({"temperature": math.inf}, {"reasoning_effort": "none"}),
-        ({"temperature": -math.inf}, {"reasoning_effort": "none"}),
+        ({"model": "reserved"}, {"reasoning_effort": "none", "temperature": 0.6}),
+        ({"api-key": "secret alias"}, {"reasoning_effort": "none", "temperature": 0.6}),
+        (
+            {"nested": {"authorization": "Bearer token"}},
+            {"nested": {"reasoning_effort": "none", "temperature": 0.6}},
+        ),
+        ({"temperature": math.nan}, {"reasoning_effort": "none", "temperature": 0.6}),
+        ({"temperature": math.inf}, {"reasoning_effort": "none", "temperature": 0.6}),
+        ({"temperature": -math.inf}, {"reasoning_effort": "none", "temperature": 0.6}),
     ],
 )
 def test_local_llm_extra_body_falls_back_for_non_persistable_values(

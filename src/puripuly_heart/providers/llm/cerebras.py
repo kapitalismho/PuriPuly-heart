@@ -262,6 +262,7 @@ class HttpxCerebrasClient:
             ],
             "stream": False,
             "reasoning_effort": "none",
+            "temperature": 0.6,
             "max_completion_tokens": self.max_completion_tokens,
         }
 
