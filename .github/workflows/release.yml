@@ -27,7 +27,7 @@ jobs:
       version: ${{ steps.sync.outputs.version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validate tag and project versions
         id: sync
@@ -113,7 +113,7 @@ jobs:
     needs: verify-version
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup UV environment
         uses: ./.github/actions/setup-uv-environment
@@ -264,7 +264,7 @@ jobs:
           if (-not (Test-Path $installer)) { throw "Installer not found: $installer" }
 
       - name: Upload release artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-artifacts
           path: |
@@ -280,10 +280,10 @@ jobs:
       - build-installer
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-artifacts
           path: release-artifacts
@@ -306,7 +306,7 @@ jobs:
           PY
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
