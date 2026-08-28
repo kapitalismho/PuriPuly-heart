@@ -142,8 +142,8 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     assert pending is not None
     assert pending.translation.http_extension_id == "demo"
     assert set(view._http_extension_secret_fields) == {"api_key"}
-    assert view._http_extension_secret_fields["api_key"].value == ""
-    assert "saved-secret" not in repr(view._http_extension_secret_fields["api_key"])
+    assert view._http_extension_secret_fields["api_key"].value == "saved-secret"
+    assert view._http_extension_secret_fields["api_key"].password is True
     assert not hasattr(view, "_http_extension_request_editor")
 
     view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
@@ -172,15 +172,36 @@ def test_custom_http_credentials_use_namespaced_secret_callback_and_reload_isola
     settings.translation.http_extension_id = "demo"
     callbacks: list[tuple[str, str]] = []
     notices: list[str] = []
-    view.on_provider_secret_change = lambda key, value: (callbacks.append((key, value)) or True)
+
+    def save_secret(key: str, value: str) -> bool:
+        callbacks.append((key, value))
+        if value:
+            store.set(key, value)
+        else:
+            store.delete(key)
+        return True
+
+    view.on_provider_secret_change = save_secret
     view.show_snackbar = lambda message, _color: notices.append(message)
     view.load_from_settings(settings, config_path=tmp_path / "settings.json")
 
     field = view._http_extension_secret_fields["api_key"]
+    assert field.value == "saved-secret"
     view._on_http_extension_secret_blur("api_key")
     assert callbacks == []
     field.value = "new-secret"
+    field.on_change(None)
     view._on_http_extension_secret_blur("api_key")
+
+    (tmp_path / "broken.json").write_text("{", encoding="utf-8")
+    changed: list[bool] = []
+    view.on_providers_changed = lambda: changed.append(True)
+    view._on_http_extension_reload(None)
+
+    field = view._http_extension_secret_fields["api_key"]
+    assert field.value == "new-secret"
+    view._on_http_extension_secret_blur("api_key")
+    assert callbacks == [("http_extension.demo.api_key", "new-secret")]
     field.value = ""
     field.on_change(None)
     view._on_http_extension_secret_blur("api_key")
@@ -190,12 +211,6 @@ def test_custom_http_credentials_use_namespaced_secret_callback_and_reload_isola
         ("http_extension.demo.api_key", ""),
     ]
     assert "new-secret" not in repr(settings)
-
-    (tmp_path / "broken.json").write_text("{", encoding="utf-8")
-    changed: list[bool] = []
-    view.on_providers_changed = lambda: changed.append(True)
-    view._on_http_extension_reload(None)
-
     assert [loaded.definition.id for loaded in view._http_extension_snapshot.extensions] == ["demo"]
     assert len(view._http_extension_snapshot.errors) == 1
     assert changed == []

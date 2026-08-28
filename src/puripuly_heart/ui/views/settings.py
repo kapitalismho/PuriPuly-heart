@@ -2695,11 +2695,29 @@ class SettingsView(ft.Column):
     def _sync_http_extension_credentials(self, extension) -> None:
         self._http_extension_secret_fields = {}
         self._http_extension_secret_dirty.clear()
+        secret_values: dict[str, str] = {}
+        if extension is not None and self._settings is not None and self._config_path is not None:
+            try:
+                store = create_secret_store(
+                    self._settings.secrets,
+                    config_path=self._config_path,
+                )
+            except Exception as exc:
+                self._emit_runtime_basic(
+                    f"Failed to load HTTP extension secrets: {exc}",
+                    level=logging.WARNING,
+                )
+            else:
+                secret_values = {
+                    secret.id: store.get(http_extension_secret_key(extension.id, secret.id)) or ""
+                    for secret in extension.secrets
+                }
         controls: list[ft.Control] = []
         if extension is not None:
             for secret in extension.secrets:
                 field = ft.TextField(
                     label=t("settings.http_extension.api_key"),
+                    value=secret_values.get(secret.id, ""),
                     password=True,
                     can_reveal_password=False,
                     border_radius=12,
@@ -2803,11 +2821,13 @@ class SettingsView(ft.Column):
     def _on_http_extension_secret_blur(self, secret_id: str) -> None:
         http_extension_id = self._http_extension_selected_id
         field = self._http_extension_secret_fields.get(secret_id)
-        if not http_extension_id or field is None:
+        if (
+            not http_extension_id
+            or field is None
+            or secret_id not in self._http_extension_secret_dirty
+        ):
             return
         value = (field.value or "").strip()
-        if not value and secret_id not in self._http_extension_secret_dirty:
-            return
         self._http_extension_secret_dirty.discard(secret_id)
         result = self._on_secret_change(
             http_extension_secret_key(http_extension_id, secret_id),
