@@ -31,13 +31,13 @@ from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
 from puripuly_heart.app.wiring_provider_runtime import (
     ProviderRuntimeSignatures,
-    project_translation_runtime_settings,
+    project_translation_runtime_settings_from_vnext,
 )
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
 from puripuly_heart.app.wiring_stt_factory import (
-    build_peer_stt_runtime_signature,
-    build_self_capture_vad_signature,
-    build_self_stt_runtime_signature,
+    build_peer_stt_runtime_signature_from_vnext,
+    build_self_capture_vad_signature_from_vnext,
+    build_self_stt_runtime_signature_from_vnext,
 )
 from puripuly_heart.app.wiring_translation_runtime_configuration import (
     replace_translation_runtime_settings,
@@ -48,6 +48,7 @@ from puripuly_heart.config.settings import (
     LLMProviderName,
     TranslationModel,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigChange,
@@ -373,7 +374,9 @@ class SettingsRuntimeEffectsAdapter:
             )
             replace_translation_runtime_settings(
                 config_owner,
-                project_translation_runtime_settings(restored_settings),
+                project_translation_runtime_settings_from_vnext(
+                    self._canonical_settings(restored_settings)
+                ),
                 peer_translation_enabled=peer_enabled,
                 integrated_context_enabled=peer_enabled,
             )
@@ -436,7 +439,7 @@ class SettingsRuntimeEffectsAdapter:
             peer_enabled = self._peer.owner.effective_enabled(self._peer.state_for(settings))
             config_change = replace_translation_runtime_settings(
                 config_owner,
-                project_translation_runtime_settings(settings),
+                project_translation_runtime_settings_from_vnext(self._canonical_settings(settings)),
                 peer_translation_enabled=peer_enabled,
                 integrated_context_enabled=peer_enabled,
             )
@@ -482,11 +485,9 @@ class SettingsRuntimeEffectsAdapter:
             )
             await self._vrc_mic_sync.configure(enabled=settings.osc.vrc_mic_intercept)
 
-        current_self_signature = build_self_stt_runtime_signature(settings)
-        current_peer_signature = build_peer_stt_runtime_signature(
-            settings,
-            canonical_settings=self._canonical_settings(settings),
-        )
+        canonical = self._canonical_settings(settings)
+        current_self_signature = build_self_stt_runtime_signature_from_vnext(canonical)
+        current_peer_signature = build_peer_stt_runtime_signature_from_vnext(canonical)
         next_peer_activation_requested = self._peer.owner.activation_requested(
             intent_enabled=settings.ui.peer_translation_enabled,
             eula_accepted=settings.ui.peer_translation_eula_accepted,
@@ -520,8 +521,10 @@ class SettingsRuntimeEffectsAdapter:
         if should_restart_stt:
             smooth_local = bool(
                 transition.previous_settings is not None
-                and build_self_capture_vad_signature(transition.previous_settings)
-                == build_self_capture_vad_signature(settings)
+                and build_self_capture_vad_signature_from_vnext(
+                    self._canonical_settings(transition.previous_settings)
+                )
+                == build_self_capture_vad_signature_from_vnext(canonical)
             )
             await self._replace_self_stt(smooth_local)
 
@@ -581,7 +584,7 @@ class SettingsRuntimeEffectsAdapter:
             if strict_runtime_errors:
                 raise
 
-    def _canonical_settings(self, settings: AppSettings) -> object:
+    def _canonical_settings(self, settings: AppSettings) -> AppSettingsVNext:
         return self._settings.project(
             settings,
             authoritative=self._settings.authoritative,

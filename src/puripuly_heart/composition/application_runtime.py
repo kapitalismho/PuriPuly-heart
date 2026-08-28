@@ -136,12 +136,7 @@ from puripuly_heart.app.services.ui_application_state import UiApplicationStateO
 from puripuly_heart.app.wiring import (
     LocalASRProviderRuntimeFactory,
     ManagedSTTProviderFactory,
-    build_peer_capture_session_config,
     build_peer_stt_provider_request,
-    build_peer_stt_runtime_signature,
-    build_self_capture_session_config,
-    build_self_stt_provider_request,
-    build_self_stt_runtime_signature,
     create_local_asr_provisioning_owner,
     create_provider_verifier,
     create_secret_store,
@@ -154,6 +149,13 @@ from puripuly_heart.app.wiring.wiring_managed_gemma import (
     managed_gemma_selection,
     managed_gemma_translation_desired,
     sync_managed_gemma_demand,
+)
+from puripuly_heart.app.wiring.wiring_stt_factory import (
+    build_peer_capture_session_config_from_vnext,
+    build_peer_stt_runtime_signature_from_vnext,
+    build_self_capture_session_config_from_vnext,
+    build_self_stt_provider_request_from_vnext,
+    build_self_stt_runtime_signature_from_vnext,
 )
 from puripuly_heart.app.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
@@ -194,6 +196,7 @@ from puripuly_heart.app.wiring_runtime_pipeline import (
     RuntimePipelineComponents,
     RuntimePipelineHandle,
     RuntimePipelineLauncher,
+    runtime_pipeline_inputs_from_vnext,
 )
 from puripuly_heart.app.wiring_vrc_mic_sync import compose_vrc_mic_sync
 from puripuly_heart.composition.application_settings import load_application_settings
@@ -689,10 +692,8 @@ def compose_application_runtime(
                 persist_manual_fallback=lambda: (
                     require_settings_application().persist_manual_fallback(channel="peer")
                 ),
-                ensure_local_ready=lambda generation: (
-                    require_local_asr().ensure_peer_ready(
-                        activation_generation=generation,
-                    )
+                ensure_local_ready=lambda generation: require_local_asr().ensure_peer_ready(
+                    activation_generation=generation,
                 ),
                 clear_cpu_pending=lambda: require_local_asr().cpu_repair.reset_peer(),
                 clear_gpu_pending=lambda: require_gpu().clear_pending("peer"),
@@ -789,7 +790,7 @@ def compose_application_runtime(
                 ),
                 detailed_log_sink=log_detailed,
                 gpu_effect_sink=require_gpu().apply_diagnostics_effect,
-                gpu_discovery_origin_provider=lambda: (require_gpu().snapshot.discovery_origin),
+                gpu_discovery_origin_provider=lambda: require_gpu().snapshot.discovery_origin,
                 gpu_provider_id=STTProviderName.LOCAL_QWEN_GPU.value,
             )
         return local_asr_diagnostics
@@ -917,8 +918,8 @@ def compose_application_runtime(
             self_application = SelfCaptureApplicationOwner(
                 settings_provider=lambda: (
                     SelfCaptureApplicationSettings(
-                        config=build_self_capture_session_config(
-                            cast(AppSettings, current_settings())
+                        config=build_self_capture_session_config_from_vnext(
+                            canonical_settings(cast(AppSettings, current_settings()))
                         ),
                         provider_id=cast(
                             AppSettings,
@@ -1174,8 +1175,8 @@ def compose_application_runtime(
                 base.provider.stt.value in local_providers
                 or next_value.provider.stt.value in local_providers
             )
-            and build_self_stt_runtime_signature(base)
-            != build_self_stt_runtime_signature(next_value)
+            and build_self_stt_runtime_signature_from_vnext(canonical_settings(base))
+            != build_self_stt_runtime_signature_from_vnext(canonical_settings(next_value))
         )
         peer_changed = (
             (peer_runtime_desired(base) or peer_runtime_desired(next_value))
@@ -1183,14 +1184,8 @@ def compose_application_runtime(
                 base.provider.peer_stt.value in local_providers
                 or next_value.provider.peer_stt.value in local_providers
             )
-            and build_peer_stt_runtime_signature(
-                base,
-                canonical_settings=canonical_settings(base),
-            )
-            != build_peer_stt_runtime_signature(
-                next_value,
-                canonical_settings=canonical_settings(next_value),
-            )
+            and build_peer_stt_runtime_signature_from_vnext(canonical_settings(base))
+            != build_peer_stt_runtime_signature_from_vnext(canonical_settings(next_value))
         )
         return self_changed or peer_changed
 
@@ -1223,13 +1218,13 @@ def compose_application_runtime(
                     clear_local_pending=lambda: (
                         require_local_asr().cpu_repair.clear_if_provider_switched_away()
                     ),
-                    replace_self_stt=lambda smooth: (
-                        require_self_application().replace_provider(smooth_local=smooth)
+                    replace_self_stt=lambda smooth: require_self_application().replace_provider(
+                        smooth_local=smooth
                     ),
                     rebuild_managed_gemma=lambda: provider_runtime.llm_rebuild.rebuild(),
                 ),
                 manual_fallback=manual_fallback,
-                cpu_auto_available=lambda: (require_provisioning().snapshot.cpu_auto_available),
+                cpu_auto_available=lambda: require_provisioning().snapshot.cpu_auto_available,
                 inspect_cpu=require_provisioning().inspect_cpu,
                 fallback_sink=lambda channels, installation_fallback: (
                     show_short_message(
@@ -1313,20 +1308,16 @@ def compose_application_runtime(
                         low_latency=(FIXED_TRANSLATION_POLICY.fast_translation_enabled),
                     ),
                 ),
-                secret_store_factory=lambda value: (
-                    create_sync_secret_store_adapter(
-                        create_secret_store(
-                            value.secrets,
-                            config_path=config_path,
-                        )
-                    )
-                ),
-                active_secret_provider=lambda value, secret_key: (
+                secret_store_factory=lambda value: create_sync_secret_store_adapter(
                     create_secret_store(
                         value.secrets,
                         config_path=config_path,
-                    ).get(secret_key)
+                    )
                 ),
+                active_secret_provider=lambda value, secret_key: create_secret_store(
+                    value.secrets,
+                    config_path=config_path,
+                ).get(secret_key),
                 save_failure_sink=log_error,
                 results=require_settings_application().results,
             )
@@ -1342,15 +1333,13 @@ def compose_application_runtime(
                 ),
                 fallback_models=tuple(model.value for model in QwenLLMModel),
                 low_latency=(FIXED_TRANSLATION_POLICY.fast_translation_enabled),
-                diagnostics_sink=lambda event, metadata, exception: (
-                    log_detailed(
-                        "[ProviderVerification] Credential verification "
-                        f"failed event={event} "
-                        f"provider={metadata.get('provider')} "
-                        f"error_type={metadata.get('error_type')}",
-                        level=logging.WARNING,
-                        exception=exception,
-                    )
+                diagnostics_sink=lambda event, metadata, exception: log_detailed(
+                    "[ProviderVerification] Credential verification "
+                    f"failed event={event} "
+                    f"provider={metadata.get('provider')} "
+                    f"error_type={metadata.get('error_type')}",
+                    level=logging.WARNING,
+                    exception=exception,
                 ),
                 error_sink=lambda provider, error_text: log_error(
                     f"Verification error for {provider}: {error_text}"
@@ -1373,7 +1362,7 @@ def compose_application_runtime(
         metadata: Mapping[str, object],
     ) -> None:
         log_detailed(
-            "[Lifecycle][GithubStarPromptRuntime] " f"event={event} metadata={dict(metadata)}",
+            f"[Lifecycle][GithubStarPromptRuntime] event={event} metadata={dict(metadata)}",
             level=logging.WARNING,
         )
 
@@ -1421,12 +1410,10 @@ def compose_application_runtime(
                 presence_provider=lambda: vrchat_osc_presence,
                 port_provider=vrchat_probe_port,
                 publish_notice=presentation.set_dashboard_vrchat_osc_notice,
-                diagnostics_sink=lambda _event, _metadata, exception: (
-                    log_detailed(
-                        "[OSC] VRChat OSC presence probe failed",
-                        level=logging.WARNING,
-                        exception=exception,
-                    )
+                diagnostics_sink=lambda _event, _metadata, exception: log_detailed(
+                    "[OSC] VRChat OSC presence probe failed",
+                    level=logging.WARNING,
+                    exception=exception,
                 ),
             )
         return vrchat_presence
@@ -1483,13 +1470,14 @@ def compose_application_runtime(
                 pipeline.self_capture is not None and pipeline.self_capture.snapshot.desired_active
             ),
             peer_enabled=value.ui.peer_translation_enabled,
-            self_config_factory=lambda: build_self_capture_session_config(value),
-            peer_config_factory=lambda: build_peer_capture_session_config(
-                value,
-                canonical_settings=canonical_settings(value),
+            self_config_factory=lambda: build_self_capture_session_config_from_vnext(
+                canonical_settings(value)
             ),
-            self_request_factory=lambda: build_self_stt_provider_request(
-                value,
+            peer_config_factory=lambda: build_peer_capture_session_config_from_vnext(
+                canonical_settings(value)
+            ),
+            self_request_factory=lambda: build_self_stt_provider_request_from_vnext(
+                canonical_settings(value),
                 warmup=True,
             ),
             peer_request_factory=lambda config: build_peer_stt_provider_request(
@@ -1542,7 +1530,7 @@ def compose_application_runtime(
                     publish_notice=True,
                     origin=("manual_retry" if reason == "manual_retry" else "settings_apply"),
                 ),
-                runtime_state_sink=lambda snapshot: (require_gpu().observe_runtime(snapshot)),
+                runtime_state_sink=lambda snapshot: require_gpu().observe_runtime(snapshot),
                 quiesce=suspend_gpu_consumers,
                 self_owner_factory=(require_runtime_components().self_capture_owner),
                 peer_owner_provider=lambda: require_peer().owner.runtime,
@@ -1563,10 +1551,8 @@ def compose_application_runtime(
             validate_gpu_activation=validate_gpu_activation,
             effect_sink=(require_local_asr().adapters.effects.apply_self_admission),
         ),
-        ensure_peer_local_ready=lambda generation: (
-            require_local_asr().ensure_peer_ready(
-                activation_generation=generation,
-            )
+        ensure_peer_local_ready=lambda generation: require_local_asr().ensure_peer_ready(
+            activation_generation=generation,
         ),
         clock=clock,
         log_detailed=log_detailed,
@@ -1645,8 +1631,8 @@ def compose_application_runtime(
         sync_effective_flags=sync_effective_flags,
         refresh_overlay=refresh_overlay_presentation,
         refresh_peer_runtime=lambda: require_peer().owner.refresh_runtime(),
-        replace_self_stt=lambda smooth: (
-            require_self_application().replace_provider(smooth_local=smooth)
+        replace_self_stt=lambda smooth: require_self_application().replace_provider(
+            smooth_local=smooth
         ),
         self_state_sink=on_self_capture_state,
         self_availability=require_self_application().project_availability,
@@ -1760,7 +1746,7 @@ def compose_application_runtime(
         previous_self_capture=lambda: pipeline.self_capture,
         component_sink=install_pipeline,
         peer_application=lambda: require_peer().owner,
-        configure_vrc_mic=lambda *, enabled: (require_vrc_mic_sync().configure(enabled=enabled)),
+        configure_vrc_mic=lambda *, enabled: require_vrc_mic_sync().configure(enabled=enabled),
         stt_failure_sink=log_error,
         cleanup_failure_sink=lambda message, exc: log_error(f"{message}: {exc}"),
         managed_gemma=managed_gemma,
@@ -1996,7 +1982,11 @@ def compose_application_runtime(
         require_provisioning()
         sync_signature_caches(typed_settings)
         await pipeline_launcher.launch(
-            typed_settings,
+            runtime_pipeline_inputs_from_vnext(
+                canonical_settings(typed_settings),
+                peer_translation_enabled=typed_settings.ui.peer_translation_enabled,
+            ),
+            secrets=create_secret_store(typed_settings.secrets, config_path=config_path),
             vrc_mic_state=pipeline.vrc_mic_state,
             vrc_mic_audio_gate=pipeline.vrc_mic_audio_gate,
             receiver_active=require_vrc_mic_sync().receiver is not None,

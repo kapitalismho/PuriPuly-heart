@@ -13,7 +13,6 @@ from puripuly_heart.app.adapters.sync_secret_store import (
 from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
 from puripuly_heart.app.ports.secret_store import SecretStorePort
 from puripuly_heart.config.resolved import ResolvedLLMConfig
-from puripuly_heart.config.runtime_resolution import resolve_llm_config
 from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
@@ -43,7 +42,6 @@ from puripuly_heart.core.runtime.self_capture import (
 )
 from puripuly_heart.core.self_capture import SelfCaptureAdmissionPort
 from puripuly_heart.core.storage.secrets import SecretStore
-from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 from .wiring_composition import (
     create_microphone_test_capture_adapter,
@@ -62,7 +60,9 @@ from .wiring_composition import (
 )
 from .wiring_llm_factory import (
     MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR,
+    LlmFactoryResolvedExtras,
     _LazyFactoryLLMProvider,
+    create_llm_provider,
 )
 from .wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
@@ -101,9 +101,7 @@ from .wiring_stt_factory import (
     build_self_stt_provider_request,
     build_self_stt_provider_signature,
     build_self_stt_runtime_signature,
-    create_peer_stt_backend,
     create_peer_stt_backend_from_resolved_config,
-    create_stt_backend,
     create_stt_backend_from_resolved_config,
     resolve_peer_stt_config,
     resolve_peer_stt_runtime_config,
@@ -199,7 +197,7 @@ def create_llm_provider_from_resolved_config(
     managed_release_service: object | None = None,
     managed_delegate_ready: Callable[[], object] | None = None,
     runtime_logging: ProviderObservationPort | None = None,
-    compatibility_settings: _llm_factory.LlmCompatibilitySettings | None = None,
+    extras: LlmFactoryResolvedExtras | None = None,
     managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
     managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
     qwen_low_latency_mode: bool = True,
@@ -211,35 +209,10 @@ def create_llm_provider_from_resolved_config(
         managed_release_service=managed_release_service,
         managed_delegate_ready=managed_delegate_ready,
         runtime_logging=runtime_logging,
-        compatibility_settings=compatibility_settings,
+        extras=extras,
         managed_gemma_runtime=managed_gemma_runtime,
         managed_gemma_release=managed_gemma_release,
         qwen_low_latency_mode=qwen_low_latency_mode,
-    )
-
-
-def create_llm_provider(
-    settings: _llm_factory.LlmCompatibilitySettings,
-    *,
-    secrets: SecretStore,
-    managed_release_service: object | None = None,
-    managed_delegate_ready: Callable[[], object] | None = None,
-    runtime_logging: ProviderObservationPort | None = None,
-    managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
-    managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
-) -> LLMProvider:
-    runtime_input = _llm_factory._runtime_resolution_input_from_compatibility_settings(settings)
-    resolved = resolve_llm_config(runtime_input)
-    return create_llm_provider_from_resolved_config(
-        resolved,
-        secrets=secrets,
-        managed_release_service=managed_release_service,
-        managed_delegate_ready=managed_delegate_ready,
-        runtime_logging=runtime_logging,
-        compatibility_settings=settings,
-        managed_gemma_runtime=managed_gemma_runtime,
-        managed_gemma_release=managed_gemma_release,
-        qwen_low_latency_mode=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
     )
 
 
@@ -290,7 +263,6 @@ __all__ = (
     "create_peer_capture_target_resolver_adapter",
     "create_peer_capture_vad_adapter",
     "create_peer_capture_vad_sink_adapter",
-    "create_peer_stt_backend",
     "create_peer_stt_backend_from_resolved_config",
     "create_provider_verifier",
     "create_secret_store",
@@ -300,7 +272,6 @@ __all__ = (
     "create_self_capture_vad_adapter",
     "create_self_capture_vad_sink_adapter",
     "create_sync_secret_store_adapter",
-    "create_stt_backend",
     "create_stt_backend_from_resolved_config",
     "require_secret",
     "require_secret_any",

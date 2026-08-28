@@ -2,141 +2,63 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Protocol
 
-from puripuly_heart.config.provider_values import (
-    LLMProviderName,
-    OpenRouterCredentialSource,
-    STTProviderName,
-)
-from puripuly_heart.config.translation_values import (
-    TranslationConnection,
-    TranslationModel,
-)
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 
-
-class _TranslationFallbackView(Protocol):
-    enabled: bool
-    model: TranslationModel
-    connection: TranslationConnection
+_OPENROUTER_FALLBACK_CONNECTIONS = frozenset({"openrouter", "managed", "managed_china"})
+_MANAGED_OPENROUTER_CONNECTIONS = frozenset({"managed", "managed_china"})
+_MANAGED_GEMMA_MODELS = frozenset({"managed_gemma", "managed_gemma_12b"})
 
 
-class _TranslationView(Protocol):
-    model: TranslationModel
-    connection: TranslationConnection
-    http_extension_id: str | None
-    fallback: _TranslationFallbackView
-    gpu_device_id: str
-
-
-class _ProviderSelectionView(Protocol):
-    llm: LLMProviderName
-    stt: STTProviderName
-    peer_stt: STTProviderName
-
-
-class _OpenRouterView(Protocol):
-    llm_model: object
-    routing_mode: object
-    provider_routing: OpenRouterProviderRouting
-    selected_source: OpenRouterCredentialSource
-    selection_alias: object
-    broker_base_url: str
-
-
-class _ManagedIdentityView(Protocol):
-    installation_id: str
-    release_token: str | None
-    release_token_expires_at: str | None
-    verified_hardware_hash: str | None
-    verified_hardware_hash_salt_version: int | None
-    active_managed_credential_ref: str | None
-    active_managed_expires_at: str | None
-    referral_id: str | None
-
-
-class _ConcurrencyView(Protocol):
-    concurrency_limit: int
-
-
-class _NamedModelView(Protocol):
-    llm_model: object
-    region: object
-
-
-class _LocalLlmView(Protocol):
-    backend: object
-    base_url: str
-    model: str
-    extra_body: object
-
-
-class _LanguageView(Protocol):
-    source_language: str
-    target_language: str
-
-
-class _SttDeviceView(Protocol):
-    gpu_device_id: str
-
-
-class LlmProviderSignatureSettings(Protocol):
-    translation: _TranslationView
-    provider: _ProviderSelectionView
-    llm: _ConcurrencyView
-    gemini: _NamedModelView
-    openrouter: _OpenRouterView
-    qwen: _NamedModelView
-    deepseek: _NamedModelView
-    local_llm: _LocalLlmView
-    languages: _LanguageView
-    system_prompt: str
-    managed_identity: _ManagedIdentityView
-
-
-class SttGpuRestartSettings(Protocol):
-    stt: _SttDeviceView
-    provider: _ProviderSelectionView
+def provider_llm_for_translation(model: str, connection: str) -> str:
+    if model in _MANAGED_GEMMA_MODELS:
+        return "managed_gemma"
+    if model == "local_llm":
+        return "local_llm"
+    if model == "gemma4_31b_cerebras" or (model == "gemma4_31b" and connection == "cerebras"):
+        return "cerebras"
+    if model in {"gemini37_flash", "gemini31_flash_lite"}:
+        if connection == "openrouter":
+            return "openrouter"
+        return "gemini"
+    if model in {"deepseek_v4_flash", "deepseek_v4_pro"} and connection == "official_byok":
+        return "deepseek"
+    if model == "qwen35_plus":
+        return "qwen"
+    return "openrouter"
 
 
 def build_llm_provider_signature(
-    settings: LlmProviderSignatureSettings,
+    settings: AppSettingsVNext,
     *,
     http_extensions: HttpExtensionRegistry | None = None,
 ) -> tuple[object, ...]:
-    managed_gemma_selected = settings.translation.model in (
-        TranslationModel.MANAGED_GEMMA,
-        TranslationModel.MANAGED_GEMMA_12B,
-    )
-    primary_uses_openrouter = settings.provider.llm == LLMProviderName.OPENROUTER
+    translation = settings.intent.translation
+    local_llm = settings.intent.local_llm
+    languages = settings.intent.languages
+    provider_llm = provider_llm_for_translation(translation.model, translation.connection)
+    managed_gemma_selected = translation.model in _MANAGED_GEMMA_MODELS
+    primary_uses_openrouter = provider_llm == "openrouter"
     fallback_uses_openrouter = bool(
         not managed_gemma_selected
-        and settings.translation.fallback.enabled
-        and settings.translation.fallback.connection
-        in (
-            TranslationConnection.OPENROUTER,
-            TranslationConnection.MANAGED,
-            TranslationConnection.MANAGED_CHINA,
-        )
+        and translation.fallback.enabled
+        and translation.fallback.connection in _OPENROUTER_FALLBACK_CONNECTIONS
     )
     uses_openrouter = primary_uses_openrouter or fallback_uses_openrouter
     uses_managed_openrouter = bool(
-        (
-            primary_uses_openrouter
-            and settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-        )
+        (primary_uses_openrouter and translation.openrouter_selected_source == "managed")
         or (
             not managed_gemma_selected
-            and settings.translation.fallback.enabled
-            and settings.translation.fallback.connection
-            in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
+            and translation.fallback.enabled
+            and translation.fallback.connection in _MANAGED_OPENROUTER_CONNECTIONS
         )
     )
     extension_signature: tuple[object, ...] | None = None
-    if settings.translation.model == TranslationModel.CUSTOM_HTTP:
-        selected_id = settings.translation.http_extension_id
+    if translation.model == "custom_http":
+        selected_id = translation.http_extension_id
         selected = (
             http_extensions.snapshot.get(selected_id) if http_extensions is not None else None
         )
@@ -145,56 +67,52 @@ def build_llm_provider_signature(
             selected.fingerprint if selected is not None else None,
         )
     return (
-        settings.translation.model,
-        settings.translation.connection,
-        settings.translation.http_extension_id,
+        translation.model,
+        translation.connection,
+        translation.http_extension_id,
         extension_signature,
-        settings.provider.llm,
-        settings.llm.concurrency_limit,
-        settings.gemini.llm_model if settings.provider.llm == LLMProviderName.GEMINI else None,
-        settings.openrouter.llm_model if primary_uses_openrouter else None,
-        settings.openrouter.routing_mode if uses_openrouter else None,
+        provider_llm,
+        translation.concurrency_limit,
+        translation.gemini.llm_model if provider_llm == "gemini" else None,
+        translation.openrouter_model if primary_uses_openrouter else None,
+        translation.openrouter_routing_mode if uses_openrouter else None,
         (
-            settings.openrouter.provider_routing
+            translation.openrouter_provider_routing
             if uses_openrouter
-            else OpenRouterProviderRouting.DEFAULT
+            else OpenRouterProviderRouting.DEFAULT.value
         ),
-        settings.openrouter.selected_source if primary_uses_openrouter else None,
-        settings.openrouter.selection_alias if primary_uses_openrouter else None,
+        translation.openrouter_selected_source if primary_uses_openrouter else None,
+        translation.openrouter_selection_alias if primary_uses_openrouter else None,
         (
             (False, None, None)
             if managed_gemma_selected
             else (
-                settings.translation.fallback.enabled,
-                settings.translation.fallback.model,
-                settings.translation.fallback.connection,
+                translation.fallback.enabled,
+                translation.fallback.model,
+                translation.fallback.connection,
             )
         ),
-        settings.openrouter.broker_base_url if uses_openrouter else None,
+        translation.openrouter_broker_base_url if uses_openrouter else None,
         _managed_openrouter_identity_signature(settings) if uses_managed_openrouter else None,
-        settings.qwen.llm_model if settings.provider.llm == LLMProviderName.QWEN else None,
-        settings.qwen.region if settings.provider.llm == LLMProviderName.QWEN else None,
-        (
-            settings.deepseek.llm_model
-            if settings.provider.llm == LLMProviderName.DEEPSEEK
-            else None
-        ),
+        translation.qwen.llm_model if provider_llm == "qwen" else None,
+        translation.qwen.region if provider_llm == "qwen" else None,
+        translation.deepseek.llm_model if provider_llm == "deepseek" else None,
         (
             (
-                settings.local_llm.backend,
-                settings.local_llm.base_url,
-                settings.local_llm.model,
-                _canonical_json_signature(settings.local_llm.extra_body),
+                local_llm.backend,
+                local_llm.base_url,
+                local_llm.model,
+                _canonical_json_signature(local_llm.extra_body),
             )
-            if settings.provider.llm == LLMProviderName.LOCAL_LLM
+            if provider_llm == "local_llm"
             else None
         ),
         (
             (
-                settings.languages.source_language,
-                settings.languages.target_language,
-                settings.system_prompt,
-                settings.translation.gpu_device_id,
+                languages.source_language,
+                languages.target_language,
+                settings.intent.prompts.system_prompt,
+                translation.gpu_device_id,
             )
             if managed_gemma_selected
             else None
@@ -203,29 +121,16 @@ def build_llm_provider_signature(
 
 
 def provider_runtime_requires_gpu_restart(
-    current_settings: object,
-    next_settings: object,
+    current_settings: AppSettingsVNext,
+    next_settings: AppSettingsVNext,
 ) -> bool:
-    current = _as_stt_gpu_restart_settings(current_settings)
-    nxt = _as_stt_gpu_restart_settings(next_settings)
-    if current is None or nxt is None:
-        return False
-    return current.stt.gpu_device_id != nxt.stt.gpu_device_id and (
-        current.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-        or current.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
-        or nxt.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-        or nxt.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
+    gpu = STTProviderName.LOCAL_QWEN_GPU.value
+    return current_settings.intent.stt.gpu_device_id != next_settings.intent.stt.gpu_device_id and (
+        current_settings.intent.stt.provider == gpu
+        or current_settings.intent.peer_stt.provider == gpu
+        or next_settings.intent.stt.provider == gpu
+        or next_settings.intent.peer_stt.provider == gpu
     )
-
-
-def _as_stt_gpu_restart_settings(settings: object) -> SttGpuRestartSettings | None:
-    try:
-        stt = settings.stt
-        provider = settings.provider
-        _ = (stt.gpu_device_id, provider.stt, provider.peer_stt)
-    except AttributeError:
-        return None
-    return settings  # type: ignore[return-value]
 
 
 def _canonical_json_signature(value: object) -> str:
@@ -243,9 +148,9 @@ def _sensitive_optional_text_signature(value: str | None) -> tuple[int, str] | N
 
 
 def _managed_openrouter_identity_signature(
-    settings: LlmProviderSignatureSettings,
+    settings: AppSettingsVNext,
 ) -> tuple[object, ...]:
-    identity = settings.managed_identity
+    identity = settings.state.managed_connection
     return (
         identity.installation_id,
         _sensitive_optional_text_signature(identity.release_token),
@@ -259,8 +164,7 @@ def _managed_openrouter_identity_signature(
 
 
 __all__ = [
-    "LlmProviderSignatureSettings",
-    "SttGpuRestartSettings",
     "build_llm_provider_signature",
+    "provider_llm_for_translation",
     "provider_runtime_requires_gpu_restart",
 ]
