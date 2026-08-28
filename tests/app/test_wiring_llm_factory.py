@@ -18,6 +18,7 @@ from puripuly_heart.core.openrouter_credentials import (
 
 from puripuly_heart.app import wiring_llm_factory
 from puripuly_heart.app.wiring import create_llm_provider_from_resolved_config
+from puripuly_heart.app.wiring.wiring_llm_factory import llm_factory_extras_from_vnext
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_MANAGED,
     ResolvedCredentialRequirement,
@@ -32,6 +33,7 @@ from puripuly_heart.config.settings import (
     TranslationConnection,
     TranslationModel,
 )
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.providers.llm.managed_gemma import ManagedGemmaLLMProvider
@@ -150,7 +152,7 @@ def test_managed_china_direct_provider_uses_qq_managed_secret() -> None:
         _managed_china_resolved_config(),
         secrets=secrets,
         managed_release_service=object(),
-        compatibility_settings=settings,
+        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
@@ -168,7 +170,7 @@ def test_managed_china_direct_provider_survives_missing_active_managed_state() -
         _managed_china_resolved_config(),
         secrets=secrets,
         managed_release_service=object(),
-        compatibility_settings=settings,
+        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
@@ -186,7 +188,7 @@ def test_managed_china_blocks_opposite_discord_managed_secret() -> None:
             _managed_china_resolved_config(),
             secrets=secrets,
             managed_release_service=object(),
-            compatibility_settings=settings,
+            extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
         )
 
 
@@ -233,7 +235,7 @@ async def test_mixed_managed_fallback_rebuilds_release_service_for_fallback_kind
         config,
         secrets=secrets,
         managed_release_service=release_service,
-        compatibility_settings=settings,
+        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
     )
 
     primary_release = provider.inner.primary.release_service  # type: ignore[attr-defined]
@@ -258,7 +260,7 @@ async def test_standard_lazy_managed_provider_blocks_qq_claim_before_release_ens
         _standard_managed_resolved_config(),
         secrets=InMemorySecretStore(),
         managed_release_service=release_service,
-        compatibility_settings=settings,
+        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
     )
 
     result = await provider.inner.release_service.ensure_key_for_llm_start()  # type: ignore[attr-defined]
@@ -280,7 +282,7 @@ async def test_standard_lazy_managed_provider_records_discord_claim_after_releas
         _standard_managed_resolved_config(),
         secrets=InMemorySecretStore(),
         managed_release_service=release_service,
-        compatibility_settings=settings,
+        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
     )
 
     result = await provider.inner.release_service.ensure_key_for_llm_start()  # type: ignore[attr-defined]
