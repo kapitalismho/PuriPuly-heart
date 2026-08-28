@@ -16,6 +16,12 @@ from experiments.psem_frozen_ceiling_gate.evaluate_ceiling import (
     aggregate_conditions,
     session_row,
 )
+from experiments.psem_frozen_ceiling_gate.experiment_support import (
+    canonical_sha256,
+    load_json,
+    sha256_file,
+    write_json,
+)
 from experiments.psem_frozen_ceiling_gate.posterior_features import (
     TemporalContract,
     temporal_features,
@@ -30,14 +36,10 @@ from experiments.psem_frozen_ceiling_gate.run_posterior_probe import (
     sigmoid,
     training_data,
 )
-from experiments.psem_relative_occupancy_gate.io_utils import (
-    canonical_sha256,
-    load_json,
-    sha256_file,
-    write_json,
-)
 
 REPRESENTATION_RECEIPT_PATH = PACKAGE_ROOT / "hidden_representation_receipt.json"
+HIDDEN_TRIGGER_PATH = PACKAGE_ROOT / "hidden_trigger_revalidation.json"
+HIDDEN_EXTRACTION_COMPATIBILITY_PATH = PACKAGE_ROOT / "hidden_extraction_compatibility.json"
 HIDDEN_CONFIG_PATH = PACKAGE_ROOT / "hidden_config.json"
 HIDDEN_TRAINING_CONFIG_PATH = PACKAGE_ROOT / "hidden_training_config.json"
 EXTRACTION_RECEIPT_PATH = RESULTS_ROOT / "hidden_extraction_receipt.json"
@@ -50,16 +52,41 @@ EXTRACTOR_PATH = PACKAGE_ROOT / "extract_hidden_features.py"
 
 def _extracted_sources() -> dict[str, dict[str, Any]]:
     extraction = load_json(EXTRACTION_RECEIPT_PATH)
+    compatibility = load_json(HIDDEN_EXTRACTION_COMPATIBILITY_PATH)
     representation = load_json(REPRESENTATION_RECEIPT_PATH)
     split = load_json(SPLIT_PATH)
     expected_sources = {str(value["source_id"]) for value in split["sources"]}
+    expected_compatibility = {
+        "schema_version": "psem.hidden_ceiling.extraction_compatibility.v1",
+        "status": "compatible_existing_features",
+        "extraction_receipt_sha256": sha256_file(EXTRACTION_RECEIPT_PATH),
+        "original_extractor_sha256": extraction.get("extractor_sha256"),
+        "current_extractor_sha256": sha256_file(EXTRACTOR_PATH),
+        "representation_receipt_sha256": sha256_file(REPRESENTATION_RECEIPT_PATH),
+        "source_count": len(expected_sources),
+    }
+    if any(compatibility.get(key) != value for key, value in expected_compatibility.items()):
+        raise ValueError("hidden extraction compatibility boundary differs")
+    if compatibility.get("posterior_equivalence") != {
+        "status": "equivalent",
+        "maximum_absolute_error": 0.0,
+    }:
+        raise ValueError("hidden extraction compatibility equivalence differs")
+    for role in ("dev", "eval"):
+        receipt = compatibility.get("authoritative_receipts", {}).get(role, {})
+        if receipt.get(
+            "path"
+        ) != f"frozen_inputs/{role}_sortformer_model_receipt.json" or sha256_file(
+            PACKAGE_ROOT / str(receipt.get("path", ""))
+        ) != receipt.get("sha256"):
+            raise ValueError(f"hidden authoritative receipt differs: {role}")
     expected_top_level = {
         "schema_version": "psem.hidden_ceiling.extraction_receipt.v1",
         "status": "complete",
         "representation_receipt_sha256": sha256_file(REPRESENTATION_RECEIPT_PATH),
         "hidden_config_sha256": sha256_file(HIDDEN_CONFIG_PATH),
         "split_manifest_sha256": sha256_file(SPLIT_PATH),
-        "extractor_sha256": sha256_file(EXTRACTOR_PATH),
+        "extractor_sha256": compatibility["original_extractor_sha256"],
         "instrumented_bench_sha256": representation["runtime"]["instrumented_bench_sha256"],
         "model_sha256": representation["runtime"]["model_sha256"],
         "hidden_export_patch_sha256": representation["runtime"]["hidden_export_patch_sha256"],
@@ -256,18 +283,26 @@ def _fit_hidden_mlp(
             ) and sanity["duration_weighted_accuracy"] >= float(
                 hidden_cfg["train_fit_min_accuracy"]
             ):
-                return probe, sanity, {
-                    "optimizer": "adam",
-                    "completed_epochs": epoch,
-                    "maximum_epochs": max_epochs,
-                    "status": "sanity_reached",
-                }
-    return probe, sanity, {
-        "optimizer": "adam",
-        "completed_epochs": max_epochs,
-        "maximum_epochs": max_epochs,
-        "status": "maximum_epochs_reached",
-    }
+                return (
+                    probe,
+                    sanity,
+                    {
+                        "optimizer": "adam",
+                        "completed_epochs": epoch,
+                        "maximum_epochs": max_epochs,
+                        "status": "sanity_reached",
+                    },
+                )
+    return (
+        probe,
+        sanity,
+        {
+            "optimizer": "adam",
+            "completed_epochs": max_epochs,
+            "maximum_epochs": max_epochs,
+            "status": "maximum_epochs_reached",
+        },
+    )
 
 
 def run() -> dict[str, Any]:
@@ -299,7 +334,9 @@ def run() -> dict[str, Any]:
         "hidden_training_config_sha256": sha256_file(HIDDEN_TRAINING_CONFIG_PATH),
         "split_manifest_sha256": sha256_file(split_path),
         "hidden_representation_receipt_sha256": sha256_file(REPRESENTATION_RECEIPT_PATH),
+        "hidden_trigger_revalidation_sha256": sha256_file(HIDDEN_TRIGGER_PATH),
         "hidden_extraction_receipt_sha256": sha256_file(EXTRACTION_RECEIPT_PATH),
+        "hidden_extraction_compatibility_sha256": sha256_file(HIDDEN_EXTRACTION_COMPATIBILITY_PATH),
         "oracle_mapping_ledger_sha256": sha256_file(MAPPING_PATH),
         "action_reference_ledger_sha256": sha256_file(ACTION_REFERENCE_PATH),
     }

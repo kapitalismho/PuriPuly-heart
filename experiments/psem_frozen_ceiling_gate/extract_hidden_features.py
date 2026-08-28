@@ -10,7 +10,7 @@ import numpy as np
 
 from experiments.psem_frozen_ceiling_gate.build_ceiling_examples import PACKAGE_ROOT
 from experiments.psem_frozen_ceiling_gate.evaluate_ceiling import RESULTS_ROOT
-from experiments.psem_relative_occupancy_gate.io_utils import (
+from experiments.psem_frozen_ceiling_gate.experiment_support import (
     canonical_sha256,
     load_json,
     path_has_alias,
@@ -112,14 +112,7 @@ def _runtime_environment(
 def _authoritative_sources() -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
     for role in ("dev", "eval"):
-        path = (
-            REPOSITORY_ROOT
-            / "experiments"
-            / "psem_relative_occupancy_gate"
-            / "results"
-            / role
-            / "sortformer_model_receipt.json"
-        )
+        path = PACKAGE_ROOT / "frozen_inputs" / f"{role}_sortformer_model_receipt.json"
         receipt = load_json(path)
         for source in receipt["source_receipts"]:
             source_id = str(source["source_id"])

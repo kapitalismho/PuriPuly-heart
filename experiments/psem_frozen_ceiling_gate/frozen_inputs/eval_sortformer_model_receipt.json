@@ -1,0 +1,3261 @@
+{
+  "backend": "vulkan",
+  "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+  "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+  "chunk_audio_ms": 480,
+  "eval_access_receipt_sha256": "4f8dca664ce9ad216f58a8069b448c522098d38b8f0b6b381634260ae7f3cbeb",
+  "eval_selection_sha256": "f181563ec55908570487f50817c1dfff47b3678af35b590e70b394282bb5d489",
+  "eval_status": "opened_once",
+  "family": "streaming_sortformer",
+  "model_filename": "diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+  "model_repository": "handy-computer/diar_streaming_sortformer_4spk-v2.1-gguf",
+  "model_revision": "7ef0c15dc8f9d717e9d24fac29a6e6551e9c6ddf",
+  "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+  "native_frame_ms": 80,
+  "preset": "low_latency",
+  "recorded_algorithmic_lookahead_ms": 1040,
+  "role": "PSEM-STRATEGY-EVAL",
+  "schema_version": "psem.relative_occupancy.model_receipt.v1",
+  "slot_count": 4,
+  "slot_validity_metadata": false,
+  "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+  "source_count": 19,
+  "source_ids": [
+    "alimeeting_R0004_M0012",
+    "alimeeting_R1019_M1960",
+    "alimeeting_R1021_M1940",
+    "alimeeting_R1021_M1944",
+    "alimeeting_R1021_M4080",
+    "alimeeting_R2105_M3318",
+    "alimeeting_R2108_M3206",
+    "alimeeting_R8009_M8018",
+    "ami_EN2004a",
+    "ami_EN2006a",
+    "ami_ES2014a",
+    "ami_IS1007a",
+    "ami_IS1007b",
+    "ami_IS1007c",
+    "ami_IS1007d",
+    "ami_TS3010a",
+    "ami_TS3010b",
+    "ami_TS3010c",
+    "ami_TS3010d"
+  ],
+  "source_receipts": [
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 24630,
+          "native_mel_frame_count": 197040,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R0004_M0012\\input.wav",
+          "retained_frame_count": 24621,
+          "sample_count": 31526400,
+          "sha256": "0b49f60e28666362496acb014819ad24e6a3d8521eed900fc3acd37aeddb9c51",
+          "size_bytes": 63052844,
+          "source_end_sample": 31514608,
+          "source_mel_frame_count": 196967,
+          "source_sample_count": 31514608,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 11792
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 270.263,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 101289.102,
+              "mel_ms": 0.0,
+              "total_ms": 101289.102,
+              "wall_ms": 103521.708
+            }
+          ],
+          "rtf_compute_mean": 19.453,
+          "rtf_wall_mean": 19.034,
+          "sample_duration_s": 1970.4,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R0004_M0012\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 101289.102,
+              "mean": 101289.102,
+              "min": 101289.102
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 101289.102,
+              "mean": 101289.102,
+              "min": 101289.102
+            },
+            "wall_ms": {
+              "max": 103521.708,
+              "mean": 103521.708,
+              "min": 103521.708
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R0004_M0012\\run\\bench.json",
+        "bench_sha256": "6febb18411a7b226506e86cba8a85f18ed360316ec0949e2af69c3a6edd9793c",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R0004_M0012\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R0004_M0012\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R0004_M0012\\run\\run.log",
+        "log_sha256": "9e089f552b7e3e2c810f870176b3b7c88ec3919484f59572eaeb15da4a4350af",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 103.92784979999851,
+        "raw_probability_frame_count": 24630,
+        "retained_probability_frame_count": 24621
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 24630,
+        "native_mel_frame_count": 197040,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R0004_M0012\\input.wav",
+        "retained_frame_count": 24621,
+        "sample_count": 31526400,
+        "sha256": "0b49f60e28666362496acb014819ad24e6a3d8521eed900fc3acd37aeddb9c51",
+        "size_bytes": 63052844,
+        "source_end_sample": 31514608,
+        "source_mel_frame_count": 196967,
+        "source_sample_count": 31514608,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 11792
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "a1b2fba26c92016d41acc01d2d7b15071ce70b86e7855729a02a4613ef5e3ec1",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 31514608,
+      "source_id": "alimeeting_R0004_M0012",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 59.654,
+          "p50": 24.377,
+          "p90": 26.0224,
+          "p99": 27.524600000000003,
+          "sum": 100502.666
+        },
+        "chunk_count": 4105,
+        "compression_call_count": 169,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R0004_M0012\\run\\telemetry.jsonl",
+        "sha256": "fdc4e7f16ff673894270930ff51d0ed81cefdbff41923baf2bb12dba905278c8"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 24621,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "alimeeting_R0004_M0012",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R0004_M0012\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "03165eda2f0ff869c8870e86a0adaabab1167172601b2f49f5828ab644553188",
+        "trace_size_bytes": 388091
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\alimeeting\\far_ch0\\R0004_M0012.wav",
+      "waveform_sha256": "23e93504d0f1b154e6401ef9fda74a984b4febe55ca2f01f238117d294d1cfd1",
+      "waveform_size_bytes": 63029260
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 22422,
+          "native_mel_frame_count": 179376,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1019_M1960\\input.wav",
+          "retained_frame_count": 22412,
+          "sample_count": 28700160,
+          "sha256": "638b8baf8fe7fe2312718e74b333fb0077dcb69616c0040278b03968f9904a84",
+          "size_bytes": 57400364,
+          "source_end_sample": 28686122,
+          "source_mel_frame_count": 179289,
+          "source_sample_count": 28686122,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 14038
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 141.456,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 85527.867,
+              "mel_ms": 0.0,
+              "total_ms": 85527.867,
+              "wall_ms": 87655.633
+            }
+          ],
+          "rtf_compute_mean": 20.973,
+          "rtf_wall_mean": 20.464,
+          "sample_duration_s": 1793.76,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1019_M1960\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 85527.867,
+              "mean": 85527.867,
+              "min": 85527.867
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 85527.867,
+              "mean": 85527.867,
+              "min": 85527.867
+            },
+            "wall_ms": {
+              "max": 87655.633,
+              "mean": 87655.633,
+              "min": 87655.633
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1019_M1960\\run\\bench.json",
+        "bench_sha256": "be77775cafbd96128e1eae1409f05a45cd9675effe0e238bc2d1b926bb4db274",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1019_M1960\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1019_M1960\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1019_M1960\\run\\run.log",
+        "log_sha256": "d622857fe6bc08eeed89d4a117fafeb97a785eeed7e6cb1f7ff3c00071271844",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 87.90733069999987,
+        "raw_probability_frame_count": 22422,
+        "retained_probability_frame_count": 22412
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 22422,
+        "native_mel_frame_count": 179376,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1019_M1960\\input.wav",
+        "retained_frame_count": 22412,
+        "sample_count": 28700160,
+        "sha256": "638b8baf8fe7fe2312718e74b333fb0077dcb69616c0040278b03968f9904a84",
+        "size_bytes": 57400364,
+        "source_end_sample": 28686122,
+        "source_mel_frame_count": 179289,
+        "source_sample_count": 28686122,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 14038
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "6fc46d9434d03cef30521b727181f4a8dfea8a9cf168cf0c1e4f105f2edf2741",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 28686122,
+      "source_id": "alimeeting_R1019_M1960",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 38.419,
+          "p50": 22.686,
+          "p90": 24.5494,
+          "p99": 26.27452,
+          "sum": 84831.108
+        },
+        "chunk_count": 3737,
+        "compression_call_count": 154,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1019_M1960\\run\\telemetry.jsonl",
+        "sha256": "7acad74201e3d4907398ca119189592257643f88f044bc53f9d65e40d260d694"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 22412,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "alimeeting_R1019_M1960",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1019_M1960\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "d5cfc2e2dc4ab6abd2b82891604dd12d4976bbed4f5add279bfc0e64612e52dc",
+        "trace_size_bytes": 305581
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\alimeeting\\far_ch0\\R1019_M1960.wav",
+      "waveform_sha256": "a842b222d0fda40bfaff7e636103c22cc7b87c9a2bea6124fa1d4ab2cd38a565",
+      "waveform_size_bytes": 57372288
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 22140,
+          "native_mel_frame_count": 177120,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1940\\input.wav",
+          "retained_frame_count": 22133,
+          "sample_count": 28339200,
+          "sha256": "a6d2ac8bb5583130c3ee06c826891dcbd6fdaf84094fef8271b57ce99eab6274",
+          "size_bytes": 56678444,
+          "source_end_sample": 28329539,
+          "source_mel_frame_count": 177060,
+          "source_sample_count": 28329539,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 9661
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 141.583,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 82521.664,
+              "mel_ms": 0.0,
+              "total_ms": 82521.664,
+              "wall_ms": 84450.697
+            }
+          ],
+          "rtf_compute_mean": 21.463,
+          "rtf_wall_mean": 20.973,
+          "sample_duration_s": 1771.2,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1940\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 82521.664,
+              "mean": 82521.664,
+              "min": 82521.664
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 82521.664,
+              "mean": 82521.664,
+              "min": 82521.664
+            },
+            "wall_ms": {
+              "max": 84450.697,
+              "mean": 84450.697,
+              "min": 84450.697
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1940\\run\\bench.json",
+        "bench_sha256": "b236ba227e56baebf7cb0222a131f687ba2b59e6e6dddbf2a5eece4421bb8d86",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1940\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1940\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1940\\run\\run.log",
+        "log_sha256": "9d5c5c48559c5dd9cd26d4dc29c8cfc80f80cdec1861d5bb646d2ab8fe758488",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 84.70065489999979,
+        "raw_probability_frame_count": 22140,
+        "retained_probability_frame_count": 22133
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 22140,
+        "native_mel_frame_count": 177120,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1940\\input.wav",
+        "retained_frame_count": 22133,
+        "sample_count": 28339200,
+        "sha256": "a6d2ac8bb5583130c3ee06c826891dcbd6fdaf84094fef8271b57ce99eab6274",
+        "size_bytes": 56678444,
+        "source_end_sample": 28329539,
+        "source_mel_frame_count": 177060,
+        "source_sample_count": 28329539,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 9661
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "00572f9974f0e5d76e61a05f120d4d327d7e8192cfb89a22ed5cdf338d31f92f",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 28329539,
+      "source_id": "alimeeting_R1021_M1940",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 31.957,
+          "p50": 22.058,
+          "p90": 23.7731,
+          "p99": 25.354520000000004,
+          "sum": 81854.719
+        },
+        "chunk_count": 3690,
+        "compression_call_count": 152,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1940\\run\\telemetry.jsonl",
+        "sha256": "66fd36969c92f24962f65999ba2f4fe2af29d466210810aa7a017c69890c448f"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 22133,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "alimeeting_R1021_M1940",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1940\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "f6798b0a350379a4c91c571705bb7a41177849677582c50b6a8077fd2f3b4874",
+        "trace_size_bytes": 317337
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\alimeeting\\far_ch0\\R1021_M1940.wav",
+      "waveform_sha256": "a70684449b1156585f4da76c8cdf69abced0cdb37f7a7d54aba894d5aa784f69",
+      "waveform_size_bytes": 56659122
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 21972,
+          "native_mel_frame_count": 175776,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1944\\input.wav",
+          "retained_frame_count": 21965,
+          "sample_count": 28124160,
+          "sha256": "cd16a16061eebf26d1dca91ce268580df10a1b2243bbe54b74eb7974f56694af",
+          "size_bytes": 56248364,
+          "source_end_sample": 28113929,
+          "source_mel_frame_count": 175713,
+          "source_sample_count": 28113929,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 10231
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 134.609,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 81851.656,
+              "mel_ms": 0.0,
+              "total_ms": 81851.656,
+              "wall_ms": 83756.96
+            }
+          ],
+          "rtf_compute_mean": 21.475,
+          "rtf_wall_mean": 20.986,
+          "sample_duration_s": 1757.76,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1944\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 81851.656,
+              "mean": 81851.656,
+              "min": 81851.656
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 81851.656,
+              "mean": 81851.656,
+              "min": 81851.656
+            },
+            "wall_ms": {
+              "max": 83756.96,
+              "mean": 83756.96,
+              "min": 83756.96
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1944\\run\\bench.json",
+        "bench_sha256": "188cd5eaad3146d8e6755710761cae3a68e11f883784c3a0d1b72b147b11321f",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1944\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1944\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1944\\run\\run.log",
+        "log_sha256": "85777ae40657c99d191242981eccc9f4536e1a0c19e633327aeac5d39daa78c6",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 84.00249449999683,
+        "raw_probability_frame_count": 21972,
+        "retained_probability_frame_count": 21965
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 21972,
+        "native_mel_frame_count": 175776,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1944\\input.wav",
+        "retained_frame_count": 21965,
+        "sample_count": 28124160,
+        "sha256": "cd16a16061eebf26d1dca91ce268580df10a1b2243bbe54b74eb7974f56694af",
+        "size_bytes": 56248364,
+        "source_end_sample": 28113929,
+        "source_mel_frame_count": 175713,
+        "source_sample_count": 28113929,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 10231
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "ae8e04269ea330eccdc50f673f3bae029699255a40c13b1cc0a5815101158245",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 28113929,
+      "source_id": "alimeeting_R1021_M1944",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 45.308,
+          "p50": 22.022,
+          "p90": 23.7979,
+          "p99": 25.74973,
+          "sum": 81177.411
+        },
+        "chunk_count": 3662,
+        "compression_call_count": 151,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1944\\run\\telemetry.jsonl",
+        "sha256": "f363a55f0020efbc9488c8ba5fc3bbbf41f7804356f67396d6184c1ab6d86ae2"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 21965,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "alimeeting_R1021_M1944",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M1944\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "010d3001dd8db3cb1b2d5e7f7cd0aab2e1339a505772cd0c620a6cf75a7e922f",
+        "trace_size_bytes": 314592
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\alimeeting\\far_ch0\\R1021_M1944.wav",
+      "waveform_sha256": "c96b364c2f0e6ee10824c5991b2c783787a266f3be0bf1d93f9540a9f0023037",
+      "waveform_size_bytes": 56227902
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 22224,
+          "native_mel_frame_count": 177792,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M4080\\input.wav",
+          "retained_frame_count": 22215,
+          "sample_count": 28446720,
+          "sha256": "e3714d661f873e1345ed390716c2df5aebe240e5b59aa0f031a36bb0de4de42e",
+          "size_bytes": 56893484,
+          "source_end_sample": 28435200,
+          "source_mel_frame_count": 177720,
+          "source_sample_count": 28435200,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 11520
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 135.078,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 84427.734,
+              "mel_ms": 0.0,
+              "total_ms": 84427.734,
+              "wall_ms": 86419.139
+            }
+          ],
+          "rtf_compute_mean": 21.058,
+          "rtf_wall_mean": 20.573,
+          "sample_duration_s": 1777.92,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M4080\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 84427.734,
+              "mean": 84427.734,
+              "min": 84427.734
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 84427.734,
+              "mean": 84427.734,
+              "min": 84427.734
+            },
+            "wall_ms": {
+              "max": 86419.139,
+              "mean": 86419.139,
+              "min": 86419.139
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M4080\\run\\bench.json",
+        "bench_sha256": "7d6b894ba28ad7097b7d6eb49ec90643b39a06598dbe16c50c2ab371ec54da0a",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M4080\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M4080\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M4080\\run\\run.log",
+        "log_sha256": "a8e7cd5bbe2cfa712d8dad5fcf96f8198f6cc49c4b4afce41244cfab6812f156",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 86.66645289999724,
+        "raw_probability_frame_count": 22224,
+        "retained_probability_frame_count": 22215
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 22224,
+        "native_mel_frame_count": 177792,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M4080\\input.wav",
+        "retained_frame_count": 22215,
+        "sample_count": 28446720,
+        "sha256": "e3714d661f873e1345ed390716c2df5aebe240e5b59aa0f031a36bb0de4de42e",
+        "size_bytes": 56893484,
+        "source_end_sample": 28435200,
+        "source_mel_frame_count": 177720,
+        "source_sample_count": 28435200,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 11520
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "70a750b139acdd9805e9ea9b24c790ee7405d197c2d9c88058c35604f771ef56",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 28435200,
+      "source_id": "alimeeting_R1021_M4080",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 55.618,
+          "p50": 22.5335,
+          "p90": 24.2747,
+          "p99": 25.94,
+          "sum": 83747.064
+        },
+        "chunk_count": 3704,
+        "compression_call_count": 153,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M4080\\run\\telemetry.jsonl",
+        "sha256": "dcba478c50fb94b0a49002df5bd7a2c05c8072dbb945d19a17b8066e8f8f716a"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 22215,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "alimeeting_R1021_M4080",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R1021_M4080\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "9b24df51ff351b97db1ecbded216396f94611b7597688644eb091858bf30e3b0",
+        "trace_size_bytes": 298652
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\alimeeting\\far_ch0\\R1021_M4080.wav",
+      "waveform_sha256": "d61134736b67d96567e772a62ca8bc8f022b8fc3e6dfd2d30ea978317c64a88c",
+      "waveform_size_bytes": 56870444
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 23130,
+          "native_mel_frame_count": 185040,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2105_M3318\\input.wav",
+          "retained_frame_count": 23119,
+          "sample_count": 29606400,
+          "sha256": "c093dbda98bbbd4b6dfe4fa1c1f10cb7286a0a527d0f507370b5b8e2e1eb4a29",
+          "size_bytes": 59212844,
+          "source_end_sample": 29591138,
+          "source_mel_frame_count": 184945,
+          "source_sample_count": 29591138,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 15262
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 136.121,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 84774.625,
+              "mel_ms": 0.0,
+              "total_ms": 84774.625,
+              "wall_ms": 86789.871
+            }
+          ],
+          "rtf_compute_mean": 21.827,
+          "rtf_wall_mean": 21.32,
+          "sample_duration_s": 1850.4,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2105_M3318\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 84774.625,
+              "mean": 84774.625,
+              "min": 84774.625
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 84774.625,
+              "mean": 84774.625,
+              "min": 84774.625
+            },
+            "wall_ms": {
+              "max": 86789.871,
+              "mean": 86789.871,
+              "min": 86789.871
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2105_M3318\\run\\bench.json",
+        "bench_sha256": "0f46603107956ee3a732f7ca020e06c50d4f3a1ccf669ad3c632dc57baf085d8",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2105_M3318\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2105_M3318\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2105_M3318\\run\\run.log",
+        "log_sha256": "f82eaf5900b84eef274339f4f41937f5ad3e9ca2945ff7e253a197989d970af6",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 87.0398337000006,
+        "raw_probability_frame_count": 23130,
+        "retained_probability_frame_count": 23119
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 23130,
+        "native_mel_frame_count": 185040,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2105_M3318\\input.wav",
+        "retained_frame_count": 23119,
+        "sample_count": 29606400,
+        "sha256": "c093dbda98bbbd4b6dfe4fa1c1f10cb7286a0a527d0f507370b5b8e2e1eb4a29",
+        "size_bytes": 59212844,
+        "source_end_sample": 29591138,
+        "source_mel_frame_count": 184945,
+        "source_sample_count": 29591138,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 15262
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "f53605574dbd765adece7dd7c9baa28833169c507076864f24c58f19becec80b",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 29591138,
+      "source_id": "alimeeting_R2105_M3318",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 30.905,
+          "p50": 21.624,
+          "p90": 23.574,
+          "p99": 25.250760000000003,
+          "sum": 84074.819
+        },
+        "chunk_count": 3855,
+        "compression_call_count": 159,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2105_M3318\\run\\telemetry.jsonl",
+        "sha256": "1cc4795e40eaf6a4f6939a5253b99a49397a236454556dc4cdc60549b9f093a6"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 23119,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "alimeeting_R2105_M3318",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2105_M3318\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "c198eb6913d290f83dbb8103bdd19d9e634959a99ec802873c57b72da5fb4c68",
+        "trace_size_bytes": 349190
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\alimeeting\\far_ch0\\R2105_M3318.wav",
+      "waveform_sha256": "4f829675f5bebfdcdfaa262e0352f9774a3a82125cba0a1261571516260975fe",
+      "waveform_size_bytes": 59182320
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 22434,
+          "native_mel_frame_count": 179472,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2108_M3206\\input.wav",
+          "retained_frame_count": 22423,
+          "sample_count": 28715520,
+          "sha256": "5709d791428c2ccab4645dac550fff31e88176a923b867668a6b47f33d4d6db2",
+          "size_bytes": 57431084,
+          "source_end_sample": 28700403,
+          "source_mel_frame_count": 179378,
+          "source_sample_count": 28700403,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 15117
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 132.681,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 83270.461,
+              "mel_ms": 0.0,
+              "total_ms": 83270.461,
+              "wall_ms": 85228.016
+            }
+          ],
+          "rtf_compute_mean": 21.553,
+          "rtf_wall_mean": 21.058,
+          "sample_duration_s": 1794.72,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2108_M3206\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 83270.461,
+              "mean": 83270.461,
+              "min": 83270.461
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 83270.461,
+              "mean": 83270.461,
+              "min": 83270.461
+            },
+            "wall_ms": {
+              "max": 85228.016,
+              "mean": 85228.016,
+              "min": 85228.016
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2108_M3206\\run\\bench.json",
+        "bench_sha256": "d4199c96be9483859491149fa043d526c44ddce2a93ce769869fd0b9951b320d",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2108_M3206\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2108_M3206\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2108_M3206\\run\\run.log",
+        "log_sha256": "c4a44e88c0818bb39501ca259ab89de37d5e1923c92dd6c189d59d8acb68d378",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 85.47337079999852,
+        "raw_probability_frame_count": 22434,
+        "retained_probability_frame_count": 22423
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 22434,
+        "native_mel_frame_count": 179472,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2108_M3206\\input.wav",
+        "retained_frame_count": 22423,
+        "sample_count": 28715520,
+        "sha256": "5709d791428c2ccab4645dac550fff31e88176a923b867668a6b47f33d4d6db2",
+        "size_bytes": 57431084,
+        "source_end_sample": 28700403,
+        "source_mel_frame_count": 179378,
+        "source_sample_count": 28700403,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 15117
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "d7b54a79eb94a7630d948904c4f463cfa9ac1859b524fb345fce014cb6fdcc0e",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 28700403,
+      "source_id": "alimeeting_R2108_M3206",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 36.535,
+          "p50": 21.879,
+          "p90": 23.912,
+          "p99": 25.7472,
+          "sum": 82587.076
+        },
+        "chunk_count": 3739,
+        "compression_call_count": 154,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2108_M3206\\run\\telemetry.jsonl",
+        "sha256": "1246422910d5ca2dd11fe3aaa7b6e6daf272be62b67f483b899042e3d71df428"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 22423,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "alimeeting_R2108_M3206",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R2108_M3206\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "ec8cd5f4ce9bd33332526d4f2263feadfcb52aa3c0fb482f6565cce147b2839a",
+        "trace_size_bytes": 329831
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\alimeeting\\far_ch0\\R2108_M3206.wav",
+      "waveform_sha256": "d560c607ce9408fec72dd7c758ce844eb2674b19b7020e83e5e10ac6dc16232c",
+      "waveform_size_bytes": 57400850
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 20694,
+          "native_mel_frame_count": 165552,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R8009_M8018\\input.wav",
+          "retained_frame_count": 20684,
+          "sample_count": 26488320,
+          "sha256": "0ff78e2eb3dbddd6e6007d57697835f199f3ac6514e4807adcd88e3cd96baa76",
+          "size_bytes": 52976684,
+          "source_end_sample": 26474512,
+          "source_mel_frame_count": 165466,
+          "source_sample_count": 26474512,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 13808
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 132.477,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 76130.883,
+              "mel_ms": 0.0,
+              "total_ms": 76130.883,
+              "wall_ms": 77929.679
+            }
+          ],
+          "rtf_compute_mean": 21.746,
+          "rtf_wall_mean": 21.244,
+          "sample_duration_s": 1655.52,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R8009_M8018\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 76130.883,
+              "mean": 76130.883,
+              "min": 76130.883
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 76130.883,
+              "mean": 76130.883,
+              "min": 76130.883
+            },
+            "wall_ms": {
+              "max": 77929.679,
+              "mean": 77929.679,
+              "min": 77929.679
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R8009_M8018\\run\\bench.json",
+        "bench_sha256": "64802caccce0966da59516856cd9a2704c9bafcd342e5a18213a78b64e697491",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R8009_M8018\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R8009_M8018\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R8009_M8018\\run\\run.log",
+        "log_sha256": "7427879e951254f73279d6782f78cb3948f38aa0e5d00cf96c1e0b15a365a91a",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 78.16756850000093,
+        "raw_probability_frame_count": 20694,
+        "retained_probability_frame_count": 20684
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 20694,
+        "native_mel_frame_count": 165552,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R8009_M8018\\input.wav",
+        "retained_frame_count": 20684,
+        "sample_count": 26488320,
+        "sha256": "0ff78e2eb3dbddd6e6007d57697835f199f3ac6514e4807adcd88e3cd96baa76",
+        "size_bytes": 52976684,
+        "source_end_sample": 26474512,
+        "source_mel_frame_count": 165466,
+        "source_sample_count": 26474512,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 13808
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "c2aefbeb050eb4330a9934840f970fd7e243550aff2c656857ad44cebb84b58a",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 26474512,
+      "source_id": "alimeeting_R8009_M8018",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 32.04,
+          "p50": 21.708,
+          "p90": 23.6642,
+          "p99": 25.41324,
+          "sum": 75507.554
+        },
+        "chunk_count": 3449,
+        "compression_call_count": 142,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R8009_M8018\\run\\telemetry.jsonl",
+        "sha256": "4d7821b425433ef65557dcf62209bbbc27eff966c11071fd1a190ab2235241fe"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 20684,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "alimeeting_R8009_M8018",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\alimeeting_R8009_M8018\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "514a7ed97cb39f8769f20e30d1700357b2c48dee13508e1e6ee58a436e8deb23",
+        "trace_size_bytes": 302110
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\alimeeting\\far_ch0\\R8009_M8018.wav",
+      "waveform_sha256": "f16e70756914e46803d7df87e7d8406cef809aa9aff0b553b8bac9732b884ef3",
+      "waveform_size_bytes": 52949068
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 43080,
+          "native_mel_frame_count": 344640,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2004a\\input.wav",
+          "retained_frame_count": 43071,
+          "sample_count": 55142400,
+          "sha256": "f65b23d742cded0ca8968f308a27142d8b5e56328ca02d0379229a389f0ebe38",
+          "size_bytes": 110284844,
+          "source_end_sample": 55130795,
+          "source_mel_frame_count": 344568,
+          "source_sample_count": 55130795,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 11605
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 133.622,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 159181.031,
+              "mel_ms": 0.0,
+              "total_ms": 159181.031,
+              "wall_ms": 162921.361
+            }
+          ],
+          "rtf_compute_mean": 21.651,
+          "rtf_wall_mean": 21.154,
+          "sample_duration_s": 3446.4,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2004a\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 159181.031,
+              "mean": 159181.031,
+              "min": 159181.031
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 159181.031,
+              "mean": 159181.031,
+              "min": 159181.031
+            },
+            "wall_ms": {
+              "max": 162921.361,
+              "mean": 162921.361,
+              "min": 162921.361
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2004a\\run\\bench.json",
+        "bench_sha256": "f8ff1052f3e6e1b6df6ca8d669d4e6d2898146d3a5d88d0dfe706c403d009f53",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2004a\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2004a\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2004a\\run\\run.log",
+        "log_sha256": "5b0d3e303773e8adb82b720a5a0a2a8b9f96ec6f304d2ec53a9b663f52aba7af",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 163.23756680000224,
+        "raw_probability_frame_count": 43080,
+        "retained_probability_frame_count": 43071
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 43080,
+        "native_mel_frame_count": 344640,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2004a\\input.wav",
+        "retained_frame_count": 43071,
+        "sample_count": 55142400,
+        "sha256": "f65b23d742cded0ca8968f308a27142d8b5e56328ca02d0379229a389f0ebe38",
+        "size_bytes": 110284844,
+        "source_end_sample": 55130795,
+        "source_mel_frame_count": 344568,
+        "source_sample_count": 55130795,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 11605
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "27f30bf658b94959e23c6d310425b8488f7a0e91494236a13c569fe8e4c694e1",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 55130795,
+      "source_id": "ami_EN2004a",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 37.568,
+          "p50": 21.8425,
+          "p90": 23.679,
+          "p99": 25.224,
+          "sum": 157908.392
+        },
+        "chunk_count": 7180,
+        "compression_call_count": 297,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2004a\\run\\telemetry.jsonl",
+        "sha256": "71c1b9541ff96eb69f6566971e23f09ba596e7813c2b603e1b9b0a9466ba789a"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 43071,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "ami_EN2004a",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2004a\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "16baaa863491a3c9378ceb8e89059135fa755748402ccae6a50dd68a8e60edf4",
+        "trace_size_bytes": 664608
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\EN2004a\\EN2004a.Mix-Headset.wav",
+      "waveform_sha256": "d188219aff66264adc8d6a8192f272ca4155b483cf7eaa9498a8f0f6ac0ed9dc",
+      "waveform_size_bytes": 110261634
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 44076,
+          "native_mel_frame_count": 352608,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2006a\\input.wav",
+          "retained_frame_count": 44069,
+          "sample_count": 56417280,
+          "sha256": "2e89b9e155b015b299e8b1f1a4a58f73cdcaa783b3c44988022bc5fdb659fff4",
+          "size_bytes": 112834604,
+          "source_end_sample": 56407894,
+          "source_mel_frame_count": 352550,
+          "source_sample_count": 56407894,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 9386
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 133.602,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 160244.469,
+              "mel_ms": 0.0,
+              "total_ms": 160244.469,
+              "wall_ms": 164062.477
+            }
+          ],
+          "rtf_compute_mean": 22.004,
+          "rtf_wall_mean": 21.492,
+          "sample_duration_s": 3526.08,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2006a\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 160244.469,
+              "mean": 160244.469,
+              "min": 160244.469
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 160244.469,
+              "mean": 160244.469,
+              "min": 160244.469
+            },
+            "wall_ms": {
+              "max": 164062.477,
+              "mean": 164062.477,
+              "min": 164062.477
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2006a\\run\\bench.json",
+        "bench_sha256": "65e65757eaf7d9245687035d151321b9f2dc75d2f41d1cf0c9eb159358188221",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2006a\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2006a\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2006a\\run\\run.log",
+        "log_sha256": "a7092c621c8212f0db14a054609af7d72476d70d0db73f3ba2bf449eada352e8",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 164.38415579999855,
+        "raw_probability_frame_count": 44076,
+        "retained_probability_frame_count": 44069
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 44076,
+        "native_mel_frame_count": 352608,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2006a\\input.wav",
+        "retained_frame_count": 44069,
+        "sample_count": 56417280,
+        "sha256": "2e89b9e155b015b299e8b1f1a4a58f73cdcaa783b3c44988022bc5fdb659fff4",
+        "size_bytes": 112834604,
+        "source_end_sample": 56407894,
+        "source_mel_frame_count": 352550,
+        "source_sample_count": 56407894,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 9386
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "f162eec379de38d83f7da746c9848f08ef675777aba52fc8730c39bfc0473ddf",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 56407894,
+      "source_id": "ami_EN2006a",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 31.843,
+          "p50": 21.399,
+          "p90": 23.49,
+          "p99": 25.13585,
+          "sum": 158941.809
+        },
+        "chunk_count": 7346,
+        "compression_call_count": 304,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2006a\\run\\telemetry.jsonl",
+        "sha256": "167241a87c34db06158daf4f85a374b4af39e8f855d4bb50bb29d1c8e051ffa0"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 44069,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "ami_EN2006a",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_EN2006a\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "70c7cd4f24cfac5bfd9c8af969007ee72003688375aeb9bc7a606020c3da11b4",
+        "trace_size_bytes": 662980
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\EN2006a\\EN2006a.Mix-Headset.wav",
+      "waveform_sha256": "4e10dd0209c661af4769e2fa9c34a3b4804c852e8ba098d9dc9026127261e211",
+      "waveform_size_bytes": 112815832
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 14370,
+          "native_mel_frame_count": 114960,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_ES2014a\\input.wav",
+          "retained_frame_count": 14363,
+          "sample_count": 18393600,
+          "sha256": "bcb9fbd1b006028e3f2c1f633734fbe6b026b74cdda0d04a71dc4aa62bf2415f",
+          "size_bytes": 36787244,
+          "source_end_sample": 18384214,
+          "source_mel_frame_count": 114902,
+          "source_sample_count": 18384214,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 9386
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 136.249,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 53052.945,
+              "mel_ms": 0.0,
+              "total_ms": 53052.945,
+              "wall_ms": 54301.257
+            }
+          ],
+          "rtf_compute_mean": 21.669,
+          "rtf_wall_mean": 21.171,
+          "sample_duration_s": 1149.6,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_ES2014a\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 53052.945,
+              "mean": 53052.945,
+              "min": 53052.945
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 53052.945,
+              "mean": 53052.945,
+              "min": 53052.945
+            },
+            "wall_ms": {
+              "max": 54301.257,
+              "mean": 54301.257,
+              "min": 54301.257
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_ES2014a\\run\\bench.json",
+        "bench_sha256": "b3af484a4282200bb088a145970a33ceb034e564e875f9fd2ded73deb72115e8",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_ES2014a\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_ES2014a\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_ES2014a\\run\\run.log",
+        "log_sha256": "d0f7ddaa739ac182cfd4531becb97b7fe0b19b3994ab6ea521868c9d1b7e0591",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 54.5217244000014,
+        "raw_probability_frame_count": 14370,
+        "retained_probability_frame_count": 14363
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 14370,
+        "native_mel_frame_count": 114960,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_ES2014a\\input.wav",
+        "retained_frame_count": 14363,
+        "sample_count": 18393600,
+        "sha256": "bcb9fbd1b006028e3f2c1f633734fbe6b026b74cdda0d04a71dc4aa62bf2415f",
+        "size_bytes": 36787244,
+        "source_end_sample": 18384214,
+        "source_mel_frame_count": 114902,
+        "source_sample_count": 18384214,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 9386
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "0174facb194fe601f0c999e69deb5ba3764b8122cc92166cd249473b6d147d56",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 18384214,
+      "source_id": "ami_ES2014a",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 28.694,
+          "p50": 21.838,
+          "p90": 23.691,
+          "p99": 25.308,
+          "sum": 52627.996
+        },
+        "chunk_count": 2395,
+        "compression_call_count": 98,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_ES2014a\\run\\telemetry.jsonl",
+        "sha256": "ff011a6827aba3c1800a2330e72a33cb76f76602e1ced83fc9fc10a53f5cfe6b"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 14363,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "ami_ES2014a",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_ES2014a\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "784950ecb9cb8163e04ba492ab83d05aa9dd95ee115daf3b5e6a9e890bbfbb3c",
+        "trace_size_bytes": 220858
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2014a\\ES2014a.Mix-Headset.wav",
+      "waveform_sha256": "9d29e308566b8c7be4c328f4a2998e371e5f506384f111042ec91b465f7f792c",
+      "waveform_size_bytes": 36768472
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 12084,
+          "native_mel_frame_count": 96672,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007a\\input.wav",
+          "retained_frame_count": 12075,
+          "sample_count": 15467520,
+          "sha256": "584dbc9559be531d2192b31686ff4642bf5da787a17b6650eba2dfcaf6025b9f",
+          "size_bytes": 30935084,
+          "source_end_sample": 15456000,
+          "source_mel_frame_count": 96600,
+          "source_sample_count": 15456000,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 11520
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 133.832,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 44572.473,
+              "mel_ms": 0.0,
+              "total_ms": 44572.473,
+              "wall_ms": 45626.917
+            }
+          ],
+          "rtf_compute_mean": 21.689,
+          "rtf_wall_mean": 21.187,
+          "sample_duration_s": 966.72,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007a\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 44572.473,
+              "mean": 44572.473,
+              "min": 44572.473
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 44572.473,
+              "mean": 44572.473,
+              "min": 44572.473
+            },
+            "wall_ms": {
+              "max": 45626.917,
+              "mean": 45626.917,
+              "min": 45626.917
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007a\\run\\bench.json",
+        "bench_sha256": "ab8ea59655330ab680213b2cad44b93cd6fe535366d3404f90d7994a970ffa55",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007a\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007a\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007a\\run\\run.log",
+        "log_sha256": "6d79322fb938daa03fe572ff7c17424904bc5f55dff6ab8d0c64523edea5d85b",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 45.83532200000627,
+        "raw_probability_frame_count": 12084,
+        "retained_probability_frame_count": 12075
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 12084,
+        "native_mel_frame_count": 96672,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007a\\input.wav",
+        "retained_frame_count": 12075,
+        "sample_count": 15467520,
+        "sha256": "584dbc9559be531d2192b31686ff4642bf5da787a17b6650eba2dfcaf6025b9f",
+        "size_bytes": 30935084,
+        "source_end_sample": 15456000,
+        "source_mel_frame_count": 96600,
+        "source_sample_count": 15456000,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 11520
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "3583c2326f448918f0b50957d0c64f2976f737845b7c4625320ae976bb7398cf",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 15456000,
+      "source_id": "ami_IS1007a",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 61.272,
+          "p50": 21.667,
+          "p90": 23.6998,
+          "p99": 26.401799999999994,
+          "sum": 44209.345
+        },
+        "chunk_count": 2014,
+        "compression_call_count": 82,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007a\\run\\telemetry.jsonl",
+        "sha256": "c0bb0a1a3ce533be843d28cb024102428ed8e408b5b25c8c5c527c13d0f631f1"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 12075,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "ami_IS1007a",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007a\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "1a0c1d7e99acfe1a69d046d5cfb82157541270b81882f016ffec53cfc530396a",
+        "trace_size_bytes": 189203
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\IS1007a\\IS1007a.Mix-Headset.wav",
+      "waveform_sha256": "df2cee040ad065649ce4285d1f3244579dd06ece2f0e16d0c8091d4698e39fc4",
+      "waveform_size_bytes": 30913427
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 16296,
+          "native_mel_frame_count": 130368,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007b\\input.wav",
+          "retained_frame_count": 16284,
+          "sample_count": 20858880,
+          "sha256": "e2b8939b279145d2083c6e830955f4cfab55d8a2bff92ceac2c7c6f5b3b8ad94",
+          "size_bytes": 41717804,
+          "source_end_sample": 20842666,
+          "source_mel_frame_count": 130267,
+          "source_sample_count": 20842666,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 16214
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 134.138,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 60173.184,
+              "mel_ms": 0.0,
+              "total_ms": 60173.184,
+              "wall_ms": 61600.479
+            }
+          ],
+          "rtf_compute_mean": 21.665,
+          "rtf_wall_mean": 21.163,
+          "sample_duration_s": 1303.68,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007b\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 60173.184,
+              "mean": 60173.184,
+              "min": 60173.184
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 60173.184,
+              "mean": 60173.184,
+              "min": 60173.184
+            },
+            "wall_ms": {
+              "max": 61600.479,
+              "mean": 61600.479,
+              "min": 61600.479
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007b\\run\\bench.json",
+        "bench_sha256": "d14ae9badd2fe4a10a2fb152bb4734cbaf68f9604d04a64405d2d344905198bf",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007b\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007b\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007b\\run\\run.log",
+        "log_sha256": "688a1b291f3e277f114208cde3ace3954ad2d1a24ef6cef5e6adbcbb399148fd",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 61.82845400000224,
+        "raw_probability_frame_count": 16296,
+        "retained_probability_frame_count": 16284
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 16296,
+        "native_mel_frame_count": 130368,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007b\\input.wav",
+        "retained_frame_count": 16284,
+        "sample_count": 20858880,
+        "sha256": "e2b8939b279145d2083c6e830955f4cfab55d8a2bff92ceac2c7c6f5b3b8ad94",
+        "size_bytes": 41717804,
+        "source_end_sample": 20842666,
+        "source_mel_frame_count": 130267,
+        "source_sample_count": 20842666,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 16214
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "bc1608365c06dff1eef0c9ff4ce2345db71b8153d0e7749f42af41876b83a317",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 20842666,
+      "source_id": "ami_IS1007b",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 32.292,
+          "p50": 21.82,
+          "p90": 23.684,
+          "p99": 25.3897,
+          "sum": 59679.649
+        },
+        "chunk_count": 2716,
+        "compression_call_count": 111,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007b\\run\\telemetry.jsonl",
+        "sha256": "b5dcf4897e0ce11557b607ff8606253fcdeaf836488f70d62ab5dd45f4abeb22"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 16284,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "ami_IS1007b",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007b\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "e8a040baefbe1ffedbcd88bb47d0d207ff5ae1d4b9cdf88101ee6dfa3172d3a8",
+        "trace_size_bytes": 253164
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\IS1007b\\IS1007b.Mix-Headset.wav",
+      "waveform_sha256": "eea0adb204e18b68e2197fa26fd13a2d9a3d464ad36bbfe76164a6dc1b67a00f",
+      "waveform_size_bytes": 41686759
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 26424,
+          "native_mel_frame_count": 211392,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007c\\input.wav",
+          "retained_frame_count": 26415,
+          "sample_count": 33822720,
+          "sha256": "e82d72218d33c0458c27140de3a13ce113939a7e4c7c27f94167e40fc7b7c105",
+          "size_bytes": 67645484,
+          "source_end_sample": 33810666,
+          "source_mel_frame_count": 211317,
+          "source_sample_count": 33810666,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 12054
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 135.482,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 96965.938,
+              "mel_ms": 0.0,
+              "total_ms": 96965.938,
+              "wall_ms": 99269.171
+            }
+          ],
+          "rtf_compute_mean": 21.801,
+          "rtf_wall_mean": 21.295,
+          "sample_duration_s": 2113.92,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007c\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 96965.938,
+              "mean": 96965.938,
+              "min": 96965.938
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 96965.938,
+              "mean": 96965.938,
+              "min": 96965.938
+            },
+            "wall_ms": {
+              "max": 99269.171,
+              "mean": 99269.171,
+              "min": 99269.171
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007c\\run\\bench.json",
+        "bench_sha256": "7f985cf39785011804e54c5bfb25e9938f6fd41e47149d3e396d16f8a229ebf2",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007c\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007c\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007c\\run\\run.log",
+        "log_sha256": "310affef4e27a09e8e3747dd6af121afc8aadd6dfb2f40437d5cc6048a6bed85",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 99.5284845999995,
+        "raw_probability_frame_count": 26424,
+        "retained_probability_frame_count": 26415
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 26424,
+        "native_mel_frame_count": 211392,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007c\\input.wav",
+        "retained_frame_count": 26415,
+        "sample_count": 33822720,
+        "sha256": "e82d72218d33c0458c27140de3a13ce113939a7e4c7c27f94167e40fc7b7c105",
+        "size_bytes": 67645484,
+        "source_end_sample": 33810666,
+        "source_mel_frame_count": 211317,
+        "source_sample_count": 33810666,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 12054
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "84c78ee3f538812650a7b112614c70e81875755cc71b2c3ae02ec023b1e0ebb0",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 33810666,
+      "source_id": "ami_IS1007c",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 30.943,
+          "p50": 21.664,
+          "p90": 23.6474,
+          "p99": 25.173220000000008,
+          "sum": 96170.823
+        },
+        "chunk_count": 4404,
+        "compression_call_count": 182,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007c\\run\\telemetry.jsonl",
+        "sha256": "2797ed83400376295c7b21dca9fe93199b798941b03fdab4838676803f3fef49"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 26415,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "ami_IS1007c",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007c\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "b76a6420ff31aa01ba2fa3c4aed0a24feb140b1e9c7d850baf00c18fa80af02d",
+        "trace_size_bytes": 397252
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\IS1007c\\IS1007c.Mix-Headset.wav",
+      "waveform_sha256": "ccc56bb3980c1027e8ff313e018a8b53c2bd730f1a378f4870e3371616e2ed1f",
+      "waveform_size_bytes": 67622759
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 25374,
+          "native_mel_frame_count": 202992,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007d\\input.wav",
+          "retained_frame_count": 25364,
+          "sample_count": 32478720,
+          "sha256": "f096dfc673dfcedeb736e33ab4a6605401a560c69191060a0b2e575fa04ff8b4",
+          "size_bytes": 64957484,
+          "source_end_sample": 32464896,
+          "source_mel_frame_count": 202906,
+          "source_sample_count": 32464896,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 13824
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 133.811,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 92911.711,
+              "mel_ms": 0.0,
+              "total_ms": 92911.711,
+              "wall_ms": 95118.274
+            }
+          ],
+          "rtf_compute_mean": 21.848,
+          "rtf_wall_mean": 21.341,
+          "sample_duration_s": 2029.92,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007d\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 92911.711,
+              "mean": 92911.711,
+              "min": 92911.711
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 92911.711,
+              "mean": 92911.711,
+              "min": 92911.711
+            },
+            "wall_ms": {
+              "max": 95118.274,
+              "mean": 95118.274,
+              "min": 95118.274
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007d\\run\\bench.json",
+        "bench_sha256": "d3ce98160d914102d4b7cc3bfa566e704883a14bb9873a3ab5ba0684a413d0a9",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007d\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007d\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007d\\run\\run.log",
+        "log_sha256": "b603b2d74e433cfbdccb1f009c860b4971eabb0f32727acea3e56cc2301334ec",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 95.37200709999888,
+        "raw_probability_frame_count": 25374,
+        "retained_probability_frame_count": 25364
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 25374,
+        "native_mel_frame_count": 202992,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007d\\input.wav",
+        "retained_frame_count": 25364,
+        "sample_count": 32478720,
+        "sha256": "f096dfc673dfcedeb736e33ab4a6605401a560c69191060a0b2e575fa04ff8b4",
+        "size_bytes": 64957484,
+        "source_end_sample": 32464896,
+        "source_mel_frame_count": 202906,
+        "source_sample_count": 32464896,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 13824
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "f34a4e805c2e08583764b04a9fc54d90f9c7c9b5b549fd0ce534797e4dea4dce",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 32464896,
+      "source_id": "ami_IS1007d",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 31.853,
+          "p50": 21.592,
+          "p90": 23.609,
+          "p99": 25.25444,
+          "sum": 92157.581
+        },
+        "chunk_count": 4229,
+        "compression_call_count": 174,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007d\\run\\telemetry.jsonl",
+        "sha256": "ad92146a7840b59561cb9668d7e1c983bc23ebb31138ed98a5bd58f86dd3a1cb"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 25364,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "ami_IS1007d",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_IS1007d\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "04ca310df294c9d81ac72fea49be2de2b87238013b9df1b703ec84b6928926ee",
+        "trace_size_bytes": 393072
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\IS1007d\\IS1007d.Mix-Headset.wav",
+      "waveform_sha256": "470b25ca979716d23c05fa30e854b11d22670754dd236da7634b7e8fda221c73",
+      "waveform_size_bytes": 64929836
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 13020,
+          "native_mel_frame_count": 104160,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010a\\input.wav",
+          "retained_frame_count": 13013,
+          "sample_count": 16665600,
+          "sha256": "54d053dc5a172da87b363012c653ed8fcbc7302bdd14206f899c03eb71bdd2fc",
+          "size_bytes": 33331244,
+          "source_end_sample": 16656384,
+          "source_mel_frame_count": 104103,
+          "source_sample_count": 16656384,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 9216
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 130.741,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 47643.703,
+              "mel_ms": 0.0,
+              "total_ms": 47643.703,
+              "wall_ms": 48772.476
+            }
+          ],
+          "rtf_compute_mean": 21.862,
+          "rtf_wall_mean": 21.356,
+          "sample_duration_s": 1041.6,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010a\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 47643.703,
+              "mean": 47643.703,
+              "min": 47643.703
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 47643.703,
+              "mean": 47643.703,
+              "min": 47643.703
+            },
+            "wall_ms": {
+              "max": 48772.476,
+              "mean": 48772.476,
+              "min": 48772.476
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010a\\run\\bench.json",
+        "bench_sha256": "3d841b5931b68a8cc924a38d9f1e11d9f3d5b13b0b233e992182c6b1c9423c58",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010a\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010a\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010a\\run\\run.log",
+        "log_sha256": "bf6a550bb389bb4a91bf35d0ca1f3f2b161be67a35d470e6bb1ac018b9e944b9",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 48.97954610000306,
+        "raw_probability_frame_count": 13020,
+        "retained_probability_frame_count": 13013
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 13020,
+        "native_mel_frame_count": 104160,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010a\\input.wav",
+        "retained_frame_count": 13013,
+        "sample_count": 16665600,
+        "sha256": "54d053dc5a172da87b363012c653ed8fcbc7302bdd14206f899c03eb71bdd2fc",
+        "size_bytes": 33331244,
+        "source_end_sample": 16656384,
+        "source_mel_frame_count": 104103,
+        "source_sample_count": 16656384,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 9216
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "d75f575167d502fd356e1f4d2bea759f6df9c6ed6b4901f45ef6eee5bdd39697",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 16656384,
+      "source_id": "ami_TS3010a",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 29.166,
+          "p50": 21.5815,
+          "p90": 23.5891,
+          "p99": 25.4321,
+          "sum": 47255.911
+        },
+        "chunk_count": 2170,
+        "compression_call_count": 89,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010a\\run\\telemetry.jsonl",
+        "sha256": "75819a88afdea31812022026a907e7b2b3b4f56afadd19989b533b48453094bc"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 13013,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "ami_TS3010a",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010a\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "ade9ebf98bfb8ec49bfc586fbea3ddbbf07351523aed8d5498fef88f8a637ef3",
+        "trace_size_bytes": 184498
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\TS3010a\\TS3010a.Mix-Headset.wav",
+      "waveform_sha256": "d3a7d934b73fa5b9cfcff54ce3909ba59b544ef43c248c931082aa62056c1625",
+      "waveform_size_bytes": 33312812
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 26076,
+          "native_mel_frame_count": 208608,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010b\\input.wav",
+          "retained_frame_count": 26069,
+          "sample_count": 33377280,
+          "sha256": "5f5468be9eacec1c0198eba495db06e74dd3cba538038d0f70b5a0f11913a8bd",
+          "size_bytes": 66754604,
+          "source_end_sample": 33367722,
+          "source_mel_frame_count": 208549,
+          "source_sample_count": 33367722,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 9558
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 132.745,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 95502.242,
+              "mel_ms": 0.0,
+              "total_ms": 95502.242,
+              "wall_ms": 97802.447
+            }
+          ],
+          "rtf_compute_mean": 21.843,
+          "rtf_wall_mean": 21.33,
+          "sample_duration_s": 2086.08,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010b\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 95502.242,
+              "mean": 95502.242,
+              "min": 95502.242
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 95502.242,
+              "mean": 95502.242,
+              "min": 95502.242
+            },
+            "wall_ms": {
+              "max": 97802.447,
+              "mean": 97802.447,
+              "min": 97802.447
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010b\\run\\bench.json",
+        "bench_sha256": "c34fc21e140656025e0584414f703c55092ab75280f4df0615e342d71b16aae9",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010b\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010b\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010b\\run\\run.log",
+        "log_sha256": "e6d3fd03f851ba3b1438625f47feeaa945c004f5363c926358c543ac85675354",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 98.05753769999865,
+        "raw_probability_frame_count": 26076,
+        "retained_probability_frame_count": 26069
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 26076,
+        "native_mel_frame_count": 208608,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010b\\input.wav",
+        "retained_frame_count": 26069,
+        "sample_count": 33377280,
+        "sha256": "5f5468be9eacec1c0198eba495db06e74dd3cba538038d0f70b5a0f11913a8bd",
+        "size_bytes": 66754604,
+        "source_end_sample": 33367722,
+        "source_mel_frame_count": 208549,
+        "source_sample_count": 33367722,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 9558
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "a0d179a7c0cdcbe46f795d3cad8701a35db8fb9683de3af05f2b8aebb96d3667",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 33367722,
+      "source_id": "ami_TS3010b",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 34.753,
+          "p50": 21.601,
+          "p90": 23.5895,
+          "p99": 25.217650000000003,
+          "sum": 94727.618
+        },
+        "chunk_count": 4346,
+        "compression_call_count": 179,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010b\\run\\telemetry.jsonl",
+        "sha256": "7e85b542aa26bc4717b18e2cc33f20921ee278b7be2f216367b79e341f355186"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 26069,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "ami_TS3010b",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010b\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "d1aff793be59f76339df9cd9f118545edbed0f57cd141d00a0ff751e902b6582",
+        "trace_size_bytes": 370218
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\TS3010b\\TS3010b.Mix-Headset.wav",
+      "waveform_sha256": "b973b8dcd69c01ff782f77da7ada6979f7999e063b8de30d89f5b8dd1d53a043",
+      "waveform_size_bytes": 66735488
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 26784,
+          "native_mel_frame_count": 214272,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010c\\input.wav",
+          "retained_frame_count": 26775,
+          "sample_count": 34283520,
+          "sha256": "7cb40f8c9b291719e159ced795d55c48863335f64f8611cefbc563621b6e75e2",
+          "size_bytes": 68567084,
+          "source_end_sample": 34272000,
+          "source_mel_frame_count": 214200,
+          "source_sample_count": 34272000,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 11520
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 134.006,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 97413.406,
+              "mel_ms": 0.0,
+              "total_ms": 97413.406,
+              "wall_ms": 99759.388
+            }
+          ],
+          "rtf_compute_mean": 21.996,
+          "rtf_wall_mean": 21.479,
+          "sample_duration_s": 2142.72,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010c\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 97413.406,
+              "mean": 97413.406,
+              "min": 97413.406
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 97413.406,
+              "mean": 97413.406,
+              "min": 97413.406
+            },
+            "wall_ms": {
+              "max": 99759.388,
+              "mean": 99759.388,
+              "min": 99759.388
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010c\\run\\bench.json",
+        "bench_sha256": "51e4bf08f62ac8b732591d2e99f4c28a49b56ed3096c01ac24b75306ea6f0895",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010c\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010c\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010c\\run\\run.log",
+        "log_sha256": "05037d5775d9091a6786a604938e03b3e727cb9769818041c2d4ce1bb4b0ed5b",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 100.02414750000025,
+        "raw_probability_frame_count": 26784,
+        "retained_probability_frame_count": 26775
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 26784,
+        "native_mel_frame_count": 214272,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010c\\input.wav",
+        "retained_frame_count": 26775,
+        "sample_count": 34283520,
+        "sha256": "7cb40f8c9b291719e159ced795d55c48863335f64f8611cefbc563621b6e75e2",
+        "size_bytes": 68567084,
+        "source_end_sample": 34272000,
+        "source_mel_frame_count": 214200,
+        "source_sample_count": 34272000,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 11520
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "3fa3afcfb81b65641d4225ff550a928d982bd6ff4c5f5fa03507be2bb4adbb31",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 34272000,
+      "source_id": "ami_TS3010c",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 52.353,
+          "p50": 21.415,
+          "p90": 23.4697,
+          "p99": 25.15422,
+          "sum": 96599.313
+        },
+        "chunk_count": 4464,
+        "compression_call_count": 184,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010c\\run\\telemetry.jsonl",
+        "sha256": "9720a261bd5f9a3e5caee87bba91a5343f01e95bc10974fdb28c08e7529a5e50"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 26775,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "ami_TS3010c",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010c\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "10bffa543abbe9ae00d6dff1048272b06267a3edbeea4b6186f2ec227f2238e7",
+        "trace_size_bytes": 392450
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\TS3010c\\TS3010c.Mix-Headset.wav",
+      "waveform_sha256": "6fae7327a367f3ea11ee91c35da708d5484c5924f51b309669409043a9c30a56",
+      "waveform_size_bytes": 68544044
+    },
+    {
+      "backend": "vulkan",
+      "backend_resolved": "Vulkan0",
+      "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+      "bench_relative_path": "external/r8/transcribe.cpp/build-r8-vulkan-short/bin/Release/transcribe-bench.exe",
+      "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+      "family": "streaming_sortformer",
+      "inference": {
+        "audio": {
+          "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+          "native_frame_count": 24018,
+          "native_mel_frame_count": 192144,
+          "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010d\\input.wav",
+          "retained_frame_count": 24009,
+          "sample_count": 30743040,
+          "sha256": "1f6af299a3abe2f8106a9a6783f9ed19e012242cffc7eef5b48dd59fa8925548",
+          "size_bytes": 61486124,
+          "source_end_sample": 30731199,
+          "source_mel_frame_count": 192070,
+          "source_sample_count": 30731199,
+          "source_start_sample": 0,
+          "trailing_zero_sample_count": 11841
+        },
+        "backend_resolved": "Vulkan0",
+        "bench": {
+          "backend": "Vulkan0",
+          "hyp_text": "",
+          "hyp_text_len": 0,
+          "iters": 1,
+          "load_ms": 133.137,
+          "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "n_tokens": 0,
+          "per_iter": [
+            {
+              "decode_ms": 0.0,
+              "encode_ms": 89192.016,
+              "mel_ms": 0.0,
+              "total_ms": 89192.016,
+              "wall_ms": 91325.264
+            }
+          ],
+          "rtf_compute_mean": 21.543,
+          "rtf_wall_mean": 21.04,
+          "sample_duration_s": 1921.44,
+          "sample_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010d\\input.wav",
+          "schema": "transcribe-bench-v2",
+          "spec_k_drafts": -1,
+          "summary": {
+            "decode_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "encode_ms": {
+              "max": 89192.016,
+              "mean": 89192.016,
+              "min": 89192.016
+            },
+            "mel_ms": {
+              "max": 0.0,
+              "mean": 0.0,
+              "min": 0.0
+            },
+            "total_ms": {
+              "max": 89192.016,
+              "mean": 89192.016,
+              "min": 89192.016
+            },
+            "wall_ms": {
+              "max": 91325.264,
+              "mean": 91325.264,
+              "min": 91325.264
+            }
+          },
+          "token_ids_csv": "",
+          "warmup": 0
+        },
+        "bench_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010d\\run\\bench.json",
+        "bench_sha256": "07ab4389bd157fb1b4e5383c0656318afc2e5dd70a910c330389fa83ef6b6ef2",
+        "command": [
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\external\\r8\\transcribe.cpp\\build-r8-vulkan-short\\bin\\Release\\transcribe-bench.exe",
+          "--model",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+          "--sample",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010d\\input.wav",
+          "--backend",
+          "vulkan",
+          "--threads",
+          "8",
+          "--warmup",
+          "0",
+          "--iters",
+          "1",
+          "--json-out",
+          "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010d\\run\\bench.json"
+        ],
+        "log_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010d\\run\\run.log",
+        "log_sha256": "d874f531471b5225c751bcddc38bbb5388d1264478c5d11f2bd1ec58cac0b820",
+        "origin": "fresh_single_frozen_inference_pass",
+        "process_wall_seconds": 91.57906890000595,
+        "raw_probability_frame_count": 24018,
+        "retained_probability_frame_count": 24009
+      },
+      "inference_audio": {
+        "materialization": "exact_pcm16_mono_16khz_frozen_source_with_zero_flush_to_full_context_chunk",
+        "native_frame_count": 24018,
+        "native_mel_frame_count": 192144,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010d\\input.wav",
+        "retained_frame_count": 24009,
+        "sample_count": 30743040,
+        "sha256": "1f6af299a3abe2f8106a9a6783f9ed19e012242cffc7eef5b48dd59fa8925548",
+        "size_bytes": 61486124,
+        "source_end_sample": 30731199,
+        "source_mel_frame_count": 192070,
+        "source_sample_count": 30731199,
+        "source_start_sample": 0,
+        "trailing_zero_sample_count": 11841
+      },
+      "manifest_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_relative_occupancy_gate\\results\\eval\\relative_occupancy_manifest.jsonl",
+      "manifest_row_sha256": "7c52b707e5e03f45cfaa0a3203774bf8bbfe48d91937b0a490a59300ef8ea2cf",
+      "manifest_sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30",
+      "model_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\models\\r8\\diar_streaming_sortformer_4spk-v2.1-Q8_0.gguf",
+      "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+      "preset": "low_latency",
+      "role": "PSEM-STRATEGY-EVAL",
+      "schema_version": "psem.relative_occupancy.model_source_receipt.v1",
+      "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+      "source_end_sample": 30731199,
+      "source_id": "ami_TS3010d",
+      "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+      "source_start_sample": 0,
+      "telemetry": {
+        "chunk_compute_ms": {
+          "maximum": 36.899,
+          "p50": 21.935,
+          "p90": 23.7808,
+          "p99": 25.512980000000002,
+          "sum": 88449.562
+        },
+        "chunk_count": 4003,
+        "compression_call_count": 165,
+        "path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010d\\run\\telemetry.jsonl",
+        "sha256": "6fb570b295656e9279ff2727466e184512ba6359a0adae93620d1ebb35abbde5"
+      },
+      "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+      "threads": 8,
+      "trace": {
+        "family": "streaming_sortformer",
+        "frame_count": 24009,
+        "schema_version": "psem.relative_occupancy.trace_receipt.v1",
+        "slot_count": 4,
+        "source_id": "ami_TS3010d",
+        "speaker_slot_ids": [
+          "slot-0",
+          "slot-1",
+          "slot-2",
+          "slot-3"
+        ],
+        "trace_path": "C:\\Users\\salee\\AppData\\Local\\puripuly-heart-research\\speaker_representation_scd_v1\\results\\issue97\\psem_relative_occupancy_gate\\streaming_sortformer\\vulkan\\PSEM-STRATEGY-EVAL\\ami_TS3010d\\posterior_trace.npz",
+        "trace_schema_version": "psem.relative_occupancy.trace.v1",
+        "trace_sha256": "69358b16b745d191c95834c5f72bfb66aa770231946f50acfc57a70011aa1746",
+        "trace_size_bytes": 350342
+      },
+      "trace_schema_version": "psem.relative_occupancy.trace.v1",
+      "usage": "full_frozen_source",
+      "waveform_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\TS3010d\\TS3010d.Mix-Headset.wav",
+      "waveform_sha256": "ff642ecea1b3709a8e8cd71414a8ddd37c04cac46319fea6db63be4ff40fdaf8",
+      "waveform_size_bytes": 61462442
+    }
+  ],
+  "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+  "telemetry_patch_sha256": "d01eecdee26bff12af2f3ba649eebc5e7e1195871a537646c72301362c47ce44",
+  "threads": 8,
+  "usage": "full_frozen_source"
+}

@@ -1,0 +1,36 @@
+{
+  "config_sha256": "4e61df08cf2c27b34b70b86c945d65b9f9abf9c95100cc16830ab855f38c8e72",
+  "manifest_path": "experiments\\psem_relative_occupancy_gate\\results\\dev\\relative_occupancy_manifest.jsonl",
+  "manifest_sha256": "b5a6d1369fc1165adb98ce91508b7f8b171ad2a981495b33e0060a324e6176b9",
+  "model": {
+    "backend": "CPUExecutionProvider",
+    "onnxruntime_version": "1.28.0",
+    "path": "src\\puripuly_heart\\data\\vad\\silero_vad.onnx",
+    "sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+    "version": "6.2.1"
+  },
+  "profile": {
+    "backend": "CPUExecutionProvider",
+    "chunk_samples": 512,
+    "hangover_ms": 500,
+    "max_segment_ms": 7000,
+    "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+    "model_version": "6.2.1",
+    "pre_roll_ms": 500,
+    "profile": "peer",
+    "source_support": "pre_roll_plus_committed_chunks_through_speech_end_excluding_trailing_hangover",
+    "speech_threshold": 0.5,
+    "start_commit_chunks": 3,
+    "start_debounce_chunks": 3
+  },
+  "role": "PSEM-STRATEGY-DEV",
+  "row_payload_sha256": "a95f1ace285eab7bf0a38ffa1fc6ab8c2e8ee26d719ec5cd91d233d7e02bb406",
+  "runner_source_sha256": "8381d54c033aad971a11fb8ea56d0d3ea7e42d641c5cc3e6e6fa3b83bf366407",
+  "schema_version": "psem.ontology_simplification.production_vad_receipt.v1",
+  "source_count": 10,
+  "source_ids_sha256": "695e79db86c6ba74a1e803d38224ce9d81c330dbbf91eba0f1cea4f5fd9a91fe",
+  "speech_gate_path": "experiments\\psem_ontology_simplification_gate\\results\\dev\\production_vad_speech_gate.jsonl",
+  "speech_gate_sha256": "fbbe457658db27679bb3529889999eb1f446090869ac72ae07571aab0be4a4a7",
+  "total_audio_seconds": 21993.9115625,
+  "total_vad_speech_seconds": 18950.811875
+}

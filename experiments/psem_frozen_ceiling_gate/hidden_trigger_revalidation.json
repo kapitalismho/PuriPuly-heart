@@ -1,0 +1,11 @@
+{
+  "schema_version": "psem.hidden_ceiling.trigger_revalidation.v1",
+  "status": "opened",
+  "decision": "hidden_ceiling_remains_required",
+  "rule": "P-C and P-NC remain clearly and consistently separated from the independently simulated bounded G frontier across both held-out source families",
+  "representation_receipt_sha256": "bcd670ec31108e54139efb2ad719b58a303290ed3d96549f8fb131ce5686da6b",
+  "gt_result_sha256": "6b93f4e7e0dd584fdc9fdaace72ea61d7df36ebad1919c5400c4d245462b039d",
+  "posterior_causal_result_sha256": "283f295b03c0553dd48f916a272d1939b993b9fdde14f73cb42aba5e7d266b3c",
+  "posterior_noncausal_result_sha256": "7cf04c2684fc690ef1cadac13ed47fea4e58d526e9dc3b6e66a195f4ef368236",
+  "source_family_result_sha256": "92b0bea0e51a980245b59f598959c78a6d5cda40e773e9b6966d75501acd835d"
+}

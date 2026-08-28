@@ -12,27 +12,25 @@ from experiments.psem_frozen_ceiling_gate.build_ceiling_examples import (
     SessionExamples,
     config,
 )
-from experiments.psem_ontology_simplification_gate.evaluate_simplified_ontologies import (
-    _aggregate_topology,
-    _session_topology,
-)
-from experiments.psem_relative_occupancy_gate.decoder import ReplacementEvent
-from experiments.psem_relative_occupancy_gate.io_utils import (
+from experiments.psem_frozen_ceiling_gate.experiment_support import (
+    ReplacementEvent,
+    aggregate_topology,
     canonical_sha256,
+    intervals_from_manifest,
     load_json,
     percentile,
+    product_event_metrics,
+    session_topology,
     sha256_file,
     write_json,
-)
-from experiments.psem_relative_occupancy_gate.model_evaluate import (
-    intervals_from_manifest,
-    product_event_metrics,
 )
 
 RESULTS_ROOT = PACKAGE_ROOT / "results" / "frozen_ceiling_1"
 HIDDEN_CONFIG_PATH = PACKAGE_ROOT / "hidden_config.json"
 HIDDEN_TRAINING_CONFIG_PATH = PACKAGE_ROOT / "hidden_training_config.json"
 REPRESENTATION_RECEIPT_PATH = PACKAGE_ROOT / "hidden_representation_receipt.json"
+HIDDEN_TRIGGER_PATH = PACKAGE_ROOT / "hidden_trigger_revalidation.json"
+HIDDEN_EXTRACTION_COMPATIBILITY_PATH = PACKAGE_ROOT / "hidden_extraction_compatibility.json"
 SPLIT_PATH = PACKAGE_ROOT / "split_manifest.json"
 CONFIG_PATH = PACKAGE_ROOT / "config.json"
 MAPPING_PATH = PACKAGE_ROOT / "oracle_mapping_ledger.jsonl"
@@ -49,7 +47,9 @@ def _expected_hidden_provenance() -> dict[str, str]:
         "hidden_training_config_sha256": sha256_file(HIDDEN_TRAINING_CONFIG_PATH),
         "split_manifest_sha256": sha256_file(SPLIT_PATH),
         "hidden_representation_receipt_sha256": sha256_file(REPRESENTATION_RECEIPT_PATH),
+        "hidden_trigger_revalidation_sha256": sha256_file(HIDDEN_TRIGGER_PATH),
         "hidden_extraction_receipt_sha256": sha256_file(EXTRACTION_RECEIPT_PATH),
+        "hidden_extraction_compatibility_sha256": sha256_file(HIDDEN_EXTRACTION_COMPATIBILITY_PATH),
         "oracle_mapping_ledger_sha256": sha256_file(MAPPING_PATH),
         "action_reference_ledger_sha256": sha256_file(ACTION_REFERENCE_PATH),
     }
@@ -63,15 +63,19 @@ def _validate_hidden_evidence(hidden_paths: dict[str, Path]) -> bool:
     if not all(present):
         raise ValueError("hidden evidence set is partial")
     representation = load_json(REPRESENTATION_RECEIPT_PATH)
+    trigger = load_json(HIDDEN_TRIGGER_PATH)
     trigger_paths = {
         "gt_result_sha256": RESULTS_ROOT / "gt_causal_action_frontier.json",
         "posterior_causal_result_sha256": RESULTS_ROOT / "fullslot_causal_metrics.json",
         "posterior_noncausal_result_sha256": RESULTS_ROOT / "fullslot_noncausal_metrics.json",
         "source_family_result_sha256": RESULTS_ROOT / "source_family_results.json",
     }
-    if representation.get("opened") is not True or any(
-        sha256_file(path) != representation["trigger"].get(field)
-        for field, path in trigger_paths.items()
+    if (
+        representation.get("opened") is not True
+        or trigger.get("status") != "opened"
+        or trigger.get("decision") != "hidden_ceiling_remains_required"
+        or trigger.get("representation_receipt_sha256") != sha256_file(REPRESENTATION_RECEIPT_PATH)
+        or any(sha256_file(path) != trigger.get(field) for field, path in trigger_paths.items())
     ):
         raise ValueError("hidden trigger evidence differs")
     split = load_json(SPLIT_PATH)
@@ -83,13 +87,38 @@ def _validate_hidden_evidence(hidden_paths: dict[str, Path]) -> bool:
     }
     expected_families = {str(value["held_out_family"]) for value in split["folds"]}
     extraction = load_json(EXTRACTION_RECEIPT_PATH)
+    compatibility = load_json(HIDDEN_EXTRACTION_COMPATIBILITY_PATH)
+    compatibility_contract = {
+        "schema_version": "psem.hidden_ceiling.extraction_compatibility.v1",
+        "status": "compatible_existing_features",
+        "extraction_receipt_sha256": sha256_file(EXTRACTION_RECEIPT_PATH),
+        "original_extractor_sha256": extraction.get("extractor_sha256"),
+        "current_extractor_sha256": sha256_file(EXTRACTOR_PATH),
+        "representation_receipt_sha256": sha256_file(REPRESENTATION_RECEIPT_PATH),
+        "source_count": len(expected_sources),
+    }
+    if any(compatibility.get(key) != value for key, value in compatibility_contract.items()):
+        raise ValueError("hidden extraction compatibility boundary differs")
+    if compatibility.get("posterior_equivalence") != {
+        "status": "equivalent",
+        "maximum_absolute_error": 0.0,
+    }:
+        raise ValueError("hidden extraction compatibility equivalence differs")
+    for role in ("dev", "eval"):
+        receipt = compatibility.get("authoritative_receipts", {}).get(role, {})
+        if receipt.get(
+            "path"
+        ) != f"frozen_inputs/{role}_sortformer_model_receipt.json" or sha256_file(
+            PACKAGE_ROOT / str(receipt.get("path", ""))
+        ) != receipt.get("sha256"):
+            raise ValueError(f"hidden authoritative receipt differs: {role}")
     extraction_contract = {
         "schema_version": "psem.hidden_ceiling.extraction_receipt.v1",
         "status": "complete",
         "representation_receipt_sha256": sha256_file(REPRESENTATION_RECEIPT_PATH),
         "hidden_config_sha256": sha256_file(HIDDEN_CONFIG_PATH),
         "split_manifest_sha256": sha256_file(SPLIT_PATH),
-        "extractor_sha256": sha256_file(EXTRACTOR_PATH),
+        "extractor_sha256": compatibility["original_extractor_sha256"],
         "instrumented_bench_sha256": representation["runtime"]["instrumented_bench_sha256"],
         "model_sha256": representation["runtime"]["model_sha256"],
         "hidden_export_patch_sha256": representation["runtime"]["hidden_export_patch_sha256"],
@@ -283,7 +312,7 @@ def session_metrics(
         contamination_episodes=contamination_episodes,
         tolerance_samples=int(cfg["product_event_alignment_tolerance_ms"] * 16),
     )
-    metrics["topology"] = _session_topology(
+    metrics["topology"] = session_topology(
         session.manifest,
         events,
         session.reference,
@@ -355,7 +384,7 @@ def aggregate_rows(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     boundary = [
         float(item) for value in metrics for item in value["backdated_boundary_error_values_ms"]
     ]
-    topology = _aggregate_topology(rows)
+    topology = aggregate_topology(rows)
     diagnostics = {}
     if rows and all("diagnostics" in value for value in rows):
         for name in rows[0]["diagnostics"]:
@@ -676,9 +705,7 @@ def _hidden_failure_concentration(
         "per_source_family": family_concentration,
         "source_family_domain": source_family_domain,
         "status": (
-            "passed"
-            if slice_localized or source_family_domain["status"] == "passed"
-            else "failed"
+            "passed" if slice_localized or source_family_domain["status"] == "passed" else "failed"
         ),
     }
 
@@ -699,11 +726,7 @@ def render_final_decision() -> str:
     hidden_cfg = load_json(HIDDEN_CONFIG_PATH)
     persistence = int(cfg["gap_reference_confirmation_ms"])
     g_result = json.loads(required["G"].read_text(encoding="utf-8"))
-    g_cell = next(
-        value
-        for value in g_result["rows"]
-        if value["confirmation_ms"] == persistence
-    )
+    g_cell = next(value for value in g_result["rows"] if value["confirmation_ms"] == persistence)
     g_per_source_family = _per_source_family_point(
         g_result,
         "G",
@@ -869,16 +892,40 @@ def render_final_decision() -> str:
         )
     vad_old = vad["issue98_mixed_support_reference"]
     vad_new = vad["corrected_cached_posterior_replay"]
+    if hidden_available:
+        family_checks = residual_concentration["per_source_family"]
+        overlap_families = sorted(
+            family for family, checks in family_checks.items() if checks["overlap_masking"]
+        )
+        competitor_families = sorted(
+            family for family, checks in family_checks.items() if checks["competitor_separation"]
+        )
+        family_domain = residual_concentration["source_family_domain"]
+        failure_concentration = (
+            "Remaining hidden-causal failures are source-family heterogeneous: "
+            f"overlap masking is detected in {overlap_families or ['none']} and competitor "
+            f"separation in {competitor_families or ['none']}; the frozen family rule passes "
+            f"{family_domain['passing_families']} and fails {family_domain['failing_families']}. "
+            "The evidence therefore localizes the residual to overlap/source-family acoustic "
+            "conditions rather than a uniform decoder failure; device/noise is represented only "
+            "through the frozen corpus-device families."
+        )
+    else:
+        failure_concentration = (
+            "Remaining posterior failures are reported in the anchor-absent, anchor-overlap, "
+            "direct-handoff, silence-gap, pause/resume, takeover, and short-replacement slices; "
+            "hidden-stage localization is not available."
+        )
     text = "# FROZEN-CEILING-1 final decision\n\n"
     text += "This report is generated only after the scored artifacts exist. It is development-known path-selection evidence, not production readiness or a fresh holdout.\n\n"
     text += "## Ordered answers\n\n"
     answers = [
-        "Yes as the bounded evaluator floor: G reproduces the shared GT Simple Anchor event ledger across the predeclared confirmation frontier without neural evidence. This does not declare one scalar utility or production readiness.",
+        "Yes as the bounded evaluator floor: every predeclared G arm is simulated independently from exact-source-time GT activity, while the 500 ms arm exactly reproduces the sealed issue-98 Simple Anchor reference. This does not declare one scalar utility or production readiness.",
         f"At the predeclared {persistence} ms / 0.5 diagnostic cell, the action-policy plus neural gap is recorded as G→S-current below; the full frontier remains authoritative.",
         "S-probe versus S-current is quantified below at the fixed diagnostic cell; no architecture or threshold was selected on the held-out families.",
         f"P-C versus S-probe has Pareto counts {pc_vs_scalar}; the fixed-cell delta is recorded below.",
         f"P-NC versus P-C has Pareto counts {pnc_vs_pc}; future context remains diagnostic and its frontier delay includes the future evidence availability.",
-        f"The fixed-cell residual diagnostics are {json.dumps((hidden_cells.get('H-C') or {'metrics': causal})['metrics']['diagnostic_slices'], sort_keys=True)} and the topology metrics below retain direct handoff, silence-gap handoff, pause/resume, overlap return, overlap takeover, and short-backchannel slices.",
+        failure_concentration,
         (
             "Yes; proceed to native causal S2."
             if next_issue == "NATIVE-S2-1"
@@ -887,7 +934,7 @@ def render_final_decision() -> str:
         hidden,
         f"Selected path: {path}.",
         rejected,
-        f"The corrected committed-live-only replay changed contamination seconds per active speech hour from {vad_old['exclusive_other_contamination_seconds_per_active_speech_hour']:.3f} to {vad_new['exclusive_other_contamination_seconds_per_active_speech_hour']:.3f}; this is integration hygiene, not teacher selection.",
+        f"No: excluding pre-roll from confirmation did not reverse or explain away the issue-98 VAD sensitivity; contamination increased from {vad_old['exclusive_other_contamination_seconds_per_active_speech_hour']:.3f} to {vad_new['exclusive_other_contamination_seconds_per_active_speech_hour']:.3f} seconds per active speech hour. The corrected replay changes the numeric estimate but preserves the qualitative interpretation that a later persistent-state gating A/B is required; it remains integration hygiene, not teacher selection.",
         "Actual persistent-state VAD gating remains deferred until a viable oracle-binding path and native S2 pass. The recorded duty-cycle split supports a later A/B but cannot validate the gated model trajectory.",
         f"Single next issue: {next_issue}.",
     ]

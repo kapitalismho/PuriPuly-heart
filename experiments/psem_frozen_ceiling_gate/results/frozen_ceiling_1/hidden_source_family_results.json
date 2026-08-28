@@ -3,9 +3,11 @@
     "action_reference_ledger_sha256": "0294d0fe35964e138fd9f4a295adbb913056bccc0a0ab2ffa9c6b015b772ae19",
     "config_sha256": "1b0f1f69f3bbca706dca11c4b731dd4992e58251eb188d5ca39bc7929d7cc5d2",
     "hidden_config_sha256": "96077e03e8d7cf8409224ecb22511e1d46daca103a8bb45af4a010bf72df6c8e",
+    "hidden_extraction_compatibility_sha256": "b2f7599538416e6ead3827569e8460e77aad4b4304b9cb1516ca0fadfa709d39",
     "hidden_extraction_receipt_sha256": "93e24d4047607568a9a2f710fe05db94f4a02b5fc87d03106df0b63080744bd7",
     "hidden_representation_receipt_sha256": "bcd670ec31108e54139efb2ad719b58a303290ed3d96549f8fb131ce5686da6b",
     "hidden_training_config_sha256": "0b35f9f65639e322a70caab315ed0b01c68a73a8f85471cb079d9a0031bf96a3",
+    "hidden_trigger_revalidation_sha256": "47f1c957f1d2de803d05e220f54510982bfc6af486bada8c5b6f8892e36ee5b3",
     "oracle_mapping_ledger_sha256": "43064f16b2fc2419b681a99c81a31cd8e2cb95362624f35d99360665902c5525",
     "split_manifest_sha256": "f3d10d6a0268e42c7f5aeda21958cecc53512267a6ef2c843f9acfa25a4c7b46"
   },

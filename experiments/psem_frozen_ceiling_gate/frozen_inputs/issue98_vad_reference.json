@@ -1,0 +1,80 @@
+{
+  "production_vad": {
+    "active_speech_hours": 6.725263888888889,
+    "anchor_uncertain_active_speech_seconds": 38.676,
+    "backdated_boundary_error_ms": {
+      "p50": -230.0,
+      "p90": -30.0
+    },
+    "exclusive_other_contamination_seconds": 12678.801,
+    "exclusive_other_contamination_seconds_per_active_speech_hour": 1885.2495916104076,
+    "exclusive_other_contamination_upper_bound_seconds": 20717.409,
+    "false_cut_count": 1563,
+    "masked_active_speech_seconds": 764.657,
+    "masked_seconds": 1422.644,
+    "matched_replacement_count": 1032,
+    "missed_replacement_count": 1766,
+    "predicted_cut_count": 2595,
+    "reference_replacement_count": 2798,
+    "replacement_emit_delay_ms": {
+      "p50": 1042.5,
+      "p90": 1314.5
+    },
+    "source_count": 19,
+    "speaker_induced_cut_count_per_active_speech_hour": 385.85846486816916,
+    "speaker_protection_enabled_fraction": 0.6571480190919733,
+    "topology": {
+      "clean_direct_different_speaker_handoff": {
+        "eligible_episode_count": 197,
+        "episodes_with_aligned_cut": 1,
+        "episodes_with_predicted_cut": 51,
+        "episodes_with_reference_replacement": 128,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": null
+      },
+      "overlap_return": {
+        "eligible_episode_count": 918,
+        "episodes_with_aligned_cut": 5,
+        "episodes_with_predicted_cut": 61,
+        "episodes_with_reference_replacement": 327,
+        "overlap_return_preservation_rate": 0.9335511982570806,
+        "overlap_takeover_success_rate": null
+      },
+      "overlap_takeover": {
+        "eligible_episode_count": 499,
+        "episodes_with_aligned_cut": 4,
+        "episodes_with_predicted_cut": 128,
+        "episodes_with_reference_replacement": 381,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": 0.008016032064128256
+      },
+      "same_speaker_silence_gap_resume": {
+        "eligible_episode_count": 5864,
+        "episodes_with_aligned_cut": 6,
+        "episodes_with_predicted_cut": 755,
+        "episodes_with_reference_replacement": 946,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": null
+      },
+      "short_backchannel_return": {
+        "eligible_episode_count": 791,
+        "episodes_with_aligned_cut": 5,
+        "episodes_with_predicted_cut": 348,
+        "episodes_with_reference_replacement": 336,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": null
+      },
+      "silence_gap_different_speaker_handoff": {
+        "eligible_episode_count": 1472,
+        "episodes_with_aligned_cut": 3,
+        "episodes_with_predicted_cut": 788,
+        "episodes_with_reference_replacement": 1097,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": null
+      }
+    },
+    "unanchored_active_speech_seconds": 7999.932
+  },
+  "schema_version": "psem.frozen_ceiling.issue98_vad_reference.v1",
+  "source_path": "experiments/psem_ontology_simplification_gate/results/eval/production_vad_sensitivity.json"
+}

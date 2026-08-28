@@ -15,17 +15,20 @@ from experiments.psem_frozen_ceiling_gate.evaluate_ceiling import (
     aggregate_rows,
     session_row,
 )
-from experiments.psem_relative_occupancy_gate.io_utils import sha256_file, write_json, write_jsonl
+from experiments.psem_frozen_ceiling_gate.experiment_support import (
+    load_json,
+    sha256_file,
+    write_json,
+    write_jsonl,
+)
 
 REPOSITORY_ROOT = PACKAGE_ROOT.parents[1]
-ISSUE98_RESULTS = REPOSITORY_ROOT / "experiments" / "psem_ontology_simplification_gate" / "results"
+FROZEN_INPUT_ROOT = PACKAGE_ROOT / "frozen_inputs"
 
 
 def read_gate(role: str) -> dict[str, dict[str, Any]]:
-    path = ISSUE98_RESULTS / role / "production_vad_speech_gate.jsonl"
-    receipt = json.loads(
-        (ISSUE98_RESULTS / role / "production_vad_replay_receipt.json").read_text(encoding="utf-8")
-    )
+    path = FROZEN_INPUT_ROOT / f"{role}_production_vad_speech_gate.jsonl"
+    receipt = load_json(FROZEN_INPUT_ROOT / f"{role}_production_vad_replay_receipt.json")
     if receipt["speech_gate_sha256"] != sha256_file(path):
         raise ValueError("production VAD gate differs from its pinned receipt")
     result = {}
@@ -137,16 +140,8 @@ def run() -> dict[str, Any]:
         )
     interval_path = RESULTS_ROOT / "vad_support_intervals.jsonl"
     write_jsonl(interval_path, all_intervals)
-    prior_path = ISSUE98_RESULTS / "eval" / "production_vad_sensitivity.json"
-    prior = json.loads(prior_path.read_text(encoding="utf-8"))
-    prior_row = next(
-        value
-        for value in prior["rows"]
-        if value["family"] == "streaming_sortformer"
-        and value["arm"] == "s1_oracle_anchor"
-        and value["candidate"] == "simple_anchor"
-        and value["replacement_confirm_ms"] == 500
-    )
+    prior_path = FROZEN_INPUT_ROOT / "issue98_vad_reference.json"
+    prior = load_json(prior_path)
     result = {
         "schema_version": "psem.frozen_ceiling.vad_support_hygiene.v1",
         "speaker_model_inference_performed": False,
@@ -161,7 +156,7 @@ def run() -> dict[str, Any]:
             "row_count": len(all_intervals),
         },
         "corrected_cached_posterior_replay": aggregate_rows(rows),
-        "issue98_mixed_support_reference": prior_row["production_vad"],
+        "issue98_mixed_support_reference": prior["production_vad"],
         "issue98_reference_sha256": sha256_file(prior_path),
         "interpretation_scope": "integration hygiene only; not teacher-path selection or a VAD-gating verdict",
     }

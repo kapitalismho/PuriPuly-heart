@@ -4,7 +4,7 @@ This report is generated only after the scored artifacts exist. It is developmen
 
 ## Ordered answers
 
-1. Yes as the bounded evaluator floor: G reproduces the shared GT Simple Anchor event ledger across the predeclared confirmation frontier without neural evidence. This does not declare one scalar utility or production readiness.
+1. Yes as the bounded evaluator floor: every predeclared G arm is simulated independently from exact-source-time GT activity, while the 500 ms arm exactly reproduces the sealed issue-98 Simple Anchor reference. This does not declare one scalar utility or production readiness.
 
 2. At the predeclared 500 ms / 0.5 diagnostic cell, the action-policy plus neural gap is recorded as G→S-current below; the full frontier remains authoritative.
 
@@ -14,7 +14,7 @@ This report is generated only after the scored artifacts exist. It is developmen
 
 5. P-NC versus P-C has Pareto counts {'left_dominates': 0, 'right_dominates': 0, 'tradeoff': 18}; future context remains diagnostic and its frontier delay includes the future evidence availability.
 
-6. The fixed-cell residual diagnostics are {"anchor_absent_live": {"mean_hazard": 0.5494415374860946, "support_seconds": 1918.21}, "anchor_only": {"mean_hazard": 0.13322748833479311, "support_seconds": 18580.731}, "anchor_overlap": {"mean_hazard": 0.2536533551837219, "support_seconds": 1554.42}} and the topology metrics below retain direct handoff, silence-gap handoff, pause/resume, overlap return, overlap takeover, and short-backchannel slices.
+6. Remaining hidden-causal failures are source-family heterogeneous: overlap masking is detected in ['alimeeting_far_ch0'] and competitor separation in ['none']; the frozen family rule passes ['alimeeting_far_ch0'] and fails ['ami_mix_headset']. The evidence therefore localizes the residual to overlap/source-family acoustic conditions rather than a uniform decoder failure; device/noise is represented only through the frozen corpus-device families.
 
 7. No; the posterior result does not yet authorize native S2.
 
@@ -24,7 +24,7 @@ This report is generated only after the scored artifacts exist. It is developmen
 
 10. Further decoder proliferation and direct scalar-posterior distillation are rejected; task adaptation is now justified.
 
-11. The corrected committed-live-only replay changed contamination seconds per active speech hour from 1885.250 to 2149.283; this is integration hygiene, not teacher selection.
+11. No: excluding pre-roll from confirmation did not reverse or explain away the issue-98 VAD sensitivity; contamination increased from 1885.250 to 2149.283 seconds per active speech hour. The corrected replay changes the numeric estimate but preserves the qualitative interpretation that a later persistent-state gating A/B is required; it remains integration hygiene, not teacher selection.
 
 12. Actual persistent-state VAD gating remains deferred until a viable oracle-binding path and native S2 pass. The recorded duty-cycle split supports a later A/B but cannot validate the gated model trajectory.
 

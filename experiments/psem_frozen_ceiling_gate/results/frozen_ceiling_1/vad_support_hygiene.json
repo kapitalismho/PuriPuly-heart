@@ -165,7 +165,7 @@
     },
     "unanchored_active_speech_seconds": 7999.932
   },
-  "issue98_reference_sha256": "70f4d60d21cf734e53c9ddaae40fa8175308f803d909db3308053c948d930eef",
+  "issue98_reference_sha256": "2b8eb5531ddb832b55b93ee85677c8fcc1000e9de8ac4f1b0bd70fb4c517789b",
   "pre_roll_ms": 500,
   "schema_version": "psem.frozen_ceiling.vad_support_hygiene.v1",
   "speaker_model_inference_performed": false,

@@ -1,0 +1,130 @@
+{
+  "artifacts": {
+    "action_reference_coverage": {
+      "path": "experiments/psem_frozen_ceiling_gate/action_reference_coverage.json",
+      "sha256": "eb893222c2ca6b709263d65701c06bf73560bacbc4fc0e78dc611b90e6ee1959"
+    },
+    "action_reference_ledger": {
+      "path": "experiments/psem_frozen_ceiling_gate/action_reference_ledger.jsonl",
+      "sha256": "0294d0fe35964e138fd9f4a295adbb913056bccc0a0ab2ffa9c6b015b772ae19"
+    },
+    "dev_gt_action_events": {
+      "path": "experiments/psem_relative_occupancy_gate/results/dev/gate0_oracle_events.jsonl",
+      "sha256": "e56152d070b361beb53417542c473d6039f9d2496f6cda6fdf1fecad4d714d50"
+    },
+    "dev_gt_action_metrics": {
+      "path": "experiments/psem_relative_occupancy_gate/results/dev/gate0_oracle_metrics.json",
+      "sha256": "5892e5883b2d2d63392d4aebd0ac13666f0534d391c8ab78a59749771ef7ec24"
+    },
+    "dev_manifest": {
+      "path": "experiments/psem_relative_occupancy_gate/results/dev/relative_occupancy_manifest.jsonl",
+      "sha256": "b5a6d1369fc1165adb98ce91508b7f8b171ad2a981495b33e0060a324e6176b9"
+    },
+    "dev_sortformer_receipt": {
+      "path": "experiments/psem_relative_occupancy_gate/results/dev/sortformer_model_receipt.json",
+      "sha256": "2131a251304da65006dd116d59ab4310311356c5909bc570e41ebb6978e5dc03"
+    },
+    "dev_vad_gate": {
+      "path": "experiments/psem_ontology_simplification_gate/results/dev/production_vad_speech_gate.jsonl",
+      "sha256": "fbbe457658db27679bb3529889999eb1f446090869ac72ae07571aab0be4a4a7"
+    },
+    "dev_vad_receipt": {
+      "path": "experiments/psem_ontology_simplification_gate/results/dev/production_vad_replay_receipt.json",
+      "sha256": "5084b469934855921bab0f72ead405729cfd1dcda5b76b64dcb630058277020f"
+    },
+    "eval_manifest": {
+      "path": "experiments/psem_relative_occupancy_gate/results/eval/relative_occupancy_manifest.jsonl",
+      "sha256": "38260d1dddcebc546d9b9b5672d3185849fc433a9027bdf2831094196c2a2b30"
+    },
+    "eval_sortformer_receipt": {
+      "path": "experiments/psem_relative_occupancy_gate/results/eval/sortformer_model_receipt.json",
+      "sha256": "b402a194ca919f25cdf7d75e984ec99fd9cc303471c8e3b1d779482714e6ae42"
+    },
+    "eval_vad_gate": {
+      "path": "experiments/psem_ontology_simplification_gate/results/eval/production_vad_speech_gate.jsonl",
+      "sha256": "b822ae34df11493aa0bf79b47795bf9b145c6dfd33bbdee2b81c4516f87e60ca"
+    },
+    "eval_vad_receipt": {
+      "path": "experiments/psem_ontology_simplification_gate/results/eval/production_vad_replay_receipt.json",
+      "sha256": "216314266492fd7165c8a63eb88e067c3cf27e1b21c7ff71a04480d55e000cc4"
+    },
+    "experiment_config": {
+      "path": "experiments/psem_frozen_ceiling_gate/config.json",
+      "sha256": "1b0f1f69f3bbca706dca11c4b731dd4992e58251eb188d5ca39bc7929d7cc5d2"
+    },
+    "feature_contract": {
+      "path": "experiments/psem_frozen_ceiling_gate/posterior_features.py",
+      "sha256": "5fd88a1aaf9935ade5a7179bbe2ff3cd0d1d13742f6748b44118b57321a80f92"
+    },
+    "gt_action_oracle": {
+      "path": "experiments/psem_relative_occupancy_gate/decoder.py",
+      "sha256": "b836be0cab5f401c38e294f4e7c48af90e431668c3ac8c5c6460bff371d6c5f8"
+    },
+    "issue97_config": {
+      "path": "experiments/psem_relative_occupancy_gate/config.json",
+      "sha256": "4d08c9f2216388dc30ff1c7134f0488a29cc45e4dce383b1ce6c2eae9a145ecb"
+    },
+    "issue98_config": {
+      "path": "experiments/psem_ontology_simplification_gate/config.json",
+      "sha256": "4e61df08cf2c27b34b70b86c945d65b9f9abf9c95100cc16830ab855f38c8e72"
+    },
+    "issue98_dev_ontology_sufficiency": {
+      "path": "experiments/psem_ontology_simplification_gate/results/dev/ontology_sufficiency.json",
+      "sha256": "528979d5ee6e57004bdae9666fcacdcfb3a466dd01ccac178778579842d8fbd3"
+    },
+    "issue98_dev_product_frontiers": {
+      "path": "experiments/psem_ontology_simplification_gate/results/dev/product_frontiers.json",
+      "sha256": "b8cf7ef8a61b64876c37674e592551cdd2821bd0b583bda6bed883c9eaee27cf"
+    },
+    "issue98_eval_product_frontiers": {
+      "path": "experiments/psem_ontology_simplification_gate/results/eval/product_frontiers.json",
+      "sha256": "0bba2e38defc680488f9d13f0812c7ac362527386766287c407ca56bd5d551ba"
+    },
+    "issue98_evaluator": {
+      "path": "experiments/psem_ontology_simplification_gate/evaluate_simplified_ontologies.py",
+      "sha256": "015b2c1a7ef600c99885af5a4c1e86f386fec357e905ca9b1f572019682b41b4"
+    },
+    "oracle_mapping_code": {
+      "path": "experiments/psem_relative_occupancy_gate/model_decode.py",
+      "sha256": "83469df925883cd5212a03bef6b9fd666b5f03f18ba8b65739b2a99ea0322fe4"
+    },
+    "oracle_mapping_coverage": {
+      "path": "experiments/psem_frozen_ceiling_gate/oracle_mapping_coverage.json",
+      "sha256": "6723cc7150b0f6a17e720e4950b59d30554320af821632e41976297671447b35"
+    },
+    "oracle_mapping_ledger": {
+      "path": "experiments/psem_frozen_ceiling_gate/oracle_mapping_ledger.jsonl",
+      "sha256": "43064f16b2fc2419b681a99c81a31cd8e2cb95362624f35d99360665902c5525"
+    },
+    "product_evaluator": {
+      "path": "experiments/psem_relative_occupancy_gate/model_evaluate.py",
+      "sha256": "15cc61daab0faaa25ab7487798cfc45082802cf9f0ceca1f1345ed6bb81f0bcc"
+    },
+    "trace_reuse_receipt": {
+      "path": "experiments/psem_ontology_simplification_gate/trace_reuse_receipt.json",
+      "sha256": "5edc64fb3e7aeaa2151a45883890ffe8b03b6cc1d6d9e2b848fd7baf727bc0d9"
+    }
+  },
+  "authority": {
+    "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/99",
+    "sha256": "5ced0919f627b4022b3836d47d8fadcbaebb304f30c7d1dfe5d3339343c176f9"
+  },
+  "dirty_state_at_issue99_start": [],
+  "new_sortformer_inference_performed": false,
+  "new_sortformer_inference_required": false,
+  "repository_baseline_sha": "fb92cf10bbbba96f25207358b65b21c49f63d68f",
+  "schema_version": "psem.frozen_ceiling.evidence_reuse_receipt.v1",
+  "sortformer": {
+    "backend": "vulkan",
+    "bench_sha256": "e26f76e36568992a445251f197de44fa5528499f788120144947fa2aedef6c12",
+    "model_repository": "handy-computer/diar_streaming_sortformer_4spk-v2.1-gguf",
+    "model_revision": "7ef0c15dc8f9d717e9d24fac29a6e6551e9c6ddf",
+    "model_sha256": "a5dacdc650790266c7a362e54e6bf51952015487edaa606c4e11632bc32442a9",
+    "native_frame_ms": 80,
+    "preset": "low_latency",
+    "recorded_algorithmic_lookahead_ms": 1040,
+    "source_commit": "d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+    "source_repository": "https://github.com/handy-computer/transcribe.cpp.git",
+    "threads": 8
+  }
+}

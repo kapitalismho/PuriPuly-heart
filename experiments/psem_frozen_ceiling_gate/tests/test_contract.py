@@ -21,6 +21,10 @@ from experiments.psem_frozen_ceiling_gate.evaluate_ceiling import (
     _per_source_family_point,
     decode_scores,
 )
+from experiments.psem_frozen_ceiling_gate.experiment_support import (
+    sha256_file,
+    simulate_gt_session,
+)
 from experiments.psem_frozen_ceiling_gate.extract_hidden_features import (
     _probability_dump,
     _source_input,
@@ -30,7 +34,6 @@ from experiments.psem_frozen_ceiling_gate.posterior_features import (
     temporal_features,
 )
 from experiments.psem_frozen_ceiling_gate.run_hidden_probe import _fit_hidden_mlp, hidden_base
-from experiments.psem_relative_occupancy_gate.io_utils import sha256_file
 
 
 def test_causal_features_do_not_use_future_or_cross_episode() -> None:
@@ -192,6 +195,26 @@ def test_hidden_representation_is_single_predeclared_point() -> None:
     assert receipt["hidden_config"]["sha256"] == sha256_file(PACKAGE_ROOT / "hidden_config.json")
 
 
+def test_hidden_extraction_compatibility_preserves_original_boundary() -> None:
+    compatibility = json.loads(
+        (PACKAGE_ROOT / "hidden_extraction_compatibility.json").read_text(encoding="utf-8")
+    )
+    extraction_path = (
+        PACKAGE_ROOT / "results" / "frozen_ceiling_1" / "hidden_extraction_receipt.json"
+    )
+    extraction = json.loads(extraction_path.read_text(encoding="utf-8"))
+    assert compatibility["status"] == "compatible_existing_features"
+    assert compatibility["extraction_receipt_sha256"] == sha256_file(extraction_path)
+    assert compatibility["original_extractor_sha256"] == extraction["extractor_sha256"]
+    assert compatibility["current_extractor_sha256"] == sha256_file(
+        PACKAGE_ROOT / "extract_hidden_features.py"
+    )
+    assert compatibility["source_count"] == extraction["source_count"] == 29
+    for role in ("dev", "eval"):
+        receipt = compatibility["authoritative_receipts"][role]
+        assert receipt["sha256"] == sha256_file(PACKAGE_ROOT / receipt["path"])
+
+
 def test_hidden_rows_align_to_authoritative_frames_and_oracle_slots(tmp_path: Path) -> None:
     feature_path = tmp_path / "hidden.npz"
     values = np.arange(4 * 192, dtype=np.float32).reshape(4, 192)
@@ -237,11 +260,9 @@ def test_hidden_rows_align_to_authoritative_frames_and_oracle_slots(tmp_path: Pa
 
 
 def test_hidden_source_input_supports_authoritative_dev_and_eval_materializations() -> None:
-    root = PACKAGE_ROOT.parent / "psem_relative_occupancy_gate" / "results"
-    dev = json.loads((root / "dev" / "sortformer_model_receipt.json").read_text())[
-        "source_receipts"
-    ][0]
-    eval_source = json.loads((root / "eval" / "sortformer_model_receipt.json").read_text())[
+    root = PACKAGE_ROOT / "frozen_inputs"
+    dev = json.loads((root / "dev_sortformer_model_receipt.json").read_text())["source_receipts"][0]
+    eval_source = json.loads((root / "eval_sortformer_model_receipt.json").read_text())[
         "source_receipts"
     ][0]
     dev_input = _source_input(dev)
@@ -253,18 +274,53 @@ def test_hidden_source_input_supports_authoritative_dev_and_eval_materialization
     assert eval_input["expected_sha256"] == eval_source["inference_audio"]["sha256"]
 
 
+def test_gt_frontier_arms_are_simulated_from_source_time() -> None:
+    cfg = config()
+    sessions = [value for value in load_sessions((500,)) if value.role == "eval"]
+    reference_count = 0
+    long_arm_count = 0
+    for session in sessions:
+        reference = simulate_gt_session(
+            session.manifest,
+            replacement_confirmation_samples=500 * 16,
+            enrollment_samples=int(cfg["enrollment_ms"]) * 16,
+            silence_reset_samples=int(cfg["silence_reset_ms"]) * 16,
+        )
+        assert [value.to_dict() for value in reference.events] == [
+            value.to_dict() for value in session.reference.events
+        ]
+        long_arm = simulate_gt_session(
+            session.manifest,
+            replacement_confirmation_samples=1000 * 16,
+            enrollment_samples=int(cfg["enrollment_ms"]) * 16,
+            silence_reset_samples=int(cfg["silence_reset_ms"]) * 16,
+        )
+        reference_count += len(reference.events)
+        long_arm_count += len(long_arm.events)
+    assert reference_count > 0
+    assert 0 < long_arm_count < reference_count
+
+
+def test_evidence_receipt_runtime_artifacts_are_self_contained() -> None:
+    receipt = json.loads((PACKAGE_ROOT / "evidence_reuse_receipt.json").read_text())
+    for value in receipt["artifacts"].values():
+        path = PACKAGE_ROOT.parents[1] / value["path"]
+        assert path.is_file()
+        assert sha256_file(path) == value["sha256"]
+
+
 def test_gt_family_reference_is_derived_from_per_source_rows() -> None:
     value = json.loads(
-        (PACKAGE_ROOT / "results" / "frozen_ceiling_1" / "gt_causal_action_frontier.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            PACKAGE_ROOT / "results" / "frozen_ceiling_1" / "gt_causal_action_frontier.json"
+        ).read_text(encoding="utf-8")
     )
     families = _per_source_family_point(value, "G", "gt_fixed_confirmation", 1.0, 500)
     pooled = next(row for row in value["rows"] if row["confirmation_ms"] == 500)
     assert set(families) == set(config()["split"]["families"])
-    assert sum(row["source_count"] for row in families.values()) == pooled["metrics"][
-        "source_count"
-    ]
+    assert (
+        sum(row["source_count"] for row in families.values()) == pooled["metrics"]["source_count"]
+    )
 
 
 def test_hidden_mlp_optimizer_reaches_train_fit_sanity() -> None:
@@ -306,8 +362,7 @@ def test_hidden_failure_can_be_localized_to_a_frozen_source_family() -> None:
         }
     }
     g_families = {
-        family: {"overlap_takeover_success_rate": 0.5}
-        for family in config()["split"]["families"]
+        family: {"overlap_takeover_success_rate": 0.5} for family in config()["split"]["families"]
     }
     first, second = config()["split"]["families"]
     result = _hidden_failure_concentration(

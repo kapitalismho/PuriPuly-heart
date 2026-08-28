@@ -1,10 +1,10 @@
 {
-  "final_decision_sha256": "e3b594d2f41383888dce8bd032a7479a50a8d985d487f6600e56ac4bc0650355",
+  "final_decision_sha256": "4bc1034f214e674ef7e0eda4af6815fd8b75a67d7ae1859fbb5319ad312ad268",
   "hidden_artifacts": {
-    "H-C": "828eba3193852441a01a7bcd24f8df39a64c3b1d29216e94de25805c512ef2ad",
-    "H-NC": "e5227eb21561480f6b25c7f35ccf9617b4349faaf7e5e694492b991e28d883d3",
+    "H-C": "8232bdf775f876a63ed675ea22e5bd2b08d69475f1cb9abe5bd4cb66be74f9eb",
+    "H-NC": "f6db8f150d4795c1795fdb5ee922b97559c2d2b24978556b3f951534d223e8ed",
     "extraction": "93e24d4047607568a9a2f710fe05db94f4a02b5fc87d03106df0b63080744bd7",
-    "source_families": "fd588219ad75d4a87aa6230d365264e4f4c0cedcf953508655d3d0be971de159"
+    "source_families": "60be60492f6e74533f7d77781cc5ff1fba1611ebdab721feec2c82e75e831bb7"
   },
   "schema_version": "psem.frozen_ceiling.evaluation_receipt.v1",
   "status": "hidden_ceiling_interpreted"
