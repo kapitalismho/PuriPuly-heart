@@ -31,6 +31,7 @@ from experiments.psem_relative_occupancy_gate.model_evaluate import (
 
 RESULTS_ROOT = PACKAGE_ROOT / "results" / "frozen_ceiling_1"
 HIDDEN_CONFIG_PATH = PACKAGE_ROOT / "hidden_config.json"
+HIDDEN_TRAINING_CONFIG_PATH = PACKAGE_ROOT / "hidden_training_config.json"
 REPRESENTATION_RECEIPT_PATH = PACKAGE_ROOT / "hidden_representation_receipt.json"
 SPLIT_PATH = PACKAGE_ROOT / "split_manifest.json"
 CONFIG_PATH = PACKAGE_ROOT / "config.json"
@@ -45,6 +46,7 @@ def _expected_hidden_provenance() -> dict[str, str]:
     return {
         "config_sha256": sha256_file(CONFIG_PATH),
         "hidden_config_sha256": sha256_file(HIDDEN_CONFIG_PATH),
+        "hidden_training_config_sha256": sha256_file(HIDDEN_TRAINING_CONFIG_PATH),
         "split_manifest_sha256": sha256_file(SPLIT_PATH),
         "hidden_representation_receipt_sha256": sha256_file(REPRESENTATION_RECEIPT_PATH),
         "hidden_extraction_receipt_sha256": sha256_file(EXTRACTION_RECEIPT_PATH),

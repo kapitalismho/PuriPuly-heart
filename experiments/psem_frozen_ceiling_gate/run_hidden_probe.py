@@ -22,10 +22,12 @@ from experiments.psem_frozen_ceiling_gate.posterior_features import (
 )
 from experiments.psem_frozen_ceiling_gate.run_posterior_probe import (
     LinearProbe,
+    Standardizer,
     TinyMLPProbe,
+    balanced_weights,
     fit_linear,
-    fit_mlp,
     fit_sanity,
+    sigmoid,
     training_data,
 )
 from experiments.psem_relative_occupancy_gate.io_utils import (
@@ -37,6 +39,7 @@ from experiments.psem_relative_occupancy_gate.io_utils import (
 
 REPRESENTATION_RECEIPT_PATH = PACKAGE_ROOT / "hidden_representation_receipt.json"
 HIDDEN_CONFIG_PATH = PACKAGE_ROOT / "hidden_config.json"
+HIDDEN_TRAINING_CONFIG_PATH = PACKAGE_ROOT / "hidden_training_config.json"
 EXTRACTION_RECEIPT_PATH = RESULTS_ROOT / "hidden_extraction_receipt.json"
 SPLIT_PATH = PACKAGE_ROOT / "split_manifest.json"
 CONFIG_PATH = PACKAGE_ROOT / "config.json"
@@ -178,9 +181,99 @@ def _compact_source_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return result
 
 
+def _fit_hidden_mlp(
+    values: np.ndarray,
+    targets: np.ndarray,
+    duration_weights: np.ndarray,
+    *,
+    cfg: dict[str, Any],
+    hidden_cfg: dict[str, Any],
+    training_cfg: dict[str, Any],
+    seed: int,
+) -> tuple[TinyMLPProbe, dict[str, Any], dict[str, Any]]:
+    if training_cfg["optimizer"] != "adam":
+        raise ValueError("hidden training optimizer differs from the frozen definition")
+    standardizer = Standardizer.fit(values)
+    features = standardizer.apply(values)
+    rng = np.random.default_rng(seed)
+    hidden_units = int(cfg["tiny_mlp_hidden_units"])
+    first = rng.normal(0.0, 0.08, (features.shape[1], hidden_units)).astype(np.float32)
+    first_bias = np.zeros(hidden_units, dtype=np.float32)
+    second = rng.normal(0.0, 0.08, hidden_units).astype(np.float32)
+    second_bias = np.zeros(1, dtype=np.float32)
+    parameters = (first, first_bias, second, second_bias)
+    first_moments = tuple(np.zeros_like(value) for value in parameters)
+    second_moments = tuple(np.zeros_like(value) for value in parameters)
+    sample_weights = balanced_weights(targets, duration_weights)
+    batch = int(cfg["training_batch_size"])
+    beta1 = float(training_cfg["beta1"])
+    beta2 = float(training_cfg["beta2"])
+    epsilon = float(training_cfg["epsilon"])
+    learning_rate = float(training_cfg["learning_rate"])
+    weight_decay = float(training_cfg["weight_decay"])
+    max_epochs = int(training_cfg["maximum_epochs"])
+    check_interval = int(training_cfg["sanity_check_interval_epochs"])
+    step = 0
+    sanity: dict[str, Any] = {}
+    for epoch in range(1, max_epochs + 1):
+        order = rng.permutation(len(features))
+        for start in range(0, len(order), batch):
+            chosen = order[start : start + batch]
+            x = features[chosen]
+            y = targets[chosen]
+            w = sample_weights[chosen]
+            hidden_pre = x @ first + first_bias
+            hidden = np.maximum(hidden_pre, 0.0)
+            error = (sigmoid(hidden @ second + float(second_bias[0])) - y) * w
+            hidden_error = np.outer(error, second) * (hidden_pre > 0.0)
+            gradients = (
+                x.T @ hidden_error / len(chosen) + weight_decay * first,
+                hidden_error.mean(axis=0),
+                hidden.T @ error / len(chosen) + weight_decay * second,
+                np.asarray([error.mean()], dtype=np.float32),
+            )
+            step += 1
+            correction = learning_rate * np.sqrt(1.0 - beta2**step) / (1.0 - beta1**step)
+            for parameter, first_moment, second_moment, gradient in zip(
+                parameters, first_moments, second_moments, gradients, strict=True
+            ):
+                first_moment *= beta1
+                first_moment += (1.0 - beta1) * gradient
+                second_moment *= beta2
+                second_moment += (1.0 - beta2) * np.square(gradient)
+                parameter -= correction * first_moment / (np.sqrt(second_moment) + epsilon)
+        if epoch % check_interval == 0 or epoch == max_epochs:
+            probe = TinyMLPProbe(
+                standardizer,
+                first,
+                first_bias,
+                second,
+                float(second_bias[0]),
+            )
+            sanity = fit_sanity(probe, values, targets, duration_weights)
+            if sanity["duration_weighted_average_precision"] >= float(
+                hidden_cfg["train_fit_min_average_precision"]
+            ) and sanity["duration_weighted_accuracy"] >= float(
+                hidden_cfg["train_fit_min_accuracy"]
+            ):
+                return probe, sanity, {
+                    "optimizer": "adam",
+                    "completed_epochs": epoch,
+                    "maximum_epochs": max_epochs,
+                    "status": "sanity_reached",
+                }
+    return probe, sanity, {
+        "optimizer": "adam",
+        "completed_epochs": max_epochs,
+        "maximum_epochs": max_epochs,
+        "status": "maximum_epochs_reached",
+    }
+
+
 def run() -> dict[str, Any]:
     cfg = config()
     hidden_cfg = load_json(HIDDEN_CONFIG_PATH)
+    training_cfg = load_json(HIDDEN_TRAINING_CONFIG_PATH)
     split_path = SPLIT_PATH
     split = load_json(split_path)
     folds = {str(value["held_out_family"]): value for value in split["folds"]}
@@ -203,6 +296,7 @@ def run() -> dict[str, Any]:
     provenance = {
         "config_sha256": sha256_file(CONFIG_PATH),
         "hidden_config_sha256": sha256_file(HIDDEN_CONFIG_PATH),
+        "hidden_training_config_sha256": sha256_file(HIDDEN_TRAINING_CONFIG_PATH),
         "split_manifest_sha256": sha256_file(split_path),
         "hidden_representation_receipt_sha256": sha256_file(REPRESENTATION_RECEIPT_PATH),
         "hidden_extraction_receipt_sha256": sha256_file(EXTRACTION_RECEIPT_PATH),
@@ -239,11 +333,25 @@ def run() -> dict[str, Any]:
             )
             train_x, train_y, train_w = training_data(train, matrices, cfg, seed)
             for probe_name in cfg["probe_classes"]:
-                probe = (
-                    fit_linear(train_x, train_y, train_w, cfg=cfg, seed=seed)
-                    if probe_name == "linear"
-                    else fit_mlp(train_x, train_y, train_w, cfg=cfg, seed=seed)
-                )
+                if probe_name == "linear":
+                    probe = fit_linear(train_x, train_y, train_w, cfg=cfg, seed=seed)
+                    sanity = fit_sanity(probe, train_x, train_y, train_w)
+                    optimization = {
+                        "optimizer": "sgd",
+                        "completed_epochs": int(cfg["training_epochs"]),
+                        "maximum_epochs": int(cfg["training_epochs"]),
+                        "status": "fixed_epochs_complete",
+                    }
+                else:
+                    probe, sanity, optimization = _fit_hidden_mlp(
+                        train_x,
+                        train_y,
+                        train_w,
+                        cfg=cfg,
+                        hidden_cfg=hidden_cfg,
+                        training_cfg=training_cfg,
+                        seed=seed,
+                    )
                 models[(condition, probe_name, held_family)] = probe
                 training_receipts.append(
                     {
@@ -253,7 +361,8 @@ def run() -> dict[str, Any]:
                         "train_source_ids": sorted(train_ids),
                         "eval_source_ids": sorted(eval_ids),
                         "future_context_ms": cfg["noncausal_horizon_ms"] if noncausal else 0,
-                        "train_fit_sanity": fit_sanity(probe, train_x, train_y, train_w),
+                        "optimization": optimization,
+                        "train_fit_sanity": sanity,
                     }
                 )
         for persistence in map(int, cfg["probe_confirmation_ms"]):

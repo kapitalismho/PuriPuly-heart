@@ -28,6 +28,8 @@ The production-VAD hygiene replay reuses the recorded issue-98 VAD spans. It mar
 
 HIDDEN-CEILING-1 fixes exactly one representation before hidden scoring: the 192-dimensional output of the eighteenth post-LN temporal Transformer block immediately before `diar.spk_head`. `sortformer_hidden_export.patch` adds readback only to the authoritative Q8_0/Vulkan/low-latency runtime. `extract_hidden_features.py` runs the exact padded inputs from the authoritative receipts, requires every instrumented posterior to match its cached trace within an absolute tolerance of 1e-6, and stores the large float32 features outside Git. Hidden causal and bounded-noncausal probes reuse the frozen split, oracle episode mapping, temporal taps, tiny probe classes, target, and product evaluator.
 
+The hidden tiny MLP keeps the predeclared 8-unit architecture and uses the training-only Adam schedule in `hidden_training_config.json`. It stops only when the already frozen train-fit AP and accuracy gates are both reached at a predeclared check interval, or at the fixed maximum epoch. This schedule does not inspect held-out metrics or alter the linear probe, hidden representation, features, target, split, score thresholds, or product evaluator.
+
 After the hidden implementation candidate passes its own pre-experiment review:
 
 ```powershell

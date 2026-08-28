@@ -28,7 +28,7 @@ from experiments.psem_frozen_ceiling_gate.posterior_features import (
     TemporalContract,
     temporal_features,
 )
-from experiments.psem_frozen_ceiling_gate.run_hidden_probe import hidden_base
+from experiments.psem_frozen_ceiling_gate.run_hidden_probe import _fit_hidden_mlp, hidden_base
 from experiments.psem_relative_occupancy_gate.io_utils import sha256_file
 
 
@@ -264,6 +264,30 @@ def test_gt_family_reference_is_derived_from_per_source_rows() -> None:
     assert sum(row["source_count"] for row in families.values()) == pooled["metrics"][
         "source_count"
     ]
+
+
+def test_hidden_mlp_optimizer_reaches_train_fit_sanity() -> None:
+    rng = np.random.default_rng(99)
+    negative = rng.normal(-2.0, 0.2, (100, 4)).astype(np.float32)
+    positive = rng.normal(2.0, 0.2, (100, 4)).astype(np.float32)
+    values = np.concatenate((negative, positive))
+    targets = np.concatenate((np.zeros(100), np.ones(100))).astype(np.float32)
+    weights = np.ones(200, dtype=np.float32)
+    probe, sanity, optimization = _fit_hidden_mlp(
+        values,
+        targets,
+        weights,
+        cfg=config(),
+        hidden_cfg=json.loads((PACKAGE_ROOT / "hidden_config.json").read_text(encoding="utf-8")),
+        training_cfg=json.loads(
+            (PACKAGE_ROOT / "hidden_training_config.json").read_text(encoding="utf-8")
+        ),
+        seed=199,
+    )
+    assert probe.predict(values).shape == targets.shape
+    assert sanity["duration_weighted_average_precision"] >= 0.8
+    assert sanity["duration_weighted_accuracy"] >= 0.7
+    assert optimization["status"] == "sanity_reached"
 
 
 def test_hidden_base_preserves_original_frame_after_episode_boundary_clipping(
