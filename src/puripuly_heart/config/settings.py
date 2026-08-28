@@ -74,6 +74,9 @@ from puripuly_heart.config.provider_values import (
     normalize_owned_referral_id,
 )
 from puripuly_heart.config.provider_values import (
+    STT_INTERNAL_SAMPLE_RATE_HZ as STT_INTERNAL_SAMPLE_RATE_HZ,
+)
+from puripuly_heart.config.provider_values import (
     custom_stt_selection_for_provider as custom_stt_selection_for_provider,
 )
 from puripuly_heart.config.provider_values import (
@@ -104,7 +107,6 @@ MANAGED_AUTH_CLAIM_SOURCES = (
     MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
     MANAGED_AUTH_CLAIM_SOURCE_QQ,
 )
-STT_INTERNAL_SAMPLE_RATE_HZ = 16000
 DEFAULT_DESKTOP_AUDIO_VAD_HANGOVER_MS = 500
 LEGACY_LOW_LATENCY_VAD_HANGOVER_MS = 600
 DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS = 500

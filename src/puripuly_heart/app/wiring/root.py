@@ -199,7 +199,7 @@ def create_llm_provider_from_resolved_config(
     managed_release_service: object | None = None,
     managed_delegate_ready: Callable[[], object] | None = None,
     runtime_logging: ProviderObservationPort | None = None,
-    compatibility_settings: _llm_factory.AppSettings | None = None,
+    compatibility_settings: _llm_factory.LlmCompatibilitySettings | None = None,
     managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
     managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
     qwen_low_latency_mode: bool = True,
@@ -219,7 +219,7 @@ def create_llm_provider_from_resolved_config(
 
 
 def create_llm_provider(
-    settings: _llm_factory.AppSettings,
+    settings: _llm_factory.LlmCompatibilitySettings,
     *,
     secrets: SecretStore,
     managed_release_service: object | None = None,

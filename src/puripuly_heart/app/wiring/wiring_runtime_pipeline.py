@@ -6,6 +6,7 @@ import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Protocol
 
 from puripuly_heart.app.ports.capture_vad_runtime import (
     PeerCaptureVadEventRuntime,
@@ -19,7 +20,8 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
 from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTranslationOwner
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.config.paths import default_http_extensions_dir
-from puripuly_heart.config.settings import AppSettings, STTProviderName, TranslationModel
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.translation_values import TranslationModel
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
@@ -80,6 +82,20 @@ from .wiring_translation_backend import create_translation_backend
 from .wiring_translation_runtime_configuration import (
     build_translation_runtime_config,
 )
+
+
+class RuntimePipelineSettings(Protocol):
+    secrets: object
+    translation: object
+    provider: object
+    osc: object
+    ui: object
+    stt: object
+    languages: object
+    system_prompt: str
+    desktop_audio: object
+    audio: object
+    openrouter: object
 
 
 @dataclass(slots=True)
@@ -540,7 +556,7 @@ class RuntimePipelineLauncher:
 
     async def launch(
         self,
-        settings: AppSettings,
+        settings: RuntimePipelineSettings,
         *,
         vrc_mic_state: VrcMicState | None,
         vrc_mic_audio_gate: VrcMicAudioGate | None,
@@ -601,7 +617,7 @@ class RuntimePipelineLauncher:
 
 async def compose_runtime_pipeline(
     *,
-    settings: AppSettings,
+    settings: RuntimePipelineSettings,
     config_path: Path,
     clock: Clock,
     runtime_logging: TranslationRuntimeLoggingPort,
@@ -672,7 +688,7 @@ async def compose_runtime_pipeline(
 
 async def _compose_runtime_pipeline(
     *,
-    settings: AppSettings,
+    settings: RuntimePipelineSettings,
     config_path: Path,
     clock: Clock,
     runtime_logging: TranslationRuntimeLoggingPort,

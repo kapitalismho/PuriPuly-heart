@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Protocol
 
 from puripuly_heart.app.ports.translation_runtime_configuration import (
     TranslationRuntimeSettingsValues,
@@ -18,13 +19,12 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     ProviderRuntimeState,
 )
 from puripuly_heart.config.paths import default_http_extensions_dir
-from puripuly_heart.config.settings import (
-    AppSettings,
+from puripuly_heart.config.provider_values import (
     LLMProviderName,
     OpenRouterCredentialSource,
-    TranslationModel,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import TranslationModel
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
@@ -61,8 +61,35 @@ from .wiring_translation_runtime_configuration import (
 )
 
 
+class ProviderRuntimeSettings(Protocol):
+    languages: object
+    system_prompt: str
+    osc: object
+    stt: object
+    desktop_audio: object
+    ui: object
+    translation: object
+    provider: object
+    openrouter: object
+    secrets: object
+
+
+def _is_provider_runtime_settings(settings: object) -> bool:
+    try:
+        _ = (
+            settings.translation.model,
+            settings.provider.llm,
+            settings.openrouter.selected_source,
+            settings.ui.peer_translation_enabled,
+            settings.secrets,
+        )
+    except AttributeError:
+        return False
+    return True
+
+
 def project_translation_runtime_settings(
-    settings: AppSettings,
+    settings: ProviderRuntimeSettings,
 ) -> TranslationRuntimeSettingsValues:
     return TranslationRuntimeSettingsValues(
         source_language=settings.languages.source_language,
@@ -93,7 +120,7 @@ class ProviderRuntimeSignatures:
 
     def sync(
         self,
-        settings: AppSettings,
+        settings: ProviderRuntimeSettings,
         *,
         canonical: AppSettingsVNext,
         peer: PeerApplicationOwner,
@@ -117,7 +144,7 @@ class ProviderRuntimeSignatures:
 
     def capture_peer_before_canonical_mutation(
         self,
-        settings: AppSettings,
+        settings: ProviderRuntimeSettings,
         *,
         canonical: AppSettingsVNext,
         peer: PeerApplicationOwner,
@@ -143,10 +170,10 @@ class ProviderRuntimeSignatures:
     def mark_llm_retry(self) -> None:
         self.last_llm_provider = ()
 
-    def mark_superseded(self, settings: AppSettings) -> None:
+    def mark_superseded(self, settings: ProviderRuntimeSettings) -> None:
         self.superseded_settings_ids.add(id(settings))
 
-    def consume_superseded(self, settings: AppSettings) -> bool:
+    def consume_superseded(self, settings: ProviderRuntimeSettings) -> bool:
         settings_id = id(settings)
         if settings_id not in self.superseded_settings_ids:
             return False
@@ -166,19 +193,19 @@ class ProviderRuntimeEffects:
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None]
     self_capture_owner: Callable[[], SelfCaptureSessionOwner]
     peer: Callable[[], PeerApplicationOwner]
-    peer_desired: Callable[[AppSettings], bool]
+    peer_desired: Callable[[ProviderRuntimeSettings], bool]
     clear_local_pending: Callable[[], None]
     sync_local_notice: Callable[[], None]
     managed_pending_sink: Callable[[bool], None]
     managed_pending_provider: Callable[[], bool]
     dashboard_managed_pending_sink: Callable[[bool], None]
-    sync_effective_flags: Callable[[AppSettings], None]
+    sync_effective_flags: Callable[[ProviderRuntimeSettings], None]
     refresh_overlay: Callable[[], None]
     refresh_peer_runtime: Callable[[], Awaitable[None]]
     replace_self_stt: Callable[[bool], Awaitable[None]]
     self_state_sink: Callable[[SelfCaptureSessionSnapshot], None]
     self_availability: Callable[[SelfCaptureSessionSnapshot], bool]
-    gpu_recovery: Callable[[AppSettings, ProviderRuntimeApplyPlan], Awaitable[None]]
+    gpu_recovery: Callable[[ProviderRuntimeSettings, ProviderRuntimeApplyPlan], Awaitable[None]]
     failure_sink: Callable[[str], None]
     success_sink: Callable[[str], None]
 
@@ -198,12 +225,15 @@ class ProviderRuntimeEffects:
                 and local_asr_runtime.snapshot.channel_for("peer").provider_id is not None
             ),
             self_stt_desired=bool(self_owner is not None and self_owner.snapshot.desired_active),
-            peer_stt_desired=isinstance(settings, AppSettings) and self.peer_desired(settings),
+            peer_stt_desired=_is_provider_runtime_settings(settings)
+            and self.peer_desired(settings),
         )
 
     def apply_common(self, settings: object) -> None:
-        if not isinstance(settings, AppSettings):
-            raise TypeError("provider runtime settings must be AppSettings")
+        if not _is_provider_runtime_settings(settings):
+            raise TypeError(
+                "provider runtime settings must provide translation, provider, openrouter, and ui fields"
+            )
         self.settings.current = settings
         self.clear_local_pending()
         self.sync_local_notice()
@@ -263,7 +293,7 @@ class ProviderRuntimeComponents:
     llm_rebuild: LlmProviderRebuildOwner
     effects: ProviderRuntimeEffects
     signatures: ProviderRuntimeSignatures
-    sync_signatures: Callable[[AppSettings], None]
+    sync_signatures: Callable[[ProviderRuntimeSettings], None]
     capture_signatures_before_canonical_mutation: Callable[[], None]
 
 
@@ -281,20 +311,20 @@ def compose_provider_runtime(
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None],
     self_capture_owner: Callable[[], SelfCaptureSessionOwner],
     peer: Callable[[], PeerApplicationOwner],
-    peer_desired: Callable[[AppSettings], bool],
-    canonical_settings: Callable[[AppSettings], AppSettingsVNext],
+    peer_desired: Callable[[ProviderRuntimeSettings], bool],
+    canonical_settings: Callable[[ProviderRuntimeSettings], AppSettingsVNext],
     clear_local_pending: Callable[[], None],
     sync_local_notice: Callable[[], None],
     managed_pending_sink: Callable[[bool], None],
     managed_pending_provider: Callable[[], bool],
     dashboard_managed_pending_sink: Callable[[bool], None],
-    sync_effective_flags: Callable[[AppSettings], None],
+    sync_effective_flags: Callable[[ProviderRuntimeSettings], None],
     refresh_overlay: Callable[[], None],
     refresh_peer_runtime: Callable[[], Awaitable[None]],
     replace_self_stt: Callable[[bool], Awaitable[None]],
     self_state_sink: Callable[[SelfCaptureSessionSnapshot], None],
     self_availability: Callable[[SelfCaptureSessionSnapshot], bool],
-    gpu_recovery: Callable[[AppSettings, ProviderRuntimeApplyPlan], Awaitable[None]],
+    gpu_recovery: Callable[[ProviderRuntimeSettings, ProviderRuntimeApplyPlan], Awaitable[None]],
     managed_release: Callable[[], ManagedOpenRouterReleaseRuntime],
     managed_delegate_ready: Callable[[], None],
     runtime_logging: ProviderObservationPort,
@@ -302,7 +332,7 @@ def compose_provider_runtime(
     usage_refresh: Callable[[], Awaitable[None]],
     failure_sink: Callable[[str], None],
     success_sink: Callable[[str], None],
-    additional_signature_sink: Callable[[AppSettings], None],
+    additional_signature_sink: Callable[[ProviderRuntimeSettings], None],
     managed_gemma: ManagedGemmaTranslationOwner | None = None,
     signatures: ProviderRuntimeSignatures | None = None,
 ) -> ProviderRuntimeComponents:
@@ -368,8 +398,10 @@ def compose_provider_runtime(
         )
 
     async def create_llm(settings_value: object) -> object | None:
-        if not isinstance(settings_value, AppSettings):
-            raise TypeError("LLM provider rebuild settings must be AppSettings")
+        if not _is_provider_runtime_settings(settings_value):
+            raise TypeError(
+                "LLM provider rebuild settings must provide translation, provider, openrouter, and ui fields"
+            )
         secrets = create_secret_store(settings_value.secrets, config_path=config_path)
         if settings_value.translation.model in (
             TranslationModel.MANAGED_GEMMA,
@@ -430,7 +462,7 @@ def compose_provider_runtime(
         success_sink=success_sink,
     )
 
-    def sync_signatures(current: AppSettings) -> None:
+    def sync_signatures(current: ProviderRuntimeSettings) -> None:
         signature_state.sync(
             current,
             canonical=canonical_settings(current),

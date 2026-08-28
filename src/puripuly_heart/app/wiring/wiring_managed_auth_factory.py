@@ -762,22 +762,36 @@ def _managed_release_service_for_alias(
 ) -> object | None:
     if managed_release_service is None:
         return None
+    return managed_release_service_for_openrouter_config(
+        managed_release_service,
+        openrouter_config=build_openrouter_release_runtime_config(alias_settings),
+        managed_state=ManagedIdentityStateAdapter(
+            alias_settings,
+            lambda _settings: managed_release_service.managed_state.persist(),
+        ),
+    )
+
+
+def managed_release_service_for_openrouter_config(
+    managed_release_service: object | None,
+    *,
+    openrouter_config: OpenRouterReleaseRuntimeConfig,
+    managed_state: object | None = None,
+) -> object | None:
+    if managed_release_service is None:
+        return None
 
     from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterReleaseService
 
     if not isinstance(managed_release_service, ManagedOpenRouterReleaseService):
         return managed_release_service
 
-    desired_config = build_openrouter_release_runtime_config(alias_settings)
-    if managed_release_service.openrouter_config == desired_config:
+    if managed_release_service.openrouter_config == openrouter_config:
         return managed_release_service
 
     return ManagedOpenRouterReleaseService(
-        openrouter_config=desired_config,
-        managed_state=ManagedIdentityStateAdapter(
-            alias_settings,
-            lambda _settings: managed_release_service.managed_state.persist(),
-        ),
+        openrouter_config=openrouter_config,
+        managed_state=managed_state or managed_release_service.managed_state,
         secrets=managed_release_service.secrets,
         client=managed_release_service.client,
         app_version=managed_release_service.app_version,

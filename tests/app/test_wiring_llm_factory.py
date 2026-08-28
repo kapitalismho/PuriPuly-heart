@@ -196,14 +196,15 @@ def test_resolved_qq_managed_credential_projects_release_runtime_kind_without_mu
     settings = AppSettings()
     settings.translation.connection = TranslationConnection.MANAGED
 
-    projected = wiring_llm_factory._settings_for_resolved_managed_credential(
-        settings,
-        _qq_managed_credential(),
+    projected = wiring_llm_factory._openrouter_release_config_from_resolved_fields(
+        model=settings.openrouter.llm_model,
+        credential=_qq_managed_credential(),
+        selected_source=OpenRouterCredentialSource.MANAGED,
+        include_selection_alias=True,
     )
 
     assert settings.translation.connection == TranslationConnection.MANAGED
-    assert projected.translation.connection == TranslationConnection.MANAGED_CHINA
-    assert build_openrouter_release_runtime_config(projected).managed_credential_kind == "qq"
+    assert projected.managed_credential_kind == "qq"
 
 
 @pytest.mark.asyncio

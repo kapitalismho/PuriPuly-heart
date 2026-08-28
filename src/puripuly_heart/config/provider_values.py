@@ -23,6 +23,7 @@ from puripuly_heart.config.llm_profiles import (
 )
 
 MAX_CUSTOM_VOCAB_TERMS = 100
+STT_INTERNAL_SAMPLE_RATE_HZ = 16000
 LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS = frozenset(
     {
         "model",
@@ -187,6 +188,7 @@ __all__ = [
     "OpenRouterSelectionAlias",
     "QwenRegion",
     "STTProviderName",
+    "STT_INTERNAL_SAMPLE_RATE_HZ",
     "custom_stt_selection_for_provider",
     "display_stt_provider",
     "is_custom_stt_provider",

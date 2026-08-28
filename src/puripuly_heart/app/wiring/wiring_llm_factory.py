@@ -4,7 +4,8 @@ import asyncio
 import contextlib
 import os
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
+from typing import Protocol
 
 from puripuly_heart.app.ports.secret_store import SecretReadResult
 from puripuly_heart.app.services.managed_auth_claims import (
@@ -14,6 +15,13 @@ from puripuly_heart.app.services.managed_auth_claims import (
     local_managed_auth_blocking_source,
 )
 from puripuly_heart.config.llm_profiles import openrouter_alias_for_fields
+from puripuly_heart.config.provider_values import (
+    LLMProviderName,
+    OpenRouterCredentialSource,
+    OpenRouterLLMModel,
+    OpenRouterSelectionAlias,
+    QwenRegion,
+)
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_MANAGED,
     CREDENTIAL_SOURCE_NONE,
@@ -48,27 +56,20 @@ from puripuly_heart.config.runtime_resolution import (
     normalize_translation_runtime_intent,
     resolve_llm_config,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    OpenRouterCredentialSource,
-    OpenRouterLLMModel,
-    OpenRouterSelectionAlias,
-    QwenRegion,
-    TranslationConnection,
-    TranslationModel,
-)
+from puripuly_heart.config.translation_values import TranslationModel
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.fallback_racing import LLMProviderAttempt
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
 from puripuly_heart.core.local_translation.devices import resolve_llama_vulkan_device
 from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
+from puripuly_heart.core.managed_openrouter_release import OpenRouterReleaseRuntimeConfig
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_ENV,
     OPENROUTER_BYOK_API_KEY_SECRET,
     OPENROUTER_MANAGED_API_KEY_SECRET,
     OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+    OpenRouterCredentialRuntimeConfig,
     load_managed_openrouter_user_identifier,
 )
 from puripuly_heart.core.openrouter_routing import (
@@ -87,8 +88,8 @@ from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 
 from .wiring_managed_auth_factory import (
-    _managed_release_service_for_alias,
-    build_openrouter_credential_runtime_config,
+    ManagedIdentityStateAdapter,
+    managed_release_service_for_openrouter_config,
 )
 from .wiring_secrets_factory import require_secret, require_secret_any
 
@@ -96,6 +97,17 @@ MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR = (
     "OpenRouter managed mode requires a managed release service; "
     "non-GUI paths are not wired for managed OpenRouter mode yet"
 )
+
+
+class LlmCompatibilitySettings(Protocol):
+    provider: object
+    translation: object
+    openrouter: object
+    gemini: object
+    qwen: object
+    llm: object
+    local_llm: object
+    managed_identity: object
 
 
 @dataclass(slots=True)
@@ -192,7 +204,7 @@ def _unwrap_claim_guarded_managed_release_service(release_service: object | None
 
 
 def _runtime_resolution_input_from_compatibility_settings(
-    settings: AppSettings,
+    settings: LlmCompatibilitySettings,
 ) -> RuntimeResolutionInput:
     openrouter_intent = normalize_openrouter_runtime_intent(
         provider_llm=settings.provider.llm,
@@ -332,7 +344,7 @@ def _managed_claim_source_for_resolved_credential(
 
 
 def _settings_have_opposite_managed_claim_source(
-    settings: AppSettings | None,
+    settings: LlmCompatibilitySettings | None,
     credential: ResolvedCredentialRequirement,
 ) -> bool:
     if settings is None:
@@ -417,50 +429,71 @@ def _openrouter_source_for_resolved_credential(
     raise ValueError("Unsupported OpenRouter resolved credential reference")
 
 
-def _settings_for_resolved_openrouter_fields(
-    settings: AppSettings | None,
+def _openrouter_selection_alias(
     *,
     model: str,
-    models: tuple[str, ...] = (),
-    service_endpoint: str | None,
+    models: tuple[str, ...],
     selected_source: OpenRouterCredentialSource,
-    provider_routing: OpenRouterProviderRouting,
-    routing_mode: OpenRouterRoutingMode,
     include_selection_alias: bool,
-) -> AppSettings:
-    resolved_settings = replace(settings) if settings is not None else AppSettings()
-    resolved_settings.openrouter = replace(resolved_settings.openrouter)
-    resolved_settings.openrouter.llm_model = OpenRouterLLMModel(model)
-    resolved_settings.openrouter.selected_source = selected_source
-    resolved_settings.openrouter.routing_mode = routing_mode
-    resolved_settings.openrouter.provider_routing = provider_routing
-    resolved_settings.openrouter.broker_base_url = service_endpoint or ""
-    selection_alias = None
-    if include_selection_alias:
-        alias_value = openrouter_alias_for_fields(
-            model=model,
-            source=selected_source.value,
-            models=models,
-        )
-        if alias_value is not None:
-            selection_alias = OpenRouterSelectionAlias(alias_value)
-    resolved_settings.openrouter.selection_alias = selection_alias
-    return resolved_settings
-
-
-def _settings_for_resolved_managed_credential(
-    settings: AppSettings,
-    credential: ResolvedCredentialRequirement,
-) -> AppSettings:
-    connection = (
-        TranslationConnection.MANAGED_CHINA
-        if credential.reference == CREDENTIAL_REF_OPENROUTER_MANAGED_QQ
-        else TranslationConnection.MANAGED
+) -> OpenRouterSelectionAlias | None:
+    if not include_selection_alias:
+        return None
+    alias_value = openrouter_alias_for_fields(
+        model=model,
+        source=selected_source.value,
+        models=models,
     )
-    resolved_settings = replace(settings)
-    resolved_settings.translation = replace(resolved_settings.translation)
-    resolved_settings.translation.connection = connection
-    return resolved_settings
+    if alias_value is None:
+        return None
+    return OpenRouterSelectionAlias(alias_value)
+
+
+def _openrouter_release_config_from_resolved_fields(
+    *,
+    model: str | OpenRouterLLMModel,
+    models: tuple[str, ...] = (),
+    credential: ResolvedCredentialRequirement,
+    selected_source: OpenRouterCredentialSource,
+    include_selection_alias: bool,
+) -> OpenRouterReleaseRuntimeConfig:
+    managed_credential_kind = (
+        "qq" if credential.reference == CREDENTIAL_REF_OPENROUTER_MANAGED_QQ else "standard"
+    )
+    llm_model = model if isinstance(model, OpenRouterLLMModel) else OpenRouterLLMModel(model)
+    return OpenRouterReleaseRuntimeConfig(
+        llm_model=llm_model,
+        selected_source=selected_source,
+        selection_alias=_openrouter_selection_alias(
+            model=llm_model.value,
+            models=models,
+            selected_source=selected_source,
+            include_selection_alias=include_selection_alias,
+        ),
+        managed_credential_kind=managed_credential_kind,
+    )
+
+
+def _openrouter_credential_config_from_resolved_fields(
+    *,
+    credential: ResolvedCredentialRequirement,
+    selected_source: OpenRouterCredentialSource,
+    compatibility_settings: LlmCompatibilitySettings | None,
+) -> OpenRouterCredentialRuntimeConfig:
+    identity = None if compatibility_settings is None else compatibility_settings.managed_identity
+    managed_credential_kind = (
+        "qq" if credential.reference == CREDENTIAL_REF_OPENROUTER_MANAGED_QQ else "standard"
+    )
+    return OpenRouterCredentialRuntimeConfig(
+        selected_source=selected_source,
+        installation_id=None if identity is None else identity.installation_id,
+        managed_credential_kind=managed_credential_kind,
+        active_managed_credential_ref=(
+            None if identity is None else identity.active_managed_credential_ref
+        ),
+        active_managed_expires_at=(
+            None if identity is None else identity.active_managed_expires_at
+        ),
+    )
 
 
 def _openrouter_routing_mode(value: str | None) -> OpenRouterRoutingMode:
@@ -531,7 +564,7 @@ def _openrouter_provider_from_resolved_config(
     managed_release_service: object | None,
     managed_delegate_ready: Callable[[], object] | None,
     runtime_logging: ProviderObservationPort | None,
-    compatibility_settings: AppSettings | None,
+    compatibility_settings: LlmCompatibilitySettings | None,
     force_managed_wrapper: bool = False,
     include_selection_alias: bool = True,
 ) -> LLMProvider:
@@ -554,7 +587,7 @@ def _openrouter_provider_from_resolved_target(
     managed_release_service: object | None,
     managed_delegate_ready: Callable[[], object] | None,
     runtime_logging: ProviderObservationPort | None,
-    compatibility_settings: AppSettings | None,
+    compatibility_settings: LlmCompatibilitySettings | None,
     force_managed_wrapper: bool = False,
     include_selection_alias: bool = True,
 ) -> LLMProvider:
@@ -587,7 +620,7 @@ def _openrouter_provider_from_resolved_fields(
     managed_release_service: object | None,
     managed_delegate_ready: Callable[[], object] | None,
     runtime_logging: ProviderObservationPort | None,
-    compatibility_settings: AppSettings | None,
+    compatibility_settings: LlmCompatibilitySettings | None,
     force_managed_wrapper: bool = False,
     include_selection_alias: bool = True,
 ) -> LLMProvider:
@@ -597,29 +630,41 @@ def _openrouter_provider_from_resolved_fields(
 
     routing_mode = _openrouter_routing_mode(routing_mode_value)
     provider_routing = _openrouter_provider_routing(provider_routing_value)
-    openrouter_settings = _settings_for_resolved_openrouter_fields(
-        compatibility_settings,
-        model=model,
-        models=models,
-        service_endpoint=service_endpoint,
+    credential_config = _openrouter_credential_config_from_resolved_fields(
+        credential=credential,
         selected_source=selected_source,
-        provider_routing=provider_routing,
-        routing_mode=routing_mode,
-        include_selection_alias=include_selection_alias,
+        compatibility_settings=compatibility_settings,
     )
 
     if selected_source == OpenRouterCredentialSource.MANAGED:
         if managed_release_service is None:
             raise ValueError(MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR)
-        openrouter_settings = _settings_for_resolved_managed_credential(
-            openrouter_settings,
-            credential,
-        )
         if _settings_have_opposite_managed_claim_source(compatibility_settings, credential):
             raise ValueError("OpenRouter managed local claim conflict")
-        alias_managed_release_service = _managed_release_service_for_alias(
-            _unwrap_claim_guarded_managed_release_service(managed_release_service),
-            alias_settings=openrouter_settings,
+        unwrapped_release_service = _unwrap_claim_guarded_managed_release_service(
+            managed_release_service
+        )
+        alias_managed_state = None
+        if compatibility_settings is not None:
+            persist = getattr(
+                getattr(unwrapped_release_service, "managed_state", None),
+                "persist",
+                None,
+            )
+            alias_managed_state = ManagedIdentityStateAdapter(
+                compatibility_settings,
+                persist if persist is not None else lambda _settings: None,
+            )
+        alias_managed_release_service = managed_release_service_for_openrouter_config(
+            unwrapped_release_service,
+            openrouter_config=_openrouter_release_config_from_resolved_fields(
+                model=model,
+                models=models,
+                credential=credential,
+                selected_source=selected_source,
+                include_selection_alias=include_selection_alias,
+            ),
+            managed_state=alias_managed_state,
         )
         guarded_managed_release_service = _guarded_managed_release_service_for_claim(
             alias_managed_release_service,
@@ -635,7 +680,7 @@ def _openrouter_provider_from_resolved_fields(
                 delegate_factory=lambda api_key: OpenRouterLLMProvider(
                     api_key=api_key,
                     user_identifier=load_managed_openrouter_user_identifier(
-                        build_openrouter_credential_runtime_config(openrouter_settings),
+                        credential_config,
                         secrets=secrets,
                     ),
                     model=model,
@@ -649,7 +694,7 @@ def _openrouter_provider_from_resolved_fields(
         return OpenRouterLLMProvider(
             api_key=managed_api_key,
             user_identifier=load_managed_openrouter_user_identifier(
-                build_openrouter_credential_runtime_config(openrouter_settings),
+                credential_config,
                 secrets=secrets,
             ),
             model=model,
@@ -677,7 +722,7 @@ def _provider_from_resolved_target(
     managed_release_service: object | None,
     managed_delegate_ready: Callable[[], object] | None,
     runtime_logging: ProviderObservationPort | None,
-    compatibility_settings: AppSettings | None,
+    compatibility_settings: LlmCompatibilitySettings | None,
     managed_gemma_runtime: ManagedGemmaRuntimeOwner | None,
     managed_gemma_release: Callable[[], Awaitable[None]] | None,
     qwen_low_latency_mode: bool,
@@ -692,9 +737,8 @@ def _provider_from_resolved_target(
             raise ValueError("managed Gemma backend must be cpu or gpu")
         vulkan_device = "Vulkan0"
         if compatibility_settings is not None:
-            translation = getattr(compatibility_settings, "translation", None)
             vulkan_device = resolve_llama_vulkan_device(
-                getattr(translation, "gpu_device_id", "auto")
+                compatibility_settings.translation.gpu_device_id
             )
         return ManagedGemmaLLMProvider(
             runtime=managed_gemma_runtime,
@@ -773,7 +817,7 @@ def _base_llm_provider_from_resolved_config(
     managed_release_service: object | None,
     managed_delegate_ready: Callable[[], object] | None,
     runtime_logging: ProviderObservationPort | None,
-    compatibility_settings: AppSettings | None,
+    compatibility_settings: LlmCompatibilitySettings | None,
     managed_gemma_runtime: ManagedGemmaRuntimeOwner | None,
     managed_gemma_release: Callable[[], Awaitable[None]] | None,
     qwen_low_latency_mode: bool,
@@ -816,7 +860,7 @@ def create_llm_provider_from_resolved_config(
     managed_release_service: object | None = None,
     managed_delegate_ready: Callable[[], object] | None = None,
     runtime_logging: ProviderObservationPort | None = None,
-    compatibility_settings: AppSettings | None = None,
+    compatibility_settings: LlmCompatibilitySettings | None = None,
     managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
     managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
     qwen_low_latency_mode: bool = True,
@@ -850,18 +894,20 @@ def create_llm_provider_from_resolved_config(
             attempt_providers.append(
                 LLMProviderAttempt(
                     provider=_LazyFactoryLLMProvider(
-                        factory=lambda attempt_plan=attempt_plan, force_managed_wrapper=force_managed_wrapper: _provider_from_resolved_target(
-                            attempt_plan.target,
-                            secrets=secrets,
-                            managed_release_service=fallback_managed_release_service,
-                            managed_delegate_ready=managed_delegate_ready,
-                            runtime_logging=runtime_logging,
-                            compatibility_settings=compatibility_settings,
-                            managed_gemma_runtime=managed_gemma_runtime,
-                            managed_gemma_release=managed_gemma_release,
-                            qwen_low_latency_mode=qwen_low_latency_mode,
-                            force_managed_wrapper=force_managed_wrapper,
-                            include_selection_alias=False,
+                        factory=lambda attempt_plan=attempt_plan, force_managed_wrapper=force_managed_wrapper: (
+                            _provider_from_resolved_target(
+                                attempt_plan.target,
+                                secrets=secrets,
+                                managed_release_service=fallback_managed_release_service,
+                                managed_delegate_ready=managed_delegate_ready,
+                                runtime_logging=runtime_logging,
+                                compatibility_settings=compatibility_settings,
+                                managed_gemma_runtime=managed_gemma_runtime,
+                                managed_gemma_release=managed_gemma_release,
+                                qwen_low_latency_mode=qwen_low_latency_mode,
+                                force_managed_wrapper=force_managed_wrapper,
+                                include_selection_alias=False,
+                            )
                         )
                     ),
                     start_after_ms=attempt_plan.start_after_ms,
@@ -887,7 +933,7 @@ def create_llm_provider_from_resolved_config(
 
 
 def create_llm_provider(
-    settings: AppSettings,
+    settings: LlmCompatibilitySettings,
     *,
     secrets: SecretStore,
     managed_release_service: object | None = None,

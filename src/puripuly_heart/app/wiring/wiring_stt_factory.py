@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from puripuly_heart.app.services.local_asr_selection import (
     LOCAL_CPU_PROVIDERS,
@@ -11,7 +12,18 @@ from puripuly_heart.app.services.local_asr_selection import (
 from puripuly_heart.config.capture_target_resolution import (
     resolve_desktop_audio_capture_target,
 )
-from puripuly_heart.config.resolved import ResolvedCredentialRequirement, ResolvedSTTConfig
+from puripuly_heart.config.provider_values import (
+    STT_INTERNAL_SAMPLE_RATE_HZ,
+    QwenRegion,
+    STTProviderName,
+    custom_stt_selection_for_provider,
+    is_custom_stt_provider,
+)
+from puripuly_heart.config.resolved import (
+    ResolvedCredentialRequirement,
+    ResolvedDesktopAudioCaptureTarget,
+    ResolvedSTTConfig,
+)
 from puripuly_heart.config.runtime_resolution import (
     CREDENTIAL_REF_CUSTOM_STT,
     CREDENTIAL_REF_DEEPGRAM_STT,
@@ -34,15 +46,7 @@ from puripuly_heart.config.runtime_resolution import (
 from puripuly_heart.config.runtime_resolution import (
     resolve_stt_config as resolve_stt_runtime_config,
 )
-from puripuly_heart.config.settings import (
-    STT_INTERNAL_SAMPLE_RATE_HZ,
-    AppSettings,
-    QwenRegion,
-    STTProviderName,
-    custom_stt_selection_for_provider,
-    is_custom_stt_provider,
-)
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, CaptureTargetIntent
 from puripuly_heart.core.language import get_local_qwen_language_hint
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.local_stt_assets import (
@@ -80,8 +84,21 @@ from .wiring_llm_factory import _qwen_api_key_for_resolved_credential
 from .wiring_secrets_factory import require_secret
 
 
+class SelfSttSettings(Protocol):
+    stt: object
+    provider: object
+    languages: object
+    audio: object
+    deepgram_stt: object
+    qwen: object
+    qwen_asr_stt: object
+    soniox_stt: object
+    custom_stt: object
+    desktop_audio: object
+
+
 def build_custom_vocabulary_runtime_config(
-    settings: AppSettings,
+    settings: SelfSttSettings,
 ) -> CustomVocabularyRuntimeConfig:
     """Build a narrow custom-vocabulary runtime DTO from legacy settings."""
 
@@ -166,7 +183,7 @@ def _stt_provider_value_or_raise(
 
 
 def _effective_custom_terms_for_resolved_config(
-    settings: AppSettings,
+    settings: SelfSttSettings,
     source_language: str,
 ) -> Mapping[str, tuple[str, ...]]:
     terms = tuple(
@@ -179,7 +196,9 @@ def _effective_custom_terms_for_resolved_config(
     return {source_language: terms}
 
 
-def _self_stt_runtime_intent_from_compatibility_settings(settings: AppSettings) -> STTRuntimeIntent:
+def _self_stt_runtime_intent_from_compatibility_settings(
+    settings: SelfSttSettings,
+) -> STTRuntimeIntent:
     source_language = settings.languages.source_language
     provider = _stt_provider_value_or_raise(settings.provider.stt, peer=False)
     soniox_language_hints = None
@@ -232,11 +251,71 @@ def _self_stt_runtime_intent_from_compatibility_settings(settings: AppSettings) 
     )
 
 
-def _peer_stt_runtime_intent_from_compatibility_settings(settings: AppSettings) -> STTRuntimeIntent:
-    from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+def _peer_stt_runtime_intent_from_compatibility_settings(
+    settings: SelfSttSettings,
+) -> STTRuntimeIntent:
+    provider = _stt_provider_value_or_raise(settings.provider.peer_stt, peer=True)
+    automatic = settings.languages.peer_source_mode == "auto"
+    automatic_soniox = provider == STT_PROVIDER_SONIOX and automatic
+    source_language = settings.languages.effective_peer_source
+    language_hints = None
+    language_hints_strict = False
+    if provider == STT_PROVIDER_SONIOX:
+        from puripuly_heart.core.language import get_soniox_language_hints
 
-    _stt_provider_value_or_raise(settings.provider.peer_stt, peer=True)
-    return peer_stt_runtime_intent_from_vnext(from_legacy_app_settings(settings))
+        if automatic_soniox:
+            mapped_language_hints = tuple(
+                dict.fromkeys(
+                    hint
+                    for language in settings.languages.peer_expected_languages
+                    for hint in get_soniox_language_hints(language)
+                )
+            )
+            language_hints = mapped_language_hints or None
+        else:
+            language_hints = tuple(get_soniox_language_hints(source_language))
+    custom_mode, custom_compatibility = custom_stt_selection_for_provider(
+        provider,
+        stored_mode=settings.custom_stt.mode,
+        stored_compatibility=settings.custom_stt.compatibility,
+    )
+    qwen_region = settings.qwen.region
+    return STTRuntimeIntent(
+        channel="peer",
+        provider=provider,
+        source_language=source_language,
+        source_mode="auto" if automatic else "manual",
+        input_host_api=None,
+        input_device=None,
+        output_device=settings.desktop_audio.output_device,
+        sample_rate_hz=STT_INTERNAL_SAMPLE_RATE_HZ,
+        channels=1,
+        ring_buffer_ms=settings.audio.ring_buffer_ms,
+        drain_timeout_s=settings.stt.drain_timeout_s,
+        vad_speech_threshold=settings.desktop_audio.vad_speech_threshold,
+        vad_hangover_ms=settings.desktop_audio.vad_hangover_ms,
+        vad_pre_roll_ms=settings.desktop_audio.vad_pre_roll_ms,
+        low_latency_enabled=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
+        low_latency_merge_gap_ms=settings.stt.low_latency_merge_gap_ms,
+        low_latency_spec_retry_max=settings.stt.low_latency_spec_retry_max,
+        custom_vocabulary_enabled=False,
+        custom_terms={},
+        deepgram_model=settings.deepgram_stt.model,
+        qwen_asr_model=settings.qwen_asr_stt.model,
+        qwen_region=qwen_region.value if hasattr(qwen_region, "value") else qwen_region,
+        soniox_model=settings.soniox_stt.model,
+        soniox_endpoint=settings.soniox_stt.endpoint,
+        soniox_keepalive_interval_s=settings.soniox_stt.keepalive_interval_s,
+        soniox_trailing_silence_ms=settings.soniox_stt.trailing_silence_ms,
+        soniox_enable_language_identification=automatic_soniox,
+        soniox_language_hints=language_hints,
+        soniox_language_hints_strict=language_hints_strict,
+        custom_stt_mode=custom_mode,
+        custom_stt_compatibility=custom_compatibility,
+        custom_stt_endpoint=settings.custom_stt.endpoint,
+        custom_stt_model=settings.custom_stt.model,
+        custom_stt_extra=dict(settings.custom_stt.extra),
+    )
 
 
 def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntimeIntent:
@@ -305,7 +384,7 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
 
 
 def create_stt_backend(
-    settings: AppSettings,
+    settings: SelfSttSettings,
     *,
     secrets: SecretStore,
     diagnostics_enabled: Callable[[], bool] | None = None,
@@ -325,14 +404,14 @@ def create_stt_backend(
     )
 
 
-def resolve_self_stt_runtime_config(settings: AppSettings) -> ResolvedSTTConfig:
+def resolve_self_stt_runtime_config(settings: SelfSttSettings) -> ResolvedSTTConfig:
     return resolve_stt_runtime_config(
         _self_stt_runtime_intent_from_compatibility_settings(settings)
     )
 
 
 def _self_stt_custom_vocabulary_signature(
-    settings: AppSettings,
+    settings: SelfSttSettings,
 ) -> tuple[bool, tuple[str, ...]]:
     if settings.provider.stt not in {
         STTProviderName.DEEPGRAM,
@@ -361,7 +440,7 @@ def _self_stt_custom_vocabulary_signature(
     )
 
 
-def build_self_stt_runtime_signature(settings: AppSettings) -> tuple[object, ...]:
+def build_self_stt_runtime_signature(settings: SelfSttSettings) -> tuple[object, ...]:
     custom_vocab_enabled, custom_terms = _self_stt_custom_vocabulary_signature(settings)
     return (
         settings.languages.source_language,
@@ -423,18 +502,18 @@ def build_self_stt_runtime_signature(settings: AppSettings) -> tuple[object, ...
     )
 
 
-def _self_stt_provider_language_identity(settings: AppSettings) -> str | None:
+def _self_stt_provider_language_identity(settings: SelfSttSettings) -> str | None:
     if build_self_local_asr_transition_request(settings, trigger="runtime") is not None:
         return None
     return settings.languages.source_language
 
 
-def _self_stt_provider_model_identity(settings: AppSettings) -> str | None:
+def _self_stt_provider_model_identity(settings: SelfSttSettings) -> str | None:
     transition = build_self_local_asr_transition_request(settings, trigger="runtime")
     return None if transition is None else transition.model_id
 
 
-def build_self_stt_provider_signature(settings: AppSettings) -> tuple[object, ...]:
+def build_self_stt_provider_signature(settings: SelfSttSettings) -> tuple[object, ...]:
     return (
         settings.provider.stt,
         _self_stt_provider_language_identity(settings),
@@ -484,7 +563,7 @@ def build_self_stt_provider_signature(settings: AppSettings) -> tuple[object, ..
     )
 
 
-def build_self_capture_vad_signature(settings: AppSettings) -> tuple[object, ...]:
+def build_self_capture_vad_signature(settings: SelfSttSettings) -> tuple[object, ...]:
     return (
         settings.audio.input_host_api,
         settings.audio.input_device,
@@ -512,7 +591,7 @@ def build_local_asr_session_options(
 
 
 def build_self_local_asr_transition_request(
-    settings: AppSettings,
+    settings: SelfSttSettings,
     *,
     trigger: str,
 ) -> LocalASRTransitionRequest | None:
@@ -544,7 +623,7 @@ def build_self_local_asr_transition_request(
 
 
 def build_self_stt_provider_request(
-    settings: AppSettings,
+    settings: SelfSttSettings,
     *,
     warmup: bool = False,
 ) -> ProviderRuntimeBuildRequest:
@@ -566,7 +645,7 @@ def build_self_stt_provider_request(
     )
 
 
-def build_self_capture_session_config(settings: AppSettings) -> SelfCaptureSessionConfig:
+def build_self_capture_session_config(settings: SelfSttSettings) -> SelfCaptureSessionConfig:
     provider = settings.provider.stt.value
     transition = build_self_local_asr_transition_request(settings, trigger="runtime")
     return SelfCaptureSessionConfig(
@@ -821,7 +900,7 @@ def create_stt_backend_from_resolved_config(
     raise ValueError(f"Unsupported STT provider: {config.provider}")
 
 
-def resolve_peer_stt_config(settings: AppSettings) -> ResolvedPeerSTTConfig:
+def resolve_peer_stt_config(settings: SelfSttSettings) -> ResolvedPeerSTTConfig:
     peer_source_language = settings.languages.effective_peer_source
     keyterms: tuple[str, ...] = ()
     provider = _stt_provider_name_or_raise(settings.provider.peer_stt, peer=True)
@@ -898,26 +977,36 @@ def resolve_peer_stt_config(settings: AppSettings) -> ResolvedPeerSTTConfig:
     raise ValueError(f"Unsupported peer STT provider: {provider}")
 
 
-def _resolved_peer_stt_config_from_compatibility_settings(
-    settings: AppSettings,
-) -> ResolvedSTTConfig:
+def resolve_peer_stt_runtime_config(settings: SelfSttSettings) -> ResolvedSTTConfig:
     return resolve_stt_runtime_config(
         _peer_stt_runtime_intent_from_compatibility_settings(settings)
     )
-
-
-def resolve_peer_stt_runtime_config(settings: AppSettings) -> ResolvedSTTConfig:
-    return _resolved_peer_stt_config_from_compatibility_settings(settings)
 
 
 def resolve_peer_stt_runtime_config_from_vnext(settings: AppSettingsVNext) -> ResolvedSTTConfig:
     return resolve_stt_runtime_config(peer_stt_runtime_intent_from_vnext(settings))
 
 
-def build_peer_stt_provider_signature(settings: AppSettings) -> tuple[object, ...]:
-    from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
-
-    return build_peer_stt_provider_signature_from_vnext(from_legacy_app_settings(settings))
+def build_peer_stt_provider_signature(settings: SelfSttSettings) -> tuple[object, ...]:
+    resolved = resolve_peer_stt_runtime_config(settings)
+    return (
+        resolved.provider,
+        resolved.source_language,
+        resolved.sample_rate_hz,
+        resolved.model,
+        resolved.endpoint,
+        resolved.region,
+        resolved.provider_options.get("keepalive_interval_s"),
+        resolved.provider_options.get("trailing_silence_ms"),
+        resolved.provider_options.get("enable_language_identification", False),
+        resolved.provider_options.get("language_hints"),
+        (settings.stt.gpu_device_id if resolved.provider == STT_PROVIDER_LOCAL_QWEN_GPU else None),
+        resolved.provider_options.get("language_hints_strict", False),
+        resolved.provider_options.get("mode"),
+        resolved.provider_options.get("compatibility"),
+        resolved.source_mode,
+        (custom_stt_secret_generation() if resolved.provider in STT_CUSTOM_PROVIDERS else None),
+    )
 
 
 def build_peer_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> tuple[object, ...]:
@@ -946,16 +1035,105 @@ def build_peer_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
     )
 
 
+def _resolved_peer_capture_target_from_compatibility_desktop_audio(
+    desktop_audio: object,
+) -> ResolvedDesktopAudioCaptureTarget:
+    runtime_target = desktop_audio.runtime_capture_target
+    if isinstance(runtime_target, ResolvedDesktopAudioCaptureTarget):
+        return runtime_target
+    if runtime_target is not None:
+        return resolve_desktop_audio_capture_target(runtime_target)
+    output_device = desktop_audio.output_device
+    intent = (
+        CaptureTargetIntent.named_output_device(output_device)
+        if isinstance(output_device, str) and output_device.strip()
+        else CaptureTargetIntent.default_output_device()
+    )
+    return resolve_desktop_audio_capture_target(intent)
+
+
 def build_peer_capture_session_config(
-    settings: AppSettings,
+    settings: SelfSttSettings,
     *,
     canonical_settings: AppSettingsVNext | None = None,
 ) -> PeerCaptureSessionConfig:
-    if canonical_settings is None:
-        from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
-
-        canonical_settings = from_legacy_app_settings(settings)
-    return build_peer_capture_session_config_from_vnext(canonical_settings)
+    if canonical_settings is not None:
+        return build_peer_capture_session_config_from_vnext(canonical_settings)
+    backend = resolve_peer_stt_runtime_config(settings)
+    provider_signature = build_peer_stt_provider_signature(settings)
+    desktop_audio = settings.desktop_audio
+    capture_target = _resolved_peer_capture_target_from_compatibility_desktop_audio(desktop_audio)
+    target = PeerCaptureTargetIntent(
+        kind=capture_target.kind,
+        device_name=capture_target.device_name,
+        process_kind=capture_target.process_kind,
+        executable_identity=capture_target.executable_identity,
+        discord_channel=capture_target.discord_channel,
+        executable_basename=capture_target.executable_basename,
+    )
+    model_id = None
+    if backend.provider == STTProviderName.LOCAL_QWEN_GPU.value:
+        model_id = LOCAL_QWEN_GPU_MODEL_ID
+    elif backend.provider in LOCAL_CPU_PROVIDERS:
+        model_id = resolve_local_asr_selection(
+            backend.provider,
+            backend.source_language,
+        ).model_id
+    local_provider = backend.provider in {
+        *LOCAL_CPU_PROVIDERS,
+        STTProviderName.LOCAL_QWEN_GPU.value,
+    }
+    session_options = (
+        build_local_asr_session_options(
+            source_language=backend.source_language,
+            source_mode=backend.source_mode,
+        )
+        if local_provider
+        else None
+    )
+    capture_signature = (
+        desktop_audio.output_device,
+        capture_target,
+        desktop_audio.vad_speech_threshold,
+        desktop_audio.vad_hangover_ms,
+        desktop_audio.vad_pre_roll_ms,
+        backend.sample_rate_hz,
+    )
+    return PeerCaptureSessionConfig(
+        provider_id=backend.provider,
+        output_device=desktop_audio.output_device,
+        vad_speech_threshold=desktop_audio.vad_speech_threshold,
+        vad_hangover_ms=desktop_audio.vad_hangover_ms,
+        vad_pre_roll_ms=desktop_audio.vad_pre_roll_ms,
+        provider_signature=provider_signature,
+        runtime_signature=(
+            backend.source_language,
+            desktop_audio.output_device,
+            target,
+            desktop_audio.vad_speech_threshold,
+            desktop_audio.vad_hangover_ms,
+            desktop_audio.vad_pre_roll_ms,
+            provider_signature,
+        ),
+        capture_signature=capture_signature,
+        capture_target=target,
+        language=PeerCaptureLanguageFacts(
+            source_mode=backend.source_mode,
+            source_language=backend.source_language,
+            expected_languages=tuple(settings.languages.peer_expected_languages),
+        ),
+        target_sample_rate_hz=backend.sample_rate_hz,
+        model_id=model_id,
+        session_options=session_options,
+        provider_context=backend,
+        local_provider=local_provider,
+        release_backend_after=(
+            LOCAL_QWEN_IDLE_RELEASE_SECONDS
+            if backend.provider == STTProviderName.LOCAL_QWEN.value
+            else None
+        ),
+        warmup=backend.provider != STTProviderName.LOCAL_QWEN.value,
+    )
 
 
 def build_peer_capture_session_config_from_vnext(
@@ -1039,7 +1217,7 @@ def build_peer_capture_session_config_from_vnext(
 
 
 def build_peer_stt_runtime_signature(
-    settings: AppSettings,
+    settings: SelfSttSettings,
     *,
     canonical_settings: AppSettingsVNext | None = None,
 ) -> tuple[object, ...]:
@@ -1068,7 +1246,7 @@ def build_peer_stt_provider_request(
 
 
 def create_peer_stt_backend(
-    settings: AppSettings,
+    settings: SelfSttSettings,
     *,
     secrets: SecretStore,
     diagnostics_enabled: Callable[[], bool] | None = None,

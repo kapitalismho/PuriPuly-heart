@@ -364,28 +364,14 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
             for importer_name in (
                 "wiring_capture_runtime.py",
                 "wiring_composition.py",
-                "wiring_llm_factory.py",
                 "wiring_local_asr_application.py",
-                "wiring_local_asr_provider_runtime.py",
                 "wiring_managed_account.py",
                 "wiring_managed_auth_factory.py",
                 "wiring_microphone_test.py",
                 "wiring_overlay_factory.py",
                 "wiring_peer_application.py",
-                "wiring_provider_runtime.py",
-                "wiring_provider_runtime_policy.py",
-                "wiring_runtime_pipeline.py",
                 "wiring_secrets_factory.py",
-                "wiring_stt_factory.py",
             )
-        ),
-        ImportViolation(
-            rule_id="adapters-avoid-ui-and-migration-internals",
-            importer="src/puripuly_heart/app/wiring/wiring_stt_factory.py",
-            imported="puripuly_heart.config.settings_vnext.migration",
-            importer_layer="adapters",
-            imported_layer="migration/serialization",
-            reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
         ),
     }
 )
@@ -422,10 +408,8 @@ SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS = frozenset(
         "src/puripuly_heart/app/services/manual_local_asr_fallback.py",
         "src/puripuly_heart/app/services/openrouter_pkce_flow.py",
         "src/puripuly_heart/app/services/capture/peer_capture_target_application.py",
-        "src/puripuly_heart/app/services/provider/provider_settings.py",
         "src/puripuly_heart/app/services/settings/settings_application.py",
         "src/puripuly_heart/app/services/settings/settings_runtime_effects.py",
-        "src/puripuly_heart/app/wiring/wiring_llm_factory.py",
         "src/puripuly_heart/app/wiring/wiring_capture_runtime.py",
         "src/puripuly_heart/app/wiring/wiring_local_asr_application.py",
         "src/puripuly_heart/app/wiring/wiring_managed_auth_factory.py",
@@ -433,10 +417,6 @@ SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS = frozenset(
         "src/puripuly_heart/app/wiring/wiring_microphone_test.py",
         "src/puripuly_heart/app/wiring/wiring_overlay_factory.py",
         "src/puripuly_heart/app/wiring/wiring_peer_application.py",
-        "src/puripuly_heart/app/wiring/wiring_provider_runtime.py",
-        "src/puripuly_heart/app/wiring/wiring_provider_runtime_policy.py",
-        "src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py",
-        "src/puripuly_heart/app/wiring/wiring_stt_factory.py",
     }
 )
 
@@ -1663,10 +1643,13 @@ def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -
     expected_current.pop("src/puripuly_heart/ui/desktop_overlay_surface/renderer.py")
     expected_current.pop("src/puripuly_heart/ui/views/settings.py")
     expected_current.pop("src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py")
-    expected_current["src/puripuly_heart/app/wiring/wiring_llm_factory.py"] -= {
-        "OpenRouterProviderRouting",
-        "OpenRouterRoutingMode",
-    }
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_llm_factory.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_local_asr_provider_runtime.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_provider_runtime.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_provider_runtime_policy.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_stt_factory.py")
+    expected_current.pop("src/puripuly_heart/app/services/provider/provider_settings.py")
     expected_current["src/puripuly_heart/app/services/canonical_settings_persistence.py"] = {
         "AppSettings"
     }
@@ -1714,10 +1697,41 @@ def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
 
 
 def test_a07_managed_broker_boundary_reduces_dependency_debt_to_16() -> None:
-    assert len(KNOWN_ALLOWED_VIOLATIONS) == 16
-    assert len(_dependency_violations()) == 16
+    assert not any(
+        violation.importer.endswith("managed_openrouter_broker_client.py")
+        for violation in KNOWN_ALLOWED_VIOLATIONS
+    )
     assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 2
     assert len(_settings_runtime_confinement_violations()) == 2
+
+
+def test_a08_provider_runtime_wiring_reduces_dependency_debt_to_9() -> None:
+    assert len(KNOWN_ALLOWED_VIOLATIONS) == 9
+    assert len(_dependency_violations()) == 9
+    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 2
+    assert len(_settings_runtime_confinement_violations()) == 2
+    a08_paths = (
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_llm_factory.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_local_asr_provider_runtime.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_provider_runtime.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_provider_runtime_policy.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_stt_factory.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "provider" / "provider_settings.py",
+    )
+    for path in a08_paths:
+        imported_modules = set(
+            _imported_modules(
+                _module_name_for_path(path),
+                path,
+                _internal_module_names(),
+            )
+        )
+        assert "puripuly_heart.config.settings" not in imported_modules
+        assert "puripuly_heart.config.settings_vnext.migration" not in imported_modules
+    assert {violation.importer for violation in KNOWN_ALLOWED_VIOLATIONS}.isdisjoint(
+        {_relative_repo_path(path) for path in a08_paths}
+    )
 
 
 def test_a07_managed_broker_uses_the_pure_provider_value_owner() -> None:
