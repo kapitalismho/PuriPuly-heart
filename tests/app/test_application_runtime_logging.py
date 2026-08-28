@@ -11,6 +11,7 @@ from puripuly_heart.app.services.application_runtime_logging import (
 )
 from puripuly_heart.app.services.application_shutdown import ApplicationShutdownDiagnostic
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_FINAL_DIAGNOSTICS
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.runtime_logging import SessionLoggingMode
 
 
@@ -83,6 +84,17 @@ def test_owner_initializes_mode_without_ui_transition_effects() -> None:
 
     assert service.mode is SessionLoggingMode.DETAILED
     assert attached == [service]
+
+
+def test_owner_exposes_provider_observation_capability() -> None:
+    owner, _ = _owner()
+    service = RecordingRuntimeLogging()
+    owner.install_service(service)
+
+    observation: ProviderObservationPort = owner
+    observation.emit_basic("provider observation", level=logging.WARNING)
+
+    assert service.basic == [(logging.WARNING, "provider observation")]
 
 
 def test_owner_formats_exception_detail_and_preserves_lazy_evaluation() -> None:

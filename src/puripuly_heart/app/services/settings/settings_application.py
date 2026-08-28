@@ -2,17 +2,74 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyPort
 from puripuly_heart.app.ports.settings_runtime_effects import SettingsRuntimeEffectsPort
+from puripuly_heart.app.ports.settings_view import (
+    AudioInputSettingsIntent,
+    AudioSettingsIntent,
+    ChatboxSourceSettingsIntent,
+    ClipboardSettingsIntent,
+    CustomSttEndpointEdit,
+    CustomSttExtraEdit,
+    CustomSttModelEdit,
+    CustomVocabularySettingsIntent,
+    DesktopAudioOutputSettingsIntent,
+    DesktopOverlayBackgroundAlphaIntent,
+    DesktopOverlayPositionResetIntent,
+    DesktopOverlaySizeIntent,
+    DesktopOverlaySwapCaptionLanguagesIntent,
+    GeneralSettingsSnapshot,
+    ImmediateSettingsIntent,
+    LlmGpuDeviceEdit,
+    LocaleSettingsIntent,
+    LocalLlmBaseUrlEdit,
+    LocalLlmExtraBodyEdit,
+    LocalLlmModelEdit,
+    ManagedReferralEdit,
+    OscConnectionSettingsIntent,
+    OverlayCalibrationSettingsIntent,
+    OverlayCalibrationSnapshot,
+    OverlayPeerOriginalSettingsIntent,
+    OverlaySettingsSnapshot,
+    OverlayTargetSettingsIntent,
+    OverlayTranslationSettingsIntent,
+    PeerExpectedLanguagesIntent,
+    PeerSttProviderEdit,
+    PeerVadHangoverIntent,
+    PeerVadPreRollIntent,
+    PeerVadSpeechThresholdIntent,
+    PromptApplyIntent,
+    PromptSettingsSnapshot,
+    ProviderApplyIntent,
+    ProviderSettingsSnapshot,
+    ProviderVerificationSnapshot,
+    QwenRegionEdit,
+    SelfSttProviderEdit,
+    SelfVadSettingsIntent,
+    SttGpuDeviceEdit,
+    SystemPromptEdit,
+    TranslationFallbackEdit,
+    TranslationFallbackSnapshot,
+    TranslationHttpExtensionEdit,
+    TranslationSelectionEdit,
+    TranslationSelectionSnapshot,
+    VrcMicInterceptSettingsIntent,
+)
+from puripuly_heart.app.ports.ui_models import (
+    OscControlPresentationName,
+    OscControlPresentationState,
+)
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
     ManualLocalASRFallbackPlan,
 )
+from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState
 from puripuly_heart.app.services.provider_runtime_apply import (
     NoopRuntimeApply,
     OverlayOscOutputRuntimeApplyAdapter,
@@ -27,7 +84,7 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     _ui_prompt_clipboard_state_runtime_degraded_transaction_result,
     _ui_prompt_clipboard_state_save_failed_transaction_result,
 )
-from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
@@ -57,12 +114,12 @@ class StrictSettingsSaveFailed(Exception):
 
 
 SettingsMutationServiceProvider = Callable[[], SettingsMutationService | None]
-SettingsPredicate = Callable[[AppSettings, AppSettings], bool]
+SettingsPredicate = Callable[[AppSettingsVNext, AppSettingsVNext], bool]
 SettingsFailureSink = Callable[[str], None]
 SettingsAsyncEffect = Callable[[], Awaitable[None]]
 SettingsFallbackSink = Callable[[tuple[str, ...], bool], None]
 SettingsFallbackLogSink = Callable[
-    [AppSettings, AppSettings, tuple[str, ...]],
+    [object, object, tuple[str, ...]],
     None,
 ]
 
@@ -74,16 +131,330 @@ def _settings_mutation_committed(result: TransactionResult) -> bool:
     }
 
 
-def _copy_runtime_only_ui_state(source: AppSettings, target: AppSettings) -> None:
+def _copy_runtime_only_ui_state(source: object, target: object) -> None:
     target.ui.overlay_enabled = bool(source.ui.overlay_enabled)
     target.ui.peer_translation_enabled = bool(source.ui.peer_translation_enabled)
+
+
+def _active_prompt_key(settings: object) -> str:
+    provider = settings.provider.llm.value
+    if provider in {"gemini", "openrouter", "deepseek", "local_llm", "managed_gemma"}:
+        return provider
+    return "qwen"
+
+
+def settings_view_surface_snapshots(
+    settings: object,
+) -> tuple[
+    ProviderSettingsSnapshot,
+    GeneralSettingsSnapshot,
+    PromptSettingsSnapshot,
+    OverlaySettingsSnapshot,
+]:
+    translation = settings.translation
+    provider = ProviderSettingsSnapshot(
+        stt_provider=settings.provider.stt,
+        peer_stt_provider=settings.provider.peer_stt,
+        llm_provider=settings.provider.llm,
+        translation=TranslationSelectionSnapshot(
+            model=translation.model,
+            connection=translation.connection,
+            connection_history=tuple(
+                (model, connection)
+                for model in type(translation.model)
+                if (connection := translation.connection_history.get(model.value)) is not None
+            ),
+            fallback=TranslationFallbackSnapshot(
+                enabled=translation.fallback.enabled,
+                model=translation.fallback.model,
+                connection=translation.fallback.connection,
+            ),
+            http_extension_id=translation.http_extension_id,
+            previous_llm_model=translation.previous_llm_model,
+            gpu_device_id=translation.gpu_device_id,
+        ),
+        stt_gpu_device_id=settings.stt.gpu_device_id,
+        qwen_region=settings.qwen.region,
+        local_llm_base_url=settings.local_llm.base_url,
+        local_llm_model=settings.local_llm.model,
+        local_llm_extra_body_json=json.dumps(
+            settings.local_llm.extra_body,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        custom_stt_mode=settings.custom_stt.mode,
+        custom_stt_compatibility=settings.custom_stt.compatibility,
+        custom_stt_endpoint=settings.custom_stt.endpoint,
+        custom_stt_model=settings.custom_stt.model,
+        custom_stt_extra_json=json.dumps(
+            settings.custom_stt.extra,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        openrouter_llm_model=settings.openrouter.llm_model,
+        openrouter_selected_source=settings.openrouter.selected_source,
+        openrouter_selection_alias=settings.openrouter.selection_alias,
+        verified=ProviderVerificationSnapshot(
+            deepgram=settings.api_key_verified.deepgram,
+            soniox=settings.api_key_verified.soniox,
+            google=settings.api_key_verified.google,
+            openrouter=settings.api_key_verified.openrouter,
+            deepseek=settings.api_key_verified.deepseek,
+            alibaba_beijing=settings.api_key_verified.alibaba_beijing,
+            alibaba_singapore=settings.api_key_verified.alibaba_singapore,
+            cerebras=settings.api_key_verified.cerebras,
+        ),
+        managed_referral_id=settings.managed_identity.referral_id,
+    )
+    general = GeneralSettingsSnapshot(
+        locale=settings.ui.locale,
+        effective_peer_source_language=settings.languages.effective_peer_source,
+        input_host_api=settings.audio.input_host_api,
+        input_device=settings.audio.input_device,
+        output_device=settings.desktop_audio.output_device,
+        self_vad_speech_threshold=settings.stt.vad_speech_threshold,
+        peer_vad_speech_threshold=settings.desktop_audio.vad_speech_threshold,
+        peer_vad_hangover_ms=settings.desktop_audio.vad_hangover_ms,
+        peer_vad_pre_roll_ms=settings.desktop_audio.vad_pre_roll_ms,
+        osc_connection_mode=settings.osc.connection_mode,
+        osc_port=settings.osc.port,
+        osc_send_port=settings.osc.send_port,
+        osc_receive_port=settings.osc.receive_port,
+        vrc_mic_intercept=settings.osc.vrc_mic_intercept,
+        chatbox_include_source=settings.osc.chatbox_include_source,
+        clipboard_auto_translate_enabled=settings.ui.clipboard_auto_translate_enabled,
+        telemetry_enabled=settings.telemetry.enabled,
+        peer_expected_languages=tuple(settings.languages.peer_expected_languages),
+    )
+    source_language = settings.languages.source_language
+    prompt = PromptSettingsSnapshot(
+        active_provider_key=_active_prompt_key(settings),
+        source_language=source_language,
+        system_prompt=settings.system_prompt,
+        custom_vocabulary_enabled=settings.stt.custom_vocabulary_enabled,
+        custom_vocabulary_terms=tuple(settings.stt.custom_terms.get(source_language, ())),
+        custom_vocabulary_other_languages_have_terms=any(
+            bool(terms)
+            for language, terms in settings.stt.custom_terms.items()
+            if language != source_language
+        ),
+    )
+    calibration = settings.overlay.calibration
+    overlay = OverlaySettingsSnapshot(
+        target=settings.overlay.target,
+        show_translation=settings.overlay.show_translation,
+        show_peer_original=settings.overlay.show_peer_original,
+        desktop_size_preset=settings.overlay.desktop_flet.size_preset,
+        desktop_background_alpha=settings.overlay.desktop_flet.visual.background_alpha,
+        desktop_swap_caption_languages=settings.overlay.desktop_flet.swap_caption_languages,
+        calibration=OverlayCalibrationSnapshot(
+            anchor=calibration.anchor,
+            distance=calibration.distance,
+            offset_x=calibration.offset_x,
+            offset_y=calibration.offset_y,
+            text_scale=calibration.text_scale,
+        ),
+    )
+    return provider, general, prompt, overlay
+
+
+def osc_control_presentation_state(
+    settings: object,
+    *,
+    canonical_state: OscCanonicalState,
+    changed_control: OscControlPresentationName,
+    self_capture_effective: bool | None = None,
+) -> OscControlPresentationState:
+    translation = settings.translation
+    fallback = translation.fallback
+    source_language = settings.languages.source_language
+    return OscControlPresentationState(
+        changed_control=changed_control,
+        self_capture=(
+            canonical_state.self_capture
+            if self_capture_effective is None
+            else bool(self_capture_effective)
+        ),
+        peer_capture=canonical_state.peer_capture,
+        translation=canonical_state.translation,
+        captions=canonical_state.captions,
+        peer_source_mode=settings.languages.peer_source_mode,
+        mute_sync=canonical_state.mute_sync,
+        chatbox_source=canonical_state.chatbox_source,
+        self_source_language=canonical_state.self_source_language,
+        self_target_language=canonical_state.self_target_language,
+        peer_source_language=canonical_state.peer_source_language,
+        peer_target_language=canonical_state.peer_target_language,
+        self_asr=canonical_state.self_asr,
+        peer_asr=canonical_state.peer_asr,
+        self_asr_setting=settings.provider.stt.value,
+        peer_asr_setting=settings.provider.peer_stt.value,
+        custom_stt_mode=settings.custom_stt.mode,
+        custom_stt_compatibility=settings.custom_stt.compatibility,
+        custom_vocabulary_enabled=bool(settings.stt.custom_vocabulary_enabled),
+        custom_vocabulary_terms=tuple(settings.stt.custom_terms.get(source_language, ())),
+        custom_vocabulary_other_languages_have_terms=any(
+            bool(terms)
+            for language, terms in settings.stt.custom_terms.items()
+            if language != source_language
+        ),
+        llm_provider=settings.provider.llm.value,
+        openrouter_llm_model=settings.openrouter.llm_model.value,
+        openrouter_selected_source=settings.openrouter.selected_source.value,
+        openrouter_selection_alias=(
+            None
+            if settings.openrouter.selection_alias is None
+            else settings.openrouter.selection_alias.value
+        ),
+        translation_model=translation.model.value,
+        translation_connection=translation.connection.value,
+        translation_connection_history=tuple(
+            sorted(
+                (str(model), connection.value)
+                for model, connection in translation.connection_history.items()
+            )
+        ),
+        translation_http_extension_id=translation.http_extension_id,
+        translation_previous_model=(
+            None if translation.previous_llm_model is None else translation.previous_llm_model.value
+        ),
+        fallback=canonical_state.fallback,
+        fallback_enabled=bool(fallback.enabled),
+        fallback_model=fallback.model.value,
+        fallback_connection=fallback.connection.value,
+    )
+
+
+def materialize_immediate_settings_intent(
+    current: object,
+    intent: ImmediateSettingsIntent,
+) -> object:
+    updated = copy.deepcopy(current)
+    if isinstance(intent, LocaleSettingsIntent):
+        updated.ui.locale = intent.locale
+    elif isinstance(intent, AudioSettingsIntent):
+        for change in intent.changes:
+            if isinstance(change, AudioInputSettingsIntent):
+                updated.audio.input_host_api = change.input_host_api
+                updated.audio.input_device = change.input_device
+            elif isinstance(change, DesktopAudioOutputSettingsIntent):
+                updated.desktop_audio.output_device = change.output_device
+    elif isinstance(intent, SelfVadSettingsIntent):
+        updated.stt.vad_speech_threshold = intent.speech_threshold
+    elif isinstance(intent, PeerVadSpeechThresholdIntent):
+        updated.desktop_audio.vad_speech_threshold = intent.speech_threshold
+    elif isinstance(intent, PeerVadHangoverIntent):
+        updated.desktop_audio.vad_hangover_ms = intent.hangover_ms
+    elif isinstance(intent, PeerVadPreRollIntent):
+        updated.desktop_audio.vad_pre_roll_ms = intent.pre_roll_ms
+    elif isinstance(intent, OscConnectionSettingsIntent):
+        updated.osc.connection_mode = intent.connection_mode
+        updated.osc.send_port = intent.send_port
+        updated.osc.receive_port = intent.receive_port
+    elif isinstance(intent, VrcMicInterceptSettingsIntent):
+        updated.osc.vrc_mic_intercept = intent.enabled
+    elif isinstance(intent, ChatboxSourceSettingsIntent):
+        updated.osc.chatbox_include_source = intent.enabled
+    elif isinstance(intent, ClipboardSettingsIntent):
+        updated.ui.clipboard_auto_translate_enabled = intent.enabled
+    elif isinstance(intent, PeerExpectedLanguagesIntent):
+        updated.languages.peer_expected_languages = list(intent.languages)
+    elif isinstance(intent, CustomVocabularySettingsIntent):
+        updated.stt.custom_terms[intent.source_language] = list(intent.terms)
+        updated.stt.custom_vocabulary_enabled = any(updated.stt.custom_terms.values())
+    elif isinstance(intent, OverlayTargetSettingsIntent):
+        updated.overlay.target = intent.target
+    elif isinstance(intent, OverlayTranslationSettingsIntent):
+        updated.overlay.show_translation = intent.enabled
+    elif isinstance(intent, OverlayPeerOriginalSettingsIntent):
+        updated.overlay.show_peer_original = intent.enabled
+    elif isinstance(intent, DesktopOverlayBackgroundAlphaIntent):
+        updated.overlay.desktop_flet.visual.background_alpha = intent.background_alpha
+    elif isinstance(intent, DesktopOverlaySwapCaptionLanguagesIntent):
+        updated.overlay.desktop_flet.swap_caption_languages = intent.enabled
+    elif isinstance(intent, DesktopOverlaySizeIntent):
+        updated.overlay.desktop_flet.size_preset = intent.size_preset
+    elif isinstance(intent, DesktopOverlayPositionResetIntent):
+        updated.overlay.desktop_flet.position.x = None
+        updated.overlay.desktop_flet.position.y = None
+        updated.overlay.desktop_flet.locked = False
+    elif isinstance(intent, OverlayCalibrationSettingsIntent):
+        calibration = intent.calibration
+        updated.overlay.calibration.anchor = calibration.anchor
+        updated.overlay.calibration.distance = calibration.distance
+        updated.overlay.calibration.offset_x = calibration.offset_x
+        updated.overlay.calibration.offset_y = calibration.offset_y
+        updated.overlay.calibration.text_scale = calibration.text_scale
+    return updated
+
+
+def materialize_prompt_apply_intent(
+    current: object,
+    intent: PromptApplyIntent,
+) -> object:
+    updated = copy.deepcopy(current)
+    updated.system_prompt = intent.value
+    updated.system_prompts = {}
+    return updated
+
+
+def materialize_provider_apply_intent(
+    current: object,
+    intent: ProviderApplyIntent,
+    *,
+    materialize_translation: Callable[[object], object],
+) -> object:
+    updated = copy.deepcopy(current)
+    for edit in intent.edits:
+        if isinstance(edit, SelfSttProviderEdit):
+            updated.provider.stt = edit.provider
+        elif isinstance(edit, PeerSttProviderEdit):
+            updated.provider.peer_stt = edit.provider
+        elif isinstance(edit, SttGpuDeviceEdit):
+            updated.stt.gpu_device_id = edit.device_id
+        elif isinstance(edit, LlmGpuDeviceEdit):
+            updated.translation.gpu_device_id = edit.device_id
+        elif isinstance(edit, TranslationSelectionEdit):
+            selection = edit.selection
+            updated.translation.model = selection.model
+            updated.translation.connection = selection.connection
+            for model, connection in edit.history_updates:
+                updated.translation.connection_history[model.value] = connection
+            updated.translation.previous_llm_model = selection.previous_llm_model
+            materialize_translation(updated)
+        elif isinstance(edit, TranslationFallbackEdit):
+            updated.translation.fallback.enabled = edit.fallback.enabled
+            updated.translation.fallback.model = edit.fallback.model
+            updated.translation.fallback.connection = edit.fallback.connection
+        elif isinstance(edit, TranslationHttpExtensionEdit):
+            updated.translation.http_extension_id = edit.extension_id
+        elif isinstance(edit, QwenRegionEdit):
+            updated.qwen.region = edit.region
+        elif isinstance(edit, LocalLlmBaseUrlEdit):
+            updated.local_llm.base_url = edit.base_url
+        elif isinstance(edit, LocalLlmModelEdit):
+            updated.local_llm.model = edit.model
+        elif isinstance(edit, LocalLlmExtraBodyEdit):
+            updated.local_llm.extra_body = json.loads(edit.extra_body_json)
+        elif isinstance(edit, CustomSttEndpointEdit):
+            updated.custom_stt.endpoint = edit.endpoint
+        elif isinstance(edit, CustomSttModelEdit):
+            updated.custom_stt.model = edit.model
+        elif isinstance(edit, CustomSttExtraEdit):
+            updated.custom_stt.extra = json.loads(edit.extra_json)
+        elif isinstance(edit, ManagedReferralEdit):
+            updated.managed_identity.referral_id = edit.referral_id
+        elif isinstance(edit, SystemPromptEdit):
+            updated.system_prompt = edit.value
+            updated.system_prompts = {}
+    return updated
 
 
 @dataclass(slots=True)
 class SettingsApplicationOwner:
     settings: SettingsOwner
     projection: SettingsProjectionOwner
-    runtime_effects: SettingsRuntimeEffectsPort[AppSettings]
+    runtime_effects: SettingsRuntimeEffectsPort[object]
     manual_fallback: ManualLocalASRFallbackOwner
     cpu_auto_available: Callable[[], bool]
     inspect_cpu: SettingsAsyncEffect
@@ -91,14 +462,14 @@ class SettingsApplicationOwner:
     sync_ui: Callable[[], None]
     fallback_log_sink: SettingsFallbackLogSink
     mutation_service_provider: SettingsMutationServiceProvider
-    consume_superseded_settings: Callable[[AppSettings], bool]
+    consume_superseded_settings: Callable[[object], bool]
     active_local_asr_change: SettingsPredicate
     failure_sink: SettingsFailureSink
     results: SettingsTransactionResultOwner = field(default_factory=SettingsTransactionResultOwner)
 
     async def apply(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
         *,
         reload_settings_view: bool = True,
     ) -> bool:
@@ -172,7 +543,7 @@ class SettingsApplicationOwner:
 
     async def _route(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
         *,
         reload_settings_view: bool,
     ) -> bool:
@@ -231,7 +602,7 @@ class SettingsApplicationOwner:
 
     async def apply_direct(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
         *,
         persist: bool = True,
         strict_runtime_errors: bool = False,
@@ -283,8 +654,6 @@ class SettingsApplicationOwner:
         settings: object,
         reload_settings_view: bool,
     ) -> None:
-        if not isinstance(settings, AppSettings):
-            raise TypeError("settings runtime effect requires AppSettings")
         await self.apply_direct(
             settings,
             persist=False,
@@ -294,13 +663,13 @@ class SettingsApplicationOwner:
 
     async def apply_ui_prompt_clipboard_state(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
     ) -> bool:
         return await self._apply_ui_prompt_clipboard_state(next_settings)
 
     async def apply_overlay_osc_output(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
     ) -> bool:
         return await self._apply_overlay_osc_output(next_settings)
 
@@ -329,8 +698,8 @@ class SettingsApplicationOwner:
     async def compensate_failed_local_asr_settings_apply(
         self,
         *,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
+        base_settings: object,
+        committed_settings: object,
         reload_settings_view: bool = True,
     ) -> None:
         self.settings.begin(legacy_snapshot=committed_settings)
@@ -363,7 +732,7 @@ class SettingsApplicationOwner:
 
     async def _apply_combined(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
         *,
         reload_settings_view: bool,
     ) -> bool:
@@ -379,9 +748,9 @@ class SettingsApplicationOwner:
 
         async def route(
             values: dict[str, object],
-            apply_patch: Callable[[AppSettings], Awaitable[bool]],
+            apply_patch: Callable[[object], Awaitable[bool]],
             *,
-            runtime_source: AppSettings | None = None,
+            runtime_source: object | None = None,
         ) -> bool:
             current = self.settings.current
             if current is None:
@@ -476,7 +845,7 @@ class SettingsApplicationOwner:
 
     async def _apply_stt_language_audio(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
         *,
         reload_settings_view: bool = True,
     ) -> bool:
@@ -518,7 +887,10 @@ class SettingsApplicationOwner:
         if (
             not has_out_of_scope_draft
             and result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
-            and self.active_local_asr_change(base_settings, committed_settings)
+            and self.active_local_asr_change(
+                self.settings.project(base_settings, authoritative=True),
+                self.settings.project(committed_settings, authoritative=True),
+            )
         ):
             try:
                 await self.compensate_failed_local_asr_settings_apply(
@@ -565,7 +937,7 @@ class SettingsApplicationOwner:
         self.projection.remember_order22(self.settings.current)
         return True
 
-    async def _apply_overlay_osc_output(self, next_settings: AppSettings) -> bool:
+    async def _apply_overlay_osc_output(self, next_settings: object) -> bool:
         base_and_patch = self.projection.order23_patch_base_and_values(next_settings)
         if base_and_patch is None:
             return False
@@ -632,7 +1004,7 @@ class SettingsApplicationOwner:
 
     async def _apply_ui_prompt_clipboard_state(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
     ) -> bool:
         base_and_patch = self.projection.order24_patch_base_and_values(next_settings)
         if base_and_patch is None:
@@ -696,8 +1068,8 @@ class SettingsApplicationOwner:
         self,
         *,
         command: SettingsMutationCommand,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
+        base_settings: object,
+        committed_settings: object,
         surface: str,
         runtime_apply: RuntimeApplyPort,
     ) -> TransactionResult:
@@ -735,8 +1107,8 @@ class SettingsApplicationOwner:
     async def _resync_committed_runtime(
         self,
         *,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
+        base_settings: object,
+        committed_settings: object,
         failure_message: str,
     ) -> None:
         self.runtime_effects.restore_memory(base_settings)

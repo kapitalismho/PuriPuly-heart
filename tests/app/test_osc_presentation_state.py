@@ -3,10 +3,8 @@ from __future__ import annotations
 from dataclasses import FrozenInstanceError
 
 import pytest
+from puripuly_heart.app.services.settings_application import osc_control_presentation_state
 
-from puripuly_heart.app.services.osc.presentation_state import (
-    presentation_state_from_settings,
-)
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
 from puripuly_heart.config.settings import (
     AppSettings,
@@ -28,7 +26,7 @@ def test_presentation_state_captures_the_post_apply_canonical_snapshot() -> None
         translation=True,
     )
 
-    state = presentation_state_from_settings(
+    state = osc_control_presentation_state(
         settings,
         canonical_state=canonical,
         changed_control="PuriPuly_Translator",

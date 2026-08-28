@@ -13,6 +13,15 @@ from puripuly_heart.app.ports.application_runtime_logging import (
 from puripuly_heart.app.ports.application_runtime_shutdown import (
     ApplicationRuntimeShutdownPort,
 )
+from puripuly_heart.app.ports.settings_secrets import SettingsSecretsPort
+from puripuly_heart.app.ports.settings_view import (
+    GeneralSettingsSnapshot,
+    ImmediateSettingsIntent,
+    OpenRouterPkceTarget,
+    OverlaySettingsSnapshot,
+    PromptApplyIntent,
+    ProviderApplyIntent,
+)
 from puripuly_heart.app.ports.ui_application import UiApplicationState
 from puripuly_heart.app.ports.ui_application_intents import (
     UiDiagnosticsRuntimePort,
@@ -56,6 +65,9 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "apply_overlay_calibration",
         "apply_providers",
         "apply_settings",
+        "apply_settings_intent",
+        "apply_prompt_intent",
+        "apply_provider_intent",
         "apply_telemetry_enabled",
         "begin_overlay_calibration",
         "cancel_discord_managed_auth",
@@ -143,6 +155,7 @@ class UiApplicationBoundary:
         state: UiApplicationStatePort,
         runtime_shutdown: ApplicationRuntimeShutdownPort,
         runtime_logging: ApplicationRuntimeLoggingPort,
+        settings_secrets: SettingsSecretsPort,
         osc_state_publisher: Callable[[], object] | None = None,
         http_extension_registry: object | None = None,
     ) -> None:
@@ -157,6 +170,7 @@ class UiApplicationBoundary:
         self._engagement = engagement
         self._diagnostics = diagnostics
         self._runtime_logging = runtime_logging
+        self._settings_secrets = settings_secrets
         self._http_extension_registry = http_extension_registry
         self._runtime_shutdown = runtime_shutdown
         self._state_owner = state
@@ -198,6 +212,9 @@ class UiApplicationBoundary:
 
     def http_extension_registry(self) -> object | None:
         return self._http_extension_registry
+
+    def settings_secrets(self) -> SettingsSecretsPort:
+        return self._settings_secrets
 
     def state(self) -> UiApplicationState:
         return self._state_owner.snapshot()
@@ -464,6 +481,28 @@ class UiApplicationBoundary:
     async def apply_telemetry_enabled(self, enabled: bool) -> Any | None:
         return await self._settings.apply_telemetry_enabled(enabled)
 
+    async def apply_settings_intent(self, intent: ImmediateSettingsIntent) -> object:
+        result = await self._settings.apply_settings_intent(intent)
+        await self._publish_osc_state()
+        return result
+
+    async def apply_prompt_intent(self, intent: PromptApplyIntent) -> object:
+        result = await self._settings.apply_prompt_intent(intent)
+        await self._publish_osc_state()
+        return result
+
+    async def apply_provider_intent(self, intent: ProviderApplyIntent) -> object:
+        settings = self._settings.materialize_provider_intent(intent)
+        result = await self._provider.apply_providers(settings)
+        await self._publish_osc_state()
+        return result
+
+    def settings_overlay_snapshot(self) -> OverlaySettingsSnapshot | None:
+        return self._settings.overlay_snapshot()
+
+    def settings_general_snapshot(self) -> GeneralSettingsSnapshot | None:
+        return self._settings.general_snapshot()
+
     async def accept_peer_translation_eula_and_enable(self) -> object:
         settings = self.compatibility_settings()
         if settings is not None:
@@ -475,11 +514,11 @@ class UiApplicationBoundary:
         return self.state().provider_name == "local_llm"
 
     async def connect_openrouter_via_pkce(
-        self, *, target_settings: Any, launch_source: str
+        self, *, target: OpenRouterPkceTarget, launch_source: str
     ) -> bool:
         return bool(
             await self._provider.connect_openrouter_via_pkce(
-                target_settings=target_settings,
+                target=target,
                 launch_source=launch_source,
             )
         )
@@ -487,8 +526,8 @@ class UiApplicationBoundary:
     def reopen_openrouter_pkce_authorization_url(self) -> None:
         self._provider.reopen_openrouter_pkce_authorization_url()
 
-    def build_managed_openrouter_byok_target_settings(self) -> Any | None:
-        return self._provider.build_managed_openrouter_byok_target_settings()
+    def build_managed_openrouter_byok_target(self) -> OpenRouterPkceTarget | None:
+        return self._provider.build_managed_openrouter_byok_target()
 
     async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
         return await self._provider.verify_api_key(provider, key)

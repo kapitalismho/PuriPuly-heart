@@ -1,14 +1,22 @@
 from __future__ import annotations
 
-import copy
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 from urllib.parse import urlsplit
 
 import httpx
 
-from puripuly_heart.config.settings import AppSettings
+
+@dataclass(frozen=True, slots=True)
+class AppActiveDayTelemetryState:
+    enabled: bool
+    anonymous_id: str | None
+    last_sent_date_utc: str | None
+    broker_base_url: str
+
+    def with_sent_date(self, active_date_utc: str) -> AppActiveDayTelemetryState:
+        return replace(self, last_sent_date_utc=active_date_utc)
 
 
 class AppActiveDayTelemetryClientPort(Protocol):
@@ -21,7 +29,7 @@ class AppActiveDayTelemetryClientPort(Protocol):
     ) -> bool: ...
 
 
-TelemetryPersistSentDate = Callable[[AppSettings], Awaitable[bool]]
+TelemetryPersistSentDate = Callable[[AppActiveDayTelemetryState], Awaitable[bool]]
 TelemetryDiagnosticsSink = Callable[[str, Mapping[str, object]], None]
 
 
@@ -76,28 +84,24 @@ class AppActiveDayTelemetryService:
 
     async def record_app_active_day(
         self,
-        settings: AppSettings,
+        settings: AppActiveDayTelemetryState,
         *,
         active_date_utc: str,
         persist_sent_date: TelemetryPersistSentDate,
     ) -> AppActiveDayTelemetryResult:
-        enabled = settings.telemetry.enabled
-        identifier = settings.telemetry_state.anonymous_id
-        last_sent_date_utc = settings.telemetry_state.last_sent_date_utc
-
-        if not enabled:
+        if not settings.enabled:
             return self._result(
                 "skipped_disabled",
                 active_date_utc=active_date_utc,
                 reason="reporting_disabled",
             )
-        if not identifier:
+        if not settings.anonymous_id:
             return self._result(
                 "skipped_missing_identifier",
                 active_date_utc=active_date_utc,
                 reason="missing_identifier",
             )
-        if active_date_utc == last_sent_date_utc:
+        if active_date_utc == settings.last_sent_date_utc:
             return self._result(
                 "skipped_already_sent",
                 active_date_utc=active_date_utc,
@@ -106,9 +110,9 @@ class AppActiveDayTelemetryService:
 
         try:
             sent = await self._client.record_app_active_day(
-                identifier,
+                settings.anonymous_id,
                 active_date_utc,
-                base_url=settings.openrouter.broker_base_url,
+                base_url=settings.broker_base_url,
             )
         except Exception as exc:
             return self._result(
@@ -126,10 +130,7 @@ class AppActiveDayTelemetryService:
                 reason="client_returned_false",
             )
 
-        updated = copy.deepcopy(settings)
-        updated.telemetry_state.last_sent_date_utc = active_date_utc
-        updated.validate()
-        persisted = await persist_sent_date(updated)
+        persisted = await persist_sent_date(settings.with_sent_date(active_date_utc))
         return self._result(
             "sent" if persisted else "persist_failed",
             attempted_send=True,
@@ -181,5 +182,6 @@ __all__ = [
     "AppActiveDayTelemetryClientPort",
     "AppActiveDayTelemetryResult",
     "AppActiveDayTelemetryService",
+    "AppActiveDayTelemetryState",
     "HttpAppActiveDayTelemetryClient",
 ]

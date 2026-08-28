@@ -718,8 +718,6 @@ def _assert_qwen_resolved_credential_helper_preserves_legacy_fallbacks() -> None
     base_llm_source = inspect.getsource(wiring._base_llm_provider_from_resolved_config)
     provider_target_source = inspect.getsource(llm_factory._provider_from_resolved_target)
     stt_source = inspect.getsource(wiring.create_stt_backend_from_resolved_config)
-    self_stt_source = inspect.getsource(wiring.create_stt_backend)
-    peer_stt_source = inspect.getsource(wiring.create_peer_stt_backend)
     peer_resolved_source = inspect.getsource(wiring.create_peer_stt_backend_from_resolved_config)
 
     assert 'key="alibaba_api_key_beijing"' in helper_source
@@ -732,8 +730,6 @@ def _assert_qwen_resolved_credential_helper_preserves_legacy_fallbacks() -> None
     assert "_provider_from_resolved_target(" in base_llm_source
     assert "_qwen_api_key_for_resolved_credential(target.credential" in provider_target_source
     assert "_qwen_api_key_for_resolved_credential(config.credential" in stt_source
-    assert "create_stt_backend_from_resolved_config(" in self_stt_source
-    assert "create_peer_stt_backend_from_resolved_config(" in peer_stt_source
     assert "create_stt_backend_from_resolved_config(" in peer_resolved_source
 
 

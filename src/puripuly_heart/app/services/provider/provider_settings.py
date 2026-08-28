@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from puripuly_heart.app.ports.canonical_settings_persistence import (
     ProviderVerificationBinding,
@@ -32,7 +33,6 @@ from puripuly_heart.app.services.settings_mutation_legacy import (
 from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
-from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -60,21 +60,28 @@ from .provider_verification_binding import (
     ProviderVerificationBindingOwner,
 )
 
-ProviderSecretStoreFactory = Callable[[AppSettings], SecretStorePort]
-ProviderActiveSecretProvider = Callable[[AppSettings, str], str | None]
+
+class ProviderCompatibilityProjection(Protocol):
+    ui: object
+
+
+ProviderSecretStoreFactory = Callable[[ProviderCompatibilityProjection], SecretStorePort]
+ProviderActiveSecretProvider = Callable[[ProviderCompatibilityProjection, str], str | None]
 ProviderSettingsSaveFailureSink = Callable[[str], None]
-ProviderSettingsMerge = Callable[[AppSettings], AppSettings]
-ProviderSettingsAsyncEffect = Callable[[AppSettings], Awaitable[None]]
-ProviderSettingsRoute = Callable[[AppSettings], Awaitable[bool]]
-ProviderSettingsSync = Callable[[AppSettings], None]
-ProviderSettingsPredicate = Callable[[AppSettings, AppSettings], bool]
+ProviderSettingsMerge = Callable[[ProviderCompatibilityProjection], ProviderCompatibilityProjection]
+ProviderSettingsAsyncEffect = Callable[[ProviderCompatibilityProjection], Awaitable[None]]
+ProviderSettingsRoute = Callable[[ProviderCompatibilityProjection], Awaitable[bool]]
+ProviderSettingsSync = Callable[[ProviderCompatibilityProjection], None]
+ProviderSettingsPredicate = Callable[
+    [ProviderCompatibilityProjection, ProviderCompatibilityProjection], bool
+]
 ProviderSettingsCompensation = Callable[..., Awaitable[None]]
 ProviderSettingsMutationServiceProvider = Callable[[], SettingsMutationService | None]
 ProviderOrder24PatchProvider = Callable[
-    [AppSettings],
-    tuple[AppSettings, dict[str, object]] | None,
+    [ProviderCompatibilityProjection],
+    tuple[ProviderCompatibilityProjection, dict[str, object]] | None,
 ]
-ProviderSupersededSettingsConsumer = Callable[[AppSettings], bool]
+ProviderSupersededSettingsConsumer = Callable[[ProviderCompatibilityProjection], bool]
 
 
 class ProviderStrictSettingsSaveFailed(Exception):
@@ -118,7 +125,7 @@ class ProviderApplicationOwner:
 
     async def apply(
         self,
-        pending: AppSettings | None = None,
+        pending: ProviderCompatibilityProjection | None = None,
         *,
         force_rebuild_llm: bool = False,
         persist_settings: bool = True,
@@ -145,7 +152,7 @@ class ProviderApplicationOwner:
             if refresh_ui:
                 self.sync_ui()
 
-    async def _apply_combined(self, next_settings: AppSettings) -> bool:
+    async def _apply_combined(self, next_settings: ProviderCompatibilityProjection) -> bool:
         base_settings = self.settings.current
         if base_settings is None:
             return False
@@ -255,7 +262,7 @@ class ProviderApplicationOwner:
                 self._set_result(degraded)
         return True
 
-    async def _apply_translation(self, next_settings: AppSettings) -> bool:
+    async def _apply_translation(self, next_settings: ProviderCompatibilityProjection) -> bool:
         base_settings = self.settings.current
         if base_settings is None:
             return False
@@ -367,7 +374,9 @@ class ProviderApplicationOwner:
         self.remember_order22(self.settings.current)
         return True
 
-    async def _apply_stt_language_audio(self, next_settings: AppSettings) -> bool:
+    async def _apply_stt_language_audio(
+        self, next_settings: ProviderCompatibilityProjection
+    ) -> bool:
         base_settings = self.settings.current
         if base_settings is None:
             return False
@@ -439,7 +448,10 @@ class ProviderApplicationOwner:
         if (
             not has_out_of_scope_draft
             and result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
-            and self.active_local_asr_change(base_settings, committed_settings)
+            and self.active_local_asr_change(
+                self.settings.project(base_settings, authoritative=True),
+                self.settings.project(committed_settings, authoritative=True),
+            )
         ):
             try:
                 await self.compensate_local_asr(
@@ -507,7 +519,7 @@ class ProviderApplicationOwner:
 
     async def _apply_direct(
         self,
-        next_settings: AppSettings,
+        next_settings: ProviderCompatibilityProjection,
         *,
         force_rebuild_llm: bool,
         plan: ProviderRuntimeApplyPlan | None = None,
@@ -609,8 +621,8 @@ class ProviderApplicationOwner:
     async def _resync_committed_provider_runtime(
         self,
         *,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
+        base_settings: ProviderCompatibilityProjection,
+        committed_settings: ProviderCompatibilityProjection,
         plan: ProviderRuntimeApplyPlan,
     ) -> None:
         self.sync_memory(base_settings)
@@ -635,7 +647,7 @@ def _settings_mutation_committed(result: TransactionResult) -> bool:
 
 
 def provider_verification_context(
-    settings: AppSettings | None,
+    settings: ProviderCompatibilityProjection | None,
     provider: str,
     *,
     low_latency: bool,
@@ -777,7 +789,7 @@ class ProviderSettingsOwner:
 
     def _apply_secret_change_result(
         self,
-        committed_settings: AppSettings,
+        committed_settings: ProviderCompatibilityProjection,
         result: TransactionResult,
         succeeded: bool,
     ) -> None:
@@ -788,7 +800,7 @@ class ProviderSettingsOwner:
         self.settings.remember_projection(committed_settings)
         self.settings.complete()
 
-    def _current(self) -> AppSettings:
+    def _current(self) -> ProviderCompatibilityProjection:
         if self.settings.current is None:
             raise RuntimeError("settings owner has no compatibility settings")
         return self.settings.current

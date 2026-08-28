@@ -248,12 +248,9 @@
         {"name": "compose_self_capture_session_owner", "kind": "attribute"},
         {"name": "create_llm_provider", "kind": "attribute"},
         {"name": "create_llm_provider_from_resolved_config", "kind": "attribute"},
-        {"name": "create_peer_stt_backend", "kind": "attribute"},
         {"name": "create_peer_stt_backend_from_resolved_config", "kind": "attribute"},
         {"name": "create_provider_verifier", "kind": "attribute"},
         {"name": "create_secret_store", "kind": "attribute"},
-        {"name": "copy_stable_secrets_to_vnext_namespace", "kind": "attribute"},
-        {"name": "create_stt_backend", "kind": "attribute"},
         {"name": "create_stt_backend_from_resolved_config", "kind": "attribute"},
         {"name": "require_secret", "kind": "attribute"},
         {"name": "require_secret_any", "kind": "attribute"},
@@ -404,7 +401,6 @@
       "exports": [
         {"name": "from_dict", "kind": "attribute"},
         {"name": "from_legacy_app_settings", "kind": "attribute"},
-        {"name": "is_legacy_shape_dict", "kind": "attribute"},
         {"name": "is_vnext_shape_dict", "kind": "attribute"},
         {"name": "is_vnext_settings_dict", "kind": "attribute"},
         {"name": "to_legacy_dict", "kind": "attribute"}
@@ -1181,12 +1177,14 @@
       "surface": "vNext schema, resolved DTO, and runtime resolution modules",
       "classification": "internal_schema_and_runtime_resolution_contracts",
       "modules": [
-        "puripuly_heart.config.profile_bootstrap",
+        "puripuly_heart.config.provider_values",
         "puripuly_heart.config.resolved",
         "puripuly_heart.config.runtime_resolution",
-        "puripuly_heart.config.settings_vnext.schema"
+        "puripuly_heart.config.settings_vnext.defaults",
+        "puripuly_heart.config.settings_vnext.schema",
+        "puripuly_heart.config.translation_values"
       ],
-      "rationale": "These modules are schema values, resolved DTOs, and runtime-resolution contracts used inside the vNext architecture. They are not legacy implementation owners and are not external compatibility facades."
+      "rationale": "These modules are pure settings values, schema values, resolved DTOs, and runtime-resolution contracts used inside the vNext architecture. They are not legacy implementation owners and are not external compatibility facades."
     },
     {
       "surface": "core lifecycle, observability, error-message, telemetry, and metadata contract modules",

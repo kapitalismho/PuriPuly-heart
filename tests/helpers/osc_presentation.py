@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from puripuly_heart.app.services.settings_application import (
+    osc_control_presentation_state as _project_osc_control_presentation_state,
+)
+
 from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationName,
     OscControlPresentationState,
-)
-from puripuly_heart.app.services.osc.presentation_state import (
-    presentation_state_from_settings,
 )
 from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState, state_from_settings
 from puripuly_heart.config.settings import AppSettings
@@ -24,7 +25,7 @@ def osc_control_presentation_state(
     canonical = canonical_state or state_from_settings(value)
     if canonical_changes:
         canonical = replace(canonical, **canonical_changes)
-    return presentation_state_from_settings(
+    return _project_osc_control_presentation_state(
         value,
         canonical_state=canonical,
         changed_control=changed_control,

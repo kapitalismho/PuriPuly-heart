@@ -6,7 +6,11 @@ from uuid import UUID
 import pytest
 from puripuly_heart.core.openrouter_credentials import OPENROUTER_MANAGED_API_KEY_SECRET
 
-from puripuly_heart.app.wiring import create_llm_provider
+from puripuly_heart.app.wiring.wiring_llm_factory import (
+    create_llm_provider,
+    llm_factory_extras_from_vnext,
+    runtime_resolution_input_from_vnext,
+)
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -15,6 +19,7 @@ from puripuly_heart.config.settings import (
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
 )
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.domain.models import Translation
@@ -112,9 +117,11 @@ async def test_openrouter_cached_managed_key_translation_smoke(
     secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, api_key)
 
     managed_release_service = FailFastManagedReleaseService()
+    canonical = from_legacy_app_settings(settings)
     provider = create_llm_provider(
-        settings,
+        runtime_resolution_input_from_vnext(canonical),
         secrets=secrets,
+        extras=llm_factory_extras_from_vnext(canonical),
         managed_release_service=managed_release_service,
         managed_delegate_ready=fail_if_managed_delegate_ready,
         runtime_logging=suppressed_runtime_logger(),

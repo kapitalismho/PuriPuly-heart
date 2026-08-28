@@ -16,6 +16,7 @@ from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaRuntimeOwner,
 )
 from puripuly_heart.core.local_translation.runtime_profile import GemmaBackend
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 def _log_basic_request(
     *,
-    runtime_logging: object | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     text: str,
     source_language: str,
@@ -44,7 +45,9 @@ def _log_basic_request(
     logger.info(message)
 
 
-def _log_basic_response(*, runtime_logging: object | None, operation: str, text: str) -> None:
+def _log_basic_response(
+    *, runtime_logging: ProviderObservationPort | None, operation: str, text: str
+) -> None:
     message = "[Basic][LLM] Gemma response [%s]: %r" % (operation, text)
     if runtime_logging is not None:
         runtime_logging.emit_basic(message)
@@ -54,7 +57,7 @@ def _log_basic_response(*, runtime_logging: object | None, operation: str, text:
 
 def _log_basic_request_failure(
     *,
-    runtime_logging: object | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     exc: BaseException,
 ) -> None:
@@ -245,7 +248,7 @@ class ManagedGemmaLLMProvider:
     backend: GemmaBackend
     vulkan_device: str = "Vulkan0"
     release_runtime: Callable[[], Awaitable[None]] | None = None
-    runtime_logging: object | None = None
+    runtime_logging: ProviderObservationPort | None = None
     _closed: bool = field(init=False, default=False, repr=False)
     _released: bool = field(init=False, default=False, repr=False)
 

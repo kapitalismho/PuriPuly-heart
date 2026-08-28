@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
-from puripuly_heart.config.settings import OpenRouterCredentialSource
+from puripuly_heart.config.provider_values import OpenRouterCredentialSource
 from puripuly_heart.core.storage.secrets import SecretStore
 
 OPENROUTER_BYOK_API_KEY_SECRET = "openrouter_api_key"

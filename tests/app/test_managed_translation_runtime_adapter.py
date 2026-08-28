@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -13,6 +14,10 @@ from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterReleaseResult,
 )
 
+from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
+    SettingsVNextCanonicalPersistenceAdapter,
+)
+from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -22,6 +27,7 @@ from puripuly_heart.config.settings import (
     TranslationModel,
     TranslationSettings,
 )
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 
 
 class AuthAdapter:
@@ -32,7 +38,7 @@ class AuthAdapter:
     def state(self) -> ManagedAuthState:
         return self._state
 
-    def claim_guard(self, _settings: AppSettings):
+    def claim_guard(self):
         if self._claim_guard is None:
             raise AssertionError("claim guard was not expected")
         return self._claim_guard
@@ -56,6 +62,16 @@ def _auth_state(
     )
 
 
+def _owner(settings: AppSettings) -> SettingsOwner:
+    return SettingsOwner(
+        path=Path("settings.json"),
+        persistence=SettingsVNextCanonicalPersistenceAdapter(),
+        canonical=from_legacy_app_settings(settings),
+        current=settings,
+        authoritative=True,
+    )
+
+
 def _adapter(
     settings: AppSettings,
     auth: AuthAdapter,
@@ -67,7 +83,7 @@ def _adapter(
 ) -> ManagedTranslationRuntimeAdapter:
     return ManagedTranslationRuntimeAdapter(
         auth=auth,
-        settings_provider=lambda: settings,
+        settings=_owner(settings),
         release_service_provider=lambda: service,
         runtime_snapshot_provider=lambda: runtime_snapshot,
         ingress_provider=lambda: False,

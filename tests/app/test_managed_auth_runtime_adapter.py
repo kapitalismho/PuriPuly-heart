@@ -7,12 +7,17 @@ from puripuly_heart.app.wiring_managed_auth_factory import (
     _managed_connection_auth_settings_values,
 )
 
+from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
+    SettingsVNextCanonicalPersistenceAdapter,
+)
+from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
     OpenRouterCredentialSource,
     TranslationConnection,
 )
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 
 
 class SecretStore:
@@ -29,6 +34,16 @@ class SecretStore:
         self.values.pop(key, None)
 
 
+def _owner(settings: AppSettings) -> SettingsOwner:
+    return SettingsOwner(
+        path=Path("settings.json"),
+        persistence=SettingsVNextCanonicalPersistenceAdapter(),
+        canonical=from_legacy_app_settings(settings),
+        current=settings,
+        authoritative=True,
+    )
+
+
 def _adapter(
     settings: AppSettings,
     *,
@@ -38,12 +53,9 @@ def _adapter(
     return ManagedAuthRuntimeAdapter(
         config_path=Path("settings.json"),
         secret_store_factory=secret_store_factory,
-        settings_provider=lambda: settings,
-        settings_sink=lambda _settings: None,
+        settings=_owner(settings),
         release_service_provider=lambda: object(),
-        persistence_callback_factory=lambda _settings: lambda _updated: None,
         settings_repository_factory=lambda _base, _committed, _surface: object(),
-        settings_owner_complete=lambda: None,
         runtime_presence_provider=lambda: runtime_presence,
         ingress_provider=lambda: False,
     )
@@ -94,7 +106,7 @@ def test_transaction_settings_values_exclude_raw_secrets() -> None:
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.managed_identity.active_managed_credential_ref = "managed-ref"
 
-    values = _managed_connection_auth_settings_values(settings)
+    values = _managed_connection_auth_settings_values(from_legacy_app_settings(settings))
     serialized = repr(values).lower()
 
     assert values["state"]["managed_connection"]["active_managed_credential_ref"] == ("managed-ref")

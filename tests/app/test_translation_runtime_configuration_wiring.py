@@ -4,7 +4,9 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from threading import Barrier
 
-from puripuly_heart.app.wiring_provider_runtime import project_translation_runtime_settings
+from puripuly_heart.app.wiring_provider_runtime import (
+    project_translation_runtime_settings_from_vnext,
+)
 from puripuly_heart.app.wiring_translation_runtime_configuration import (
     build_translation_runtime_config,
     replace_translation_runtime_effective_flags,
@@ -13,6 +15,7 @@ from puripuly_heart.app.wiring_translation_runtime_configuration import (
 )
 
 from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigurationOwner,
@@ -39,7 +42,9 @@ def test_settings_replace_is_one_atomic_revision_and_preserves_runtime_only_valu
     settings.stt.low_latency_spec_retry_max = 3
     settings.stt.low_latency_vad_hangover_ms = 815
     settings.desktop_audio.vad_hangover_ms = 935
-    settings_values = project_translation_runtime_settings(settings)
+    settings_values = project_translation_runtime_settings_from_vnext(
+        from_legacy_app_settings(settings)
+    )
 
     change = replace_translation_runtime_settings(
         owner,

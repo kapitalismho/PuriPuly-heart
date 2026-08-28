@@ -16,7 +16,7 @@ from puripuly_heart.app.ports.broker_client import (
     QqManagedAssertionResult,
     QqManagedEntitlementSnapshot,
 )
-from puripuly_heart.config.settings import normalize_owned_referral_id
+from puripuly_heart.config.provider_values import normalize_owned_referral_id
 from puripuly_heart.core import messages
 
 from .managed_openrouter_release import (

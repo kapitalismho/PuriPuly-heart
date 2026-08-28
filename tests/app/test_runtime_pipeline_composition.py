@@ -33,6 +33,7 @@ from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
 )
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
+from tests.helpers.runtime_pipeline import pipeline_inputs_from_legacy
 
 
 class ManagedRelease:
@@ -95,7 +96,7 @@ class CaptureOwner:
 async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
+
     monkeypatch.setattr(
         runtime_pipeline_module,
         "create_translation_backend",
@@ -116,7 +117,8 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
         return CaptureOwner("peer")
 
     pipeline = await compose_runtime_pipeline(
-        settings=AppSettings(),
+        inputs=pipeline_inputs_from_legacy(AppSettings()),
+        secrets=object(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
         runtime_logging=None,
@@ -173,7 +175,7 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
 async def test_pipeline_binds_stt_event_ingress_observer_to_translation_diagnostics(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
+
     monkeypatch.setattr(
         runtime_pipeline_module,
         "create_translation_backend",
@@ -202,7 +204,8 @@ async def test_pipeline_binds_stt_event_ingress_observer_to_translation_diagnost
     )
 
     pipeline = await compose_runtime_pipeline(
-        settings=AppSettings(),
+        inputs=pipeline_inputs_from_legacy(AppSettings()),
+        secrets=object(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
         runtime_logging=None,
@@ -244,13 +247,12 @@ async def test_managed_gemma_startup_constructs_provider_without_preparing(
         async def close(self) -> None:
             events.append("close")
 
-    def create_backend(_settings: AppSettings, **kwargs: object) -> Provider:
+    def create_backend(**kwargs: object) -> Provider:
         events.append("create")
         assert kwargs["managed_gemma_runtime"] is activation_runtime
         assert kwargs["managed_gemma_release"] is runtime_pipeline_module.noop_managed_gemma_release
         return Provider()
 
-    monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
     monkeypatch.setattr(runtime_pipeline_module, "create_translation_backend", create_backend)
     monkeypatch.setattr(
         runtime_pipeline_module,
@@ -268,7 +270,8 @@ async def test_managed_gemma_startup_constructs_provider_without_preparing(
     materialize_translation_settings(settings)
 
     pipeline = await compose_runtime_pipeline(
-        settings=settings,
+        inputs=pipeline_inputs_from_legacy(settings),
+        secrets=object(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
         runtime_logging=None,
@@ -315,7 +318,6 @@ async def test_pipeline_composition_preserves_runtime_configuration_and_gate(
     llm_kwargs: dict[str, object] = {}
     osc_kwargs: dict[str, object] = {}
     runtime_logging = object()
-    monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
 
     def create_llm(*_args: object, **kwargs: object) -> None:
         llm_kwargs.update(kwargs)
@@ -342,7 +344,8 @@ async def test_pipeline_composition_preserves_runtime_configuration_and_gate(
     gate = VrcMicAudioGate(state=original_state, enabled=False)
 
     pipeline = await compose_runtime_pipeline(
-        settings=settings,
+        inputs=pipeline_inputs_from_legacy(settings),
+        secrets=object(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
         runtime_logging=runtime_logging,
@@ -429,7 +432,8 @@ async def test_pipeline_launcher_replaces_owned_runtime_in_order(
     settings.ui.peer_translation_enabled = True
 
     result = await launcher.launch(
-        settings,
+        pipeline_inputs_from_legacy(settings),
+        secrets=object(),
         vrc_mic_state=None,
         vrc_mic_audio_gate=None,
         receiver_active=False,
@@ -464,7 +468,7 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
 
     chatbox = RecordingChatbox()
     overlay = RecordingOverlay()
-    monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
+
     monkeypatch.setattr(
         runtime_pipeline_module,
         "create_translation_backend",
@@ -478,7 +482,8 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
     monkeypatch.setattr(runtime_pipeline_module, "ChatboxPaginator", lambda *_a, **_k: chatbox)
 
     pipeline = await compose_runtime_pipeline(
-        settings=AppSettings(),
+        inputs=pipeline_inputs_from_legacy(AppSettings()),
+        secrets=object(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
         runtime_logging=None,
@@ -799,7 +804,6 @@ async def test_pipeline_composition_closes_pending_llm_on_early_failure(
     def create_peer_owner(*_args: object, **_kwargs: object) -> object:
         raise RuntimeError("peer_owner construction failed")
 
-    monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
     monkeypatch.setattr(
         runtime_pipeline_module,
         "create_translation_backend",
@@ -819,7 +823,8 @@ async def test_pipeline_composition_closes_pending_llm_on_early_failure(
 
     with pytest.raises(RuntimeError, match=f"{failure_stage} construction failed"):
         await compose_runtime_pipeline(
-            settings=AppSettings(),
+            inputs=pipeline_inputs_from_legacy(AppSettings()),
+            secrets=object(),
             config_path=Path("settings.json"),
             clock=SystemClock(),
             runtime_logging=None,
@@ -888,7 +893,8 @@ async def test_pipeline_launcher_retains_failed_cleanup_for_retry(
 
     with pytest.raises(BaseExceptionGroup) as raised:
         await launcher.launch(
-            AppSettings(),
+            pipeline_inputs_from_legacy(AppSettings()),
+            secrets=object(),
             vrc_mic_state=None,
             vrc_mic_audio_gate=None,
             receiver_active=False,

@@ -22,7 +22,7 @@ from puripuly_heart.app.services.local_asr_selection import (
     required_local_asr_model_ids,
 )
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
-from puripuly_heart.config.settings import AppSettings, STTProviderName
+from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     ProviderRuntimeChannelSnapshot,
@@ -92,12 +92,10 @@ class LocalASRApplicationRuntime:
 
 def compose_local_asr_application(
     *,
-    settings_provider: Callable[[], AppSettings | None],
+    settings_provider: Callable[[], LocalASRApplicationSettings | None],
     runtime_provider: Callable[[], LocalASRProviderRuntimePort | None],
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None],
     peer_provider: Callable[[], PeerApplicationOwner],
-    peer_requested: Callable[[AppSettings | None], bool],
-    peer_activation_requested: Callable[[AppSettings], bool],
     provisioning_provider: Callable[[], LocalASRProvisioningPort],
     gpu_state_provider: Callable[[], str],
     retain_gpu_pending: Callable[[LocalASRChannel], None],
@@ -112,22 +110,6 @@ def compose_local_asr_application(
     persist_manual_fallback: Callable[[str], bool],
     load_log_sink: Callable[..., None],
 ) -> LocalASRApplicationRuntime:
-    def application_settings() -> LocalASRApplicationSettings | None:
-        settings = settings_provider()
-        if settings is None:
-            return None
-        return LocalASRApplicationSettings(
-            locale=settings.ui.locale,
-            self_provider=settings.provider.stt.value,
-            peer_provider=settings.provider.peer_stt.value,
-            self_source_language=settings.languages.source_language,
-            peer_source_language=settings.languages.effective_peer_source,
-            self_gpu_provider=settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU,
-            peer_gpu_provider=settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU,
-            peer_requested=peer_requested(settings),
-            peer_activation_requested=peer_activation_requested(settings),
-        )
-
     def self_provider_available() -> bool:
         runtime = runtime_provider()
         return runtime is not None and runtime.snapshot.channel_for("self").provider_id is not None
@@ -143,7 +125,7 @@ def compose_local_asr_application(
         await runtime.warmup_channel("self")
 
     state = LocalASRApplicationStateAdapter(
-        settings_provider=application_settings,
+        settings_provider=settings_provider,
         runtime_available=lambda: runtime_provider() is not None,
         self_capture_provider=self_capture_provider,
         peer=peer_provider,
@@ -151,7 +133,7 @@ def compose_local_asr_application(
         provisioning_snapshot=lambda: provisioning_provider().snapshot,
     )
     notice = LocalASRNoticeProjector(
-        settings_provider=application_settings,
+        settings_provider=settings_provider,
         self_capture_provider=self_capture_provider,
         peer=peer_provider,
         provisioning_snapshot=lambda: provisioning_provider().snapshot,

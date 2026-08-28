@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import replace
 
 from puripuly_heart.app.wiring_provider_runtime_policy import (
     build_llm_provider_signature,
@@ -18,6 +19,17 @@ from puripuly_heart.config.settings import (
     TranslationFallbackSettings,
     TranslationModel,
 )
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+
+
+def _canonical(settings: AppSettings) -> AppSettingsVNext:
+    return from_legacy_app_settings(settings)
+
+
+def _signature(settings: AppSettings | AppSettingsVNext) -> tuple[object, ...]:
+    canonical = settings if isinstance(settings, AppSettingsVNext) else _canonical(settings)
+    return build_llm_provider_signature(canonical)
 
 
 def test_llm_provider_signature_tracks_all_runtime_inputs() -> None:
@@ -30,13 +42,22 @@ def test_llm_provider_signature_tracks_all_runtime_inputs() -> None:
         model=TranslationModel.DEEPSEEK_V4_FLASH,
         connection=TranslationConnection.OPENROUTER,
     )
-    different_selection = copy.deepcopy(base)
-    different_selection.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
+    canonical = _canonical(base)
+    different_selection = replace(
+        canonical,
+        intent=replace(
+            canonical.intent,
+            translation=replace(
+                canonical.intent.translation,
+                openrouter_selection_alias=OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED.value,
+            ),
+        ),
+    )
     different_fallback = copy.deepcopy(base)
     different_fallback.translation.fallback = TranslationFallbackSettings(enabled=False)
 
-    assert build_llm_provider_signature(base) != build_llm_provider_signature(different_selection)
-    assert build_llm_provider_signature(base) != build_llm_provider_signature(different_fallback)
+    assert _signature(canonical) != _signature(different_selection)
+    assert _signature(canonical) != _signature(different_fallback)
 
     managed_fallback = AppSettings()
     managed_fallback.provider.llm = LLMProviderName.GEMINI
@@ -47,16 +68,30 @@ def test_llm_provider_signature_tracks_all_runtime_inputs() -> None:
     )
     different_identity = copy.deepcopy(managed_fallback)
     different_identity.managed_identity.verified_hardware_hash = "fallback-managed-hash"
-    assert build_llm_provider_signature(managed_fallback) != build_llm_provider_signature(
-        different_identity
-    )
+    assert _signature(managed_fallback) != _signature(different_identity)
 
-    routed = copy.deepcopy(base)
-    routed.openrouter.selection_alias = OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-    routed.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
-    deepseek_only = copy.deepcopy(routed)
-    deepseek_only.openrouter.provider_routing = OpenRouterProviderRouting.DEEPSEEK_ONLY
-    assert build_llm_provider_signature(routed) != build_llm_provider_signature(deepseek_only)
+    routed = replace(
+        canonical,
+        intent=replace(
+            canonical.intent,
+            translation=replace(
+                canonical.intent.translation,
+                openrouter_selection_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value,
+                openrouter_provider_routing=OpenRouterProviderRouting.DEFAULT.value,
+            ),
+        ),
+    )
+    deepseek_only = replace(
+        routed,
+        intent=replace(
+            routed.intent,
+            translation=replace(
+                routed.intent.translation,
+                openrouter_provider_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
+            ),
+        ),
+    )
+    assert _signature(routed) != _signature(deepseek_only)
 
     local = AppSettings()
     local.provider.llm = LLMProviderName.LOCAL_LLM
@@ -73,11 +108,9 @@ def test_llm_provider_signature_tracks_all_runtime_inputs() -> None:
     changed_body = copy.deepcopy(local)
     changed_body.local_llm.extra_body = {"enable_thinking": False}
 
-    assert build_llm_provider_signature(local) == build_llm_provider_signature(
-        same_json_different_order
-    )
-    assert build_llm_provider_signature(local) != build_llm_provider_signature(changed_model)
-    assert build_llm_provider_signature(local) != build_llm_provider_signature(changed_body)
+    assert _signature(local) == _signature(same_json_different_order)
+    assert _signature(local) != _signature(changed_model)
+    assert _signature(local) != _signature(changed_body)
 
 
 def test_managed_gemma_signature_ignores_disabled_provider_fallback_but_tracks_prefix() -> None:
@@ -102,7 +135,7 @@ def test_managed_gemma_signature_ignores_disabled_provider_fallback_but_tracks_p
     changed_backend = copy.deepcopy(base)
     changed_backend.translation.connection = TranslationConnection.GPU
 
-    assert build_llm_provider_signature(base) == build_llm_provider_signature(changed_fallback)
-    assert build_llm_provider_signature(base) != build_llm_provider_signature(changed_language)
-    assert build_llm_provider_signature(base) != build_llm_provider_signature(changed_prompt)
-    assert build_llm_provider_signature(base) != build_llm_provider_signature(changed_backend)
+    assert _signature(base) == _signature(changed_fallback)
+    assert _signature(base) != _signature(changed_language)
+    assert _signature(base) != _signature(changed_prompt)
+    assert _signature(base) != _signature(changed_backend)

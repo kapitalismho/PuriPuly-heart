@@ -6,6 +6,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from puripuly_heart.app.ports._settings_values import freeze_settings_values
+from puripuly_heart.app.ports.settings_view import (
+    GeneralSettingsSnapshot,
+    OverlaySettingsSnapshot,
+    PromptSettingsSnapshot,
+    ProviderSettingsSnapshot,
+)
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 
 from .settings_mutation_legacy import (
@@ -113,32 +119,64 @@ class SettingsProjectionOwner:
         _apply_settings_path_patch(merged_settings, change.values_by_path)
         return merged_settings
 
+    def render_surfaces(
+        self,
+        *,
+        provider: ProviderSettingsSnapshot,
+        general: GeneralSettingsSnapshot,
+        prompt: PromptSettingsSnapshot,
+        overlay: OverlaySettingsSnapshot,
+        compatibility_settings: object,
+        preserve_custom_vocab_draft: bool = False,
+    ) -> bool | None:
+        try:
+            loaded = self.presentation.render_settings(
+                provider=provider,
+                general=general,
+                prompt=prompt,
+                overlay=overlay,
+                config_path=self.config_path,
+                preserve_custom_vocab_draft=preserve_custom_vocab_draft,
+            )
+        except Exception:
+            return None
+        self.remember_all(compatibility_settings)
+        return bool(loaded)
+
     def render(
         self,
         settings: object,
         *,
         preserve_custom_vocab_draft: bool = False,
     ) -> bool | None:
-        try:
-            loaded = self.presentation.render_settings(
-                settings,
-                config_path=self.config_path,
-                preserve_custom_vocab_draft=preserve_custom_vocab_draft,
-            )
-        except Exception:
-            return None
-        self.remember_all(settings)
-        return bool(loaded)
+        from .settings_application import settings_view_surface_snapshots
 
-    def refresh_after_openrouter_pkce_success(self, settings: object) -> bool | None:
+        provider, general, prompt, overlay = settings_view_surface_snapshots(settings)
+        return self.render_surfaces(
+            provider=provider,
+            general=general,
+            prompt=prompt,
+            overlay=overlay,
+            compatibility_settings=settings,
+            preserve_custom_vocab_draft=preserve_custom_vocab_draft,
+        )
+
+    def refresh_after_openrouter_pkce_success(
+        self,
+        *,
+        provider: ProviderSettingsSnapshot,
+        prompt: PromptSettingsSnapshot,
+        compatibility_settings: object,
+    ) -> bool | None:
         try:
             loaded = self.presentation.refresh_settings_after_openrouter_pkce_success(
-                settings,
+                provider=provider,
+                prompt=prompt,
                 config_path=self.config_path,
             )
         except Exception:
             return None
-        self.remember_all(settings)
+        self.remember_all(compatibility_settings)
         return bool(loaded)
 
     def order22_patch_base_and_values(

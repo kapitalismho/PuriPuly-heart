@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from puripuly_heart.config.settings import MAX_CUSTOM_VOCAB_TERMS
+from puripuly_heart.config.provider_values import MAX_CUSTOM_VOCAB_TERMS
 
 LOCAL_QWEN_MAX_HOTWORDS = 12
 

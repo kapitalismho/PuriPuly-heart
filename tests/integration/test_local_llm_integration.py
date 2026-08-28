@@ -9,7 +9,6 @@ from tests.integration.helpers import (
     integration_mark,
     require_local_llm_server,
     run_llm_smoke,
-    suppressed_runtime_logger,
 )
 
 pytestmark = integration_mark()
@@ -28,7 +27,6 @@ async def test_local_openai_compatible_translation_smoke() -> None:
         base_url=base_url,
         model=model,
         api_key=api_key,
-        runtime_logging=suppressed_runtime_logger(),
     )
 
     await run_llm_smoke(provider)

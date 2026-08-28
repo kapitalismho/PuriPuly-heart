@@ -243,11 +243,12 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
     await secret_adapter.set_secret(OPENROUTER_BYOK_API_KEY_SECRET, "secret")
     assert OPENROUTER_BYOK_API_KEY_SECRET == "openrouter_api_key"
     assert store.get(OPENROUTER_BYOK_API_KEY_SECRET) == "secret"
-    assert secret_store_calls == [
-        (owner.current.secrets, owner.path),
-        (owner.current.secrets, owner.path),
-        (owner.current.secrets, owner.path),
-    ]
+    assert len(secret_store_calls) == 3
+    assert all(path == owner.path for _secrets, path in secret_store_calls)
+    for secrets, _path in secret_store_calls:
+        backend = secrets.backend
+        backend_value = backend.value if hasattr(backend, "value") else backend
+        assert backend_value == "keyring"
 
 
 @pytest.mark.asyncio
