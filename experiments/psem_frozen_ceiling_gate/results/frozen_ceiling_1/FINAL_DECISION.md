@@ -14,26 +14,34 @@ This report is generated only after the scored artifacts exist. It is developmen
 
 5. P-NC versus P-C has Pareto counts {'left_dominates': 0, 'right_dominates': 0, 'tradeoff': 18}; future context remains diagnostic and its frontier delay includes the future evidence availability.
 
-6. The fixed-cell residual diagnostics are {"anchor_absent_live": {"mean_hazard": 0.6959882498187386, "support_seconds": 1918.21}, "anchor_only": {"mean_hazard": 0.5673660037974635, "support_seconds": 18580.731}, "anchor_overlap": {"mean_hazard": 0.6421341719006693, "support_seconds": 1554.42}} and the topology metrics below retain direct handoff, silence-gap handoff, pause/resume, overlap return, overlap takeover, and short-backchannel slices.
+6. The fixed-cell residual diagnostics are {"anchor_absent_live": {"mean_hazard": 0.7286927017120987, "support_seconds": 1918.21}, "anchor_only": {"mean_hazard": 0.4905668750470377, "support_seconds": 18580.731}, "anchor_overlap": {"mean_hazard": 0.7585235177067176, "support_seconds": 1554.42}} and the topology metrics below retain direct handoff, silence-gap handoff, pause/resume, overlap return, overlap takeover, and short-backchannel slices.
 
 7. No; the posterior result does not yet authorize native S2.
 
-8. opened by the stop rule; hidden results are required before this decision is terminal
+8. opened and executed, but failure cannot be interpreted because the predeclared train-fit sanity gate failed: {'H-C': {'status': 'failed', 'reference_probe_class': 'tiny_mlp', 'fold_count': 2, 'minimum_average_precision': 0.22703612905889545, 'minimum_accuracy': 0.7312311152215748}, 'H-NC': {'status': 'failed', 'reference_probe_class': 'tiny_mlp', 'fold_count': 2, 'minimum_average_precision': 0.19905524114483264, 'minimum_accuracy': 0.726535953270992}}
 
-9. Selected path: posterior ceiling did not establish a path; HIDDEN-CEILING-1 is required before selecting B or D.
+9. Selected path: unresolved; hidden probe train-fit sanity failed.
 
-10. Direct scalar-posterior distillation and immediate full fine-tuning remain rejected until hidden evidence exists.
+10. Full Sortformer adaptation remains unauthorized until hidden train-fit sanity is proven.
 
 11. The corrected committed-live-only replay changed contamination seconds per active speech hour from 1885.250 to 2149.283; this is integration hygiene, not teacher selection.
 
 12. Actual persistent-state VAD gating remains deferred until a viable oracle-binding path and native S2 pass. The recorded duty-cycle split supports a later A/B but cannot validate the gated model trajectory.
 
-13. Single next issue: conditional HIDDEN-CEILING-1 within this issue.
+13. Single next issue: hidden probe train-fit repair within this issue.
 
 ## Nested gap attribution at 500 ms / 0.5
 
 ```json
 {
+  "G_to_H_C_residual": {
+    "contamination_seconds_per_active_speech_hour": 2321.0094440738594,
+    "false_cut_count": 2474,
+    "missed_replacement_count": 2477,
+    "overlap_return_preservation_rate": -0.027233115468409563,
+    "overlap_takeover_success_rate": -0.7595190380761523,
+    "replacement_emit_delay_p90_ms": 872.5
+  },
   "G_to_P_C_residual": {
     "contamination_seconds_per_active_speech_hour": 2041.9013628131074,
     "false_cut_count": 2568,
@@ -49,6 +57,22 @@ This report is generated only after the scored artifacts exist. It is developmen
     "overlap_return_preservation_rate": 0.2734204793028323,
     "overlap_takeover_success_rate": -0.7474949899799599,
     "replacement_emit_delay_p90_ms": 910.5
+  },
+  "H_C_to_H_NC": {
+    "contamination_seconds_per_active_speech_hour": -50.385011740555456,
+    "false_cut_count": -372,
+    "missed_replacement_count": -67,
+    "overlap_return_preservation_rate": -0.03812636165577343,
+    "overlap_takeover_success_rate": 0.0,
+    "replacement_emit_delay_p90_ms": 51.200000000000045
+  },
+  "P_C_to_H_C": {
+    "contamination_seconds_per_active_speech_hour": 279.108081260752,
+    "false_cut_count": -94,
+    "missed_replacement_count": 243,
+    "overlap_return_preservation_rate": -0.05446623093681924,
+    "overlap_takeover_success_rate": 0.0,
+    "replacement_emit_delay_p90_ms": -30.0
   },
   "P_C_to_P_NC": {
     "contamination_seconds_per_active_speech_hour": -119.40416216629274,
@@ -73,6 +97,71 @@ This report is generated only after the scored artifacts exist. It is developmen
     "overlap_return_preservation_rate": -0.224400871459695,
     "overlap_takeover_success_rate": -0.008016032064128258,
     "replacement_emit_delay_p90_ms": -8.0
+  },
+  "hidden_decision_diagnostics": {
+    "hidden_causal_over_posterior_causal": {
+      "frontier_comparison": {
+        "left_dominates": 1,
+        "right_dominates": 2,
+        "tradeoff": 15
+      },
+      "reference_cell_improvements": {
+        "exclusive_other_contamination_seconds_per_active_speech_hour": false,
+        "false_cut_count": true,
+        "missed_replacement_count": false
+      },
+      "source_family_improved_metric_counts": {
+        "alimeeting_far_ch0": 0,
+        "ami_mix_headset": 3
+      },
+      "status": "failed"
+    },
+    "hidden_noncausal_over_hidden_causal": {
+      "frontier_comparison": {
+        "left_dominates": 0,
+        "right_dominates": 1,
+        "tradeoff": 17
+      },
+      "reference_cell_improvements": {
+        "exclusive_other_contamination_seconds_per_active_speech_hour": true,
+        "false_cut_count": true,
+        "missed_replacement_count": true
+      },
+      "source_family_improved_metric_counts": {
+        "alimeeting_far_ch0": 3,
+        "ami_mix_headset": 2
+      },
+      "status": "failed"
+    },
+    "neural_acoustic_failure_concentration": {
+      "per_source_family": {
+        "alimeeting_far_ch0": {
+          "competitor_separation": true,
+          "overlap_masking": true
+        },
+        "ami_mix_headset": {
+          "competitor_separation": true,
+          "overlap_masking": true
+        }
+      },
+      "status": "passed"
+    },
+    "train_fit_sanity": {
+      "H-C": {
+        "fold_count": 2,
+        "minimum_accuracy": 0.7312311152215748,
+        "minimum_average_precision": 0.22703612905889545,
+        "reference_probe_class": "tiny_mlp",
+        "status": "failed"
+      },
+      "H-NC": {
+        "fold_count": 2,
+        "minimum_accuracy": 0.726535953270992,
+        "minimum_average_precision": 0.19905524114483264,
+        "reference_probe_class": "tiny_mlp",
+        "status": "failed"
+      }
+    }
   },
   "pareto_counts": {
     "P_C_vs_S_probe": {
@@ -163,6 +252,184 @@ This report is generated only after the scored artifacts exist. It is developmen
         "eligible_episode_count": 1472,
         "episodes_with_aligned_cut": 1097,
         "episodes_with_predicted_cut": 1097,
+        "episodes_with_reference_replacement": 1097,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": null
+      }
+    }
+  },
+  "H-C": {
+    "active_speech_hours": 6.725263888888889,
+    "backdated_boundary_error_ms": {
+      "p50": -58.0,
+      "p90": -6.0
+    },
+    "diagnostic_slices": {
+      "anchor_absent_live": {
+        "mean_hazard": 0.7286927017120987,
+        "support_seconds": 1918.21
+      },
+      "anchor_only": {
+        "mean_hazard": 0.4905668750470377,
+        "support_seconds": 18580.731
+      },
+      "anchor_overlap": {
+        "mean_hazard": 0.7585235177067176,
+        "support_seconds": 1554.42
+      }
+    },
+    "exclusive_other_contamination_seconds_per_active_speech_hour": 2529.031021087566,
+    "false_cut_count": 2474,
+    "matched_replacement_count": 321,
+    "missed_replacement_count": 2477,
+    "overlap_return_preservation_rate": 0.616557734204793,
+    "overlap_takeover_success_rate": 0.004008016032064128,
+    "predicted_cut_count": 2795,
+    "reference_replacement_count": 2798,
+    "replacement_emit_delay_ms": {
+      "p50": 1110.5,
+      "p90": 1372.5
+    },
+    "source_count": 19,
+    "source_families": [
+      "alimeeting_far_ch0",
+      "ami_mix_headset"
+    ],
+    "speaker_induced_cut_count_per_active_speech_hour": 415.5970748772766,
+    "topology": {
+      "clean_direct_different_speaker_handoff": {
+        "eligible_episode_count": 197,
+        "episodes_with_aligned_cut": 0,
+        "episodes_with_predicted_cut": 77,
+        "episodes_with_reference_replacement": 128,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": null
+      },
+      "overlap_return": {
+        "eligible_episode_count": 918,
+        "episodes_with_aligned_cut": 0,
+        "episodes_with_predicted_cut": 352,
+        "episodes_with_reference_replacement": 327,
+        "overlap_return_preservation_rate": 0.616557734204793,
+        "overlap_takeover_success_rate": null
+      },
+      "overlap_takeover": {
+        "eligible_episode_count": 499,
+        "episodes_with_aligned_cut": 2,
+        "episodes_with_predicted_cut": 255,
+        "episodes_with_reference_replacement": 381,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": 0.004008016032064128
+      },
+      "same_speaker_silence_gap_resume": {
+        "eligible_episode_count": 5864,
+        "episodes_with_aligned_cut": 14,
+        "episodes_with_predicted_cut": 1188,
+        "episodes_with_reference_replacement": 946,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": null
+      },
+      "short_backchannel_return": {
+        "eligible_episode_count": 791,
+        "episodes_with_aligned_cut": 7,
+        "episodes_with_predicted_cut": 328,
+        "episodes_with_reference_replacement": 336,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": null
+      },
+      "silence_gap_different_speaker_handoff": {
+        "eligible_episode_count": 1472,
+        "episodes_with_aligned_cut": 17,
+        "episodes_with_predicted_cut": 523,
+        "episodes_with_reference_replacement": 1097,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": null
+      }
+    }
+  },
+  "H-NC": {
+    "active_speech_hours": 6.725263888888889,
+    "backdated_boundary_error_ms": {
+      "p50": -40.0,
+      "p90": -4.0
+    },
+    "diagnostic_slices": {
+      "anchor_absent_live": {
+        "mean_hazard": 0.6726391016253719,
+        "support_seconds": 1918.21
+      },
+      "anchor_only": {
+        "mean_hazard": 0.42953180950333025,
+        "support_seconds": 18580.731
+      },
+      "anchor_overlap": {
+        "mean_hazard": 0.7392356052252556,
+        "support_seconds": 1554.42
+      }
+    },
+    "exclusive_other_contamination_seconds_per_active_speech_hour": 2478.6460093470105,
+    "false_cut_count": 2102,
+    "matched_replacement_count": 388,
+    "missed_replacement_count": 2410,
+    "overlap_return_preservation_rate": 0.5784313725490196,
+    "overlap_takeover_success_rate": 0.004008016032064128,
+    "predicted_cut_count": 2490,
+    "reference_replacement_count": 2798,
+    "replacement_emit_delay_ms": {
+      "p50": 1220.5,
+      "p90": 1423.7
+    },
+    "source_count": 19,
+    "source_families": [
+      "alimeeting_far_ch0",
+      "ami_mix_headset"
+    ],
+    "speaker_induced_cut_count_per_active_speech_hour": 370.24569461338774,
+    "topology": {
+      "clean_direct_different_speaker_handoff": {
+        "eligible_episode_count": 197,
+        "episodes_with_aligned_cut": 0,
+        "episodes_with_predicted_cut": 76,
+        "episodes_with_reference_replacement": 128,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": null
+      },
+      "overlap_return": {
+        "eligible_episode_count": 918,
+        "episodes_with_aligned_cut": 1,
+        "episodes_with_predicted_cut": 387,
+        "episodes_with_reference_replacement": 327,
+        "overlap_return_preservation_rate": 0.5784313725490196,
+        "overlap_takeover_success_rate": null
+      },
+      "overlap_takeover": {
+        "eligible_episode_count": 499,
+        "episodes_with_aligned_cut": 2,
+        "episodes_with_predicted_cut": 256,
+        "episodes_with_reference_replacement": 381,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": 0.004008016032064128
+      },
+      "same_speaker_silence_gap_resume": {
+        "eligible_episode_count": 5864,
+        "episodes_with_aligned_cut": 16,
+        "episodes_with_predicted_cut": 844,
+        "episodes_with_reference_replacement": 946,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": null
+      },
+      "short_backchannel_return": {
+        "eligible_episode_count": 791,
+        "episodes_with_aligned_cut": 11,
+        "episodes_with_predicted_cut": 320,
+        "episodes_with_reference_replacement": 336,
+        "overlap_return_preservation_rate": null,
+        "overlap_takeover_success_rate": null
+      },
+      "silence_gap_different_speaker_handoff": {
+        "eligible_episode_count": 1472,
+        "episodes_with_aligned_cut": 21,
+        "episodes_with_predicted_cut": 457,
         "episodes_with_reference_replacement": 1097,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null
