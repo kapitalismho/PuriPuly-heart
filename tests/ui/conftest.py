@@ -12,6 +12,9 @@ from puripuly_heart.app.ports.settings_view import (
     DesktopOverlayPositionResetIntent,
     DesktopOverlaySizeIntent,
 )
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    materialize_compatibility_translation_settings,
+)
 from puripuly_heart.ui.i18n import get_locale, set_locale
 from puripuly_heart.ui.views.settings import SettingsView
 
@@ -60,7 +63,11 @@ def settings_view_typed_boundary_adapter(monkeypatch: pytest.MonkeyPatch):
         intent = build_provider(view)
         if current is None or intent is None:
             return None
-        return materialize_provider_apply_intent(current, intent)
+        return materialize_provider_apply_intent(
+            current,
+            intent,
+            materialize_translation=materialize_compatibility_translation_settings,
+        )
 
     def load_adapter(
         view,
@@ -113,7 +120,11 @@ def settings_view_typed_boundary_adapter(monkeypatch: pytest.MonkeyPatch):
         intent = build_provider(view)
         if current is None or intent is None:
             return None
-        return materialize_provider_apply_intent(current, intent)
+        return materialize_provider_apply_intent(
+            current,
+            intent,
+            materialize_translation=materialize_compatibility_translation_settings,
+        )
 
     def consume_prompt_adapter(view):
         current = get_compatibility_settings(view)

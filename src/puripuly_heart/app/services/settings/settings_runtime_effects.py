@@ -45,13 +45,10 @@ from puripuly_heart.app.wiring_stt_factory import (
 from puripuly_heart.app.wiring_translation_runtime_configuration import (
     replace_translation_runtime_settings,
 )
-from puripuly_heart.config.settings import (
-    OVERLAY_TARGET_DESKTOP,
-    AppSettings,
-    LLMProviderName,
-    TranslationModel,
-)
+from puripuly_heart.config.provider_values import LLMProviderName
+from puripuly_heart.config.resolved import OVERLAY_TARGET_DESKTOP
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import TranslationModel
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigChange,
@@ -67,7 +64,7 @@ class SettingsRuntimeEffectsState:
 
 
 def managed_gemma_prefix_refresh_required(
-    transition: SettingsRuntimeTransition[AppSettings],
+    transition: SettingsRuntimeTransition[object],
 ) -> bool:
     settings = transition.settings
     if settings.translation.model not in {
@@ -86,7 +83,7 @@ def managed_gemma_prefix_refresh_required(
 
 
 async def refresh_managed_gemma_prefix(
-    transition: SettingsRuntimeTransition[AppSettings],
+    transition: SettingsRuntimeTransition[object],
     *,
     rebuild: Callable[[], Awaitable[bool]],
 ) -> None:
@@ -113,10 +110,10 @@ class SettingsRuntimeEffectsAdapter:
         vrc_mic_sync: OscControlIntegrationOwner,
         projection: SettingsProjectionOwner,
         github_prompt: Callable[[], GithubStarPromptOwner],
-        desktop_overlay: DesktopOverlayRuntimeEffectsPort[AppSettings],
+        desktop_overlay: DesktopOverlayRuntimeEffectsPort[object],
         calibration: OverlayCalibrationRuntimeEffectsPort,
         overlay: OverlayApplicationOwner,
-        overlay_state_provider: Callable[[AppSettings | None], OverlayApplicationState],
+        overlay_state_provider: Callable[..., OverlayApplicationState],
         peer: PeerApplicationRuntime,
         self_capture: Callable[[], SelfCaptureSessionOwner | None],
         clear_local_pending: Callable[[], None],
@@ -148,7 +145,7 @@ class SettingsRuntimeEffectsAdapter:
 
     @staticmethod
     def _microphone_audio(
-        settings: AppSettings | None,
+        settings: object | None,
     ) -> MicrophoneTestAudioSettings | None:
         if settings is None:
             return None
@@ -159,7 +156,7 @@ class SettingsRuntimeEffectsAdapter:
             internal_channels=settings.audio.internal_channels,
         )
 
-    async def preserve_before_replace(self, settings: AppSettings) -> None:
+    async def preserve_before_replace(self, settings: object) -> None:
         await self._github_prompt().preserve_before_settings_replace(settings)
 
     def capture_runtime_signatures(self) -> None:
@@ -174,9 +171,9 @@ class SettingsRuntimeEffectsAdapter:
 
     async def prepare(
         self,
-        current_settings: AppSettings | None,
-        next_settings: AppSettings,
-    ) -> SettingsRuntimeTransition[AppSettings]:
+        current_settings: object | None,
+        next_settings: object,
+    ) -> SettingsRuntimeTransition[object]:
         microphone_owner = self._microphone.owner_if_created
         previous_microphone_signature = (
             self._state.microphone_audio_signature
@@ -200,10 +197,20 @@ class SettingsRuntimeEffectsAdapter:
             copy.deepcopy(current_settings) if current_settings is not None else None
         )
         previous_settings_overlay_target = self._overlay.target_for_state(
-            self._overlay_state_provider(current_settings)
+            self._overlay_state_provider(
+                None if current_settings is None else self._canonical_settings(current_settings),
+                overlay_enabled=(
+                    False
+                    if current_settings is None
+                    else bool(current_settings.ui.overlay_enabled)
+                ),
+            )
         )
         next_overlay_target = self._overlay.target_for_state(
-            self._overlay_state_provider(next_settings)
+            self._overlay_state_provider(
+                self._canonical_settings(next_settings),
+                overlay_enabled=bool(next_settings.ui.overlay_enabled),
+            )
         )
         if self._overlay.snapshot.fallback_active:
             previous_overlay_target = previous_settings_overlay_target
@@ -364,7 +371,7 @@ class SettingsRuntimeEffectsAdapter:
 
     def activate_before_persist(
         self,
-        transition: SettingsRuntimeTransition[AppSettings],
+        transition: SettingsRuntimeTransition[object],
     ) -> None:
         settings = transition.settings
         self._state.microphone_audio_signature = self._microphone.audio_signature(
@@ -375,15 +382,15 @@ class SettingsRuntimeEffectsAdapter:
 
     async def prepare_overlay_persistence(
         self,
-        previous_settings: AppSettings,
-        next_settings: AppSettings,
+        previous_settings: object,
+        next_settings: object,
     ) -> None:
         await self._desktop_overlay.prepare_persistence(
             previous_settings,
             next_settings,
         )
 
-    def restore_memory(self, settings: AppSettings) -> None:
+    def restore_memory(self, settings: object) -> None:
         restored_settings = copy.deepcopy(settings)
         self._settings.current = restored_settings
         self._calibration.sync_from_settings(restored_settings)
@@ -400,10 +407,10 @@ class SettingsRuntimeEffectsAdapter:
             )
         self._sync_signatures(restored_settings)
 
-    def sync_signatures(self, settings: AppSettings) -> None:
+    def sync_signatures(self, settings: object) -> None:
         self._sync_signatures(settings)
 
-    def state(self, settings: AppSettings) -> SettingsRuntimeState:
+    def state(self, settings: object) -> SettingsRuntimeState:
         local_asr_runtime = self._pipeline.local_asr_runtime
         llm_runtime = self._pipeline.llm_runtime
         self_capture = self._self_capture()
@@ -430,7 +437,7 @@ class SettingsRuntimeEffectsAdapter:
 
     async def apply_after_persist(
         self,
-        transition: SettingsRuntimeTransition[AppSettings],
+        transition: SettingsRuntimeTransition[object],
         *,
         strict_runtime_errors: bool,
         reload_settings_view: bool,
@@ -602,13 +609,13 @@ class SettingsRuntimeEffectsAdapter:
             if strict_runtime_errors:
                 raise
 
-    def _canonical_settings(self, settings: AppSettings) -> AppSettingsVNext:
+    def _canonical_settings(self, settings: object) -> AppSettingsVNext:
         return self._settings.project(
             settings,
             authoritative=self._settings.authoritative,
         )
 
-    def _sync_signatures(self, settings: AppSettings) -> None:
+    def _sync_signatures(self, settings: object) -> None:
         self._runtime_signatures.sync(
             settings,
             canonical=self._canonical_settings(settings),
@@ -618,7 +625,7 @@ class SettingsRuntimeEffectsAdapter:
             self._microphone_audio(settings)
         )
 
-    def _sync_effective_translation_flags(self, settings: AppSettings) -> None:
+    def _sync_effective_translation_flags(self, settings: object) -> None:
         self._peer.owner.sync_effective_flags(self._peer.state_for(None))
 
     @staticmethod

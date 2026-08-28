@@ -9,7 +9,7 @@ from uuid import UUID
 
 import numpy as np
 
-from puripuly_heart.config.settings import STTProviderName
+from puripuly_heart.config.provider_values import STTProviderName
 
 logger = logging.getLogger(__name__)
 MANAGED_STT_SAMPLE_RATE_HZ = 16000

@@ -30,7 +30,6 @@ from puripuly_heart.config.provider_values import (
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
 )
-from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_APPLIED,
@@ -113,7 +112,7 @@ class OpenRouterPkceApplicationOwner:
     settings: SettingsOwner
     provider_settings: ProviderSettingsOwner
     provider_runtime: ProviderRuntimeOwner
-    secret_store_factory: Callable[[AppSettings], SecretStorePort]
+    secret_store_factory: Callable[[object], SecretStorePort]
     failure_message_sink: Callable[[str], None]
     failure_diagnostics_sink: Callable[[str], None]
     failure_route: Callable[[str], None]
@@ -158,7 +157,11 @@ class OpenRouterPkceApplicationOwner:
         current = self.settings.current
         if current is None:
             return False
-        updated = materialize_provider_apply_intent(current, target.provider_intent)
+        updated = materialize_provider_apply_intent(
+            current,
+            target.provider_intent,
+            materialize_translation=self.settings.materialize_translation,
+        )
         updated.provider.llm = LLMProviderName.OPENROUTER
         updated.openrouter.selection_alias = OpenRouterSelectionAlias(profile.alias)
         updated.openrouter.selected_source = OpenRouterCredentialSource.BYOK

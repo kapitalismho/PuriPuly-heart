@@ -76,7 +76,10 @@ from .wiring_managed_auth_factory import (
     apply_discord_issue_result_to_managed_state,
     build_managed_identity_state_port,
     build_openrouter_credential_runtime_config,
+    build_openrouter_credential_runtime_config_from_vnext,
     build_openrouter_release_runtime_config,
+    build_openrouter_release_runtime_config_from_vnext,
+    managed_openrouter_selected_from_vnext,
 )
 from .wiring_overlay_factory import (
     overlay_runtime_intent_from_vnext,
@@ -301,7 +304,10 @@ __all__ = (
     "apply_discord_issue_result_to_managed_state",
     "build_managed_identity_state_port",
     "build_openrouter_credential_runtime_config",
+    "build_openrouter_credential_runtime_config_from_vnext",
     "build_openrouter_release_runtime_config",
+    "build_openrouter_release_runtime_config_from_vnext",
+    "managed_openrouter_selected_from_vnext",
     "build_custom_vocabulary_runtime_config",
     "_LazyFactoryLLMProvider",
 )

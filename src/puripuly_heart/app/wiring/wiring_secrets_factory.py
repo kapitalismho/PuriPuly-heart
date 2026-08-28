@@ -5,7 +5,8 @@ import os
 from pathlib import Path
 
 from puripuly_heart.config.paths import STABLE_APP_DIR_NAME
-from puripuly_heart.config.settings import SecretsBackend, SecretsSettings
+from puripuly_heart.config.provider_values import SecretsBackend
+from puripuly_heart.config.settings_vnext.schema import SecretsIntent
 from puripuly_heart.core.storage.secrets import (
     EncryptedFileSecretStore,
     KeyringSecretStore,
@@ -17,7 +18,7 @@ STABLE_KEYRING_SERVICE_NAME = STABLE_APP_DIR_NAME
 
 
 def create_secret_store(
-    settings: SecretsSettings,
+    settings: SecretsIntent,
     *,
     config_path: Path,
     passphrase: str | None = None,

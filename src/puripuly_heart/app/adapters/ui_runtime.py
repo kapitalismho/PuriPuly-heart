@@ -72,6 +72,7 @@ from puripuly_heart.core.local_translation.devices import list_llama_vulkan_devi
 from puripuly_heart.core.telemetry import (
     TranslationSuccessTelemetryResult,
     TranslationSuccessTelemetryService,
+    TranslationSuccessTelemetryState,
 )
 
 
@@ -312,7 +313,11 @@ class UiSettingsRuntimeAdapter:
         settings = self.settings.current
         if settings is None:
             raise RuntimeError("settings owner has no compatibility settings")
-        return materialize_provider_apply_intent(settings, intent)
+        return materialize_provider_apply_intent(
+            settings,
+            intent,
+            materialize_translation=self.settings.materialize_translation,
+        )
 
     def overlay_snapshot(self) -> OverlaySettingsSnapshot | None:
         settings = self.settings.current
@@ -477,16 +482,29 @@ class UiEngagementRuntimeAdapter:
     async def record_telemetry_translation_success_day(
         self,
     ) -> TranslationSuccessTelemetryResult:
-        settings = self.settings.current
-        if settings is None:
+        canonical = self.settings.canonical
+        if canonical is None:
             return TranslationSuccessTelemetryResult(status="skipped_no_settings")
+        state = TranslationSuccessTelemetryState(
+            consent=canonical.intent.telemetry.consent,
+            anonymous_id=canonical.state.telemetry.anonymous_id,
+            sent_translation_success_dates_utc=(
+                canonical.state.telemetry.sent_translation_success_dates_utc
+            ),
+        )
 
-        async def persist(updated: object) -> bool:
-            await self.settings_application.apply(updated)
+        async def persist(updated: TranslationSuccessTelemetryState) -> bool:
+            current = self.settings.current
+            if current is None:
+                return False
+            current.telemetry_state.sent_translation_success_dates_utc = list(
+                updated.sent_translation_success_dates_utc
+            )
+            await self.settings_application.apply(current)
             return self.settings_application.results.committed()
 
         return await self.telemetry.record_translation_success_day(
-            settings,
+            state,
             persist_sent_date=persist,
         )
 

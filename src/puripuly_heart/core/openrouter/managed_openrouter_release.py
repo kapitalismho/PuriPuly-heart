@@ -17,7 +17,7 @@ from puripuly_heart.config.llm_profiles import (
     get_openrouter_llm_profile,
     openrouter_alias_for_fields,
 )
-from puripuly_heart.config.settings import (
+from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,

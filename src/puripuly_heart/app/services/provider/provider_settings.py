@@ -448,7 +448,10 @@ class ProviderApplicationOwner:
         if (
             not has_out_of_scope_draft
             and result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
-            and self.active_local_asr_change(base_settings, committed_settings)
+            and self.active_local_asr_change(
+                self.settings.project(base_settings, authoritative=True),
+                self.settings.project(committed_settings, authoritative=True),
+            )
         ):
             try:
                 await self.compensate_local_asr(

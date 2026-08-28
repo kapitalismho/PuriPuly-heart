@@ -8,6 +8,7 @@ from enum import Enum
 from pathlib import Path
 from typing import cast
 
+import puripuly_heart.config.settings as legacy_settings
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
@@ -211,6 +212,23 @@ def compose_canonical_settings_persistence() -> CanonicalSettingsPersistencePort
     return SettingsVNextCanonicalPersistenceAdapter()
 
 
+def materialize_compatibility_translation_settings(settings: AppSettings) -> AppSettings:
+    return legacy_settings.materialize_translation_settings(settings)
+
+
+def compatibility_telemetry_consent_settings(
+    settings: AppSettings,
+    consent: str,
+) -> AppSettings:
+    return legacy_settings.with_telemetry_consent(settings, consent)
+
+
+def compatibility_managed_openrouter_byok_target_settings(
+    current_settings: AppSettings | None,
+) -> AppSettings | None:
+    return legacy_settings.build_managed_openrouter_byok_target_settings(current_settings)
+
+
 @dataclass(frozen=True, slots=True)
 class SettingsOwnerStartResult:
     settings: AppSettings
@@ -233,6 +251,42 @@ class SettingsOwner:
     _rollback_authoritative: bool = False
     _rollback_pending: bool = False
     _mutation_depth: int = 0
+
+    def materialize_translation(self, settings: AppSettings) -> AppSettings:
+        return materialize_compatibility_translation_settings(settings)
+
+    def with_telemetry_consent(self, settings: AppSettings, consent: str) -> AppSettings:
+        return compatibility_telemetry_consent_settings(settings, consent)
+
+    def build_managed_openrouter_byok_target(
+        self,
+        current_settings: AppSettings | None,
+    ) -> AppSettings | None:
+        return compatibility_managed_openrouter_byok_target_settings(current_settings)
+
+    def overlay_enabled(self) -> bool:
+        current = self.current
+        return False if current is None else bool(current.ui.overlay_enabled)
+
+    def set_overlay_enabled(self, enabled: bool) -> None:
+        current = self.current
+        if current is None:
+            return
+        current.ui.overlay_enabled = bool(enabled)
+
+    def overlay_desktop_locked(self) -> bool:
+        current = self.current
+        return False if current is None else bool(current.overlay.desktop_flet.locked)
+
+    def peer_translation_enabled(self) -> bool:
+        current = self.current
+        return False if current is None else bool(current.ui.peer_translation_enabled)
+
+    def set_peer_translation_enabled(self, enabled: bool) -> None:
+        current = self.current
+        if current is None:
+            return
+        current.ui.peer_translation_enabled = bool(enabled)
 
     def start(self) -> SettingsOwnerStartResult:
         if not self.path.exists():

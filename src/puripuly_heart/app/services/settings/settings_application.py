@@ -84,11 +84,7 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     _ui_prompt_clipboard_state_runtime_degraded_transaction_result,
     _ui_prompt_clipboard_state_save_failed_transaction_result,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    TranslationFallbackSettings,
-    materialize_translation_settings,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
@@ -118,12 +114,12 @@ class StrictSettingsSaveFailed(Exception):
 
 
 SettingsMutationServiceProvider = Callable[[], SettingsMutationService | None]
-SettingsPredicate = Callable[[AppSettings, AppSettings], bool]
+SettingsPredicate = Callable[[AppSettingsVNext, AppSettingsVNext], bool]
 SettingsFailureSink = Callable[[str], None]
 SettingsAsyncEffect = Callable[[], Awaitable[None]]
 SettingsFallbackSink = Callable[[tuple[str, ...], bool], None]
 SettingsFallbackLogSink = Callable[
-    [AppSettings, AppSettings, tuple[str, ...]],
+    [object, object, tuple[str, ...]],
     None,
 ]
 
@@ -135,12 +131,12 @@ def _settings_mutation_committed(result: TransactionResult) -> bool:
     }
 
 
-def _copy_runtime_only_ui_state(source: AppSettings, target: AppSettings) -> None:
+def _copy_runtime_only_ui_state(source: object, target: object) -> None:
     target.ui.overlay_enabled = bool(source.ui.overlay_enabled)
     target.ui.peer_translation_enabled = bool(source.ui.peer_translation_enabled)
 
 
-def _active_prompt_key(settings: AppSettings) -> str:
+def _active_prompt_key(settings: object) -> str:
     provider = settings.provider.llm.value
     if provider in {"gemini", "openrouter", "deepseek", "local_llm", "managed_gemma"}:
         return provider
@@ -148,7 +144,7 @@ def _active_prompt_key(settings: AppSettings) -> str:
 
 
 def settings_view_surface_snapshots(
-    settings: AppSettings,
+    settings: object,
 ) -> tuple[
     ProviderSettingsSnapshot,
     GeneralSettingsSnapshot,
@@ -263,7 +259,7 @@ def settings_view_surface_snapshots(
 
 
 def osc_control_presentation_state(
-    settings: AppSettings,
+    settings: object,
     *,
     canonical_state: OscCanonicalState,
     changed_control: OscControlPresentationName,
@@ -330,9 +326,9 @@ def osc_control_presentation_state(
 
 
 def materialize_immediate_settings_intent(
-    current: AppSettings,
+    current: object,
     intent: ImmediateSettingsIntent,
-) -> AppSettings:
+) -> object:
     updated = copy.deepcopy(current)
     if isinstance(intent, LocaleSettingsIntent):
         updated.ui.locale = intent.locale
@@ -393,9 +389,9 @@ def materialize_immediate_settings_intent(
 
 
 def materialize_prompt_apply_intent(
-    current: AppSettings,
+    current: object,
     intent: PromptApplyIntent,
-) -> AppSettings:
+) -> object:
     updated = copy.deepcopy(current)
     updated.system_prompt = intent.value
     updated.system_prompts = {}
@@ -403,9 +399,11 @@ def materialize_prompt_apply_intent(
 
 
 def materialize_provider_apply_intent(
-    current: AppSettings,
+    current: object,
     intent: ProviderApplyIntent,
-) -> AppSettings:
+    *,
+    materialize_translation: Callable[[object], object],
+) -> object:
     updated = copy.deepcopy(current)
     for edit in intent.edits:
         if isinstance(edit, SelfSttProviderEdit):
@@ -423,13 +421,11 @@ def materialize_provider_apply_intent(
             for model, connection in edit.history_updates:
                 updated.translation.connection_history[model.value] = connection
             updated.translation.previous_llm_model = selection.previous_llm_model
-            materialize_translation_settings(updated)
+            materialize_translation(updated)
         elif isinstance(edit, TranslationFallbackEdit):
-            updated.translation.fallback = TranslationFallbackSettings(
-                enabled=edit.fallback.enabled,
-                model=edit.fallback.model,
-                connection=edit.fallback.connection,
-            )
+            updated.translation.fallback.enabled = edit.fallback.enabled
+            updated.translation.fallback.model = edit.fallback.model
+            updated.translation.fallback.connection = edit.fallback.connection
         elif isinstance(edit, TranslationHttpExtensionEdit):
             updated.translation.http_extension_id = edit.extension_id
         elif isinstance(edit, QwenRegionEdit):
@@ -458,7 +454,7 @@ def materialize_provider_apply_intent(
 class SettingsApplicationOwner:
     settings: SettingsOwner
     projection: SettingsProjectionOwner
-    runtime_effects: SettingsRuntimeEffectsPort[AppSettings]
+    runtime_effects: SettingsRuntimeEffectsPort[object]
     manual_fallback: ManualLocalASRFallbackOwner
     cpu_auto_available: Callable[[], bool]
     inspect_cpu: SettingsAsyncEffect
@@ -466,14 +462,14 @@ class SettingsApplicationOwner:
     sync_ui: Callable[[], None]
     fallback_log_sink: SettingsFallbackLogSink
     mutation_service_provider: SettingsMutationServiceProvider
-    consume_superseded_settings: Callable[[AppSettings], bool]
+    consume_superseded_settings: Callable[[object], bool]
     active_local_asr_change: SettingsPredicate
     failure_sink: SettingsFailureSink
     results: SettingsTransactionResultOwner = field(default_factory=SettingsTransactionResultOwner)
 
     async def apply(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
         *,
         reload_settings_view: bool = True,
     ) -> bool:
@@ -547,7 +543,7 @@ class SettingsApplicationOwner:
 
     async def _route(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
         *,
         reload_settings_view: bool,
     ) -> bool:
@@ -606,7 +602,7 @@ class SettingsApplicationOwner:
 
     async def apply_direct(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
         *,
         persist: bool = True,
         strict_runtime_errors: bool = False,
@@ -658,8 +654,6 @@ class SettingsApplicationOwner:
         settings: object,
         reload_settings_view: bool,
     ) -> None:
-        if not isinstance(settings, AppSettings):
-            raise TypeError("settings runtime effect requires AppSettings")
         await self.apply_direct(
             settings,
             persist=False,
@@ -669,13 +663,13 @@ class SettingsApplicationOwner:
 
     async def apply_ui_prompt_clipboard_state(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
     ) -> bool:
         return await self._apply_ui_prompt_clipboard_state(next_settings)
 
     async def apply_overlay_osc_output(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
     ) -> bool:
         return await self._apply_overlay_osc_output(next_settings)
 
@@ -704,8 +698,8 @@ class SettingsApplicationOwner:
     async def compensate_failed_local_asr_settings_apply(
         self,
         *,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
+        base_settings: object,
+        committed_settings: object,
         reload_settings_view: bool = True,
     ) -> None:
         self.settings.begin(legacy_snapshot=committed_settings)
@@ -738,7 +732,7 @@ class SettingsApplicationOwner:
 
     async def _apply_combined(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
         *,
         reload_settings_view: bool,
     ) -> bool:
@@ -754,9 +748,9 @@ class SettingsApplicationOwner:
 
         async def route(
             values: dict[str, object],
-            apply_patch: Callable[[AppSettings], Awaitable[bool]],
+            apply_patch: Callable[[object], Awaitable[bool]],
             *,
-            runtime_source: AppSettings | None = None,
+            runtime_source: object | None = None,
         ) -> bool:
             current = self.settings.current
             if current is None:
@@ -851,7 +845,7 @@ class SettingsApplicationOwner:
 
     async def _apply_stt_language_audio(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
         *,
         reload_settings_view: bool = True,
     ) -> bool:
@@ -893,7 +887,10 @@ class SettingsApplicationOwner:
         if (
             not has_out_of_scope_draft
             and result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
-            and self.active_local_asr_change(base_settings, committed_settings)
+            and self.active_local_asr_change(
+                self.settings.project(base_settings, authoritative=True),
+                self.settings.project(committed_settings, authoritative=True),
+            )
         ):
             try:
                 await self.compensate_failed_local_asr_settings_apply(
@@ -940,7 +937,7 @@ class SettingsApplicationOwner:
         self.projection.remember_order22(self.settings.current)
         return True
 
-    async def _apply_overlay_osc_output(self, next_settings: AppSettings) -> bool:
+    async def _apply_overlay_osc_output(self, next_settings: object) -> bool:
         base_and_patch = self.projection.order23_patch_base_and_values(next_settings)
         if base_and_patch is None:
             return False
@@ -1007,7 +1004,7 @@ class SettingsApplicationOwner:
 
     async def _apply_ui_prompt_clipboard_state(
         self,
-        next_settings: AppSettings,
+        next_settings: object,
     ) -> bool:
         base_and_patch = self.projection.order24_patch_base_and_values(next_settings)
         if base_and_patch is None:
@@ -1071,8 +1068,8 @@ class SettingsApplicationOwner:
         self,
         *,
         command: SettingsMutationCommand,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
+        base_settings: object,
+        committed_settings: object,
         surface: str,
         runtime_apply: RuntimeApplyPort,
     ) -> TransactionResult:
@@ -1110,8 +1107,8 @@ class SettingsApplicationOwner:
     async def _resync_committed_runtime(
         self,
         *,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
+        base_settings: object,
+        committed_settings: object,
         failure_message: str,
     ) -> None:
         self.runtime_effects.restore_memory(base_settings)

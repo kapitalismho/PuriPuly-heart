@@ -409,7 +409,7 @@ def compose_provider_runtime(
     async def create_llm(settings_value: object) -> object | None:
         canonical = canonical_settings(settings_value)
         translation = canonical.intent.translation
-        secrets = create_secret_store(settings_value.secrets, config_path=config_path)
+        secrets = create_secret_store(canonical.intent.secrets, config_path=config_path)
         if translation.model in {"managed_gemma", "managed_gemma_12b"}:
             if managed_gemma is None:
                 raise RuntimeError("managed Gemma translation runtime is unavailable")

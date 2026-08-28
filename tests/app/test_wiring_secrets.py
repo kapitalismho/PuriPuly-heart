@@ -4,7 +4,8 @@ import pytest
 
 from puripuly_heart.app import wiring_secrets_factory
 from puripuly_heart.app.wiring import create_secret_store
-from puripuly_heart.config.settings import SecretsBackend, SecretsSettings
+from puripuly_heart.config.provider_values import SecretsBackend
+from puripuly_heart.config.settings_vnext.schema import SecretsIntent
 from puripuly_heart.core.storage.secrets import (
     EncryptedFileSecretStore,
     KeyringSecretStore,
@@ -13,7 +14,7 @@ from puripuly_heart.core.storage.secrets import (
 
 def test_create_secret_store_keyring_returns_keyring_store(tmp_path):
     store = create_secret_store(
-        SecretsSettings(backend=SecretsBackend.KEYRING),
+        SecretsIntent(backend=SecretsBackend.KEYRING.value),
         config_path=tmp_path / "settings.json",
     )
 
@@ -23,7 +24,10 @@ def test_create_secret_store_keyring_returns_keyring_store(tmp_path):
 
 def test_create_secret_store_encrypted_file_resolves_relative_path(tmp_path):
     store = create_secret_store(
-        SecretsSettings(backend=SecretsBackend.ENCRYPTED_FILE, encrypted_file_path="secrets.json"),
+        SecretsIntent(
+            backend=SecretsBackend.ENCRYPTED_FILE.value,
+            encrypted_file_path="secrets.json",
+        ),
         config_path=tmp_path / "settings.json",
         passphrase="pw",
     )
@@ -35,8 +39,9 @@ def test_create_secret_store_encrypted_file_resolves_relative_path(tmp_path):
 def test_create_secret_store_encrypted_file_requires_passphrase(tmp_path):
     with pytest.raises(ValueError):
         create_secret_store(
-            SecretsSettings(
-                backend=SecretsBackend.ENCRYPTED_FILE, encrypted_file_path="secrets.json"
+            SecretsIntent(
+                backend=SecretsBackend.ENCRYPTED_FILE.value,
+                encrypted_file_path="secrets.json",
             ),
             config_path=tmp_path / "settings.json",
         )

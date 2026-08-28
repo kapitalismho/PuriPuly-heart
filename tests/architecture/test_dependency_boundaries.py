@@ -350,26 +350,7 @@ EXTERNAL_MODULE_LAYERS = {
     "keyring": ADAPTERS,
 }
 
-KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
-    {
-        *(
-            ImportViolation(
-                rule_id="adapters-avoid-ui-and-migration-internals",
-                importer=f"src/puripuly_heart/app/wiring/{importer_name}",
-                imported="puripuly_heart.config.settings",
-                importer_layer="adapters",
-                imported_layer="migration/serialization",
-                reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
-            )
-            for importer_name in (
-                "wiring_composition.py",
-                "wiring_managed_account.py",
-                "wiring_managed_auth_factory.py",
-                "wiring_secrets_factory.py",
-            )
-        ),
-    }
-)
+KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset()
 
 SETTINGS_COMPATIBILITY_SOURCE_PATHS = frozenset(
     {
@@ -459,22 +440,7 @@ LEGACY_SETTINGS_VALUE_PAYLOAD_PREFIXES = (
 
 UNKNOWN_SETTINGS_RUNTIME_CONFINEMENT_RATIONALE = "unclassified order-11 settings runtime debt"
 
-KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT: frozenset[SettingsRuntimeConfinementViolation] = frozenset(
-    {
-        SettingsRuntimeConfinementViolation(
-            "legacy-settings-api-import",
-            "src/puripuly_heart/composition/application_runtime.py",
-            "AppSettings",
-            "The production composition root uses the AppSettings compatibility DTO only to connect focused owners while SettingsOwner exclusively owns load, normalization, migration, backup, and persistence.",
-        ),
-        SettingsRuntimeConfinementViolation(
-            "legacy-settings-api-import",
-            "src/puripuly_heart/core/telemetry.py",
-            "AppSettings",
-            "Translation-success telemetry service mutates and persists consent/anonymous identity through the public AppSettings compatibility model until a dedicated telemetry state port is extracted.",
-        ),
-    }
-)
+KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT: frozenset[SettingsRuntimeConfinementViolation] = frozenset()
 
 
 def _known_allowed_violation_gate6_rationale(violation: ImportViolation) -> str:
@@ -1647,15 +1613,24 @@ def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -
     expected_current.pop(
         "src/puripuly_heart/app/services/capture/peer_capture_target_application.py"
     )
+    expected_current.pop("src/puripuly_heart/composition/application_runtime.py")
+    expected_current.pop("src/puripuly_heart/core/telemetry.py")
+    expected_current.pop("src/puripuly_heart/core/openrouter/managed_openrouter_release.py")
+    expected_current.pop("src/puripuly_heart/core/openrouter/openrouter_credentials.py")
+    expected_current.pop("src/puripuly_heart/core/stt/controller.py")
+    expected_current.pop("src/puripuly_heart/core/stt/custom_vocab.py")
+    expected_current.pop("src/puripuly_heart/app/services/github_star_prompt_settings.py")
+    expected_current.pop("src/puripuly_heart/app/services/manual_local_asr_fallback.py")
+    expected_current.pop("src/puripuly_heart/app/services/openrouter_pkce_flow.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_composition.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_managed_account.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_managed_auth_factory.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_secrets_factory.py")
+    expected_current.pop("src/puripuly_heart/app/services/settings/settings_application.py")
+    expected_current.pop("src/puripuly_heart/app/services/settings/settings_runtime_effects.py")
     expected_current["src/puripuly_heart/app/services/canonical_settings_persistence.py"] = {
         "AppSettings"
     }
-    expected_current["src/puripuly_heart/app/services/settings/settings_application.py"] = {
-        "AppSettings",
-        "TranslationFallbackSettings",
-        "materialize_translation_settings",
-    }
-    expected_current["src/puripuly_heart/app/services/openrouter_pkce_flow.py"] = {"AppSettings"}
     actual_current: dict[str, set[str]] = {}
     for source_path in SOURCE_PACKAGE_ROOT.rglob("*.py"):
         tree = ast.parse(source_path.read_text(encoding="utf-8"))
@@ -1698,13 +1673,13 @@ def test_a07_managed_broker_boundary_reduces_dependency_debt_to_16() -> None:
         violation.importer.endswith("managed_openrouter_broker_client.py")
         for violation in KNOWN_ALLOWED_VIOLATIONS
     )
-    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 2
-    assert len(_settings_runtime_confinement_violations()) == 2
+    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 0
+    assert len(_settings_runtime_confinement_violations()) == 0
 
 
 def test_a08_provider_runtime_wiring_reduces_dependency_debt_to_9() -> None:
-    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 2
-    assert len(_settings_runtime_confinement_violations()) == 2
+    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 0
+    assert len(_settings_runtime_confinement_violations()) == 0
     a08_paths = (
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_llm_factory.py",
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_local_asr_provider_runtime.py",
@@ -1730,10 +1705,8 @@ def test_a08_provider_runtime_wiring_reduces_dependency_debt_to_9() -> None:
 
 
 def test_a09_capture_overlay_application_wiring_reduces_dependency_debt_to_4() -> None:
-    assert len(KNOWN_ALLOWED_VIOLATIONS) == 4
-    assert len(_dependency_violations()) == 4
-    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 2
-    assert len(_settings_runtime_confinement_violations()) == 2
+    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 0
+    assert len(_settings_runtime_confinement_violations()) == 0
     a09_paths = (
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_capture_runtime.py",
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_local_asr_application.py",
@@ -1755,6 +1728,39 @@ def test_a09_capture_overlay_application_wiring_reduces_dependency_debt_to_4() -
     assert {violation.importer for violation in KNOWN_ALLOWED_VIOLATIONS}.isdisjoint(
         {_relative_repo_path(path) for path in a09_paths}
     )
+
+
+def test_a10_composition_managed_secrets_wiring_reduces_dependency_debt_to_0() -> None:
+    assert KNOWN_ALLOWED_VIOLATIONS == frozenset()
+    assert _dependency_violations() == frozenset()
+    assert KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT == frozenset()
+    assert _settings_runtime_confinement_violations() == frozenset()
+    a10_paths = (
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_composition.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_managed_account.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_managed_auth_factory.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_secrets_factory.py",
+        SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py",
+        SOURCE_PACKAGE_ROOT / "core" / "telemetry.py",
+        SOURCE_PACKAGE_ROOT / "core" / "openrouter" / "managed_openrouter_release.py",
+        SOURCE_PACKAGE_ROOT / "core" / "openrouter" / "openrouter_credentials.py",
+        SOURCE_PACKAGE_ROOT / "core" / "stt" / "controller.py",
+        SOURCE_PACKAGE_ROOT / "core" / "stt" / "custom_vocab.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "github_star_prompt_settings.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "manual_local_asr_fallback.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "openrouter_pkce_flow.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "settings" / "settings_application.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py",
+    )
+    for path in a10_paths:
+        imported_modules = set(
+            _imported_modules(
+                _module_name_for_path(path),
+                path,
+                _internal_module_names(),
+            )
+        )
+        assert "puripuly_heart.config.settings" not in imported_modules
 
 
 def test_a07_managed_broker_uses_the_pure_provider_value_owner() -> None:

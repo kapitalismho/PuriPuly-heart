@@ -5,9 +5,9 @@ import contextlib
 import copy
 import inspect
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
 from puripuly_heart.app.ports.broker_client import (
@@ -26,6 +26,7 @@ from puripuly_heart.app.ports.managed_identity_state import (
     ManagedIdentityStatePort,
 )
 from puripuly_heart.app.ports.settings_repository import SettingsRepositoryPort
+from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.github_star_prompt import (
     github_star_prompt_utc_timestamp,
 )
@@ -53,13 +54,16 @@ from puripuly_heart.config.llm_profiles import (
     get_openrouter_llm_profile,
     openrouter_alias_for_fields,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
+from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
+    OpenRouterLLMModel,
+    OpenRouterSelectionAlias,
+    normalize_owned_referral_id,
+)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import (
     TranslationConnection,
     TranslationModel,
-    normalize_owned_referral_id,
 )
 from puripuly_heart.core.discord_oauth_loopback import (
     DiscordOAuthCallbackError,
@@ -113,141 +117,166 @@ DiscordOAuthCallbackRunner = Callable[
 ]
 
 
+class ManagedIdentityRecord(Protocol):
+    installation_id: str
+    release_token: str | None
+    release_token_expires_at: str | None
+    verified_hardware_hash: str | None
+    verified_hardware_hash_salt_version: int | None
+    active_managed_credential_ref: str | None
+    active_managed_expires_at: str | None
+    founder_letter_seen_credential_ref: str | None
+    referral_id: str | None
+    local_managed_claim_sources: tuple[str, ...]
+    pending_delivery_ack_source: str | None
+    pending_delivery_ack_delivery_id: str | None
+    pending_delivery_ack_managed_credential_ref: str | None
+    pending_delivery_ack_expires_at: str | None
+
+
 @dataclass(slots=True)
 class ManagedIdentityStateAdapter:
-    """Boundary adapter that exposes ``AppSettings`` managed-identity state as a
+    """Boundary adapter that exposes managed-identity fields as a
     ``ManagedIdentityStatePort``.
-
-    Reads and writes proxy directly to ``settings.managed_identity`` so that
-    mutations are visible to subsequent reads before ``persist`` is called.
-    ``persist`` delegates to the supplied persistence callable, which receives
-    the wrapped ``AppSettings`` instance.
     """
 
-    _settings: AppSettings
-    _persist: Callable[[AppSettings], None]
+    _identity: ManagedIdentityRecord
+    _persist: Callable[..., None]
+    _settings_bag: object | None = field(init=False, default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        managed = getattr(self._identity, "managed_identity", None)
+        if managed is not None:
+            self._settings_bag = self._identity
+            self._identity = managed
 
     @property
     def installation_id(self) -> str:
-        return self._settings.managed_identity.installation_id
+        return self._identity.installation_id
 
     @installation_id.setter
     def installation_id(self, value: str) -> None:
-        self._settings.managed_identity.installation_id = value
+        self._identity.installation_id = value
 
     @property
     def release_token(self) -> str | None:
-        return self._settings.managed_identity.release_token
+        return self._identity.release_token
 
     @release_token.setter
     def release_token(self, value: str | None) -> None:
-        self._settings.managed_identity.release_token = value
+        self._identity.release_token = value
 
     @property
     def release_token_expires_at(self) -> str | None:
-        return self._settings.managed_identity.release_token_expires_at
+        return self._identity.release_token_expires_at
 
     @release_token_expires_at.setter
     def release_token_expires_at(self, value: str | None) -> None:
-        self._settings.managed_identity.release_token_expires_at = value
+        self._identity.release_token_expires_at = value
 
     @property
     def verified_hardware_hash(self) -> str | None:
-        return self._settings.managed_identity.verified_hardware_hash
+        return self._identity.verified_hardware_hash
 
     @verified_hardware_hash.setter
     def verified_hardware_hash(self, value: str | None) -> None:
-        self._settings.managed_identity.verified_hardware_hash = value
+        self._identity.verified_hardware_hash = value
 
     @property
     def verified_hardware_hash_salt_version(self) -> int | None:
-        return self._settings.managed_identity.verified_hardware_hash_salt_version
+        return self._identity.verified_hardware_hash_salt_version
 
     @verified_hardware_hash_salt_version.setter
     def verified_hardware_hash_salt_version(self, value: int | None) -> None:
-        self._settings.managed_identity.verified_hardware_hash_salt_version = value
+        self._identity.verified_hardware_hash_salt_version = value
 
     @property
     def active_managed_credential_ref(self) -> str | None:
-        return self._settings.managed_identity.active_managed_credential_ref
+        return self._identity.active_managed_credential_ref
 
     @active_managed_credential_ref.setter
     def active_managed_credential_ref(self, value: str | None) -> None:
-        self._settings.managed_identity.active_managed_credential_ref = value
+        self._identity.active_managed_credential_ref = value
 
     @property
     def active_managed_expires_at(self) -> str | None:
-        return self._settings.managed_identity.active_managed_expires_at
+        return self._identity.active_managed_expires_at
 
     @active_managed_expires_at.setter
     def active_managed_expires_at(self, value: str | None) -> None:
-        self._settings.managed_identity.active_managed_expires_at = value
+        self._identity.active_managed_expires_at = value
 
     @property
     def founder_letter_seen_credential_ref(self) -> str | None:
-        return self._settings.managed_identity.founder_letter_seen_credential_ref
+        return self._identity.founder_letter_seen_credential_ref
 
     @founder_letter_seen_credential_ref.setter
     def founder_letter_seen_credential_ref(self, value: str | None) -> None:
-        self._settings.managed_identity.founder_letter_seen_credential_ref = value
+        self._identity.founder_letter_seen_credential_ref = value
 
     @property
     def referral_id(self) -> str | None:
-        return self._settings.managed_identity.referral_id
+        return self._identity.referral_id
 
     @referral_id.setter
     def referral_id(self, value: str | None) -> None:
-        self._settings.managed_identity.referral_id = value
+        self._identity.referral_id = value
 
     @property
     def local_managed_claim_sources(self) -> tuple[str, ...]:
-        return self._settings.managed_identity.local_managed_claim_sources
+        return self._identity.local_managed_claim_sources
 
     @local_managed_claim_sources.setter
     def local_managed_claim_sources(self, value: tuple[str, ...]) -> None:
-        self._settings.managed_identity.local_managed_claim_sources = value
+        self._identity.local_managed_claim_sources = value
 
     @property
     def pending_delivery_ack_source(self) -> str | None:
-        return getattr(self._settings.managed_identity, "pending_delivery_ack_source", None)
+        return getattr(self._identity, "pending_delivery_ack_source", None)
 
     @pending_delivery_ack_source.setter
     def pending_delivery_ack_source(self, value: str | None) -> None:
-        self._settings.managed_identity.pending_delivery_ack_source = value
+        self._identity.pending_delivery_ack_source = value
 
     @property
     def pending_delivery_ack_delivery_id(self) -> str | None:
-        return getattr(self._settings.managed_identity, "pending_delivery_ack_delivery_id", None)
+        return getattr(self._identity, "pending_delivery_ack_delivery_id", None)
 
     @pending_delivery_ack_delivery_id.setter
     def pending_delivery_ack_delivery_id(self, value: str | None) -> None:
-        self._settings.managed_identity.pending_delivery_ack_delivery_id = value
+        self._identity.pending_delivery_ack_delivery_id = value
 
     @property
     def pending_delivery_ack_managed_credential_ref(self) -> str | None:
         return getattr(
-            self._settings.managed_identity,
+            self._identity,
             "pending_delivery_ack_managed_credential_ref",
             None,
         )
 
     @pending_delivery_ack_managed_credential_ref.setter
     def pending_delivery_ack_managed_credential_ref(self, value: str | None) -> None:
-        self._settings.managed_identity.pending_delivery_ack_managed_credential_ref = value
+        self._identity.pending_delivery_ack_managed_credential_ref = value
 
     @property
     def pending_delivery_ack_expires_at(self) -> str | None:
-        return getattr(self._settings.managed_identity, "pending_delivery_ack_expires_at", None)
+        return getattr(self._identity, "pending_delivery_ack_expires_at", None)
 
     @pending_delivery_ack_expires_at.setter
     def pending_delivery_ack_expires_at(self, value: str | None) -> None:
-        self._settings.managed_identity.pending_delivery_ack_expires_at = value
+        self._identity.pending_delivery_ack_expires_at = value
 
     def persist(self) -> None:
-        self._persist(self._settings)
+        if self._settings_bag is not None:
+            try:
+                self._persist(self._settings_bag)
+                return
+            except TypeError:
+                pass
+        self._persist()
 
     def snapshot(self) -> ManagedIdentitySnapshot:
-        managed = self._settings.managed_identity
+        managed = self._identity
         return ManagedIdentitySnapshot(
             installation_id=managed.installation_id,
             release_token=managed.release_token,
@@ -276,7 +305,7 @@ class ManagedIdentityStateAdapter:
         )
 
     def restore(self, snapshot: ManagedIdentitySnapshot) -> None:
-        managed = self._settings.managed_identity
+        managed = self._identity
         managed.installation_id = snapshot.installation_id
         managed.release_token = snapshot.release_token
         managed.release_token_expires_at = snapshot.release_token_expires_at
@@ -296,12 +325,12 @@ class ManagedIdentityStateAdapter:
 
 
 def build_managed_identity_state_port(
-    settings: AppSettings,
-    persist: Callable[[AppSettings], None],
+    identity: ManagedIdentityRecord,
+    persist: Callable[[], None],
 ) -> ManagedIdentityStatePort:
     """Build a ``ManagedIdentityStatePort`` adapter at the wiring boundary."""
 
-    return ManagedIdentityStateAdapter(settings, persist)
+    return ManagedIdentityStateAdapter(identity, persist)
 
 
 @dataclass(slots=True)
@@ -717,13 +746,25 @@ def _normalize_optional_text(value: object) -> str | None:
 
 
 def _normalize_owned_referral_id(value: object) -> str | None:
-    from puripuly_heart.config.settings import normalize_owned_referral_id
-
     return normalize_owned_referral_id(value)
 
 
+def build_openrouter_credential_runtime_config_from_vnext(
+    settings: AppSettingsVNext,
+) -> OpenRouterCredentialRuntimeConfig:
+    translation = settings.intent.translation
+    identity = settings.state.managed_connection
+    return OpenRouterCredentialRuntimeConfig(
+        selected_source=OpenRouterCredentialSource(translation.openrouter_selected_source),
+        installation_id=identity.installation_id or None,
+        managed_credential_kind=_managed_credential_kind_from_connection(translation.connection),
+        active_managed_credential_ref=identity.active_managed_credential_ref,
+        active_managed_expires_at=identity.active_managed_expires_at,
+    )
+
+
 def build_openrouter_credential_runtime_config(
-    settings: AppSettings,
+    settings: object,
 ) -> OpenRouterCredentialRuntimeConfig:
     """Build a narrow OpenRouter credential runtime DTO from legacy settings."""
 
@@ -736,8 +777,21 @@ def build_openrouter_credential_runtime_config(
     )
 
 
+def build_openrouter_release_runtime_config_from_vnext(
+    settings: AppSettingsVNext,
+) -> OpenRouterReleaseRuntimeConfig:
+    translation = settings.intent.translation
+    alias = translation.openrouter_selection_alias
+    return OpenRouterReleaseRuntimeConfig(
+        llm_model=OpenRouterLLMModel(translation.openrouter_model),
+        selected_source=OpenRouterCredentialSource(translation.openrouter_selected_source),
+        selection_alias=None if alias is None else OpenRouterSelectionAlias(alias),
+        managed_credential_kind=_managed_credential_kind_from_connection(translation.connection),
+    )
+
+
 def build_openrouter_release_runtime_config(
-    settings: AppSettings,
+    settings: object,
 ) -> OpenRouterReleaseRuntimeConfig:
     """Build a narrow OpenRouter release runtime DTO from legacy settings."""
 
@@ -749,16 +803,20 @@ def build_openrouter_release_runtime_config(
     )
 
 
-def _managed_credential_kind_for_settings(settings: AppSettings) -> str:
-    if settings.translation.connection == TranslationConnection.MANAGED_CHINA:
+def _managed_credential_kind_from_connection(connection: str) -> str:
+    if connection == TranslationConnection.MANAGED_CHINA.value:
         return "qq"
     return "standard"
+
+
+def _managed_credential_kind_for_settings(settings: object) -> str:
+    return _managed_credential_kind_from_connection(settings.translation.connection.value)
 
 
 def _managed_release_service_for_alias(
     managed_release_service: object | None,
     *,
-    alias_settings: AppSettings,
+    alias_settings: object,
 ) -> object | None:
     if managed_release_service is None:
         return None
@@ -766,8 +824,8 @@ def _managed_release_service_for_alias(
         managed_release_service,
         openrouter_config=build_openrouter_release_runtime_config(alias_settings),
         managed_state=ManagedIdentityStateAdapter(
-            alias_settings,
-            lambda _settings: managed_release_service.managed_state.persist(),
+            alias_settings.managed_identity,
+            lambda: managed_release_service.managed_state.persist(),
         ),
     )
 
@@ -812,40 +870,28 @@ DISCORD_AUTH_ERROR_KEY_BY_SUBCODE = {
     "loopback_unavailable": "discord_auth.error.loopback_unavailable",
 }
 
-ManagedAuthSettingsProvider = Callable[[], AppSettings | None]
-ManagedAuthSettingsSink = Callable[[AppSettings], None]
 ManagedAuthSecretStoreFactory = Callable[..., object]
 ManagedAuthReleaseServiceProvider = Callable[[], object | None]
-ManagedAuthPersistenceCallbackFactory = Callable[
-    [AppSettings],
-    Callable[[AppSettings], None],
-]
-ManagedAuthSettingsRepositoryFactory = Callable[
-    [AppSettings, AppSettings, str],
-    SettingsRepositoryPort,
-]
-ManagedAuthSettingsOwnerComplete = Callable[[], None]
 ManagedAuthRuntimePresenceProvider = Callable[[], tuple[bool, bool]]
 ManagedAuthIngressProvider = Callable[[], bool]
+ManagedAuthSettingsRepositoryFactory = Callable[..., SettingsRepositoryPort]
 
 
 @dataclass(slots=True)
 class ManagedAuthRuntimeAdapter:
     config_path: Path
     secret_store_factory: ManagedAuthSecretStoreFactory
-    settings_provider: ManagedAuthSettingsProvider
-    settings_sink: ManagedAuthSettingsSink
+    settings: SettingsOwner
     release_service_provider: ManagedAuthReleaseServiceProvider
-    persistence_callback_factory: ManagedAuthPersistenceCallbackFactory
     settings_repository_factory: ManagedAuthSettingsRepositoryFactory
-    settings_owner_complete: ManagedAuthSettingsOwnerComplete
     runtime_presence_provider: ManagedAuthRuntimePresenceProvider
     ingress_provider: ManagedAuthIngressProvider
 
     def state(self) -> ManagedAuthState:
-        settings = self.settings_provider()
+        canonical = self.settings.canonical
+        current = self.settings.current
         runtime_owner_available, runtime_available = self.runtime_presence_provider()
-        if settings is None:
+        if canonical is None or current is None:
             return ManagedAuthState(
                 settings_available=False,
                 managed_selected=False,
@@ -855,13 +901,15 @@ class ManagedAuthRuntimeAdapter:
                 runtime_available=runtime_available,
                 ingress_frozen=self.ingress_provider(),
             )
-        managed_selected = _managed_openrouter_selected(settings)
+        managed_selected = managed_openrouter_selected_from_vnext(canonical)
         return ManagedAuthState(
             settings_available=True,
             managed_selected=managed_selected,
-            managed_china=(settings.translation.connection == TranslationConnection.MANAGED_CHINA),
+            managed_china=(
+                current.translation.connection == TranslationConnection.MANAGED_CHINA
+            ),
             local_key_available=(
-                self._local_key_available(settings) if managed_selected else False
+                self._local_key_available(canonical) if managed_selected else False
             ),
             release_service_available=self.release_service_provider() is not None,
             runtime_available=runtime_available if runtime_owner_available else False,
@@ -873,22 +921,24 @@ class ManagedAuthRuntimeAdapter:
         qq_identity: str,
         credential: str,
     ) -> ManagedAuthExecutionResult:
-        settings = self.settings_provider()
+        current = self.settings.current
+        canonical = self.settings.canonical
         release_service = self.release_service_provider()
         broker_client = getattr(release_service, "client", None)
-        if settings is None or broker_client is None:
+        if current is None or canonical is None or broker_client is None:
             return ManagedAuthExecutionResult(
                 succeeded=False,
                 message_key="qq_managed_auth.error.retry",
             )
         secret_store = self.secret_store_factory(
-            settings.secrets,
+            canonical.intent.secrets,
             config_path=self.config_path,
         )
         secret_store_port = SyncSecretStoreAdapter(secret_store)
+        persist = self.settings.managed_identity_persistence_callback(current)
         managed_state = build_managed_identity_state_port(
-            settings,
-            self.persistence_callback_factory(settings),
+            current.managed_identity,
+            lambda: persist(current),
         )
         result = await QqManagedAuthService(
             broker_client=broker_client,
@@ -929,18 +979,16 @@ class ManagedAuthRuntimeAdapter:
         on_callback_received: Callable[[], None] | None,
     ) -> ManagedAuthExecutionResult:
         release_service = self.release_service_provider()
-        settings = self.settings_provider()
-        if release_service is None or settings is None:
+        current = self.settings.current
+        if release_service is None or current is None:
             return ManagedAuthExecutionResult(succeeded=False)
         if not _supports_transaction_auth(release_service):
             return await self._execute_legacy_discord(
                 release_service,
-                settings,
                 referral_id=referral_id,
             )
         return await self._execute_transaction_discord(
             release_service,
-            settings,
             referral_id=referral_id,
             on_callback_received=on_callback_received,
         )
@@ -948,20 +996,24 @@ class ManagedAuthRuntimeAdapter:
     async def _execute_transaction_discord(
         self,
         release_service: object,
-        settings: AppSettings,
         *,
         referral_id: str | None,
         on_callback_received: Callable[[], None] | None,
     ) -> ManagedAuthExecutionResult:
-        updated = copy.deepcopy(settings)
+        current = self.settings.current
+        canonical = self.settings.canonical
+        if current is None or canonical is None:
+            return ManagedAuthExecutionResult(succeeded=False)
+        updated = copy.deepcopy(current)
         secret_store = self.secret_store_factory(
-            updated.secrets,
+            canonical.intent.secrets,
             config_path=self.config_path,
         )
         secret_store_port = SyncSecretStoreAdapter(secret_store)
+        persist = self.settings.managed_identity_persistence_callback(updated)
         managed_state = build_managed_identity_state_port(
-            updated,
-            self.persistence_callback_factory(updated),
+            updated.managed_identity,
+            lambda: persist(updated),
         )
         identity = ManagedIdentityPreflightAdapter(
             managed_state=managed_state,
@@ -996,7 +1048,7 @@ class ManagedAuthRuntimeAdapter:
             broker_client=broker,
             secret_store=secret_store_port,
             settings_repository=self.settings_repository_factory(
-                settings,
+                current,
                 updated,
                 "managed_connection_auth",
             ),
@@ -1007,16 +1059,18 @@ class ManagedAuthRuntimeAdapter:
         ).authorize(
             ManagedConnectionAuthRequest(
                 local_secret_key=OPENROUTER_MANAGED_API_KEY_SECRET,
-                settings_values=_managed_connection_auth_settings_values(updated),
+                settings_values=_managed_connection_auth_settings_values(
+                    self.settings.project(updated, authoritative=True)
+                ),
                 expected_settings_revision=None,
                 reason="managed_connection_auth",
                 correlation_id=None,
                 broker_metadata={"flow": "managed_connection_auth"},
             )
         )
-        self.settings_owner_complete()
+        self.settings.complete()
         if result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING:
-            self.settings_sink(updated)
+            self.settings.current = updated
         if not _settings_mutation_committed(result):
             message = result.message
             diagnostics = result.diagnostics
@@ -1031,7 +1085,7 @@ class ManagedAuthRuntimeAdapter:
                 error_class=getattr(diagnostics, "category", None),
             )
         issue = broker.last_issue_response
-        self.settings_sink(updated)
+        self.settings.current = updated
         return ManagedAuthExecutionResult(
             succeeded=True,
             transaction_result=result,
@@ -1044,12 +1098,11 @@ class ManagedAuthRuntimeAdapter:
     async def _execute_legacy_discord(
         self,
         release_service: object,
-        settings: AppSettings,
         *,
         referral_id: str | None,
     ) -> ManagedAuthExecutionResult:
         try:
-            claim_guard = self.claim_guard(settings)
+            claim_guard = self.claim_guard()
             claim_result = await claim_guard.preflight(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
         except Exception:
             return ManagedAuthExecutionResult(succeeded=False, log_failure=False)
@@ -1089,29 +1142,34 @@ class ManagedAuthRuntimeAdapter:
             error_class=getattr(diagnostics, "error_class", None),
         )
 
-    def claim_guard(self, settings: AppSettings) -> ManagedAuthClaimGuard:
+    def claim_guard(self) -> ManagedAuthClaimGuard:
+        current = self.settings.current
+        canonical = self.settings.canonical
+        if current is None or canonical is None:
+            raise RuntimeError("Settings are not loaded")
         secret_store = self.secret_store_factory(
-            settings.secrets,
+            canonical.intent.secrets,
             config_path=self.config_path,
         )
         secret_store_port = SyncSecretStoreAdapter(secret_store)
+        persist = self.settings.managed_identity_persistence_callback(current)
         managed_state = build_managed_identity_state_port(
-            settings,
-            self.persistence_callback_factory(settings),
+            current.managed_identity,
+            lambda: persist(current),
         )
         return ManagedAuthClaimGuard(
             managed_state=managed_state,
             secret_store=secret_store_port,
         )
 
-    def _local_key_available(self, settings: AppSettings) -> bool:
+    def _local_key_available(self, settings: AppSettingsVNext) -> bool:
         try:
             secrets = self.secret_store_factory(
-                settings.secrets,
+                settings.intent.secrets,
                 config_path=self.config_path,
             )
             resolution = resolve_openrouter_credentials(
-                build_openrouter_credential_runtime_config(settings),
+                build_openrouter_credential_runtime_config_from_vnext(settings),
                 secrets=secrets,
                 request_intent="TRANS",
             )
@@ -1147,43 +1205,57 @@ def _discord_auth_message_key(result: object) -> str:
     return getattr(result, "message_key", "discord_auth.error.retry")
 
 
-def _managed_openrouter_selected(settings: AppSettings) -> bool:
-    return bool(
-        settings.provider.llm == LLMProviderName.OPENROUTER
-        and settings.translation.connection
-        in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
-        and settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
+def managed_openrouter_selected_from_vnext(settings: AppSettingsVNext) -> bool:
+    translation = settings.intent.translation
+    return (
+        translation.connection
+        in {
+            TranslationConnection.MANAGED.value,
+            TranslationConnection.MANAGED_CHINA.value,
+        }
+        and translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
     )
 
 
 def _managed_connection_auth_settings_values(
-    settings: AppSettings,
+    settings: AppSettingsVNext,
 ) -> dict[str, Any]:
-    managed = settings.managed_identity
-    selection_alias = settings.openrouter.selection_alias
+    translation = settings.intent.translation
+    managed = settings.state.managed_connection
     return {
         "intent": {
             "translation": {
-                "connection": settings.translation.connection.value,
-                "model": settings.translation.model.value,
+                "connection": translation.connection,
+                "model": translation.model,
             },
             "openrouter": {
-                "selected_source": settings.openrouter.selected_source.value,
-                "llm_model": settings.openrouter.llm_model.value,
-                "selection_alias": (selection_alias.value if selection_alias is not None else None),
+                "selected_source": translation.openrouter_selected_source,
+                "llm_model": translation.openrouter_model,
+                "selection_alias": translation.openrouter_selection_alias,
             },
         },
         "state": {
             "managed_connection": {
                 "installation_id": managed.installation_id,
-                "active_managed_credential_ref": (managed.active_managed_credential_ref),
+                "active_managed_credential_ref": managed.active_managed_credential_ref,
                 "active_managed_expires_at": managed.active_managed_expires_at,
-                "founder_letter_seen_credential_ref": (managed.founder_letter_seen_credential_ref),
+                "founder_letter_seen_credential_ref": (
+                    managed.founder_letter_seen_credential_ref
+                ),
                 "referral_id": managed.referral_id,
                 "local_managed_claim_sources": list(managed.local_managed_claim_sources),
             }
         },
     }
+
+
+def _llm_provider_name_from_vnext(settings: AppSettingsVNext) -> str:
+    from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
+        provider_llm_for_translation,
+    )
+
+    translation = settings.intent.translation
+    return provider_llm_for_translation(translation.model, translation.connection)
 
 
 def _settings_mutation_committed(result: TransactionResult) -> bool:
@@ -1193,7 +1265,6 @@ def _settings_mutation_committed(result: TransactionResult) -> bool:
     }
 
 
-ManagedTranslationSettingsProvider = Callable[[], AppSettings | None]
 ManagedTranslationReleaseServiceProvider = Callable[[], object | None]
 ManagedTranslationRuntimeSnapshotProvider = Callable[
     [],
@@ -1207,7 +1278,7 @@ ManagedTranslationPersistSettings = Callable[[], object]
 @dataclass(slots=True)
 class ManagedTranslationRuntimeAdapter:
     auth: ManagedAuthRuntimeAdapter
-    settings_provider: ManagedTranslationSettingsProvider
+    settings: SettingsOwner
     release_service_provider: ManagedTranslationReleaseServiceProvider
     runtime_snapshot_provider: ManagedTranslationRuntimeSnapshotProvider
     ingress_provider: ManagedTranslationIngressProvider
@@ -1215,27 +1286,25 @@ class ManagedTranslationRuntimeAdapter:
     persist_settings: ManagedTranslationPersistSettings
 
     def state(self) -> TranslationEnableState:
-        settings = self.settings_provider()
+        canonical = self.settings.canonical
         runtime_available, translation_enabled, llm = self.runtime_snapshot_provider()
         auth_state = self.auth.state()
         is_custom_http = (
-            settings is not None and settings.translation.model == TranslationModel.CUSTOM_HTTP
+            canonical is not None
+            and canonical.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
         )
+        qwen_region = None if canonical is None else canonical.intent.translation.qwen.region
         return TranslationEnableState(
             runtime_available=runtime_available,
             translation_enabled=translation_enabled,
             llm_available=llm is not None,
-            settings_available=settings is not None,
+            settings_available=canonical is not None,
             provider_name=(
                 "custom_http"
                 if is_custom_http
-                else (settings.provider.llm.value if settings is not None else None)
+                else (None if canonical is None else _llm_provider_name_from_vnext(canonical))
             ),
-            qwen_region=(
-                None
-                if is_custom_http
-                else (settings.qwen.region.value if settings is not None else None)
-            ),
+            qwen_region=None if is_custom_http else qwen_region,
             managed_selected=auth_state.managed_selected and not is_custom_http,
             managed_china=auth_state.managed_china and not is_custom_http,
             managed_local_key_available=auth_state.local_key_available and not is_custom_http,
@@ -1246,18 +1315,20 @@ class ManagedTranslationRuntimeAdapter:
         )
 
     async def prepare(self) -> ManagedTranslationPreparation:
-        settings = self.settings_provider()
+        canonical = self.settings.canonical
+        current = self.settings.current
         service = self.release_service_provider()
         if (
-            settings is None
+            canonical is None
+            or current is None
             or service is None
-            or settings.translation.model == TranslationModel.CUSTOM_HTTP
+            or canonical.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
         ):
             return ManagedTranslationPreparation(ready=True)
         claim_guard = None
         if not self.auth.state().managed_china:
             try:
-                claim_guard = self.auth.claim_guard(settings)
+                claim_guard = self.auth.claim_guard()
                 claim_result = await claim_guard.preflight(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
             except Exception:
                 return ManagedTranslationPreparation(
@@ -1292,13 +1363,13 @@ class ManagedTranslationRuntimeAdapter:
         )
 
     def show_founder_letter(self) -> None:
-        settings = self.settings_provider()
-        if settings is None or not self.founder_dialog():
+        current = self.settings.current
+        if current is None or not self.founder_dialog():
             return
         mark_founder_letter_shown(
             build_managed_identity_state_port(
-                settings,
-                lambda _settings: None,
+                current.managed_identity,
+                lambda: None,
             )
         )
         with contextlib.suppress(Exception):

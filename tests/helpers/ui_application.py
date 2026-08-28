@@ -44,6 +44,9 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownDiagnostic,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    materialize_compatibility_translation_settings,
+)
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
@@ -144,7 +147,11 @@ class UiApplicationRuntimeStub:
             return materialize(intent)
         current = self._compatibility_settings()
         if current is not None and isinstance(intent, ProviderApplyIntent):
-            return materialize_provider_apply_intent(current, intent)
+            return materialize_provider_apply_intent(
+                current,
+                intent,
+                materialize_translation=materialize_compatibility_translation_settings,
+            )
         return intent
 
     async def connect_openrouter_via_pkce(

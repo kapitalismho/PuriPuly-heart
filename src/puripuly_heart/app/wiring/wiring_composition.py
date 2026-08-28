@@ -510,7 +510,7 @@ def create_provider_verifier() -> ProviderVerifierPort:
 
 
 def create_desktop_overlay_policy() -> DesktopOverlayPolicy:
-    from puripuly_heart.config.settings import (
+    from puripuly_heart.config.desktop_overlay_values import (
         DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
         DESKTOP_FLET_DEFAULT_SIZE_PRESET,
         DESKTOP_FLET_DEFAULT_TEXT_SCALE,

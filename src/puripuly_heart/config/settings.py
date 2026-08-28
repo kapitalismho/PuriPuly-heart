@@ -68,7 +68,9 @@ from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
+    QwenLLMModel,
     QwenRegion,
+    SecretsBackend,
     STTProviderName,
     normalize_local_llm_base_url,
     normalize_owned_referral_id,
@@ -147,19 +149,9 @@ def normalize_managed_claim_sources(value: object) -> tuple[str, ...]:
     return tuple(source for source in MANAGED_AUTH_CLAIM_SOURCES if source in normalized)
 
 
-class SecretsBackend(str, Enum):
-    KEYRING = "keyring"
-    ENCRYPTED_FILE = "encrypted_file"
-
-
 class GeminiLLMModel(str, Enum):
     GEMINI_37_FLASH = "gemini-3.7-flash"
     GEMINI_31_FLASH_LITE = "gemini-3.1-flash-lite"
-
-
-class QwenLLMModel(str, Enum):
-    QWEN_35_FLASH = "qwen3.5-flash"
-    QWEN_35_PLUS = "qwen3.5-plus"
 
 
 class DeepSeekLLMModel(str, Enum):

@@ -1,12 +1,25 @@
 from __future__ import annotations
 
-import copy
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Protocol
 
-from puripuly_heart.config.settings import AppSettings
+
+@dataclass(frozen=True, slots=True)
+class TranslationSuccessTelemetryState:
+    consent: str
+    anonymous_id: str | None
+    sent_translation_success_dates_utc: tuple[str, ...] = ()
+
+    def with_sent_date(self, active_date_utc: str) -> TranslationSuccessTelemetryState:
+        return TranslationSuccessTelemetryState(
+            consent=self.consent,
+            anonymous_id=self.anonymous_id,
+            sent_translation_success_dates_utc=tuple(
+                sorted({*self.sent_translation_success_dates_utc, active_date_utc})
+            ),
+        )
 
 
 class TranslationSuccessTelemetryClientPort(Protocol):
@@ -17,7 +30,7 @@ class TranslationSuccessTelemetryClientPort(Protocol):
     ) -> bool: ...
 
 
-TelemetryPersistSentDate = Callable[[AppSettings], Awaitable[bool]]
+TelemetryPersistSentDate = Callable[[TranslationSuccessTelemetryState], Awaitable[bool]]
 TelemetryDiagnosticsSink = Callable[[str, Mapping[str, object]], None]
 
 
@@ -54,14 +67,14 @@ class TranslationSuccessTelemetryService:
 
     async def record_translation_success_day(
         self,
-        settings: AppSettings,
+        settings: TranslationSuccessTelemetryState,
         *,
         persist_sent_date: TelemetryPersistSentDate,
     ) -> TranslationSuccessTelemetryResult:
         active_date_utc = self._active_date_utc()
-        consent = getattr(settings.telemetry, "consent", "unknown")
-        identifier = settings.telemetry_state.anonymous_id
-        sent_dates = set(settings.telemetry_state.sent_translation_success_dates_utc)
+        consent = settings.consent
+        identifier = settings.anonymous_id
+        sent_dates = set(settings.sent_translation_success_dates_utc)
 
         if consent == "decline":
             return self._result(
@@ -112,12 +125,7 @@ class TranslationSuccessTelemetryService:
                 reason="client_returned_false",
             )
 
-        updated = copy.deepcopy(settings)
-        updated.telemetry_state.sent_translation_success_dates_utc = sorted(
-            {*updated.telemetry_state.sent_translation_success_dates_utc, active_date_utc}
-        )
-        updated.validate()
-        persisted = await persist_sent_date(updated)
+        persisted = await persist_sent_date(settings.with_sent_date(active_date_utc))
         return self._result(
             "sent" if persisted else "persist_failed",
             attempted_send=True,
@@ -165,4 +173,5 @@ __all__ = [
     "TranslationSuccessTelemetryClientPort",
     "TranslationSuccessTelemetryResult",
     "TranslationSuccessTelemetryService",
+    "TranslationSuccessTelemetryState",
 ]

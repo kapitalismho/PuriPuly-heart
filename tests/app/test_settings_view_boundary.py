@@ -32,6 +32,9 @@ from puripuly_heart.app.ports.settings_view import (
     TranslationSelectionEdit,
     VrcMicInterceptSettingsIntent,
 )
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    materialize_compatibility_translation_settings,
+)
 from puripuly_heart.config.provider_values import (
     LLMProviderName,
     OpenRouterCredentialSource,
@@ -202,6 +205,7 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
                 SystemPromptEdit("focused prompt"),
             )
         ),
+        materialize_translation=materialize_compatibility_translation_settings,
     )
 
     assert updated.provider.llm == LLMProviderName.OPENROUTER
@@ -261,6 +265,10 @@ def test_managed_byok_pkce_target_carries_focused_translation_change() -> None:
     target = adapter.build_managed_openrouter_byok_target()
 
     assert target is not None
-    updated = materialize_provider_apply_intent(current, target.provider_intent)
+    updated = materialize_provider_apply_intent(
+        current,
+        target.provider_intent,
+        materialize_translation=materialize_compatibility_translation_settings,
+    )
     assert updated.translation.connection == TranslationConnection.OPENROUTER
     assert current.translation.connection == TranslationConnection.MANAGED

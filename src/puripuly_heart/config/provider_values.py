@@ -114,6 +114,16 @@ class QwenRegion(str, Enum):
     SINGAPORE = "singapore"
 
 
+class QwenLLMModel(str, Enum):
+    QWEN_35_FLASH = "qwen3.5-flash"
+    QWEN_35_PLUS = "qwen3.5-plus"
+
+
+class SecretsBackend(str, Enum):
+    KEYRING = "keyring"
+    ENCRYPTED_FILE = "encrypted_file"
+
+
 class OpenRouterLLMModel(str, Enum):
     GEMMA_4_26B_A4B_IT = "google/gemma-4-26b-a4b-it"
     GEMMA_4_31B_IT = OPENROUTER_MODEL_GEMMA_4_31B_IT
@@ -186,8 +196,10 @@ __all__ = [
     "OpenRouterCredentialSource",
     "OpenRouterLLMModel",
     "OpenRouterSelectionAlias",
+    "QwenLLMModel",
     "QwenRegion",
     "STTProviderName",
+    "SecretsBackend",
     "STT_INTERNAL_SAMPLE_RATE_HZ",
     "custom_stt_selection_for_provider",
     "display_stt_provider",

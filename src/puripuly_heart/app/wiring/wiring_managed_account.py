@@ -28,13 +28,12 @@ from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
 from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    OpenRouterCredentialSource,
-    TranslationConnection,
-    TranslationModel,
+from puripuly_heart.config.provider_values import (
     normalize_owned_referral_id,
+)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import (
+    TranslationModel,
 )
 from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
 from puripuly_heart.core.managed_openrouter_broker_client import (
@@ -56,8 +55,9 @@ from .wiring_managed_auth_factory import (
     ManagedAuthRuntimeAdapter,
     ManagedTranslationRuntimeAdapter,
     build_managed_identity_state_port,
-    build_openrouter_credential_runtime_config,
-    build_openrouter_release_runtime_config,
+    build_openrouter_credential_runtime_config_from_vnext,
+    build_openrouter_release_runtime_config_from_vnext,
+    managed_openrouter_selected_from_vnext,
 )
 from .wiring_managed_gemma import managed_gemma_selection
 from .wiring_secrets_factory import create_secret_store
@@ -66,13 +66,6 @@ from .wiring_translation_runtime_configuration import (
 )
 
 logger = logging.getLogger(__name__)
-
-_MANAGED_CONNECTIONS = frozenset(
-    {
-        TranslationConnection.MANAGED,
-        TranslationConnection.MANAGED_CHINA,
-    }
-)
 
 
 class ManagedTranslationContextPort(Protocol):
@@ -147,17 +140,12 @@ class ManagedOpenRouterReleaseRuntime:
         repr=False,
     )
 
-    def selected(self, settings: AppSettings | None = None) -> bool:
-        current = settings if settings is not None else self.settings.current
-        return bool(
-            current is not None
-            and current.provider.llm == LLMProviderName.OPENROUTER
-            and current.translation.connection in _MANAGED_CONNECTIONS
-            and current.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-        )
+    def selected(self, settings: AppSettingsVNext | None = None) -> bool:
+        current = settings if settings is not None else self.settings.canonical
+        return current is not None and managed_openrouter_selected_from_vnext(current)
 
-    def release_settings(self) -> AppSettings | None:
-        current = self.settings.current
+    def release_settings(self) -> AppSettingsVNext | None:
+        current = self.settings.canonical
         return current if self.selected(current) else None
 
     async def rebuild(self, *, secrets: object) -> ManagedOpenRouterReleaseService | None:
@@ -215,15 +203,16 @@ class ManagedOpenRouterReleaseRuntime:
 
         from puripuly_heart import __version__
 
+        broker_base_url = release_settings.intent.translation.openrouter_broker_base_url
         try:
             client = HttpManagedOpenRouterBrokerClient(
-                base_url=current.openrouter.broker_base_url,
+                base_url=broker_base_url,
             )
             telemetry_client: TranslationSuccessTelemetryClientPort | None = client
         except ValueError as exc:
             logger.warning(
                 "[Managed OpenRouter] Invalid broker base URL %r; using unavailable fallback: %s",
-                current.openrouter.broker_base_url,
+                broker_base_url,
                 exc,
             )
             client = UnavailableManagedOpenRouterReleaseClient()
@@ -231,10 +220,14 @@ class ManagedOpenRouterReleaseRuntime:
 
         return (
             ManagedOpenRouterReleaseService(
-                openrouter_config=build_openrouter_release_runtime_config(release_settings),
+                openrouter_config=build_openrouter_release_runtime_config_from_vnext(
+                    release_settings
+                ),
                 managed_state=build_managed_identity_state_port(
-                    current,
-                    self.settings.managed_identity_persistence_callback(current),
+                    current.managed_identity,
+                    lambda: self.settings.managed_identity_persistence_callback(current)(
+                        current
+                    ),
                 ),
                 secrets=secrets,
                 client=client,
@@ -282,8 +275,8 @@ class ManagedUsageRuntimeAdapter:
     ingress_provider: Callable[[], bool]
 
     def state(self) -> ManagedUsageState:
-        current = self.settings.current
-        if current is None:
+        canonical = self.settings.canonical
+        if canonical is None:
             return ManagedUsageState(
                 settings_available=False,
                 managed_key_visible=False,
@@ -293,15 +286,16 @@ class ManagedUsageRuntimeAdapter:
                 referral_id=None,
                 ingress_frozen=self.ingress_provider(),
             )
-        active_ref = current.managed_identity.active_managed_credential_ref
+        identity = canonical.state.managed_connection
+        active_ref = identity.active_managed_credential_ref
         entitlement_ref = active_ref.strip() if isinstance(active_ref, str) else None
         return ManagedUsageState(
             settings_available=True,
-            managed_key_visible=self.release.selected(current),
+            managed_key_visible=self.release.selected(canonical),
             release_settings_available=self.release.release_settings() is not None,
-            installation_id=current.managed_identity.installation_id.strip() or None,
+            installation_id=identity.installation_id.strip() or None,
             entitlement_ref=entitlement_ref or None,
-            referral_id=normalize_owned_referral_id(current.managed_identity.referral_id),
+            referral_id=normalize_owned_referral_id(identity.referral_id),
             ingress_frozen=self.ingress_provider(),
         )
 
@@ -311,9 +305,12 @@ class ManagedUsageRuntimeAdapter:
         if current is None or release_settings is None:
             return ManagedUsageMetadataResult(key_available=False, metadata=None)
         try:
-            secrets = create_secret_store(current.secrets, config_path=self.config_path)
+            secrets = create_secret_store(
+                release_settings.intent.secrets,
+                config_path=self.config_path,
+            )
             resolution = resolve_openrouter_credentials(
-                build_openrouter_credential_runtime_config(release_settings),
+                build_openrouter_credential_runtime_config_from_vnext(release_settings),
                 secrets=secrets,
             )
         except Exception:
@@ -328,7 +325,7 @@ class ManagedUsageRuntimeAdapter:
         if current is None:
             return False
         return should_auto_show_founder_letter(
-            build_managed_identity_state_port(current, lambda _settings: None),
+            build_managed_identity_state_port(current.managed_identity, lambda: None),
             metadata,
         )
 
@@ -385,10 +382,8 @@ def compose_managed_account(
     auth_adapter = ManagedAuthRuntimeAdapter(
         config_path=config_path,
         secret_store_factory=create_secret_store,
-        settings_provider=lambda: settings.current,
-        settings_sink=lambda value: setattr(settings, "current", value),
+        settings=settings,
         release_service_provider=lambda: release.service,
-        persistence_callback_factory=settings.managed_identity_persistence_callback,
         settings_repository_factory=lambda base, committed, surface: (
             settings.create_legacy_patch_repository(
                 base_settings=base,
@@ -397,7 +392,6 @@ def compose_managed_account(
                 save_failure_sink=log_error,
             )
         ),
-        settings_owner_complete=settings.complete,
         runtime_presence_provider=runtime.presence,
         ingress_provider=ingress_provider,
     )
@@ -441,7 +435,7 @@ def compose_managed_account(
 
     translation_adapter = ManagedTranslationRuntimeAdapter(
         auth=auth_adapter,
-        settings_provider=lambda: settings.current,
+        settings=settings,
         release_service_provider=lambda: release.service,
         runtime_snapshot_provider=runtime.snapshot,
         ingress_provider=ingress_provider,
