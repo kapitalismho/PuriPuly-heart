@@ -624,6 +624,65 @@ def _hidden_success(
     }
 
 
+def _hidden_failure_concentration(
+    hidden_cell: dict[str, Any],
+    g_per_source_family: dict[str, Any],
+    causal_success: dict[str, Any],
+    cfg: dict[str, Any],
+) -> dict[str, Any]:
+    family_concentration = {}
+    for family, hidden_family in hidden_cell["per_source_family"].items():
+        hidden_slices = hidden_family["diagnostic_slices"]
+        g_family = g_per_source_family[family]
+        overlap_hazard = hidden_slices["anchor_overlap"]["mean_hazard"]
+        anchor_hazard = hidden_slices["anchor_only"]["mean_hazard"]
+        absent_hazard = hidden_slices["anchor_absent_live"]["mean_hazard"]
+        hidden_takeover = hidden_family["overlap_takeover_success_rate"]
+        g_takeover = g_family["overlap_takeover_success_rate"]
+        family_concentration[family] = {
+            "overlap_masking": (
+                None not in (overlap_hazard, anchor_hazard, hidden_takeover, g_takeover)
+                and overlap_hazard > anchor_hazard
+                and hidden_takeover < g_takeover
+            ),
+            "competitor_separation": (
+                None not in (absent_hazard, overlap_hazard) and absent_hazard <= overlap_hazard
+            ),
+        }
+    improved_counts = {
+        str(family): int(value)
+        for family, value in causal_success["source_family_improved_metric_counts"].items()
+    }
+    if set(improved_counts) != set(family_concentration):
+        raise ValueError("hidden failure source-family attribution differs")
+    minimum = int(cfg["source_family_min_improved_metrics"])
+    passing_families = sorted(
+        family for family, count in improved_counts.items() if count >= minimum
+    )
+    failing_families = sorted(
+        family for family, count in improved_counts.items() if count < minimum
+    )
+    source_family_domain = {
+        "status": "passed" if passing_families and failing_families else "failed",
+        "minimum_improved_metrics": minimum,
+        "improved_metric_counts": improved_counts,
+        "passing_families": passing_families,
+        "failing_families": failing_families,
+    }
+    slice_localized = bool(family_concentration) and all(
+        any(checks.values()) for checks in family_concentration.values()
+    )
+    return {
+        "per_source_family": family_concentration,
+        "source_family_domain": source_family_domain,
+        "status": (
+            "passed"
+            if slice_localized or source_family_domain["status"] == "passed"
+            else "failed"
+        ),
+    }
+
+
 def render_final_decision() -> str:
     required = {
         "G": RESULTS_ROOT / "gt_causal_action_frontier.json",
@@ -708,34 +767,12 @@ def render_final_decision() -> str:
             "hidden_causal_over_posterior_causal": causal_success,
             "hidden_noncausal_over_hidden_causal": noncausal_success,
         }
-        family_concentration = {}
-        for family, hidden_family in hidden_cells["H-C"]["per_source_family"].items():
-            hidden_slices = hidden_family["diagnostic_slices"]
-            g_family = g_per_source_family[family]
-            overlap_hazard = hidden_slices["anchor_overlap"]["mean_hazard"]
-            anchor_hazard = hidden_slices["anchor_only"]["mean_hazard"]
-            absent_hazard = hidden_slices["anchor_absent_live"]["mean_hazard"]
-            hidden_takeover = hidden_family["overlap_takeover_success_rate"]
-            g_takeover = g_family["overlap_takeover_success_rate"]
-            family_concentration[family] = {
-                "overlap_masking": (
-                    None not in (overlap_hazard, anchor_hazard, hidden_takeover, g_takeover)
-                    and overlap_hazard > anchor_hazard
-                    and hidden_takeover < g_takeover
-                ),
-                "competitor_separation": (
-                    None not in (absent_hazard, overlap_hazard) and absent_hazard <= overlap_hazard
-                ),
-            }
-        residual_concentration = {
-            "per_source_family": family_concentration,
-            "status": (
-                "passed"
-                if family_concentration
-                and all(any(checks.values()) for checks in family_concentration.values())
-                else "failed"
-            ),
-        }
+        residual_concentration = _hidden_failure_concentration(
+            hidden_cells["H-C"],
+            g_per_source_family,
+            causal_success,
+            hidden_cfg,
+        )
         hidden_diagnostics["neural_acoustic_failure_concentration"] = residual_concentration
         if any(value["status"] != "passed" for value in fit.values()):
             path = "unresolved; hidden probe train-fit sanity failed"

@@ -17,6 +17,7 @@ from experiments.psem_frozen_ceiling_gate.build_ceiling_examples import (
     load_sessions,
 )
 from experiments.psem_frozen_ceiling_gate.evaluate_ceiling import (
+    _hidden_failure_concentration,
     _per_source_family_point,
     decode_scores,
 )
@@ -288,6 +289,36 @@ def test_hidden_mlp_optimizer_reaches_train_fit_sanity() -> None:
     assert sanity["duration_weighted_average_precision"] >= 0.8
     assert sanity["duration_weighted_accuracy"] >= 0.7
     assert optimization["status"] == "sanity_reached"
+
+
+def test_hidden_failure_can_be_localized_to_a_frozen_source_family() -> None:
+    hidden_cell = {
+        "per_source_family": {
+            family: {
+                "diagnostic_slices": {
+                    "anchor_only": {"mean_hazard": 0.1},
+                    "anchor_overlap": {"mean_hazard": 0.2 if index == 0 else 0.1},
+                    "anchor_absent_live": {"mean_hazard": 0.5},
+                },
+                "overlap_takeover_success_rate": 0.1,
+            }
+            for index, family in enumerate(config()["split"]["families"])
+        }
+    }
+    g_families = {
+        family: {"overlap_takeover_success_rate": 0.5}
+        for family in config()["split"]["families"]
+    }
+    first, second = config()["split"]["families"]
+    result = _hidden_failure_concentration(
+        hidden_cell,
+        g_families,
+        {"source_family_improved_metric_counts": {first: 3, second: 1}},
+        {"source_family_min_improved_metrics": 2},
+    )
+    assert result["status"] == "passed"
+    assert result["source_family_domain"]["passing_families"] == [first]
+    assert result["source_family_domain"]["failing_families"] == [second]
 
 
 def test_hidden_base_preserves_original_frame_after_episode_boundary_clipping(

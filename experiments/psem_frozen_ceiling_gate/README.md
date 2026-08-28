@@ -30,6 +30,8 @@ HIDDEN-CEILING-1 fixes exactly one representation before hidden scoring: the 192
 
 The hidden tiny MLP keeps the predeclared 8-unit architecture and uses the training-only Adam schedule in `hidden_training_config.json`. It stops only when the already frozen train-fit AP and accuracy gates are both reached at a predeclared check interval, or at the fixed maximum epoch. This schedule does not inspect held-out metrics or alter the linear probe, hidden representation, features, target, split, score thresholds, or product evaluator.
 
+Hidden failure attribution uses the frozen neural/acoustic slice checks and the already reported per-source-family improved-metric counts. A result is source-family/domain-localized when at least one frozen family reaches the predeclared family improvement minimum and at least one does not; no new metric threshold is introduced.
+
 After the hidden implementation candidate passes its own pre-experiment review:
 
 ```powershell
