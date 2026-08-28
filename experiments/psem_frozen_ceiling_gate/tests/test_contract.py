@@ -16,7 +16,10 @@ from experiments.psem_frozen_ceiling_gate.build_ceiling_examples import (
     config,
     load_sessions,
 )
-from experiments.psem_frozen_ceiling_gate.evaluate_ceiling import decode_scores
+from experiments.psem_frozen_ceiling_gate.evaluate_ceiling import (
+    _per_source_family_point,
+    decode_scores,
+)
 from experiments.psem_frozen_ceiling_gate.extract_hidden_features import (
     _probability_dump,
     _source_input,
@@ -247,6 +250,20 @@ def test_hidden_source_input_supports_authoritative_dev_and_eval_materialization
     assert dev_input["expected_sha256"] == dev["waveform_sha256"]
     assert eval_input["native_frame_count"] > eval_input["retained_frame_count"]
     assert eval_input["expected_sha256"] == eval_source["inference_audio"]["sha256"]
+
+
+def test_gt_family_reference_is_derived_from_per_source_rows() -> None:
+    value = json.loads(
+        (PACKAGE_ROOT / "results" / "frozen_ceiling_1" / "gt_causal_action_frontier.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    families = _per_source_family_point(value, "G", "gt_fixed_confirmation", 1.0, 500)
+    pooled = next(row for row in value["rows"] if row["confirmation_ms"] == 500)
+    assert set(families) == set(config()["split"]["families"])
+    assert sum(row["source_count"] for row in families.values()) == pooled["metrics"][
+        "source_count"
+    ]
 
 
 def test_hidden_base_preserves_original_frame_after_episode_boundary_clipping(

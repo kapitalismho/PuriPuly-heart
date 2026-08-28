@@ -462,6 +462,24 @@ def _point(
     )
 
 
+def _per_source_family_point(
+    value: dict[str, Any],
+    condition: str,
+    probe: str,
+    threshold: float,
+    persistence: int,
+) -> dict[str, Any]:
+    point = next(
+        row
+        for row in aggregate_conditions(value["per_source"])
+        if row["condition"] == condition
+        and row["probe_class"] == probe
+        and row["threshold"] == threshold
+        and row["confirmation_ms"] == persistence
+    )
+    return point["per_source_family"]
+
+
 def _delta(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
     return {
         "contamination_seconds_per_active_speech_hour": (
@@ -619,10 +637,18 @@ def render_final_decision() -> str:
     cfg = config()
     hidden_cfg = load_json(HIDDEN_CONFIG_PATH)
     persistence = int(cfg["gap_reference_confirmation_ms"])
+    g_result = json.loads(required["G"].read_text(encoding="utf-8"))
     g_cell = next(
         value
-        for value in json.loads(required["G"].read_text(encoding="utf-8"))["rows"]
+        for value in g_result["rows"]
         if value["confirmation_ms"] == persistence
+    )
+    g_per_source_family = _per_source_family_point(
+        g_result,
+        "G",
+        "gt_fixed_confirmation",
+        1.0,
+        persistence,
     )
     g = g_cell["metrics"]
     current = _point(required["S-current"], "S-current", "current", 0.5, persistence)["metrics"]
@@ -683,7 +709,7 @@ def render_final_decision() -> str:
         family_concentration = {}
         for family, hidden_family in hidden_cells["H-C"]["per_source_family"].items():
             hidden_slices = hidden_family["diagnostic_slices"]
-            g_family = g_cell["per_source_family"][family]
+            g_family = g_per_source_family[family]
             overlap_hazard = hidden_slices["anchor_overlap"]["mean_hazard"]
             anchor_hazard = hidden_slices["anchor_only"]["mean_hazard"]
             absent_hazard = hidden_slices["anchor_absent_live"]["mean_hazard"]
