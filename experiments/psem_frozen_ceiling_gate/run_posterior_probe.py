@@ -6,6 +6,7 @@ from typing import Any
 import numpy as np
 
 from experiments.psem_frozen_ceiling_gate.build_ceiling_examples import (
+    PACKAGE_ROOT,
     SessionExamples,
     config,
     load_sessions,
@@ -28,6 +29,11 @@ from experiments.psem_frozen_ceiling_gate.posterior_features import (
     scalar_base,
     temporal_features,
 )
+
+POSTERIOR_TRAINING_CONFIG_PATH = PACKAGE_ROOT / "posterior_training_config.json"
+DECISION_CONFIG_PATH = PACKAGE_ROOT / "decision_config.json"
+HIDDEN_TRIGGER_PATH = PACKAGE_ROOT / "hidden_trigger_revalidation.json"
+REPRESENTATION_RECEIPT_PATH = PACKAGE_ROOT / "hidden_representation_receipt.json"
 
 
 def sigmoid(value: np.ndarray) -> np.ndarray:
@@ -146,8 +152,12 @@ def fit_mlp(
     duration_weights: np.ndarray,
     *,
     cfg: dict[str, Any],
+    training_cfg: dict[str, Any],
     seed: int,
-) -> TinyMLPProbe:
+    maximum_epochs: int | None = None,
+) -> tuple[TinyMLPProbe, dict[str, Any], dict[str, Any]]:
+    if training_cfg["optimizer"] != "adam":
+        raise ValueError("posterior training optimizer differs from the frozen definition")
     standardizer = Standardizer.fit(values)
     features = standardizer.apply(values)
     rng = np.random.default_rng(seed)
@@ -155,11 +165,23 @@ def fit_mlp(
     first = rng.normal(0.0, 0.08, (features.shape[1], hidden_units)).astype(np.float32)
     first_bias = np.zeros(hidden_units, dtype=np.float32)
     second = rng.normal(0.0, 0.08, hidden_units).astype(np.float32)
-    second_bias = 0.0
+    second_bias = np.zeros(1, dtype=np.float32)
+    parameters = (first, first_bias, second, second_bias)
+    first_moments = tuple(np.zeros_like(value) for value in parameters)
+    second_moments = tuple(np.zeros_like(value) for value in parameters)
     sample_weights = balanced_weights(targets, duration_weights)
     batch = int(cfg["training_batch_size"])
+    beta1 = float(training_cfg["beta1"])
+    beta2 = float(training_cfg["beta2"])
+    epsilon = float(training_cfg["epsilon"])
+    learning_rate = float(training_cfg["learning_rate"])
+    weight_decay = float(training_cfg["weight_decay"])
+    max_epochs = int(maximum_epochs or training_cfg["maximum_epochs"])
+    check_interval = int(training_cfg["sanity_check_interval_epochs"])
     step = 0
-    for _ in range(int(cfg["training_epochs"])):
+    sanity: dict[str, Any] = {}
+    probe: TinyMLPProbe | None = None
+    for epoch in range(1, max_epochs + 1):
         order = rng.permutation(len(features))
         for start in range(0, len(order), batch):
             chosen = order[start : start + batch]
@@ -168,19 +190,60 @@ def fit_mlp(
             w = sample_weights[chosen]
             hidden_pre = x @ first + first_bias
             hidden = np.maximum(hidden_pre, 0.0)
-            error = (sigmoid(hidden @ second + second_bias) - y) * w
-            grad_second = hidden.T @ error / len(chosen) + 1e-4 * second
-            grad_second_bias = float(error.mean())
+            error = (sigmoid(hidden @ second + float(second_bias[0])) - y) * w
             hidden_error = np.outer(error, second) * (hidden_pre > 0.0)
-            grad_first = x.T @ hidden_error / len(chosen) + 1e-4 * first
-            grad_first_bias = hidden_error.mean(axis=0)
-            learning_rate = 0.02 / (1.0 + step / 300.0)
-            first -= learning_rate * grad_first
-            first_bias -= learning_rate * grad_first_bias
-            second -= learning_rate * grad_second
-            second_bias -= learning_rate * grad_second_bias
+            gradients = (
+                x.T @ hidden_error / len(chosen) + weight_decay * first,
+                hidden_error.mean(axis=0),
+                hidden.T @ error / len(chosen) + weight_decay * second,
+                np.asarray([error.mean()], dtype=np.float32),
+            )
             step += 1
-    return TinyMLPProbe(standardizer, first, first_bias, second, second_bias)
+            correction = learning_rate * np.sqrt(1.0 - beta2**step) / (1.0 - beta1**step)
+            for parameter, first_moment, second_moment, gradient in zip(
+                parameters, first_moments, second_moments, gradients, strict=True
+            ):
+                first_moment *= beta1
+                first_moment += (1.0 - beta1) * gradient
+                second_moment *= beta2
+                second_moment += (1.0 - beta2) * np.square(gradient)
+                parameter -= correction * first_moment / (np.sqrt(second_moment) + epsilon)
+        if epoch % check_interval == 0 or epoch == max_epochs:
+            probe = TinyMLPProbe(
+                standardizer,
+                first,
+                first_bias,
+                second,
+                float(second_bias[0]),
+            )
+            sanity = fit_sanity(probe, values, targets, duration_weights)
+            if sanity["duration_weighted_average_precision"] >= float(
+                training_cfg["train_fit_min_average_precision"]
+            ) and sanity["duration_weighted_accuracy"] >= float(
+                training_cfg["train_fit_min_accuracy"]
+            ):
+                return (
+                    probe,
+                    sanity,
+                    {
+                        "optimizer": "adam",
+                        "completed_epochs": epoch,
+                        "maximum_epochs": max_epochs,
+                        "status": "sanity_reached",
+                    },
+                )
+    if probe is None:
+        raise ValueError("posterior training produced no probe")
+    return (
+        probe,
+        sanity,
+        {
+            "optimizer": "adam",
+            "completed_epochs": max_epochs,
+            "maximum_epochs": max_epochs,
+            "status": "maximum_epochs_reached",
+        },
+    )
 
 
 def feature_matrix(
@@ -246,9 +309,138 @@ def fit_sanity(
     }
 
 
+def posterior_train_fit(
+    receipts: list[dict[str, Any]],
+    condition: str,
+    training_cfg: dict[str, Any],
+) -> dict[str, Any]:
+    reference_probe = str(training_cfg["reference_probe_class"])
+    selected = [
+        value
+        for value in receipts
+        if value["condition"] == condition and value["probe_class"] == reference_probe
+    ]
+    checks = [
+        value["optimization"]["status"] == "sanity_reached"
+        and value["train_fit_sanity"]["duration_weighted_average_precision"]
+        >= float(training_cfg["train_fit_min_average_precision"])
+        and value["train_fit_sanity"]["duration_weighted_accuracy"]
+        >= float(training_cfg["train_fit_min_accuracy"])
+        for value in selected
+    ]
+    return {
+        "status": "passed" if selected and all(checks) else "failed",
+        "reference_probe_class": reference_probe,
+        "fold_count": len(selected),
+        "minimum_average_precision": min(
+            (
+                value["train_fit_sanity"]["duration_weighted_average_precision"]
+                for value in selected
+            ),
+            default=None,
+        ),
+        "minimum_accuracy": min(
+            (value["train_fit_sanity"]["duration_weighted_accuracy"] for value in selected),
+            default=None,
+        ),
+    }
+
+
+def write_hidden_trigger_revalidation(
+    training_receipts: list[dict[str, Any]],
+    training_cfg: dict[str, Any],
+    decision_cfg: dict[str, Any],
+) -> dict[str, Any]:
+    result_paths = {
+        "gt_result_sha256": RESULTS_ROOT / "gt_causal_action_frontier.json",
+        "posterior_causal_result_sha256": RESULTS_ROOT / "fullslot_causal_metrics.json",
+        "posterior_noncausal_result_sha256": RESULTS_ROOT / "fullslot_noncausal_metrics.json",
+        "source_family_result_sha256": RESULTS_ROOT / "source_family_results.json",
+    }
+    required_conditions = tuple(map(str, training_cfg["train_fit_required_conditions"]))
+    fit = {
+        condition: posterior_train_fit(training_receipts, condition, training_cfg)
+        for condition in required_conditions
+    }
+    g_result = load_json(result_paths["gt_result_sha256"])
+    persistence = int(config()["gap_reference_confirmation_ms"])
+    g_row = next(
+        value
+        for value in aggregate_conditions(g_result["per_source"])
+        if value["confirmation_ms"] == persistence
+    )
+    fields = (
+        "exclusive_other_contamination_seconds_per_active_speech_hour",
+        "false_cut_count",
+        "missed_replacement_count",
+    )
+    separation = {}
+    result_path_by_condition = {
+        "P-C": result_paths["posterior_causal_result_sha256"],
+        "P-NC": result_paths["posterior_noncausal_result_sha256"],
+    }
+    for condition in required_conditions:
+        path = result_path_by_condition[condition]
+        value = load_json(path)
+        row = next(
+            item
+            for item in value["rows"]
+            if item["probe_class"] == training_cfg["reference_probe_class"]
+            and item["threshold"] == 0.5
+            and item["confirmation_ms"] == persistence
+        )
+        separation[condition] = {
+            family: {
+                field: row["per_source_family"][family][field]
+                > g_row["per_source_family"][family][field]
+                for field in fields
+            }
+            for family in sorted(g_row["per_source_family"])
+        }
+    fit_passed = all(value["status"] == "passed" for value in fit.values())
+    minimum_worse_metrics = int(decision_cfg["posterior_source_family_min_worse_metrics"])
+    separation_counts = {
+        condition: {
+            family: sum(bool(value) for value in checks.values())
+            for family, checks in families.items()
+        }
+        for condition, families in separation.items()
+    }
+    separated = all(
+        count >= minimum_worse_metrics
+        for conditions in separation_counts.values()
+        for count in conditions.values()
+    )
+    opened = fit_passed and separated
+    receipt = {
+        "schema_version": "psem.hidden_ceiling.trigger_revalidation.v1",
+        "status": "opened" if opened else "inconclusive",
+        "decision": (
+            "hidden_ceiling_remains_required"
+            if opened
+            else "posterior_train_fit_inconclusive"
+            if not fit_passed
+            else "posterior_ceiling_not_consistently_separated"
+        ),
+        "rule": "P-C and P-NC must pass the training-only sanity gate and remain worse than independently simulated bounded G on at least two of contamination, false cuts, and misses in each frozen source family",
+        "posterior_training_config_sha256": sha256_file(POSTERIOR_TRAINING_CONFIG_PATH),
+        "decision_config_sha256": sha256_file(DECISION_CONFIG_PATH),
+        "posterior_train_fit_sanity": fit,
+        "source_family_reference_separation": separation,
+        "source_family_reference_separation_counts": separation_counts,
+        "source_family_minimum_worse_metrics": minimum_worse_metrics,
+        "representation_receipt_sha256": sha256_file(REPRESENTATION_RECEIPT_PATH),
+        **{field: sha256_file(path) for field, path in result_paths.items()},
+    }
+    write_json(HIDDEN_TRIGGER_PATH, receipt)
+    return receipt
+
+
 def run() -> dict[str, Any]:
     cfg = config()
-    package_root = RESULTS_ROOT.parents[1]
+    training_cfg = load_json(POSTERIOR_TRAINING_CONFIG_PATH)
+    decision_cfg = load_json(DECISION_CONFIG_PATH)
+    package_root = PACKAGE_ROOT
     split_path = package_root / "split_manifest.json"
     evidence_path = package_root / "evidence_reuse_receipt.json"
     mapping_path = package_root / "oracle_mapping_ledger.jsonl"
@@ -261,6 +453,7 @@ def run() -> dict[str, Any]:
     folds = {value["held_out_family"]: value for value in split["folds"]}
     provenance = {
         "config_sha256": sha256_file(package_root / "config.json"),
+        "posterior_training_config_sha256": sha256_file(POSTERIOR_TRAINING_CONFIG_PATH),
         "split_manifest_sha256": sha256_file(split_path),
         "evidence_reuse_receipt_sha256": sha256_file(evidence_path),
         "oracle_mapping_ledger_sha256": sha256_file(mapping_path),
@@ -288,6 +481,7 @@ def run() -> dict[str, Any]:
         ("P-C", "fullslot", False),
         ("P-NC", "fullslot", True),
     )
+    required_fit_conditions = set(map(str, training_cfg["train_fit_required_conditions"]))
     for condition_index, (condition, evidence_kind, noncausal) in enumerate(conditions):
         matrices = {
             session.source_id: feature_matrix(
@@ -310,11 +504,29 @@ def run() -> dict[str, Any]:
             seed = int(cfg["training_seed"]) + condition_index * 10 + fold_index
             train_x, train_y, train_w = training_data(train, matrices, cfg, seed)
             for probe_name in cfg["probe_classes"]:
-                probe = (
-                    fit_linear(train_x, train_y, train_w, cfg=cfg, seed=seed)
-                    if probe_name == "linear"
-                    else fit_mlp(train_x, train_y, train_w, cfg=cfg, seed=seed)
-                )
+                if probe_name == "linear":
+                    probe = fit_linear(train_x, train_y, train_w, cfg=cfg, seed=seed)
+                    sanity = fit_sanity(probe, train_x, train_y, train_w)
+                    optimization = {
+                        "optimizer": "sgd",
+                        "completed_epochs": int(cfg["training_epochs"]),
+                        "maximum_epochs": int(cfg["training_epochs"]),
+                        "status": "fixed_epochs_complete",
+                    }
+                else:
+                    probe, sanity, optimization = fit_mlp(
+                        train_x,
+                        train_y,
+                        train_w,
+                        cfg=cfg,
+                        training_cfg=training_cfg,
+                        seed=seed,
+                        maximum_epochs=(
+                            int(training_cfg["required_condition_maximum_epochs"])
+                            if condition in required_fit_conditions
+                            else int(training_cfg["maximum_epochs"])
+                        ),
+                    )
                 models[(condition, probe_name, held_family)] = probe
                 training_receipts.append(
                     {
@@ -324,7 +536,8 @@ def run() -> dict[str, Any]:
                         "train_source_ids": sorted(train_ids),
                         "eval_source_ids": sorted(eval_ids),
                         "future_context_ms": cfg["noncausal_horizon_ms"] if noncausal else 0,
-                        "train_fit_sanity": fit_sanity(probe, train_x, train_y, train_w),
+                        "optimization": optimization,
+                        "train_fit_sanity": sanity,
                     }
                 )
     scoring_sessions = [value for value in training_sessions if value.role == "eval"]
@@ -431,9 +644,11 @@ def run() -> dict[str, Any]:
         source_rows, int(cfg["bootstrap_resamples"]), int(cfg["training_seed"])
     )
     write_json(RESULTS_ROOT / "paired_deltas_or_bootstrap.json", bootstrap)
+    trigger = write_hidden_trigger_revalidation(training_receipts, training_cfg, decision_cfg)
     return {
         "source_row_count": len(source_rows),
         "training_receipt_count": len(training_receipts),
+        "hidden_trigger_status": trigger["status"],
     }
 
 

@@ -6,19 +6,19 @@ This report is generated only after the scored artifacts exist. It is developmen
 
 1. Yes as the bounded evaluator floor: every predeclared G arm is simulated independently from exact-source-time GT activity, while the 500 ms arm exactly reproduces the sealed issue-98 Simple Anchor reference. This does not declare one scalar utility or production readiness.
 
-2. At the predeclared 500 ms / 0.5 diagnostic cell, the action-policy plus neural gap is recorded as G→S-current below; the full frontier remains authoritative.
+2. The G action-policy tradeoff is explicit: moving from the sealed 500 ms arm to the 100 ms arm changes contamination by +242.689 seconds/hour, false cuts by +2448, misses by +385, and p90 delay by -400.0 ms. At the same sealed policy point, S-current remains worse than G by +1532.115 seconds/hour, +418 false cuts, and +1692 misses. The frontier therefore identifies a latency/cut tradeoff, while the much larger fixed-policy residual is neural-evidence loss rather than the 500 ms action policy alone.
 
-3. S-probe versus S-current is quantified below at the fixed diagnostic cell; no architecture or threshold was selected on the held-out families.
+3. The flexible scalar S-probe changes contamination by -6.028 seconds/hour, false cuts by +110, misses by -13, and p90 delay by +0.0 ms at the fixed cell. Its training-only sanity gate did not pass (minimum AP 0.231, minimum accuracy 0.774), so these held-out tradeoffs are descriptive and do not establish the scalar projection ceiling; no held-out architecture or threshold was selected.
 
-4. P-C versus S-probe has Pareto counts {'left_dominates': 0, 'right_dominates': 1, 'tradeoff': 17}; the fixed-cell delta is recorded below.
+4. Full-slot P-C also does not close additional gap over S-probe at the fixed cell: contamination changes by +647.297 seconds/hour, false cuts by -202, misses by +672, with frontier counts {'left_dominates': 0, 'right_dominates': 0, 'tradeoff': 18}. The causal full-slot evidence is therefore not a viable frozen-posterior ceiling under this probe contract.
 
-5. P-NC versus P-C has Pareto counts {'left_dominates': 0, 'right_dominates': 0, 'tradeoff': 18}; future context remains diagnostic and its frontier delay includes the future evidence availability.
+5. Bounded P-NC is a tradeoff rather than a material overall win over P-C: contamination changes by -206.188 seconds/hour and misses by -201, but false cuts change by +4 and p90 delay by +20.0 ms; frontier counts are {'left_dominates': 0, 'right_dominates': 1, 'tradeoff': 17}. Future context remains diagnostic and does not establish a streaming/context-only path.
 
-6. Remaining hidden-causal failures are source-family heterogeneous: overlap masking is detected in ['alimeeting_far_ch0'] and competitor separation in ['none']; the frozen family rule passes ['alimeeting_far_ch0'] and fails ['ami_mix_headset']. The evidence therefore localizes the residual to overlap/source-family acoustic conditions rather than a uniform decoder failure; device/noise is represented only through the frozen corpus-device families.
+6. Direct H-C-to-G residuals are source-family concentrated in ['ami_mix_headset'], with worst-metric counts {'alimeeting_far_ch0': 1, 'ami_mix_headset': 3} across the four frozen residual fields. The acoustic checks additionally find overlap masking is detected in ['alimeeting_far_ch0'] and competitor separation in ['none']. The rule measures hidden-to-G product residuals directly, so the evidence localizes failure to overlap/source-family conditions rather than hidden-over-posterior improvement; device/noise is represented only through the frozen corpus-device families.
 
 7. No; the posterior result does not yet authorize native S2.
 
-8. opened; causal and bounded non-causal hidden ceilings both failed despite passing train-fit sanity: {'train_fit_sanity': {'H-C': {'status': 'passed', 'reference_probe_class': 'tiny_mlp', 'fold_count': 2, 'minimum_average_precision': 0.8116016984776114, 'minimum_accuracy': 0.9457091999728517}, 'H-NC': {'status': 'passed', 'reference_probe_class': 'tiny_mlp', 'fold_count': 2, 'minimum_average_precision': 0.8047884575857124, 'minimum_accuracy': 0.9253816447157331}}, 'hidden_causal_over_posterior_causal': {'status': 'failed', 'frontier_comparison': {'left_dominates': 4, 'right_dominates': 2, 'tradeoff': 12}, 'reference_cell_improvements': {'exclusive_other_contamination_seconds_per_active_speech_hour': True, 'false_cut_count': True, 'missed_replacement_count': False}, 'source_family_improved_metric_counts': {'alimeeting_far_ch0': 3, 'ami_mix_headset': 1}}, 'hidden_noncausal_over_hidden_causal': {'status': 'failed', 'frontier_comparison': {'left_dominates': 0, 'right_dominates': 8, 'tradeoff': 10}, 'reference_cell_improvements': {'exclusive_other_contamination_seconds_per_active_speech_hour': False, 'false_cut_count': False, 'missed_replacement_count': False}, 'source_family_improved_metric_counts': {'alimeeting_far_ch0': 0, 'ami_mix_headset': 2}}, 'neural_acoustic_failure_concentration': {'per_source_family': {'alimeeting_far_ch0': {'overlap_masking': True, 'competitor_separation': False}, 'ami_mix_headset': {'overlap_masking': False, 'competitor_separation': False}}, 'source_family_domain': {'status': 'passed', 'minimum_improved_metrics': 2, 'improved_metric_counts': {'alimeeting_far_ch0': 3, 'ami_mix_headset': 1}, 'passing_families': ['alimeeting_far_ch0'], 'failing_families': ['ami_mix_headset']}, 'status': 'passed'}}
+8. opened; causal and bounded non-causal hidden ceilings both failed despite passing train-fit sanity: {'train_fit_sanity': {'H-C': {'status': 'passed', 'reference_probe_class': 'tiny_mlp', 'fold_count': 2, 'minimum_average_precision': 0.8116016984776114, 'minimum_accuracy': 0.9457091999728517}, 'H-NC': {'status': 'passed', 'reference_probe_class': 'tiny_mlp', 'fold_count': 2, 'minimum_average_precision': 0.8047884575857124, 'minimum_accuracy': 0.9253816447157331}}, 'hidden_causal_over_posterior_causal': {'status': 'failed', 'frontier_comparison': {'left_dominates': 0, 'right_dominates': 2, 'tradeoff': 16}, 'reference_cell_improvements': {'exclusive_other_contamination_seconds_per_active_speech_hour': True, 'false_cut_count': False, 'missed_replacement_count': True}, 'source_family_improved_metric_counts': {'alimeeting_far_ch0': 3, 'ami_mix_headset': 2}}, 'hidden_noncausal_over_hidden_causal': {'status': 'failed', 'frontier_comparison': {'left_dominates': 0, 'right_dominates': 8, 'tradeoff': 10}, 'reference_cell_improvements': {'exclusive_other_contamination_seconds_per_active_speech_hour': False, 'false_cut_count': False, 'missed_replacement_count': False}, 'source_family_improved_metric_counts': {'alimeeting_far_ch0': 0, 'ami_mix_headset': 2}}, 'neural_acoustic_failure_concentration': {'per_source_family': {'alimeeting_far_ch0': {'overlap_masking': True, 'competitor_separation': False, 'overlap_takeover_deficit': True}, 'ami_mix_headset': {'overlap_masking': False, 'competitor_separation': False, 'overlap_takeover_deficit': True}}, 'source_family_domain': {'status': 'passed', 'minimum_worst_residual_metrics': 3, 'direct_hidden_to_gt_residuals': {'alimeeting_far_ch0': {'contamination_seconds_per_active_speech_hour_gap': 1678.4448786702362, 'false_cut_count_per_active_speech_hour_gap': 91.41696292534282, 'missed_replacement_rate_gap': 0.6488919667590027, 'overlap_takeover_success_rate_gap': 0.7608695652173914}, 'ami_mix_headset': {'contamination_seconds_per_active_speech_hour_gap': 2331.3196202908566, 'false_cut_count_per_active_speech_hour_gap': 120.0586000309675, 'missed_replacement_rate_gap': 0.9593796159527327, 'overlap_takeover_success_rate_gap': 0.7443946188340808}}, 'worst_families_by_metric': {'contamination_seconds_per_active_speech_hour_gap': ['ami_mix_headset'], 'false_cut_count_per_active_speech_hour_gap': ['ami_mix_headset'], 'missed_replacement_rate_gap': ['ami_mix_headset'], 'overlap_takeover_success_rate_gap': ['alimeeting_far_ch0']}, 'worst_metric_counts': {'alimeeting_far_ch0': 1, 'ami_mix_headset': 3}, 'concentrated_families': ['ami_mix_headset']}, 'status': 'passed'}}
 
 9. Selected path: D. Sortformer task adaptation / full FT -> KD.
 
@@ -34,6 +34,14 @@ This report is generated only after the scored artifacts exist. It is developmen
 
 ```json
 {
+  "G_action_frontier_fast_to_reference": {
+    "contamination_seconds_per_active_speech_hour": 242.68891555267348,
+    "false_cut_count": 2448,
+    "missed_replacement_count": 385,
+    "overlap_return_preservation_rate": -0.05991285403050095,
+    "overlap_takeover_success_rate": -0.018036072144288595,
+    "replacement_emit_delay_p90_ms": -400.0
+  },
   "G_to_H_C_residual": {
     "contamination_seconds_per_active_speech_hour": 2018.0518153975786,
     "false_cut_count": 715,
@@ -43,12 +51,12 @@ This report is generated only after the scored artifacts exist. It is developmen
     "replacement_emit_delay_p90_ms": 902.5
   },
   "G_to_P_C_residual": {
-    "contamination_seconds_per_active_speech_hour": 2041.9013628131074,
-    "false_cut_count": 2568,
-    "missed_replacement_count": 2234,
-    "overlap_return_preservation_rate": 0.027233115468409674,
-    "overlap_takeover_success_rate": -0.7595190380761523,
-    "replacement_emit_delay_p90_ms": 902.5
+    "contamination_seconds_per_active_speech_hour": 2173.384010127649,
+    "false_cut_count": 326,
+    "missed_replacement_count": 2351,
+    "overlap_return_preservation_rate": 0.2919389978213508,
+    "overlap_takeover_success_rate": -0.7575150300601202,
+    "replacement_emit_delay_p90_ms": 912.5
   },
   "G_to_S_current": {
     "contamination_seconds_per_active_speech_hour": 1532.1146010379603,
@@ -67,52 +75,52 @@ This report is generated only after the scored artifacts exist. It is developmen
     "replacement_emit_delay_p90_ms": 35.90000000000009
   },
   "P_C_to_H_C": {
-    "contamination_seconds_per_active_speech_hour": -23.849547415528832,
-    "false_cut_count": -1853,
-    "missed_replacement_count": 2,
-    "overlap_return_preservation_rate": 0.210239651416122,
-    "overlap_takeover_success_rate": 0.006012024048096192,
-    "replacement_emit_delay_p90_ms": 0.0
+    "contamination_seconds_per_active_speech_hour": -155.33219473007057,
+    "false_cut_count": 389,
+    "missed_replacement_count": -115,
+    "overlap_return_preservation_rate": -0.05446623093681913,
+    "overlap_takeover_success_rate": 0.004008016032064128,
+    "replacement_emit_delay_p90_ms": -10.0
   },
   "P_C_to_P_NC": {
-    "contamination_seconds_per_active_speech_hour": -119.40416216629274,
-    "false_cut_count": 103,
-    "missed_replacement_count": -135,
-    "overlap_return_preservation_rate": -0.009803921568627527,
-    "overlap_takeover_success_rate": -0.002004008016032064,
-    "replacement_emit_delay_p90_ms": 30.0
+    "contamination_seconds_per_active_speech_hour": -206.18834039969533,
+    "false_cut_count": 4,
+    "missed_replacement_count": -201,
+    "overlap_return_preservation_rate": 0.004357298474945592,
+    "overlap_takeover_success_rate": 0.0,
+    "replacement_emit_delay_p90_ms": 20.0
   },
   "S_current_to_S_probe": {
-    "contamination_seconds_per_active_speech_hour": 148.69438828298757,
-    "false_cut_count": 793,
-    "missed_replacement_count": 195,
-    "overlap_return_preservation_rate": -0.02178649237472763,
-    "overlap_takeover_success_rate": -0.004008016032064127,
+    "contamination_seconds_per_active_speech_hour": -6.027867555796092,
+    "false_cut_count": 110,
+    "missed_replacement_count": -13,
+    "overlap_return_preservation_rate": -0.013071895424836555,
+    "overlap_takeover_success_rate": 0.002004008016032066,
     "replacement_emit_delay_p90_ms": 0.0
   },
   "S_probe_to_P_C": {
-    "contamination_seconds_per_active_speech_hour": 361.0923734921596,
-    "false_cut_count": 1357,
-    "missed_replacement_count": 347,
-    "overlap_return_preservation_rate": -0.224400871459695,
-    "overlap_takeover_success_rate": -0.008016032064128258,
-    "replacement_emit_delay_p90_ms": -8.0
+    "contamination_seconds_per_active_speech_hour": 647.297276645485,
+    "false_cut_count": -202,
+    "missed_replacement_count": 672,
+    "overlap_return_preservation_rate": 0.031590413943355045,
+    "overlap_takeover_success_rate": -0.012024048096192386,
+    "replacement_emit_delay_p90_ms": 2.0
   },
   "hidden_decision_diagnostics": {
     "hidden_causal_over_posterior_causal": {
       "frontier_comparison": {
-        "left_dominates": 4,
+        "left_dominates": 0,
         "right_dominates": 2,
-        "tradeoff": 12
+        "tradeoff": 16
       },
       "reference_cell_improvements": {
         "exclusive_other_contamination_seconds_per_active_speech_hour": true,
-        "false_cut_count": true,
-        "missed_replacement_count": false
+        "false_cut_count": false,
+        "missed_replacement_count": true
       },
       "source_family_improved_metric_counts": {
         "alimeeting_far_ch0": 3,
-        "ami_mix_headset": 1
+        "ami_mix_headset": 2
       },
       "status": "failed"
     },
@@ -137,26 +145,53 @@ This report is generated only after the scored artifacts exist. It is developmen
       "per_source_family": {
         "alimeeting_far_ch0": {
           "competitor_separation": false,
-          "overlap_masking": true
+          "overlap_masking": true,
+          "overlap_takeover_deficit": true
         },
         "ami_mix_headset": {
           "competitor_separation": false,
-          "overlap_masking": false
+          "overlap_masking": false,
+          "overlap_takeover_deficit": true
         }
       },
       "source_family_domain": {
-        "failing_families": [
+        "concentrated_families": [
           "ami_mix_headset"
         ],
-        "improved_metric_counts": {
-          "alimeeting_far_ch0": 3,
-          "ami_mix_headset": 1
+        "direct_hidden_to_gt_residuals": {
+          "alimeeting_far_ch0": {
+            "contamination_seconds_per_active_speech_hour_gap": 1678.4448786702362,
+            "false_cut_count_per_active_speech_hour_gap": 91.41696292534282,
+            "missed_replacement_rate_gap": 0.6488919667590027,
+            "overlap_takeover_success_rate_gap": 0.7608695652173914
+          },
+          "ami_mix_headset": {
+            "contamination_seconds_per_active_speech_hour_gap": 2331.3196202908566,
+            "false_cut_count_per_active_speech_hour_gap": 120.0586000309675,
+            "missed_replacement_rate_gap": 0.9593796159527327,
+            "overlap_takeover_success_rate_gap": 0.7443946188340808
+          }
         },
-        "minimum_improved_metrics": 2,
-        "passing_families": [
-          "alimeeting_far_ch0"
-        ],
-        "status": "passed"
+        "minimum_worst_residual_metrics": 3,
+        "status": "passed",
+        "worst_families_by_metric": {
+          "contamination_seconds_per_active_speech_hour_gap": [
+            "ami_mix_headset"
+          ],
+          "false_cut_count_per_active_speech_hour_gap": [
+            "ami_mix_headset"
+          ],
+          "missed_replacement_rate_gap": [
+            "ami_mix_headset"
+          ],
+          "overlap_takeover_success_rate_gap": [
+            "alimeeting_far_ch0"
+          ]
+        },
+        "worst_metric_counts": {
+          "alimeeting_far_ch0": 1,
+          "ami_mix_headset": 3
+        }
       },
       "status": "passed"
     },
@@ -180,13 +215,36 @@ This report is generated only after the scored artifacts exist. It is developmen
   "pareto_counts": {
     "P_C_vs_S_probe": {
       "left_dominates": 0,
-      "right_dominates": 1,
-      "tradeoff": 17
+      "right_dominates": 0,
+      "tradeoff": 18
     },
     "P_NC_vs_P_C": {
       "left_dominates": 0,
-      "right_dominates": 0,
-      "tradeoff": 18
+      "right_dominates": 1,
+      "tradeoff": 17
+    }
+  },
+  "posterior_train_fit_sanity": {
+    "P-C": {
+      "fold_count": 2,
+      "minimum_accuracy": 0.9288374823477415,
+      "minimum_average_precision": 0.8018623735379253,
+      "reference_probe_class": "tiny_mlp",
+      "status": "passed"
+    },
+    "P-NC": {
+      "fold_count": 2,
+      "minimum_accuracy": 0.9235661464368115,
+      "minimum_average_precision": 0.8000988623852348,
+      "reference_probe_class": "tiny_mlp",
+      "status": "passed"
+    },
+    "S-probe": {
+      "fold_count": 2,
+      "minimum_accuracy": 0.7744752483940064,
+      "minimum_average_precision": 0.23131581137284507,
+      "reference_probe_class": "tiny_mlp",
+      "status": "failed"
     }
   }
 }
@@ -458,81 +516,81 @@ This report is generated only after the scored artifacts exist. It is developmen
     },
     "diagnostic_slices": {
       "anchor_absent_live": {
-        "mean_hazard": 0.6959882498187386,
+        "mean_hazard": 0.42914921207269896,
         "support_seconds": 1918.21
       },
       "anchor_only": {
-        "mean_hazard": 0.5673660037974635,
+        "mean_hazard": 0.02239213765421582,
         "support_seconds": 18580.731
       },
       "anchor_overlap": {
-        "mean_hazard": 0.6421341719006693,
+        "mean_hazard": 0.21612055621132045,
         "support_seconds": 1554.42
       }
     },
-    "exclusive_other_contamination_seconds_per_active_speech_hour": 2249.922939826814,
-    "false_cut_count": 2568,
-    "matched_replacement_count": 564,
-    "missed_replacement_count": 2234,
-    "overlap_return_preservation_rate": 0.6710239651416122,
-    "overlap_takeover_success_rate": 0.004008016032064128,
-    "predicted_cut_count": 3132,
+    "exclusive_other_contamination_seconds_per_active_speech_hour": 2381.4055871413557,
+    "false_cut_count": 326,
+    "matched_replacement_count": 447,
+    "missed_replacement_count": 2351,
+    "overlap_return_preservation_rate": 0.9357298474945533,
+    "overlap_takeover_success_rate": 0.006012024048096192,
+    "predicted_cut_count": 773,
     "reference_replacement_count": 2798,
     "replacement_emit_delay_ms": {
-      "p50": 1142.5,
-      "p90": 1402.5
+      "p50": 1152.5,
+      "p90": 1412.5
     },
     "source_count": 19,
     "source_families": [
       "alimeeting_far_ch0",
       "ami_mix_headset"
     ],
-    "speaker_induced_cut_count_per_active_speech_hour": 465.7066327426227,
+    "speaker_induced_cut_count_per_active_speech_hour": 114.9397276852003,
     "topology": {
       "clean_direct_different_speaker_handoff": {
         "eligible_episode_count": 197,
-        "episodes_with_aligned_cut": 2,
-        "episodes_with_predicted_cut": 76,
+        "episodes_with_aligned_cut": 3,
+        "episodes_with_predicted_cut": 18,
         "episodes_with_reference_replacement": 128,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null
       },
       "overlap_return": {
         "eligible_episode_count": 918,
-        "episodes_with_aligned_cut": 2,
-        "episodes_with_predicted_cut": 302,
+        "episodes_with_aligned_cut": 3,
+        "episodes_with_predicted_cut": 59,
         "episodes_with_reference_replacement": 327,
-        "overlap_return_preservation_rate": 0.6710239651416122,
+        "overlap_return_preservation_rate": 0.9357298474945533,
         "overlap_takeover_success_rate": null
       },
       "overlap_takeover": {
         "eligible_episode_count": 499,
-        "episodes_with_aligned_cut": 2,
-        "episodes_with_predicted_cut": 281,
+        "episodes_with_aligned_cut": 3,
+        "episodes_with_predicted_cut": 161,
         "episodes_with_reference_replacement": 381,
         "overlap_return_preservation_rate": null,
-        "overlap_takeover_success_rate": 0.004008016032064128
+        "overlap_takeover_success_rate": 0.006012024048096192
       },
       "same_speaker_silence_gap_resume": {
         "eligible_episode_count": 5864,
-        "episodes_with_aligned_cut": 39,
-        "episodes_with_predicted_cut": 1009,
+        "episodes_with_aligned_cut": 36,
+        "episodes_with_predicted_cut": 70,
         "episodes_with_reference_replacement": 946,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null
       },
       "short_backchannel_return": {
         "eligible_episode_count": 791,
-        "episodes_with_aligned_cut": 19,
-        "episodes_with_predicted_cut": 334,
+        "episodes_with_aligned_cut": 18,
+        "episodes_with_predicted_cut": 151,
         "episodes_with_reference_replacement": 336,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null
       },
       "silence_gap_different_speaker_handoff": {
         "eligible_episode_count": 1472,
-        "episodes_with_aligned_cut": 52,
-        "episodes_with_predicted_cut": 646,
+        "episodes_with_aligned_cut": 43,
+        "episodes_with_predicted_cut": 225,
         "episodes_with_reference_replacement": 1097,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null
@@ -542,30 +600,30 @@ This report is generated only after the scored artifacts exist. It is developmen
   "P-NC": {
     "active_speech_hours": 6.725263888888889,
     "backdated_boundary_error_ms": {
-      "p50": -40.0,
-      "p90": -1.7999999999999545
+      "p50": -30.0,
+      "p90": 0.0
     },
     "diagnostic_slices": {
       "anchor_absent_live": {
-        "mean_hazard": 0.9008696285804515,
+        "mean_hazard": 0.4473115852892377,
         "support_seconds": 1918.21
       },
       "anchor_only": {
-        "mean_hazard": 0.57601560665708,
+        "mean_hazard": 0.035294694368692286,
         "support_seconds": 18580.731
       },
       "anchor_overlap": {
-        "mean_hazard": 0.8507102975002999,
+        "mean_hazard": 0.23142513100493653,
         "support_seconds": 1554.42
       }
     },
-    "exclusive_other_contamination_seconds_per_active_speech_hour": 2130.518777660521,
-    "false_cut_count": 2671,
-    "matched_replacement_count": 699,
-    "missed_replacement_count": 2099,
-    "overlap_return_preservation_rate": 0.6612200435729847,
-    "overlap_takeover_success_rate": 0.002004008016032064,
-    "predicted_cut_count": 3370,
+    "exclusive_other_contamination_seconds_per_active_speech_hour": 2175.2172467416603,
+    "false_cut_count": 330,
+    "matched_replacement_count": 648,
+    "missed_replacement_count": 2150,
+    "overlap_return_preservation_rate": 0.9400871459694989,
+    "overlap_takeover_success_rate": 0.006012024048096192,
+    "predicted_cut_count": 978,
     "reference_replacement_count": 2798,
     "replacement_emit_delay_ms": {
       "p50": 1232.5,
@@ -576,52 +634,52 @@ This report is generated only after the scored artifacts exist. It is developmen
       "alimeeting_far_ch0",
       "ami_mix_headset"
     ],
-    "speaker_induced_cut_count_per_active_speech_hour": 501.0955786534605,
+    "speaker_induced_cut_count_per_active_speech_hour": 145.42180294453544,
     "topology": {
       "clean_direct_different_speaker_handoff": {
         "eligible_episode_count": 197,
-        "episodes_with_aligned_cut": 0,
-        "episodes_with_predicted_cut": 95,
+        "episodes_with_aligned_cut": 2,
+        "episodes_with_predicted_cut": 33,
         "episodes_with_reference_replacement": 128,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null
       },
       "overlap_return": {
         "eligible_episode_count": 918,
-        "episodes_with_aligned_cut": 3,
-        "episodes_with_predicted_cut": 311,
+        "episodes_with_aligned_cut": 2,
+        "episodes_with_predicted_cut": 55,
         "episodes_with_reference_replacement": 327,
-        "overlap_return_preservation_rate": 0.6612200435729847,
+        "overlap_return_preservation_rate": 0.9400871459694989,
         "overlap_takeover_success_rate": null
       },
       "overlap_takeover": {
         "eligible_episode_count": 499,
-        "episodes_with_aligned_cut": 1,
-        "episodes_with_predicted_cut": 316,
+        "episodes_with_aligned_cut": 3,
+        "episodes_with_predicted_cut": 172,
         "episodes_with_reference_replacement": 381,
         "overlap_return_preservation_rate": null,
-        "overlap_takeover_success_rate": 0.002004008016032064
+        "overlap_takeover_success_rate": 0.006012024048096192
       },
       "same_speaker_silence_gap_resume": {
         "eligible_episode_count": 5864,
-        "episodes_with_aligned_cut": 37,
-        "episodes_with_predicted_cut": 1083,
+        "episodes_with_aligned_cut": 42,
+        "episodes_with_predicted_cut": 89,
         "episodes_with_reference_replacement": 946,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null
       },
       "short_backchannel_return": {
         "eligible_episode_count": 791,
-        "episodes_with_aligned_cut": 16,
-        "episodes_with_predicted_cut": 366,
+        "episodes_with_aligned_cut": 24,
+        "episodes_with_predicted_cut": 177,
         "episodes_with_reference_replacement": 336,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null
       },
       "silence_gap_different_speaker_handoff": {
         "eligible_episode_count": 1472,
-        "episodes_with_aligned_cut": 56,
-        "episodes_with_predicted_cut": 724,
+        "episodes_with_aligned_cut": 60,
+        "episodes_with_predicted_cut": 349,
         "episodes_with_reference_replacement": 1097,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null
@@ -721,29 +779,29 @@ This report is generated only after the scored artifacts exist. It is developmen
     "active_speech_hours": 6.725263888888889,
     "backdated_boundary_error_ms": {
       "p50": -30.0,
-      "p90": 0.0
+      "p90": -2.0
     },
     "diagnostic_slices": {
       "anchor_absent_live": {
-        "mean_hazard": 0.5664786033758554,
+        "mean_hazard": 0.7569178287112994,
         "support_seconds": 1918.21
       },
       "anchor_only": {
-        "mean_hazard": 0.48632351836142385,
+        "mean_hazard": 0.1227114410055057,
         "support_seconds": 18580.731
       },
       "anchor_overlap": {
-        "mean_hazard": 0.4987778033760422,
+        "mean_hazard": 0.21892699089575055,
         "support_seconds": 1554.42
       }
     },
-    "exclusive_other_contamination_seconds_per_active_speech_hour": 1888.8305663346543,
-    "false_cut_count": 1211,
-    "matched_replacement_count": 911,
-    "missed_replacement_count": 1887,
-    "overlap_return_preservation_rate": 0.8954248366013072,
-    "overlap_takeover_success_rate": 0.012024048096192385,
-    "predicted_cut_count": 2122,
+    "exclusive_other_contamination_seconds_per_active_speech_hour": 1734.1083104958707,
+    "false_cut_count": 528,
+    "matched_replacement_count": 1119,
+    "missed_replacement_count": 1679,
+    "overlap_return_preservation_rate": 0.9041394335511983,
+    "overlap_takeover_success_rate": 0.018036072144288578,
+    "predicted_cut_count": 1647,
     "reference_replacement_count": 2798,
     "replacement_emit_delay_ms": {
       "p50": 1182.5,
@@ -754,52 +812,52 @@ This report is generated only after the scored artifacts exist. It is developmen
       "alimeeting_far_ch0",
       "ami_mix_headset"
     ],
-    "speaker_induced_cut_count_per_active_speech_hour": 315.52665219663004,
+    "speaker_induced_cut_count_per_active_speech_hour": 244.89745342499984,
     "topology": {
       "clean_direct_different_speaker_handoff": {
         "eligible_episode_count": 197,
         "episodes_with_aligned_cut": 3,
-        "episodes_with_predicted_cut": 45,
+        "episodes_with_predicted_cut": 50,
         "episodes_with_reference_replacement": 128,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null
       },
       "overlap_return": {
         "eligible_episode_count": 918,
-        "episodes_with_aligned_cut": 5,
-        "episodes_with_predicted_cut": 96,
+        "episodes_with_aligned_cut": 6,
+        "episodes_with_predicted_cut": 88,
         "episodes_with_reference_replacement": 327,
-        "overlap_return_preservation_rate": 0.8954248366013072,
+        "overlap_return_preservation_rate": 0.9041394335511983,
         "overlap_takeover_success_rate": null
       },
       "overlap_takeover": {
         "eligible_episode_count": 499,
-        "episodes_with_aligned_cut": 6,
-        "episodes_with_predicted_cut": 155,
+        "episodes_with_aligned_cut": 9,
+        "episodes_with_predicted_cut": 175,
         "episodes_with_reference_replacement": 381,
         "overlap_return_preservation_rate": null,
-        "overlap_takeover_success_rate": 0.012024048096192385
+        "overlap_takeover_success_rate": 0.018036072144288578
       },
       "same_speaker_silence_gap_resume": {
         "eligible_episode_count": 5864,
-        "episodes_with_aligned_cut": 47,
-        "episodes_with_predicted_cut": 685,
+        "episodes_with_aligned_cut": 48,
+        "episodes_with_predicted_cut": 217,
         "episodes_with_reference_replacement": 946,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null
       },
       "short_backchannel_return": {
         "eligible_episode_count": 791,
-        "episodes_with_aligned_cut": 19,
-        "episodes_with_predicted_cut": 296,
+        "episodes_with_aligned_cut": 24,
+        "episodes_with_predicted_cut": 238,
         "episodes_with_reference_replacement": 336,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null
       },
       "silence_gap_different_speaker_handoff": {
         "eligible_episode_count": 1472,
-        "episodes_with_aligned_cut": 61,
-        "episodes_with_predicted_cut": 565,
+        "episodes_with_aligned_cut": 69,
+        "episodes_with_predicted_cut": 596,
         "episodes_with_reference_replacement": 1097,
         "overlap_return_preservation_rate": null,
         "overlap_takeover_success_rate": null

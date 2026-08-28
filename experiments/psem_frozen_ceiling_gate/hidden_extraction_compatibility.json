@@ -3,7 +3,7 @@
   "status": "compatible_existing_features",
   "extraction_receipt_sha256": "93e24d4047607568a9a2f710fe05db94f4a02b5fc87d03106df0b63080744bd7",
   "original_extractor_sha256": "b2a1d5af9ddfbc329870862729d8112d142aa203e2d725b2b5b7edabf485fcaf",
-  "current_extractor_sha256": "4b4481911c99721fd7e9b5ce46e885c1a3c377d8d9ff1d8bc65496c132ad5de9",
+  "current_extractor_sha256": "c07c8765b88a4a3d7e672dc817dd0f239ab493a5440a508b37c29f9e655a0248",
   "representation_receipt_sha256": "bcd670ec31108e54139efb2ad719b58a303290ed3d96549f8fb131ce5686da6b",
   "source_count": 29,
   "posterior_equivalence": {
@@ -20,5 +20,5 @@
       "sha256": "b402a194ca919f25cdf7d75e984ec99fd9cc303471c8e3b1d779482714e6ae42"
     }
   },
-  "reuse_boundary": "The immutable hidden features remain governed by the original extractor contract. The current extractor only relocates support helpers and byte-identical authoritative receipts into this experiment namespace; it is not claimed as their producer."
+  "reuse_boundary": "The immutable hidden features remain governed by the original extractor contract. The current extractor relocates support helpers and byte-identical authoritative receipts into this experiment namespace and validates the current trigger revalidation; it is not claimed as their producer."
 }

@@ -1,0 +1,16 @@
+{
+  "schema_version": "psem.frozen_ceiling.posterior_training.v1",
+  "optimizer": "adam",
+  "reference_probe_class": "tiny_mlp",
+  "train_fit_min_average_precision": 0.8,
+  "train_fit_min_accuracy": 0.7,
+  "train_fit_required_conditions": ["P-C", "P-NC"],
+  "maximum_epochs": 64,
+  "required_condition_maximum_epochs": 256,
+  "sanity_check_interval_epochs": 4,
+  "learning_rate": 0.001,
+  "beta1": 0.9,
+  "beta2": 0.999,
+  "epsilon": 1e-8,
+  "weight_decay": 0.0001
+}

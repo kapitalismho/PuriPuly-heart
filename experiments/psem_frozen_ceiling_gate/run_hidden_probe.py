@@ -19,6 +19,7 @@ from experiments.psem_frozen_ceiling_gate.evaluate_ceiling import (
 from experiments.psem_frozen_ceiling_gate.experiment_support import (
     canonical_sha256,
     load_json,
+    posterior_hidden_trigger_gate_passes,
     sha256_file,
     write_json,
 )
@@ -39,6 +40,8 @@ from experiments.psem_frozen_ceiling_gate.run_posterior_probe import (
 
 REPRESENTATION_RECEIPT_PATH = PACKAGE_ROOT / "hidden_representation_receipt.json"
 HIDDEN_TRIGGER_PATH = PACKAGE_ROOT / "hidden_trigger_revalidation.json"
+POSTERIOR_TRAINING_CONFIG_PATH = PACKAGE_ROOT / "posterior_training_config.json"
+DECISION_CONFIG_PATH = PACKAGE_ROOT / "decision_config.json"
 HIDDEN_EXTRACTION_COMPATIBILITY_PATH = PACKAGE_ROOT / "hidden_extraction_compatibility.json"
 HIDDEN_CONFIG_PATH = PACKAGE_ROOT / "hidden_config.json"
 HIDDEN_TRAINING_CONFIG_PATH = PACKAGE_ROOT / "hidden_training_config.json"
@@ -307,6 +310,32 @@ def _fit_hidden_mlp(
 
 def run() -> dict[str, Any]:
     cfg = config()
+    trigger = load_json(HIDDEN_TRIGGER_PATH)
+    posterior_training_cfg = load_json(POSTERIOR_TRAINING_CONFIG_PATH)
+    decision_cfg = load_json(DECISION_CONFIG_PATH)
+    trigger_paths = {
+        "gt_result_sha256": RESULTS_ROOT / "gt_causal_action_frontier.json",
+        "posterior_causal_result_sha256": RESULTS_ROOT / "fullslot_causal_metrics.json",
+        "posterior_noncausal_result_sha256": RESULTS_ROOT / "fullslot_noncausal_metrics.json",
+        "source_family_result_sha256": RESULTS_ROOT / "source_family_results.json",
+    }
+    if (
+        trigger.get("schema_version") != "psem.hidden_ceiling.trigger_revalidation.v1"
+        or trigger.get("status") != "opened"
+        or trigger.get("decision") != "hidden_ceiling_remains_required"
+        or trigger.get("representation_receipt_sha256") != sha256_file(REPRESENTATION_RECEIPT_PATH)
+        or trigger.get("posterior_training_config_sha256")
+        != sha256_file(POSTERIOR_TRAINING_CONFIG_PATH)
+        or trigger.get("decision_config_sha256") != sha256_file(DECISION_CONFIG_PATH)
+        or not posterior_hidden_trigger_gate_passes(
+            trigger,
+            posterior_training_cfg,
+            tuple(map(str, decision_cfg["posterior_train_fit_required_conditions"])),
+            int(decision_cfg["posterior_source_family_min_worse_metrics"]),
+        )
+        or any(sha256_file(path) != trigger.get(field) for field, path in trigger_paths.items())
+    ):
+        raise ValueError("hidden trigger evidence differs")
     hidden_cfg = load_json(HIDDEN_CONFIG_PATH)
     training_cfg = load_json(HIDDEN_TRAINING_CONFIG_PATH)
     split_path = SPLIT_PATH

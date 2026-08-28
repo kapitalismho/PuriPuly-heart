@@ -49,6 +49,45 @@ def write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
     path.write_text(payload + ("\n" if payload else ""), encoding="utf-8", newline="\n")
 
 
+def posterior_hidden_trigger_gate_passes(
+    trigger: Mapping[str, Any],
+    training_cfg: Mapping[str, Any],
+    required_conditions: Sequence[str],
+    minimum_worse_metrics: int,
+) -> bool:
+    conditions = tuple(map(str, required_conditions))
+    fit = trigger.get("posterior_train_fit_sanity")
+    separation = trigger.get("source_family_reference_separation")
+    if not isinstance(fit, Mapping) or set(fit) != set(conditions):
+        return False
+    if not isinstance(separation, Mapping) or set(separation) != set(conditions):
+        return False
+    for condition in conditions:
+        summary = fit[condition]
+        if (
+            not isinstance(summary, Mapping)
+            or summary.get("status") != "passed"
+            or summary.get("reference_probe_class") != training_cfg["reference_probe_class"]
+            or int(summary.get("fold_count", 0)) <= 0
+            or float(summary.get("minimum_average_precision", 0.0))
+            < float(training_cfg["train_fit_min_average_precision"])
+            or float(summary.get("minimum_accuracy", 0.0))
+            < float(training_cfg["train_fit_min_accuracy"])
+        ):
+            return False
+        families = separation[condition]
+        if not isinstance(families, Mapping) or not families:
+            return False
+        if any(
+            not isinstance(checks, Mapping)
+            or not checks
+            or sum(bool(value) for value in checks.values()) < minimum_worse_metrics
+            for checks in families.values()
+        ):
+            return False
+    return True
+
+
 def percentile(values: Iterable[float], q: float) -> float | None:
     array = np.asarray(list(values), dtype=np.float64)
     return None if not array.size else float(np.percentile(array, q))

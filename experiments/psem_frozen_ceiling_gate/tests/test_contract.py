@@ -19,9 +19,12 @@ from experiments.psem_frozen_ceiling_gate.build_ceiling_examples import (
 from experiments.psem_frozen_ceiling_gate.evaluate_ceiling import (
     _hidden_failure_concentration,
     _per_source_family_point,
+    _point,
+    _validate_hidden_evidence,
     decode_scores,
 )
 from experiments.psem_frozen_ceiling_gate.experiment_support import (
+    posterior_hidden_trigger_gate_passes,
     sha256_file,
     simulate_gt_session,
 )
@@ -34,6 +37,7 @@ from experiments.psem_frozen_ceiling_gate.posterior_features import (
     temporal_features,
 )
 from experiments.psem_frozen_ceiling_gate.run_hidden_probe import _fit_hidden_mlp, hidden_base
+from experiments.psem_frozen_ceiling_gate.run_posterior_probe import fit_mlp
 
 
 def test_causal_features_do_not_use_future_or_cross_episode() -> None:
@@ -347,7 +351,113 @@ def test_hidden_mlp_optimizer_reaches_train_fit_sanity() -> None:
     assert optimization["status"] == "sanity_reached"
 
 
+def test_posterior_mlp_optimizer_reaches_train_fit_sanity() -> None:
+    rng = np.random.default_rng(99)
+    negative = rng.normal(-2.0, 0.2, (100, 4)).astype(np.float32)
+    positive = rng.normal(2.0, 0.2, (100, 4)).astype(np.float32)
+    values = np.concatenate((negative, positive))
+    targets = np.concatenate((np.zeros(100), np.ones(100))).astype(np.float32)
+    weights = np.ones(200, dtype=np.float32)
+    probe, sanity, optimization = fit_mlp(
+        values,
+        targets,
+        weights,
+        cfg=config(),
+        training_cfg=json.loads(
+            (PACKAGE_ROOT / "posterior_training_config.json").read_text(encoding="utf-8")
+        ),
+        seed=99,
+    )
+    assert probe.predict(values).shape == targets.shape
+    assert sanity["duration_weighted_average_precision"] >= 0.8
+    assert sanity["duration_weighted_accuracy"] >= 0.7
+    assert optimization["status"] == "sanity_reached"
+
+
+def test_posterior_fit_gate_conditions_match_decision_contract() -> None:
+    training = json.loads(
+        (PACKAGE_ROOT / "posterior_training_config.json").read_text(encoding="utf-8")
+    )
+    decision = json.loads((PACKAGE_ROOT / "decision_config.json").read_text(encoding="utf-8"))
+    assert training["train_fit_required_conditions"] == decision[
+        "posterior_train_fit_required_conditions"
+    ]
+    assert training["required_condition_maximum_epochs"] > training["maximum_epochs"]
+
+
+def test_current_posterior_trigger_passes_frozen_fit_and_separation_contracts() -> None:
+    training_path = PACKAGE_ROOT / "posterior_training_config.json"
+    decision_path = PACKAGE_ROOT / "decision_config.json"
+    trigger_path = PACKAGE_ROOT / "hidden_trigger_revalidation.json"
+    training = json.loads(training_path.read_text(encoding="utf-8"))
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    trigger = json.loads(trigger_path.read_text(encoding="utf-8"))
+    conditions = tuple(map(str, decision["posterior_train_fit_required_conditions"]))
+    assert trigger["status"] == "opened"
+    assert trigger["decision"] == "hidden_ceiling_remains_required"
+    assert trigger["posterior_training_config_sha256"] == sha256_file(training_path)
+    assert trigger["decision_config_sha256"] == sha256_file(decision_path)
+    assert posterior_hidden_trigger_gate_passes(
+        trigger,
+        training,
+        conditions,
+        int(decision["posterior_source_family_min_worse_metrics"]),
+    )
+    assert trigger["source_family_reference_separation_counts"] == {
+        "P-C": {"alimeeting_far_ch0": 3, "ami_mix_headset": 2},
+        "P-NC": {"alimeeting_far_ch0": 3, "ami_mix_headset": 3},
+    }
+
+
+def test_final_decision_uses_current_hidden_evidence_and_direct_residuals() -> None:
+    results = PACKAGE_ROOT / "results" / "frozen_ceiling_1"
+    final_path = results / "FINAL_DECISION.md"
+    receipt_path = results / "evaluation_receipt.json"
+    training = json.loads(
+        (PACKAGE_ROOT / "posterior_training_config.json").read_text(encoding="utf-8")
+    )
+    decision = json.loads((PACKAGE_ROOT / "decision_config.json").read_text(encoding="utf-8"))
+    hidden_paths = {
+        "H-C": results / "hidden_causal_metrics.json",
+        "H-NC": results / "hidden_noncausal_metrics.json",
+    }
+    assert _validate_hidden_evidence(hidden_paths, training, decision)
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["status"] == "hidden_ceiling_interpreted"
+    assert receipt["final_decision_sha256"] == sha256_file(final_path)
+    assert receipt["hidden_trigger_revalidation_sha256"] == sha256_file(
+        PACKAGE_ROOT / "hidden_trigger_revalidation.json"
+    )
+    final = final_path.read_text(encoding="utf-8")
+    assert "training-only sanity gate did not pass" in final
+    assert "these held-out tradeoffs are descriptive" in final
+    assert "Direct H-C-to-G residuals are source-family concentrated" in final
+    assert "9. Selected path: D. Sortformer task adaptation / full FT -> KD." in final
+    g_result = json.loads((results / "gt_causal_action_frontier.json").read_text())
+    g_families = _per_source_family_point(
+        g_result,
+        "G",
+        "gt_fixed_confirmation",
+        1.0,
+        int(config()["gap_reference_confirmation_ms"]),
+    )
+    hidden_cell = _point(
+        hidden_paths["H-C"],
+        "H-C",
+        "tiny_mlp",
+        0.5,
+        int(config()["gap_reference_confirmation_ms"]),
+    )
+    concentration = _hidden_failure_concentration(hidden_cell, g_families, decision)
+    assert concentration["status"] == "passed"
+    assert concentration["source_family_domain"]["worst_metric_counts"] == {
+        "alimeeting_far_ch0": 1,
+        "ami_mix_headset": 3,
+    }
+
+
 def test_hidden_failure_can_be_localized_to_a_frozen_source_family() -> None:
+    first, second = config()["split"]["families"]
     hidden_cell = {
         "per_source_family": {
             family: {
@@ -356,24 +466,37 @@ def test_hidden_failure_can_be_localized_to_a_frozen_source_family() -> None:
                     "anchor_overlap": {"mean_hazard": 0.2 if index == 0 else 0.1},
                     "anchor_absent_live": {"mean_hazard": 0.5},
                 },
-                "overlap_takeover_success_rate": 0.1,
+                "active_speech_hours": 1.0,
+                "reference_replacement_count": 100,
+                "exclusive_other_contamination_seconds_per_active_speech_hour": (
+                    100.0 if family == first else 50.0
+                ),
+                "false_cut_count": 20 if family == first else 10,
+                "missed_replacement_count": 30 if family == first else 10,
+                "overlap_takeover_success_rate": 0.1 if family == first else 0.05,
             }
             for index, family in enumerate(config()["split"]["families"])
         }
     }
     g_families = {
-        family: {"overlap_takeover_success_rate": 0.5} for family in config()["split"]["families"]
+        family: {
+            "active_speech_hours": 1.0,
+            "reference_replacement_count": 100,
+            "exclusive_other_contamination_seconds_per_active_speech_hour": 0.0,
+            "false_cut_count": 0,
+            "missed_replacement_count": 0,
+            "overlap_takeover_success_rate": 0.5,
+        }
+        for family in config()["split"]["families"]
     }
-    first, second = config()["split"]["families"]
     result = _hidden_failure_concentration(
         hidden_cell,
         g_families,
-        {"source_family_improved_metric_counts": {first: 3, second: 1}},
-        {"source_family_min_improved_metrics": 2},
+        json.loads((PACKAGE_ROOT / "decision_config.json").read_text(encoding="utf-8")),
     )
     assert result["status"] == "passed"
-    assert result["source_family_domain"]["passing_families"] == [first]
-    assert result["source_family_domain"]["failing_families"] == [second]
+    assert result["source_family_domain"]["concentrated_families"] == [first]
+    assert result["source_family_domain"]["worst_metric_counts"] == {first: 3, second: 1}
 
 
 def test_hidden_base_preserves_original_frame_after_episode_boundary_clipping(

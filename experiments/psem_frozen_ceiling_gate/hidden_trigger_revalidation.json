@@ -1,11 +1,66 @@
 {
-  "schema_version": "psem.hidden_ceiling.trigger_revalidation.v1",
-  "status": "opened",
   "decision": "hidden_ceiling_remains_required",
-  "rule": "P-C and P-NC remain clearly and consistently separated from the independently simulated bounded G frontier across both held-out source families",
-  "representation_receipt_sha256": "bcd670ec31108e54139efb2ad719b58a303290ed3d96549f8fb131ce5686da6b",
+  "decision_config_sha256": "79ff88b91bf30a9ac087f3e28b52bc00e3f9d72605398120503d39cf506eba29",
   "gt_result_sha256": "6b93f4e7e0dd584fdc9fdaace72ea61d7df36ebad1919c5400c4d245462b039d",
-  "posterior_causal_result_sha256": "283f295b03c0553dd48f916a272d1939b993b9fdde14f73cb42aba5e7d266b3c",
-  "posterior_noncausal_result_sha256": "7cf04c2684fc690ef1cadac13ed47fea4e58d526e9dc3b6e66a195f4ef368236",
-  "source_family_result_sha256": "92b0bea0e51a980245b59f598959c78a6d5cda40e773e9b6966d75501acd835d"
+  "posterior_causal_result_sha256": "8e8633b92ff0d8920d9b742b3ac47ca42a509a6ec2c57b051d8663e876543eb5",
+  "posterior_noncausal_result_sha256": "84c4599a58693a45963e0032388daaf75f4379ae93b45c5a04658d5fc6ab75ea",
+  "posterior_train_fit_sanity": {
+    "P-C": {
+      "fold_count": 2,
+      "minimum_accuracy": 0.9288374823477415,
+      "minimum_average_precision": 0.8018623735379253,
+      "reference_probe_class": "tiny_mlp",
+      "status": "passed"
+    },
+    "P-NC": {
+      "fold_count": 2,
+      "minimum_accuracy": 0.9235661464368115,
+      "minimum_average_precision": 0.8000988623852348,
+      "reference_probe_class": "tiny_mlp",
+      "status": "passed"
+    }
+  },
+  "posterior_training_config_sha256": "706475d4e346ea1a4a07644bdbb8ce15cb53a9d3fb4f5ac6a060b3ad5bffc700",
+  "representation_receipt_sha256": "bcd670ec31108e54139efb2ad719b58a303290ed3d96549f8fb131ce5686da6b",
+  "rule": "P-C and P-NC must pass the training-only sanity gate and remain worse than independently simulated bounded G on at least two of contamination, false cuts, and misses in each frozen source family",
+  "schema_version": "psem.hidden_ceiling.trigger_revalidation.v1",
+  "source_family_minimum_worse_metrics": 2,
+  "source_family_reference_separation": {
+    "P-C": {
+      "alimeeting_far_ch0": {
+        "exclusive_other_contamination_seconds_per_active_speech_hour": true,
+        "false_cut_count": true,
+        "missed_replacement_count": true
+      },
+      "ami_mix_headset": {
+        "exclusive_other_contamination_seconds_per_active_speech_hour": true,
+        "false_cut_count": false,
+        "missed_replacement_count": true
+      }
+    },
+    "P-NC": {
+      "alimeeting_far_ch0": {
+        "exclusive_other_contamination_seconds_per_active_speech_hour": true,
+        "false_cut_count": true,
+        "missed_replacement_count": true
+      },
+      "ami_mix_headset": {
+        "exclusive_other_contamination_seconds_per_active_speech_hour": true,
+        "false_cut_count": true,
+        "missed_replacement_count": true
+      }
+    }
+  },
+  "source_family_reference_separation_counts": {
+    "P-C": {
+      "alimeeting_far_ch0": 3,
+      "ami_mix_headset": 2
+    },
+    "P-NC": {
+      "alimeeting_far_ch0": 3,
+      "ami_mix_headset": 3
+    }
+  },
+  "source_family_result_sha256": "5f8d233cc740161c052b9417c54307309bcc96855cbbc9a35e57ab995a90f6e2",
+  "status": "opened"
 }

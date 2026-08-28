@@ -3,8 +3,9 @@
   "provenance": {
     "action_reference_ledger_sha256": "0294d0fe35964e138fd9f4a295adbb913056bccc0a0ab2ffa9c6b015b772ae19",
     "config_sha256": "1b0f1f69f3bbca706dca11c4b731dd4992e58251eb188d5ca39bc7929d7cc5d2",
-    "evidence_reuse_receipt_sha256": "5710d9f16f712a3d607d32e15b68793f1af53a0bfaa785175915cebdd1cb1bcf",
+    "evidence_reuse_receipt_sha256": "5f719fe2249316eb767666651b769a636e0638161a4a8ed2740ef0a4e4cec06f",
     "oracle_mapping_ledger_sha256": "43064f16b2fc2419b681a99c81a31cd8e2cb95362624f35d99360665902c5525",
+    "posterior_training_config_sha256": "706475d4e346ea1a4a07644bdbb8ce15cb53a9d3fb4f5ac6a060b3ad5bffc700",
     "repository_baseline_sha": "fb92cf10bbbba96f25207358b65b21c49f63d68f",
     "split_manifest_sha256": "f3d10d6a0268e42c7f5aeda21958cecc53512267a6ef2c843f9acfa25a4c7b46"
   },
@@ -2481,86 +2482,86 @@
       "metrics": {
         "active_speech_hours": 6.725263888888889,
         "backdated_boundary_error_ms": {
-          "p50": -274.0,
-          "p90": -4.199999999999932
+          "p50": -10.0,
+          "p90": 60.0
         },
         "diagnostic_slices": {
           "anchor_absent_live": {
-            "mean_hazard": 0.5664786033758554,
+            "mean_hazard": 0.7569178287112994,
             "support_seconds": 1918.21
           },
           "anchor_only": {
-            "mean_hazard": 0.48632351836142385,
+            "mean_hazard": 0.1227114410055057,
             "support_seconds": 18580.731
           },
           "anchor_overlap": {
-            "mean_hazard": 0.4987778033760422,
+            "mean_hazard": 0.21892699089575055,
             "support_seconds": 1554.42
           }
         },
-        "exclusive_other_contamination_seconds_per_active_speech_hour": 2630.05791181263,
-        "false_cut_count": 4257,
-        "matched_replacement_count": 178,
-        "missed_replacement_count": 2620,
-        "overlap_return_preservation_rate": 0.5664488017429194,
-        "overlap_takeover_success_rate": 0.002004008016032064,
-        "predicted_cut_count": 4435,
+        "exclusive_other_contamination_seconds_per_active_speech_hour": 2102.8005344689077,
+        "false_cut_count": 3029,
+        "matched_replacement_count": 843,
+        "missed_replacement_count": 1955,
+        "overlap_return_preservation_rate": 0.7821350762527233,
+        "overlap_takeover_success_rate": 0.1523046092184369,
+        "predicted_cut_count": 3872,
         "reference_replacement_count": 2798,
         "replacement_emit_delay_ms": {
-          "p50": 630.5,
-          "p90": 925.5000000000001
+          "p50": 818.5,
+          "p90": 1046.3000000000002
         },
         "source_count": 19,
         "source_families": [
           "alimeeting_far_ch0",
           "ami_mix_headset"
         ],
-        "speaker_induced_cut_count_per_active_speech_hour": 659.4536769519577,
+        "speaker_induced_cut_count_per_active_speech_hour": 575.7394897763203,
         "topology": {
           "clean_direct_different_speaker_handoff": {
             "eligible_episode_count": 197,
-            "episodes_with_aligned_cut": 2,
-            "episodes_with_predicted_cut": 129,
+            "episodes_with_aligned_cut": 25,
+            "episodes_with_predicted_cut": 99,
             "episodes_with_reference_replacement": 128,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "overlap_return": {
             "eligible_episode_count": 918,
-            "episodes_with_aligned_cut": 2,
-            "episodes_with_predicted_cut": 398,
+            "episodes_with_aligned_cut": 37,
+            "episodes_with_predicted_cut": 200,
             "episodes_with_reference_replacement": 327,
-            "overlap_return_preservation_rate": 0.5664488017429194,
+            "overlap_return_preservation_rate": 0.7821350762527233,
             "overlap_takeover_success_rate": null
           },
           "overlap_takeover": {
             "eligible_episode_count": 499,
-            "episodes_with_aligned_cut": 1,
-            "episodes_with_predicted_cut": 350,
+            "episodes_with_aligned_cut": 76,
+            "episodes_with_predicted_cut": 258,
             "episodes_with_reference_replacement": 381,
             "overlap_return_preservation_rate": null,
-            "overlap_takeover_success_rate": 0.002004008016032064
+            "overlap_takeover_success_rate": 0.1523046092184369
           },
           "same_speaker_silence_gap_resume": {
             "eligible_episode_count": 5864,
-            "episodes_with_aligned_cut": 4,
-            "episodes_with_predicted_cut": 1807,
+            "episodes_with_aligned_cut": 90,
+            "episodes_with_predicted_cut": 1909,
             "episodes_with_reference_replacement": 946,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "short_backchannel_return": {
             "eligible_episode_count": 791,
-            "episodes_with_aligned_cut": 5,
-            "episodes_with_predicted_cut": 403,
+            "episodes_with_aligned_cut": 86,
+            "episodes_with_predicted_cut": 418,
             "episodes_with_reference_replacement": 336,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "silence_gap_different_speaker_handoff": {
             "eligible_episode_count": 1472,
-            "episodes_with_aligned_cut": 7,
-            "episodes_with_predicted_cut": 1055,
+            "episodes_with_aligned_cut": 164,
+            "episodes_with_predicted_cut": 770,
             "episodes_with_reference_replacement": 1097,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
@@ -2571,85 +2572,85 @@
         "alimeeting_far_ch0": {
           "active_speech_hours": 3.2269722222222224,
           "backdated_boundary_error_ms": {
-            "p50": -250.0,
-            "p90": -20.0
+            "p50": -10.0,
+            "p90": 76.99999999999989
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5809957576610908,
+              "mean_hazard": 0.7450994145736064,
               "support_seconds": 953.53
             },
             "anchor_only": {
-              "mean_hazard": 0.47741071948099034,
+              "mean_hazard": 0.11717510974377801,
               "support_seconds": 9440.31
             },
             "anchor_overlap": {
-              "mean_hazard": 0.49528668428113376,
+              "mean_hazard": 0.24563220638456704,
               "support_seconds": 687.91
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2775.3283521705075,
-          "false_cut_count": 1629,
-          "matched_replacement_count": 98,
-          "missed_replacement_count": 1346,
-          "overlap_return_preservation_rate": 0.5754923413566739,
-          "overlap_takeover_success_rate": 0.0036231884057971015,
-          "predicted_cut_count": 1727,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 2317.5470642415057,
+          "false_cut_count": 1279,
+          "matched_replacement_count": 374,
+          "missed_replacement_count": 1070,
+          "overlap_return_preservation_rate": 0.7964989059080962,
+          "overlap_takeover_success_rate": 0.14855072463768115,
+          "predicted_cut_count": 1653,
           "reference_replacement_count": 1444,
           "replacement_emit_delay_ms": {
-            "p50": 652.5,
-            "p90": 912.5
+            "p50": 802.5,
+            "p90": 1042.5
           },
           "source_count": 8,
           "source_families": [
             "alimeeting_far_ch0"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 535.1765931256509,
+          "speaker_induced_cut_count_per_active_speech_hour": 512.2448803918362,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 97,
-              "episodes_with_aligned_cut": 1,
-              "episodes_with_predicted_cut": 72,
+              "episodes_with_aligned_cut": 17,
+              "episodes_with_predicted_cut": 53,
               "episodes_with_reference_replacement": 70,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 457,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 194,
+              "episodes_with_aligned_cut": 14,
+              "episodes_with_predicted_cut": 93,
               "episodes_with_reference_replacement": 182,
-              "overlap_return_preservation_rate": 0.5754923413566739,
+              "overlap_return_preservation_rate": 0.7964989059080962,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 276,
-              "episodes_with_aligned_cut": 1,
-              "episodes_with_predicted_cut": 198,
+              "episodes_with_aligned_cut": 41,
+              "episodes_with_predicted_cut": 141,
               "episodes_with_reference_replacement": 215,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.0036231884057971015
+              "overlap_takeover_success_rate": 0.14855072463768115
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2886,
-              "episodes_with_aligned_cut": 2,
-              "episodes_with_predicted_cut": 824,
+              "episodes_with_aligned_cut": 48,
+              "episodes_with_predicted_cut": 881,
               "episodes_with_reference_replacement": 583,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 478,
-              "episodes_with_aligned_cut": 3,
-              "episodes_with_predicted_cut": 256,
+              "episodes_with_aligned_cut": 57,
+              "episodes_with_predicted_cut": 255,
               "episodes_with_reference_replacement": 224,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 787,
-              "episodes_with_aligned_cut": 2,
-              "episodes_with_predicted_cut": 597,
+              "episodes_with_aligned_cut": 82,
+              "episodes_with_predicted_cut": 387,
               "episodes_with_reference_replacement": 641,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -2659,85 +2660,85 @@
         "ami_mix_headset": {
           "active_speech_hours": 3.498291666666667,
           "backdated_boundary_error_ms": {
-            "p50": -309.0,
-            "p90": 11.300000000000026
+            "p50": -8.0,
+            "p90": 48.39999999999998
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5521292417993735,
+              "mean_hazard": 0.7685996428182723,
               "support_seconds": 964.68
             },
             "anchor_only": {
-              "mean_hazard": 0.4955287381646413,
+              "mean_hazard": 0.12842941432133007,
               "support_seconds": 9140.421
             },
             "anchor_overlap": {
-              "mean_hazard": 0.5015493533138139,
+              "mean_hazard": 0.19772609905732777,
               "support_seconds": 866.51
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2496.054312223823,
-          "false_cut_count": 2628,
-          "matched_replacement_count": 80,
-          "missed_replacement_count": 1274,
-          "overlap_return_preservation_rate": 0.5574837310195228,
-          "overlap_takeover_success_rate": 0.0,
-          "predicted_cut_count": 2708,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1904.709250943913,
+          "false_cut_count": 1750,
+          "matched_replacement_count": 469,
+          "missed_replacement_count": 885,
+          "overlap_return_preservation_rate": 0.7678958785249458,
+          "overlap_takeover_success_rate": 0.15695067264573992,
+          "predicted_cut_count": 2219,
           "reference_replacement_count": 1354,
           "replacement_emit_delay_ms": {
-            "p50": 620.0,
-            "p90": 947.1
+            "p50": 832.5,
+            "p90": 1046.5
           },
           "source_count": 11,
           "source_families": [
             "ami_mix_headset"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 774.0921163901428,
+          "speaker_induced_cut_count_per_active_speech_hour": 634.3096034969449,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 100,
-              "episodes_with_aligned_cut": 1,
-              "episodes_with_predicted_cut": 57,
+              "episodes_with_aligned_cut": 8,
+              "episodes_with_predicted_cut": 46,
               "episodes_with_reference_replacement": 58,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 461,
-              "episodes_with_aligned_cut": 2,
-              "episodes_with_predicted_cut": 204,
+              "episodes_with_aligned_cut": 23,
+              "episodes_with_predicted_cut": 107,
               "episodes_with_reference_replacement": 145,
-              "overlap_return_preservation_rate": 0.5574837310195228,
+              "overlap_return_preservation_rate": 0.7678958785249458,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 223,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 152,
+              "episodes_with_aligned_cut": 35,
+              "episodes_with_predicted_cut": 117,
               "episodes_with_reference_replacement": 166,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.0
+              "overlap_takeover_success_rate": 0.15695067264573992
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2978,
-              "episodes_with_aligned_cut": 2,
-              "episodes_with_predicted_cut": 983,
+              "episodes_with_aligned_cut": 42,
+              "episodes_with_predicted_cut": 1028,
               "episodes_with_reference_replacement": 363,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 313,
-              "episodes_with_aligned_cut": 2,
-              "episodes_with_predicted_cut": 147,
+              "episodes_with_aligned_cut": 29,
+              "episodes_with_predicted_cut": 163,
               "episodes_with_reference_replacement": 112,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 685,
-              "episodes_with_aligned_cut": 5,
-              "episodes_with_predicted_cut": 458,
+              "episodes_with_aligned_cut": 82,
+              "episodes_with_predicted_cut": 383,
               "episodes_with_reference_replacement": 456,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -2755,86 +2756,86 @@
       "metrics": {
         "active_speech_hours": 6.725263888888889,
         "backdated_boundary_error_ms": {
-          "p50": -43.0,
-          "p90": 27.600000000000023
+          "p50": 0.0,
+          "p90": 50.0
         },
         "diagnostic_slices": {
           "anchor_absent_live": {
-            "mean_hazard": 0.5664786033758554,
+            "mean_hazard": 0.7569178287112994,
             "support_seconds": 1918.21
           },
           "anchor_only": {
-            "mean_hazard": 0.48632351836142385,
+            "mean_hazard": 0.1227114410055057,
             "support_seconds": 18580.731
           },
           "anchor_overlap": {
-            "mean_hazard": 0.4987778033760422,
+            "mean_hazard": 0.21892699089575055,
             "support_seconds": 1554.42
           }
         },
-        "exclusive_other_contamination_seconds_per_active_speech_hour": 2545.946714193371,
-        "false_cut_count": 4021,
-        "matched_replacement_count": 257,
-        "missed_replacement_count": 2541,
-        "overlap_return_preservation_rate": 0.5751633986928104,
-        "overlap_takeover_success_rate": 0.006012024048096192,
-        "predicted_cut_count": 4278,
+        "exclusive_other_contamination_seconds_per_active_speech_hour": 1447.990169737247,
+        "false_cut_count": 1603,
+        "matched_replacement_count": 1517,
+        "missed_replacement_count": 1281,
+        "overlap_return_preservation_rate": 0.7930283224400871,
+        "overlap_takeover_success_rate": 0.2545090180360721,
+        "predicted_cut_count": 3120,
         "reference_replacement_count": 2798,
         "replacement_emit_delay_ms": {
-          "p50": 952.5,
-          "p90": 1233.3
+          "p50": 1042.5,
+          "p90": 1242.5
         },
         "source_count": 19,
         "source_families": [
           "alimeeting_far_ch0",
           "ami_mix_headset"
         ],
-        "speaker_induced_cut_count_per_active_speech_hour": 636.1088680948084,
+        "speaker_induced_cut_count_per_active_speech_hour": 463.9223161420762,
         "topology": {
           "clean_direct_different_speaker_handoff": {
             "eligible_episode_count": 197,
-            "episodes_with_aligned_cut": 5,
-            "episodes_with_predicted_cut": 126,
+            "episodes_with_aligned_cut": 39,
+            "episodes_with_predicted_cut": 108,
             "episodes_with_reference_replacement": 128,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "overlap_return": {
             "eligible_episode_count": 918,
-            "episodes_with_aligned_cut": 5,
-            "episodes_with_predicted_cut": 390,
+            "episodes_with_aligned_cut": 70,
+            "episodes_with_predicted_cut": 190,
             "episodes_with_reference_replacement": 327,
-            "overlap_return_preservation_rate": 0.5751633986928104,
+            "overlap_return_preservation_rate": 0.7930283224400871,
             "overlap_takeover_success_rate": null
           },
           "overlap_takeover": {
             "eligible_episode_count": 499,
-            "episodes_with_aligned_cut": 3,
-            "episodes_with_predicted_cut": 335,
+            "episodes_with_aligned_cut": 127,
+            "episodes_with_predicted_cut": 300,
             "episodes_with_reference_replacement": 381,
             "overlap_return_preservation_rate": null,
-            "overlap_takeover_success_rate": 0.006012024048096192
+            "overlap_takeover_success_rate": 0.2545090180360721
           },
           "same_speaker_silence_gap_resume": {
             "eligible_episode_count": 5864,
-            "episodes_with_aligned_cut": 15,
-            "episodes_with_predicted_cut": 1825,
+            "episodes_with_aligned_cut": 220,
+            "episodes_with_predicted_cut": 777,
             "episodes_with_reference_replacement": 946,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "short_backchannel_return": {
             "eligible_episode_count": 791,
-            "episodes_with_aligned_cut": 23,
-            "episodes_with_predicted_cut": 397,
+            "episodes_with_aligned_cut": 123,
+            "episodes_with_predicted_cut": 494,
             "episodes_with_reference_replacement": 336,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "silence_gap_different_speaker_handoff": {
             "eligible_episode_count": 1472,
-            "episodes_with_aligned_cut": 41,
-            "episodes_with_predicted_cut": 1019,
+            "episodes_with_aligned_cut": 349,
+            "episodes_with_predicted_cut": 946,
             "episodes_with_reference_replacement": 1097,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
@@ -2845,85 +2846,85 @@
         "alimeeting_far_ch0": {
           "active_speech_hours": 3.2269722222222224,
           "backdated_boundary_error_ms": {
-            "p50": -90.0,
-            "p90": 20.0
+            "p50": 0.0,
+            "p90": 50.0
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5809957576610908,
+              "mean_hazard": 0.7450994145736064,
               "support_seconds": 953.53
             },
             "anchor_only": {
-              "mean_hazard": 0.47741071948099034,
+              "mean_hazard": 0.11717510974377801,
               "support_seconds": 9440.31
             },
             "anchor_overlap": {
-              "mean_hazard": 0.49528668428113376,
+              "mean_hazard": 0.24563220638456704,
               "support_seconds": 687.91
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2753.902695164886,
-          "false_cut_count": 1587,
-          "matched_replacement_count": 127,
-          "missed_replacement_count": 1317,
-          "overlap_return_preservation_rate": 0.5842450765864333,
-          "overlap_takeover_success_rate": 0.010869565217391304,
-          "predicted_cut_count": 1714,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1563.300565545618,
+          "false_cut_count": 757,
+          "matched_replacement_count": 750,
+          "missed_replacement_count": 694,
+          "overlap_return_preservation_rate": 0.7899343544857769,
+          "overlap_takeover_success_rate": 0.2536231884057971,
+          "predicted_cut_count": 1507,
           "reference_replacement_count": 1444,
           "replacement_emit_delay_ms": {
-            "p50": 942.5,
-            "p90": 1236.5
+            "p50": 1042.5,
+            "p90": 1242.5
           },
           "source_count": 8,
           "source_families": [
             "alimeeting_far_ch0"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 531.1480489967375,
+          "speaker_induced_cut_count_per_active_speech_hour": 467.0012309440394,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 97,
-              "episodes_with_aligned_cut": 4,
-              "episodes_with_predicted_cut": 69,
+              "episodes_with_aligned_cut": 23,
+              "episodes_with_predicted_cut": 54,
               "episodes_with_reference_replacement": 70,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 457,
-              "episodes_with_aligned_cut": 1,
-              "episodes_with_predicted_cut": 190,
+              "episodes_with_aligned_cut": 38,
+              "episodes_with_predicted_cut": 96,
               "episodes_with_reference_replacement": 182,
-              "overlap_return_preservation_rate": 0.5842450765864333,
+              "overlap_return_preservation_rate": 0.7899343544857769,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 276,
-              "episodes_with_aligned_cut": 3,
-              "episodes_with_predicted_cut": 191,
+              "episodes_with_aligned_cut": 70,
+              "episodes_with_predicted_cut": 157,
               "episodes_with_reference_replacement": 215,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.010869565217391304
+              "overlap_takeover_success_rate": 0.2536231884057971
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2886,
-              "episodes_with_aligned_cut": 7,
-              "episodes_with_predicted_cut": 830,
+              "episodes_with_aligned_cut": 134,
+              "episodes_with_predicted_cut": 490,
               "episodes_with_reference_replacement": 583,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 478,
-              "episodes_with_aligned_cut": 17,
-              "episodes_with_predicted_cut": 254,
+              "episodes_with_aligned_cut": 85,
+              "episodes_with_predicted_cut": 290,
               "episodes_with_reference_replacement": 224,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 787,
-              "episodes_with_aligned_cut": 20,
-              "episodes_with_predicted_cut": 581,
+              "episodes_with_aligned_cut": 203,
+              "episodes_with_predicted_cut": 484,
               "episodes_with_reference_replacement": 641,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -2933,85 +2934,85 @@
         "ami_mix_headset": {
           "active_speech_hours": 3.498291666666667,
           "backdated_boundary_error_ms": {
-            "p50": -32.0,
-            "p90": 32.0
+            "p50": -1.0,
+            "p90": 52.39999999999998
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5521292417993735,
+              "mean_hazard": 0.7685996428182723,
               "support_seconds": 964.68
             },
             "anchor_only": {
-              "mean_hazard": 0.4955287381646413,
+              "mean_hazard": 0.12842941432133007,
               "support_seconds": 9140.421
             },
             "anchor_overlap": {
-              "mean_hazard": 0.5015493533138139,
+              "mean_hazard": 0.19772609905732777,
               "support_seconds": 866.51
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2354.119320144356,
-          "false_cut_count": 2434,
-          "matched_replacement_count": 130,
-          "missed_replacement_count": 1224,
-          "overlap_return_preservation_rate": 0.5661605206073752,
-          "overlap_takeover_success_rate": 0.0,
-          "predicted_cut_count": 2564,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1341.6229826462916,
+          "false_cut_count": 846,
+          "matched_replacement_count": 767,
+          "missed_replacement_count": 587,
+          "overlap_return_preservation_rate": 0.7960954446854664,
+          "overlap_takeover_success_rate": 0.2556053811659193,
+          "predicted_cut_count": 1613,
           "reference_replacement_count": 1354,
           "replacement_emit_delay_ms": {
-            "p50": 963.5,
-            "p90": 1230.9
+            "p50": 1042.5,
+            "p90": 1249.3
           },
           "source_count": 11,
           "source_families": [
             "ami_mix_headset"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 732.9291678080967,
+          "speaker_induced_cut_count_per_active_speech_hour": 461.08219488083466,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 100,
-              "episodes_with_aligned_cut": 1,
-              "episodes_with_predicted_cut": 57,
+              "episodes_with_aligned_cut": 16,
+              "episodes_with_predicted_cut": 54,
               "episodes_with_reference_replacement": 58,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 461,
-              "episodes_with_aligned_cut": 4,
-              "episodes_with_predicted_cut": 200,
+              "episodes_with_aligned_cut": 32,
+              "episodes_with_predicted_cut": 94,
               "episodes_with_reference_replacement": 145,
-              "overlap_return_preservation_rate": 0.5661605206073752,
+              "overlap_return_preservation_rate": 0.7960954446854664,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 223,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 144,
+              "episodes_with_aligned_cut": 57,
+              "episodes_with_predicted_cut": 143,
               "episodes_with_reference_replacement": 166,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.0
+              "overlap_takeover_success_rate": 0.2556053811659193
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2978,
-              "episodes_with_aligned_cut": 8,
-              "episodes_with_predicted_cut": 995,
+              "episodes_with_aligned_cut": 86,
+              "episodes_with_predicted_cut": 287,
               "episodes_with_reference_replacement": 363,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 313,
-              "episodes_with_aligned_cut": 6,
-              "episodes_with_predicted_cut": 143,
+              "episodes_with_aligned_cut": 38,
+              "episodes_with_predicted_cut": 204,
               "episodes_with_reference_replacement": 112,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 685,
-              "episodes_with_aligned_cut": 21,
-              "episodes_with_predicted_cut": 438,
+              "episodes_with_aligned_cut": 146,
+              "episodes_with_predicted_cut": 462,
               "episodes_with_reference_replacement": 456,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -3029,86 +3030,86 @@
       "metrics": {
         "active_speech_hours": 6.725263888888889,
         "backdated_boundary_error_ms": {
-          "p50": -50.0,
-          "p90": -9.400000000000006
+          "p50": -30.0,
+          "p90": -2.0
         },
         "diagnostic_slices": {
           "anchor_absent_live": {
-            "mean_hazard": 0.5664786033758554,
+            "mean_hazard": 0.7569178287112994,
             "support_seconds": 1918.21
           },
           "anchor_only": {
-            "mean_hazard": 0.48632351836142385,
+            "mean_hazard": 0.1227114410055057,
             "support_seconds": 18580.731
           },
           "anchor_overlap": {
-            "mean_hazard": 0.4987778033760422,
+            "mean_hazard": 0.21892699089575055,
             "support_seconds": 1554.42
           }
         },
-        "exclusive_other_contamination_seconds_per_active_speech_hour": 2567.791210175561,
-        "false_cut_count": 3753,
-        "matched_replacement_count": 255,
-        "missed_replacement_count": 2543,
-        "overlap_return_preservation_rate": 0.593681917211329,
-        "overlap_takeover_success_rate": 0.002004008016032064,
-        "predicted_cut_count": 4008,
+        "exclusive_other_contamination_seconds_per_active_speech_hour": 1719.8977157030188,
+        "false_cut_count": 664,
+        "matched_replacement_count": 1138,
+        "missed_replacement_count": 1660,
+        "overlap_return_preservation_rate": 0.8943355119825708,
+        "overlap_takeover_success_rate": 0.018036072144288578,
+        "predicted_cut_count": 1802,
         "reference_replacement_count": 2798,
         "replacement_emit_delay_ms": {
-          "p50": 1112.5,
-          "p90": 1381.7
+          "p50": 1182.5,
+          "p90": 1409.1000000000001
         },
         "source_count": 19,
         "source_families": [
           "alimeeting_far_ch0",
           "ami_mix_headset"
         ],
-        "speaker_induced_cut_count_per_active_speech_hour": 595.9617445825133,
+        "speaker_induced_cut_count_per_active_speech_hour": 267.9448761820581,
         "topology": {
           "clean_direct_different_speaker_handoff": {
             "eligible_episode_count": 197,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 117,
+            "episodes_with_aligned_cut": 3,
+            "episodes_with_predicted_cut": 59,
             "episodes_with_reference_replacement": 128,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "overlap_return": {
             "eligible_episode_count": 918,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 373,
+            "episodes_with_aligned_cut": 6,
+            "episodes_with_predicted_cut": 97,
             "episodes_with_reference_replacement": 327,
-            "overlap_return_preservation_rate": 0.593681917211329,
+            "overlap_return_preservation_rate": 0.8943355119825708,
             "overlap_takeover_success_rate": null
           },
           "overlap_takeover": {
             "eligible_episode_count": 499,
-            "episodes_with_aligned_cut": 1,
-            "episodes_with_predicted_cut": 325,
+            "episodes_with_aligned_cut": 9,
+            "episodes_with_predicted_cut": 192,
             "episodes_with_reference_replacement": 381,
             "overlap_return_preservation_rate": null,
-            "overlap_takeover_success_rate": 0.002004008016032064
+            "overlap_takeover_success_rate": 0.018036072144288578
           },
           "same_speaker_silence_gap_resume": {
             "eligible_episode_count": 5864,
-            "episodes_with_aligned_cut": 4,
-            "episodes_with_predicted_cut": 1826,
+            "episodes_with_aligned_cut": 44,
+            "episodes_with_predicted_cut": 269,
             "episodes_with_reference_replacement": 946,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "short_backchannel_return": {
             "eligible_episode_count": 791,
-            "episodes_with_aligned_cut": 6,
-            "episodes_with_predicted_cut": 380,
+            "episodes_with_aligned_cut": 21,
+            "episodes_with_predicted_cut": 246,
             "episodes_with_reference_replacement": 336,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "silence_gap_different_speaker_handoff": {
             "eligible_episode_count": 1472,
-            "episodes_with_aligned_cut": 11,
-            "episodes_with_predicted_cut": 931,
+            "episodes_with_aligned_cut": 67,
+            "episodes_with_predicted_cut": 613,
             "episodes_with_reference_replacement": 1097,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
@@ -3119,85 +3120,85 @@
         "alimeeting_far_ch0": {
           "active_speech_hours": 3.2269722222222224,
           "backdated_boundary_error_ms": {
-            "p50": -90.0,
-            "p90": -0.9999999999999432
+            "p50": -30.0,
+            "p90": 0.0
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5809957576610908,
+              "mean_hazard": 0.7450994145736064,
               "support_seconds": 953.53
             },
             "anchor_only": {
-              "mean_hazard": 0.47741071948099034,
+              "mean_hazard": 0.11717510974377801,
               "support_seconds": 9440.31
             },
             "anchor_overlap": {
-              "mean_hazard": 0.49528668428113376,
+              "mean_hazard": 0.24563220638456704,
               "support_seconds": 687.91
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2761.0115261123688,
-          "false_cut_count": 1523,
-          "matched_replacement_count": 122,
-          "missed_replacement_count": 1322,
-          "overlap_return_preservation_rate": 0.6017505470459519,
-          "overlap_takeover_success_rate": 0.0036231884057971015,
-          "predicted_cut_count": 1645,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1719.9133174372262,
+          "false_cut_count": 336,
+          "matched_replacement_count": 620,
+          "missed_replacement_count": 824,
+          "overlap_return_preservation_rate": 0.886214442013129,
+          "overlap_takeover_success_rate": 0.028985507246376812,
+          "predicted_cut_count": 956,
           "reference_replacement_count": 1444,
           "replacement_emit_delay_ms": {
-            "p50": 1112.5,
-            "p90": 1382.5
+            "p50": 1192.5,
+            "p90": 1412.5
           },
           "source_count": 8,
           "source_families": [
             "alimeeting_far_ch0"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 509.76577631250484,
+          "speaker_induced_cut_count_per_active_speech_hour": 296.252937480094,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 97,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 63,
+              "episodes_with_aligned_cut": 3,
+              "episodes_with_predicted_cut": 33,
               "episodes_with_reference_replacement": 70,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 457,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 182,
+              "episodes_with_aligned_cut": 5,
+              "episodes_with_predicted_cut": 52,
               "episodes_with_reference_replacement": 182,
-              "overlap_return_preservation_rate": 0.6017505470459519,
+              "overlap_return_preservation_rate": 0.886214442013129,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 276,
-              "episodes_with_aligned_cut": 1,
-              "episodes_with_predicted_cut": 186,
+              "episodes_with_aligned_cut": 8,
+              "episodes_with_predicted_cut": 116,
               "episodes_with_reference_replacement": 215,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.0036231884057971015
+              "overlap_takeover_success_rate": 0.028985507246376812
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2886,
-              "episodes_with_aligned_cut": 3,
-              "episodes_with_predicted_cut": 835,
+              "episodes_with_aligned_cut": 37,
+              "episodes_with_predicted_cut": 163,
               "episodes_with_reference_replacement": 583,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 478,
-              "episodes_with_aligned_cut": 6,
-              "episodes_with_predicted_cut": 244,
+              "episodes_with_aligned_cut": 20,
+              "episodes_with_predicted_cut": 174,
               "episodes_with_reference_replacement": 224,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 787,
-              "episodes_with_aligned_cut": 10,
-              "episodes_with_predicted_cut": 540,
+              "episodes_with_aligned_cut": 60,
+              "episodes_with_predicted_cut": 371,
               "episodes_with_reference_replacement": 641,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -3207,85 +3208,85 @@
         "ami_mix_headset": {
           "active_speech_hours": 3.498291666666667,
           "backdated_boundary_error_ms": {
-            "p50": -38.0,
-            "p90": -10.0
+            "p50": -32.0,
+            "p90": -5.0
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5521292417993735,
+              "mean_hazard": 0.7685996428182723,
               "support_seconds": 964.68
             },
             "anchor_only": {
-              "mean_hazard": 0.4955287381646413,
+              "mean_hazard": 0.12842941432133007,
               "support_seconds": 9140.421
             },
             "anchor_overlap": {
-              "mean_hazard": 0.5015493533138139,
+              "mean_hazard": 0.19772609905732777,
               "support_seconds": 866.51
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2389.5566169201634,
-          "false_cut_count": 2230,
-          "matched_replacement_count": 133,
-          "missed_replacement_count": 1221,
-          "overlap_return_preservation_rate": 0.5856832971800434,
-          "overlap_takeover_success_rate": 0.0,
-          "predicted_cut_count": 2363,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1719.8833240033825,
+          "false_cut_count": 328,
+          "matched_replacement_count": 518,
+          "missed_replacement_count": 836,
+          "overlap_return_preservation_rate": 0.9023861171366594,
+          "overlap_takeover_success_rate": 0.004484304932735426,
+          "predicted_cut_count": 846,
           "reference_replacement_count": 1354,
           "replacement_emit_delay_ms": {
-            "p50": 1110.5,
-            "p90": 1360.7
+            "p50": 1170.5,
+            "p90": 1399.1
           },
           "source_count": 11,
           "source_families": [
             "ami_mix_headset"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 675.4725520789909,
+          "speaker_induced_cut_count_per_active_speech_hour": 241.83232291952024,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 100,
               "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 54,
+              "episodes_with_predicted_cut": 26,
               "episodes_with_reference_replacement": 58,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 461,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 191,
+              "episodes_with_aligned_cut": 1,
+              "episodes_with_predicted_cut": 45,
               "episodes_with_reference_replacement": 145,
-              "overlap_return_preservation_rate": 0.5856832971800434,
+              "overlap_return_preservation_rate": 0.9023861171366594,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 223,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 139,
+              "episodes_with_aligned_cut": 1,
+              "episodes_with_predicted_cut": 76,
               "episodes_with_reference_replacement": 166,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.0
+              "overlap_takeover_success_rate": 0.004484304932735426
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2978,
-              "episodes_with_aligned_cut": 1,
-              "episodes_with_predicted_cut": 991,
+              "episodes_with_aligned_cut": 7,
+              "episodes_with_predicted_cut": 106,
               "episodes_with_reference_replacement": 363,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 313,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 136,
+              "episodes_with_aligned_cut": 1,
+              "episodes_with_predicted_cut": 72,
               "episodes_with_reference_replacement": 112,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 685,
-              "episodes_with_aligned_cut": 1,
-              "episodes_with_predicted_cut": 391,
+              "episodes_with_aligned_cut": 7,
+              "episodes_with_predicted_cut": 242,
               "episodes_with_reference_replacement": 456,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -3304,85 +3305,85 @@
         "active_speech_hours": 6.725263888888889,
         "backdated_boundary_error_ms": {
           "p50": 0.0,
-          "p90": 110.0
+          "p90": 82.39999999999998
         },
         "diagnostic_slices": {
           "anchor_absent_live": {
-            "mean_hazard": 0.5664786033758554,
+            "mean_hazard": 0.7569178287112994,
             "support_seconds": 1918.21
           },
           "anchor_only": {
-            "mean_hazard": 0.48632351836142385,
+            "mean_hazard": 0.1227114410055057,
             "support_seconds": 18580.731
           },
           "anchor_overlap": {
-            "mean_hazard": 0.4987778033760422,
+            "mean_hazard": 0.21892699089575055,
             "support_seconds": 1554.42
           }
         },
-        "exclusive_other_contamination_seconds_per_active_speech_hour": 2057.766911252966,
-        "false_cut_count": 3051,
-        "matched_replacement_count": 844,
-        "missed_replacement_count": 1954,
-        "overlap_return_preservation_rate": 0.789760348583878,
-        "overlap_takeover_success_rate": 0.1623246492985972,
-        "predicted_cut_count": 3895,
+        "exclusive_other_contamination_seconds_per_active_speech_hour": 1999.7946879407873,
+        "false_cut_count": 2789,
+        "matched_replacement_count": 947,
+        "missed_replacement_count": 1851,
+        "overlap_return_preservation_rate": 0.803921568627451,
+        "overlap_takeover_success_rate": 0.18236472945891782,
+        "predicted_cut_count": 3736,
         "reference_replacement_count": 2798,
         "replacement_emit_delay_ms": {
-          "p50": 852.5,
-          "p90": 1079.9
+          "p50": 834.5,
+          "p90": 1061.9
         },
         "source_count": 19,
         "source_families": [
           "alimeeting_far_ch0",
           "ami_mix_headset"
         ],
-        "speaker_induced_cut_count_per_active_speech_hour": 579.1594299273676,
+        "speaker_induced_cut_count_per_active_speech_hour": 555.5172349701272,
         "topology": {
           "clean_direct_different_speaker_handoff": {
             "eligible_episode_count": 197,
-            "episodes_with_aligned_cut": 27,
-            "episodes_with_predicted_cut": 94,
+            "episodes_with_aligned_cut": 33,
+            "episodes_with_predicted_cut": 104,
             "episodes_with_reference_replacement": 128,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "overlap_return": {
             "eligible_episode_count": 918,
-            "episodes_with_aligned_cut": 39,
-            "episodes_with_predicted_cut": 193,
+            "episodes_with_aligned_cut": 41,
+            "episodes_with_predicted_cut": 180,
             "episodes_with_reference_replacement": 327,
-            "overlap_return_preservation_rate": 0.789760348583878,
+            "overlap_return_preservation_rate": 0.803921568627451,
             "overlap_takeover_success_rate": null
           },
           "overlap_takeover": {
             "eligible_episode_count": 499,
-            "episodes_with_aligned_cut": 81,
-            "episodes_with_predicted_cut": 238,
+            "episodes_with_aligned_cut": 91,
+            "episodes_with_predicted_cut": 253,
             "episodes_with_reference_replacement": 381,
             "overlap_return_preservation_rate": null,
-            "overlap_takeover_success_rate": 0.1623246492985972
+            "overlap_takeover_success_rate": 0.18236472945891782
           },
           "same_speaker_silence_gap_resume": {
             "eligible_episode_count": 5864,
-            "episodes_with_aligned_cut": 113,
-            "episodes_with_predicted_cut": 2045,
+            "episodes_with_aligned_cut": 114,
+            "episodes_with_predicted_cut": 1726,
             "episodes_with_reference_replacement": 946,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "short_backchannel_return": {
             "eligible_episode_count": 791,
-            "episodes_with_aligned_cut": 89,
-            "episodes_with_predicted_cut": 410,
+            "episodes_with_aligned_cut": 96,
+            "episodes_with_predicted_cut": 431,
             "episodes_with_reference_replacement": 336,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "silence_gap_different_speaker_handoff": {
             "eligible_episode_count": 1472,
-            "episodes_with_aligned_cut": 174,
-            "episodes_with_predicted_cut": 733,
+            "episodes_with_aligned_cut": 196,
+            "episodes_with_predicted_cut": 773,
             "episodes_with_reference_replacement": 1097,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
@@ -3394,54 +3395,54 @@
           "active_speech_hours": 3.2269722222222224,
           "backdated_boundary_error_ms": {
             "p50": 0.0,
-            "p90": 131.00000000000023
+            "p90": 81.00000000000023
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5809957576610908,
+              "mean_hazard": 0.7450994145736064,
               "support_seconds": 953.53
             },
             "anchor_only": {
-              "mean_hazard": 0.47741071948099034,
+              "mean_hazard": 0.11717510974377801,
               "support_seconds": 9440.31
             },
             "anchor_overlap": {
-              "mean_hazard": 0.49528668428113376,
+              "mean_hazard": 0.24563220638456704,
               "support_seconds": 687.91
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2241.589639410868,
-          "false_cut_count": 1230,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 2255.216189926918,
+          "false_cut_count": 1226,
           "matched_replacement_count": 410,
           "missed_replacement_count": 1034,
-          "overlap_return_preservation_rate": 0.8074398249452954,
+          "overlap_return_preservation_rate": 0.8140043763676149,
           "overlap_takeover_success_rate": 0.16666666666666666,
-          "predicted_cut_count": 1640,
+          "predicted_cut_count": 1636,
           "reference_replacement_count": 1444,
           "replacement_emit_delay_ms": {
-            "p50": 852.5,
-            "p90": 1082.5
+            "p50": 822.5,
+            "p90": 1053.5000000000002
           },
           "source_count": 8,
           "source_families": [
             "alimeeting_far_ch0"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 508.21633626292277,
+          "speaker_induced_cut_count_per_active_speech_hour": 506.9767842232571,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 97,
-              "episodes_with_aligned_cut": 20,
-              "episodes_with_predicted_cut": 53,
+              "episodes_with_aligned_cut": 18,
+              "episodes_with_predicted_cut": 54,
               "episodes_with_reference_replacement": 70,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 457,
-              "episodes_with_aligned_cut": 16,
-              "episodes_with_predicted_cut": 88,
+              "episodes_with_aligned_cut": 15,
+              "episodes_with_predicted_cut": 85,
               "episodes_with_reference_replacement": 182,
-              "overlap_return_preservation_rate": 0.8074398249452954,
+              "overlap_return_preservation_rate": 0.8140043763676149,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
@@ -3454,16 +3455,16 @@
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2886,
-              "episodes_with_aligned_cut": 68,
-              "episodes_with_predicted_cut": 934,
+              "episodes_with_aligned_cut": 61,
+              "episodes_with_predicted_cut": 884,
               "episodes_with_reference_replacement": 583,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 478,
-              "episodes_with_aligned_cut": 62,
-              "episodes_with_predicted_cut": 251,
+              "episodes_with_aligned_cut": 61,
+              "episodes_with_predicted_cut": 257,
               "episodes_with_reference_replacement": 224,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -3471,7 +3472,7 @@
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 787,
               "episodes_with_aligned_cut": 96,
-              "episodes_with_predicted_cut": 353,
+              "episodes_with_predicted_cut": 371,
               "episodes_with_reference_replacement": 641,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -3482,84 +3483,84 @@
           "active_speech_hours": 3.498291666666667,
           "backdated_boundary_error_ms": {
             "p50": -2.0,
-            "p90": 93.39999999999998
+            "p90": 82.40000000000003
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5521292417993735,
+              "mean_hazard": 0.7685996428182723,
               "support_seconds": 964.68
             },
             "anchor_only": {
-              "mean_hazard": 0.4955287381646413,
+              "mean_hazard": 0.12842941432133007,
               "support_seconds": 9140.421
             },
             "anchor_overlap": {
-              "mean_hazard": 0.5015493533138139,
+              "mean_hazard": 0.19772609905732777,
               "support_seconds": 866.51
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 1888.2010505127503,
-          "false_cut_count": 1821,
-          "matched_replacement_count": 434,
-          "missed_replacement_count": 920,
-          "overlap_return_preservation_rate": 0.7722342733188721,
-          "overlap_takeover_success_rate": 0.15695067264573992,
-          "predicted_cut_count": 2255,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1764.1830893650472,
+          "false_cut_count": 1563,
+          "matched_replacement_count": 537,
+          "missed_replacement_count": 817,
+          "overlap_return_preservation_rate": 0.7939262472885033,
+          "overlap_takeover_success_rate": 0.20179372197309417,
+          "predicted_cut_count": 2100,
           "reference_replacement_count": 1354,
           "replacement_emit_delay_ms": {
-            "p50": 845.5,
-            "p90": 1073.9
+            "p50": 842.5,
+            "p90": 1061.9
           },
           "source_count": 11,
           "source_families": [
             "ami_mix_headset"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 644.6003406424564,
+          "speaker_induced_cut_count_per_active_speech_hour": 600.2930001548375,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 100,
-              "episodes_with_aligned_cut": 7,
-              "episodes_with_predicted_cut": 41,
+              "episodes_with_aligned_cut": 15,
+              "episodes_with_predicted_cut": 50,
               "episodes_with_reference_replacement": 58,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 461,
-              "episodes_with_aligned_cut": 23,
-              "episodes_with_predicted_cut": 105,
+              "episodes_with_aligned_cut": 26,
+              "episodes_with_predicted_cut": 95,
               "episodes_with_reference_replacement": 145,
-              "overlap_return_preservation_rate": 0.7722342733188721,
+              "overlap_return_preservation_rate": 0.7939262472885033,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 223,
-              "episodes_with_aligned_cut": 35,
-              "episodes_with_predicted_cut": 108,
+              "episodes_with_aligned_cut": 45,
+              "episodes_with_predicted_cut": 123,
               "episodes_with_reference_replacement": 166,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.15695067264573992
+              "overlap_takeover_success_rate": 0.20179372197309417
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2978,
-              "episodes_with_aligned_cut": 45,
-              "episodes_with_predicted_cut": 1111,
+              "episodes_with_aligned_cut": 53,
+              "episodes_with_predicted_cut": 842,
               "episodes_with_reference_replacement": 363,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 313,
-              "episodes_with_aligned_cut": 27,
-              "episodes_with_predicted_cut": 159,
+              "episodes_with_aligned_cut": 35,
+              "episodes_with_predicted_cut": 174,
               "episodes_with_reference_replacement": 112,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 685,
-              "episodes_with_aligned_cut": 78,
-              "episodes_with_predicted_cut": 380,
+              "episodes_with_aligned_cut": 100,
+              "episodes_with_predicted_cut": 402,
               "episodes_with_reference_replacement": 456,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -3577,86 +3578,86 @@
       "metrics": {
         "active_speech_hours": 6.725263888888889,
         "backdated_boundary_error_ms": {
-          "p50": 2.0,
-          "p90": 82.29999999999995
+          "p50": 0.0,
+          "p90": 69.5
         },
         "diagnostic_slices": {
           "anchor_absent_live": {
-            "mean_hazard": 0.5664786033758554,
+            "mean_hazard": 0.7569178287112994,
             "support_seconds": 1918.21
           },
           "anchor_only": {
-            "mean_hazard": 0.48632351836142385,
+            "mean_hazard": 0.1227114410055057,
             "support_seconds": 18580.731
           },
           "anchor_overlap": {
-            "mean_hazard": 0.4987778033760422,
+            "mean_hazard": 0.21892699089575055,
             "support_seconds": 1554.42
           }
         },
-        "exclusive_other_contamination_seconds_per_active_speech_hour": 1741.2868392194441,
-        "false_cut_count": 2332,
-        "matched_replacement_count": 1178,
-        "missed_replacement_count": 1620,
-        "overlap_return_preservation_rate": 0.8126361655773421,
-        "overlap_takeover_success_rate": 0.20440881763527055,
-        "predicted_cut_count": 3510,
+        "exclusive_other_contamination_seconds_per_active_speech_hour": 1377.156146289179,
+        "false_cut_count": 1416,
+        "matched_replacement_count": 1606,
+        "missed_replacement_count": 1192,
+        "overlap_return_preservation_rate": 0.8028322440087146,
+        "overlap_takeover_success_rate": 0.2905811623246493,
+        "predicted_cut_count": 3022,
         "reference_replacement_count": 2798,
         "replacement_emit_delay_ms": {
-          "p50": 1052.5,
-          "p90": 1259.1
+          "p50": 1046.0,
+          "p90": 1250.5
         },
         "source_count": 19,
         "source_families": [
           "alimeeting_far_ch0",
           "ami_mix_headset"
         ],
-        "speaker_induced_cut_count_per_active_speech_hour": 521.9126056598358,
+        "speaker_induced_cut_count_per_active_speech_hour": 449.35039723761355,
         "topology": {
           "clean_direct_different_speaker_handoff": {
             "eligible_episode_count": 197,
-            "episodes_with_aligned_cut": 34,
-            "episodes_with_predicted_cut": 86,
+            "episodes_with_aligned_cut": 47,
+            "episodes_with_predicted_cut": 108,
             "episodes_with_reference_replacement": 128,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "overlap_return": {
             "eligible_episode_count": 918,
-            "episodes_with_aligned_cut": 59,
-            "episodes_with_predicted_cut": 172,
+            "episodes_with_aligned_cut": 74,
+            "episodes_with_predicted_cut": 181,
             "episodes_with_reference_replacement": 327,
-            "overlap_return_preservation_rate": 0.8126361655773421,
+            "overlap_return_preservation_rate": 0.8028322440087146,
             "overlap_takeover_success_rate": null
           },
           "overlap_takeover": {
             "eligible_episode_count": 499,
-            "episodes_with_aligned_cut": 102,
-            "episodes_with_predicted_cut": 232,
+            "episodes_with_aligned_cut": 145,
+            "episodes_with_predicted_cut": 303,
             "episodes_with_reference_replacement": 381,
             "overlap_return_preservation_rate": null,
-            "overlap_takeover_success_rate": 0.20440881763527055
+            "overlap_takeover_success_rate": 0.2905811623246493
           },
           "same_speaker_silence_gap_resume": {
             "eligible_episode_count": 5864,
-            "episodes_with_aligned_cut": 176,
-            "episodes_with_predicted_cut": 1643,
+            "episodes_with_aligned_cut": 245,
+            "episodes_with_predicted_cut": 679,
             "episodes_with_reference_replacement": 946,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "short_backchannel_return": {
             "eligible_episode_count": 791,
-            "episodes_with_aligned_cut": 115,
-            "episodes_with_predicted_cut": 437,
+            "episodes_with_aligned_cut": 130,
+            "episodes_with_predicted_cut": 497,
             "episodes_with_reference_replacement": 336,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "silence_gap_different_speaker_handoff": {
             "eligible_episode_count": 1472,
-            "episodes_with_aligned_cut": 278,
-            "episodes_with_predicted_cut": 768,
+            "episodes_with_aligned_cut": 377,
+            "episodes_with_predicted_cut": 980,
             "episodes_with_reference_replacement": 1097,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
@@ -3668,84 +3669,84 @@
           "active_speech_hours": 3.2269722222222224,
           "backdated_boundary_error_ms": {
             "p50": 0.0,
-            "p90": 90.0
+            "p90": 60.0
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5809957576610908,
+              "mean_hazard": 0.7450994145736064,
               "support_seconds": 953.53
             },
             "anchor_only": {
-              "mean_hazard": 0.47741071948099034,
+              "mean_hazard": 0.11717510974377801,
               "support_seconds": 9440.31
             },
             "anchor_overlap": {
-              "mean_hazard": 0.49528668428113376,
+              "mean_hazard": 0.24563220638456704,
               "support_seconds": 687.91
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 1840.2583260882664,
-          "false_cut_count": 908,
-          "matched_replacement_count": 614,
-          "missed_replacement_count": 830,
-          "overlap_return_preservation_rate": 0.8293216630196937,
-          "overlap_takeover_success_rate": 0.2427536231884058,
-          "predicted_cut_count": 1522,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1466.2591352402924,
+          "false_cut_count": 688,
+          "matched_replacement_count": 802,
+          "missed_replacement_count": 642,
+          "overlap_return_preservation_rate": 0.7833698030634573,
+          "overlap_takeover_success_rate": 0.29347826086956524,
+          "predicted_cut_count": 1490,
           "reference_replacement_count": 1444,
           "replacement_emit_delay_ms": {
-            "p50": 1042.5,
-            "p90": 1252.5
+            "p50": 1052.5,
+            "p90": 1242.5
           },
           "source_count": 8,
           "source_families": [
             "alimeeting_far_ch0"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 471.6495510927856,
+          "speaker_induced_cut_count_per_active_speech_hour": 461.7331347754603,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 97,
-              "episodes_with_aligned_cut": 20,
-              "episodes_with_predicted_cut": 45,
+              "episodes_with_aligned_cut": 24,
+              "episodes_with_predicted_cut": 53,
               "episodes_with_reference_replacement": 70,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 457,
-              "episodes_with_aligned_cut": 32,
-              "episodes_with_predicted_cut": 78,
+              "episodes_with_aligned_cut": 42,
+              "episodes_with_predicted_cut": 99,
               "episodes_with_reference_replacement": 182,
-              "overlap_return_preservation_rate": 0.8293216630196937,
+              "overlap_return_preservation_rate": 0.7833698030634573,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 276,
-              "episodes_with_aligned_cut": 67,
-              "episodes_with_predicted_cut": 129,
+              "episodes_with_aligned_cut": 81,
+              "episodes_with_predicted_cut": 161,
               "episodes_with_reference_replacement": 215,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.2427536231884058
+              "overlap_takeover_success_rate": 0.29347826086956524
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2886,
-              "episodes_with_aligned_cut": 113,
-              "episodes_with_predicted_cut": 680,
+              "episodes_with_aligned_cut": 150,
+              "episodes_with_predicted_cut": 444,
               "episodes_with_reference_replacement": 583,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 478,
-              "episodes_with_aligned_cut": 80,
-              "episodes_with_predicted_cut": 270,
+              "episodes_with_aligned_cut": 88,
+              "episodes_with_predicted_cut": 291,
               "episodes_with_reference_replacement": 224,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 787,
-              "episodes_with_aligned_cut": 168,
-              "episodes_with_predicted_cut": 395,
+              "episodes_with_aligned_cut": 219,
+              "episodes_with_predicted_cut": 506,
               "episodes_with_reference_replacement": 641,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -3760,80 +3761,80 @@
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5521292417993735,
+              "mean_hazard": 0.7685996428182723,
               "support_seconds": 964.68
             },
             "anchor_only": {
-              "mean_hazard": 0.4955287381646413,
+              "mean_hazard": 0.12842941432133007,
               "support_seconds": 9140.421
             },
             "anchor_overlap": {
-              "mean_hazard": 0.5015493533138139,
+              "mean_hazard": 0.19772609905732777,
               "support_seconds": 866.51
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 1649.9913529222595,
-          "false_cut_count": 1424,
-          "matched_replacement_count": 564,
-          "missed_replacement_count": 790,
-          "overlap_return_preservation_rate": 0.7960954446854664,
-          "overlap_takeover_success_rate": 0.15695067264573992,
-          "predicted_cut_count": 1988,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1294.963779940209,
+          "false_cut_count": 728,
+          "matched_replacement_count": 804,
+          "missed_replacement_count": 550,
+          "overlap_return_preservation_rate": 0.8221258134490239,
+          "overlap_takeover_success_rate": 0.28699551569506726,
+          "predicted_cut_count": 1532,
           "reference_replacement_count": 1354,
           "replacement_emit_delay_ms": {
-            "p50": 1061.0,
-            "p90": 1266.5
+            "p50": 1044.5,
+            "p90": 1252.5
           },
           "source_count": 11,
           "source_families": [
             "ami_mix_headset"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 568.2773734799127,
+          "speaker_induced_cut_count_per_active_speech_hour": 437.9280363034338,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 100,
-              "episodes_with_aligned_cut": 14,
-              "episodes_with_predicted_cut": 41,
+              "episodes_with_aligned_cut": 23,
+              "episodes_with_predicted_cut": 55,
               "episodes_with_reference_replacement": 58,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 461,
-              "episodes_with_aligned_cut": 27,
-              "episodes_with_predicted_cut": 94,
+              "episodes_with_aligned_cut": 32,
+              "episodes_with_predicted_cut": 82,
               "episodes_with_reference_replacement": 145,
-              "overlap_return_preservation_rate": 0.7960954446854664,
+              "overlap_return_preservation_rate": 0.8221258134490239,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 223,
-              "episodes_with_aligned_cut": 35,
-              "episodes_with_predicted_cut": 103,
+              "episodes_with_aligned_cut": 64,
+              "episodes_with_predicted_cut": 142,
               "episodes_with_reference_replacement": 166,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.15695067264573992
+              "overlap_takeover_success_rate": 0.28699551569506726
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2978,
-              "episodes_with_aligned_cut": 63,
-              "episodes_with_predicted_cut": 963,
+              "episodes_with_aligned_cut": 95,
+              "episodes_with_predicted_cut": 235,
               "episodes_with_reference_replacement": 363,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 313,
-              "episodes_with_aligned_cut": 35,
-              "episodes_with_predicted_cut": 167,
+              "episodes_with_aligned_cut": 42,
+              "episodes_with_predicted_cut": 206,
               "episodes_with_reference_replacement": 112,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 685,
-              "episodes_with_aligned_cut": 110,
-              "episodes_with_predicted_cut": 373,
+              "episodes_with_aligned_cut": 158,
+              "episodes_with_predicted_cut": 474,
               "episodes_with_reference_replacement": 456,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -3852,29 +3853,29 @@
         "active_speech_hours": 6.725263888888889,
         "backdated_boundary_error_ms": {
           "p50": -30.0,
-          "p90": 0.0
+          "p90": -2.0
         },
         "diagnostic_slices": {
           "anchor_absent_live": {
-            "mean_hazard": 0.5664786033758554,
+            "mean_hazard": 0.7569178287112994,
             "support_seconds": 1918.21
           },
           "anchor_only": {
-            "mean_hazard": 0.48632351836142385,
+            "mean_hazard": 0.1227114410055057,
             "support_seconds": 18580.731
           },
           "anchor_overlap": {
-            "mean_hazard": 0.4987778033760422,
+            "mean_hazard": 0.21892699089575055,
             "support_seconds": 1554.42
           }
         },
-        "exclusive_other_contamination_seconds_per_active_speech_hour": 1888.8305663346543,
-        "false_cut_count": 1211,
-        "matched_replacement_count": 911,
-        "missed_replacement_count": 1887,
-        "overlap_return_preservation_rate": 0.8954248366013072,
-        "overlap_takeover_success_rate": 0.012024048096192385,
-        "predicted_cut_count": 2122,
+        "exclusive_other_contamination_seconds_per_active_speech_hour": 1734.1083104958707,
+        "false_cut_count": 528,
+        "matched_replacement_count": 1119,
+        "missed_replacement_count": 1679,
+        "overlap_return_preservation_rate": 0.9041394335511983,
+        "overlap_takeover_success_rate": 0.018036072144288578,
+        "predicted_cut_count": 1647,
         "reference_replacement_count": 2798,
         "replacement_emit_delay_ms": {
           "p50": 1182.5,
@@ -3885,52 +3886,52 @@
           "alimeeting_far_ch0",
           "ami_mix_headset"
         ],
-        "speaker_induced_cut_count_per_active_speech_hour": 315.52665219663004,
+        "speaker_induced_cut_count_per_active_speech_hour": 244.89745342499984,
         "topology": {
           "clean_direct_different_speaker_handoff": {
             "eligible_episode_count": 197,
             "episodes_with_aligned_cut": 3,
-            "episodes_with_predicted_cut": 45,
+            "episodes_with_predicted_cut": 50,
             "episodes_with_reference_replacement": 128,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "overlap_return": {
             "eligible_episode_count": 918,
-            "episodes_with_aligned_cut": 5,
-            "episodes_with_predicted_cut": 96,
+            "episodes_with_aligned_cut": 6,
+            "episodes_with_predicted_cut": 88,
             "episodes_with_reference_replacement": 327,
-            "overlap_return_preservation_rate": 0.8954248366013072,
+            "overlap_return_preservation_rate": 0.9041394335511983,
             "overlap_takeover_success_rate": null
           },
           "overlap_takeover": {
             "eligible_episode_count": 499,
-            "episodes_with_aligned_cut": 6,
-            "episodes_with_predicted_cut": 155,
+            "episodes_with_aligned_cut": 9,
+            "episodes_with_predicted_cut": 175,
             "episodes_with_reference_replacement": 381,
             "overlap_return_preservation_rate": null,
-            "overlap_takeover_success_rate": 0.012024048096192385
+            "overlap_takeover_success_rate": 0.018036072144288578
           },
           "same_speaker_silence_gap_resume": {
             "eligible_episode_count": 5864,
-            "episodes_with_aligned_cut": 47,
-            "episodes_with_predicted_cut": 685,
+            "episodes_with_aligned_cut": 48,
+            "episodes_with_predicted_cut": 217,
             "episodes_with_reference_replacement": 946,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "short_backchannel_return": {
             "eligible_episode_count": 791,
-            "episodes_with_aligned_cut": 19,
-            "episodes_with_predicted_cut": 296,
+            "episodes_with_aligned_cut": 24,
+            "episodes_with_predicted_cut": 238,
             "episodes_with_reference_replacement": 336,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "silence_gap_different_speaker_handoff": {
             "eligible_episode_count": 1472,
-            "episodes_with_aligned_cut": 61,
-            "episodes_with_predicted_cut": 565,
+            "episodes_with_aligned_cut": 69,
+            "episodes_with_predicted_cut": 596,
             "episodes_with_reference_replacement": 1097,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
@@ -3946,40 +3947,40 @@
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5809957576610908,
+              "mean_hazard": 0.7450994145736064,
               "support_seconds": 953.53
             },
             "anchor_only": {
-              "mean_hazard": 0.47741071948099034,
+              "mean_hazard": 0.11717510974377801,
               "support_seconds": 9440.31
             },
             "anchor_overlap": {
-              "mean_hazard": 0.49528668428113376,
+              "mean_hazard": 0.24563220638456704,
               "support_seconds": 687.91
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 1853.2635511444337,
-          "false_cut_count": 402,
-          "matched_replacement_count": 525,
-          "missed_replacement_count": 919,
-          "overlap_return_preservation_rate": 0.8971553610503282,
-          "overlap_takeover_success_rate": 0.021739130434782608,
-          "predicted_cut_count": 927,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1701.5694966902238,
+          "false_cut_count": 278,
+          "matched_replacement_count": 620,
+          "missed_replacement_count": 824,
+          "overlap_return_preservation_rate": 0.8927789934354485,
+          "overlap_takeover_success_rate": 0.028985507246376812,
+          "predicted_cut_count": 898,
           "reference_replacement_count": 1444,
           "replacement_emit_delay_ms": {
-            "p50": 1202.5,
+            "p50": 1192.5,
             "p90": 1412.5
           },
           "source_count": 8,
           "source_families": [
             "alimeeting_far_ch0"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 287.2661851925179,
+          "speaker_induced_cut_count_per_active_speech_hour": 278.2794329049418,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 97,
               "episodes_with_aligned_cut": 3,
-              "episodes_with_predicted_cut": 24,
+              "episodes_with_predicted_cut": 29,
               "episodes_with_reference_replacement": 70,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -3987,39 +3988,39 @@
             "overlap_return": {
               "eligible_episode_count": 457,
               "episodes_with_aligned_cut": 5,
-              "episodes_with_predicted_cut": 47,
+              "episodes_with_predicted_cut": 49,
               "episodes_with_reference_replacement": 182,
-              "overlap_return_preservation_rate": 0.8971553610503282,
+              "overlap_return_preservation_rate": 0.8927789934354485,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 276,
-              "episodes_with_aligned_cut": 6,
-              "episodes_with_predicted_cut": 91,
+              "episodes_with_aligned_cut": 8,
+              "episodes_with_predicted_cut": 109,
               "episodes_with_reference_replacement": 215,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.021739130434782608
+              "overlap_takeover_success_rate": 0.028985507246376812
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2886,
-              "episodes_with_aligned_cut": 42,
-              "episodes_with_predicted_cut": 215,
+              "episodes_with_aligned_cut": 41,
+              "episodes_with_predicted_cut": 132,
               "episodes_with_reference_replacement": 583,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 478,
-              "episodes_with_aligned_cut": 18,
-              "episodes_with_predicted_cut": 176,
+              "episodes_with_aligned_cut": 23,
+              "episodes_with_predicted_cut": 172,
               "episodes_with_reference_replacement": 224,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 787,
-              "episodes_with_aligned_cut": 55,
-              "episodes_with_predicted_cut": 339,
+              "episodes_with_aligned_cut": 62,
+              "episodes_with_predicted_cut": 362,
               "episodes_with_reference_replacement": 641,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -4030,39 +4031,39 @@
           "active_speech_hours": 3.498291666666667,
           "backdated_boundary_error_ms": {
             "p50": -32.0,
-            "p90": -5.5
+            "p90": -5.0
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5521292417993735,
+              "mean_hazard": 0.7685996428182723,
               "support_seconds": 964.68
             },
             "anchor_only": {
-              "mean_hazard": 0.4955287381646413,
+              "mean_hazard": 0.12842941432133007,
               "support_seconds": 9140.421
             },
             "anchor_overlap": {
-              "mean_hazard": 0.5015493533138139,
+              "mean_hazard": 0.19772609905732777,
               "support_seconds": 866.51
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 1921.6390857442323,
-          "false_cut_count": 809,
-          "matched_replacement_count": 386,
-          "missed_replacement_count": 968,
-          "overlap_return_preservation_rate": 0.8937093275488069,
-          "overlap_takeover_success_rate": 0.0,
-          "predicted_cut_count": 1195,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1764.123488845746,
+          "false_cut_count": 250,
+          "matched_replacement_count": 499,
+          "missed_replacement_count": 855,
+          "overlap_return_preservation_rate": 0.9154013015184381,
+          "overlap_takeover_success_rate": 0.004484304932735426,
+          "predicted_cut_count": 749,
           "reference_replacement_count": 1354,
           "replacement_emit_delay_ms": {
-            "p50": 1157.5,
-            "p90": 1398.5
+            "p50": 1175.5,
+            "p90": 1400.9
           },
           "source_count": 11,
           "source_families": [
             "ami_mix_headset"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 341.5953024690623,
+          "speaker_induced_cut_count_per_active_speech_hour": 214.1045033885587,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 100,
@@ -4074,24 +4075,24 @@
             },
             "overlap_return": {
               "eligible_episode_count": 461,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 49,
+              "episodes_with_aligned_cut": 1,
+              "episodes_with_predicted_cut": 39,
               "episodes_with_reference_replacement": 145,
-              "overlap_return_preservation_rate": 0.8937093275488069,
+              "overlap_return_preservation_rate": 0.9154013015184381,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 223,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 64,
+              "episodes_with_aligned_cut": 1,
+              "episodes_with_predicted_cut": 66,
               "episodes_with_reference_replacement": 166,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.0
+              "overlap_takeover_success_rate": 0.004484304932735426
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2978,
-              "episodes_with_aligned_cut": 5,
-              "episodes_with_predicted_cut": 470,
+              "episodes_with_aligned_cut": 7,
+              "episodes_with_predicted_cut": 85,
               "episodes_with_reference_replacement": 363,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -4099,15 +4100,15 @@
             "short_backchannel_return": {
               "eligible_episode_count": 313,
               "episodes_with_aligned_cut": 1,
-              "episodes_with_predicted_cut": 120,
+              "episodes_with_predicted_cut": 66,
               "episodes_with_reference_replacement": 112,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 685,
-              "episodes_with_aligned_cut": 6,
-              "episodes_with_predicted_cut": 226,
+              "episodes_with_aligned_cut": 7,
+              "episodes_with_predicted_cut": 234,
               "episodes_with_reference_replacement": 456,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -4125,86 +4126,86 @@
       "metrics": {
         "active_speech_hours": 6.725263888888889,
         "backdated_boundary_error_ms": {
-          "p50": null,
-          "p90": null
+          "p50": 10.0,
+          "p90": 131.60000000000014
         },
         "diagnostic_slices": {
           "anchor_absent_live": {
-            "mean_hazard": 0.5664786033758554,
+            "mean_hazard": 0.7569178287112994,
             "support_seconds": 1918.21
           },
           "anchor_only": {
-            "mean_hazard": 0.48632351836142385,
+            "mean_hazard": 0.1227114410055057,
             "support_seconds": 18580.731
           },
           "anchor_overlap": {
-            "mean_hazard": 0.4987778033760422,
+            "mean_hazard": 0.21892699089575055,
             "support_seconds": 1554.42
           }
         },
-        "exclusive_other_contamination_seconds_per_active_speech_hour": 2775.4409802176287,
-        "false_cut_count": 2,
-        "matched_replacement_count": 0,
-        "missed_replacement_count": 2798,
-        "overlap_return_preservation_rate": 0.9989106753812637,
-        "overlap_takeover_success_rate": 0.0,
-        "predicted_cut_count": 2,
+        "exclusive_other_contamination_seconds_per_active_speech_hour": 1871.689380218455,
+        "false_cut_count": 2532,
+        "matched_replacement_count": 1073,
+        "missed_replacement_count": 1725,
+        "overlap_return_preservation_rate": 0.8224400871459695,
+        "overlap_takeover_success_rate": 0.22645290581162325,
+        "predicted_cut_count": 3605,
         "reference_replacement_count": 2798,
         "replacement_emit_delay_ms": {
-          "p50": null,
-          "p90": null
+          "p50": 862.5,
+          "p90": 1090.5
         },
         "source_count": 19,
         "source_families": [
           "alimeeting_far_ch0",
           "ami_mix_headset"
         ],
-        "speaker_induced_cut_count_per_active_speech_hour": 0.2973861000910745,
+        "speaker_induced_cut_count_per_active_speech_hour": 536.0384454141617,
         "topology": {
           "clean_direct_different_speaker_handoff": {
             "eligible_episode_count": 197,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 41,
+            "episodes_with_predicted_cut": 100,
             "episodes_with_reference_replacement": 128,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "overlap_return": {
             "eligible_episode_count": 918,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 1,
+            "episodes_with_aligned_cut": 57,
+            "episodes_with_predicted_cut": 163,
             "episodes_with_reference_replacement": 327,
-            "overlap_return_preservation_rate": 0.9989106753812637,
+            "overlap_return_preservation_rate": 0.8224400871459695,
             "overlap_takeover_success_rate": null
           },
           "overlap_takeover": {
             "eligible_episode_count": 499,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 113,
+            "episodes_with_predicted_cut": 259,
             "episodes_with_reference_replacement": 381,
             "overlap_return_preservation_rate": null,
-            "overlap_takeover_success_rate": 0.0
+            "overlap_takeover_success_rate": 0.22645290581162325
           },
           "same_speaker_silence_gap_resume": {
             "eligible_episode_count": 5864,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 1,
+            "episodes_with_aligned_cut": 145,
+            "episodes_with_predicted_cut": 1567,
             "episodes_with_reference_replacement": 946,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "short_backchannel_return": {
             "eligible_episode_count": 791,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 2,
+            "episodes_with_aligned_cut": 113,
+            "episodes_with_predicted_cut": 437,
             "episodes_with_reference_replacement": 336,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "silence_gap_different_speaker_handoff": {
             "eligible_episode_count": 1472,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 237,
+            "episodes_with_predicted_cut": 771,
             "episodes_with_reference_replacement": 1097,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
@@ -4215,85 +4216,85 @@
         "alimeeting_far_ch0": {
           "active_speech_hours": 3.2269722222222224,
           "backdated_boundary_error_ms": {
-            "p50": null,
-            "p90": null
+            "p50": 10.0,
+            "p90": 130.0
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5809957576610908,
+              "mean_hazard": 0.7450994145736064,
               "support_seconds": 953.53
             },
             "anchor_only": {
-              "mean_hazard": 0.47741071948099034,
+              "mean_hazard": 0.11717510974377801,
               "support_seconds": 9440.31
             },
             "anchor_overlap": {
-              "mean_hazard": 0.49528668428113376,
+              "mean_hazard": 0.24563220638456704,
               "support_seconds": 687.91
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2919.3619750195835,
-          "false_cut_count": 2,
-          "matched_replacement_count": 0,
-          "missed_replacement_count": 1444,
-          "overlap_return_preservation_rate": 0.9978118161925602,
-          "overlap_takeover_success_rate": 0.0,
-          "predicted_cut_count": 2,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 2104.767885272572,
+          "false_cut_count": 1126,
+          "matched_replacement_count": 483,
+          "missed_replacement_count": 961,
+          "overlap_return_preservation_rate": 0.8358862144420132,
+          "overlap_takeover_success_rate": 0.20652173913043478,
+          "predicted_cut_count": 1609,
           "reference_replacement_count": 1444,
           "replacement_emit_delay_ms": {
-            "p50": null,
-            "p90": null
+            "p50": 842.5,
+            "p90": 1072.5
           },
           "source_count": 8,
           "source_families": [
             "alimeeting_far_ch0"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 0.6197760198328326,
+          "speaker_induced_cut_count_per_active_speech_hour": 498.6098079555138,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 97,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 20,
+              "episodes_with_predicted_cut": 49,
               "episodes_with_reference_replacement": 70,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 457,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 1,
+              "episodes_with_aligned_cut": 25,
+              "episodes_with_predicted_cut": 75,
               "episodes_with_reference_replacement": 182,
-              "overlap_return_preservation_rate": 0.9978118161925602,
+              "overlap_return_preservation_rate": 0.8358862144420132,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 276,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 57,
+              "episodes_with_predicted_cut": 136,
               "episodes_with_reference_replacement": 215,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.0
+              "overlap_takeover_success_rate": 0.20652173913043478
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2886,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 1,
+              "episodes_with_aligned_cut": 85,
+              "episodes_with_predicted_cut": 847,
               "episodes_with_reference_replacement": 583,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 478,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 2,
+              "episodes_with_aligned_cut": 73,
+              "episodes_with_predicted_cut": 259,
               "episodes_with_reference_replacement": 224,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 787,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 125,
+              "episodes_with_predicted_cut": 357,
               "episodes_with_reference_replacement": 641,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -4303,85 +4304,85 @@
         "ami_mix_headset": {
           "active_speech_hours": 3.498291666666667,
           "backdated_boundary_error_ms": {
-            "p50": null,
-            "p90": null
+            "p50": 8.0,
+            "p90": 139.10000000000002
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5521292417993735,
+              "mean_hazard": 0.7685996428182723,
               "support_seconds": 964.68
             },
             "anchor_only": {
-              "mean_hazard": 0.4955287381646413,
+              "mean_hazard": 0.12842941432133007,
               "support_seconds": 9140.421
             },
             "anchor_overlap": {
-              "mean_hazard": 0.5015493533138139,
+              "mean_hazard": 0.19772609905732777,
               "support_seconds": 866.51
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2642.6821662954535,
-          "false_cut_count": 0,
-          "matched_replacement_count": 0,
-          "missed_replacement_count": 1354,
-          "overlap_return_preservation_rate": 1.0,
-          "overlap_takeover_success_rate": 0.0,
-          "predicted_cut_count": 0,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1656.6879071927965,
+          "false_cut_count": 1406,
+          "matched_replacement_count": 590,
+          "missed_replacement_count": 764,
+          "overlap_return_preservation_rate": 0.8091106290672452,
+          "overlap_takeover_success_rate": 0.25112107623318386,
+          "predicted_cut_count": 1996,
           "reference_replacement_count": 1354,
           "replacement_emit_delay_ms": {
-            "p50": null,
-            "p90": null
+            "p50": 876.0,
+            "p90": 1096.5
           },
           "source_count": 11,
           "source_families": [
             "ami_mix_headset"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 0.0,
+          "speaker_induced_cut_count_per_active_speech_hour": 570.5642039566932,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 100,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 21,
+              "episodes_with_predicted_cut": 51,
               "episodes_with_reference_replacement": 58,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 461,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 32,
+              "episodes_with_predicted_cut": 88,
               "episodes_with_reference_replacement": 145,
-              "overlap_return_preservation_rate": 1.0,
+              "overlap_return_preservation_rate": 0.8091106290672452,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 223,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 56,
+              "episodes_with_predicted_cut": 123,
               "episodes_with_reference_replacement": 166,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.0
+              "overlap_takeover_success_rate": 0.25112107623318386
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2978,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 60,
+              "episodes_with_predicted_cut": 720,
               "episodes_with_reference_replacement": 363,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 313,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 40,
+              "episodes_with_predicted_cut": 178,
               "episodes_with_reference_replacement": 112,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 685,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 112,
+              "episodes_with_predicted_cut": 414,
               "episodes_with_reference_replacement": 456,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -4399,86 +4400,86 @@
       "metrics": {
         "active_speech_hours": 6.725263888888889,
         "backdated_boundary_error_ms": {
-          "p50": null,
-          "p90": null
+          "p50": 6.0,
+          "p90": 90.0
         },
         "diagnostic_slices": {
           "anchor_absent_live": {
-            "mean_hazard": 0.5664786033758554,
+            "mean_hazard": 0.7569178287112994,
             "support_seconds": 1918.21
           },
           "anchor_only": {
-            "mean_hazard": 0.48632351836142385,
+            "mean_hazard": 0.1227114410055057,
             "support_seconds": 18580.731
           },
           "anchor_overlap": {
-            "mean_hazard": 0.4987778033760422,
+            "mean_hazard": 0.21892699089575055,
             "support_seconds": 1554.42
           }
         },
-        "exclusive_other_contamination_seconds_per_active_speech_hour": 2775.4409802176287,
-        "false_cut_count": 0,
-        "matched_replacement_count": 0,
-        "missed_replacement_count": 2798,
-        "overlap_return_preservation_rate": 1.0,
-        "overlap_takeover_success_rate": 0.0,
-        "predicted_cut_count": 0,
+        "exclusive_other_contamination_seconds_per_active_speech_hour": 1253.5616652795532,
+        "false_cut_count": 1185,
+        "matched_replacement_count": 1702,
+        "missed_replacement_count": 1096,
+        "overlap_return_preservation_rate": 0.8115468409586056,
+        "overlap_takeover_success_rate": 0.32064128256513025,
+        "predicted_cut_count": 2887,
         "reference_replacement_count": 2798,
         "replacement_emit_delay_ms": {
-          "p50": null,
-          "p90": null
+          "p50": 1052.5,
+          "p90": 1252.5
         },
         "source_count": 19,
         "source_families": [
           "alimeeting_far_ch0",
           "ami_mix_headset"
         ],
-        "speaker_induced_cut_count_per_active_speech_hour": 0.0,
+        "speaker_induced_cut_count_per_active_speech_hour": 429.27683548146604,
         "topology": {
           "clean_direct_different_speaker_handoff": {
             "eligible_episode_count": 197,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 51,
+            "episodes_with_predicted_cut": 99,
             "episodes_with_reference_replacement": 128,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "overlap_return": {
             "eligible_episode_count": 918,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 87,
+            "episodes_with_predicted_cut": 173,
             "episodes_with_reference_replacement": 327,
-            "overlap_return_preservation_rate": 1.0,
+            "overlap_return_preservation_rate": 0.8115468409586056,
             "overlap_takeover_success_rate": null
           },
           "overlap_takeover": {
             "eligible_episode_count": 499,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 160,
+            "episodes_with_predicted_cut": 292,
             "episodes_with_reference_replacement": 381,
             "overlap_return_preservation_rate": null,
-            "overlap_takeover_success_rate": 0.0
+            "overlap_takeover_success_rate": 0.32064128256513025
           },
           "same_speaker_silence_gap_resume": {
             "eligible_episode_count": 5864,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 271,
+            "episodes_with_predicted_cut": 571,
             "episodes_with_reference_replacement": 946,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "short_backchannel_return": {
             "eligible_episode_count": 791,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 141,
+            "episodes_with_predicted_cut": 497,
             "episodes_with_reference_replacement": 336,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "silence_gap_different_speaker_handoff": {
             "eligible_episode_count": 1472,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 426,
+            "episodes_with_predicted_cut": 1022,
             "episodes_with_reference_replacement": 1097,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
@@ -4489,85 +4490,85 @@
         "alimeeting_far_ch0": {
           "active_speech_hours": 3.2269722222222224,
           "backdated_boundary_error_ms": {
-            "p50": null,
-            "p90": null
+            "p50": 0.0,
+            "p90": 70.0
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5809957576610908,
+              "mean_hazard": 0.7450994145736064,
               "support_seconds": 953.53
             },
             "anchor_only": {
-              "mean_hazard": 0.47741071948099034,
+              "mean_hazard": 0.11717510974377801,
               "support_seconds": 9440.31
             },
             "anchor_overlap": {
-              "mean_hazard": 0.49528668428113376,
+              "mean_hazard": 0.24563220638456704,
               "support_seconds": 687.91
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2919.3619750195835,
-          "false_cut_count": 0,
-          "matched_replacement_count": 0,
-          "missed_replacement_count": 1444,
-          "overlap_return_preservation_rate": 1.0,
-          "overlap_takeover_success_rate": 0.0,
-          "predicted_cut_count": 0,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1305.36218161159,
+          "false_cut_count": 565,
+          "matched_replacement_count": 877,
+          "missed_replacement_count": 567,
+          "overlap_return_preservation_rate": 0.787746170678337,
+          "overlap_takeover_success_rate": 0.31521739130434784,
+          "predicted_cut_count": 1442,
           "reference_replacement_count": 1444,
           "replacement_emit_delay_ms": {
-            "p50": null,
-            "p90": null
+            "p50": 1052.5,
+            "p90": 1252.5
           },
           "source_count": 8,
           "source_families": [
             "alimeeting_far_ch0"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 0.0,
+          "speaker_induced_cut_count_per_active_speech_hour": 446.8585102994723,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 97,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 24,
+              "episodes_with_predicted_cut": 48,
               "episodes_with_reference_replacement": 70,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 457,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 51,
+              "episodes_with_predicted_cut": 97,
               "episodes_with_reference_replacement": 182,
-              "overlap_return_preservation_rate": 1.0,
+              "overlap_return_preservation_rate": 0.787746170678337,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 276,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 87,
+              "episodes_with_predicted_cut": 158,
               "episodes_with_reference_replacement": 215,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.0
+              "overlap_takeover_success_rate": 0.31521739130434784
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2886,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 170,
+              "episodes_with_predicted_cut": 359,
               "episodes_with_reference_replacement": 583,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 478,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 94,
+              "episodes_with_predicted_cut": 300,
               "episodes_with_reference_replacement": 224,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 787,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 251,
+              "episodes_with_predicted_cut": 540,
               "episodes_with_reference_replacement": 641,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -4577,85 +4578,85 @@
         "ami_mix_headset": {
           "active_speech_hours": 3.498291666666667,
           "backdated_boundary_error_ms": {
-            "p50": null,
-            "p90": null
+            "p50": 8.0,
+            "p90": 105.20000000000005
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5521292417993735,
+              "mean_hazard": 0.7685996428182723,
               "support_seconds": 964.68
             },
             "anchor_only": {
-              "mean_hazard": 0.4955287381646413,
+              "mean_hazard": 0.12842941432133007,
               "support_seconds": 9140.421
             },
             "anchor_overlap": {
-              "mean_hazard": 0.5015493533138139,
+              "mean_hazard": 0.19772609905732777,
               "support_seconds": 866.51
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2642.6821662954535,
-          "false_cut_count": 0,
-          "matched_replacement_count": 0,
-          "missed_replacement_count": 1354,
-          "overlap_return_preservation_rate": 1.0,
-          "overlap_takeover_success_rate": 0.0,
-          "predicted_cut_count": 0,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1205.778677687919,
+          "false_cut_count": 620,
+          "matched_replacement_count": 825,
+          "missed_replacement_count": 529,
+          "overlap_return_preservation_rate": 0.8351409978308026,
+          "overlap_takeover_success_rate": 0.3273542600896861,
+          "predicted_cut_count": 1445,
           "reference_replacement_count": 1354,
           "replacement_emit_delay_ms": {
-            "p50": null,
-            "p90": null
+            "p50": 1056.5,
+            "p90": 1259.7
           },
           "source_count": 11,
           "source_families": [
             "ami_mix_headset"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 0.0,
+          "speaker_induced_cut_count_per_active_speech_hour": 413.0587548684477,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 100,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 27,
+              "episodes_with_predicted_cut": 51,
               "episodes_with_reference_replacement": 58,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 461,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 36,
+              "episodes_with_predicted_cut": 76,
               "episodes_with_reference_replacement": 145,
-              "overlap_return_preservation_rate": 1.0,
+              "overlap_return_preservation_rate": 0.8351409978308026,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 223,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 73,
+              "episodes_with_predicted_cut": 134,
               "episodes_with_reference_replacement": 166,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.0
+              "overlap_takeover_success_rate": 0.3273542600896861
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2978,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 101,
+              "episodes_with_predicted_cut": 212,
               "episodes_with_reference_replacement": 363,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 313,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 47,
+              "episodes_with_predicted_cut": 197,
               "episodes_with_reference_replacement": 112,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 685,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 175,
+              "episodes_with_predicted_cut": 482,
               "episodes_with_reference_replacement": 456,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -4673,86 +4674,86 @@
       "metrics": {
         "active_speech_hours": 6.725263888888889,
         "backdated_boundary_error_ms": {
-          "p50": null,
-          "p90": null
+          "p50": -30.0,
+          "p90": 0.0
         },
         "diagnostic_slices": {
           "anchor_absent_live": {
-            "mean_hazard": 0.5664786033758554,
+            "mean_hazard": 0.7569178287112994,
             "support_seconds": 1918.21
           },
           "anchor_only": {
-            "mean_hazard": 0.48632351836142385,
+            "mean_hazard": 0.1227114410055057,
             "support_seconds": 18580.731
           },
           "anchor_overlap": {
-            "mean_hazard": 0.4987778033760422,
+            "mean_hazard": 0.21892699089575055,
             "support_seconds": 1554.42
           }
         },
-        "exclusive_other_contamination_seconds_per_active_speech_hour": 2775.4409802176287,
-        "false_cut_count": 0,
-        "matched_replacement_count": 0,
-        "missed_replacement_count": 2798,
-        "overlap_return_preservation_rate": 1.0,
-        "overlap_takeover_success_rate": 0.0,
-        "predicted_cut_count": 0,
+        "exclusive_other_contamination_seconds_per_active_speech_hour": 1759.8986739471188,
+        "false_cut_count": 394,
+        "matched_replacement_count": 1066,
+        "missed_replacement_count": 1732,
+        "overlap_return_preservation_rate": 0.9291938997821351,
+        "overlap_takeover_success_rate": 0.01603206412825651,
+        "predicted_cut_count": 1460,
         "reference_replacement_count": 2798,
         "replacement_emit_delay_ms": {
-          "p50": null,
-          "p90": null
+          "p50": 1186.5,
+          "p90": 1412.5
         },
         "source_count": 19,
         "source_families": [
           "alimeeting_far_ch0",
           "ami_mix_headset"
         ],
-        "speaker_induced_cut_count_per_active_speech_hour": 0.0,
+        "speaker_induced_cut_count_per_active_speech_hour": 217.0918530664844,
         "topology": {
           "clean_direct_different_speaker_handoff": {
             "eligible_episode_count": 197,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 4,
+            "episodes_with_predicted_cut": 36,
             "episodes_with_reference_replacement": 128,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "overlap_return": {
             "eligible_episode_count": 918,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 6,
+            "episodes_with_predicted_cut": 65,
             "episodes_with_reference_replacement": 327,
-            "overlap_return_preservation_rate": 1.0,
+            "overlap_return_preservation_rate": 0.9291938997821351,
             "overlap_takeover_success_rate": null
           },
           "overlap_takeover": {
             "eligible_episode_count": 499,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 8,
+            "episodes_with_predicted_cut": 145,
             "episodes_with_reference_replacement": 381,
             "overlap_return_preservation_rate": null,
-            "overlap_takeover_success_rate": 0.0
+            "overlap_takeover_success_rate": 0.01603206412825651
           },
           "same_speaker_silence_gap_resume": {
             "eligible_episode_count": 5864,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 53,
+            "episodes_with_predicted_cut": 158,
             "episodes_with_reference_replacement": 946,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "short_backchannel_return": {
             "eligible_episode_count": 791,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 24,
+            "episodes_with_predicted_cut": 201,
             "episodes_with_reference_replacement": 336,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
           },
           "silence_gap_different_speaker_handoff": {
             "eligible_episode_count": 1472,
-            "episodes_with_aligned_cut": 0,
-            "episodes_with_predicted_cut": 0,
+            "episodes_with_aligned_cut": 71,
+            "episodes_with_predicted_cut": 593,
             "episodes_with_reference_replacement": 1097,
             "overlap_return_preservation_rate": null,
             "overlap_takeover_success_rate": null
@@ -4763,85 +4764,85 @@
         "alimeeting_far_ch0": {
           "active_speech_hours": 3.2269722222222224,
           "backdated_boundary_error_ms": {
-            "p50": null,
-            "p90": null
+            "p50": -30.0,
+            "p90": 0.0
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5809957576610908,
+              "mean_hazard": 0.7450994145736064,
               "support_seconds": 953.53
             },
             "anchor_only": {
-              "mean_hazard": 0.47741071948099034,
+              "mean_hazard": 0.11717510974377801,
               "support_seconds": 9440.31
             },
             "anchor_overlap": {
-              "mean_hazard": 0.49528668428113376,
+              "mean_hazard": 0.24563220638456704,
               "support_seconds": 687.91
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2919.3619750195835,
-          "false_cut_count": 0,
-          "matched_replacement_count": 0,
-          "missed_replacement_count": 1444,
-          "overlap_return_preservation_rate": 1.0,
-          "overlap_takeover_success_rate": 0.0,
-          "predicted_cut_count": 0,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1716.944590302227,
+          "false_cut_count": 214,
+          "matched_replacement_count": 598,
+          "missed_replacement_count": 846,
+          "overlap_return_preservation_rate": 0.912472647702407,
+          "overlap_takeover_success_rate": 0.025362318840579712,
+          "predicted_cut_count": 812,
           "reference_replacement_count": 1444,
           "replacement_emit_delay_ms": {
-            "p50": null,
-            "p90": null
+            "p50": 1202.5,
+            "p90": 1422.5
           },
           "source_count": 8,
           "source_families": [
             "alimeeting_far_ch0"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 0.0,
+          "speaker_induced_cut_count_per_active_speech_hour": 251.62906405213005,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 97,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 4,
+              "episodes_with_predicted_cut": 21,
               "episodes_with_reference_replacement": 70,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 457,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 5,
+              "episodes_with_predicted_cut": 40,
               "episodes_with_reference_replacement": 182,
-              "overlap_return_preservation_rate": 1.0,
+              "overlap_return_preservation_rate": 0.912472647702407,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 276,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 7,
+              "episodes_with_predicted_cut": 93,
               "episodes_with_reference_replacement": 215,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.0
+              "overlap_takeover_success_rate": 0.025362318840579712
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2886,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 46,
+              "episodes_with_predicted_cut": 96,
               "episodes_with_reference_replacement": 583,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 478,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 23,
+              "episodes_with_predicted_cut": 155,
               "episodes_with_reference_replacement": 224,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 787,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 64,
+              "episodes_with_predicted_cut": 359,
               "episodes_with_reference_replacement": 641,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -4851,85 +4852,85 @@
         "ami_mix_headset": {
           "active_speech_hours": 3.498291666666667,
           "backdated_boundary_error_ms": {
-            "p50": null,
-            "p90": null
+            "p50": -30.0,
+            "p90": -4.0
           },
           "diagnostic_slices": {
             "anchor_absent_live": {
-              "mean_hazard": 0.5521292417993735,
+              "mean_hazard": 0.7685996428182723,
               "support_seconds": 964.68
             },
             "anchor_only": {
-              "mean_hazard": 0.4955287381646413,
+              "mean_hazard": 0.12842941432133007,
               "support_seconds": 9140.421
             },
             "anchor_overlap": {
-              "mean_hazard": 0.5015493533138139,
+              "mean_hazard": 0.19772609905732777,
               "support_seconds": 866.51
             }
           },
-          "exclusive_other_contamination_seconds_per_active_speech_hour": 2642.6821662954535,
-          "false_cut_count": 0,
-          "matched_replacement_count": 0,
-          "missed_replacement_count": 1354,
-          "overlap_return_preservation_rate": 1.0,
-          "overlap_takeover_success_rate": 0.0,
-          "predicted_cut_count": 0,
+          "exclusive_other_contamination_seconds_per_active_speech_hour": 1799.521337795829,
+          "false_cut_count": 180,
+          "matched_replacement_count": 468,
+          "missed_replacement_count": 886,
+          "overlap_return_preservation_rate": 0.9457700650759219,
+          "overlap_takeover_success_rate": 0.004484304932735426,
+          "predicted_cut_count": 648,
           "reference_replacement_count": 1354,
           "replacement_emit_delay_ms": {
-            "p50": null,
-            "p90": null
+            "p50": 1178.5,
+            "p90": 1402.5
           },
           "source_count": 11,
           "source_families": [
             "ami_mix_headset"
           ],
-          "speaker_induced_cut_count_per_active_speech_hour": 0.0,
+          "speaker_induced_cut_count_per_active_speech_hour": 185.233268619207,
           "topology": {
             "clean_direct_different_speaker_handoff": {
               "eligible_episode_count": 100,
               "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_predicted_cut": 15,
               "episodes_with_reference_replacement": 58,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "overlap_return": {
               "eligible_episode_count": 461,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 1,
+              "episodes_with_predicted_cut": 25,
               "episodes_with_reference_replacement": 145,
-              "overlap_return_preservation_rate": 1.0,
+              "overlap_return_preservation_rate": 0.9457700650759219,
               "overlap_takeover_success_rate": null
             },
             "overlap_takeover": {
               "eligible_episode_count": 223,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 1,
+              "episodes_with_predicted_cut": 52,
               "episodes_with_reference_replacement": 166,
               "overlap_return_preservation_rate": null,
-              "overlap_takeover_success_rate": 0.0
+              "overlap_takeover_success_rate": 0.004484304932735426
             },
             "same_speaker_silence_gap_resume": {
               "eligible_episode_count": 2978,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 7,
+              "episodes_with_predicted_cut": 62,
               "episodes_with_reference_replacement": 363,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "short_backchannel_return": {
               "eligible_episode_count": 313,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 1,
+              "episodes_with_predicted_cut": 46,
               "episodes_with_reference_replacement": 112,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
             },
             "silence_gap_different_speaker_handoff": {
               "eligible_episode_count": 685,
-              "episodes_with_aligned_cut": 0,
-              "episodes_with_predicted_cut": 0,
+              "episodes_with_aligned_cut": 7,
+              "episodes_with_predicted_cut": 234,
               "episodes_with_reference_replacement": 456,
               "overlap_return_preservation_rate": null,
               "overlap_takeover_success_rate": null
@@ -4958,6 +4959,12 @@
       ],
       "future_context_ms": 0,
       "held_out_family": "alimeeting_far_ch0",
+      "optimization": {
+        "completed_epochs": 8,
+        "maximum_epochs": 8,
+        "optimizer": "sgd",
+        "status": "fixed_epochs_complete"
+      },
       "probe_class": "linear",
       "train_fit_sanity": {
         "duration_weighted_accuracy": 0.7685676760094675,
@@ -4989,10 +4996,16 @@
       ],
       "future_context_ms": 0,
       "held_out_family": "alimeeting_far_ch0",
+      "optimization": {
+        "completed_epochs": 64,
+        "maximum_epochs": 64,
+        "optimizer": "adam",
+        "status": "maximum_epochs_reached"
+      },
       "probe_class": "tiny_mlp",
       "train_fit_sanity": {
-        "duration_weighted_accuracy": 0.7354346199679044,
-        "duration_weighted_average_precision": 0.23979286973517588,
+        "duration_weighted_accuracy": 0.7744752483940064,
+        "duration_weighted_average_precision": 0.24077300327531717,
         "positive_fraction": 0.06577002257108688,
         "sample_count": 135795
       },
@@ -5023,6 +5036,12 @@
       ],
       "future_context_ms": 0,
       "held_out_family": "ami_mix_headset",
+      "optimization": {
+        "completed_epochs": 8,
+        "maximum_epochs": 8,
+        "optimizer": "sgd",
+        "status": "fixed_epochs_complete"
+      },
       "probe_class": "linear",
       "train_fit_sanity": {
         "duration_weighted_accuracy": 0.7426464050594743,
@@ -5053,10 +5072,16 @@
       ],
       "future_context_ms": 0,
       "held_out_family": "ami_mix_headset",
+      "optimization": {
+        "completed_epochs": 64,
+        "maximum_epochs": 64,
+        "optimizer": "adam",
+        "status": "maximum_epochs_reached"
+      },
       "probe_class": "tiny_mlp",
       "train_fit_sanity": {
-        "duration_weighted_accuracy": 0.6866763567764407,
-        "duration_weighted_average_precision": 0.2074402203751184,
+        "duration_weighted_accuracy": 0.7839537194172017,
+        "duration_weighted_average_precision": 0.23131581137284507,
         "positive_fraction": 0.039846066385507584,
         "sample_count": 51870
       },

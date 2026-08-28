@@ -3,8 +3,9 @@
   "provenance": {
     "action_reference_ledger_sha256": "0294d0fe35964e138fd9f4a295adbb913056bccc0a0ab2ffa9c6b015b772ae19",
     "config_sha256": "1b0f1f69f3bbca706dca11c4b731dd4992e58251eb188d5ca39bc7929d7cc5d2",
-    "evidence_reuse_receipt_sha256": "5710d9f16f712a3d607d32e15b68793f1af53a0bfaa785175915cebdd1cb1bcf",
+    "evidence_reuse_receipt_sha256": "5f719fe2249316eb767666651b769a636e0638161a4a8ed2740ef0a4e4cec06f",
     "oracle_mapping_ledger_sha256": "43064f16b2fc2419b681a99c81a31cd8e2cb95362624f35d99360665902c5525",
+    "posterior_training_config_sha256": "706475d4e346ea1a4a07644bdbb8ce15cb53a9d3fb4f5ac6a060b3ad5bffc700",
     "repository_baseline_sha": "fb92cf10bbbba96f25207358b65b21c49f63d68f",
     "split_manifest_sha256": "f3d10d6a0268e42c7f5aeda21958cecc53512267a6ef2c843f9acfa25a4c7b46"
   },

@@ -19,6 +19,7 @@ from experiments.psem_frozen_ceiling_gate.experiment_support import (
     intervals_from_manifest,
     load_json,
     percentile,
+    posterior_hidden_trigger_gate_passes,
     product_event_metrics,
     session_topology,
     sha256_file,
@@ -31,6 +32,8 @@ HIDDEN_TRAINING_CONFIG_PATH = PACKAGE_ROOT / "hidden_training_config.json"
 REPRESENTATION_RECEIPT_PATH = PACKAGE_ROOT / "hidden_representation_receipt.json"
 HIDDEN_TRIGGER_PATH = PACKAGE_ROOT / "hidden_trigger_revalidation.json"
 HIDDEN_EXTRACTION_COMPATIBILITY_PATH = PACKAGE_ROOT / "hidden_extraction_compatibility.json"
+POSTERIOR_TRAINING_CONFIG_PATH = PACKAGE_ROOT / "posterior_training_config.json"
+DECISION_CONFIG_PATH = PACKAGE_ROOT / "decision_config.json"
 SPLIT_PATH = PACKAGE_ROOT / "split_manifest.json"
 CONFIG_PATH = PACKAGE_ROOT / "config.json"
 MAPPING_PATH = PACKAGE_ROOT / "oracle_mapping_ledger.jsonl"
@@ -55,7 +58,11 @@ def _expected_hidden_provenance() -> dict[str, str]:
     }
 
 
-def _validate_hidden_evidence(hidden_paths: dict[str, Path]) -> bool:
+def _validate_hidden_evidence(
+    hidden_paths: dict[str, Path],
+    posterior_training_cfg: dict[str, Any],
+    decision_cfg: dict[str, Any],
+) -> bool:
     artifact_paths = [*hidden_paths.values(), HIDDEN_SOURCE_RESULTS_PATH, EXTRACTION_RECEIPT_PATH]
     present = [path.is_file() for path in artifact_paths]
     if not any(present):
@@ -74,6 +81,15 @@ def _validate_hidden_evidence(hidden_paths: dict[str, Path]) -> bool:
         representation.get("opened") is not True
         or trigger.get("status") != "opened"
         or trigger.get("decision") != "hidden_ceiling_remains_required"
+        or trigger.get("posterior_training_config_sha256")
+        != sha256_file(POSTERIOR_TRAINING_CONFIG_PATH)
+        or trigger.get("decision_config_sha256") != sha256_file(DECISION_CONFIG_PATH)
+        or not posterior_hidden_trigger_gate_passes(
+            trigger,
+            posterior_training_cfg,
+            tuple(map(str, decision_cfg["posterior_train_fit_required_conditions"])),
+            int(decision_cfg["posterior_source_family_min_worse_metrics"]),
+        )
         or trigger.get("representation_receipt_sha256") != sha256_file(REPRESENTATION_RECEIPT_PATH)
         or any(sha256_file(path) != trigger.get(field) for field, path in trigger_paths.items())
     ):
@@ -620,6 +636,44 @@ def _hidden_train_fit(path: Path, cfg: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _posterior_train_fit(path: Path, cfg: dict[str, Any]) -> dict[str, Any]:
+    value = load_json(path)
+    if value.get("provenance", {}).get("posterior_training_config_sha256") != sha256_file(
+        POSTERIOR_TRAINING_CONFIG_PATH
+    ):
+        raise ValueError(f"posterior training provenance differs: {path.name}")
+    reference_probe = str(cfg["reference_probe_class"])
+    receipts = [
+        receipt
+        for receipt in value["training_receipts"]
+        if receipt["probe_class"] == reference_probe
+    ]
+    checks = [
+        receipt.get("optimization", {}).get("status") == "sanity_reached"
+        and receipt["train_fit_sanity"]["duration_weighted_average_precision"]
+        >= float(cfg["train_fit_min_average_precision"])
+        and receipt["train_fit_sanity"]["duration_weighted_accuracy"]
+        >= float(cfg["train_fit_min_accuracy"])
+        for receipt in receipts
+    ]
+    return {
+        "status": "passed" if receipts and all(checks) else "failed",
+        "reference_probe_class": reference_probe,
+        "fold_count": len(receipts),
+        "minimum_average_precision": min(
+            (
+                receipt["train_fit_sanity"]["duration_weighted_average_precision"]
+                for receipt in receipts
+            ),
+            default=None,
+        ),
+        "minimum_accuracy": min(
+            (receipt["train_fit_sanity"]["duration_weighted_accuracy"] for receipt in receipts),
+            default=None,
+        ),
+    }
+
+
 def _hidden_success(
     left_path: Path,
     right_path: Path,
@@ -656,10 +710,10 @@ def _hidden_success(
 def _hidden_failure_concentration(
     hidden_cell: dict[str, Any],
     g_per_source_family: dict[str, Any],
-    causal_success: dict[str, Any],
     cfg: dict[str, Any],
 ) -> dict[str, Any]:
     family_concentration = {}
+    residuals = {}
     for family, hidden_family in hidden_cell["per_source_family"].items():
         hidden_slices = hidden_family["diagnostic_slices"]
         g_family = g_per_source_family[family]
@@ -668,6 +722,25 @@ def _hidden_failure_concentration(
         absent_hazard = hidden_slices["anchor_absent_live"]["mean_hazard"]
         hidden_takeover = hidden_family["overlap_takeover_success_rate"]
         g_takeover = g_family["overlap_takeover_success_rate"]
+        hidden_hours = float(hidden_family["active_speech_hours"])
+        g_hours = float(g_family["active_speech_hours"])
+        hidden_replacements = int(hidden_family["reference_replacement_count"])
+        g_replacements = int(g_family["reference_replacement_count"])
+        residuals[family] = {
+            "contamination_seconds_per_active_speech_hour_gap": (
+                hidden_family["exclusive_other_contamination_seconds_per_active_speech_hour"]
+                - g_family["exclusive_other_contamination_seconds_per_active_speech_hour"]
+            ),
+            "false_cut_count_per_active_speech_hour_gap": (
+                hidden_family["false_cut_count"] / hidden_hours
+                - g_family["false_cut_count"] / g_hours
+            ),
+            "missed_replacement_rate_gap": (
+                hidden_family["missed_replacement_count"] / hidden_replacements
+                - g_family["missed_replacement_count"] / g_replacements
+            ),
+            "overlap_takeover_success_rate_gap": ((g_takeover or 0.0) - (hidden_takeover or 0.0)),
+        }
         family_concentration[family] = {
             "overlap_masking": (
                 None not in (overlap_hazard, anchor_hazard, hidden_takeover, g_takeover)
@@ -677,29 +750,40 @@ def _hidden_failure_concentration(
             "competitor_separation": (
                 None not in (absent_hazard, overlap_hazard) and absent_hazard <= overlap_hazard
             ),
+            "overlap_takeover_deficit": (
+                None not in (hidden_takeover, g_takeover) and hidden_takeover < g_takeover
+            ),
         }
-    improved_counts = {
-        str(family): int(value)
-        for family, value in causal_success["source_family_improved_metric_counts"].items()
+    fields = tuple(map(str, cfg["hidden_residual_fields"]))
+    if any(set(value) != set(fields) for value in residuals.values()):
+        raise ValueError("hidden residual attribution fields differ")
+    worst_families_by_metric = {
+        field: sorted(
+            family
+            for family, values in residuals.items()
+            if values[field] == max(item[field] for item in residuals.values())
+        )
+        for field in fields
     }
-    if set(improved_counts) != set(family_concentration):
-        raise ValueError("hidden failure source-family attribution differs")
-    minimum = int(cfg["source_family_min_improved_metrics"])
-    passing_families = sorted(
-        family for family, count in improved_counts.items() if count >= minimum
-    )
-    failing_families = sorted(
-        family for family, count in improved_counts.items() if count < minimum
+    worst_metric_counts = {
+        family: sum(family in worst for worst in worst_families_by_metric.values())
+        for family in sorted(residuals)
+    }
+    minimum = int(cfg["source_family_min_worst_residual_metrics"])
+    concentrated_families = sorted(
+        family for family, count in worst_metric_counts.items() if count >= minimum
     )
     source_family_domain = {
-        "status": "passed" if passing_families and failing_families else "failed",
-        "minimum_improved_metrics": minimum,
-        "improved_metric_counts": improved_counts,
-        "passing_families": passing_families,
-        "failing_families": failing_families,
+        "status": "passed" if concentrated_families else "failed",
+        "minimum_worst_residual_metrics": minimum,
+        "direct_hidden_to_gt_residuals": residuals,
+        "worst_families_by_metric": worst_families_by_metric,
+        "worst_metric_counts": worst_metric_counts,
+        "concentrated_families": concentrated_families,
     }
     slice_localized = bool(family_concentration) and all(
-        any(checks.values()) for checks in family_concentration.values()
+        checks["overlap_masking"] or checks["competitor_separation"]
+        for checks in family_concentration.values()
     )
     return {
         "per_source_family": family_concentration,
@@ -724,6 +808,8 @@ def render_final_decision() -> str:
         raise FileNotFoundError("missing result artifacts: " + ", ".join(missing))
     cfg = config()
     hidden_cfg = load_json(HIDDEN_CONFIG_PATH)
+    posterior_training_cfg = load_json(POSTERIOR_TRAINING_CONFIG_PATH)
+    decision_cfg = load_json(DECISION_CONFIG_PATH)
     persistence = int(cfg["gap_reference_confirmation_ms"])
     g_result = json.loads(required["G"].read_text(encoding="utf-8"))
     g_cell = next(value for value in g_result["rows"] if value["confirmation_ms"] == persistence)
@@ -735,6 +821,8 @@ def render_final_decision() -> str:
         persistence,
     )
     g = g_cell["metrics"]
+    g_fast_cell = min(g_result["rows"], key=lambda value: int(value["confirmation_ms"]))
+    g_fast = g_fast_cell["metrics"]
     current = _point(required["S-current"], "S-current", "current", 0.5, persistence)["metrics"]
     scalar = _point(required["S-probe"], "S-probe", "tiny_mlp", 0.5, persistence)["metrics"]
     causal = _point(required["P-C"], "P-C", "tiny_mlp", 0.5, persistence)["metrics"]
@@ -746,11 +834,36 @@ def render_final_decision() -> str:
         "H-C": RESULTS_ROOT / "hidden_causal_metrics.json",
         "H-NC": RESULTS_ROOT / "hidden_noncausal_metrics.json",
     }
-    hidden_available = _validate_hidden_evidence(hidden_paths)
+    posterior_fit = {
+        condition: _posterior_train_fit(required[condition], posterior_training_cfg)
+        for condition in ("S-probe", "P-C", "P-NC")
+    }
+    required_fit_conditions = tuple(
+        map(str, decision_cfg["posterior_train_fit_required_conditions"])
+    )
+    posterior_fit_passed = all(
+        posterior_fit[condition]["status"] == "passed" for condition in required_fit_conditions
+    )
+    hidden_available = (
+        _validate_hidden_evidence(
+            hidden_paths, posterior_training_cfg, decision_cfg
+        )
+        if posterior_fit_passed
+        else False
+    )
     hidden_cells: dict[str, Any] = {}
     hidden_diagnostics: dict[str, Any] = {}
     terminal_status = "hidden_ceiling_not_evaluated"
-    if hidden_available:
+    if not posterior_fit_passed:
+        path = "unresolved; posterior probe train-fit sanity failed"
+        next_issue = "posterior probe train-fit repair within this issue"
+        hidden = (
+            "not interpretable because the posterior ceiling failed its training-only sanity "
+            f"gate: {posterior_fit}"
+        )
+        rejected = "Hidden-stage and teacher-path selection remain unauthorized until posterior train-fit sanity is proven."
+        terminal_status = "posterior_probe_train_fit_inconclusive"
+    elif hidden_available:
         hidden_cells = {
             "H-C": _point(
                 hidden_paths["H-C"],
@@ -793,8 +906,7 @@ def render_final_decision() -> str:
         residual_concentration = _hidden_failure_concentration(
             hidden_cells["H-C"],
             g_per_source_family,
-            causal_success,
-            hidden_cfg,
+            decision_cfg,
         )
         hidden_diagnostics["neural_acoustic_failure_concentration"] = residual_concentration
         if any(value["status"] != "passed" for value in fit.values()):
@@ -869,6 +981,7 @@ def render_final_decision() -> str:
         rejected = "Direct scalar-posterior distillation and immediate full fine-tuning remain rejected until hidden evidence exists."
         terminal_status = "hidden_ceiling_required"
     gap = {
+        "G_action_frontier_fast_to_reference": _delta(g_fast, g),
         "G_to_S_current": _delta(current, g),
         "S_current_to_S_probe": _delta(scalar, current),
         "S_probe_to_P_C": _delta(causal, scalar),
@@ -878,6 +991,7 @@ def render_final_decision() -> str:
             "P_C_vs_S_probe": pc_vs_scalar,
             "P_NC_vs_P_C": pnc_vs_pc,
         },
+        "posterior_train_fit_sanity": posterior_fit,
     }
     if hidden_available:
         gap.update(
@@ -902,13 +1016,15 @@ def render_final_decision() -> str:
         )
         family_domain = residual_concentration["source_family_domain"]
         failure_concentration = (
-            "Remaining hidden-causal failures are source-family heterogeneous: "
+            "Direct H-C-to-G residuals are source-family concentrated in "
+            f"{family_domain['concentrated_families'] or ['none']}, with worst-metric counts "
+            f"{family_domain['worst_metric_counts']} across the four frozen residual fields. "
+            "The acoustic checks additionally find "
             f"overlap masking is detected in {overlap_families or ['none']} and competitor "
-            f"separation in {competitor_families or ['none']}; the frozen family rule passes "
-            f"{family_domain['passing_families']} and fails {family_domain['failing_families']}. "
-            "The evidence therefore localizes the residual to overlap/source-family acoustic "
-            "conditions rather than a uniform decoder failure; device/noise is represented only "
-            "through the frozen corpus-device families."
+            f"separation in {competitor_families or ['none']}. The rule measures hidden-to-G "
+            "product residuals directly, so the evidence localizes failure to overlap/source-family "
+            "conditions rather than hidden-over-posterior improvement; device/noise is represented "
+            "only through the frozen corpus-device families."
         )
     else:
         failure_concentration = (
@@ -919,12 +1035,18 @@ def render_final_decision() -> str:
     text = "# FROZEN-CEILING-1 final decision\n\n"
     text += "This report is generated only after the scored artifacts exist. It is development-known path-selection evidence, not production readiness or a fresh holdout.\n\n"
     text += "## Ordered answers\n\n"
+    scalar_fit = posterior_fit["S-probe"]
+    scalar_answer = (
+        f"The flexible scalar S-probe changes contamination by {gap['S_current_to_S_probe']['contamination_seconds_per_active_speech_hour']:+.3f} seconds/hour, false cuts by {gap['S_current_to_S_probe']['false_cut_count']:+d}, misses by {gap['S_current_to_S_probe']['missed_replacement_count']:+d}, and p90 delay by {gap['S_current_to_S_probe']['replacement_emit_delay_p90_ms']:+.1f} ms at the fixed cell. Its training-only sanity gate did not pass (minimum AP {scalar_fit['minimum_average_precision']:.3f}, minimum accuracy {scalar_fit['minimum_accuracy']:.3f}), so these held-out tradeoffs are descriptive and do not establish the scalar projection ceiling; no held-out architecture or threshold was selected."
+        if scalar_fit["status"] != "passed"
+        else f"The flexible scalar S-probe changes contamination by {gap['S_current_to_S_probe']['contamination_seconds_per_active_speech_hour']:+.3f} seconds/hour, false cuts by {gap['S_current_to_S_probe']['false_cut_count']:+d}, misses by {gap['S_current_to_S_probe']['missed_replacement_count']:+d}, and p90 delay by {gap['S_current_to_S_probe']['replacement_emit_delay_p90_ms']:+.1f} ms at the fixed cell. Its training-only sanity gate passed, but the product result remains a Pareto tradeoff rather than a material scalar-readout win; no held-out architecture or threshold was selected."
+    )
     answers = [
         "Yes as the bounded evaluator floor: every predeclared G arm is simulated independently from exact-source-time GT activity, while the 500 ms arm exactly reproduces the sealed issue-98 Simple Anchor reference. This does not declare one scalar utility or production readiness.",
-        f"At the predeclared {persistence} ms / 0.5 diagnostic cell, the action-policy plus neural gap is recorded as G→S-current below; the full frontier remains authoritative.",
-        "S-probe versus S-current is quantified below at the fixed diagnostic cell; no architecture or threshold was selected on the held-out families.",
-        f"P-C versus S-probe has Pareto counts {pc_vs_scalar}; the fixed-cell delta is recorded below.",
-        f"P-NC versus P-C has Pareto counts {pnc_vs_pc}; future context remains diagnostic and its frontier delay includes the future evidence availability.",
+        f"The G action-policy tradeoff is explicit: moving from the sealed {persistence} ms arm to the {g_fast_cell['confirmation_ms']} ms arm changes contamination by {gap['G_action_frontier_fast_to_reference']['contamination_seconds_per_active_speech_hour']:+.3f} seconds/hour, false cuts by {gap['G_action_frontier_fast_to_reference']['false_cut_count']:+d}, misses by {gap['G_action_frontier_fast_to_reference']['missed_replacement_count']:+d}, and p90 delay by {gap['G_action_frontier_fast_to_reference']['replacement_emit_delay_p90_ms']:+.1f} ms. At the same sealed policy point, S-current remains worse than G by {gap['G_to_S_current']['contamination_seconds_per_active_speech_hour']:+.3f} seconds/hour, {gap['G_to_S_current']['false_cut_count']:+d} false cuts, and {gap['G_to_S_current']['missed_replacement_count']:+d} misses. The frontier therefore identifies a latency/cut tradeoff, while the much larger fixed-policy residual is neural-evidence loss rather than the 500 ms action policy alone.",
+        scalar_answer,
+        f"Full-slot P-C also does not close additional gap over S-probe at the fixed cell: contamination changes by {gap['S_probe_to_P_C']['contamination_seconds_per_active_speech_hour']:+.3f} seconds/hour, false cuts by {gap['S_probe_to_P_C']['false_cut_count']:+d}, misses by {gap['S_probe_to_P_C']['missed_replacement_count']:+d}, with frontier counts {pc_vs_scalar}. The causal full-slot evidence is therefore not a viable frozen-posterior ceiling under this probe contract.",
+        f"Bounded P-NC is a tradeoff rather than a material overall win over P-C: contamination changes by {gap['P_C_to_P_NC']['contamination_seconds_per_active_speech_hour']:+.3f} seconds/hour and misses by {gap['P_C_to_P_NC']['missed_replacement_count']:+d}, but false cuts change by {gap['P_C_to_P_NC']['false_cut_count']:+d} and p90 delay by {gap['P_C_to_P_NC']['replacement_emit_delay_p90_ms']:+.1f} ms; frontier counts are {pnc_vs_pc}. Future context remains diagnostic and does not establish a streaming/context-only path.",
         failure_concentration,
         (
             "Yes; proceed to native causal S2."
@@ -955,7 +1077,7 @@ def render_final_decision() -> str:
     )
     text += json.dumps(reference_cells, indent=2, sort_keys=True)
     text += "\n```\n"
-    (RESULTS_ROOT / "FINAL_DECISION.md").write_text(text, encoding="utf-8")
+    (RESULTS_ROOT / "FINAL_DECISION.md").write_text(text, encoding="utf-8", newline="\n")
     return terminal_status
 
 
@@ -977,6 +1099,9 @@ def main() -> None:
             "schema_version": "psem.frozen_ceiling.evaluation_receipt.v1",
             "status": status,
             "final_decision_sha256": sha256_file(RESULTS_ROOT / "FINAL_DECISION.md"),
+            "posterior_training_config_sha256": sha256_file(POSTERIOR_TRAINING_CONFIG_PATH),
+            "decision_config_sha256": sha256_file(DECISION_CONFIG_PATH),
+            "hidden_trigger_revalidation_sha256": sha256_file(HIDDEN_TRIGGER_PATH),
             "hidden_artifacts": hidden_artifacts,
         },
     )

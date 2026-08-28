@@ -1,0 +1,12 @@
+{
+  "schema_version": "psem.frozen_ceiling.decision.v1",
+  "posterior_train_fit_required_conditions": ["P-C", "P-NC"],
+  "posterior_source_family_min_worse_metrics": 2,
+  "hidden_residual_fields": [
+    "contamination_seconds_per_active_speech_hour_gap",
+    "false_cut_count_per_active_speech_hour_gap",
+    "missed_replacement_rate_gap",
+    "overlap_takeover_success_rate_gap"
+  ],
+  "source_family_min_worst_residual_metrics": 3
+}

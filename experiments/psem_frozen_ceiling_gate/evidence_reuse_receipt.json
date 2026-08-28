@@ -38,7 +38,7 @@
     },
     "experiment_support": {
       "path": "experiments/psem_frozen_ceiling_gate/experiment_support.py",
-      "sha256": "1e981d6ce8b640c87cfd106207c7e506a1c9c83339bd913fa8d3f07e5cf0de7c"
+      "sha256": "7ddc8b5b6ba80c9053b34dd7cc7d2dbbd75599325792b31bb3ece555e0f5c5c3"
     },
     "feature_contract": {
       "path": "experiments/psem_frozen_ceiling_gate/posterior_features.py",

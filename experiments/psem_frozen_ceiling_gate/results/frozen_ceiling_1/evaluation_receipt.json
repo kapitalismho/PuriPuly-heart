@@ -1,11 +1,14 @@
 {
-  "final_decision_sha256": "4bc1034f214e674ef7e0eda4af6815fd8b75a67d7ae1859fbb5319ad312ad268",
+  "decision_config_sha256": "79ff88b91bf30a9ac087f3e28b52bc00e3f9d72605398120503d39cf506eba29",
+  "final_decision_sha256": "7950943a5ea05f52cea69502a4e243541e3eb1bbc856d55620800d594bd7acf1",
   "hidden_artifacts": {
-    "H-C": "8232bdf775f876a63ed675ea22e5bd2b08d69475f1cb9abe5bd4cb66be74f9eb",
-    "H-NC": "f6db8f150d4795c1795fdb5ee922b97559c2d2b24978556b3f951534d223e8ed",
+    "H-C": "8ac9bef07377b7ecc6a25b467b82c6a8840c4ec92966b50d8817b0cde18ea8ec",
+    "H-NC": "3c6f2e947926b174f05c89d32cec7f5c34073b5d13989af3ce8125959cac6bef",
     "extraction": "93e24d4047607568a9a2f710fe05db94f4a02b5fc87d03106df0b63080744bd7",
-    "source_families": "60be60492f6e74533f7d77781cc5ff1fba1611ebdab721feec2c82e75e831bb7"
+    "source_families": "5c96a693d495023722fd2bed31b0ceed0d31c3ade7b384b758067f312c47fba7"
   },
+  "hidden_trigger_revalidation_sha256": "1962b9a86b010112c5d83c22d53dfef9663f8c42ce937bd855b4e7115ea55eab",
+  "posterior_training_config_sha256": "706475d4e346ea1a4a07644bdbb8ce15cb53a9d3fb4f5ac6a060b3ad5bffc700",
   "schema_version": "psem.frozen_ceiling.evaluation_receipt.v1",
   "status": "hidden_ceiling_interpreted"
 }
