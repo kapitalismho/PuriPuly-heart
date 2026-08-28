@@ -1,11 +1,11 @@
 {
-  "final_decision_sha256": "2e56dcae9526e89f80056f124d7b064d1a76931e7b1b977301031c41e661c236",
+  "final_decision_sha256": "0b0da28bff898a346ef4e361df4f242c89a54f027e9cd09003559012683a13bb",
   "hidden_artifacts": {
-    "H-C": "be36ff872f335dc503f69e571b1fef0166a47558f057d95911cc9dac05dd1462",
-    "H-NC": "3023061e9cda059980687c048528d314776bf375e73858059af5c5111d5b030f",
+    "H-C": "828eba3193852441a01a7bcd24f8df39a64c3b1d29216e94de25805c512ef2ad",
+    "H-NC": "e5227eb21561480f6b25c7f35ccf9617b4349faaf7e5e694492b991e28d883d3",
     "extraction": "93e24d4047607568a9a2f710fe05db94f4a02b5fc87d03106df0b63080744bd7",
-    "source_families": "1b2eb5fd77b0295bc8647d271d6f69b79fcd9c62b437ecb28b7df4f049ec96af"
+    "source_families": "fd588219ad75d4a87aa6230d365264e4f4c0cedcf953508655d3d0be971de159"
   },
   "schema_version": "psem.frozen_ceiling.evaluation_receipt.v1",
-  "status": "hidden_probe_train_fit_inconclusive"
+  "status": "hidden_failure_attribution_inconclusive"
 }
