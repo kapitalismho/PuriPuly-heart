@@ -13,6 +13,8 @@ from puripuly_heart.app.wiring import (
     build_openrouter_release_runtime_config,
     build_peer_stt_provider_signature,
     build_peer_stt_provider_signature_from_vnext,
+    build_self_stt_runtime_signature,
+    build_self_stt_runtime_signature_from_vnext,
     create_llm_provider_from_resolved_config,
     resolve_peer_stt_config,
     resolve_peer_stt_runtime_config_from_vnext,
@@ -2043,6 +2045,54 @@ def test_create_peer_stt_backend_uses_shared_qwen_region_for_endpoint_and_secret
     assert isinstance(backend, QwenASRRealtimeSTTBackend)
     assert backend.api_key == "peer-qwen"
     assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+
+
+def test_self_stt_runtime_signature_from_vnext_matches_bag_restart_fields() -> None:
+    cases = (
+        AppSettings(
+            provider=ProviderSettings(stt=STTProviderName.DEEPGRAM),
+            stt=STTSettings(
+                custom_vocabulary_enabled=True,
+                custom_terms={"ko": [" Puripuly ", "a,b", "VRChat"]},
+            ),
+        ),
+        AppSettings(
+            provider=ProviderSettings(stt=STTProviderName.LOCAL_QWEN),
+            stt=STTSettings(
+                custom_vocabulary_enabled=True,
+                custom_terms={"ko": [f"term{i}, extra" for i in range(20)]},
+            ),
+        ),
+        AppSettings(
+            provider=ProviderSettings(stt=STTProviderName.LOCAL_QWEN_GPU),
+            stt=STTSettings(
+                custom_vocabulary_enabled=True,
+                custom_terms={"ko": ["gpu-term"]},
+            ),
+        ),
+        AppSettings(
+            provider=ProviderSettings(stt=STTProviderName.SONIOX),
+            stt=STTSettings(
+                custom_vocabulary_enabled=True,
+                custom_terms={"ko": ["soniox-term"]},
+            ),
+        ),
+        AppSettings(
+            provider=ProviderSettings(stt=STTProviderName.QWEN_ASR),
+            qwen=QwenSettings(region=QwenRegion.BEIJING),
+        ),
+        AppSettings(
+            provider=ProviderSettings(stt=STTProviderName.QWEN_ASR),
+            qwen=QwenSettings(region=QwenRegion.SINGAPORE),
+        ),
+        AppSettings(provider=ProviderSettings(stt=STTProviderName.CUSTOM)),
+    )
+    for settings in cases:
+        settings.qwen_asr_stt.endpoint = settings.qwen.get_asr_endpoint()
+        canonical = from_legacy_app_settings(settings)
+        assert build_self_stt_runtime_signature_from_vnext(
+            canonical
+        ) == build_self_stt_runtime_signature(settings)
 
 
 def test_build_peer_stt_provider_signature_includes_backend_affecting_values() -> None:

@@ -24,6 +24,7 @@ from puripuly_heart.app.services.peer_capture_target_application import (
     PeerCaptureTargetApplicationOwner,
 )
 from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
@@ -47,7 +48,7 @@ def compose_peer_application(
     *,
     settings_provider: Callable[[], AppSettings | None],
     settings_owner: SettingsOwner,
-    canonical_settings: Callable[[AppSettings], object],
+    canonical_settings: Callable[[AppSettings], AppSettingsVNext],
     runtime_provider: Callable[[], LocalASRProviderRuntimePort | None],
     translation_runtime_configuration_provider: Callable[
         [],

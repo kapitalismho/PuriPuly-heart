@@ -18,11 +18,10 @@ from puripuly_heart.app.services.manual_local_asr_fallback import (
 from puripuly_heart.app.services.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
 )
-from puripuly_heart.app.wiring.wiring_secrets_factory import create_secret_store
+from puripuly_heart.app.wiring import create_secret_store, runtime_pipeline_inputs_from_vnext
 from puripuly_heart.app.wiring_runtime_pipeline import (
     RuntimePipelineHandle,
     RuntimePipelineLauncher,
-    runtime_pipeline_inputs_from_vnext,
 )
 from puripuly_heart.app.wiring_translation_runtime_configuration import (
     replace_translation_runtime_enabled,

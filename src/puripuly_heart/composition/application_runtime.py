@@ -136,26 +136,25 @@ from puripuly_heart.app.services.ui_application_state import UiApplicationStateO
 from puripuly_heart.app.wiring import (
     LocalASRProviderRuntimeFactory,
     ManagedSTTProviderFactory,
+    build_peer_capture_session_config_from_vnext,
     build_peer_stt_provider_request,
+    build_peer_stt_runtime_signature_from_vnext,
+    build_self_capture_session_config_from_vnext,
+    build_self_stt_provider_request_from_vnext,
+    build_self_stt_runtime_signature_from_vnext,
     create_local_asr_provisioning_owner,
     create_provider_verifier,
     create_secret_store,
     create_self_capture_admission_adapter,
     create_sync_secret_store_adapter,
     resolve_overlay_config,
+    runtime_pipeline_inputs_from_vnext,
 )
 from puripuly_heart.app.wiring.wiring_managed_gemma import (
     create_managed_gemma_runtime,
     managed_gemma_selection,
     managed_gemma_translation_desired,
     sync_managed_gemma_demand,
-)
-from puripuly_heart.app.wiring.wiring_stt_factory import (
-    build_peer_capture_session_config_from_vnext,
-    build_peer_stt_runtime_signature_from_vnext,
-    build_self_capture_session_config_from_vnext,
-    build_self_stt_provider_request_from_vnext,
-    build_self_stt_runtime_signature_from_vnext,
 )
 from puripuly_heart.app.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
@@ -196,7 +195,6 @@ from puripuly_heart.app.wiring_runtime_pipeline import (
     RuntimePipelineComponents,
     RuntimePipelineHandle,
     RuntimePipelineLauncher,
-    runtime_pipeline_inputs_from_vnext,
 )
 from puripuly_heart.app.wiring_vrc_mic_sync import compose_vrc_mic_sync
 from puripuly_heart.composition.application_settings import load_application_settings

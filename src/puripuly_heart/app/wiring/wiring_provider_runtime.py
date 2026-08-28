@@ -496,9 +496,7 @@ def compose_provider_runtime(
         ),
         peer_signature_builder=lambda current, canonical: (
             build_peer_stt_provider_signature_from_vnext(
-                canonical
-                if isinstance(canonical, AppSettingsVNext)
-                else canonical_settings(current)
+                canonical if canonical is not None else canonical_settings(current)
             )
         ),
         llm_signature_builder=lambda current: build_llm_provider_signature(

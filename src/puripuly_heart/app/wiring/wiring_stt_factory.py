@@ -438,33 +438,39 @@ def resolve_self_stt_runtime_config(settings: object) -> ResolvedSTTConfig:
     )
 
 
-def _self_stt_custom_vocabulary_signature(
-    settings: object,
+def _qwen_asr_endpoint_for_region(region: object) -> str:
+    if region == QwenRegion.SINGAPORE or region == QwenRegion.SINGAPORE.value:
+        return "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+    return "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+
+
+def _self_stt_custom_vocabulary_signature_for_provider(
+    *,
+    provider: object,
+    enabled: bool,
+    terms: Mapping[str, list[str]],
+    source_language: str,
 ) -> tuple[bool, tuple[str, ...]]:
-    if settings.provider.stt not in {
+    if provider not in {
         STTProviderName.DEEPGRAM,
         STTProviderName.LOCAL_QWEN,
         STTProviderName.SONIOX,
     }:
         return False, ()
-    if settings.provider.stt == STTProviderName.LOCAL_QWEN:
-        return (
-            settings.stt.custom_vocabulary_enabled,
-            tuple(
-                get_effective_local_qwen_hotwords(
-                    build_custom_vocabulary_runtime_config(settings),
-                    settings.languages.source_language,
-                )
-            ),
-        )
-    return (
-        settings.stt.custom_vocabulary_enabled,
-        tuple(
-            get_effective_custom_terms(
-                build_custom_vocabulary_runtime_config(settings),
-                settings.languages.source_language,
-            )
-        ),
+    config = CustomVocabularyRuntimeConfig(enabled=enabled, terms=terms)
+    if provider == STTProviderName.LOCAL_QWEN:
+        return enabled, tuple(get_effective_local_qwen_hotwords(config, source_language))
+    return enabled, tuple(get_effective_custom_terms(config, source_language))
+
+
+def _self_stt_custom_vocabulary_signature(
+    settings: object,
+) -> tuple[bool, tuple[str, ...]]:
+    return _self_stt_custom_vocabulary_signature_for_provider(
+        provider=settings.provider.stt,
+        enabled=settings.stt.custom_vocabulary_enabled,
+        terms=settings.stt.custom_terms,
+        source_language=settings.languages.source_language,
     )
 
 
@@ -793,17 +799,11 @@ def build_self_capture_session_config_from_vnext(
 def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> tuple[object, ...]:
     intent = settings.intent
     provider = intent.stt.provider
-    terms = tuple(
-        get_effective_custom_terms(
-            CustomVocabularyRuntimeConfig(
-                enabled=intent.stt.custom_vocabulary_enabled,
-                terms=intent.stt.custom_terms,
-            ),
-            intent.languages.source_language,
-        )
-    )
-    custom_vocab_enabled = intent.stt.custom_vocabulary_enabled and not is_custom_stt_provider(
-        provider
+    custom_vocab_enabled, custom_terms = _self_stt_custom_vocabulary_signature_for_provider(
+        provider=provider,
+        enabled=intent.stt.custom_vocabulary_enabled,
+        terms=intent.stt.custom_terms,
+        source_language=intent.languages.source_language,
     )
     return (
         intent.languages.source_language,
@@ -823,7 +823,11 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
         intent.stt.deepgram.model if provider == STTProviderName.DEEPGRAM.value else None,
         intent.translation.qwen.region if provider == STTProviderName.QWEN_ASR.value else None,
         intent.stt.qwen_asr.model if provider == STTProviderName.QWEN_ASR.value else None,
-        None,
+        (
+            _qwen_asr_endpoint_for_region(intent.translation.qwen.region)
+            if provider == STTProviderName.QWEN_ASR.value
+            else None
+        ),
         intent.stt.soniox.model if provider == STTProviderName.SONIOX.value else None,
         intent.stt.soniox.endpoint if provider == STTProviderName.SONIOX.value else None,
         (
@@ -841,7 +845,7 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
         intent.stt.custom.endpoint if is_custom_stt_provider(provider) else None,
         intent.stt.custom.model if is_custom_stt_provider(provider) else None,
         custom_vocab_enabled,
-        terms,
+        custom_terms,
     )
 
 

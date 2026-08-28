@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from puripuly_heart.app.ports.canonical_settings_persistence import (
     ProviderVerificationBinding,
@@ -59,21 +60,28 @@ from .provider_verification_binding import (
     ProviderVerificationBindingOwner,
 )
 
-ProviderSecretStoreFactory = Callable[[object], SecretStorePort]
-ProviderActiveSecretProvider = Callable[[object, str], str | None]
+
+class ProviderCompatibilityProjection(Protocol):
+    ui: object
+
+
+ProviderSecretStoreFactory = Callable[[ProviderCompatibilityProjection], SecretStorePort]
+ProviderActiveSecretProvider = Callable[[ProviderCompatibilityProjection, str], str | None]
 ProviderSettingsSaveFailureSink = Callable[[str], None]
-ProviderSettingsMerge = Callable[[object], object]
-ProviderSettingsAsyncEffect = Callable[[object], Awaitable[None]]
-ProviderSettingsRoute = Callable[[object], Awaitable[bool]]
-ProviderSettingsSync = Callable[[object], None]
-ProviderSettingsPredicate = Callable[[object, object], bool]
+ProviderSettingsMerge = Callable[[ProviderCompatibilityProjection], ProviderCompatibilityProjection]
+ProviderSettingsAsyncEffect = Callable[[ProviderCompatibilityProjection], Awaitable[None]]
+ProviderSettingsRoute = Callable[[ProviderCompatibilityProjection], Awaitable[bool]]
+ProviderSettingsSync = Callable[[ProviderCompatibilityProjection], None]
+ProviderSettingsPredicate = Callable[
+    [ProviderCompatibilityProjection, ProviderCompatibilityProjection], bool
+]
 ProviderSettingsCompensation = Callable[..., Awaitable[None]]
 ProviderSettingsMutationServiceProvider = Callable[[], SettingsMutationService | None]
 ProviderOrder24PatchProvider = Callable[
-    [object],
-    tuple[object, dict[str, object]] | None,
+    [ProviderCompatibilityProjection],
+    tuple[ProviderCompatibilityProjection, dict[str, object]] | None,
 ]
-ProviderSupersededSettingsConsumer = Callable[[object], bool]
+ProviderSupersededSettingsConsumer = Callable[[ProviderCompatibilityProjection], bool]
 
 
 class ProviderStrictSettingsSaveFailed(Exception):
@@ -117,7 +125,7 @@ class ProviderApplicationOwner:
 
     async def apply(
         self,
-        pending: object | None = None,
+        pending: ProviderCompatibilityProjection | None = None,
         *,
         force_rebuild_llm: bool = False,
         persist_settings: bool = True,
@@ -144,7 +152,7 @@ class ProviderApplicationOwner:
             if refresh_ui:
                 self.sync_ui()
 
-    async def _apply_combined(self, next_settings: object) -> bool:
+    async def _apply_combined(self, next_settings: ProviderCompatibilityProjection) -> bool:
         base_settings = self.settings.current
         if base_settings is None:
             return False
@@ -254,7 +262,7 @@ class ProviderApplicationOwner:
                 self._set_result(degraded)
         return True
 
-    async def _apply_translation(self, next_settings: object) -> bool:
+    async def _apply_translation(self, next_settings: ProviderCompatibilityProjection) -> bool:
         base_settings = self.settings.current
         if base_settings is None:
             return False
@@ -366,7 +374,9 @@ class ProviderApplicationOwner:
         self.remember_order22(self.settings.current)
         return True
 
-    async def _apply_stt_language_audio(self, next_settings: object) -> bool:
+    async def _apply_stt_language_audio(
+        self, next_settings: ProviderCompatibilityProjection
+    ) -> bool:
         base_settings = self.settings.current
         if base_settings is None:
             return False
@@ -506,7 +516,7 @@ class ProviderApplicationOwner:
 
     async def _apply_direct(
         self,
-        next_settings: object,
+        next_settings: ProviderCompatibilityProjection,
         *,
         force_rebuild_llm: bool,
         plan: ProviderRuntimeApplyPlan | None = None,
@@ -608,8 +618,8 @@ class ProviderApplicationOwner:
     async def _resync_committed_provider_runtime(
         self,
         *,
-        base_settings: object,
-        committed_settings: object,
+        base_settings: ProviderCompatibilityProjection,
+        committed_settings: ProviderCompatibilityProjection,
         plan: ProviderRuntimeApplyPlan,
     ) -> None:
         self.sync_memory(base_settings)
@@ -634,7 +644,7 @@ def _settings_mutation_committed(result: TransactionResult) -> bool:
 
 
 def provider_verification_context(
-    settings: object | None,
+    settings: ProviderCompatibilityProjection | None,
     provider: str,
     *,
     low_latency: bool,
@@ -776,7 +786,7 @@ class ProviderSettingsOwner:
 
     def _apply_secret_change_result(
         self,
-        committed_settings: object,
+        committed_settings: ProviderCompatibilityProjection,
         result: TransactionResult,
         succeeded: bool,
     ) -> None:
@@ -787,7 +797,7 @@ class ProviderSettingsOwner:
         self.settings.remember_projection(committed_settings)
         self.settings.complete()
 
-    def _current(self) -> object:
+    def _current(self) -> ProviderCompatibilityProjection:
         if self.settings.current is None:
             raise RuntimeError("settings owner has no compatibility settings")
         return self.settings.current
