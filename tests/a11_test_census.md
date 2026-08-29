@@ -296,3 +296,50 @@ Every entry states why it exists and the exact deletion condition (sunset). The 
 - Universal-fake surface: dead members of `fakes.py` removed; no universal fake remains.
 - Durable tests with explicit protected-risk rationale: 100% of surviving families are
   covered by this artifact.
+
+## Deep-read re-pass (owner-authorized continuation, 2026-08-29)
+
+The initial census classified most files correctly from targeted reading plus pattern
+measurement, but ~20 of the 31 terminal-review additions were classified from test names
+and module imports only, and the implemented-seam list is a small subset of the census's
+REFACTOR/SPLIT dispositions. Per owner decision, the census is now being re-executed as a
+deep-read pass:
+
+**Protocol** (applies per file, one at a time):
+
+1. Read the test file in full (every test body, helper, fixture, and fake).
+2. Classify each coherent row against the authority's core decision rule and evidence
+   hierarchy: protected risk, contract basis, observation boundary, refactor resistance,
+   duplication, lifetime, disposition.
+3. Append the per-file verdict to the [Deep-read log](#deep-read-log) below, including any
+   correction to the earlier row above (earlier rows are historical, the log is live).
+4. Continue immediately until every file in the pass list is logged.
+5. When the log is complete, implement every disposition the log records in dependency
+   order (production seam first, then test rewrite, then census row update), as new
+   checkpoints with fresh review.
+
+**Pass list and status** (files NOT already deep-read in CP1–CP4; updated as work
+progresses):
+
+- [ ] `tests/ui/test_settings_view_branches.py` (~984+ private reaches — largest surface)
+- [ ] `tests/ui/test_app_branches.py` — remaining 84 `TranslatorApp.__new__` rows
+- [ ] `tests/app/test_wiring_providers.py` — remaining ~148 `provider.inner` reaches
+- [ ] `tests/ui/test_dashboard_view_branches.py`
+- [ ] `tests/ui/test_desktop_overlay_renderer.py` (101 private-constant reaches)
+- [ ] `tests/core/test_overlay_presenter.py` (burst-task internals)
+- [ ] `tests/app/test_overlay_process_manager.py` (private state-machine drives)
+- [ ] `tests/core/test_stt_controller.py` (private queue drives)
+- [ ] `tests/core/test_self_translation_low_latency.py` (private-drive rows)
+- [ ] `tests/core/test_translation_output_streaming.py` (map-emptiness rows)
+- [ ] `tests/core/test_translation_owner_branch_coverage.py`
+- [ ] `tests/providers/test_openrouter_gemma_routing.py`
+- [ ] `tests/core/local_translation/` gemma family (6 files) — name-classified only
+- [ ] `tests/core/test_audio_source.py`, `tests/core/test_file_logging.py` — name-classified only
+- [ ] `tests/app/` runtime/ownership/composition files from the 31-file batch — name-classified only
+- [ ] `tests/architecture/test_local_asr_provider_runtime_contracts.py`, `tests/architecture/test_provider_credential_verification_ownership.py` — name-classified only
+- [ ] `tests/config/test_custom_stt_runtime_resolution.py` — name-classified only
+
+## Deep-read log
+
+Per-file verdicts appended below as the pass proceeds. Each entry: file, what was read,
+verdict (confirm or correct the earlier row), and concrete disposition to implement.
