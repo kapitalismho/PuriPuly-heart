@@ -353,52 +353,57 @@ positional card indexes, typography {28}) are visual-contract documentation guar
 the geometry/token tests. No test or production change. Census table row already
 updated to KEEP with corrected residual.
 
-### `tests/ui/test_app_branches.py` — actions queued for CP5 implementation
+### `tests/ui/test_app_branches.py` — actions IMPLEMENTED (CP5, 2026-08-29)
 
 Deep-read 2026-08-29 (4,633 lines, 117 tests, full pass). Durable flow rows are
 port-based and stay unchanged. Actions:
-1. DELETE dead helpers `TelemetryController` + `TelemetrySettingsView` (lines 192-220,
-   zero usages after CP3).
-2. REFACTOR (mechanical, no behavior change) ~45 `controller=`-based rows to install
-   `_ui_application` port doubles directly, then remove the autouse `application`
-   property override fixture and shrink the `__getattr__` fallbacks in
-   `tests/helpers/ui_application.py`.
+1. DONE `b86a3aac` — DELETE dead helpers `TelemetryController` + `TelemetrySettingsView`.
+2. DONE (this checkpoint) — REFACTOR all remaining `controller=`-based rows to
+   explicit `_ui_application` doubles: autouse `application` property override
+   fixture removed; construction rows read backends via a recorded
+   `_construction_backends` list (no `presentation._app.controller` seeding);
+   `__new__` rows install
+   `app._ui_application = compose_test_ui_application_boundary(controller)`
+   directly; BYOK rows use explicit port doubles (`_byok_pkce_target` mirrors the
+   provider adapter's projection-to-target wrapping); unused `controller` stubs
+   deleted; `connect_openrouter_via_pkce` fakes renamed `target_settings` →
+   `target` to match the production port signature. Helper fallbacks shrunken:
+   legacy `build_managed_openrouter_byok_target_settings` wrapping path and
+   `target_settings=` TypeError shim removed from `tests/helpers/ui_application.py`
+   (load-bearing `__getattr__` passthrough retained). 121 passed.
 
-### `tests/app/test_wiring_providers.py` — actions queued for CP5 implementation
+### `tests/app/test_wiring_providers.py` — actions IMPLEMENTED (`b2fc6a4e` + `cb335a31`)
 
 Deep-read 2026-08-29 (2,487 lines, 93 tests, full pass). `isinstance(provider.inner, X)`
 wiring-identity rows are intentional contracts at the factory boundary; the earlier
 "concrete-factory rewrite" follow-up is withdrawn. Actions:
-1. EDIT remove two duplicate `provider.inner.fallback._delegate` pre-condition
-   assertions (lines ~1276-1278); the adjacent `factory()` call already asserts the
-   outcome behaviorally.
-2. CENSUS re-classify the wiring row to KEEP (wiring-identity intentional).
+1. DONE `b2fc6a4e` — EDIT removed the duplicate `provider.inner.fallback._delegate`
+   pre-condition assertion; the adjacent `factory()` call asserts the outcome
+   behaviorally.
+2. DONE `cb335a31` — CENSUS wiring row re-classified to KEEP (wiring-identity
+   intentional).
 
-### `tests/core/test_self_translation_low_latency.py` — action queued for CP5 implementation
+### `tests/core/test_self_translation_low_latency.py` — action IMPLEMENTED (`6df4d759`)
 
 Deep-read 2026-08-29 (2,824 lines, ~80 tests, full pass). `_handle_low_latency_final`
 is the low-latency arm of the public `handle_stt_event` router (same method, same
 dedup/latency/merge path); driving it via `harness.dispatch_stt_event(STTFinalEvent(...))`
 is behavior-identical and removes the private reach. Actions:
-1. REFACTOR (mechanical) ~20 rows calling `self_owner._handle_low_latency_final(...)`
-   to `harness.dispatch_stt_event(STTFinalEvent(...))` — must set low-latency mode in
-   each harness (rows already do) and drop the now-unneeded direct Transcript call.
-   `_commit_merge`/`_sync_overlay_active_self` rows keep using the existing harness
-   seams (`commit_self_merge`, direct sync seam) — they are already the recorded
-   pilot surface.
-2. CENSUS update row 47: private-drive count resolved; harness seams accepted.
+1. DONE `6df4d759` — REFACTOR 27 `_handle_low_latency_final` call sites re-routed
+   through `harness.dispatch_stt_event(STTFinalEvent(...))` (per-site original text/
+   timestamps preserved); `_commit_merge`/`_sync_overlay_active_self` rows keep the
+   existing harness seams (`commit_self_merge`, direct sync seam).
+2. DONE — CENSUS row 47 updated: private-drive count resolved; harness seams accepted.
 
-### `tests/core/test_translation_output_streaming.py` — action queued for CP5 implementation
+### `tests/core/test_translation_output_streaming.py` — action IMPLEMENTED (`612380cb`)
 
 Deep-read 2026-08-29 (3,350 lines, ~70 tests, full pass). The `_peer_parent_turn_ids`
 /`_peer_turn_parent_ids`/`_peer_completed_turn_ids`/`_peer_parent_speech_end_times`
 map-emptiness assertions (8 sites) duplicate the user-visible assertions in the same
 rows (`timeline_keys`, `peer_runtime.utterances`, routing decisions). Actions:
-1. EDIT remove the internal bookkeeping-map emptiness assertions at lines 1176-1178,
-   1217-1218, 1521-1524, 1569-1572, 1661-1662+1669-1670, 1722-1723, 2677 — keep the
-   adjacent user-visible assertions.
-2. CENSUS update row 48: SPLIT resolved (behavioral projection checks keep; internal
-   map assertions dropped).
+1. DONE `612380cb` — EDIT removed the internal bookkeeping-map emptiness assertions;
+   adjacent user-visible assertions retained.
+2. DONE — CENSUS row 48 updated: SPLIT resolved.
 
 ### Re-pass verdict upgrades (no action — KEEP confirmed, census rows updated)
 
