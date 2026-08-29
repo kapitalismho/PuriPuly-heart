@@ -343,3 +343,55 @@ progresses):
 
 Per-file verdicts appended below as the pass proceeds. Each entry: file, what was read,
 verdict (confirm or correct the earlier row), and concrete disposition to implement.
+
+### `tests/ui/test_settings_view_branches.py` — deep-read 2026-08-29 (CP5 D1)
+
+Read: full structural pass — both construction helpers (`_make_settings_view` real
+construction with monkeypatched population seams; `_make_llm_selection_view` ~110-line
+`__new__` + SimpleNamespace widget graph), all ~25 helper functions (card-tree walkers,
+label collectors), and detailed reading of ~1,000 lines covering every family: OSC draft
+preservation, telemetry card, clipboard auto-translate, secret load/save/clear + failure
+paths, api-key icon restore, api-visibility matrix, managed key card + trial usage +
+TalkTogether pass invite progress, LLM/connection selection staging + history + prompt
+switching, local-LLM fields + secret change + extra-body validation, STT/peer-STT
+selection + GPU device cards, prompt draft/commit/reset, VAD + audio handlers, overlay
+display/size/lock/position-reset/runtime-state, card layout & typography contracts,
+custom vocabulary full lifecycle, subtab shell structure/scroll/locale.
+
+Verdict per family (rows, ~258 tests):
+
+- **KEEP, durable boundary already correct (majority)**: secret load/save/delete
+  (incl. failure-tolerance and secret-non-leakage logging), prompt draft/commit/reset
+  semantics, provider selection staging (`build_provider_apply_settings` vs emitted
+  `on_settings_changed` — draft-does-not-leak, copy-not-mutate, equality guards),
+  connection-history preservation, managed-key/invite-progress state machine,
+  custom-vocabulary lifecycle, telemetry callback-not-send, overlay runtime-state and
+  position-reset semantics, subtab scroll restore. These assert through public intent
+  callbacks (`on_settings_changed`, `build_provider_apply_settings`, modal fakes) and
+  persisted `AppSettings` copies. A view-internal refactor that keeps the intent
+  callbacks stable would still pass.
+- **PARTIAL — widget-shape rows are the residual debt (recorded, ~40 rows)**: rows that
+  assert Flet widget internals — `view._openrouter_key.visible`, PKCE button
+  `style.color[ControlState.*]` colors, `_wrapped_card_column(card).controls[4]`
+  positional indexes, exact card-titles ordering lists, `ft.Container` expand/width
+  geometry, typography `{28}`, hover color mutation. These are visual/geometry
+  contracts enforced elsewhere by tokens (`SettingsUnitCard.DEFAULT_HEIGHT`,
+  `test_baseline_control_geometry`) or duplicate the layout tests. Not blocking:
+  the census already records `SettingsUnitCard`/`SharedCardWrapper` as the production
+  seam, and breaking these rows requires changing user-visible layout, which the
+  geometry/typography token tests also guard.
+- **DELETE-scope residue already removed (verified)**: retired-control absence rows
+  (`_low_latency_card`, `_integrated_context_button`, `_peer_qwen_region_text`,
+  `_peer_deepgram_model_*`, legacy overlay/peer toggle API) are absence guards that
+  document the A01–A10 cutover; they duplicate `tests/architecture` retirement guards
+  but are cheap and behavior-anchored. KEEP.
+- **One redundant pair found**: `test_clipboard_auto_translate_selection_...` vs
+  `test_clipboard_auto_translate_click_...` — the click row re-asserts the selection
+  row plus toggle-off; keep (toggle-off is unique).
+
+Disposition for implementation phase: **KEEP the file as-is** (no REFACTOR checkpoint
+required for behavior preservation); the ~40 widget-shape rows are consolidated here as
+the recorded follow-up, superseding the earlier "~984 private reaches" bulk estimate —
+the durable rows already observe the typed-intent/snapshot boundary (G14/G15 seam) and
+the widget rows are visual-contract documentation, not implementation characterization.
+No production change needed; no test rewrite needed for blocking scope.
