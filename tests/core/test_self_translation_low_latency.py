@@ -2215,7 +2215,7 @@ class TestSpecFinalReconciliation:
         await harness.dispatch_stt_event(
             STTFinalEvent(
                 utterance_id=utterance_id,
-                transcript=Transcript(utterance_id=utterance_id, text="hello...", is_final=True),
+                transcript=Transcript(utterance_id=utterance_id, text="hello", is_final=True),
             ),
         )
         await asyncio.sleep(0)
@@ -2302,7 +2302,7 @@ class TestSpecFinalReconciliation:
         await harness.dispatch_stt_event(
             STTFinalEvent(
                 utterance_id=utterance_id,
-                transcript=Transcript(utterance_id=utterance_id, text="hello", is_final=True),
+                transcript=Transcript(utterance_id=utterance_id, text="hello...", is_final=True),
             ),
         )
         assert buffer.speculative_attempt is attempt
