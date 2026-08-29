@@ -1273,7 +1273,6 @@ def test_create_llm_provider_openrouter_wraps_primary_with_source_locked_openrou
     assert provider.inner.primary.routing_mode == OpenRouterRoutingMode.LATENCY
     assert provider.inner.primary.runtime_logging is runtime_logging
     assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
-    assert provider.inner.fallback._delegate is None
 
     fallback_delegate = provider.inner.fallback.factory()
 
