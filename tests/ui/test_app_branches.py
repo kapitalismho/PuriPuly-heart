@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+from collections.abc import Awaitable, Callable
 from datetime import datetime as real_datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -25,6 +26,7 @@ from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.http_extension_registry import HttpExtensionRegistryService
+from puripuly_heart.app.services.telemetry_reporting import APP_ACTIVE_DAY_RETRY_DELAY_S
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.composition.ui_application import compose_ui_application
 from puripuly_heart.config.settings import (
@@ -242,112 +244,154 @@ def _dialog_containers(dialog) -> list[ft.Container]:
     return [node for node in _iter_control_tree(dialog) if isinstance(node, ft.Container)]
 
 
+class FakeTelemetryApplication:
+    def __init__(self, settings: AppSettings) -> None:
+        self.settings = settings
+        self.applied: list[bool] = []
+        self.active_day_results: list[object] = []
+        self.active_day_dates: list[str] = []
+
+    async def apply_telemetry_enabled(self, enabled: bool) -> None:
+        self.applied.append(enabled)
+        if enabled is False:
+            self.settings.telemetry.enabled = False
+            self.settings.telemetry_state.anonymous_id = None
+            self.settings.telemetry_state.last_sent_date_utc = None
+
+    def settings_general_snapshot(self):
+        return SimpleNamespace(telemetry_enabled=self.settings.telemetry.enabled)
+
+    async def record_app_active_day(self, active_date_utc: str) -> object:
+        self.active_day_dates.append(active_date_utc)
+        if self.active_day_results:
+            return self.active_day_results.pop(0)
+        return SimpleNamespace(status="sent")
+
+
+def _make_telemetry_owner(
+    application: FakeTelemetryApplication,
+    *,
+    queued: list | None = None,
+    background: list | None = None,
+    clock=None,
+    sleep=None,
+    shutting_down: bool = False,
+    synced: list | None = None,
+):
+    from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
+
+    return TelemetryReportingOwner(
+        application,
+        run_background=(
+            background.append if background is not None else (lambda coroutine, *args: None)
+        ),
+        queue_settings_mutation=(
+            queued.append if queued is not None else (lambda task_factory: None)
+        ),
+        is_shutting_down=lambda: shutting_down,
+        sync_telemetry=synced.append if synced is not None else None,
+        clock=clock,
+        sleep=sleep,
+    )
+
+
 def test_telemetry_enabled_choice_persists_and_syncs_settings_view() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    page = DummyPage()
-    app.page = page
     settings = AppSettings()
     settings.telemetry_state.last_sent_date_utc = "2026-07-01"
-    app.controller = TelemetryController(settings)
-    app.view_settings = TelemetrySettingsView()
+    application = FakeTelemetryApplication(settings)
+    synced: list[object] = []
+    tasks: list[object] = []
+    owner = _make_telemetry_owner(application, background=tasks, synced=synced)
 
-    app._on_telemetry_enabled_change(False)
-    assert len(page.tasks) == 1
-    asyncio.run(page.tasks.pop(0)())
-    assert app.controller.settings.telemetry.enabled is False
-    assert app.controller.settings.telemetry_state.anonymous_id is None
-    assert app.controller.settings.telemetry_state.last_sent_date_utc is None
-    assert app.view_settings.synced[-1].telemetry_enabled is False
+    owner.apply_telemetry_enabled(False)
+    assert len(tasks) == 1
+    asyncio.run(tasks.pop(0)())
+    assert application.applied == [False]
+    assert settings.telemetry.enabled is False
+    assert settings.telemetry_state.anonymous_id is None
+    assert settings.telemetry_state.last_sent_date_utc is None
+    assert synced[-1].telemetry_enabled is False
 
-    app._on_telemetry_enabled_change(True)
-    asyncio.run(page.tasks.pop(0)())
-    assert app.controller.settings.telemetry.enabled is True
-    assert app.controller.settings.telemetry_state.anonymous_id
+    owner.apply_telemetry_enabled(True)
+    asyncio.run(tasks.pop(0)())
+    assert application.applied == [False, True]
 
 
 def test_telemetry_setting_action_does_not_send() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app.controller = TelemetryController(AppSettings())
-    app.view_settings = TelemetrySettingsView()
+    application = FakeTelemetryApplication(AppSettings())
+    tasks: list[object] = []
+    owner = _make_telemetry_owner(application, background=tasks)
 
-    app._on_telemetry_enabled_change(False)
+    owner.apply_telemetry_enabled(False)
 
-    assert len(app.page.tasks) == 1
-    assert not hasattr(app, "telemetry_client")
+    assert len(tasks) == 1
+    assert application.active_day_dates == []
 
 
 def test_app_active_day_report_captures_utc_date_before_queue(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.controller = TelemetryController(AppSettings())
+    application = FakeTelemetryApplication(AppSettings())
     queued: list[object] = []
-    monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
 
-    class CapturedDateTime:
+    class CapturedDateTime(real_datetime):
         @classmethod
-        def now(cls, timezone):
-            _ = timezone
+        def now(cls, tz=None):
             return real_datetime.fromisoformat("2026-07-03T23:59:59+00:00")
 
-    monkeypatch.setattr(app_module, "datetime", CapturedDateTime)
-    app._schedule_app_active_day_report()
+    owner = _make_telemetry_owner(application, queued=queued, clock=CapturedDateTime.now)
+    owner.schedule_app_active_day_report()
 
     assert len(queued) == 1
-    asyncio.run(queued[0]())
-    assert app.controller.active_day_dates == ["2026-07-03"]
+    asyncio.run(queued.pop(0)())
+    assert application.active_day_dates == ["2026-07-03"]
 
 
 def test_app_active_day_report_retries_once_after_60_seconds_on_same_utc_date(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    controller = TelemetryController(AppSettings())
-    controller.active_day_results = [
+    application = FakeTelemetryApplication(AppSettings())
+    application.active_day_results = [
         SimpleNamespace(status="send_failed"),
         SimpleNamespace(status="sent"),
     ]
-    app.controller = controller
-    app._shutting_down = False
     queued: list[object] = []
     background: list[object] = []
     sleeps: list[float] = []
-    monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
-    monkeypatch.setattr(app, "_run_page_task", background.append)
 
-    class CapturedDateTime:
+    class CapturedDateTime(real_datetime):
         @classmethod
-        def now(cls, timezone):
-            _ = timezone
+        def now(cls, tz=None):
             return real_datetime.fromisoformat("2026-07-03T12:00:00+00:00")
 
     async def fake_sleep(delay_s: float) -> None:
         sleeps.append(delay_s)
 
-    monkeypatch.setattr(app_module, "datetime", CapturedDateTime)
-    monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    app._schedule_app_active_day_report()
+    owner = _make_telemetry_owner(
+        application,
+        queued=queued,
+        background=background,
+        clock=CapturedDateTime.now,
+        sleep=fake_sleep,
+    )
+    owner.schedule_app_active_day_report()
     asyncio.run(queued.pop(0)())
 
-    assert controller.active_day_dates == ["2026-07-03"]
+    assert application.active_day_dates == ["2026-07-03"]
     assert len(background) == 1
     asyncio.run(background.pop(0)())
     assert len(queued) == 1
     asyncio.run(queued.pop(0)())
 
-    assert controller.active_day_dates == ["2026-07-03", "2026-07-03"]
-    assert sleeps == [app_module.APP_ACTIVE_DAY_RETRY_DELAY_S]
+    assert application.active_day_dates == ["2026-07-03", "2026-07-03"]
+    assert sleeps == [APP_ACTIVE_DAY_RETRY_DELAY_S]
 
 
 def test_app_active_day_report_does_not_retry_after_utc_date_changes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    controller = TelemetryController(AppSettings())
-    controller.active_day_results = [SimpleNamespace(status="send_failed")]
-    app.controller = controller
-    app._shutting_down = False
+    application = FakeTelemetryApplication(AppSettings())
+    application.active_day_results = [SimpleNamespace(status="send_failed")]
     queued: list[object] = []
     background: list[object] = []
     now_values = iter(
@@ -356,36 +400,35 @@ def test_app_active_day_report_does_not_retry_after_utc_date_changes(
             real_datetime.fromisoformat("2026-07-04T00:00:01+00:00"),
         )
     )
-    monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
-    monkeypatch.setattr(app, "_run_page_task", background.append)
 
-    class CapturedDateTime:
+    class CapturedDateTime(real_datetime):
         @classmethod
-        def now(cls, timezone):
-            _ = timezone
+        def now(cls, tz=None):
             return next(now_values)
 
     async def fake_sleep(delay_s: float) -> None:
-        assert delay_s == app_module.APP_ACTIVE_DAY_RETRY_DELAY_S
+        assert delay_s == APP_ACTIVE_DAY_RETRY_DELAY_S
 
-    monkeypatch.setattr(app_module, "datetime", CapturedDateTime)
-    monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    app._schedule_app_active_day_report()
+    owner = _make_telemetry_owner(
+        application,
+        queued=queued,
+        background=background,
+        clock=CapturedDateTime.now,
+        sleep=fake_sleep,
+    )
+    owner.schedule_app_active_day_report()
     asyncio.run(queued.pop(0)())
     asyncio.run(background.pop(0)())
 
-    assert controller.active_day_dates == ["2026-07-03"]
+    assert application.active_day_dates == ["2026-07-03"]
     assert queued == []
 
 
 def test_app_active_day_report_does_not_retry_when_queue_crosses_utc_midnight(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    controller = TelemetryController(AppSettings())
-    controller.active_day_results = [SimpleNamespace(status="send_failed")]
-    app.controller = controller
-    app._shutting_down = False
+    application = FakeTelemetryApplication(AppSettings())
+    application.active_day_results = [SimpleNamespace(status="send_failed")]
     queued: list[object] = []
     background: list[object] = []
     now_values = iter(
@@ -395,101 +438,130 @@ def test_app_active_day_report_does_not_retry_when_queue_crosses_utc_midnight(
             real_datetime.fromisoformat("2026-07-04T00:00:01+00:00"),
         )
     )
-    monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
-    monkeypatch.setattr(app, "_run_page_task", background.append)
 
-    class CapturedDateTime:
+    class CapturedDateTime(real_datetime):
         @classmethod
-        def now(cls, timezone):
-            _ = timezone
+        def now(cls, tz=None):
             return next(now_values)
 
     async def fake_sleep(delay_s: float) -> None:
-        assert delay_s == app_module.APP_ACTIVE_DAY_RETRY_DELAY_S
+        assert delay_s == APP_ACTIVE_DAY_RETRY_DELAY_S
 
-    monkeypatch.setattr(app_module, "datetime", CapturedDateTime)
-    monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    app._schedule_app_active_day_report()
+    owner = _make_telemetry_owner(
+        application,
+        queued=queued,
+        background=background,
+        clock=CapturedDateTime.now,
+        sleep=fake_sleep,
+    )
+    owner.schedule_app_active_day_report()
     asyncio.run(queued.pop(0)())
     asyncio.run(background.pop(0)())
 
     assert len(queued) == 1
     asyncio.run(queued.pop(0)())
-    assert controller.active_day_dates == ["2026-07-03"]
+    assert application.active_day_dates == ["2026-07-03"]
 
 
 @pytest.mark.asyncio
 async def test_app_active_day_retry_does_not_block_settings_mutation_queue(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    controller = TelemetryController(AppSettings())
-    controller.active_day_results = [
+    application = FakeTelemetryApplication(AppSettings())
+    application.active_day_results = [
         SimpleNamespace(status="send_failed"),
         SimpleNamespace(status="sent"),
     ]
     retry_recorded = asyncio.Event()
-    original_record = controller.record_app_active_day
+    original_record = application.record_app_active_day
 
     async def record_app_active_day(active_date_utc: str) -> object:
         result = await original_record(active_date_utc)
-        if len(controller.active_day_dates) == 2:
+        if len(application.active_day_dates) == 2:
             retry_recorded.set()
         return result
 
-    controller.record_app_active_day = record_app_active_day
-    app.controller = controller
-    app._shutting_down = False
-    app._settings_mutation_queue = []
-    app._settings_mutation_worker_active = False
-    app._app_active_day_retry_task_handle = None
+    application.record_app_active_day = record_app_active_day
+
+    from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
+
+    queue: list[Callable[[], Awaitable[None]]] = []
+    worker_active = False
     retry_sleep_started = asyncio.Event()
     release_retry_sleep = asyncio.Event()
     later_mutation_ran = asyncio.Event()
     tasks: list[asyncio.Task[None]] = []
 
-    def run_page_task(task_factory) -> asyncio.Task[None]:
-        task = asyncio.create_task(task_factory())
+    def run_background(coroutine_factory, *args):
+        task = asyncio.create_task(coroutine_factory(*args))
         tasks.append(task)
         return task
 
+    async def queue_worker() -> None:
+        nonlocal worker_active
+        try:
+            while queue:
+                next_task = queue.pop(0)
+                await next_task()
+        finally:
+            worker_active = False
+
+    def queue_settings_mutation(task_factory) -> None:
+        nonlocal worker_active
+        queue.append(task_factory)
+        if worker_active:
+            return
+        worker_active = True
+        tasks.append(asyncio.create_task(queue_worker()))
+
     async def fake_sleep(delay_s: float) -> None:
-        assert delay_s == app_module.APP_ACTIVE_DAY_RETRY_DELAY_S
+        assert delay_s == APP_ACTIVE_DAY_RETRY_DELAY_S
         retry_sleep_started.set()
         await release_retry_sleep.wait()
 
     async def later_settings_mutation() -> None:
         later_mutation_ran.set()
 
-    class CapturedDateTime:
-        @classmethod
-        def now(cls, timezone):
-            _ = timezone
-            return real_datetime.fromisoformat("2026-07-03T12:00:00+00:00")
+    now_values = iter(
+        (
+            real_datetime.fromisoformat("2026-07-03T12:00:00+00:00"),
+            real_datetime.fromisoformat("2026-07-03T12:00:00+00:00"),
+            real_datetime.fromisoformat("2026-07-03T12:00:00+00:00"),
+        )
+    )
 
-    monkeypatch.setattr(app, "_run_page_task", run_page_task)
-    monkeypatch.setattr(app_module, "datetime", CapturedDateTime)
-    monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    app._schedule_app_active_day_report()
-    app._queue_settings_mutation_task(later_settings_mutation)
+    class CapturedDateTime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return next(now_values)
+
+    owner = TelemetryReportingOwner(
+        application,
+        run_background=run_background,
+        queue_settings_mutation=queue_settings_mutation,
+        sleep=fake_sleep,
+        clock=CapturedDateTime.now,
+    )
+    owner.schedule_app_active_day_report()
+    queue_settings_mutation(later_settings_mutation)
 
     await asyncio.wait_for(retry_sleep_started.wait(), timeout=1)
     await asyncio.wait_for(later_mutation_ran.wait(), timeout=1)
-    assert controller.active_day_dates == ["2026-07-03"]
+    assert application.active_day_dates == ["2026-07-03"]
 
     release_retry_sleep.set()
     await asyncio.wait_for(retry_recorded.wait(), timeout=1)
     await asyncio.gather(*tasks)
 
-    assert controller.active_day_dates == ["2026-07-03", "2026-07-03"]
-    assert app._app_active_day_retry_task_handle is None
+    assert application.active_day_dates == ["2026-07-03", "2026-07-03"]
+    assert owner._retry_task_handle is None
 
 
 @pytest.mark.asyncio
 async def test_close_after_launch_tasks_cancels_app_active_day_retry() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app._after_launch_task_handle = None
-    app._github_star_prompt_launch_pending = True
+    from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
+
+    application = FakeTelemetryApplication(AppSettings())
     retry_started = asyncio.Event()
     retry_cancelled = asyncio.Event()
 
@@ -500,14 +572,71 @@ async def test_close_after_launch_tasks_cancels_app_active_day_retry() -> None:
         finally:
             retry_cancelled.set()
 
+    owner = TelemetryReportingOwner(
+        application,
+        run_background=lambda coroutine, *args: asyncio.create_task(coroutine()),
+        queue_settings_mutation=lambda task_factory: None,
+    )
     handle = asyncio.create_task(retry_task())
-    app._app_active_day_retry_task_handle = handle
+    owner._retry_task_handle = handle
     await retry_started.wait()
-    await app._close_after_launch_ui_tasks()
+    await owner.cancel_retry()
 
     assert handle.cancelled()
     assert retry_cancelled.is_set()
-    assert app._app_active_day_retry_task_handle is None
+    assert owner._retry_task_handle is None
+
+
+def test_translator_app_telemetry_binding_delegates_to_owner() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    calls: list[object] = []
+
+    class _Owner:
+        def apply_telemetry_enabled(self, enabled: bool) -> None:
+            calls.append(("apply", enabled))
+
+        def schedule_app_active_day_report(self) -> None:
+            calls.append(("schedule",))
+
+    app._telemetry_reporting = _Owner()
+    app._on_telemetry_enabled_change(True)
+    app._schedule_app_active_day_report()
+    assert calls == [("apply", True), ("schedule",)]
+
+
+@pytest.mark.asyncio
+async def test_close_after_launch_cancels_existing_telemetry_retry_only() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    cancelled: list[bool] = []
+
+    class _Owner:
+        async def cancel_retry(self) -> None:
+            cancelled.append(True)
+
+    app._telemetry_reporting = _Owner()
+    app._github_star_prompt_launch_pending = True
+
+    async def _close_handle(_name: str) -> None:
+        return None
+
+    app._close_ui_task_handle = _close_handle  # type: ignore[method-assign]
+    await app._close_after_launch_ui_tasks()
+    assert cancelled == [True]
+    assert app._github_star_prompt_launch_pending is False
+
+
+@pytest.mark.asyncio
+async def test_close_after_launch_skips_telemetry_cancel_when_owner_absent() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app._github_star_prompt_launch_pending = True
+
+    async def _close_handle(_name: str) -> None:
+        return None
+
+    app._close_ui_task_handle = _close_handle  # type: ignore[method-assign]
+    await app._close_after_launch_ui_tasks()
+    assert getattr(app, "_telemetry_reporting", None) is None
+    assert app._github_star_prompt_launch_pending is False
 
 
 class ConstructionDummyController:

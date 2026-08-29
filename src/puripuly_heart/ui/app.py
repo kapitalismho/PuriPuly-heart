@@ -5,7 +5,6 @@ import json
 import logging
 import tempfile
 import webbrowser
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +29,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCoordinator,
     application_shutdown_callback,
 )
+from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
@@ -110,7 +110,6 @@ FOUNDER_README_DEFAULT_API_KEYS_ANCHOR = "using-your-own-api-keys"
 DEBUG_PREVIEW_TALK_TOGETHER_PASS_ID = "7KQ9M2"
 GITHUB_STAR_REPOSITORY_URL = "https://github.com/kapitalismho/PuriPuly-heart"
 GITHUB_STAR_PROMPT_DELAY_S = 2.5
-APP_ACTIVE_DAY_RETRY_DELAY_S = 60.0
 GITHUB_STAR_PROMPT_DURATION_MS = 8000
 
 
@@ -208,7 +207,7 @@ class TranslatorApp:
         self._qq_managed_auth_task_handle = None
         self._github_star_prompt_launch_pending = True
         self._after_launch_task_handle = None
-        self._app_active_day_retry_task_handle = None
+        self._telemetry_reporting: TelemetryReportingOwner | None = None
         self._launch_high_priority_feedback_shown = False
         self._launch_high_priority_feedback_reason: str | None = None
         self._launch_high_priority_snackbar = None
@@ -711,7 +710,9 @@ class TranslatorApp:
 
     async def _close_after_launch_ui_tasks(self) -> None:
         await self._close_ui_task_handle("_after_launch_task_handle")
-        await self._close_ui_task_handle("_app_active_day_retry_task_handle")
+        owner = getattr(self, "_telemetry_reporting", None)
+        if owner is not None:
+            await owner.cancel_retry()
         self._github_star_prompt_launch_pending = False
 
     async def close_after_launch_tasks(self) -> None:
@@ -947,17 +948,7 @@ class TranslatorApp:
         dialog.open()
 
     def _on_telemetry_enabled_change(self, enabled: bool) -> None:
-        if not isinstance(enabled, bool):
-            return
-
-        async def _task() -> None:
-            await self.application.apply_telemetry_enabled(enabled)
-            settings = self.application.settings_general_snapshot()
-            sync_telemetry = getattr(self.view_settings, "sync_telemetry_settings", None)
-            if callable(sync_telemetry) and settings is not None:
-                sync_telemetry(settings)
-
-        self._run_page_task(_task)
+        self._telemetry_reporting_owner().apply_telemetry_enabled(enabled)
 
     def show_local_qwen_hallucination_dialog(self) -> None:
         dialog = LocalQwenHallucinationDialog(
@@ -2011,46 +2002,30 @@ class TranslatorApp:
         self.application.schedule_github_star_prompt_translation_success_observed()
 
     def _schedule_app_active_day_report(self) -> None:
-        active_date_utc = datetime.now(timezone.utc).date().isoformat()
+        self._telemetry_reporting_owner().schedule_app_active_day_report()
 
-        async def _send() -> None:
-            result = await self.application.record_app_active_day(active_date_utc)
-            if getattr(result, "status", None) == "send_failed":
-                self._schedule_app_active_day_retry(active_date_utc)
+    def _sync_telemetry_settings_view(self, settings) -> None:
+        view_settings = getattr(self, "view_settings", None)
+        sync_telemetry = (
+            getattr(view_settings, "sync_telemetry_settings", None)
+            if view_settings is not None
+            else None
+        )
+        if callable(sync_telemetry):
+            sync_telemetry(settings)
 
-        self._queue_settings_mutation_task(_send)
-
-    def _schedule_app_active_day_retry(self, active_date_utc: str) -> None:
-        existing = getattr(self, "_app_active_day_retry_task_handle", None)
-        if existing is not None and not existing.done():
-            return
-        if getattr(self, "_shutting_down", False):
-            return
-
-        handle = None
-
-        async def _retry_after_delay() -> None:
-            try:
-                await asyncio.sleep(APP_ACTIVE_DAY_RETRY_DELAY_S)
-                if getattr(self, "_shutting_down", False):
-                    return
-                if datetime.now(timezone.utc).date().isoformat() != active_date_utc:
-                    return
-
-                async def _retry() -> None:
-                    if getattr(self, "_shutting_down", False):
-                        return
-                    if datetime.now(timezone.utc).date().isoformat() != active_date_utc:
-                        return
-                    await self.application.record_app_active_day(active_date_utc)
-
-                self._queue_settings_mutation_task(_retry)
-            finally:
-                if getattr(self, "_app_active_day_retry_task_handle", None) is handle:
-                    self._app_active_day_retry_task_handle = None
-
-        handle = self._run_page_task(_retry_after_delay)
-        self._app_active_day_retry_task_handle = handle
+    def _telemetry_reporting_owner(self) -> TelemetryReportingOwner:
+        owner = getattr(self, "_telemetry_reporting", None)
+        if owner is None:
+            owner = TelemetryReportingOwner(
+                self.application,
+                run_background=self._run_page_task,
+                queue_settings_mutation=self._queue_settings_mutation_task,
+                is_shutting_down=lambda: getattr(self, "_shutting_down", False),
+                sync_telemetry=self._sync_telemetry_settings_view,
+            )
+            self._telemetry_reporting = owner
+        return owner
 
     def on_overlay_state_changed(
         self,
