@@ -17,7 +17,6 @@ from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatu
 
 import puripuly_heart.ui.app as app_module
 from puripuly_heart.app.ports.settings_view import (
-    GeneralSettingsSnapshot,
     OverlaySettingsSnapshot,
     PromptApplyIntent,
 )
@@ -42,7 +41,6 @@ from puripuly_heart.config.settings import (
     TranslationModel,
     TranslationSettings,
     build_managed_openrouter_byok_target_settings,
-    with_telemetry_enabled,
 )
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS
@@ -187,36 +185,6 @@ class RuntimeLoggingController:
     def log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
         _ = level
         self.detailed_messages.append(message)
-
-
-class TelemetryController:
-    def __init__(self, settings: AppSettings) -> None:
-        self.settings = settings
-        self.applied: list[AppSettings] = []
-        self.active_day_results: list[object] = []
-        self.active_day_dates: list[str] = []
-
-    async def apply_settings(self, settings: AppSettings) -> None:
-        self.settings = settings
-        self.applied.append(settings)
-
-    async def apply_telemetry_enabled(self, enabled: bool) -> AppSettings:
-        await self.apply_settings(with_telemetry_enabled(self.settings, enabled))
-        return self.settings
-
-    async def record_app_active_day(self, active_date_utc: str) -> object:
-        self.active_day_dates.append(active_date_utc)
-        if self.active_day_results:
-            return self.active_day_results.pop(0)
-        return SimpleNamespace(status="sent")
-
-
-class TelemetrySettingsView:
-    def __init__(self) -> None:
-        self.synced: list[GeneralSettingsSnapshot] = []
-
-    def sync_telemetry_settings(self, settings: GeneralSettingsSnapshot) -> None:
-        self.synced.append(settings)
 
 
 def _iter_control_tree(control):
