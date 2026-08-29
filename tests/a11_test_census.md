@@ -102,7 +102,7 @@ characterization debt.
 
 | Family | Protected risk | Basis | Boundary | Refactor-resistant | Disposition |
 | --- | --- | --- | --- | --- | --- |
-| `test_wiring_providers.py` — settings→provider/STT resolution, secret lookup rules, routing/fallback pool selection, concurrency limits, managed delegation | Wrong provider/config/credential selected at runtime | Strong: user-visible provider behavior + persisted settings semantics | Mixed: concurrency behavioral (`assert_bounded_concurrency` probe through `SemaphoreLLMProvider.translate`); ~148 `provider.inner`/`isinstance(provider.inner, ...)` private reaches remain | **No** for the remaining inner reaches | **REFACTOR** — partially implemented (CP1): semaphore._value reaches replaced by the bounded-concurrency probe. Remaining `isinstance(provider.inner, X)` identity rows and `provider.inner.*` field reaches are a recorded follow-up: finish the concrete-factory identity rewrite (assert via the factory function each connection wires, plus behavioral request-body checks), or document per-row durable invariants. |
+| test_wiring_providers.py — settings-to-provider/STT resolution, secret lookup rules, routing/fallback pool selection, concurrency limits, managed delegation | Wrong provider/config/credential selected at runtime | Strong: user-visible provider behavior + persisted settings semantics | Mixed: concurrency behavioral (assert_bounded_concurrency probe through SemaphoreLLMProvider.translate); wiring-identity rows (isinstance(provider.inner, X) + constructor-propagation fields) verified as intentional contracts at the factory boundary | **No** — identity at the factory boundary is the contract | **KEEP** (re-pass correction 2026-08-29) — the earlier concrete-factory identity rewrite follow-up is withdrawn; the one genuine private reach (_delegate is None, duplicate of the adjacent behavioral factory() call) is removed. |
 | `test_wiring_llm_factory.py`, `test_wiring_translation_backend.py`, `test_wiring_secrets.py`, `test_wiring_local_asr_provider_runtime.py`, `test_runtime_adapter_composition.py` | Wiring correctness: backend kind, secret source, adapter construction | Strong: composition correctness feeds every runtime path | Public factories | Yes | **KEEP** |
 | `test_runtime_pipeline_composition.py` — single-owner composition, rollback on partial acquisition, close-retry, peer-off-chatbox | Resource leaks on partial startup; peer chatbox leak | Explicit architecture contract + strong behavior | Public composition | Yes | **KEEP** |
 | `test_application_runtime_lifecycle.py` — shutdown ordering with failure continuation, logging-last, startup partial-failure cleanup | Cleanup skipped after a failed owner; logging torn down before diagnostics | Service/port behavioral contract: *which* ordering relations are required | 30–40 step exact event trace incl. private `TranslatorApp.__new__` composition | **No** | **REFACTOR** — implemented: the test now asserts required ordering *relations* (freeze before releases; overlay failure does not block later closes; diagnostics+logging last; failure surfaced), not one giant exact trace; private `__new__` composition replaced by the test boundary composition. |
@@ -321,9 +321,9 @@ deep-read pass:
 **Pass list and status** (files NOT already deep-read in CP1–CP4; updated as work
 progresses):
 
-- [ ] `tests/ui/test_settings_view_branches.py` (~984+ private reaches — largest surface)
-- [ ] `tests/ui/test_app_branches.py` — remaining 84 `TranslatorApp.__new__` rows
-- [ ] `tests/app/test_wiring_providers.py` — remaining ~148 `provider.inner` reaches
+- [x] `tests/ui/test_settings_view_branches.py` (~984+ private reaches — largest surface)
+- [x] `tests/ui/test_app_branches.py` — remaining 84 `TranslatorApp.__new__` rows
+- [x] `tests/app/test_wiring_providers.py` — remaining ~148 `provider.inner` reaches
 - [ ] `tests/ui/test_dashboard_view_branches.py`
 - [ ] `tests/ui/test_desktop_overlay_renderer.py` (101 private-constant reaches)
 - [ ] `tests/core/test_overlay_presenter.py` (burst-task internals)
