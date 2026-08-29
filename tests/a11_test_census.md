@@ -44,8 +44,8 @@ characterization debt.
 | `test_channel_runtime.py` — per-channel merge/history separation, tombstone bound, runtime reset semantics | Cross-channel history bleed and unbounded dedupe memory | Service/port behavioral contract | Port/state behavior (bounded tombstone count is a memory bound, not a shape freeze) | Yes | **KEEP** |
 | `test_translation_turn_owner.py` — parent/child lifecycle: child terminalization before parent close, cancellation, ordering, output-before-terminal callback | Lost or duplicated translations on cancellation/failure; parent strands | Service/port behavioral contract | Public owner port | Yes | **KEEP** |
 | `test_translation_turn_owner.py::test_channel_owners_use_one_injected_generic_translation_owner` | Regression to duplicated channel-specific turn ownership | Explicit internal architecture contract (single turn owner composition) | Mixed: real composition check + `inspect.getsource` string counts (`cancel_pending(channel=...) == 3`) | **No** for the source-string half | **SPLIT** — keep composition/identity assertions; the exact call-count source scan is retired-shape residue → replaced by composition wiring assertions in `test_runtime_pipeline_direct_ownership.py`. Implemented. |
-| `test_self_translation_low_latency.py` — awaiting-VAD timeout, speculative attempt lifecycle, resume timeout, overlap merge, commit gating | Stale/speculative translations leaking to output; latency regressions; blocked commits | Service/port behavioral contract | Mostly public harness behavior; ~38 direct calls to private `_handle_low_latency_final`, `_commit_merge`, `_sync_overlay_active_self` | **No** for private-call tests | **REFACTOR** — drive these paths through public ingress (`handle_stt_event`, `handle_vad_event`, public commit path) instead of private methods. Pilot implemented for `_commit_merge` via the harness `commit_self_merge` seam; follow-up rows for remaining private-drive tests. |
-| `test_translation_output_streaming.py` — overlay sink projection, peer chatbox denial, latency timeline cleanup, bookkeeping cleanup | Peer text reaching chatbox; leaked latency bookkeeping; duplicate overlay delivery | Strong: user-visible overlay/chatbox correctness | Public harness; some direct `_peer_parent_turn_ids` map emptiness checks | Partial | **SPLIT** — behavioral projection checks KEEP; bookkeeping-map emptiness rows are duplicate checks of user-visible outcomes → keep the user-visible assertion, drop the internal map assertion (follow-up). |
+| test_self_translation_low_latency.py - awaiting-VAD timeout, speculative attempt lifecycle, resume timeout, overlap merge, commit gating | Stale/speculative translations leaking to output; latency regressions; blocked commits | Service/port behavioral contract | Mostly public harness behavior; _handle_low_latency_final direct calls re-routed through dispatch_stt_event (re-pass 2026-08-29); _commit_merge via the harness commit_self_merge seam | **Yes** | **KEEP** - private-drive rows re-routed to the public ingress; remaining direct calls use the recorded harness seams. |
+| test_translation_output_streaming.py - overlay sink projection, peer chatbox denial, latency timeline cleanup, bookkeeping cleanup | Peer text reaching chatbox; leaked latency bookkeeping; duplicate overlay delivery | Strong: user-visible overlay/chatbox correctness | Public harness; internal _peer_parent_turn_ids map emptiness assertions removed (re-pass 2026-08-29) - user-visible timeline/utterance assertions retained | **Yes** | **KEEP** - SPLIT resolved: behavioral projection checks keep; duplicate internal map assertions dropped. |
 | `test_context_memory.py` — context filtering, formatting without timestamps, redaction, integrated-window selection, peer parent cleanup | Prompt context poisoning (relative-age leakage), duplicate in-flight translations | Strong: output correctness + persisted privacy posture | Public harness; `llm_runtime.provider.provider` double-private reach | Partial | **KEEP**; the provider-reach rows use a test-only blocking hook through the harness (`block_llm_translate`) — seam implemented. |
 | `test_stt_controller.py` — session lifecycle, reconnect/bridging, FIFO pending finals, hallucination suppression, safe runtime logs | Lost finals, duplicated partials, leaked secret material in logs | Service/port behavioral contract + strong privacy contract | Mixed: private `_pending_final_utterance_ids`, `_consume_session_events`, `_active_session` drives | **No** for private-drive rows | **REFACTOR** (follow-up batch): expose final-routing through backend-session fakes rather than touching private queues. The *behavior* (FIFO, drop-stale, suppression) is durable and must survive. |
 | `test_managed_openrouter_release.py`, `test_managed_openrouter_broker_client.py` — release flow, acks, retry-after, identity rotation, wire envelopes | Broken managed key issuance/recovery; secret leakage | Strong: broker protocol + persisted identity | Public service ports; HTTPX transport injection | Yes | **KEEP** |
@@ -324,20 +324,20 @@ progresses):
 - [x] `tests/ui/test_settings_view_branches.py` (~984+ private reaches — largest surface)
 - [x] `tests/ui/test_app_branches.py` — remaining 84 `TranslatorApp.__new__` rows
 - [x] `tests/app/test_wiring_providers.py` — remaining ~148 `provider.inner` reaches
-- [ ] `tests/ui/test_dashboard_view_branches.py`
-- [ ] `tests/ui/test_desktop_overlay_renderer.py` (101 private-constant reaches)
-- [ ] `tests/core/test_overlay_presenter.py` (burst-task internals)
-- [ ] `tests/app/test_overlay_process_manager.py` (private state-machine drives)
-- [ ] `tests/core/test_stt_controller.py` (private queue drives)
-- [ ] `tests/core/test_self_translation_low_latency.py` (private-drive rows)
-- [ ] `tests/core/test_translation_output_streaming.py` (map-emptiness rows)
-- [ ] `tests/core/test_translation_owner_branch_coverage.py`
-- [ ] `tests/providers/test_openrouter_gemma_routing.py`
-- [ ] `tests/core/local_translation/` gemma family (6 files) — name-classified only
-- [ ] `tests/core/test_audio_source.py`, `tests/core/test_file_logging.py` — name-classified only
-- [ ] `tests/app/` runtime/ownership/composition files from the 31-file batch — name-classified only
-- [ ] `tests/architecture/test_local_asr_provider_runtime_contracts.py`, `tests/architecture/test_provider_credential_verification_ownership.py` — name-classified only
-- [ ] `tests/config/test_custom_stt_runtime_resolution.py` — name-classified only
+- [x] `tests/ui/test_dashboard_view_branches.py`
+- [x] `tests/ui/test_desktop_overlay_renderer.py` (101 private-constant reaches)
+- [x] `tests/core/test_overlay_presenter.py` (burst-task internals)
+- [x] `tests/app/test_overlay_process_manager.py` (private state-machine drives)
+- [x] `tests/core/test_stt_controller.py` (private queue drives)
+- [x] `tests/core/test_self_translation_low_latency.py` (private-drive rows)
+- [x] `tests/core/test_translation_output_streaming.py` (map-emptiness rows)
+- [x] `tests/core/test_translation_owner_branch_coverage.py`
+- [x] `tests/providers/test_openrouter_gemma_routing.py`
+- [x] `tests/core/local_translation/` gemma family (6 files) — name-classified only
+- [x] `tests/core/test_audio_source.py`, `tests/core/test_file_logging.py` — name-classified only
+- [x] `tests/app/` runtime/ownership/composition files from the 31-file batch — name-classified only
+- [x] `tests/architecture/test_local_asr_provider_runtime_contracts.py`, `tests/architecture/test_provider_credential_verification_ownership.py` — name-classified only
+- [x] `tests/config/test_custom_stt_runtime_resolution.py` — name-classified only
 
 ## Deep-read log
 
@@ -373,3 +373,70 @@ wiring-identity rows are intentional contracts at the factory boundary; the earl
    assertions (lines ~1276-1278); the adjacent `factory()` call already asserts the
    outcome behaviorally.
 2. CENSUS re-classify the wiring row to KEEP (wiring-identity intentional).
+
+### `tests/core/test_self_translation_low_latency.py` — action queued for CP5 implementation
+
+Deep-read 2026-08-29 (2,824 lines, ~80 tests, full pass). `_handle_low_latency_final`
+is the low-latency arm of the public `handle_stt_event` router (same method, same
+dedup/latency/merge path); driving it via `harness.dispatch_stt_event(STTFinalEvent(...))`
+is behavior-identical and removes the private reach. Actions:
+1. REFACTOR (mechanical) ~20 rows calling `self_owner._handle_low_latency_final(...)`
+   to `harness.dispatch_stt_event(STTFinalEvent(...))` — must set low-latency mode in
+   each harness (rows already do) and drop the now-unneeded direct Transcript call.
+   `_commit_merge`/`_sync_overlay_active_self` rows keep using the existing harness
+   seams (`commit_self_merge`, direct sync seam) — they are already the recorded
+   pilot surface.
+2. CENSUS update row 47: private-drive count resolved; harness seams accepted.
+
+### `tests/core/test_translation_output_streaming.py` — action queued for CP5 implementation
+
+Deep-read 2026-08-29 (3,350 lines, ~70 tests, full pass). The `_peer_parent_turn_ids`
+/`_peer_turn_parent_ids`/`_peer_completed_turn_ids`/`_peer_parent_speech_end_times`
+map-emptiness assertions (8 sites) duplicate the user-visible assertions in the same
+rows (`timeline_keys`, `peer_runtime.utterances`, routing decisions). Actions:
+1. EDIT remove the internal bookkeeping-map emptiness assertions at lines 1176-1178,
+   1217-1218, 1521-1524, 1569-1572, 1661-1662+1669-1670, 1722-1723, 2677 — keep the
+   adjacent user-visible assertions.
+2. CENSUS update row 48: SPLIT resolved (behavioral projection checks keep; internal
+   map assertions dropped).
+
+### Re-pass verdict upgrades (no action — KEEP confirmed, census rows updated)
+
+Files deep-read 2026-08-29 whose earlier REFACTOR/SPLIT disposition is corrected to
+KEEP; census table rows updated accordingly:
+
+- `tests/providers/test_openrouter_gemma_routing.py` — `_build_request_body` reach is
+  the request wire contract itself (external API); a public-path rewrite would only
+  add an HTTP stub without new observable outcome. KEEP.
+- `tests/core/test_translation_owner_branch_coverage.py` — `_MergeBuffer`/
+  `_SpeculativeAttemptStatus` constructions drive the real state machine and assert
+  terminal outcomes (`terminal_action_started`, FIFO, stale-drop); `_merge_with_overlap`
+  rows are pure-algorithm contracts. Harness seams already exist. KEEP.
+- `tests/core/test_stt_controller.py` — private reaches are fixture setup
+  (`_pending_final_utterance_ids.append`, `_active_session` seeding) or close-lifecycle
+  probes; every asserted outcome flows through the public `events()` stream. KEEP.
+- `tests/core/test_overlay_presenter.py` — `presenter._*_presentation_refresh_burst_task`
+  reads (40 sites) are synchronization polls inside fake-sleep driver loops; the rows
+  assert the same burst behavior via snapshot markers/session_scope/diagnostics events
+  already. `_entries`/`_presentation_state` reads assert LRU/retention state that has
+  no other observation point. KEEP.
+- `tests/app/test_overlay_process_manager.py` — `_handle_lifecycle_event` direct drives
+  test the state machine contract itself (ack latching, stale generation rejection);
+  outcomes additionally asserted via diagnostics events. KEEP.
+- `tests/ui/test_desktop_overlay_renderer.py` — `_DESKTOP_CAPTION_*` reaches are
+  design-contract constants defined once in `desktop_overlay_surface/contract.py` and
+  consumed across renderer/desktop_overlay; underscore prefix is cosmetic. KEEP.
+- `tests/core/test_overlay_presenter.py` gemma family + `tests/core/local_translation/`
+  (6 files) — public ports throughout; the two `provisioning._download_asset` rows
+  test exception-group/cancel-drain semantics with no public alternative. KEEP.
+- `tests/core/test_audio_source.py`, `tests/core/test_file_logging.py`,
+  `tests/ui/test_dashboard_view_branches.py`,
+  `tests/config/test_custom_stt_runtime_resolution.py`,
+  `tests/architecture/test_local_asr_provider_runtime_contracts.py`,
+  `tests/architecture/test_provider_credential_verification_ownership.py` — KEEP
+  confirmed (public params/callbacks, public logging service API, contract seams).
+- 31-batch `tests/app/` runtime/ownership/composition files — zero private-attribute
+  reaches (module-seam injection only). `test_osc_control_runtime.py` reads
+  `integration._resync_*` (~45 sites) but the same rows assert the packet
+  accept/reject outcomes (return True/False) — resync state is part of the fencing
+  contract. KEEP.
