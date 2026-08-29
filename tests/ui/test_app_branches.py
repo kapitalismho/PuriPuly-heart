@@ -2908,147 +2908,74 @@ def test_discord_managed_auth_waiting_hides_reopen_when_controller_cannot_reopen
     ]
 
 
-def test_peer_translation_toggle_first_enable_opens_eula_without_running_task(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def _peer_translation_binding_app(
+    *,
+    eula_accepted: bool,
+):
     app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    settings = AppSettings()
-    settings.ui.peer_translation_eula_accepted = False
-    app.controller = SimpleNamespace(settings=settings)
-    seen: dict[str, object] = {}
-    monkeypatch.setattr(
-        app,
-        "_show_peer_translation_eula",
-        lambda on_accept: seen.setdefault("on_accept", on_accept),
+    app._log_basic = lambda *_args, **_kwargs: None
+    app._log_detailed = lambda *_args, **_kwargs: None
+    tasks: list[object] = []
+    shown: list[object] = []
+    enabled: list[bool] = []
+    accepted: list[bool] = []
+
+    async def set_peer_translation_enabled(value: bool) -> None:
+        enabled.append(value)
+
+    async def accept_peer_translation_eula_and_enable() -> None:
+        accepted.append(True)
+
+    app._run_page_task = lambda coroutine, *args: tasks.append(coroutine)
+    app._show_peer_translation_eula = shown.append
+    app._ui_application = SimpleNamespace(
+        state=lambda: SimpleNamespace(peer_translation_eula_accepted=eula_accepted),
+        set_peer_translation_enabled=set_peer_translation_enabled,
+        accept_peer_translation_eula_and_enable=accept_peer_translation_eula_and_enable,
     )
+    return app, tasks, shown, enabled, accepted
+
+
+def test_peer_translation_toggle_first_enable_opens_eula_without_running_task() -> None:
+    app, tasks, shown, enabled, _accepted = _peer_translation_binding_app(eula_accepted=False)
 
     app._on_peer_translation_toggle(True)
 
-    assert "on_accept" in seen
-    assert app.page.tasks == []
-    assert settings.ui.peer_translation_eula_accepted is False
+    assert shown == [app._accept_peer_translation_eula_and_enable]
+    assert tasks == []
+    assert enabled == []
 
 
-@pytest.mark.asyncio
-async def test_peer_translation_toggle_after_eula_acceptance_routes_and_enables(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    settings = AppSettings()
-    settings.ui.peer_translation_eula_accepted = False
-    calls: list[bool] = []
-    applied: list[AppSettings] = []
-
-    async def fake_enable(enabled: bool):
-        calls.append(enabled)
-
-    async def fake_apply_settings(updated: AppSettings) -> None:
-        applied.append(updated)
-        app.controller.settings = updated
-
-    app.controller = SimpleNamespace(
-        settings=settings,
-        config_path="settings.json",
-        apply_settings=fake_apply_settings,
-        set_peer_translation_enabled=fake_enable,
-    )
-    saves: list[tuple[str, AppSettings]] = []
-    app.controller._save_settings = lambda: saves.append(("controller", settings))
+def test_peer_translation_accept_binding_runs_application_port() -> None:
+    app, tasks, _shown, _enabled, accepted = _peer_translation_binding_app(eula_accepted=False)
 
     app._accept_peer_translation_eula_and_enable()
-    await app.page.tasks[0]()
+    assert len(tasks) == 1
+    asyncio.run(tasks.pop(0)())
 
-    assert settings.ui.peer_translation_eula_accepted is False
-    assert len(applied) == 1
-    assert applied[0].ui.peer_translation_eula_accepted is True
-    assert calls == [True]
-    assert saves == []
+    assert accepted == [True]
 
 
-@pytest.mark.asyncio
-async def test_peer_translation_eula_acceptance_routes_settings_patch_before_enable() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    settings = AppSettings()
-    settings.ui.peer_translation_eula_accepted = False
-    applied: list[AppSettings] = []
-    enable_calls: list[bool] = []
-
-    async def fake_apply_settings(updated: AppSettings) -> None:
-        applied.append(updated)
-        app.controller.settings = updated
-
-    async def fake_enable(enabled: bool) -> None:
-        enable_calls.append(enabled)
-
-    app.controller = SimpleNamespace(
-        settings=settings,
-        apply_settings=fake_apply_settings,
-        set_peer_translation_enabled=fake_enable,
-    )
-
-    app._accept_peer_translation_eula_and_enable()
-    await app.page.tasks[0]()
-
-    assert len(applied) == 1
-    assert applied[0] is not settings
-    assert applied[0].ui.peer_translation_eula_accepted is True
-    assert settings.ui.peer_translation_eula_accepted is False
-    assert enable_calls == [True]
-
-
-@pytest.mark.asyncio
-async def test_peer_translation_toggle_with_existing_acceptance_enables_directly(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    settings = AppSettings()
-    settings.ui.peer_translation_eula_accepted = True
-    calls: list[bool] = []
-    monkeypatch.setattr(
-        app,
-        "_show_peer_translation_eula",
-        lambda _on_accept: pytest.fail("accepted peer translation should not reopen EULA"),
-    )
-
-    async def fake_enable(enabled: bool):
-        calls.append(enabled)
-
-    app.controller = SimpleNamespace(settings=settings, set_peer_translation_enabled=fake_enable)
+def test_peer_translation_toggle_with_existing_acceptance_enables_directly() -> None:
+    app, tasks, shown, enabled, _accepted = _peer_translation_binding_app(eula_accepted=True)
 
     app._on_peer_translation_toggle(True)
-    await app.page.tasks[0]()
+    assert shown == []
+    assert len(tasks) == 1
+    asyncio.run(tasks.pop(0)())
 
-    assert calls == [True]
+    assert enabled == [True]
 
 
-@pytest.mark.asyncio
-async def test_peer_translation_disable_does_not_open_eula(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    settings = AppSettings()
-    settings.ui.peer_translation_eula_accepted = False
-    calls: list[bool] = []
-    monkeypatch.setattr(
-        app,
-        "_show_peer_translation_eula",
-        lambda _on_accept: pytest.fail("disabling peer translation should not show EULA"),
-    )
-
-    async def fake_enable(enabled: bool):
-        calls.append(enabled)
-
-    app.controller = SimpleNamespace(settings=settings, set_peer_translation_enabled=fake_enable)
+def test_peer_translation_disable_does_not_open_eula() -> None:
+    app, tasks, shown, enabled, _accepted = _peer_translation_binding_app(eula_accepted=False)
 
     app._on_peer_translation_toggle(False)
-    await app.page.tasks[0]()
+    assert shown == []
+    assert len(tasks) == 1
+    asyncio.run(tasks.pop(0)())
 
-    assert calls == [False]
+    assert enabled == [False]
 
 
 @pytest.mark.asyncio
