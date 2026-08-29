@@ -45,6 +45,9 @@ MAXIMUM_EPOCHS = 8
 EARLY_STOPPING_PATIENCE = 2
 WARMUP_FRACTION = 0.05
 OVERFIT_MAXIMUM_STEPS = 500
+MICRO_BATCH_SIZE = 1
+GRADIENT_ACCUMULATION_STEPS = 16
+OPTIMIZER_STEPS_PER_EPOCH = WINDOWS_PER_EPOCH // (MICRO_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS)
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -212,6 +215,48 @@ def prepare_training_example(
         state_reset_at_start=row.get("state_reset_at_window_start") is True,
         window_start_sample=start,
         window_end_sample=int(row["window_end_sample"]),
+        waveform_content_sha256=_tensor_content_sha256(waveform),
+        supervision_content_sha256=_supervision_content_sha256(supervision),
+        _factory_token=_TRAINING_EXAMPLE_TOKEN,
+    )
+
+
+def prepare_dev_example(
+    *,
+    source_id: str,
+    corpus: str,
+    window_start_sample: int,
+    waveform: torch.Tensor,
+    labels: Any,
+) -> TrainingExample:
+    if (
+        not source_id
+        or corpus not in {"AMI", "AliMeeting"}
+        or window_start_sample < 0
+        or window_start_sample % 480000
+        or waveform.shape != (480000,)
+        or not torch.is_floating_point(waveform)
+        or not bool(torch.isfinite(waveform).all())
+    ):
+        raise TrainingContractError("DEV sequence geometry differs from the frozen policy")
+    episode_ids, anchor_speakers = anchor_timeline(source_id, labels, window_start_sample)
+    supervision = build_frame_supervision(
+        labels,
+        window_start_sample,
+        episode_ids,
+        anchor_speakers,
+    )
+    row_id = f"dev-{source_id}-{window_start_sample:012d}"
+    return TrainingExample(
+        source_id=source_id,
+        corpus=corpus,
+        row_id=row_id,
+        waveform=waveform,
+        supervision=supervision,
+        split_role=DEV_ROLE,
+        state_reset_at_start=True,
+        window_start_sample=window_start_sample,
+        window_end_sample=window_start_sample + 480000,
         waveform_content_sha256=_tensor_content_sha256(waveform),
         supervision_content_sha256=_supervision_content_sha256(supervision),
         _factory_token=_TRAINING_EXAMPLE_TOKEN,
@@ -530,11 +575,14 @@ def forward_batch(
         waveform.device
     )
     outputs = model.psem_outputs(evidence, anchor_one_hot)
+    roles = tuple(example.split_role for example in examples)
+    if len(set(roles)) != 1 or roles[0] not in {TRAIN_ROLE, DEV_ROLE}:
+        raise TrainingContractError("loss batches must contain one homogeneous TRAIN or DEV role")
     native = model.native_sortformer_loss(
         evidence,
         arrival_targets,
         native_mask,
-        tuple(TRAIN_ROLE for _ in examples),
+        roles,
     )
     losses = composite_loss(
         outputs,
@@ -543,7 +591,7 @@ def forward_batch(
         mask=mask,
         replacement_positive_weight=class_weights.replacement_positive,
         anchor_positive_weight=class_weights.anchor_positive,
-        sampling_roles=tuple(TRAIN_ROLE for _ in examples),
+        sampling_roles=roles,
         native_sortformer_loss=native,
     )
     return ForwardResult(
@@ -635,7 +683,7 @@ def fit_arm(
         text=True,
     ).stdout.splitlines()
     if (
-        steps_per_epoch <= 0
+        steps_per_epoch != OPTIMIZER_STEPS_PER_EPOCH
         or arm != authorization.arm
         or class_weights != authorization.class_weights
         or current_head != authorization.git_head
@@ -655,9 +703,11 @@ def fit_arm(
     for epoch in range(1, MAXIMUM_EPOCHS + 1):
         model.train()
         epoch_steps = 0
+        accumulated_micro_batches = 0
         observed_row_ids: list[str] = []
+        optimizer.zero_grad(set_to_none=True)
         for examples in train_batches(epoch):
-            if not examples:
+            if not examples or len(examples) != MICRO_BATCH_SIZE:
                 raise TrainingContractError("official training produced an empty batch")
             for example in examples:
                 if (
@@ -683,19 +733,26 @@ def fit_arm(
                         "training batch differs from the authorized shared inputs"
                     )
                 observed_row_ids.append(example.row_id)
-            optimizer.zero_grad(set_to_none=True)
             result = forward_batch(model, examples, class_weights)
-            result.losses["total"].backward()
-            norm = torch.nn.utils.clip_grad_norm_(
-                [parameter for parameter in model.parameters() if parameter.requires_grad],
-                GRADIENT_CLIP_NORM,
-            )
-            if not bool(torch.isfinite(norm)):
-                raise TrainingContractError("official training produced a non-finite gradient norm")
-            optimizer.step()
-            scheduler.step()
-            epoch_steps += 1
-            global_step += 1
+            (result.losses["total"] / GRADIENT_ACCUMULATION_STEPS).backward()
+            accumulated_micro_batches += 1
+            if accumulated_micro_batches == GRADIENT_ACCUMULATION_STEPS:
+                norm = torch.nn.utils.clip_grad_norm_(
+                    [parameter for parameter in model.parameters() if parameter.requires_grad],
+                    GRADIENT_CLIP_NORM,
+                )
+                if not bool(torch.isfinite(norm)):
+                    raise TrainingContractError(
+                        "official training produced a non-finite gradient norm"
+                    )
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad(set_to_none=True)
+                accumulated_micro_batches = 0
+                epoch_steps += 1
+                global_step += 1
+        if accumulated_micro_batches:
+            raise TrainingContractError("epoch ended inside a gradient-accumulation group")
         if epoch_steps != steps_per_epoch:
             raise TrainingContractError(
                 "epoch optimizer-step count differs from the shared manifest"
@@ -743,6 +800,9 @@ def fit_arm(
         "early_stopping_patience": EARLY_STOPPING_PATIENCE,
         "checkpoint_metric": "dev_total_loss",
         "checkpoint_tiebreak": "dev_replacement_average_precision",
+        "micro_batch_size": MICRO_BATCH_SIZE,
+        "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
+        "effective_windows_per_optimizer_step": (MICRO_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS),
         "selected_checkpoint": {
             "epoch": selected_epoch,
             **selected_metrics,
@@ -757,11 +817,12 @@ def fit_arm(
 @torch.no_grad()
 def evaluate_examples(
     model: TrainableSortformerPSEM,
-    batches: Sequence[Sequence[TrainingExample]],
+    batches: Iterable[Sequence[TrainingExample]],
     class_weights: ClassWeights,
 ) -> dict[str, float]:
     model.eval()
     losses = []
+    totals = []
     native = []
     logits = []
     targets = []
@@ -769,14 +830,16 @@ def evaluate_examples(
     for examples in batches:
         result = forward_batch(model, examples, class_weights)
         losses.append(float(result.losses["replacement"].detach().cpu()))
+        totals.append(float(result.losses["total"].detach().cpu()))
         native.append(float(result.losses["native_sortformer"].detach().cpu()))
         logits.append(result.replacement_logits.detach().cpu())
         targets.append(result.replacement_targets.detach().cpu())
         masks.append(result.mask.detach().cpu())
-    if not losses or not all(math.isfinite(value) for value in (*losses, *native)):
+    if not losses or not all(math.isfinite(value) for value in (*losses, *totals, *native)):
         raise TrainingContractError("evaluation losses are absent or non-finite")
     return {
         "replacement_loss": sum(losses) / len(losses),
+        "total_loss": sum(totals) / len(totals),
         "native_sortformer_loss": sum(native) / len(native),
         "replacement_average_precision": duration_weighted_average_precision(
             torch.cat(logits), torch.cat(targets), torch.cat(masks)
@@ -883,6 +946,7 @@ def build_overfit_receipt(
         raise TrainingContractError("overfit receipt subset differs from the hash-selected budget")
     arms = {}
     for arm, values in arm_results.items():
+        result_conditional_authorization = values.get("conditional_arm_audit_authorization")
         if (
             values.get("arm") != arm
             or values.get("optimizer_steps") != OVERFIT_MAXIMUM_STEPS
@@ -896,6 +960,7 @@ def build_overfit_receipt(
         timing = bound.get("timing_receipt")
         inventory = bound.get("parameter_inventory")
         graph = bound.get("model_graph_receipt")
+        canary_conditional_authorization = bound.get("conditional_arm_audit_authorization")
         if (
             not isinstance(gradient, Mapping)
             or not isinstance(update, Mapping)
@@ -910,6 +975,25 @@ def build_overfit_receipt(
                 parameter_inventory_receipt=inventory,
                 model_graph_receipt=graph,
             )
+            or result_conditional_authorization != canary_conditional_authorization
+            or (
+                arm == "TA-ALL-TEMPORAL"
+                and (
+                    not isinstance(result_conditional_authorization, Mapping)
+                    or result_conditional_authorization.get("artifact_role")
+                    != "conditional_arm_audit_authorization"
+                    or result_conditional_authorization.get("arm") != arm
+                    or result_conditional_authorization.get("payload_sha256")
+                    != canonical_sha256(
+                        {
+                            key: value
+                            for key, value in result_conditional_authorization.items()
+                            if key != "payload_sha256"
+                        }
+                    )
+                )
+            )
+            or (arm != "TA-ALL-TEMPORAL" and result_conditional_authorization is not None)
         ):
             raise TrainingContractError(f"overfit canaries are absent or invalid for {arm}")
         arms[arm] = {

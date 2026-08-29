@@ -24,9 +24,22 @@
     "nemo_revision": "1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6",
     "lock_kind": "complete_installed_distribution_inventory",
     "platform_identity_fields": ["system", "release", "machine"],
+    "container_image_identity": "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
+    "accelerator_identity_fields": [
+      "cuda_device_count",
+      "device_name",
+      "device_total_memory_bytes",
+      "nvidia_driver_version",
+      "torch_cuda_version"
+    ],
     "required_exact_packages": ["hydra-core", "lightning", "numpy", "omegaconf", "torch", "torchaudio"],
     "all_installed_distributions_must_match": true,
-    "all_loaded_nemo_modules_must_resolve_under_checkout": true
+    "all_loaded_nemo_modules_must_resolve_under_checkout": true,
+    "validated_lock_bytes_are_parsed_and_hashed_once": true
+  },
+  "checkpoint_loading": {
+    "base_nemo_verified_bytes_restored_from_private_copy": true,
+    "trained_checkpoint_verified_bytes_are_loaded_once": true
   },
   "sampling": {
     "manifest_epochs": 8,
@@ -39,6 +52,14 @@
     "training_sequence_start_is_declared_reset": true,
     "target_recipe_version": "issue-107-oracle-anchor-frame-targets-v1",
     "augmentation_recipe_version": "issue-107-waveform-augmentation-v1"
+  },
+  "optimization_execution": {
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "effective_windows_per_optimizer_step": 16,
+    "optimizer_steps_per_epoch": 256,
+    "dev_sequence_policy": "complete_source_aligned_nonoverlapping_30_second_sequences",
+    "dev_incomplete_tail_policy": "excluded_from_loss_but_included_in_product_evaluation"
   },
   "overfit": {
     "source_rule_version": "issue-107-overfit-source-v1",
@@ -58,16 +79,44 @@
       "state_reset",
       "raw_sortformer_activity_logits",
       "raw_anchor_present_logit",
-      "raw_replacement_evidence_logit"
+      "raw_replacement_evidence_logit",
+      "source_waveform_sha256",
+      "base_checkpoint_sha256",
+      "trained_checkpoint_sha256",
+      "trained_checkpoint_receipt_sha256",
+      "runtime_identity_sha256",
+      "parameter_policy_sha256",
+      "candidate_git_head",
+      "candidate_code_identity_sha256"
     ],
     "final_frame_policy": "waveform_length_must_be_divisible_by_1280_and_output_count_must_equal_length_div_1280",
     "lineage_source_coverage": "zero_to_largest_complete_1280_sample_frame_with_explicit_excluded_tail",
     "state_reset_policy": "first_frame_only",
     "lifecycle_fields_are_binary": true,
-    "logits_must_be_finite": true
+    "logits_must_be_finite": true,
+    "prefix_causality_must_be_executed": true,
+    "streaming_cache_trace_must_be_content_bound": true
+  },
+  "action_evaluation_alignment": {
+    "native_prediction_grid_samples": 1280,
+    "action_grid_authority": "issue_99_committed_action_reference",
+    "causal_sampling_rule": "latest_native_frame_whose_end_is_not_after_action_end",
+    "oracle_mapping_recomputed_on_action_aligned_checkpoint_posteriors": true,
+    "native_rows_retain_episode_and_recomputed_slot_mapping": true,
+    "stale_reported_slot_is_fatal": true
+  },
+  "eval_isolation": {
+    "registry_environment_variable": "PSEM_PROTOCOL_REGISTRY_ROOT",
+    "caller_registry_is_external_provenance_only": true,
+    "authority_registry_location": "git_common_dir/psem-sortformer-adaptation-depth/authority_pin",
+    "authority_registry_shared_by_clone_worktrees_and_processes": true,
+    "authority_pinned_exclusive_marker": "issue-107-eba82c5a39421b7c8d619cfd971720d8b35b19c8d198605e6e5c0dd09fcd0a97.json",
+    "dev_training_refreeze_after_marker": false,
+    "runtime_evidence_requires_content_addressed_authority_record": true
   },
   "lineage_numeric_evidence": {
     "float_prediction_set_hash_recomputed_from_external_artifacts": true,
+    "validated_artifact_bytes_are_reused_for_numeric_recomputation": true,
     "q8_prediction_set_sha256": "27b7eaaa5c2ee332c3b81c048f8e2666499da9a3a4d7e46e8c994876c6ddcee8",
     "paired_bootstrap_algorithm": "paired_source_bootstrap_v1",
     "paired_bootstrap_resamples_minimum": 2000,

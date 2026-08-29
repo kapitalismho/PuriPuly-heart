@@ -48,6 +48,11 @@
     "state_reset_policy": "declared_source_or_reset_boundary_only",
     "additional_future_context_allowed": false
   },
+  "dev_checkpoint_selection": {
+    "sequence_policy": "complete_source_aligned_nonoverlapping_30_second_sequences",
+    "incomplete_source_tail_policy": "excluded_from_loss_but_included_in_product_evaluation",
+    "state_reset_at_sequence_start": true
+  },
   "loss": {
     "replacement_weight": 1.0,
     "anchor_weight": 0.5,
@@ -70,6 +75,10 @@
     "maximum_epochs": 8,
     "early_stopping_patience": 2,
     "warmup_fraction": 0.05,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "effective_windows_per_optimizer_step": 16,
+    "optimizer_steps_per_epoch": 256,
     "seeds": [7301, 7302],
     "learning_rates": {
       "psem_head": 0.001,

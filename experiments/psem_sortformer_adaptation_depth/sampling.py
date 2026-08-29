@@ -676,7 +676,13 @@ def load_window_waveform(
     relative = Path(session.audio_ref)
     root = corpus_root.resolve()
     path = (root / relative).resolve()
-    if relative.is_absolute() or ".." in relative.parts or not path.is_relative_to(root):
+    if (
+        relative.is_absolute()
+        or ".." in relative.parts
+        or not path.is_relative_to(root)
+        or not path.is_file()
+        or _sha256_file(path) != session.waveform_sha256
+    ):
         raise SamplingContractError("waveform path escapes the bound corpus root")
     waveform, sample_rate = torchaudio.load(
         path,

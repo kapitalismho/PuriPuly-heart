@@ -23,6 +23,7 @@ from experiments.psem_sortformer_adaptation_depth.runtime_audit import (
     parameter_inventory,
     parameter_inventory_runtime_passed,
     run_gradient_update_canary,
+    run_prefix_causality_audit,
     validate_streaming_graph,
 )
 
@@ -223,6 +224,12 @@ def test_model_graph_receipt_binds_low_latency_geometry_and_taps() -> None:
         receipt["parameter_schema_sha256"]
         == parameter_inventory(model, "F0-FROZEN-FLOAT")["parameter_schema_sha256"]
     )
+    state_dict_rows = [
+        {"name": name, "shape": list(value.shape), "dtype": str(value.dtype)}
+        for name, value in model.state_dict().items()
+    ]
+    assert receipt["state_dict_schema_sha256"] == canonical_sha256(state_dict_rows)
+    assert receipt["executable_state_entry_count"] == len(state_dict_rows)
 
 
 def test_model_graph_rejects_config_claims_that_disagree_with_executable_shapes() -> None:
@@ -285,6 +292,65 @@ def test_parameter_inventory_is_recomputed_and_bound_to_the_executable_graph() -
     )
 
 
+def _timing_runtime_evidence(frame_count: int) -> tuple[tuple[dict, ...], dict]:
+    rows = []
+    emitted_total = 0
+    cache = 0
+    fifo = 0
+    while emitted_total < frame_count:
+        emitted = min(6, frame_count - emitted_total)
+        left_offset = 0 if not rows else 8
+        final = emitted_total + emitted == frame_count
+        right_offset = 0 if final else 56
+        chunk_frames = (0 if not rows else 1) + emitted + (0 if final else 7)
+        fifo_total = fifo + emitted
+        if fifo_total > 188:
+            pop_count = min(max(144, emitted - 188 + fifo), fifo_total)
+            next_fifo = fifo_total - pop_count
+            next_cache = min(188, cache + pop_count)
+        else:
+            next_fifo = fifo_total
+            next_cache = cache
+        rows.append(
+            {
+                "step_index": len(rows),
+                "left_offset": left_offset,
+                "right_offset": right_offset,
+                "chunk_feature_frames": chunk_frames,
+                "chunk_length_min": chunk_frames,
+                "chunk_length_max": chunk_frames,
+                "cache_before_frames": cache,
+                "fifo_before_frames": fifo,
+                "cache_after_frames": next_cache,
+                "fifo_after_frames": next_fifo,
+                "emitted_frames": emitted,
+            }
+        )
+        cache = next_cache
+        fifo = next_fifo
+        emitted_total += emitted
+    trace = tuple(rows)
+    prefix = {
+        "passed": True,
+        "algorithmic_evidence_delay_samples": 16640,
+        "mutation_start_sample": 240000,
+        "protected_frame_count": max(1, frame_count - 1),
+        "protected_prefix_unchanged": True,
+        "suffix_change_observed": True,
+        "prefix_max_abs_delta": {
+            "probabilities": 0.0,
+            "activity_logits": 0.0,
+            "final_temporal_hidden": 0.0,
+        },
+        "suffix_max_abs_delta": {
+            "probabilities": 1.0,
+            "activity_logits": 1.0,
+            "final_temporal_hidden": 1.0,
+        },
+    }
+    return trace, prefix
+
+
 def test_parameter_inventory_and_one_step_canaries_are_exact() -> None:
     model = _fake_adaptation_model()
     inventory = parameter_inventory(model, "T2-TOP")
@@ -301,6 +367,7 @@ def test_parameter_inventory_and_one_step_canaries_are_exact() -> None:
         parameter_inventory_receipt=receipts["parameter_inventory"],
         model_graph_receipt=receipts["model_graph_receipt"],
     )
+    trace, prefix = _timing_runtime_evidence(375)
     timing = build_timing_receipt(
         torch.tensor([480000]),
         torch.full((1, 375, 4), 0.5),
@@ -309,6 +376,8 @@ def test_parameter_inventory_and_one_step_canaries_are_exact() -> None:
         torch.ones((1, 375, 4)),
         torch.cat((torch.ones((1, 1, 1)), torch.zeros((1, 374, 1))), dim=1),
         torch.full((1, 375, 1), 1.04),
+        trace,
+        prefix,
     )
     assert canary_bundle_runtime_passed(
         receipts["gradient_canary_receipt"],
@@ -342,6 +411,23 @@ def test_parameter_inventory_and_one_step_canaries_are_exact() -> None:
     )
 
 
+def test_timing_receipt_rejects_zero_context_geometry() -> None:
+    trace, prefix = _timing_runtime_evidence(12)
+    forged = tuple({**row, "left_offset": 0} if row["step_index"] == 1 else row for row in trace)
+    with pytest.raises(Exception, match="streaming cache or prefix-causality"):
+        build_timing_receipt(
+            torch.tensor([15360]),
+            torch.full((1, 12, 4), 0.5),
+            torch.zeros((1, 12, 4)),
+            torch.zeros((1, 12, 192)),
+            torch.ones((1, 12, 4)),
+            torch.cat((torch.ones((1, 1, 1)), torch.zeros((1, 11, 1))), dim=1),
+            torch.full((1, 12, 1), 1.04),
+            forged,
+            {**prefix, "protected_frame_count": 5},
+        )
+
+
 def test_raw_waveform_canary_rejects_a_constant_graph_input() -> None:
     model = _fake_adaptation_model()
 
@@ -358,6 +444,27 @@ def test_raw_waveform_canary_rejects_a_constant_graph_input() -> None:
 
     with pytest.raises(Exception, match="exact fixed runtime canary path"):
         run_gradient_update_canary(model, "T2-TOP", torch.full((1, 480000), 0.5))
+
+
+def test_prefix_causality_audit_rejects_whole_sequence_future_leakage(monkeypatch) -> None:
+    waveform = torch.linspace(-0.5, 0.5, 480000).unsqueeze(0)
+    lengths = torch.tensor([480000])
+    model = _fake_adaptation_model()
+    assert run_prefix_causality_audit(model, waveform, lengths)["passed"]
+    original = FakeSortformer.process_signal
+
+    def leaking_process_signal(self, *, audio_signal, audio_signal_length):
+        frames, frame_lengths = original(
+            self,
+            audio_signal=audio_signal,
+            audio_signal_length=audio_signal_length,
+        )
+        return frames + audio_signal.mean(dim=1, keepdim=True).unsqueeze(-1), frame_lengths
+
+    monkeypatch.setattr(FakeSortformer, "process_signal", leaking_process_signal)
+    leaking_model = _fake_adaptation_model()
+    with pytest.raises(Exception, match="violates charged prefix causality"):
+        run_prefix_causality_audit(leaking_model, waveform, lengths)
 
 
 def test_runtime_canary_rejects_a_replaced_class_implementation(monkeypatch) -> None:
@@ -379,7 +486,10 @@ def test_timing_receipt_binds_exact_frame_count_delay_and_binary_lifecycle() -> 
     alive = torch.ones((1, 2, 4))
     reset = torch.tensor([[[1.0], [0.0]]])
     delay = torch.full((1, 2, 1), 1.04)
-    receipt = build_timing_receipt(lengths, probabilities, logits, hidden, alive, reset, delay)
+    trace, prefix = _timing_runtime_evidence(2)
+    receipt = build_timing_receipt(
+        lengths, probabilities, logits, hidden, alive, reset, delay, trace, prefix
+    )
     assert receipt["frame_counts"] == [2]
     with pytest.raises(Exception, match="native frame contract"):
         build_timing_receipt(
@@ -390,6 +500,8 @@ def test_timing_receipt_binds_exact_frame_count_delay_and_binary_lifecycle() -> 
             alive,
             torch.zeros_like(reset),
             delay,
+            trace,
+            prefix,
         )
     with pytest.raises(Exception, match="native frame contract"):
         build_timing_receipt(
@@ -400,4 +512,19 @@ def test_timing_receipt_binds_exact_frame_count_delay_and_binary_lifecycle() -> 
             alive[:, :1],
             reset[:, :1],
             delay[:, :1],
+            trace,
+            prefix,
+        )
+    changed_prefix = {**prefix, "protected_prefix_unchanged": False}
+    with pytest.raises(Exception, match="prefix-causality"):
+        build_timing_receipt(
+            lengths,
+            probabilities,
+            logits,
+            hidden,
+            alive,
+            reset,
+            delay,
+            trace,
+            changed_prefix,
         )

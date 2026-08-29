@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import random
@@ -9,8 +10,12 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from experiments.psem_sortformer_adaptation_depth.authority_registry import (
+    require_registered_execution,
+)
 from experiments.psem_sortformer_adaptation_depth.preflight import (
     PreflightPaths,
+    _safe_external_output_root,
     build_preflight,
     canonical_sha256,
     sha256_file,
@@ -91,6 +96,36 @@ EXPECTED_EVALUATOR_ARTIFACTS = {
     "product_evaluator": {
         "path": "experiments/psem_relative_occupancy_gate/model_evaluate.py",
         "sha256": "15cc61daab0faaa25ab7487798cfc45082802cf9f0ceca1f1345ed6bb81f0bcc",
+    },
+}
+EXECUTED_ISSUE99_EVALUATOR_ARTIFACTS = {
+    "session_builder": {
+        "path": "experiments/psem_frozen_ceiling_gate/build_ceiling_examples.py",
+        "sha256": "bfaaa5d87ffd0761c3895787c1066417109b802f42b4939a10fb6073f2313a7b",
+    },
+    "source_time_evaluator": {
+        "path": "experiments/psem_frozen_ceiling_gate/evaluate_ceiling.py",
+        "sha256": "dee7a20ea69181a0854347f4102cd0bac326c86306394500bf3fe5bc79eeb1d6",
+    },
+    "action_reference_builder": {
+        "path": "experiments/psem_frozen_ceiling_gate/experiment_support.py",
+        "sha256": "7ddc8b5b6ba80c9053b34dd7cc7d2dbbd75599325792b31bb3ece555e0f5c5c3",
+    },
+    "action_reference_ledger": {
+        "path": "experiments/psem_frozen_ceiling_gate/action_reference_ledger.jsonl",
+        "sha256": "0294d0fe35964e138fd9f4a295adbb913056bccc0a0ab2ffa9c6b015b772ae19",
+    },
+    "action_reference_coverage": {
+        "path": "experiments/psem_frozen_ceiling_gate/action_reference_coverage.json",
+        "sha256": "eb893222c2ca6b709263d65701c06bf73560bacbc4fc0e78dc611b90e6ee1959",
+    },
+    "issue99_g_frontier": {
+        "path": "experiments/psem_frozen_ceiling_gate/results/frozen_ceiling_1/gt_causal_action_frontier.json",
+        "sha256": "6b93f4e7e0dd584fdc9fdaace72ea61d7df36ebad1919c5400c4d245462b039d",
+    },
+    "issue99_q8_s_current": {
+        "path": "experiments/psem_frozen_ceiling_gate/results/frozen_ceiling_1/scalar_current_metrics.json",
+        "sha256": "e7dce5b500c27e105fa313053d85529e570a12a0ca72c970148562d22821b0f7",
     },
 }
 
@@ -225,21 +260,27 @@ def paired_source_bootstrap_v1(
     }
 
 
-def _validate_prediction_artifact(row: Mapping[str, Any]) -> None:
+def _validate_prediction_artifact(row: Mapping[str, Any]) -> bytes:
     descriptor = row.get("prediction_artifact")
     if not isinstance(descriptor, Mapping):
         raise ReceiptContractError("lineage prediction artifact descriptor is absent")
     raw_path = descriptor.get("path")
     unresolved_path = Path(raw_path) if isinstance(raw_path, str) else None
     path = unresolved_path.resolve() if unresolved_path is not None else None
+    output_value = row.get("experiment_output_root")
+    output_root = Path(output_value).resolve() if isinstance(output_value, str) else None
+    raw = path.read_bytes() if path is not None and path.is_file() else None
     if (
         path is None
         or unresolved_path is None
         or not unresolved_path.is_absolute()
         or not path.is_file()
         or path.is_relative_to(REPOSITORY_ROOT.resolve())
-        or descriptor.get("sha256") != sha256_file(path)
-        or descriptor.get("size_bytes") != path.stat().st_size
+        or output_root is None
+        or path != (output_root / "lineage_predictions" / f"{row.get('source_id')}.jsonl")
+        or raw is None
+        or descriptor.get("sha256") != hashlib.sha256(raw).hexdigest()
+        or descriptor.get("size_bytes") != len(raw)
     ):
         raise ReceiptContractError(
             "lineage prediction artifact is absent, mutable, or in-repository"
@@ -252,53 +293,70 @@ def _validate_prediction_artifact(row: Mapping[str, Any]) -> None:
     first_frontier = None
     last_frontier = None
     previous_alive = [False, False, False, False]
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
+    try:
+        lines = raw.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise ReceiptContractError("lineage prediction artifact is not UTF-8") from exc
+    for line in lines:
+        try:
             value = json.loads(line)
-            if not isinstance(value, dict):
-                raise ReceiptContractError(f"lineage prediction row is invalid: {source_id}")
-            start = value.get("source_frame_start_sample")
-            end = value.get("source_frame_end_sample")
-            frontier = value.get("model_evidence_frontier_source_sample")
-            activity_logits = value.get("raw_sortformer_activity_logits")
-            slot_alive = value.get("slot_alive")
-            state_reset = value.get("state_reset")
-            if (
-                value.get("artifact_role") != "psem_sortformer_frame_prediction"
-                or value.get("source_id") != source_id
-                or not isinstance(start, int)
-                or isinstance(start, bool)
-                or end != start + 1280
-                or frontier != start + 16640
-                or (count and start != last_end)
-                or not isinstance(activity_logits, list)
-                or len(activity_logits) != 4
-                or not all(_finite_number(item) for item in activity_logits)
-                or not _finite_number(value.get("raw_anchor_present_logit"))
-                or not _finite_number(value.get("raw_replacement_evidence_logit"))
-                or not isinstance(slot_alive, list)
-                or len(slot_alive) != 4
-                or any(type(item) is not bool for item in slot_alive)
-                or slot_alive != [True, True, True, True]
-                or any(
-                    was_alive and not alive for was_alive, alive in zip(previous_alive, slot_alive)
-                )
-                or type(state_reset) is not bool
-                or state_reset is not (count == 0)
-                or value.get("oracle_anchor_slot") not in {0, 1, 2, 3}
-                or isinstance(value.get("oracle_anchor_slot"), bool)
-                or (
-                    value.get("anchor_episode_id") is not None
-                    and not isinstance(value.get("anchor_episode_id"), str)
-                )
-            ):
-                raise ReceiptContractError(f"lineage prediction row is invalid: {source_id}")
-            first_start = start if first_start is None else first_start
-            first_frontier = frontier if first_frontier is None else first_frontier
-            last_end = end
-            last_frontier = frontier
-            previous_alive = slot_alive
-            count += 1
+        except json.JSONDecodeError as exc:
+            raise ReceiptContractError("lineage prediction artifact contains invalid JSON") from exc
+        if not isinstance(value, dict):
+            raise ReceiptContractError(f"lineage prediction row is invalid: {source_id}")
+        start = value.get("source_frame_start_sample")
+        end = value.get("source_frame_end_sample")
+        frontier = value.get("model_evidence_frontier_source_sample")
+        activity_logits = value.get("raw_sortformer_activity_logits")
+        slot_alive = value.get("slot_alive")
+        state_reset = value.get("state_reset")
+        if (
+            value.get("artifact_role") != "psem_sortformer_frame_prediction"
+            or value.get("source_id") != source_id
+            or not isinstance(start, int)
+            or isinstance(start, bool)
+            or end != start + 1280
+            or frontier != start + 16640
+            or (count and start != last_end)
+            or not isinstance(activity_logits, list)
+            or len(activity_logits) != 4
+            or not all(_finite_number(item) for item in activity_logits)
+            or not _finite_number(value.get("raw_anchor_present_logit"))
+            or not _finite_number(value.get("raw_replacement_evidence_logit"))
+            or not isinstance(slot_alive, list)
+            or len(slot_alive) != 4
+            or any(type(item) is not bool for item in slot_alive)
+            or slot_alive != [True, True, True, True]
+            or any(was_alive and not alive for was_alive, alive in zip(previous_alive, slot_alive))
+            or type(state_reset) is not bool
+            or state_reset is not (count == 0)
+            or value.get("oracle_anchor_slot") not in {0, 1, 2, 3}
+            or isinstance(value.get("oracle_anchor_slot"), bool)
+            or (
+                value.get("anchor_episode_id") is not None
+                and not isinstance(value.get("anchor_episode_id"), str)
+            )
+            or value.get("artifact_context") != "trainable_checkpoint_lineage"
+            or value.get("split_role") != row.get("split_role")
+            or value.get("arm") != "F0-FROZEN-FLOAT"
+            or value.get("seed") is not None
+            or value.get("source_waveform_sha256") != row.get("source_waveform_sha256")
+            or value.get("base_checkpoint_sha256") != CHECKPOINT_IDENTITY["sha256"]
+            or value.get("trained_checkpoint_sha256") is not None
+            or value.get("trained_checkpoint_receipt_sha256") is not None
+            or value.get("runtime_identity_sha256") != row.get("runtime_identity_sha256")
+            or value.get("candidate_git_head") != row.get("candidate_git_head")
+            or value.get("candidate_code_identity_sha256")
+            != row.get("candidate_code_identity_sha256")
+            or value.get("experiment_output_root") != row.get("experiment_output_root")
+        ):
+            raise ReceiptContractError(f"lineage prediction row is invalid: {source_id}")
+        first_start = start if first_start is None else first_start
+        first_frontier = frontier if first_frontier is None else first_frontier
+        last_end = end
+        last_frontier = frontier
+        previous_alive = slot_alive
+        count += 1
     if (
         count != frame_count
         or descriptor.get("row_count") != frame_count
@@ -308,6 +366,140 @@ def _validate_prediction_artifact(row: Mapping[str, Any]) -> None:
         or last_frontier != row.get("last_evidence_frontier_sample")
     ):
         raise ReceiptContractError(f"lineage prediction artifact coverage differs: {source_id}")
+    return raw
+
+
+def recompute_lineage_numeric_evidence(
+    sources: Sequence[Mapping[str, Any]],
+    evaluator_contract: Mapping[str, Any],
+    *,
+    artifact_bytes: Mapping[str, bytes] | None = None,
+) -> dict[str, Any]:
+    import numpy as np
+
+    from experiments.psem_frozen_ceiling_gate.build_ceiling_examples import load_sessions
+    from experiments.psem_frozen_ceiling_gate.evaluate_ceiling import session_row
+    from experiments.psem_sortformer_adaptation_depth.evaluation import _adapt_session
+    from experiments.psem_sortformer_adaptation_depth.frame_alignment import (
+        align_native_predictions,
+    )
+
+    snapshots = {
+        session.source_id: session for session in load_sessions(validate_mapping_ledger=False)
+    }
+    posterior_rows = []
+    product_deltas = {
+        metric: {} for metric in ("contamination", "false_cuts", "missed_replacements")
+    }
+    for source in sources:
+        source_id = source["source_id"]
+        snapshot = snapshots.get(source_id)
+        descriptor = source.get("prediction_artifact")
+        raw_path = descriptor.get("path") if isinstance(descriptor, Mapping) else None
+        path = Path(raw_path) if isinstance(raw_path, str) else None
+        if snapshot is None or path is None:
+            raise ReceiptContractError("lineage numeric source evidence is absent")
+        try:
+            raw = path.read_bytes() if artifact_bytes is None else artifact_bytes[source_id]
+            rows = [json.loads(line) for line in raw.decode("utf-8").splitlines()]
+        except (KeyError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ReceiptContractError("lineage numeric artifact is unreadable") from exc
+        float_probabilities = align_native_predictions(snapshot, rows)["probabilities"].astype(
+            np.float64
+        )
+        q8_probabilities = snapshot.probabilities.astype(np.float64)
+        if float_probabilities.shape != q8_probabilities.shape:
+            raise ReceiptContractError("lineage float/Q8 posterior geometry differs")
+        absolute = np.abs(float_probabilities - q8_probabilities)
+        posterior_rows.append(
+            {
+                "source_id": source_id,
+                "metrics": {
+                    "mean_absolute_posterior_delta": float(absolute.mean()),
+                    "maximum_absolute_posterior_delta": float(absolute.max()),
+                },
+            }
+        )
+        float_session, selected_float, _, _ = _adapt_session(snapshot, rows)
+        float_row = session_row(
+            float_session,
+            (selected_float < 0.5).astype(np.float32),
+            condition="F0-FROZEN-FLOAT",
+            probe_class="current",
+            threshold=0.5,
+            confirmation_ms=500,
+            time_condition="causal",
+        )
+        q8_selected = q8_probabilities[:, 0]
+        q8_row = session_row(
+            snapshot,
+            (q8_selected < 0.5).astype(np.float32),
+            condition="Q8-S-current",
+            probe_class="current",
+            threshold=0.5,
+            confirmation_ms=500,
+            time_condition="causal",
+        )
+        float_metrics = float_row["metrics"]
+        q8_metrics = q8_row["metrics"]
+        metric_fields = {
+            "contamination": "exclusive_other_contamination_seconds",
+            "false_cuts": "false_cut_count",
+            "missed_replacements": "missed_replacement_count",
+        }
+        for metric, field in metric_fields.items():
+            product_deltas[metric][source_id] = float(float_metrics[field]) - float(
+                q8_metrics[field]
+            )
+    descriptors = [
+        {
+            "source_id": row["source_id"],
+            "sha256": row["prediction_artifact"]["sha256"],
+            "size_bytes": row["prediction_artifact"]["size_bytes"],
+            "row_count": row["prediction_artifact"]["row_count"],
+        }
+        for row in sources
+    ]
+    float_set_sha = canonical_sha256(descriptors)
+    q8_set_sha = evaluator_contract["q8_posterior_sessions"]["sha256"]
+    product_metrics = {}
+    materially_different = 0
+    for index, metric in enumerate(("contamination", "false_cuts", "missed_replacements")):
+        deltas = product_deltas[metric]
+        interval = paired_source_bootstrap_v1(deltas, seed=10700 + index, resamples=2000)
+        excludes = interval["upper"] < 0 or interval["lower"] > 0
+        materially_different += int(excludes)
+        product_metrics[metric] = {
+            "paired_source_deltas": deltas,
+            "point_estimate": sum(deltas.values()) / len(deltas),
+            "bootstrap_95": {
+                **interval,
+                "seed": 10700 + index,
+                "resamples": 2000,
+                "unit": "source_or_meeting",
+                "algorithm": "paired_source_bootstrap_v1",
+            },
+            "paired_source_bootstrap_interval_excludes_zero": excludes,
+        }
+    return {
+        "float_vs_q8_posterior_deltas": {
+            "per_source": posterior_rows,
+            "paired_source_count": len(sources),
+            "float_prediction_set_sha256": float_set_sha,
+            "q8_prediction_set_sha256": q8_set_sha,
+        },
+        "float_vs_q8_product_deltas": {
+            "metrics": product_metrics,
+            "float_prediction_set_sha256": float_set_sha,
+            "q8_prediction_set_sha256": q8_set_sha,
+        },
+        "study_label": (
+            "float-checkpoint adaptation study"
+            if materially_different >= 2
+            else "Q8-linked float adaptation study"
+        ),
+        "float_checkpoint_materially_differs_on_two_or_more_metrics": materially_different >= 2,
+    }
 
 
 def validate_trainable_checkpoint_lineage(
@@ -330,6 +522,24 @@ def validate_trainable_checkpoint_lineage(
         raise ReceiptContractError("lineage NeMo revision differs from the frozen commit")
     if receipt.get("q8_baseline") != Q8_IDENTITY:
         raise ReceiptContractError("lineage Q8 baseline differs from #99")
+    output_value = receipt.get("experiment_output_root")
+    output_root = Path(output_value).resolve() if isinstance(output_value, str) else None
+    if output_root is None or not _safe_external_output_root(output_root):
+        raise ReceiptContractError("lineage output root is not a safe external cache")
+    from experiments.psem_sortformer_adaptation_depth.execution import (
+        validate_current_candidate_identity,
+    )
+
+    validate_current_candidate_identity(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_candidate_code_identity",
+            "git_head": receipt.get("candidate_git_head"),
+            "worktree_clean": True,
+            "artifact_sha256s": receipt.get("candidate_artifact_sha256s"),
+            "payload_sha256": receipt.get("candidate_code_identity_sha256"),
+        }
+    )
     expected_evaluator = evaluator_reconstruction_contract()
     graph = runtime_identity.get("model_graph")
     dependency_lock = runtime_identity.get("dependency_lock")
@@ -388,6 +598,7 @@ def validate_trainable_checkpoint_lineage(
         for role, values in split_receipt["source_ids_by_role"].items()
         for source_id in values
     }
+    artifact_bytes: dict[str, bytes] = {}
     for row in sources:
         frame_count = row.get("frame_count")
         first_start = row.get("first_frame_start_sample")
@@ -429,11 +640,31 @@ def validate_trainable_checkpoint_lineage(
             != "sortformer.sortformer_modules.single_hidden_to_spks.output_pre_sigmoid"
             or row.get("executable_graph_sha256") != graph.get("executable_graph_sha256")
             or row.get("dependency_lock_sha256") != runtime_identity.get("dependency_lock_sha256")
+            or row.get("runtime_identity_sha256") != receipt.get("runtime_identity_sha256")
+            or row.get("candidate_git_head") != receipt.get("candidate_git_head")
+            or row.get("candidate_code_identity_sha256")
+            != receipt.get("candidate_code_identity_sha256")
+            or row.get("experiment_output_root") != str(output_root)
         ):
             raise ReceiptContractError(
                 f"lineage frame/tap invariant failed: {row.get('source_id')}"
             )
-        _validate_prediction_artifact(row)
+        artifact_bytes[str(row["source_id"])] = _validate_prediction_artifact(row)
+    recomputed_numeric = recompute_lineage_numeric_evidence(
+        sources,
+        expected_evaluator,
+        artifact_bytes=artifact_bytes,
+    )
+    from experiments.psem_sortformer_adaptation_depth.lineage import lineage_authorization
+
+    if (
+        receipt.get("float_vs_q8_posterior_deltas")
+        != recomputed_numeric["float_vs_q8_posterior_deltas"]
+        or receipt.get("float_vs_q8_product_deltas")
+        != recomputed_numeric["float_vs_q8_product_deltas"]
+        or receipt.get("lineage_authorization_sha256") != lineage_authorization()["payload_sha256"]
+    ):
+        raise ReceiptContractError("lineage numeric evidence is not reproducible from artifacts")
     float_prediction_set_sha256 = canonical_sha256(
         [
             {
@@ -543,6 +774,7 @@ def validate_trainable_checkpoint_lineage(
     )
     if (
         receipt.get("study_label") != study_label
+        or receipt.get("study_label") != recomputed_numeric["study_label"]
         or receipt.get("direct_q8_fine_tuning_claim") is not False
         or _contains_direct_q8_claim(receipt)
     ):
@@ -585,6 +817,15 @@ def evaluator_reconstruction_contract() -> dict[str, Any]:
         if digest != descriptor["sha256"]:
             raise ReceiptContractError(f"#99 evaluator artifact drifted: {key}")
         bound[key] = {"path": str(path), "sha256": digest}
+    executed = {}
+    for key, descriptor in sorted(EXECUTED_ISSUE99_EVALUATOR_ARTIFACTS.items()):
+        path = (REPOSITORY_ROOT / descriptor["path"]).resolve()
+        if (
+            not path.is_relative_to(REPOSITORY_ROOT.resolve())
+            or sha256_file(path) != descriptor["sha256"]
+        ):
+            raise ReceiptContractError(f"executed #99 evaluator artifact drifted: {key}")
+        executed[key] = {"path": str(path), "sha256": descriptor["sha256"]}
     q8_posterior_path = (REPOSITORY_ROOT / Q8_POSTERIOR_SESSIONS["path"]).resolve()
     if (
         not q8_posterior_path.is_relative_to(REPOSITORY_ROOT.resolve())
@@ -597,6 +838,7 @@ def evaluator_reconstruction_contract() -> dict[str, Any]:
         "passed": True,
         "provenance_sha256": EXPECTED_EVALUATOR_PROVENANCE_SHA256,
         "artifacts": bound,
+        "executed_evaluator_artifacts": executed,
         "q8_posterior_sessions": {
             **Q8_POSTERIOR_SESSIONS,
             "path": str(q8_posterior_path),
@@ -666,6 +908,33 @@ def validate_overfit_canary(
         timing = bound.get("timing_receipt")
         inventory = bound.get("parameter_inventory")
         graph = bound.get("model_graph_receipt")
+        conditional_authorization = values.get("conditional_arm_audit_authorization")
+        raw_overfit = {
+            key: item
+            for key, item in values.items()
+            if key
+            not in {
+                "gradient_canary_sha256",
+                "update_canary_sha256",
+                "timing_receipt_sha256",
+                "parameter_inventory_sha256",
+                "model_graph_receipt_sha256",
+            }
+        }
+        try:
+            require_registered_execution("overfit-arm", raw_overfit)
+            for kind, runtime_receipt in (
+                ("gradient-canary", gradient),
+                ("update-canary", update),
+                ("timing-receipt", timing),
+                ("parameter-inventory", inventory),
+                ("model-graph", graph),
+            ):
+                require_registered_execution(kind, runtime_receipt)
+        except Exception as exc:
+            raise ReceiptContractError(
+                f"overfit execution evidence is not registered: {arm}"
+            ) from exc
         if (
             values.get("arm") != arm
             or values.get("sampling_manifest_sha256") != sha256_file(sampling_manifest_path)
@@ -700,6 +969,25 @@ def validate_overfit_canary(
             or values.get("model_graph_receipt_sha256") != canonical_sha256(graph)
             or timing.get("algorithmic_evidence_delay_samples") != 16640
             or timing.get("native_frame_samples") != 1280
+            or conditional_authorization != bound.get("conditional_arm_audit_authorization")
+            or (
+                arm == "TA-ALL-TEMPORAL"
+                and (
+                    not isinstance(conditional_authorization, Mapping)
+                    or conditional_authorization.get("artifact_role")
+                    != "conditional_arm_audit_authorization"
+                    or conditional_authorization.get("arm") != arm
+                    or conditional_authorization.get("payload_sha256")
+                    != canonical_sha256(
+                        {
+                            key: value
+                            for key, value in conditional_authorization.items()
+                            if key != "payload_sha256"
+                        }
+                    )
+                )
+            )
+            or (arm != "TA-ALL-TEMPORAL" and conditional_authorization is not None)
         ):
             raise ReceiptContractError(f"overfit canary failed for {arm}")
     validated = {**payload, "passed": True}
@@ -731,6 +1019,7 @@ def _validate_runtime_preflight(receipt: Mapping[str, Any]) -> None:
         "corpus_root": "runtime.corpus_root",
         "reference_root": "runtime.reference_root",
         "output_root": "runtime.output_root",
+        "protocol_registry_root": "runtime.protocol_registry_root",
     }
     if len(checks_by_id) != len(check_rows or []) or any(
         not isinstance(checks_by_id.get(check_id, {}).get("observed"), str)
@@ -747,8 +1036,32 @@ def _validate_runtime_preflight(receipt: Mapping[str, Any]) -> None:
         raise ReceiptContractError("runtime preflight does not match a current exact rerun")
 
 
-def _validate_staged_authorization(receipt: Mapping[str, Any], arm: str, seed: int) -> None:
+def _validate_staged_authorization(
+    receipt: Mapping[str, Any],
+    arm: str,
+    seed: int,
+    dev_results: Sequence[Mapping[str, Any]],
+) -> None:
+    from experiments.psem_sortformer_adaptation_depth.protocol import (
+        validate_staged_execution_state,
+    )
+
+    try:
+        validate_staged_execution_state(receipt, dev_results)
+    except Exception as exc:
+        raise ReceiptContractError("staged authorization is not reproducible") from exc
     payload = _bound_payload(receipt, "staged_execution_state")
+    from experiments.psem_sortformer_adaptation_depth.execution import candidate_code_identity
+
+    current_identity = candidate_code_identity()
+    if any(
+        not isinstance(result.get("prediction_set"), Mapping)
+        or result["prediction_set"].get("candidate_git_head") != current_identity["git_head"]
+        or result["prediction_set"].get("candidate_code_identity_sha256")
+        != current_identity["payload_sha256"]
+        for result in dev_results
+    ):
+        raise ReceiptContractError("staged DEV evidence belongs to another candidate identity")
     if payload.get("eval_open_count") != 0 or payload.get("eval_used_for_development") is not False:
         raise ReceiptContractError("EVAL entered staged training authorization")
     completed = payload.get("completed_runs")
@@ -922,9 +1235,30 @@ def validate_material_training_gate(
     overfit_receipt: Mapping[str, Any],
     overfit_canary_receipts: Mapping[str, Mapping[str, Mapping[str, Any]]],
     staged_execution_receipt: Mapping[str, Any],
+    staged_dev_results: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     if arm not in {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"} or seed not in {7301, 7302}:
         raise ReceiptContractError("material training arm or seed is unauthorized")
+    from experiments.psem_sortformer_adaptation_depth.protocol import (
+        authorize_conditional_arm_audit,
+    )
+
+    expected_conditional_authorization = authorize_conditional_arm_audit(
+        arm,
+        staged_execution_receipt if arm == "TA-ALL-TEMPORAL" else None,
+        staged_dev_results if arm == "TA-ALL-TEMPORAL" else (),
+    )
+    bound_overfit_arm = overfit_receipt.get("arms", {}).get(arm)
+    bound_canary_arm = overfit_canary_receipts.get(arm)
+    if (
+        not isinstance(bound_overfit_arm, Mapping)
+        or not isinstance(bound_canary_arm, Mapping)
+        or bound_overfit_arm.get("conditional_arm_audit_authorization")
+        != expected_conditional_authorization
+        or bound_canary_arm.get("conditional_arm_audit_authorization")
+        != expected_conditional_authorization
+    ):
+        raise ReceiptContractError("arm canaries are not bound to the current staged authorization")
     _validate_runtime_preflight(preflight_receipt)
     preflight_payload = {
         key: value for key, value in preflight_receipt.items() if key != "payload_sha256"
@@ -953,6 +1287,9 @@ def validate_material_training_gate(
         or current_dirty
     ):
         raise ReceiptContractError("runtime preflight has not passed")
+    from experiments.psem_sortformer_adaptation_depth.execution import candidate_code_identity
+
+    current_identity = candidate_code_identity()
     split = build_data_split_receipt()
     manifest_sha = sampling_validation.get("manifest_sha256")
     if (
@@ -994,8 +1331,19 @@ def validate_material_training_gate(
     lineage_payload = _bound_payload(validated_lineage, "trainable_checkpoint_lineage")
     if lineage_receipt != validated_lineage or lineage_payload.get("passed") is not True:
         raise ReceiptContractError("Q8-to-float lineage has not passed")
+    require_registered_execution("lineage", lineage_receipt)
     expected_evaluator = evaluator_reconstruction_contract()
     graph = runtime_identity.get("model_graph")
+    for kind, runtime_receipt in (
+        ("gradient-canary", gradient_receipt),
+        ("update-canary", update_receipt),
+        ("timing-receipt", timing_receipt),
+        ("parameter-inventory", parameter_inventory),
+        ("model-graph", graph),
+    ):
+        if not isinstance(runtime_receipt, Mapping):
+            raise ReceiptContractError("registered runtime evidence is absent")
+        require_registered_execution(kind, runtime_receipt)
     if (
         evaluator_contract != expected_evaluator
         or lineage_payload.get("runtime_identity_sha256") != canonical_sha256(runtime_identity)
@@ -1062,7 +1410,7 @@ def validate_material_training_gate(
         or arm not in overfit_payload.get("arms", {})
     ):
         raise ReceiptContractError("the arm has not passed the TRAIN-only overfit canary")
-    _validate_staged_authorization(staged_execution_receipt, arm, seed)
+    _validate_staged_authorization(staged_execution_receipt, arm, seed, staged_dev_results)
     shared_input_identity = canonical_sha256(
         [
             {
@@ -1101,6 +1449,7 @@ def validate_material_training_gate(
         "arm": arm,
         "seed": seed,
         "git_head": current_head,
+        "candidate_code_identity_sha256": current_identity["payload_sha256"],
         "preflight_receipt_sha256": preflight_receipt["payload_sha256"],
         "sampling_manifest_sha256": manifest_sha,
         "shared_input_identity_sha256": shared_input_identity,
@@ -1117,6 +1466,143 @@ def validate_material_training_gate(
         "overfit_canary_receipts_sha256": canonical_sha256(overfit_canary_receipts),
         "staged_execution_receipt_sha256": staged_execution_receipt["payload_sha256"],
         "dev_source_ids_sha256": canonical_sha256(split["source_ids_by_role"][DEV_ROLE]),
+        "authorized_checkpoint_path": next(
+            row["observed"]
+            for row in preflight_receipt["checks"]
+            if row["id"] == "runtime.checkpoint_path"
+        ),
+        "authorized_corpus_root": next(
+            row["observed"]
+            for row in preflight_receipt["checks"]
+            if row["id"] == "runtime.corpus_root"
+        ),
+        "authorized_reference_root": next(
+            row["observed"]
+            for row in preflight_receipt["checks"]
+            if row["id"] == "runtime.reference_root"
+        ),
+        "authorized_output_root": next(
+            row["observed"]
+            for row in preflight_receipt["checks"]
+            if row["id"] == "runtime.output_root"
+        ),
+        "authorized_protocol_registry_root": next(
+            row["observed"]
+            for row in preflight_receipt["checks"]
+            if row["id"] == "runtime.protocol_registry_root"
+        ),
         "eval_source_count": 0,
+        "validation_bundle": {
+            "preflight_receipt": dict(preflight_receipt),
+            "sampling_validation": dict(sampling_validation),
+            "sampling_manifest_path": str(sampling_manifest_path.resolve()),
+            "class_weight_receipt": dict(class_weight_receipt),
+            "lineage_receipt": dict(lineage_receipt),
+            "runtime_identity": dict(runtime_identity),
+            "evaluator_contract": dict(evaluator_contract),
+            "parameter_inventory": dict(parameter_inventory),
+            "gradient_receipt": dict(gradient_receipt),
+            "update_receipt": dict(update_receipt),
+            "timing_receipt": dict(timing_receipt),
+            "overfit_receipt": dict(overfit_receipt),
+            "overfit_canary_receipts": {
+                key: dict(value) for key, value in overfit_canary_receipts.items()
+            },
+            "staged_execution_receipt": dict(staged_execution_receipt),
+            "staged_dev_results": [dict(value) for value in staged_dev_results],
+        },
     }
     return {**payload, "payload_sha256": canonical_sha256(payload)}
+
+
+def revalidate_material_training_gate(
+    gate: Mapping[str, Any],
+    *,
+    sampling_manifest_path: Path,
+    sampling_rows: Sequence[Mapping[str, Any]],
+    training_sessions: Mapping[str, Any],
+    class_weight_receipt: Mapping[str, Any],
+    checkpoint_path: Path,
+    corpus_root: Path,
+    reference_root: Path,
+    output_root: Path,
+) -> dict[str, Any]:
+    bundle = gate.get("validation_bundle")
+    if not isinstance(bundle, Mapping):
+        raise ReceiptContractError("material gate lacks its reproducible validation bundle")
+    if (
+        bundle.get("sampling_manifest_path") != str(sampling_manifest_path.resolve())
+        or gate.get("authorized_checkpoint_path") != str(checkpoint_path.resolve())
+        or gate.get("authorized_corpus_root") != str(corpus_root.resolve())
+        or gate.get("authorized_reference_root") != str(reference_root.resolve())
+        or gate.get("authorized_output_root") != str(output_root.resolve())
+        or bundle.get("class_weight_receipt") != class_weight_receipt
+    ):
+        raise ReceiptContractError(
+            "material execution paths or class weights differ from preflight"
+        )
+    recomputed = validate_material_training_gate(
+        arm=str(gate.get("arm")),
+        seed=int(gate.get("seed")),
+        preflight_receipt=bundle["preflight_receipt"],
+        sampling_validation=bundle["sampling_validation"],
+        sampling_manifest_path=sampling_manifest_path,
+        sampling_rows=sampling_rows,
+        training_sessions=training_sessions,
+        class_weight_receipt=class_weight_receipt,
+        lineage_receipt=bundle["lineage_receipt"],
+        runtime_identity=bundle["runtime_identity"],
+        evaluator_contract=bundle["evaluator_contract"],
+        parameter_inventory=bundle["parameter_inventory"],
+        gradient_receipt=bundle["gradient_receipt"],
+        update_receipt=bundle["update_receipt"],
+        timing_receipt=bundle["timing_receipt"],
+        overfit_receipt=bundle["overfit_receipt"],
+        overfit_canary_receipts=bundle["overfit_canary_receipts"],
+        staged_execution_receipt=bundle["staged_execution_receipt"],
+        staged_dev_results=bundle["staged_dev_results"],
+    )
+    if recomputed != dict(gate):
+        raise ReceiptContractError(
+            "material training gate differs from a current exact revalidation"
+        )
+    return dict(gate)
+
+
+def revalidate_material_training_gate_from_bundle(
+    gate: Mapping[str, Any],
+) -> dict[str, Any]:
+    bundle = gate.get("validation_bundle")
+    if not isinstance(bundle, Mapping):
+        raise ReceiptContractError("material gate lacks its reproducible validation bundle")
+    required_paths = {
+        "sampling_manifest_path": bundle.get("sampling_manifest_path"),
+        "checkpoint_path": gate.get("authorized_checkpoint_path"),
+        "corpus_root": gate.get("authorized_corpus_root"),
+        "reference_root": gate.get("authorized_reference_root"),
+        "output_root": gate.get("authorized_output_root"),
+    }
+    if any(not isinstance(value, str) or not value for value in required_paths.values()):
+        raise ReceiptContractError("material gate execution paths are incomplete")
+    class_weights = bundle.get("class_weight_receipt")
+    if not isinstance(class_weights, Mapping):
+        raise ReceiptContractError("material gate class weights are absent")
+    from experiments.psem_sortformer_adaptation_depth.sampling import (
+        load_sampling_rows,
+        load_training_sessions,
+    )
+
+    sampling_manifest_path = Path(required_paths["sampling_manifest_path"])
+    corpus_root = Path(required_paths["corpus_root"])
+    reference_root = Path(required_paths["reference_root"])
+    return revalidate_material_training_gate(
+        gate,
+        sampling_manifest_path=sampling_manifest_path,
+        sampling_rows=load_sampling_rows(sampling_manifest_path),
+        training_sessions=load_training_sessions(corpus_root, reference_root),
+        class_weight_receipt=class_weights,
+        checkpoint_path=Path(required_paths["checkpoint_path"]),
+        corpus_root=corpus_root,
+        reference_root=reference_root,
+        output_root=Path(required_paths["output_root"]),
+    )

@@ -50,6 +50,12 @@
     "revision": "1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6",
     "compatibility_status": "must_pass_runtime_preflight"
   },
+  "runtime_environment": {
+    "path": "experiments/psem_sortformer_adaptation_depth/runtime_environment.json",
+    "sha256": "003d5b701f18ed5883b4708d69e1e9952365fa17a1b01e8e7ffc0481a4f8aed5",
+    "container_image_identity": "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
+    "dependency_inventory_status": "must_match_generated_complete_lock"
+  },
   "decision": "select the shallowest stable Sortformer temporal adaptation depth or stop with outcome D",
   "required_arms": ["F0-FROZEN-FLOAT", "H-HEAD", "T2-TOP"],
   "conditional_arm": "TA-ALL-TEMPORAL",

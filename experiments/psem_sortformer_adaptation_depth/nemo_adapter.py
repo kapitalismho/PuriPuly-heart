@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.metadata
 import inspect
 import json
 import math
+import os
 import platform
 import random
 import re
 import subprocess
 import sys
+import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +38,9 @@ from experiments.psem_sortformer_adaptation_depth.runtime_audit import (
 )
 
 NEMO_REVISION = "1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6"
+PINNED_CONTAINER_IMAGE_IDENTITY = (
+    "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb"
+)
 FRAME_SAMPLES = 1280
 REQUIRED_LOCK_PACKAGES = {
     "hydra-core",
@@ -72,6 +78,43 @@ def _platform_identity() -> dict[str, str]:
     }
 
 
+def _container_image_identity() -> str:
+    value = os.environ.get("PSEM_CONTAINER_IMAGE_IDENTITY", "").strip()
+    if value != PINNED_CONTAINER_IMAGE_IDENTITY:
+        raise NeMoAdapterError(
+            "PSEM_CONTAINER_IMAGE_IDENTITY differs from the pinned NVIDIA PyTorch image digest"
+        )
+    return value
+
+
+def _accelerator_identity() -> dict[str, Any]:
+    if not torch.cuda.is_available() or torch.cuda.device_count() != 1:
+        raise NeMoAdapterError("the runtime must expose exactly one CUDA accelerator")
+    properties = torch.cuda.get_device_properties(0)
+    try:
+        driver_lines = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=driver_version",
+                "--format=csv,noheader",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise NeMoAdapterError("NVIDIA driver identity is unavailable") from exc
+    if len(driver_lines) != 1 or not driver_lines[0].strip():
+        raise NeMoAdapterError("NVIDIA driver identity is ambiguous")
+    return {
+        "cuda_device_count": 1,
+        "device_name": str(properties.name),
+        "device_total_memory_bytes": int(properties.total_memory),
+        "nvidia_driver_version": driver_lines[0].strip(),
+        "torch_cuda_version": torch.version.cuda,
+    }
+
+
 def build_dependency_lock() -> dict[str, Any]:
     packages = _installed_dependency_inventory()
     if not REQUIRED_LOCK_PACKAGES <= {row["name"] for row in packages}:
@@ -82,6 +125,8 @@ def build_dependency_lock() -> dict[str, Any]:
         "nemo_revision": NEMO_REVISION,
         "python_version": platform.python_version(),
         "platform": _platform_identity(),
+        "container_image_identity": _container_image_identity(),
+        "accelerator": _accelerator_identity(),
         "lock_kind": "complete_installed_distribution_inventory",
         "packages": packages,
     }
@@ -101,7 +146,8 @@ def validate_dependency_lock(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise NeMoAdapterError("dependency lock is absent")
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        raw = path.read_bytes()
+        value = json.loads(raw.decode("utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise NeMoAdapterError("dependency lock is not canonical JSON") from exc
     packages = value.get("packages") if isinstance(value, dict) else None
@@ -111,6 +157,8 @@ def validate_dependency_lock(path: Path) -> dict[str, Any]:
         or value.get("nemo_revision") != NEMO_REVISION
         or value.get("python_version") != platform.python_version()
         or value.get("platform") != _platform_identity()
+        or value.get("container_image_identity") != _container_image_identity()
+        or value.get("accelerator") != _accelerator_identity()
         or value.get("lock_kind") != "complete_installed_distribution_inventory"
         or not isinstance(packages, list)
     ):
@@ -135,8 +183,10 @@ def validate_dependency_lock(path: Path) -> dict[str, Any]:
         raise NeMoAdapterError("installed dependency inventory differs from lock")
     return {
         "path": str(path.resolve()),
-        "sha256": sha256_file(path),
+        "sha256": hashlib.sha256(raw).hexdigest(),
         "python_version": platform.python_version(),
+        "container_image_identity": value["container_image_identity"],
+        "accelerator": value["accelerator"],
         "packages": observed,
     }
 
@@ -204,6 +254,7 @@ class SortformerEvidence:
     slot_alive: torch.Tensor
     state_reset: torch.Tensor
     evidence_delay_seconds: torch.Tensor
+    streaming_trace: tuple[dict[str, int], ...] = ()
 
 
 def compact_valid_frames(
@@ -240,9 +291,10 @@ def load_pinned_sortformer(
     dependency_lock: Path,
     device: torch.device | str,
 ) -> tuple[TrainableSortformerPSEM, dict[str, Any]]:
+    checkpoint_bytes = checkpoint_path.read_bytes() if checkpoint_path.is_file() else None
     if (
-        not checkpoint_path.is_file()
-        or sha256_file(checkpoint_path) != NATIVE_SORTFORMER_CHECKPOINT_SHA256
+        checkpoint_bytes is None
+        or hashlib.sha256(checkpoint_bytes).hexdigest() != NATIVE_SORTFORMER_CHECKPOINT_SHA256
     ):
         raise NeMoAdapterError("trainable checkpoint identity differs from the frozen artifact")
     checkout = nemo_checkout.resolve()
@@ -276,9 +328,12 @@ def load_pinned_sortformer(
         ),
         "get_ats_targets": _assert_symbol_origin(get_ats_targets, checkout, "get_ats_targets"),
     }
-    sortformer = SortformerEncLabelModel.restore_from(
-        restore_path=str(checkpoint_path.resolve()), map_location=device
-    )
+    with tempfile.TemporaryDirectory(prefix="psem-sortformer-checkpoint-") as temporary:
+        verified_checkpoint = Path(temporary) / checkpoint_path.name
+        verified_checkpoint.write_bytes(checkpoint_bytes)
+        sortformer = SortformerEncLabelModel.restore_from(
+            restore_path=str(verified_checkpoint), map_location=device
+        )
     sortformer.streaming_mode = True
     sortformer.async_streaming = False
     for field, value in LOW_LATENCY_STREAMING.items():
@@ -344,9 +399,11 @@ class TrainableSortformerPSEM(nn.Module):
         *,
         left_offset: int,
         right_offset: int,
-    ) -> tuple[Any, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[Any, torch.Tensor, torch.Tensor, torch.Tensor, dict[str, int]]:
         model = self.sortformer
         modules = model.sortformer_modules
+        cache_before = int(streaming_state.spkcache.shape[1])
+        fifo_before = int(streaming_state.fifo.shape[1])
         chunk, chunk_lengths = model.encoder.pre_encode(
             x=processed_signal, lengths=processed_signal_length
         )
@@ -408,7 +465,19 @@ class TrainableSortformerPSEM(nn.Module):
             raise NeMoAdapterError("streaming hidden and posterior frame grids differ")
         if current_logits.shape != current_probabilities.shape:
             raise NeMoAdapterError("streaming activity logits and posterior geometry differ")
-        return streaming_state, current_hidden, current_logits, current_probabilities
+        trace = {
+            "left_offset": int(left_offset),
+            "right_offset": int(right_offset),
+            "chunk_feature_frames": int(chunk.shape[1]),
+            "chunk_length_min": int(chunk_lengths.min()),
+            "chunk_length_max": int(chunk_lengths.max()),
+            "cache_before_frames": cache_before,
+            "fifo_before_frames": fifo_before,
+            "cache_after_frames": int(streaming_state.spkcache.shape[1]),
+            "fifo_after_frames": int(streaming_state.fifo.shape[1]),
+            "emitted_frames": int(current_hidden.shape[1]),
+        }
+        return streaming_state, current_hidden, current_logits, current_probabilities, trace
 
     def sortformer_evidence(
         self,
@@ -441,6 +510,7 @@ class TrainableSortformerPSEM(nn.Module):
         hidden_parts = []
         logit_parts = []
         probability_parts = []
+        streaming_trace = []
         attention_modified = (
             model.training and random.random() < model.sortformer_modules.causal_attn_rate
         )
@@ -451,7 +521,7 @@ class TrainableSortformerPSEM(nn.Module):
                 feat_seq_offset=offsets,
             )
             for _, chunk, lengths, left_offset, right_offset in loader:
-                state, hidden, logits, probabilities = self._streaming_step(
+                state, hidden, logits, probabilities, trace = self._streaming_step(
                     chunk,
                     lengths,
                     state,
@@ -461,6 +531,7 @@ class TrainableSortformerPSEM(nn.Module):
                 hidden_parts.append(hidden)
                 logit_parts.append(logits)
                 probability_parts.append(probabilities)
+                streaming_trace.append({"step_index": len(streaming_trace), **trace})
         if not hidden_parts:
             raise NeMoAdapterError("streaming graph produced no frames")
         hidden = torch.cat(hidden_parts, dim=1)
@@ -496,6 +567,7 @@ class TrainableSortformerPSEM(nn.Module):
             slot_alive=alive,
             state_reset=reset,
             evidence_delay_seconds=delay,
+            streaming_trace=tuple(streaming_trace),
         )
 
     def psem_outputs(

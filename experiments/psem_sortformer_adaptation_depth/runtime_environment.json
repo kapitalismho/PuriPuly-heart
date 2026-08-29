@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "artifact_role": "psem_sortformer_runtime_environment",
+  "platform": {
+    "system": "Linux",
+    "architecture": "x86_64",
+    "python_requirement": ">=3.10",
+    "pytorch_requirement": ">=2.5"
+  },
+  "container": {
+    "image": "nvcr.io/nvidia/pytorch@sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
+    "tag": "25.01-py3",
+    "manifest_digest": "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
+    "source": "NVIDIA NeMo pinned-commit README NGC PyTorch container recipe",
+    "image_identity_must_match_manifest_digest": true
+  },
+  "nemo": {
+    "repository": "https://github.com/NVIDIA-NeMo/NeMo.git",
+    "revision": "1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6",
+    "install": [
+      "bash docker/common/install_dep.sh --library all",
+      "python -m pip install -e \".[asr]\"",
+      "python -m pip check"
+    ],
+    "loaded_module_origin_must_be_checkout": true
+  },
+  "compute": {
+    "accelerator_count": 1,
+    "preferred_accelerator": "NVIDIA A100 80GB PCIe or SXM",
+    "minimum_device_memory_bytes": 80000000000,
+    "mixed_precision": false,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16
+  },
+  "runtime_freeze": {
+    "complete_installed_distribution_inventory": true,
+    "container_image_identity": true,
+    "container_image_identity_environment_variable": "PSEM_CONTAINER_IMAGE_IDENTITY",
+    "container_image_identity_expected": "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
+    "protocol_registry_root_environment_variable": "PSEM_PROTOCOL_REGISTRY_ROOT",
+    "protocol_registry_is_distinct_from_output_root": true,
+    "nvidia_driver_and_cuda_identity": true,
+    "gpu_model_and_memory_identity": true
+  }
+}

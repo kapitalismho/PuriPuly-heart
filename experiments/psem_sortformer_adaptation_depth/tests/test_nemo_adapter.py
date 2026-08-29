@@ -9,6 +9,7 @@ from torch import nn
 from experiments.psem_sortformer_adaptation_depth import nemo_adapter
 from experiments.psem_sortformer_adaptation_depth.nemo_adapter import (
     NEMO_REVISION,
+    PINNED_CONTAINER_IMAGE_IDENTITY,
     REQUIRED_LOCK_PACKAGES,
     TrainableSortformerPSEM,
     _temporary_causal_attention,
@@ -28,6 +29,14 @@ def _lock() -> dict:
             "release": platform.release(),
             "machine": platform.machine(),
         },
+        "container_image_identity": "sha256:" + "a" * 64,
+        "accelerator": {
+            "cuda_device_count": 1,
+            "device_name": "test accelerator",
+            "device_total_memory_bytes": 80000000000,
+            "nvidia_driver_version": "test-driver",
+            "torch_cuda_version": "test-cuda",
+        },
         "lock_kind": "complete_installed_distribution_inventory",
         "packages": [
             {"name": name, "version": importlib.metadata.version(name)}
@@ -45,6 +54,16 @@ def test_dependency_lock_requires_exact_installed_versions_and_complete_package_
         "_installed_dependency_inventory",
         lambda: _lock()["packages"],
     )
+    monkeypatch.setattr(
+        nemo_adapter,
+        "_container_image_identity",
+        lambda: _lock()["container_image_identity"],
+    )
+    monkeypatch.setattr(
+        nemo_adapter,
+        "_accelerator_identity",
+        lambda: _lock()["accelerator"],
+    )
     path = tmp_path / "lock.json"
     path.write_text(json.dumps(_lock()), encoding="utf-8")
     receipt = validate_dependency_lock(path)
@@ -59,6 +78,14 @@ def test_dependency_lock_requires_exact_installed_versions_and_complete_package_
     path.write_text(json.dumps(value), encoding="utf-8")
     with pytest.raises(Exception, match="incomplete"):
         validate_dependency_lock(path)
+
+
+def test_container_identity_requires_the_pinned_ngc_manifest_digest(monkeypatch) -> None:
+    monkeypatch.setenv("PSEM_CONTAINER_IMAGE_IDENTITY", PINNED_CONTAINER_IMAGE_IDENTITY)
+    assert nemo_adapter._container_image_identity() == PINNED_CONTAINER_IMAGE_IDENTITY
+    monkeypatch.setenv("PSEM_CONTAINER_IMAGE_IDENTITY", "sha256:" + "a" * 64)
+    with pytest.raises(Exception, match="differs from the pinned NVIDIA PyTorch image digest"):
+        nemo_adapter._container_image_identity()
 
 
 def test_psem_head_moves_with_the_sortformer_wrapper() -> None:

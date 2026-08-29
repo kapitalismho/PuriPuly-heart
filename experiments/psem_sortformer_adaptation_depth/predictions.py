@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import torch
@@ -21,8 +21,9 @@ def prediction_rows(
     source_start_sample: int,
     evidence: SortformerEvidence,
     psem_outputs: dict[str, torch.Tensor],
-    anchor_episode_ids: Sequence[str],
+    anchor_episode_ids: Sequence[str | None],
     oracle_anchor_slots: Sequence[int],
+    provenance: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     if evidence.probabilities.shape[0] != 1:
         raise PredictionContractError("prediction serialization requires one source at a time")
@@ -92,27 +93,33 @@ def prediction_rows(
         delay_samples = round(float(evidence.evidence_delay_seconds[0, index, 0]) * 16000)
         if delay_samples != EVIDENCE_DELAY_SAMPLES or not math.isfinite(float(delay_samples)):
             raise PredictionContractError("saved prediction carries an altered evidence delay")
-        rows.append(
-            {
-                "schema_version": 1,
-                "artifact_role": "psem_sortformer_frame_prediction",
-                "source_id": source_id,
-                "source_frame_start_sample": start,
-                "source_frame_end_sample": start + FRAME_SAMPLES,
-                "model_evidence_frontier_source_sample": start + delay_samples,
-                "anchor_episode_id": anchor_episode_ids[index],
-                "oracle_anchor_slot": slot,
-                "slot_alive": [bool(value) for value in evidence.slot_alive[0, index].tolist()],
-                "state_reset": bool(evidence.state_reset[0, index, 0]),
-                "raw_sortformer_activity_logits": [
-                    float(value) for value in evidence.activity_logits[0, index].detach().cpu()
-                ],
-                "raw_anchor_present_logit": float(
-                    psem_outputs["anchor_present"][0, index].detach().cpu()
-                ),
-                "raw_replacement_evidence_logit": float(
-                    psem_outputs["replacement_evidence"][0, index].detach().cpu()
-                ),
-            }
-        )
+        row = {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_frame_prediction",
+            "source_id": source_id,
+            "source_frame_start_sample": start,
+            "source_frame_end_sample": start + FRAME_SAMPLES,
+            "model_evidence_frontier_source_sample": start + delay_samples,
+            "anchor_episode_id": anchor_episode_ids[index],
+            "oracle_anchor_slot": slot,
+            "slot_alive": [bool(value) for value in evidence.slot_alive[0, index].tolist()],
+            "state_reset": bool(evidence.state_reset[0, index, 0]),
+            "raw_sortformer_activity_logits": [
+                float(value) for value in evidence.activity_logits[0, index].detach().cpu()
+            ],
+            "raw_anchor_present_logit": float(
+                psem_outputs["anchor_present"][0, index].detach().cpu()
+            ),
+            "raw_replacement_evidence_logit": float(
+                psem_outputs["replacement_evidence"][0, index].detach().cpu()
+            ),
+        }
+        if provenance is not None:
+            overlap = set(row).intersection(provenance)
+            if overlap:
+                raise PredictionContractError(
+                    f"prediction provenance collides with row fields: {sorted(overlap)}"
+                )
+            row.update(dict(provenance))
+        rows.append(row)
     return rows

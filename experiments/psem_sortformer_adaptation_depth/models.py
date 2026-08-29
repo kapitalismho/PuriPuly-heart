@@ -13,6 +13,7 @@ SLOT_COUNT = 4
 PSEM_INPUT_DIMENSION = 208
 MODEL_EVIDENCE_DELAY_SECONDS = 1.04
 TRAIN_ROLE = "PSEM-STRATEGY-TRAIN"
+DEV_ROLE = "PSEM-STRATEGY-DEV"
 NATIVE_SORTFORMER_LOSS_KIND = "checkpoint_arrival_order_four_slot_loss"
 NATIVE_SORTFORMER_LOSS_ORIGIN = "nemo.streaming_sortformer.native_loss"
 NATIVE_SORTFORMER_CHECKPOINT_SHA256 = (
@@ -33,10 +34,10 @@ def _require_binary(name: str, value: torch.Tensor) -> None:
         raise ValueError(f"{name} must be binary")
 
 
-def _training_roles(sampling_roles: Sequence[str]) -> tuple[str, ...]:
+def _loss_roles(sampling_roles: Sequence[str]) -> tuple[str, ...]:
     roles = tuple(sampling_roles)
-    if not roles or any(role != TRAIN_ROLE for role in roles):
-        raise ValueError("loss inputs must contain TRAIN examples only")
+    if not roles or len(set(roles)) != 1 or roles[0] not in {TRAIN_ROLE, DEV_ROLE}:
+        raise ValueError("loss inputs must contain one homogeneous TRAIN or DEV role")
     return roles
 
 
@@ -48,7 +49,7 @@ def bind_native_sortformer_loss(
     origin: str,
     checkpoint_sha256: str,
 ) -> NativeSortformerLoss:
-    roles = _training_roles(sampling_roles)
+    roles = _loss_roles(sampling_roles)
     if value.ndim != 0 or not torch.isfinite(value):
         raise ValueError("native Sortformer loss must be one finite scalar")
     if kind != NATIVE_SORTFORMER_LOSS_KIND:
@@ -208,7 +209,7 @@ def composite_loss(
     sampling_roles: Sequence[str],
     native_sortformer_loss: NativeSortformerLoss,
 ) -> dict[str, Any]:
-    roles = _training_roles(sampling_roles)
+    roles = _loss_roles(sampling_roles)
     if mask.ndim < 1 or mask.shape[0] != len(roles):
         raise ValueError("sampling role count must match the loss batch")
     if (

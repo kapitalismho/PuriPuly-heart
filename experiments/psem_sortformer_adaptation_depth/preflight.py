@@ -4,10 +4,14 @@ import hashlib
 import json
 import os
 import platform
+import re
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import torch
 
 from experiments.psem_training_strategy_gate.data.forced_alignment_reference import (
     validate_reference_checkout,
@@ -19,6 +23,13 @@ CONTRACT_PATH = PACKAGE_ROOT / "contract.json"
 CONFIG_PATH = PACKAGE_ROOT / "config.json"
 DATA_SPLIT_RECEIPT_PATH = PACKAGE_ROOT / "data_split_receipt.json"
 RUNTIME_CONTRACT_PATH = PACKAGE_ROOT / "runtime_contract.json"
+RUNTIME_ENVIRONMENT_PATH = PACKAGE_ROOT / "runtime_environment.json"
+EXPECTED_RUNTIME_ENVIRONMENT_SHA256 = (
+    "003d5b701f18ed5883b4708d69e1e9952365fa17a1b01e8e7ffc0481a4f8aed5"
+)
+PINNED_CONTAINER_IMAGE_IDENTITY = (
+    "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb"
+)
 SOURCE_MANIFEST_PATH = (
     REPOSITORY_ROOT
     / "experiments"
@@ -28,16 +39,16 @@ SOURCE_MANIFEST_PATH = (
     / "source_manifest.jsonl"
 )
 EXPECTED_CONTRACT_CANONICAL_SHA256 = (
-    "905a6d2c5c4626efabe06ea24d1d89551bdf354f3ecd75cb91b785fcb86c1252"
+    "494f46407901546ca40dcd6f76349ef0f2200a2f6672b53f924f24d135a0c176"
 )
 EXPECTED_CONFIG_CANONICAL_SHA256 = (
-    "c0f4fa8143d363b9bd9c7c22a28c94000eb51c4b69d8a2fd02c89a9c1f52fa10"
+    "9b195cc5bb8e73ab79318c4b7bd52a16c7498378c7d1a763b888248b8641a095"
 )
 EXPECTED_DATA_SPLIT_RECEIPT_CANONICAL_SHA256 = (
     "872879a463077416b12527359527b0b74ab609aebddb5631fa7a55afb8592287"
 )
 EXPECTED_RUNTIME_CONTRACT_CANONICAL_SHA256 = (
-    "06a723bb8f26ecd572bbb15a01104325462e2ebb902c8ab5b4e305e719f81ae9"
+    "911a9f7792a7a8de8e54c3c901de216dd3670f2122761da10fb0921511de0606"
 )
 EXPECTED_ARTIFACTS = {
     "freeze": (
@@ -89,6 +100,7 @@ class PreflightPaths:
     corpus_root: Path | None
     reference_root: Path | None
     output_root: Path | None
+    protocol_registry_root: Path | None
 
 
 def load_json(path: Path) -> Any:
@@ -123,12 +135,14 @@ def resolve_paths(
     corpus_root: Path | None = None,
     reference_root: Path | None = None,
     output_root: Path | None = None,
+    protocol_registry_root: Path | None = None,
 ) -> PreflightPaths:
     return PreflightPaths(
         _path(checkpoint, "PSEM_SORTFORMER_NEMO_PATH"),
         _path(corpus_root, "PSEM_CORPUS_ROOT"),
         _path(reference_root, "PSEM_REFERENCE_ROOT"),
         _path(output_root, "PSEM_ADAPTATION_OUTPUT_ROOT"),
+        _path(protocol_registry_root, "PSEM_PROTOCOL_REGISTRY_ROOT"),
     )
 
 
@@ -191,6 +205,12 @@ def static_checks() -> list[dict[str, Any]]:
             canonical_sha256(runtime_contract) == EXPECTED_RUNTIME_CONTRACT_CANONICAL_SHA256,
             EXPECTED_RUNTIME_CONTRACT_CANONICAL_SHA256,
             canonical_sha256(runtime_contract),
+        ),
+        check(
+            "runtime_environment.controls_exact",
+            sha256_file(RUNTIME_ENVIRONMENT_PATH) == EXPECTED_RUNTIME_ENVIRONMENT_SHA256,
+            EXPECTED_RUNTIME_ENVIRONMENT_SHA256,
+            sha256_file(RUNTIME_ENVIRONMENT_PATH),
         ),
     ]
     for artifact_id, (relative_path, expected_hash) in EXPECTED_ARTIFACTS.items():
@@ -332,6 +352,56 @@ def _reference_check(reference_root: Path | None) -> dict[str, Any]:
     return check("runtime.reference_checkout_exact", passed, EXPECTED_REFERENCE, observed)
 
 
+def _runtime_environment_checks() -> list[dict[str, Any]]:
+    environment = load_json(RUNTIME_ENVIRONMENT_PATH)
+    compute = environment["compute"]
+    container_identity = os.environ.get("PSEM_CONTAINER_IMAGE_IDENTITY")
+    cuda_available = torch.cuda.is_available()
+    device_count = torch.cuda.device_count() if cuda_available else 0
+    device_memory = (
+        int(torch.cuda.get_device_properties(0).total_memory) if device_count == 1 else None
+    )
+    torch_version_match = re.match(r"^(\d+)\.(\d+)", torch.__version__)
+    torch_version = (
+        tuple(int(part) for part in torch_version_match.groups())
+        if torch_version_match is not None
+        else None
+    )
+    return [
+        check("runtime.architecture", platform.machine() == "x86_64", "x86_64", platform.machine()),
+        check(
+            "runtime.python_version",
+            sys.version_info >= (3, 10),
+            ">=3.10",
+            platform.python_version(),
+        ),
+        check(
+            "runtime.pytorch_version",
+            torch_version is not None and torch_version >= (2, 5),
+            ">=2.5",
+            torch.__version__,
+        ),
+        check(
+            "runtime.cuda_device_count",
+            cuda_available and device_count == compute["accelerator_count"],
+            compute["accelerator_count"],
+            device_count,
+        ),
+        check(
+            "runtime.cuda_device_memory",
+            device_memory is not None and device_memory >= compute["minimum_device_memory_bytes"],
+            {"minimum_bytes": compute["minimum_device_memory_bytes"]},
+            {"bytes": device_memory},
+        ),
+        check(
+            "runtime.container_image_identity",
+            container_identity == PINNED_CONTAINER_IMAGE_IDENTITY,
+            PINNED_CONTAINER_IMAGE_IDENTITY,
+            container_identity,
+        ),
+    ]
+
+
 def runtime_checks(paths: PreflightPaths) -> list[dict[str, Any]]:
     checkpoint_exists = paths.checkpoint is not None and paths.checkpoint.is_file()
     observed_hash = sha256_file(paths.checkpoint) if checkpoint_exists else None
@@ -375,6 +445,14 @@ def runtime_checks(paths: PreflightPaths) -> list[dict[str, Any]]:
             str(paths.output_root) if paths.output_root else None,
         ),
         check(
+            "runtime.protocol_registry_root",
+            _safe_external_output_root(paths.protocol_registry_root)
+            and paths.output_root is not None
+            and paths.protocol_registry_root.resolve() != paths.output_root.resolve(),
+            "existing absolute non-root directory outside the repository and output root",
+            str(paths.protocol_registry_root) if paths.protocol_registry_root else None,
+        ),
+        check(
             "runtime.eval_sealed",
             os.environ.get("PSEM_ALLOW_EVAL") is None,
             "PSEM_ALLOW_EVAL absent",
@@ -382,6 +460,7 @@ def runtime_checks(paths: PreflightPaths) -> list[dict[str, Any]]:
         ),
         _bound_waveform_check(paths.corpus_root),
         _reference_check(paths.reference_root),
+        *_runtime_environment_checks(),
     ]
 
 

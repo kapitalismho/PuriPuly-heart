@@ -38,6 +38,7 @@ LOW_LATENCY_STREAMING = {
     "spkcache_len": 188,
     "chunk_left_context": 1,
 }
+STREAMING_SUBSAMPLING_FACTOR = 8
 
 
 class RuntimeAuditError(RuntimeError):
@@ -254,8 +255,10 @@ def model_graph_runtime_passed(receipt: Mapping[str, Any]) -> bool:
         "slot_alive_policy",
         "executable_graph_sha256",
         "parameter_schema_sha256",
+        "state_dict_schema_sha256",
         "executable_module_count",
         "executable_parameter_count",
+        "executable_state_entry_count",
         "payload_sha256",
     }
     if set(receipt) != expected_keys:
@@ -289,10 +292,13 @@ def model_graph_runtime_passed(receipt: Mapping[str, Any]) -> bool:
         and receipt.get("slot_alive_policy") == "issue_99_all_four_stable_columns_alive"
         and _is_sha256(receipt.get("executable_graph_sha256"))
         and _is_sha256(receipt.get("parameter_schema_sha256"))
+        and _is_sha256(receipt.get("state_dict_schema_sha256"))
         and type(receipt.get("executable_module_count")) is int
         and receipt["executable_module_count"] > 0
         and type(receipt.get("executable_parameter_count")) is int
         and receipt["executable_parameter_count"] > 0
+        and type(receipt.get("executable_state_entry_count")) is int
+        and receipt["executable_state_entry_count"] >= receipt["executable_parameter_count"]
     )
 
 
@@ -508,6 +514,9 @@ def canary_bundle_runtime_passed(
         and timing.get("all_four_stable_slots_alive") is True
         and timing.get("state_reset_first_frame_only") is True
         and timing.get("additional_future_context_observed") is False
+        and timing.get("prefix_causality_passed") is True
+        and timing.get("streaming_cache_integrity_passed") is True
+        and _is_sha256(timing.get("streaming_trace_sha256"))
     )
 
 
@@ -577,14 +586,23 @@ def validate_streaming_graph(model: nn.Module) -> dict[str, Any]:
         {"name": name, "shape": list(parameter.shape), "dtype": str(parameter.dtype)}
         for name, parameter in model.named_parameters()
     ]
+    state_dict_rows = [
+        {"name": name, "shape": list(value.shape), "dtype": str(value.dtype)}
+        for name, value in model.state_dict().items()
+    ]
     graph_sha256 = hashlib.sha256(
         json.dumps(
-            {"modules": graph_rows, "parameters": parameter_rows},
+            {
+                "modules": graph_rows,
+                "parameters": parameter_rows,
+                "state_dict": state_dict_rows,
+            },
             sort_keys=True,
             separators=(",", ":"),
         ).encode()
     ).hexdigest()
     parameter_schema_sha256 = _canonical_sha256(parameter_rows)
+    state_dict_schema_sha256 = _canonical_sha256(state_dict_rows)
     payload = {
         "schema_version": 1,
         "artifact_role": "model_graph_receipt",
@@ -614,8 +632,10 @@ def validate_streaming_graph(model: nn.Module) -> dict[str, Any]:
         "slot_alive_policy": "issue_99_all_four_stable_columns_alive",
         "executable_graph_sha256": graph_sha256,
         "parameter_schema_sha256": parameter_schema_sha256,
+        "state_dict_schema_sha256": state_dict_schema_sha256,
         "executable_module_count": len(graph_rows),
         "executable_parameter_count": len(parameter_rows),
+        "executable_state_entry_count": len(state_dict_rows),
     }
     return {**payload, "payload_sha256": _canonical_sha256(payload)}
 
@@ -627,6 +647,64 @@ def _validate_raw_waveform(waveform: torch.Tensor) -> None:
         raise RuntimeAuditError("canary waveform must be finite floating-point PCM")
 
 
+def _trace_matches_low_latency(
+    streaming_trace: tuple[dict[str, int], ...], frame_count: int
+) -> bool:
+    expected_steps = math.ceil(frame_count / LOW_LATENCY_STREAMING["chunk_len"])
+    if len(streaming_trace) != expected_steps:
+        return False
+    emitted_total = 0
+    prior_cache = 0
+    prior_fifo = 0
+    for index, row in enumerate(streaming_trace):
+        emitted = min(LOW_LATENCY_STREAMING["chunk_len"], frame_count - emitted_total)
+        expected_left = (
+            0
+            if index == 0
+            else LOW_LATENCY_STREAMING["chunk_left_context"] * STREAMING_SUBSAMPLING_FACTOR
+        )
+        expected_right = (
+            0
+            if index == expected_steps - 1
+            else LOW_LATENCY_STREAMING["chunk_right_context"] * STREAMING_SUBSAMPLING_FACTOR
+        )
+        left_frames = expected_left // STREAMING_SUBSAMPLING_FACTOR
+        right_frames = expected_right // STREAMING_SUBSAMPLING_FACTOR
+        expected_chunk = left_frames + emitted + right_frames
+        fifo_total = prior_fifo + emitted
+        if fifo_total > LOW_LATENCY_STREAMING["fifo_len"]:
+            pop_count = max(
+                LOW_LATENCY_STREAMING["spkcache_update_period"],
+                emitted - LOW_LATENCY_STREAMING["fifo_len"] + prior_fifo,
+            )
+            pop_count = min(pop_count, fifo_total)
+            expected_fifo_after = fifo_total - pop_count
+            expected_cache_after = min(
+                LOW_LATENCY_STREAMING["spkcache_len"], prior_cache + pop_count
+            )
+        else:
+            expected_fifo_after = fifo_total
+            expected_cache_after = prior_cache
+        if (
+            row["step_index"] != index
+            or row["left_offset"] != expected_left
+            or row["right_offset"] != expected_right
+            or row["chunk_feature_frames"] != expected_chunk
+            or row["chunk_length_min"] != expected_chunk
+            or row["chunk_length_max"] != expected_chunk
+            or row["emitted_frames"] != emitted
+            or row["cache_before_frames"] != prior_cache
+            or row["fifo_before_frames"] != prior_fifo
+            or row["cache_after_frames"] != expected_cache_after
+            or row["fifo_after_frames"] != expected_fifo_after
+        ):
+            return False
+        prior_cache = row["cache_after_frames"]
+        prior_fifo = row["fifo_after_frames"]
+        emitted_total += emitted
+    return emitted_total == frame_count
+
+
 def build_timing_receipt(
     waveform_lengths: torch.Tensor,
     probabilities: torch.Tensor,
@@ -635,6 +713,8 @@ def build_timing_receipt(
     slot_alive: torch.Tensor,
     state_reset: torch.Tensor,
     evidence_delay_seconds: torch.Tensor,
+    streaming_trace: tuple[dict[str, int], ...],
+    prefix_causality: Mapping[str, Any],
 ) -> dict[str, Any]:
     expected_reset = torch.zeros_like(state_reset, dtype=torch.bool)
     if expected_reset.ndim == 3 and expected_reset.shape[1] > 0:
@@ -670,6 +750,56 @@ def build_timing_receipt(
         or not bool((evidence_delay_seconds == 1.04).all())
     ):
         raise RuntimeAuditError("timing evidence differs from the exact native frame contract")
+    expected_trace_keys = {
+        "step_index",
+        "left_offset",
+        "right_offset",
+        "chunk_feature_frames",
+        "chunk_length_min",
+        "chunk_length_max",
+        "cache_before_frames",
+        "fifo_before_frames",
+        "cache_after_frames",
+        "fifo_after_frames",
+        "emitted_frames",
+    }
+    if (
+        not streaming_trace
+        or any(set(row) != expected_trace_keys for row in streaming_trace)
+        or [row["step_index"] for row in streaming_trace] != list(range(len(streaming_trace)))
+        or any(
+            type(value) is not int or value < 0 for row in streaming_trace for value in row.values()
+        )
+        or any(row["chunk_length_min"] > row["chunk_length_max"] for row in streaming_trace)
+        or any(row["chunk_length_max"] > row["chunk_feature_frames"] for row in streaming_trace)
+        or any(
+            row["cache_before_frames"] > LOW_LATENCY_STREAMING["spkcache_len"]
+            for row in streaming_trace
+        )
+        or any(
+            row["cache_after_frames"] > LOW_LATENCY_STREAMING["spkcache_len"]
+            for row in streaming_trace
+        )
+        or any(
+            row["fifo_before_frames"] > LOW_LATENCY_STREAMING["fifo_len"] for row in streaming_trace
+        )
+        or any(
+            row["fifo_after_frames"] > LOW_LATENCY_STREAMING["fifo_len"] for row in streaming_trace
+        )
+        or any(row["emitted_frames"] <= 0 for row in streaming_trace)
+        or sum(row["emitted_frames"] for row in streaming_trace) != probabilities.shape[1]
+        or not _trace_matches_low_latency(streaming_trace, probabilities.shape[1])
+        or prefix_causality.get("passed") is not True
+        or prefix_causality.get("algorithmic_evidence_delay_samples") != 16640
+        or type(prefix_causality.get("mutation_start_sample")) is not int
+        or type(prefix_causality.get("protected_frame_count")) is not int
+        or prefix_causality["protected_frame_count"] <= 0
+        or prefix_causality["protected_frame_count"] >= probabilities.shape[1]
+        or prefix_causality.get("protected_prefix_unchanged") is not True
+        or prefix_causality.get("suffix_change_observed") is not True
+    ):
+        raise RuntimeAuditError("streaming cache or prefix-causality evidence is invalid")
+    trace_rows = [dict(row) for row in streaming_trace]
     payload = {
         "schema_version": 1,
         "artifact_role": "timing_receipt",
@@ -684,8 +814,82 @@ def build_timing_receipt(
         "all_four_stable_slots_alive": True,
         "state_reset_first_frame_only": True,
         "additional_future_context_observed": False,
+        "prefix_causality_passed": True,
+        "prefix_causality": dict(prefix_causality),
+        "streaming_cache_integrity_passed": True,
+        "streaming_step_count": len(trace_rows),
+        "streaming_trace_sha256": _canonical_sha256(trace_rows),
     }
     return {**payload, "payload_sha256": _canonical_sha256(payload)}
+
+
+def run_prefix_causality_audit(
+    model: nn.Module,
+    waveform: torch.Tensor,
+    lengths: torch.Tensor,
+) -> dict[str, Any]:
+    from experiments.psem_sortformer_adaptation_depth.nemo_adapter import (
+        TrainableSortformerPSEM,
+    )
+
+    if type(model) is not TrainableSortformerPSEM:
+        raise RuntimeAuditError("prefix-causality audit requires the exact Sortformer wrapper")
+    mutation_start = (waveform.shape[1] // 2 // 1280) * 1280
+    protected_frame_count = (mutation_start - 16640 + 1279) // 1280
+    if protected_frame_count <= 0 or mutation_start >= waveform.shape[1]:
+        raise RuntimeAuditError("canary waveform is too short for prefix-causality audit")
+    reset = torch.zeros(
+        (waveform.shape[0], waveform.shape[1] // 1280, 1),
+        dtype=torch.bool,
+        device=waveform.device,
+    )
+    reset[:, 0, 0] = True
+    perturbed = waveform.detach().clone()
+    perturbed[:, mutation_start:] = -perturbed[:, mutation_start:] + 0.03125
+    was_training = model.training
+    model.eval()
+    try:
+        with torch.no_grad():
+            baseline = model.sortformer_evidence(waveform, lengths, state_reset=reset)
+            changed = model.sortformer_evidence(perturbed, lengths, state_reset=reset)
+    finally:
+        model.train(was_training)
+    tensor_pairs = {
+        "probabilities": (baseline.probabilities, changed.probabilities),
+        "activity_logits": (baseline.activity_logits, changed.activity_logits),
+        "final_temporal_hidden": (
+            baseline.final_temporal_hidden,
+            changed.final_temporal_hidden,
+        ),
+    }
+    prefix_max_abs_delta = {
+        name: float(
+            (left[:, :protected_frame_count] - right[:, :protected_frame_count]).abs().max()
+        )
+        for name, (left, right) in tensor_pairs.items()
+    }
+    suffix_max_abs_delta = {
+        name: float(
+            (left[:, protected_frame_count:] - right[:, protected_frame_count:]).abs().max()
+        )
+        for name, (left, right) in tensor_pairs.items()
+    }
+    prefix_unchanged = all(value <= 1e-6 for value in prefix_max_abs_delta.values())
+    suffix_changed = any(value > 1e-6 for value in suffix_max_abs_delta.values())
+    if not prefix_unchanged or not suffix_changed:
+        raise RuntimeAuditError(
+            "runtime evidence violates charged prefix causality or ignores the waveform suffix"
+        )
+    return {
+        "passed": True,
+        "algorithmic_evidence_delay_samples": 16640,
+        "mutation_start_sample": mutation_start,
+        "protected_frame_count": protected_frame_count,
+        "protected_prefix_unchanged": True,
+        "suffix_change_observed": True,
+        "prefix_max_abs_delta": prefix_max_abs_delta,
+        "suffix_max_abs_delta": suffix_max_abs_delta,
+    }
 
 
 def _output_tensor(value: Any) -> torch.Tensor | None:

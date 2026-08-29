@@ -3,19 +3,24 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
+import numpy as np
 import pytest
 from torch import nn
 
+from experiments.psem_sortformer_adaptation_depth import execution as execution_module
 from experiments.psem_sortformer_adaptation_depth import receipts as receipts_module
 from experiments.psem_sortformer_adaptation_depth.preflight import canonical_sha256, sha256_file
 from experiments.psem_sortformer_adaptation_depth.receipts import (
+    CHECKPOINT_IDENTITY,
     _validate_prediction_artifact,
     _validate_runtime_preflight,
     _validate_staged_authorization,
     build_data_split_receipt,
     evaluator_reconstruction_contract,
     paired_source_bootstrap_v1,
+    recompute_lineage_numeric_evidence,
     validate_overfit_canary,
 )
 from experiments.psem_sortformer_adaptation_depth.runtime_audit import (
@@ -26,6 +31,11 @@ from experiments.psem_sortformer_adaptation_depth.runtime_audit import (
 from experiments.psem_sortformer_adaptation_depth.sampling import select_overfit_rows
 from experiments.psem_sortformer_adaptation_depth.training import build_overfit_receipt
 from experiments.psem_training_strategy_gate.sampling import DEV_ROLE, EVAL_ROLE, TRAIN_ROLE
+
+
+@pytest.fixture(autouse=True)
+def _registered_execution_records(monkeypatch):
+    monkeypatch.setattr(receipts_module, "require_registered_execution", lambda *args: {})
 
 
 def test_data_split_receipt_proves_exact_counts_hours_and_eval_seal() -> None:
@@ -78,6 +88,7 @@ def test_runtime_preflight_must_equal_a_current_exact_rerun(tmp_path, monkeypatc
             ("runtime.corpus_root", "corpus"),
             ("runtime.reference_root", "reference"),
             ("runtime.output_root", "output"),
+            ("runtime.protocol_registry_root", "registry"),
         )
     ]
     receipt = {"mode": "runtime", "ready_for_runtime_audit": True, "checks": checks}
@@ -94,7 +105,9 @@ def test_runtime_preflight_must_equal_a_current_exact_rerun(tmp_path, monkeypatc
 
 
 def test_lineage_prediction_requires_all_four_stable_slots_alive(tmp_path) -> None:
-    path = tmp_path / "predictions.jsonl"
+    output_root = tmp_path / "output"
+    path = output_root / "lineage_predictions" / "source.jsonl"
+    path.parent.mkdir(parents=True)
     row = {
         "artifact_role": "psem_sortformer_frame_prediction",
         "source_id": "source",
@@ -108,6 +121,18 @@ def test_lineage_prediction_requires_all_four_stable_slots_alive(tmp_path) -> No
         "state_reset": True,
         "oracle_anchor_slot": 0,
         "anchor_episode_id": "episode",
+        "artifact_context": "trainable_checkpoint_lineage",
+        "split_role": "PSEM-STRATEGY-DEV",
+        "arm": "F0-FROZEN-FLOAT",
+        "seed": None,
+        "source_waveform_sha256": "w" * 64,
+        "base_checkpoint_sha256": CHECKPOINT_IDENTITY["sha256"],
+        "trained_checkpoint_sha256": None,
+        "trained_checkpoint_receipt_sha256": None,
+        "runtime_identity_sha256": "r" * 64,
+        "candidate_git_head": "a" * 40,
+        "candidate_code_identity_sha256": "c" * 64,
+        "experiment_output_root": str(output_root.resolve()),
     }
     path.write_text(json.dumps(row) + "\n", encoding="utf-8")
     descriptor = {
@@ -125,6 +150,12 @@ def test_lineage_prediction_requires_all_four_stable_slots_alive(tmp_path) -> No
                 "last_frame_end_sample": 1280,
                 "first_evidence_frontier_sample": 16640,
                 "last_evidence_frontier_sample": 16640,
+                "split_role": "PSEM-STRATEGY-DEV",
+                "source_waveform_sha256": "w" * 64,
+                "runtime_identity_sha256": "r" * 64,
+                "candidate_git_head": "a" * 40,
+                "candidate_code_identity_sha256": "c" * 64,
+                "experiment_output_root": str(output_root.resolve()),
                 "prediction_artifact": descriptor,
             }
         )
@@ -137,6 +168,71 @@ def test_paired_source_bootstrap_is_recomputed_from_numeric_deltas() -> None:
     assert receipt["lower"] == -1.0
     assert receipt["upper"] == 1.0
     assert len(receipt["replicate_estimates_sha256"]) == 64
+
+
+def test_lineage_replays_the_exact_issue_99_q8_scalar_slot(tmp_path, monkeypatch) -> None:
+    from experiments.psem_frozen_ceiling_gate import build_ceiling_examples, evaluate_ceiling
+    from experiments.psem_sortformer_adaptation_depth import evaluation
+
+    snapshot = SimpleNamespace(
+        source_id="source",
+        starts=np.asarray([0, 1280], dtype=np.int64),
+        ends=np.asarray([1280, 2560], dtype=np.int64),
+        probabilities=np.asarray([[0.9, 0.1, 0.1, 0.1], [0.2, 0.8, 0.1, 0.1]], dtype=np.float32),
+    )
+    monkeypatch.setattr(build_ceiling_examples, "load_sessions", lambda **_: [snapshot])
+    monkeypatch.setattr(
+        evaluation,
+        "_adapt_session",
+        lambda *_: (snapshot, np.asarray([0.4, 0.6]), None, None),
+    )
+    observed = {}
+
+    def session_row(_session, scores, *, condition, **_kwargs):
+        observed[condition] = scores.tolist()
+        return {
+            "metrics": {
+                "exclusive_other_contamination_seconds": float(np.sum(scores)),
+                "false_cut_count": int(np.sum(scores)),
+                "missed_replacement_count": int(np.sum(scores)),
+            }
+        }
+
+    monkeypatch.setattr(evaluate_ceiling, "session_row", session_row)
+    rows = [
+        {
+            "source_frame_start_sample": index * 1280,
+            "source_frame_end_sample": (index + 1) * 1280,
+            "model_evidence_frontier_source_sample": index * 1280 + 16640,
+            "raw_sortformer_activity_logits": [0.0, 0.0, 0.0, 0.0],
+            "slot_alive": [True, True, True, True],
+            "state_reset": index == 0,
+            "raw_anchor_present_logit": 0.0,
+            "raw_replacement_evidence_logit": 0.0,
+        }
+        for index in range(2)
+    ]
+    path = tmp_path / "predictions.jsonl"
+    path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+    verified_bytes = path.read_bytes()
+    descriptor = {
+        "path": str(path),
+        "sha256": sha256_file(path),
+        "size_bytes": path.stat().st_size,
+        "row_count": 2,
+    }
+    path.write_text("changed after verification\n", encoding="utf-8")
+    recompute_lineage_numeric_evidence(
+        [
+            {
+                "source_id": "source",
+                "prediction_artifact": descriptor,
+            }
+        ],
+        {"q8_posterior_sessions": {"sha256": "q8"}},
+        artifact_bytes={"source": verified_bytes},
+    )
+    assert observed["Q8-S-current"] == [0.0, 1.0]
 
 
 def _bound_staged(payload: dict) -> dict:
@@ -158,7 +254,12 @@ class _CanaryInventoryModel(nn.Module):
 
 
 def _complete_canary_bundle(arm: str) -> dict:
-    inventory = parameter_inventory(_CanaryInventoryModel(), arm)
+    model = _CanaryInventoryModel()
+    inventory = parameter_inventory(model, arm)
+    state_dict_rows = [
+        {"name": name, "shape": list(value.shape), "dtype": str(value.dtype)}
+        for name, value in model.state_dict().items()
+    ]
     graph_payload = {
         "schema_version": 1,
         "artifact_role": "model_graph_receipt",
@@ -191,8 +292,10 @@ def _complete_canary_bundle(arm: str) -> dict:
         "slot_alive_policy": "issue_99_all_four_stable_columns_alive",
         "executable_graph_sha256": "a" * 64,
         "parameter_schema_sha256": inventory["parameter_schema_sha256"],
+        "state_dict_schema_sha256": canonical_sha256(state_dict_rows),
         "executable_module_count": 24,
         "executable_parameter_count": inventory["parameter_count"],
+        "executable_state_entry_count": len(state_dict_rows),
     }
     graph = {
         **graph_payload,
@@ -260,6 +363,18 @@ def _complete_canary_bundle(arm: str) -> dict:
         "all_four_stable_slots_alive": True,
         "state_reset_first_frame_only": True,
         "additional_future_context_observed": False,
+        "prefix_causality_passed": True,
+        "prefix_causality": {
+            "passed": True,
+            "algorithmic_evidence_delay_samples": 16640,
+            "mutation_start_sample": 240000,
+            "protected_frame_count": 100,
+            "protected_prefix_unchanged": True,
+            "suffix_change_observed": True,
+        },
+        "streaming_cache_integrity_passed": True,
+        "streaming_step_count": 1,
+        "streaming_trace_sha256": "f" * 64,
     }
     return {
         "gradient_canary_receipt": {
@@ -276,6 +391,7 @@ def _complete_canary_bundle(arm: str) -> dict:
         },
         "parameter_inventory": inventory,
         "model_graph_receipt": graph,
+        "conditional_arm_audit_authorization": None,
     }
 
 
@@ -295,53 +411,8 @@ def test_staged_execution_enforces_dev_only_ta_and_confirmation_rules() -> None:
             }
         ],
     }
-    _validate_staged_authorization(_bound_staged(base), "H-HEAD", 7301)
-    with pytest.raises(Exception, match="deeper training"):
-        _validate_staged_authorization(_bound_staged(base), "TA-ALL-TEMPORAL", 7301)
-    confirmation = copy.deepcopy(base)
-    confirmation["completed_runs"].append(
-        {
-            "arm": "H-HEAD",
-            "seed": 7301,
-            "passed": True,
-            "evaluation_roles": [DEV_ROLE],
-            "dev_evidence_sha256": "b" * 64,
-        }
-    )
-    confirmation["confirmation_seed_authorization"] = {
-        "arms": ["H-HEAD"],
-        "rule": "dev_non_dominated_or_difference_within_paired_bootstrap_uncertainty",
-        "dev_evidence_sha256": "c" * 64,
-        "evidence_by_arm": {
-            "H-HEAD": {
-                "non_dominated": False,
-                "leader_difference_bootstrap_95": {"lower": 1.0, "upper": 2.0},
-            }
-        },
-    }
-    with pytest.raises(Exception, match="confirmation seed"):
-        _validate_staged_authorization(_bound_staged(confirmation), "H-HEAD", 7302)
-    out_of_order = copy.deepcopy(base)
-    out_of_order["completed_runs"].extend(
-        [
-            {
-                "arm": "T2-TOP",
-                "seed": 7301,
-                "passed": True,
-                "evaluation_roles": [DEV_ROLE],
-                "dev_evidence_sha256": "d" * 64,
-            },
-            {
-                "arm": "H-HEAD",
-                "seed": 7301,
-                "passed": True,
-                "evaluation_roles": [DEV_ROLE],
-                "dev_evidence_sha256": "e" * 64,
-            },
-        ]
-    )
-    with pytest.raises(Exception, match="must precede"):
-        _validate_staged_authorization(_bound_staged(out_of_order), "TA-ALL-TEMPORAL", 7301)
+    with pytest.raises(Exception, match="staged authorization is not reproducible"):
+        _validate_staged_authorization(_bound_staged(base), "H-HEAD", 7301, [])
 
 
 def test_overfit_receipt_recomputes_exact_rows_and_binds_actual_canaries(tmp_path) -> None:
@@ -415,4 +486,41 @@ def test_overfit_receipt_recomputes_exact_rows_and_binds_actual_canaries(tmp_pat
             sampling_manifest_path=manifest,
             corpus_by_source=corpus_by_source,
             canary_receipts=canaries,
+        )
+
+
+def test_material_gate_rejects_staged_dev_evidence_from_another_candidate(monkeypatch) -> None:
+    state = {
+        "schema_version": 1,
+        "artifact_role": "staged_execution_state",
+        "eval_open_count": 0,
+        "eval_used_for_development": False,
+    }
+    state["payload_sha256"] = canonical_sha256(state)
+    monkeypatch.setattr(
+        __import__(
+            "experiments.psem_sortformer_adaptation_depth.protocol",
+            fromlist=["validate_staged_execution_state"],
+        ),
+        "validate_staged_execution_state",
+        lambda receipt, results: receipt,
+    )
+    monkeypatch.setattr(
+        execution_module,
+        "candidate_code_identity",
+        lambda: {"git_head": "a" * 40, "payload_sha256": "b" * 64},
+    )
+    with pytest.raises(Exception, match="another candidate identity"):
+        _validate_staged_authorization(
+            state,
+            "H-HEAD",
+            7301,
+            [
+                {
+                    "prediction_set": {
+                        "candidate_git_head": "c" * 40,
+                        "candidate_code_identity_sha256": "d" * 64,
+                    }
+                }
+            ],
         )

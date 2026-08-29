@@ -159,11 +159,27 @@ def test_masked_loss_rejects_nonbinary_inputs(target: float, mask: float) -> Non
         )
 
 
-def test_native_loss_binding_rejects_non_train_roles() -> None:
-    with pytest.raises(ValueError, match="TRAIN"):
+def test_native_loss_binding_accepts_dev_but_rejects_eval_or_mixed_roles() -> None:
+    bound = bind_native_sortformer_loss(
+        torch.tensor(1.0),
+        sampling_roles=("PSEM-STRATEGY-DEV",),
+        kind=NATIVE_SORTFORMER_LOSS_KIND,
+        origin=NATIVE_SORTFORMER_LOSS_ORIGIN,
+        checkpoint_sha256=NATIVE_SORTFORMER_CHECKPOINT_SHA256,
+    )
+    assert bound.sampling_roles == ("PSEM-STRATEGY-DEV",)
+    with pytest.raises(ValueError, match="TRAIN or DEV"):
         bind_native_sortformer_loss(
             torch.tensor(1.0),
-            sampling_roles=("PSEM-STRATEGY-DEV",),
+            sampling_roles=("PSEM-STRATEGY-EVAL",),
+            kind=NATIVE_SORTFORMER_LOSS_KIND,
+            origin=NATIVE_SORTFORMER_LOSS_ORIGIN,
+            checkpoint_sha256=NATIVE_SORTFORMER_CHECKPOINT_SHA256,
+        )
+    with pytest.raises(ValueError, match="homogeneous"):
+        bind_native_sortformer_loss(
+            torch.tensor(1.0),
+            sampling_roles=("PSEM-STRATEGY-TRAIN", "PSEM-STRATEGY-DEV"),
             kind=NATIVE_SORTFORMER_LOSS_KIND,
             origin=NATIVE_SORTFORMER_LOSS_ORIGIN,
             checkpoint_sha256=NATIVE_SORTFORMER_CHECKPOINT_SHA256,
