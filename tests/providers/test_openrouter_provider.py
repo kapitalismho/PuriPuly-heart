@@ -126,33 +126,63 @@ async def test_openrouter_provider_uses_injected_client() -> None:
 
 
 @pytest.mark.asyncio
-async def test_openrouter_provider_close_cleans_up() -> None:
-    fake = FakeOpenRouterClient()
-    provider = OpenRouterLLMProvider(api_key="k", client=fake)
-    provider._internal_client = fake
+async def test_openrouter_provider_close_closes_owned_http_client_and_not_injected_client(
+    monkeypatch,
+) -> None:
+    fake_client = FakeAsyncClient()
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
+    provider = OpenRouterLLMProvider(api_key="k")
 
+    await provider.translate(
+        utterance_id=uuid4(),
+        text="hello",
+        system_prompt="PROMPT",
+        source_language="ko-KR",
+        target_language="en",
+    )
     await provider.close()
 
-    assert fake.closed is True
-    assert provider._internal_client is None
+    assert fake_client.closed is True
+
+    injected = FakeOpenRouterClient()
+    owner = OpenRouterLLMProvider(api_key="k", client=injected)
+    await owner.close()
+
+    assert injected.closed is False
 
 
-def test_openrouter_provider_passes_max_tokens_to_internal_httpx_client() -> None:
+@pytest.mark.asyncio
+async def test_openrouter_provider_propagates_max_tokens_to_request(monkeypatch) -> None:
+    fake_client = FakeAsyncClient()
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
     provider = OpenRouterLLMProvider(api_key="k", max_tokens=17)
 
-    client = provider._get_client()
+    await provider.translate(
+        utterance_id=uuid4(),
+        text="hello",
+        system_prompt="PROMPT",
+        source_language="ko-KR",
+        target_language="en",
+    )
 
-    assert isinstance(client, HttpxOpenRouterClient)
-    assert client.max_tokens == 17
+    assert fake_client.last_request["json"]["max_tokens"] == 17
 
 
-def test_openrouter_provider_passes_user_identifier_to_internal_httpx_client() -> None:
+@pytest.mark.asyncio
+async def test_openrouter_provider_propagates_user_identifier_to_request(monkeypatch) -> None:
+    fake_client = FakeAsyncClient()
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
     provider = OpenRouterLLMProvider(api_key="k", user_identifier="user-123")
 
-    client = provider._get_client()
+    await provider.translate(
+        utterance_id=uuid4(),
+        text="hello",
+        system_prompt="PROMPT",
+        source_language="ko-KR",
+        target_language="en",
+    )
 
-    assert isinstance(client, HttpxOpenRouterClient)
-    assert client.user_identifier == "user-123"
+    assert fake_client.last_request["json"]["user"] == "user-123"
 
 
 @pytest.mark.asyncio
