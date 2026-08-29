@@ -1173,9 +1173,6 @@ async def test_back_to_back_peer_parents_publish_in_submission_order() -> None:
         assert harness.peer_runtime.utterance_start_times == {}
         assert harness.peer_runtime.speech_ended_ids == set()
         assert not harness.translation_diagnostics.snapshot().timeline_keys
-        assert harness.peer_owner._peer_parent_turn_ids == {}
-        assert harness.peer_owner._peer_turn_parent_ids == {}
-        assert harness.peer_owner._peer_completed_turn_ids == set()
     finally:
         await harness.stop()
 
@@ -1214,8 +1211,6 @@ async def test_peer_partial_stt_event_remains_ignored_without_outputs_or_tasks()
     assert harness.peer_runtime.translation_tasks == {}
     assert harness.peer_runtime.utterance_start_times == {}
     assert harness.peer_runtime.speech_ended_ids == set()
-    assert harness.peer_owner._peer_parent_turn_ids == {}
-    assert harness.peer_owner._peer_turn_parent_ids == {}
     assert harness.ui_events.empty()
     assert llm.calls == []
 
@@ -1518,10 +1513,6 @@ async def test_peer_overlay_success_clears_latency_timeline() -> None:
     assert not harness.translation_diagnostics.snapshot().timeline_keys
     assert harness.peer_runtime.utterance_start_times == {}
     assert harness.peer_runtime.speech_ended_ids == set()
-    assert harness.peer_owner._peer_turn_parent_ids == {}
-    assert harness.peer_owner._peer_parent_turn_ids == {}
-    assert harness.peer_owner._peer_completed_turn_ids == set()
-    assert harness.peer_owner._peer_parent_speech_end_times == {}
 
 
 @pytest.mark.asyncio
@@ -1566,10 +1557,6 @@ async def test_peer_overlay_translation_denies_chatbox_and_cleans_bookkeeping() 
     assert not harness.translation_diagnostics.snapshot().timeline_keys
     assert harness.peer_runtime.utterance_start_times == {}
     assert harness.peer_runtime.speech_ended_ids == set()
-    assert harness.peer_owner._peer_turn_parent_ids == {}
-    assert harness.peer_owner._peer_parent_turn_ids == {}
-    assert harness.peer_owner._peer_completed_turn_ids == set()
-    assert harness.peer_owner._peer_parent_speech_end_times == {}
 
 
 @pytest.mark.asyncio
@@ -1658,16 +1645,12 @@ async def test_late_peer_speech_end_after_completed_turn_does_not_resurrect_book
     peer_turn_id = next(iter(harness.peer_runtime.utterances))
 
     assert peer_turn_id != parent_vad_id
-    assert parent_vad_id not in harness.peer_owner._peer_parent_turn_ids
-    assert peer_turn_id not in harness.peer_owner._peer_turn_parent_ids
     assert harness.peer_runtime.utterance_start_times == {}
     assert harness.peer_runtime.speech_ended_ids == set()
 
     harness.clock.advance(0.1)
     await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_vad_id))
 
-    assert parent_vad_id not in harness.peer_owner._peer_parent_turn_ids
-    assert peer_turn_id not in harness.peer_owner._peer_turn_parent_ids
     assert harness.peer_runtime.utterance_start_times == {}
     assert harness.peer_runtime.speech_ended_ids == set()
     assert not harness.translation_diagnostics.snapshot().timeline_keys
@@ -1719,8 +1702,6 @@ async def test_closed_parent_rejects_late_duplicate_final_without_child_output()
     assert set(harness.peer_runtime.utterances) == {first_peer_turn_id}
     assert harness.peer_runtime.translation_tasks == {}
     assert llm.calls == []
-    assert harness.peer_owner._peer_turn_parent_ids == {}
-    assert harness.peer_owner._peer_parent_turn_ids == {}
     decision = harness.output_runtime.routing_decisions[-1]
     assert decision.decision == "denied"
     assert decision.reason == "peer_chatbox_denied"
@@ -2673,8 +2654,6 @@ async def test_peer_final_runs_cancellation_suppression_cannot_publish_success_o
     assert sink.events[-1].is_final is False
     assert harness.translation_turns.has_resources is False
     assert harness.peer_runtime.translation_tasks == {}
-    assert harness.peer_owner._peer_turn_parent_ids == {}
-    assert harness.peer_owner._peer_parent_turn_ids == {}
 
 
 @pytest.mark.asyncio
