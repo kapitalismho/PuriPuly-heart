@@ -395,3 +395,102 @@ the recorded follow-up, superseding the earlier "~984 private reaches" bulk esti
 the durable rows already observe the typed-intent/snapshot boundary (G14/G15 seam) and
 the widget rows are visual-contract documentation, not implementation characterization.
 No production change needed; no test rewrite needed for blocking scope.
+
+### `tests/ui/test_app_branches.py` (remaining `__new__` rows) — deep-read 2026-08-29 (CP5 D1)
+
+Read: full file (4,633 lines, 117 tests) including both construction seams
+(`_patch_app_construction` + real `TranslatorApp(...)` construction with dummy views —
+used by ~20 construction rows; `TranslatorApp.__new__` + attribute injection + autouse
+`application` property override — used by ~84 flow rows), the dummy view/controller
+classes, and detailed reading of ~1,800 lines across: window/layout construction,
+debug-preview wiring and per-preview safety (fail-closures on persistence/OAuth),
+managed Discord/QQ auth flows (dialog state machine, generation counters, cancel,
+referral), nav-change/provider-apply/prompt-apply/settings queue ordering, microphone
+test dialogs, PKCE flow, language change, verify-api-key persistence, snackbar/founder
+letter, update check, telemetry binding (CP3), peer-EULA binding (CP4), shutdown
+idempotency + lifecycle registration (CP1).
+
+Verdict per family:
+
+- **KEEP, durable (majority, ~100 rows)**: the flow rows assert user-visible outcomes
+  through *ports* — queued page-task factories, dialog fakes with recorded calls,
+  application-boundary doubles, `build_provider_apply_settings`, snackbar/dialog
+  recording. They are refactor-resistant to production-internal changes: the seams they
+  depend on (`_run_page_task`, `_queue_settings_mutation_task`, `_show_snackbar`,
+  view intent callbacks, `compose_test_ui_application_boundary`) are the stable
+  TranslatorApp↔view/boundary contracts, not private internals. The `__new__` pattern
+  here is test construction of those ports, not characterization of private state.
+- **KEEP with caveat, `controller=` SimpleNamespace (~45 rows)**: managed auth and
+  debug-preview rows install a fake `app.controller` and rely on the autouse fixture
+  wrapping it into a boundary. The `controller` attribute is retired production shape
+  (production uses `self.application`), kept alive only by the autouse fixture. The
+  behavior asserted (dialog lifecycle, generation staleness, cancel, referral bonus,
+  preview safety) is durable; the construction vehicle is legacy. Cleanup = migrate
+  these rows to install `_ui_application` doubles directly (as CP4 did for peer-EULA),
+  then delete the autouse fixture. **Implementation follow-up (mechanical, no
+  behavior change).**
+- **KEEP, construction rows (~20 rows)**: real construction through the public
+  `application_factory` port (one row even uses the production `compose_ui_application`)
+  — boundary wiring tests, exactly the preferred direction.
+- **DELETE candidates identified**: `TelemetryController`/`TelemetrySettingsView`
+  helper classes (lines 192–220) have **zero usages** after CP3's rewrite — dead test
+  infrastructure, same status the census already assigned to other dead fakes.
+
+Disposition for implementation phase: CP5 implements the mechanical cleanup —
+migrate `controller=`-based rows to `_ui_application` port doubles, drop the autouse
+`application` property override, delete dead `TelemetryController`/`TelemetrySettingsView`,
+shrink `tests/helpers/ui_application.py` fallbacks as the census already planned. The
+authority's preferred direction (thin binding → controller/flow seam) is already
+satisfied for the *new* families (telemetry, peer-EULA); the remaining auth/debug
+families are judged KEEP-at-binding because their asserted contracts are the dialog and
+queue behaviors themselves, observable only at this layer.
+
+### `tests/app/test_wiring_providers.py` — deep-read 2026-08-29 (CP5 D1)
+
+Read: full file (2,487 lines, 93 tests), including the compatibility shims at top
+(`create_llm_provider`/`create_stt_backend` legacy→canonical adapters, `_canonical_settings`,
+`assert_bounded_concurrency` probe, `_unwrap_release_service`, `_resolved_stt_config`
+builder) and detailed reading of ~1,500 lines covering: per-provider LLM factory rows
+(gemini/qwen/deepseek/cerebras/local-LLM/openrouter incl. managed/BYOK/fallback-racing/
+release-service wrapping), STT backend factory rows (deepgram/qwen-asr/soniox/local-qwen/
+parakeet/cpu-auto, self and peer channels, resolved-DTO paths), peer runtime resolution +
+signatures, overlay config mapping.
+
+Verdict per family:
+
+- **The `provider.inner` reaches are narrower than the bulk count suggested.** The
+  ~148 `provider.inner` matches decompose into: (a) `isinstance(provider.inner, X)`
+  *construction-identity* rows asserting which concrete provider a settings combo wires
+  (~45 rows) — these are wiring-correctness contracts ("this connection must produce a
+  fallback-racing wrapper whose primary is OpenRouter"), and the concrete class IS the
+  observable contract at this boundary because the factory is the unit under test;
+  (b) `provider.inner.<field>` config-propagation rows asserting api_key/model/
+  base_url/routing/runtime_logging reach the constructed provider (~90 assertions
+  inside the same rows) — same nature: constructor-argument propagation, checked at the
+  only seam where it exists (the provider's public constructor surface); (c) two rows
+  reaching `provider.inner.fallback._delegate` (`_LazyFactoryLLMProvider` internals,
+  lines 1276–1278) — genuine private-state assertion, but the immediately adjacent
+  `factory()` call asserts the same outcome behaviorally, so `_delegate is None` is a
+  duplicate pre-condition check.
+- **KEEP (the overwhelming majority)**: secret resolution rules (legacy-key backfill,
+  region keys, env fallbacks, store-over-env precedence — persisted-security contracts),
+  fallback routing plans, managed release-service wrapping and lazy user-identifier
+  loading, peer/self channel isolation (self settings must not leak into peer backend),
+  sample-rate 16k runtime contract, custom-term normalization. All durable, all
+  refactor-resistant (a wrapper-rename or semaphore-internal change passes).
+- **SPLIT (small)**: the two `_delegate` pre-condition assertions can be dropped as
+  duplicates without losing coverage; the `isinstance(provider.inner, X)` rows are
+  documented as *intentional* wiring-identity contracts (the census's earlier
+  "concrete-factory rewrite" idea would just move the same identity assertion one
+  level up — the class boundary here is the contract, not a shape freeze).
+- **The top-of-file compatibility shims** (`create_llm_provider` legacy adapter,
+  `_canonical_settings`) are transitional A10→A12 seam helpers used by tests only;
+  they are exactly the kind of "compatibility surface backed by a real consumer" the
+  authority allows, with the consumer being this suite until A12 deletes the island.
+
+Disposition for implementation phase: **KEEP with a micro-cleanup** — drop the two
+duplicate `_delegate` pre-condition assertions; re-classify the census wiring row from
+"REFACTOR partially implemented, ~148 reaches remain" to "KEEP (wiring-identity
+contracts intentional; 2 duplicate private pre-condition assertions removed)". The
+earlier "concrete-factory identity rewrite" follow-up is withdrawn: at the factory
+boundary, the concrete provider class is the contract.
