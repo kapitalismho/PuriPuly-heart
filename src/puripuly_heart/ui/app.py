@@ -7,6 +7,7 @@ import tempfile
 import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import flet as ft
 from puripuly_heart.core.discord_oauth_loopback import (
@@ -367,18 +368,28 @@ class TranslatorApp:
 
     def _compose_application_lifecycle(self) -> ApplicationShutdownCoordinator:
         foundation_runtime = self._ensure_foundation_runtime()
-        self.application.register_application_shutdown_callbacks(
-            self._application_shutdown_callbacks()
+        return TranslatorApp.compose_application_lifecycle(
+            self,
+            foundation_runtime,
+            self._application_shutdown_callbacks(),
         )
-        lifecycle = self.application.application_lifecycle()
-        foundation_runtime.bind_application_lifecycle(lifecycle)
-        return lifecycle
 
     def _get_application_lifecycle(self) -> ApplicationShutdownCoordinator:
         lifecycle = getattr(self, "_application_lifecycle", None)
         if lifecycle is None:
             lifecycle = self._compose_application_lifecycle()
             self._application_lifecycle = lifecycle
+        return lifecycle
+
+    @staticmethod
+    def compose_application_lifecycle(
+        application: Any,
+        foundation_runtime: Any,
+        callbacks: tuple[ApplicationShutdownCallback, ...],
+    ) -> ApplicationShutdownCoordinator:
+        application.application.register_application_shutdown_callbacks(callbacks)
+        lifecycle = application.application.application_lifecycle()
+        foundation_runtime.bind_application_lifecycle(lifecycle)
         return lifecycle
 
     def _application_shutdown_callbacks(self) -> tuple[ApplicationShutdownCallback, ...]:

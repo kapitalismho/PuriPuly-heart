@@ -5,11 +5,6 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from puripuly_heart.core.self_capture import (
-    SelfCaptureProviderStatus,
-    SelfCaptureSessionSnapshot,
-    SelfCaptureSessionState,
-)
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.domain.models import OSCMessage
@@ -134,59 +129,6 @@ class TargetThread(_BaseThreadStub):
 class NoopThread(_BaseThreadStub):
     def start(self):
         return None
-
-
-def self_capture_snapshot(
-    desired_active: bool,
-    *,
-    state: SelfCaptureSessionState | None = None,
-) -> SelfCaptureSessionSnapshot:
-    resolved_state = state or (
-        SelfCaptureSessionState.RUNNING if desired_active else SelfCaptureSessionState.STOPPED
-    )
-    active = desired_active and resolved_state is SelfCaptureSessionState.RUNNING
-    return SelfCaptureSessionSnapshot(
-        state=resolved_state,
-        provider_status=(
-            SelfCaptureProviderStatus.READY
-            if active
-            else (
-                SelfCaptureProviderStatus.FAILED
-                if resolved_state is SelfCaptureSessionState.FAULTED
-                else SelfCaptureProviderStatus.DETACHED
-            )
-        ),
-        desired_active=desired_active,
-        effective_active=active,
-        generation=1,
-        provider_id="deepgram" if active else None,
-        runtime_signature=("runtime",) if active else None,
-        failure_reason=None,
-        admission_reason=None,
-        has_source=active,
-        has_vad=active,
-        has_loop_task=active,
-        cleanup_debt=0,
-        closed=False,
-    )
-
-
-class SelfCaptureStateStub:
-    def __init__(self, desired_active: bool) -> None:
-        active_resource = object() if desired_active else None
-        self.snapshot = self_capture_snapshot(desired_active)
-        self.loop_task = active_resource
-        self.source = active_resource
-        self.cleanup_source = None
-        self.vad = active_resource
-        self.last_cleanup_exception = None
-
-    def invalidate_intent(self) -> SelfCaptureSessionSnapshot:
-        self.snapshot = self_capture_snapshot(False)
-        self.loop_task = None
-        self.source = None
-        self.vad = None
-        return self.snapshot
 
 
 def samples(value: float, n: int = 512) -> np.ndarray:
