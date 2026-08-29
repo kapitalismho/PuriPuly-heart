@@ -341,156 +341,35 @@ progresses):
 
 ## Deep-read log
 
-Per-file verdicts appended below as the pass proceeds. Each entry: file, what was read,
-verdict (confirm or correct the earlier row), and concrete disposition to implement.
+Only files with a concrete action (edit/delete/census-fix) are logged. Files whose
+deep-read confirms the existing KEEP row leave no entry.
 
-### `tests/ui/test_settings_view_branches.py` — deep-read 2026-08-29 (CP5 D1)
+### `tests/ui/test_settings_view_branches.py` — action: census-row correction only
 
-Read: full structural pass — both construction helpers (`_make_settings_view` real
-construction with monkeypatched population seams; `_make_llm_selection_view` ~110-line
-`__new__` + SimpleNamespace widget graph), all ~25 helper functions (card-tree walkers,
-label collectors), and detailed reading of ~1,000 lines covering every family: OSC draft
-preservation, telemetry card, clipboard auto-translate, secret load/save/clear + failure
-paths, api-key icon restore, api-visibility matrix, managed key card + trial usage +
-TalkTogether pass invite progress, LLM/connection selection staging + history + prompt
-switching, local-LLM fields + secret change + extra-body validation, STT/peer-STT
-selection + GPU device cards, prompt draft/commit/reset, VAD + audio handlers, overlay
-display/size/lock/position-reset/runtime-state, card layout & typography contracts,
-custom vocabulary full lifecycle, subtab shell structure/scroll/locale.
+Deep-read 2026-08-29 (6,339 lines, 258 tests, full pass). The earlier "~984 private
+reaches" bulk estimate is corrected: durable rows already observe the typed-intent/
+snapshot boundary; residual widget-shape rows (~40: PKCE button style colors,
+positional card indexes, typography {28}) are visual-contract documentation guarded by
+the geometry/token tests. No test or production change. Census table row already
+updated to KEEP with corrected residual.
 
-Verdict per family (rows, ~258 tests):
+### `tests/ui/test_app_branches.py` — actions queued for CP5 implementation
 
-- **KEEP, durable boundary already correct (majority)**: secret load/save/delete
-  (incl. failure-tolerance and secret-non-leakage logging), prompt draft/commit/reset
-  semantics, provider selection staging (`build_provider_apply_settings` vs emitted
-  `on_settings_changed` — draft-does-not-leak, copy-not-mutate, equality guards),
-  connection-history preservation, managed-key/invite-progress state machine,
-  custom-vocabulary lifecycle, telemetry callback-not-send, overlay runtime-state and
-  position-reset semantics, subtab scroll restore. These assert through public intent
-  callbacks (`on_settings_changed`, `build_provider_apply_settings`, modal fakes) and
-  persisted `AppSettings` copies. A view-internal refactor that keeps the intent
-  callbacks stable would still pass.
-- **PARTIAL — widget-shape rows are the residual debt (recorded, ~40 rows)**: rows that
-  assert Flet widget internals — `view._openrouter_key.visible`, PKCE button
-  `style.color[ControlState.*]` colors, `_wrapped_card_column(card).controls[4]`
-  positional indexes, exact card-titles ordering lists, `ft.Container` expand/width
-  geometry, typography `{28}`, hover color mutation. These are visual/geometry
-  contracts enforced elsewhere by tokens (`SettingsUnitCard.DEFAULT_HEIGHT`,
-  `test_baseline_control_geometry`) or duplicate the layout tests. Not blocking:
-  the census already records `SettingsUnitCard`/`SharedCardWrapper` as the production
-  seam, and breaking these rows requires changing user-visible layout, which the
-  geometry/typography token tests also guard.
-- **DELETE-scope residue already removed (verified)**: retired-control absence rows
-  (`_low_latency_card`, `_integrated_context_button`, `_peer_qwen_region_text`,
-  `_peer_deepgram_model_*`, legacy overlay/peer toggle API) are absence guards that
-  document the A01–A10 cutover; they duplicate `tests/architecture` retirement guards
-  but are cheap and behavior-anchored. KEEP.
-- **One redundant pair found**: `test_clipboard_auto_translate_selection_...` vs
-  `test_clipboard_auto_translate_click_...` — the click row re-asserts the selection
-  row plus toggle-off; keep (toggle-off is unique).
+Deep-read 2026-08-29 (4,633 lines, 117 tests, full pass). Durable flow rows are
+port-based and stay unchanged. Actions:
+1. DELETE dead helpers `TelemetryController` + `TelemetrySettingsView` (lines 192-220,
+   zero usages after CP3).
+2. REFACTOR (mechanical, no behavior change) ~45 `controller=`-based rows to install
+   `_ui_application` port doubles directly, then remove the autouse `application`
+   property override fixture and shrink the `__getattr__` fallbacks in
+   `tests/helpers/ui_application.py`.
 
-Disposition for implementation phase: **KEEP the file as-is** (no REFACTOR checkpoint
-required for behavior preservation); the ~40 widget-shape rows are consolidated here as
-the recorded follow-up, superseding the earlier "~984 private reaches" bulk estimate —
-the durable rows already observe the typed-intent/snapshot boundary (G14/G15 seam) and
-the widget rows are visual-contract documentation, not implementation characterization.
-No production change needed; no test rewrite needed for blocking scope.
+### `tests/app/test_wiring_providers.py` — actions queued for CP5 implementation
 
-### `tests/ui/test_app_branches.py` (remaining `__new__` rows) — deep-read 2026-08-29 (CP5 D1)
-
-Read: full file (4,633 lines, 117 tests) including both construction seams
-(`_patch_app_construction` + real `TranslatorApp(...)` construction with dummy views —
-used by ~20 construction rows; `TranslatorApp.__new__` + attribute injection + autouse
-`application` property override — used by ~84 flow rows), the dummy view/controller
-classes, and detailed reading of ~1,800 lines across: window/layout construction,
-debug-preview wiring and per-preview safety (fail-closures on persistence/OAuth),
-managed Discord/QQ auth flows (dialog state machine, generation counters, cancel,
-referral), nav-change/provider-apply/prompt-apply/settings queue ordering, microphone
-test dialogs, PKCE flow, language change, verify-api-key persistence, snackbar/founder
-letter, update check, telemetry binding (CP3), peer-EULA binding (CP4), shutdown
-idempotency + lifecycle registration (CP1).
-
-Verdict per family:
-
-- **KEEP, durable (majority, ~100 rows)**: the flow rows assert user-visible outcomes
-  through *ports* — queued page-task factories, dialog fakes with recorded calls,
-  application-boundary doubles, `build_provider_apply_settings`, snackbar/dialog
-  recording. They are refactor-resistant to production-internal changes: the seams they
-  depend on (`_run_page_task`, `_queue_settings_mutation_task`, `_show_snackbar`,
-  view intent callbacks, `compose_test_ui_application_boundary`) are the stable
-  TranslatorApp↔view/boundary contracts, not private internals. The `__new__` pattern
-  here is test construction of those ports, not characterization of private state.
-- **KEEP with caveat, `controller=` SimpleNamespace (~45 rows)**: managed auth and
-  debug-preview rows install a fake `app.controller` and rely on the autouse fixture
-  wrapping it into a boundary. The `controller` attribute is retired production shape
-  (production uses `self.application`), kept alive only by the autouse fixture. The
-  behavior asserted (dialog lifecycle, generation staleness, cancel, referral bonus,
-  preview safety) is durable; the construction vehicle is legacy. Cleanup = migrate
-  these rows to install `_ui_application` doubles directly (as CP4 did for peer-EULA),
-  then delete the autouse fixture. **Implementation follow-up (mechanical, no
-  behavior change).**
-- **KEEP, construction rows (~20 rows)**: real construction through the public
-  `application_factory` port (one row even uses the production `compose_ui_application`)
-  — boundary wiring tests, exactly the preferred direction.
-- **DELETE candidates identified**: `TelemetryController`/`TelemetrySettingsView`
-  helper classes (lines 192–220) have **zero usages** after CP3's rewrite — dead test
-  infrastructure, same status the census already assigned to other dead fakes.
-
-Disposition for implementation phase: CP5 implements the mechanical cleanup —
-migrate `controller=`-based rows to `_ui_application` port doubles, drop the autouse
-`application` property override, delete dead `TelemetryController`/`TelemetrySettingsView`,
-shrink `tests/helpers/ui_application.py` fallbacks as the census already planned. The
-authority's preferred direction (thin binding → controller/flow seam) is already
-satisfied for the *new* families (telemetry, peer-EULA); the remaining auth/debug
-families are judged KEEP-at-binding because their asserted contracts are the dialog and
-queue behaviors themselves, observable only at this layer.
-
-### `tests/app/test_wiring_providers.py` — deep-read 2026-08-29 (CP5 D1)
-
-Read: full file (2,487 lines, 93 tests), including the compatibility shims at top
-(`create_llm_provider`/`create_stt_backend` legacy→canonical adapters, `_canonical_settings`,
-`assert_bounded_concurrency` probe, `_unwrap_release_service`, `_resolved_stt_config`
-builder) and detailed reading of ~1,500 lines covering: per-provider LLM factory rows
-(gemini/qwen/deepseek/cerebras/local-LLM/openrouter incl. managed/BYOK/fallback-racing/
-release-service wrapping), STT backend factory rows (deepgram/qwen-asr/soniox/local-qwen/
-parakeet/cpu-auto, self and peer channels, resolved-DTO paths), peer runtime resolution +
-signatures, overlay config mapping.
-
-Verdict per family:
-
-- **The `provider.inner` reaches are narrower than the bulk count suggested.** The
-  ~148 `provider.inner` matches decompose into: (a) `isinstance(provider.inner, X)`
-  *construction-identity* rows asserting which concrete provider a settings combo wires
-  (~45 rows) — these are wiring-correctness contracts ("this connection must produce a
-  fallback-racing wrapper whose primary is OpenRouter"), and the concrete class IS the
-  observable contract at this boundary because the factory is the unit under test;
-  (b) `provider.inner.<field>` config-propagation rows asserting api_key/model/
-  base_url/routing/runtime_logging reach the constructed provider (~90 assertions
-  inside the same rows) — same nature: constructor-argument propagation, checked at the
-  only seam where it exists (the provider's public constructor surface); (c) two rows
-  reaching `provider.inner.fallback._delegate` (`_LazyFactoryLLMProvider` internals,
-  lines 1276–1278) — genuine private-state assertion, but the immediately adjacent
-  `factory()` call asserts the same outcome behaviorally, so `_delegate is None` is a
-  duplicate pre-condition check.
-- **KEEP (the overwhelming majority)**: secret resolution rules (legacy-key backfill,
-  region keys, env fallbacks, store-over-env precedence — persisted-security contracts),
-  fallback routing plans, managed release-service wrapping and lazy user-identifier
-  loading, peer/self channel isolation (self settings must not leak into peer backend),
-  sample-rate 16k runtime contract, custom-term normalization. All durable, all
-  refactor-resistant (a wrapper-rename or semaphore-internal change passes).
-- **SPLIT (small)**: the two `_delegate` pre-condition assertions can be dropped as
-  duplicates without losing coverage; the `isinstance(provider.inner, X)` rows are
-  documented as *intentional* wiring-identity contracts (the census's earlier
-  "concrete-factory rewrite" idea would just move the same identity assertion one
-  level up — the class boundary here is the contract, not a shape freeze).
-- **The top-of-file compatibility shims** (`create_llm_provider` legacy adapter,
-  `_canonical_settings`) are transitional A10→A12 seam helpers used by tests only;
-  they are exactly the kind of "compatibility surface backed by a real consumer" the
-  authority allows, with the consumer being this suite until A12 deletes the island.
-
-Disposition for implementation phase: **KEEP with a micro-cleanup** — drop the two
-duplicate `_delegate` pre-condition assertions; re-classify the census wiring row from
-"REFACTOR partially implemented, ~148 reaches remain" to "KEEP (wiring-identity
-contracts intentional; 2 duplicate private pre-condition assertions removed)". The
-earlier "concrete-factory identity rewrite" follow-up is withdrawn: at the factory
-boundary, the concrete provider class is the contract.
+Deep-read 2026-08-29 (2,487 lines, 93 tests, full pass). `isinstance(provider.inner, X)`
+wiring-identity rows are intentional contracts at the factory boundary; the earlier
+"concrete-factory rewrite" follow-up is withdrawn. Actions:
+1. EDIT remove two duplicate `provider.inner.fallback._delegate` pre-condition
+   assertions (lines ~1276-1278); the adjacent `factory()` call already asserts the
+   outcome behaviorally.
+2. CENSUS re-classify the wiring row to KEEP (wiring-identity intentional).
