@@ -8,11 +8,12 @@ from puripuly_heart.app.ports.osc_control import (
     FALLBACK_IDS,
     OscControlApplicationPort,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 from .state_publisher import fallback_alias_from_settings
 
-SettingsProvider = Callable[[], object | None]
-SettingsApply = Callable[[object], Awaitable[object]]
+SettingsProvider = Callable[[], AppSettingsVNext | None]
+SettingsApply = Callable[[AppSettingsVNext], Awaitable[object]]
 ApplicationCall = Callable[..., Awaitable[object]]
 TranslationModelNormalizer = Callable[[object], object]
 
@@ -196,7 +197,9 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
                 return await fallback(value)
         raise RuntimeError(f"OSC control application command is not wired: {fallback_name}")
 
-    async def _apply_settings(self, mutator: Callable[[object], object]) -> object:
+    async def _apply_settings(
+        self, mutator: Callable[[AppSettingsVNext], AppSettingsVNext]
+    ) -> object:
         current = self.settings_provider()
         if current is None:
             raise RuntimeError("OSC control settings are unavailable")
@@ -217,13 +220,13 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
 
     @staticmethod
     def _set_languages(
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         self_source: str,
         self_target: str,
         peer_source: str,
         peer_target: str,
-    ) -> object:
+    ) -> AppSettingsVNext:
         return _with_languages(
             settings,
             source_language=self_source,
@@ -234,10 +237,10 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
 
     def _set_translation_model(
         self,
-        settings: object,
+        settings: AppSettingsVNext,
         model: str,
         connection: str | None,
-    ) -> object:
+    ) -> AppSettingsVNext:
         translation = settings.intent.translation
         current_value = translation.model
         next_translation = replace(
@@ -257,7 +260,7 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         return self.translation_model_normalizer(updated)
 
     @staticmethod
-    def _set_fallback(settings: object, alias: str) -> object:
+    def _set_fallback(settings: AppSettingsVNext, alias: str) -> AppSettingsVNext:
         if alias not in FALLBACK_IDS.values():
             raise ValueError(f"unknown OSC fallback alias: {alias}")
         fallback = settings.intent.translation.fallback
@@ -271,7 +274,7 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         )
 
 
-def _with_languages(settings: object, **changes: object) -> object:
+def _with_languages(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext:
     return replace(
         settings,
         intent=replace(

@@ -4,7 +4,6 @@ import asyncio
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
-from typing import Any
 
 from puripuly_heart.app.ports.desktop_overlay import (
     DesktopBounds,
@@ -461,7 +460,7 @@ class DesktopOverlayApplicationOwner:
             width, height = self.dimensions(current.intent.overlay.desktop_flet.size_preset)
         return self.centered_bounds(width=width, height=height)
 
-    def runtime_is_running_for_settings(self, settings: Any) -> bool:
+    def runtime_is_running_for_settings(self, settings: AppSettingsVNext) -> bool:
         overlay = self.overlay_provider()
         return bool(
             self.settings.overlay_enabled()
@@ -488,8 +487,8 @@ class DesktopOverlayApplicationOwner:
 
     def prepare_settings_update(
         self,
-        previous_settings: Any | None,
-        next_settings: Any,
+        previous_settings: AppSettingsVNext | None,
+        next_settings: AppSettingsVNext,
     ) -> tuple[DesktopRuntimeControl, ...]:
         if previous_settings is None:
             return ()
@@ -523,8 +522,8 @@ class DesktopOverlayApplicationOwner:
 
     async def prepare_persistence(
         self,
-        previous_settings: Any,
-        next_settings: Any,
+        previous_settings: AppSettingsVNext,
+        next_settings: AppSettingsVNext,
     ) -> None:
         previous = previous_settings.intent.overlay.desktop_flet
         next_desktop = next_settings.intent.overlay.desktop_flet

@@ -733,7 +733,7 @@ def materialize_provider_apply_intent(
 class SettingsApplicationOwner:
     settings: SettingsOwner
     projection: SettingsProjectionOwner
-    runtime_effects: SettingsRuntimeEffectsPort[object]
+    runtime_effects: SettingsRuntimeEffectsPort[AppSettingsVNext]
     manual_fallback: ManualLocalASRFallbackOwner
     cpu_auto_available: Callable[[], bool]
     inspect_cpu: SettingsAsyncEffect
@@ -822,7 +822,7 @@ class SettingsApplicationOwner:
 
     async def _route(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
         *,
         reload_settings_view: bool,
     ) -> bool:
@@ -881,7 +881,7 @@ class SettingsApplicationOwner:
 
     async def apply_direct(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
         *,
         persist: bool = True,
         strict_runtime_errors: bool = False,
@@ -942,13 +942,13 @@ class SettingsApplicationOwner:
 
     async def apply_ui_prompt_clipboard_state(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
     ) -> bool:
         return await self._apply_ui_prompt_clipboard_state(next_settings)
 
     async def apply_overlay_osc_output(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
     ) -> bool:
         return await self._apply_overlay_osc_output(next_settings)
 
@@ -982,8 +982,8 @@ class SettingsApplicationOwner:
     async def compensate_failed_local_asr_settings_apply(
         self,
         *,
-        base_settings: object,
-        committed_settings: object,
+        base_settings: AppSettingsVNext,
+        committed_settings: AppSettingsVNext,
         reload_settings_view: bool = True,
     ) -> None:
         self.settings.begin(snapshot=committed_settings)
@@ -1016,7 +1016,7 @@ class SettingsApplicationOwner:
 
     async def _apply_combined(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
         *,
         reload_settings_view: bool,
     ) -> bool:
@@ -1128,7 +1128,7 @@ class SettingsApplicationOwner:
 
     async def _apply_stt_language_audio(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
         *,
         reload_settings_view: bool = True,
     ) -> bool:
@@ -1219,7 +1219,7 @@ class SettingsApplicationOwner:
         self.projection.remember_order22(self.settings.canonical)
         return True
 
-    async def _apply_overlay_osc_output(self, next_settings: object) -> bool:
+    async def _apply_overlay_osc_output(self, next_settings: AppSettingsVNext) -> bool:
         base_and_patch = self.projection.order23_patch_base_and_values(next_settings)
         if base_and_patch is None:
             return False
@@ -1285,7 +1285,7 @@ class SettingsApplicationOwner:
 
     async def _apply_ui_prompt_clipboard_state(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
     ) -> bool:
         base_and_patch = self.projection.order24_patch_base_and_values(next_settings)
         if base_and_patch is None:
@@ -1348,8 +1348,8 @@ class SettingsApplicationOwner:
         self,
         *,
         command: SettingsMutationCommand,
-        base_settings: object,
-        committed_settings: object,
+        base_settings: AppSettingsVNext,
+        committed_settings: AppSettingsVNext,
         surface: str,
         runtime_apply: RuntimeApplyPort,
     ) -> TransactionResult:
@@ -1387,8 +1387,8 @@ class SettingsApplicationOwner:
     async def _resync_committed_runtime(
         self,
         *,
-        base_settings: object,
-        committed_settings: object,
+        base_settings: AppSettingsVNext,
+        committed_settings: AppSettingsVNext,
         failure_message: str,
     ) -> None:
         self.runtime_effects.restore_memory(base_settings)

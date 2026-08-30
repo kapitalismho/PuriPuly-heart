@@ -294,14 +294,14 @@ def _require_self_capture_owner(
 class _LocalASRProductionCompositionAccess:
     config_path: Path
     settings_loader: Callable[[], AppSettingsVNext]
-    runtime_initializer: Callable[..., Awaitable[None]]
+    runtime_initializer: Callable[[AppSettingsVNext], Awaitable[None]]
     components_provider: Callable[[], RuntimePipelineComponents | None]
     gpu_retry: Callable[[], Awaitable[None]]
 
     def load_compatibility_settings(self) -> AppSettingsVNext:
         return self.settings_loader()
 
-    async def initialize(self, settings) -> None:
+    async def initialize(self, settings: AppSettingsVNext) -> None:
         await self.runtime_initializer(settings)
 
     @property
@@ -2061,7 +2061,7 @@ def compose_application_runtime(
         ),
     )
 
-    async def initialize_local_asr_evidence(value) -> None:
+    async def initialize_local_asr_evidence(value: AppSettingsVNext) -> None:
         settings.canonical = value
         canonical = settings.project(value, authoritative=True)
         require_provisioning()
