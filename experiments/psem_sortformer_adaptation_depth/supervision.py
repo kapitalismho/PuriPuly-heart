@@ -30,17 +30,10 @@ class FrameSupervision:
     anchor_episode_ids: tuple[str | None, ...]
 
 
-def build_frame_supervision(
-    labels: LabelResult,
-    window_start_sample: int,
-    anchor_episode_ids: tuple[str | None, ...],
-    anchor_speakers: tuple[str | None, ...],
-) -> FrameSupervision:
-    if (
-        window_start_sample % FRAME_SAMPLES
-        or len(anchor_episode_ids) != FRAME_COUNT
-        or len(anchor_speakers) != FRAME_COUNT
-    ):
+def _window_frame_activity(
+    labels: LabelResult, window_start_sample: int
+) -> tuple[tuple[tuple[str, ...], ...], tuple[bool, ...], tuple[str, ...]]:
+    if window_start_sample % FRAME_SAMPLES:
         raise SupervisionError("frame supervision geometry differs from the frozen recipe")
     window_end = window_start_sample + WINDOW_SAMPLES
     if (
@@ -73,6 +66,24 @@ def build_frame_supervision(
         for speaker in active:
             if speaker not in arrival_order:
                 arrival_order.append(speaker)
+    return tuple(active_by_frame), tuple(valid_by_frame), tuple(arrival_order)
+
+
+def window_fits_arrival_order_slots(labels: LabelResult, window_start_sample: int) -> bool:
+    return len(_window_frame_activity(labels, window_start_sample)[2]) <= SLOT_COUNT
+
+
+def build_frame_supervision(
+    labels: LabelResult,
+    window_start_sample: int,
+    anchor_episode_ids: tuple[str | None, ...],
+    anchor_speakers: tuple[str | None, ...],
+) -> FrameSupervision:
+    if len(anchor_episode_ids) != FRAME_COUNT or len(anchor_speakers) != FRAME_COUNT:
+        raise SupervisionError("frame supervision geometry differs from the frozen recipe")
+    active_by_frame, valid_by_frame, arrival_order = _window_frame_activity(
+        labels, window_start_sample
+    )
     if len(arrival_order) > SLOT_COUNT:
         raise SupervisionError(
             "a 30-second sequence contains more than four arrival-order speakers"

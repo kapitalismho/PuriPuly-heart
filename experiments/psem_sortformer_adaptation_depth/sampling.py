@@ -262,12 +262,28 @@ def _transition_center(transition: Mapping[str, Any], session: RuntimeSession) -
     return None
 
 
+def _window_fits_slots(session: RuntimeSession, window_start_sample: int) -> bool:
+    from experiments.psem_sortformer_adaptation_depth.supervision import (
+        window_fits_arrival_order_slots,
+    )
+
+    return window_fits_arrival_order_slots(session.labels, window_start_sample)
+
+
 def candidate_pools(
     sessions: Mapping[str, RuntimeSession],
 ) -> dict[str, tuple[WindowCandidate, ...]]:
     pools: dict[str, dict[str, WindowCandidate]] = {
         family: {} for family in (*POSITIVE_FAMILIES, *HARD_NEGATIVE_FAMILIES)
     }
+    eligibility: dict[tuple[str, int], bool] = {}
+
+    def eligible(source_id: str, session: RuntimeSession, start: int) -> bool:
+        key = (source_id, start)
+        if key not in eligibility:
+            eligibility[key] = _window_fits_slots(session, start)
+        return eligibility[key]
+
     for source_id, session in sorted(sessions.items()):
         if session.role != TRAIN_ROLE:
             raise SamplingContractError("sampling accepts TRAIN sessions only")
@@ -287,7 +303,7 @@ def candidate_pools(
             if family is None or center is None:
                 continue
             start = _window_around(session, center)
-            if start is None:
+            if start is None or not eligible(source_id, session, start):
                 continue
             candidate = WindowCandidate(source_id, start, family, center)
             pools[family][candidate.identity] = candidate
@@ -309,7 +325,7 @@ def candidate_pools(
                 continue
             center = (interval.start_sample + interval.end_sample) // 2
             start = _window_around(session, center)
-            if start is None:
+            if start is None or not eligible(source_id, session, start):
                 continue
             candidate = WindowCandidate(source_id, start, family, None)
             pools[family][candidate.identity] = candidate
@@ -377,10 +393,40 @@ def _uniform_candidate(
     raise SamplingContractError("uniform grid index was not resolved")
 
 
+def _uniform_candidates(
+    ranges: Sequence[UniformRange],
+    base: int,
+    count: int,
+    total_ordinals: int,
+    sessions: Mapping[str, RuntimeSession] | None,
+) -> tuple[WindowCandidate, ...]:
+    if sessions is None:
+        return tuple(
+            _uniform_candidate(ranges, base + index, total_ordinals) for index in range(count)
+        )
+    total = sum(value.count for value in ranges)
+    selected: list[WindowCandidate] = []
+    ordinal = base
+    while ordinal < total and len(selected) < count:
+        candidate = _uniform_candidate(ranges, ordinal, total_ordinals)
+        session = sessions.get(candidate.source_id)
+        if (
+            session is not None
+            and session.role == TRAIN_ROLE
+            and _window_fits_slots(session, candidate.window_start_sample)
+        ):
+            selected.append(candidate)
+        ordinal += 1
+    if len(selected) != count:
+        raise SamplingContractError("uniform grid cannot provide enough four-slot training windows")
+    return tuple(selected)
+
+
 def epoch_plan(
     pools: Mapping[str, Sequence[WindowCandidate]],
     ranges: Sequence[UniformRange],
     epoch: int,
+    sessions: Mapping[str, RuntimeSession] | None = None,
 ) -> tuple[tuple[str, WindowCandidate], ...]:
     if not 1 <= epoch <= MAXIMUM_EPOCHS:
         raise SamplingContractError("epoch lies outside the frozen training recipe")
@@ -400,15 +446,14 @@ def epoch_plan(
     uniform_count = ROLE_COUNTS["source_time_uniform"]
     base = (epoch - 1) * uniform_count
     selected.extend(
-        (
-            "source_time_uniform",
-            _uniform_candidate(
-                ranges,
-                base + index,
-                MAXIMUM_EPOCHS * uniform_count,
-            ),
+        ("source_time_uniform", candidate)
+        for candidate in _uniform_candidates(
+            ranges,
+            base,
+            uniform_count,
+            MAXIMUM_EPOCHS * uniform_count,
+            sessions,
         )
-        for index in range(uniform_count)
     )
     selected.sort(
         key=lambda item: hashlib.sha256(
@@ -439,7 +484,9 @@ def materialize_sampling_manifest(
         source_id: canonical_sha256(session.labels.to_dict())
         for source_id, session in sessions.items()
     }
-    plans = {epoch: epoch_plan(pools, ranges, epoch) for epoch in range(1, MAXIMUM_EPOCHS + 1)}
+    plans = {
+        epoch: epoch_plan(pools, ranges, epoch, sessions) for epoch in range(1, MAXIMUM_EPOCHS + 1)
+    }
     role_counts: Counter[str] = Counter()
     family_counts: Counter[str] = Counter()
     temporary = output_path.with_name(f".{output_path.name}.{os.getpid()}.tmp")
@@ -605,7 +652,9 @@ def validate_sampling_manifest(
         source_id: canonical_sha256(session.labels.to_dict())
         for source_id, session in sessions.items()
     }
-    plans = {epoch: epoch_plan(pools, ranges, epoch) for epoch in range(1, MAXIMUM_EPOCHS + 1)}
+    plans = {
+        epoch: epoch_plan(pools, ranges, epoch, sessions) for epoch in range(1, MAXIMUM_EPOCHS + 1)
+    }
     role_counts: Counter[str] = Counter()
     for absolute_index, row in enumerate(rows):
         epoch = absolute_index // WINDOWS_PER_EPOCH + 1
