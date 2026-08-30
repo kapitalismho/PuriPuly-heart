@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self] My cat just jumped onto my desk.
+[${inputChannel}] My cat just jumped onto my desk.
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Your response:
 
 ### Context Ignore Example
 <context>
-[self] I need to charge my controllers soon.
+[${inputChannel}] I need to charge my controllers soon.
 </context>
 
 <input>

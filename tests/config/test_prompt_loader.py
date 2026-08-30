@@ -114,11 +114,13 @@ def test_build_translation_prompt_variables_returns_expected_keys_and_content() 
     assert set(variables) == {
         "sourceName",
         "targetName",
+        "inputChannel",
         "targetLanguageRules",
         "translationExamples",
     }
     assert variables["sourceName"] == "English"
     assert variables["targetName"] == "Japanese"
+    assert variables["inputChannel"] == "self"
     assert "タメ口" in variables["targetLanguageRules"]
     assert "Context Use Example" in variables["translationExamples"]
 

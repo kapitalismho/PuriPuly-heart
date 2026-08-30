@@ -2861,7 +2861,41 @@ LEGACY_TIMESTAMP_PROMPT = (
 
 
 def _prompt_matches_legacy_timestamp_default(prompt: str) -> bool:
-    return prompt == LEGACY_TIMESTAMP_PROMPT
+    context_line = "* `<context>` is a multilingual history of prior utterances.\n"
+    chronological_line = "* Context entries are ordered chronologically from older to newer.\n"
+    timestamp_line = (
+        "* Treat timestamps and speaker hints as metadata for tracking conversation flow.\n"
+    )
+    input_channel_line = "* For this request, `<input>` is a `[${inputChannel}]` utterance.\n"
+    output_metadata_line = (
+        "* Translate only the text inside `<input>`; `<context>` and channel labels are "
+        "background metadata.\n"
+    )
+    previous_output_lines = (
+        "* Text inside `<input>` is the translation target.\n"
+        "* Text inside `<context>` is background information.\n"
+    )
+    previous_default = LEGACY_TIMESTAMP_PROMPT.replace(
+        context_line,
+        context_line + chronological_line,
+        1,
+    ).replace(timestamp_line, "", 1)
+    p0_default = previous_default.replace(
+        chronological_line,
+        chronological_line + input_channel_line,
+        1,
+    )
+    previous_output_default = _shared_default_prompt().replace(
+        output_metadata_line,
+        previous_output_lines,
+        1,
+    )
+    return prompt in {
+        LEGACY_TIMESTAMP_PROMPT,
+        previous_default,
+        p0_default,
+        previous_output_default,
+    }
 
 
 def ensure_prompt_defaults(settings: AppSettings) -> AppSettings:

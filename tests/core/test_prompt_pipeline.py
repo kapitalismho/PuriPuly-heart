@@ -99,15 +99,19 @@ async def test_translation_renders_dynamic_prompt_placeholders() -> None:
         clock=FakeClock(),
         source_language="ko",
         target_language="en",
-        system_prompt=("${sourceName}|${targetName}|${targetLanguageRules}|${translationExamples}"),
+        system_prompt=(
+            "${sourceName}|${targetName}|${inputChannel}|"
+            "${targetLanguageRules}|${translationExamples}"
+        ),
     )
 
     await harness.process_translation(uuid4(), "안녕")
 
     assert fake_llm.last_prompt is not None
-    assert "Korean|English" in fake_llm.last_prompt
+    assert "Korean|English|self|" in fake_llm.last_prompt
     assert "Use contractions" in fake_llm.last_prompt
     assert "Context Use Example" in fake_llm.last_prompt
+    assert "${inputChannel}" not in fake_llm.last_prompt
     assert "${targetLanguageRules}" not in fake_llm.last_prompt
     assert "${translationExamples}" not in fake_llm.last_prompt
 
@@ -123,17 +127,21 @@ def test_translation_renders_peer_runtime_dynamic_prompt_placeholders() -> None:
         peer_translation_enabled=True,
         peer_source_language="en",
         peer_target_language="ja",
-        system_prompt=("${sourceName}|${targetName}|${targetLanguageRules}|${translationExamples}"),
+        system_prompt=(
+            "${sourceName}|${targetName}|${inputChannel}|"
+            "${targetLanguageRules}|${translationExamples}"
+        ),
     )
 
     prompt, _, _ = harness.prepare_translation_request("hello", runtime=harness.peer_runtime)
 
-    assert "English|Japanese" in prompt
+    assert "English|Japanese|peer|" in prompt
     assert "Korean|English" not in prompt
     assert "タメ口" in prompt
     assert "Context Use Example" in prompt
     assert "${sourceName}" not in prompt
     assert "${targetName}" not in prompt
+    assert "${inputChannel}" not in prompt
     assert "${targetLanguageRules}" not in prompt
     assert "${translationExamples}" not in prompt
 

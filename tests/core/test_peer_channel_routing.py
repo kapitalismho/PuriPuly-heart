@@ -255,8 +255,6 @@ async def test_integrated_context_always_includes_peer_entries() -> None:
     context, mode = harness.translation_requests.context_resolver.resolve_for_request(
         runtime=harness.self_runtime,
         other_runtime=harness.peer_runtime,
-        requested_mode="integrated",
-        peer_translation_enabled=True,
         source_language="en",
         target_language="ko",
     )

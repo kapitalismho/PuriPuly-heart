@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self] 아, 트래커 배터리 다 돼간다.
+[${inputChannel}] 아, 트래커 배터리 다 돼간다.
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Your response:
 
 ### Context Ignore Example
 <context>
-[self] 이 월드 진짜 예쁘게 잘 꾸며놨네요.
+[${inputChannel}] 이 월드 진짜 예쁘게 잘 꾸며놨네요.
 </context>
 
 <input>

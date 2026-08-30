@@ -372,16 +372,12 @@ class TranslationLatencyDiagnosticsOwner:
         diagnostic: ContextApplicationDiagnostic,
     ) -> None:
         applied_mode = self._last_context_modes.get(diagnostic.channel)
-        if diagnostic.channel == "peer" and applied_mode in (None, "local"):
-            peer_entries = len(diagnostic.context_lines)
-            self_entries = 0
-        else:
-            peer_entries = sum(
-                1
-                for line in diagnostic.context_lines
-                if line.startswith("- [peer]") or line.startswith("- [others]")
-            )
-            self_entries = len(diagnostic.context_lines) - peer_entries
+        peer_entries = sum(
+            1
+            for line in diagnostic.context_lines
+            if line.startswith("- [peer]") or line.startswith("- [others]")
+        )
+        self_entries = len(diagnostic.context_lines) - peer_entries
         self.emit(
             RuntimeDiagnostic(
                 message=(
