@@ -10,3 +10,4 @@ class LanguageSelectionChange:
     peer_source_mode: str
     recent_source_codes: tuple[str, ...]
     recent_target_codes: tuple[str, ...]
+    secondary_target_code: str = ""

@@ -21,6 +21,7 @@ class FoundationPaletteTokens:
     tertiary: str
     translation_tonal: str
     translation_on: str
+    display_source: str
     neutral: str
     neutral_dark: str
     surface_tonal: str
@@ -86,6 +87,7 @@ FOUNDATION_DESIGN_TOKENS = FoundationDesignTokens(
         tertiary="#B28A44",
         translation_tonal="#F5DEDC",
         translation_on="#D64058",
+        display_source="#A6706D",
         neutral="#998E8D",
         neutral_dark="#5C4D4C",
         surface_tonal="#FCEBE9",

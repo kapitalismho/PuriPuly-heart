@@ -22,6 +22,9 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
     TranslationReadyDiagnostic,
     TranslationSkipDiagnostic,
 )
+from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
+from puripuly_heart.domain.models import OSCMessage
+from tests.helpers.fakes import FakeSender
 
 
 class RuntimeLogging:
@@ -134,6 +137,78 @@ def test_owner_emits_latency_contract_once_with_channel_hangover_and_cause() -> 
     assert "llm_request_to_llm_done_ms=300" in cause
 
 
+def test_chatbox_replacement_and_prune_reach_runtime_logging_without_overlay_diagnostics() -> None:
+    clock = FakeClock(_now=10.0)
+    logging = RuntimeLogging()
+    owner = make_owner(clock=clock, runtime_logging=logging, overlay_diagnostics=None)
+    paginator = ChatboxPaginator(
+        sender=FakeSender(),
+        clock=clock,
+        max_chars=4,
+        runtime_logging=logging,
+        stage_recorder=owner.record_chatbox_stage,
+    )
+    parent_id = uuid4()
+
+    paginator.enqueue(
+        OSCMessage(
+            utterance_id=parent_id,
+            text="PRIVATE_FIRST",
+            created_at=clock.now(),
+            turn_generation=3,
+            turn_order=7,
+            presentation_revision=1,
+            target_indexes=(1,),
+            target_languages=("ja",),
+        )
+    )
+    paginator.enqueue(
+        OSCMessage(
+            utterance_id=parent_id,
+            text="PRIVATE_COMPLETE",
+            created_at=clock.now(),
+            turn_generation=3,
+            turn_order=7,
+            presentation_revision=2,
+            target_indexes=(0, 1),
+            target_languages=("zh-CN", "ja"),
+        )
+    )
+    newer_parent_id = uuid4()
+    paginator.enqueue(
+        OSCMessage(
+            utterance_id=newer_parent_id,
+            text="PRIVATE_NEWER",
+            created_at=clock.now(),
+            turn_generation=3,
+            turn_order=8,
+            presentation_revision=1,
+            target_indexes=(0,),
+            target_languages=("zh-CN",),
+        )
+    )
+
+    replacement = next(
+        message for message in logging.detailed if "chatbox_revision_replaced" in message
+    )
+    prune = next(message for message in logging.detailed if "chatbox_older_turn_pruned" in message)
+    assert f"parent_utterance_id={parent_id}" in replacement
+    assert "turn_generation=3" in replacement
+    assert "turn_order=7" in replacement
+    assert "target_indexes=(0, 1)" in replacement
+    assert "target_languages=('zh-CN', 'ja')" in replacement
+    assert "presentation_revision=2" in replacement
+    assert "previous_revision=1" in replacement
+    assert f"parent_utterance_id={newer_parent_id}" in prune
+    assert "turn_order=8" in prune
+    assert "target_indexes=(0,)" in prune
+    assert "target_languages=('zh-CN',)" in prune
+    combined = "\n".join(logging.detailed)
+    assert "PRIVATE_FIRST" not in combined
+    assert "PRIVATE_COMPLETE" not in combined
+    assert "PRIVATE_NEWER" not in combined
+
+
 def test_owner_inherits_and_clears_only_the_selected_timeline() -> None:
     owner = make_owner()
     source_id = uuid4()
@@ -198,6 +273,81 @@ def test_owner_suppresses_duplicate_context_mode_and_logs_metadata_only() -> Non
     assert "peer_entries=1" in application
     assert "first" not in application
     assert "second" not in application
+
+
+def test_target_diagnostics_include_parent_index_and_language_metadata() -> None:
+    clock = FakeClock(10.0)
+    logging = RuntimeLogging()
+    owner = make_owner(clock=clock, runtime_logging=logging)
+    parent_id = uuid4()
+    child_id = uuid4()
+
+    owner.record_context_mode(
+        ContextModeDiagnostic(
+            channel="self",
+            applied_mode="local",
+            parent_utterance_id=parent_id,
+            target_index=1,
+            target_language="ja",
+        )
+    )
+    owner.record_context_application(
+        ContextApplicationDiagnostic(
+            channel="self",
+            request_chars=12,
+            context_lines=(),
+            context_chars=0,
+            parent_utterance_id=parent_id,
+            target_index=1,
+            target_language="ja",
+        )
+    )
+    owner.record_latency_stage(
+        LatencyStageDiagnostic(
+            channel="self",
+            utterance_id=child_id,
+            stage="speech_end",
+            publish_now=False,
+        )
+    )
+    clock.advance(0.2)
+    owner.record_latency_stage(
+        LatencyStageDiagnostic(
+            channel="self",
+            utterance_id=child_id,
+            stage="llm_done",
+            parent_utterance_id=parent_id,
+            target_index=1,
+            target_language="ja",
+            turn_generation=3,
+            turn_order=7,
+        )
+    )
+    owner.emit_translation_ready(
+        TranslationReadyDiagnostic(
+            channel="self",
+            utterance_id=child_id,
+            update_id="update",
+            origin_wall_clock_ms=None,
+            session_scope=None,
+            source_text_hash=None,
+            source_text_len=None,
+            logical_turn_key=f"self:{parent_id}",
+            translation_len=3,
+            parent_utterance_id=parent_id,
+            target_index=1,
+            target_language="ja",
+            turn_generation=3,
+            turn_order=7,
+        )
+    )
+
+    combined = "\n".join(logging.basic + logging.detailed)
+    assert f"parent_utterance_id={parent_id}" in combined
+    assert "target_index=1" in combined
+    assert "target_language=ja" in combined
+    assert "turn_generation=3" in combined
+    assert "turn_order=7" in combined
 
 
 def test_owner_suppresses_runtime_and_overlay_decision_duplicates_independently() -> None:

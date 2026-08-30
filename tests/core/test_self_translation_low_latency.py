@@ -79,6 +79,7 @@ class FakeLLMProvider:
                 "utterance_id": utterance_id,
                 "text": text,
                 "context": context,
+                "target_language": target_language,
             }
         )
         await asyncio.sleep(self.delay_s)
@@ -134,6 +135,7 @@ class BlockingLLMProvider(FakeLLMProvider):
                 "utterance_id": utterance_id,
                 "text": text,
                 "context": context,
+                "target_language": target_language,
             }
         )
         self.started.set()
@@ -2402,6 +2404,89 @@ class TestSpecCommitPaths:
         assert overlay_sink.events[1].utterance_id == merge_id
         assert overlay_sink.events[-1].channel == "self"
         assert overlay_sink.events[-1].is_final is True
+
+    @pytest.mark.asyncio
+    async def test_dual_target_commit_reuses_primary_and_runs_only_secondary_provider(self):
+        clock = FakeClock(initial_time=10.0)
+        llm = BlockingLLMProvider(response_text="secondary translation", delay_s=0.0)
+        osc = FakeOscQueue()
+        runtime_logging, log_stream = _make_runtime_logging_capture()
+        runtime_logging.set_mode(SessionLoggingMode.DETAILED)
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=llm,
+            osc=osc,
+            clock=clock,
+            low_latency_mode=True,
+            source_language="en",
+            target_language="zh-CN",
+            self_target_languages=("zh-CN", "ja"),
+            runtime_logging=runtime_logging,
+        )
+        source_id = uuid4()
+        merge_id = uuid4()
+        buffer = _MergeBuffer(
+            merge_id=merge_id,
+            parts=["hello"],
+            utterance_ids=[source_id],
+            start_time=clock.now(),
+            last_end_time=clock.now(),
+            speculative_attempt=make_speculative_attempt(
+                source_text="hello",
+                config_snapshot=harness.configuration.snapshot(),
+                provider_generation=harness.translation_requests.provider_generation,
+                result=Translation(
+                    utterance_id=merge_id,
+                    text="reused primary",
+                    source_text="hello",
+                    source_language="en",
+                    target_language="zh-CN",
+                ),
+            ),
+        )
+        harness.self_owner.merge_buffer = buffer
+        harness.self_runtime.utterance_start_times[source_id] = clock.now()
+        commit = asyncio.create_task(harness.self_owner._commit_merge(buffer, reason="spec_done"))
+        next_turn: asyncio.Task[object] | None = None
+
+        try:
+            await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+            for _ in range(100):
+                if osc.messages:
+                    break
+                await asyncio.sleep(0)
+
+            assert [call["target_language"] for call in llm.calls] == ["ja"]
+            assert [message.text for message in osc.messages] == ["reused primary"]
+            secondary_start = next(
+                message
+                for message in _runtime_log_messages(log_stream)
+                if "translation_target_started" in message and "target_index=1" in message
+            )
+            assert "presentation_revision=1" in secondary_start
+            await asyncio.wait_for(commit, timeout=1.0)
+            assert not llm.release.is_set()
+
+            next_turn = asyncio.create_task(harness.self_owner.submit_text("next source"))
+            for _ in range(100):
+                if len(llm.calls) == 3:
+                    break
+                await asyncio.sleep(0)
+            next_calls = [call for call in llm.calls if call["text"] == "next source"]
+            assert {call["target_language"] for call in next_calls} == {"zh-CN", "ja"}
+
+            llm.release.set()
+            await asyncio.wait_for(next_turn, timeout=1.0)
+            await harness.translation_turns.wait_for_idle()
+
+            assert osc.messages[0].text == "reused primary"
+            assert osc.messages[-1].text == "secondary translation\nsecondary translation"
+        finally:
+            llm.release.set()
+            await asyncio.gather(commit, return_exceptions=True)
+            if next_turn is not None:
+                await asyncio.gather(next_turn, return_exceptions=True)
+            await harness.stop()
 
     @pytest.mark.asyncio
     async def test_commit_merge_self_active_update_carries_merge_id_when_clearing_stale_active_secondary_before_finalizing_mismatch(

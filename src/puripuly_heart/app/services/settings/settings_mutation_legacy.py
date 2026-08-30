@@ -54,6 +54,7 @@ ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS: Final[tuple[str, ...]] = (
     "intent.peer_stt.provider",
     "intent.languages.source_language",
     "intent.languages.target_language",
+    "intent.languages.secondary_target_language",
     "intent.languages.peer_source_language",
     "intent.languages.peer_target_language",
     "intent.languages.peer_source_mode",

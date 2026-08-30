@@ -18,6 +18,7 @@ from puripuly_heart.core.osc.control_schema import (
     OSC_BOOLEAN_PARAMETER_NAMES,
     OSC_INTEGER_PARAMETER_NAMES,
     OSC_PARAMETER_DEFINITIONS,
+    SECONDARY_LANGUAGE_IDS,
     TRANSLATION_CONNECTION_BY_MODEL_ID,
     TRANSLATION_MODEL_ID_BY_SELECTION,
     TRANSLATION_MODEL_IDS,
@@ -54,10 +55,15 @@ def test_translation_model_publish_ids_cover_every_product_model() -> None:
 def test_codec_validates_absolute_boolean_and_integer_controls() -> None:
     bool_message = decode_control_message("/avatar/parameters/PuriPuly_Talk", True)
     integer_message = decode_control_message("/avatar/parameters/PuriPuly_SelfASR", 5)
+    secondary_off = decode_control_message(
+        "/avatar/parameters/PuriPuly_SelfDstLang2",
+        255,
+    )
 
     assert bool_message.name == "PuriPuly_Talk"
     assert bool_message.value is True
     assert integer_message.value == 5
+    assert secondary_off.value == 255
     assert encode_control_message("PuriPuly_Translator", 2) == (
         "/avatar/parameters/PuriPuly_Translator",
         2,
@@ -76,7 +82,7 @@ def test_codec_rejects_wrong_types_unknown_ids_and_unknown_parameters() -> None:
 def test_control_schema_keeps_boolean_and_integer_surfaces_separate() -> None:
     assert set(OSC_BOOLEAN_PARAMETER_NAMES).isdisjoint(OSC_INTEGER_PARAMETER_NAMES)
     assert len(OSC_BOOLEAN_PARAMETER_NAMES) == 7
-    assert len(OSC_INTEGER_PARAMETER_NAMES) == 8
+    assert len(OSC_INTEGER_PARAMETER_NAMES) == 9
 
 
 def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
@@ -92,6 +98,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
     assert OSC_INTEGER_PARAMETER_NAMES == (
         "PuriPuly_SelfSrcLang",
         "PuriPuly_SelfDstLang",
+        "PuriPuly_SelfDstLang2",
         "PuriPuly_PeerSrcLang",
         "PuriPuly_PeerDstLang",
         "PuriPuly_SelfASR",
@@ -111,6 +118,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
     assert dict(INTEGER_CONTROLS) == {
         "PuriPuly_SelfSrcLang": "languages.source_language",
         "PuriPuly_SelfDstLang": "languages.target_language",
+        "PuriPuly_SelfDstLang2": "languages.secondary_target_language",
         "PuriPuly_PeerSrcLang": "languages.peer_source_language",
         "PuriPuly_PeerDstLang": "languages.peer_target_language",
         "PuriPuly_SelfASR": "stt.provider",
@@ -131,6 +139,11 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         ("PuriPuly_ChatboxSource", "bool", "chatbox_include_source"),
         ("PuriPuly_SelfSrcLang", "int", "languages.source_language"),
         ("PuriPuly_SelfDstLang", "int", "languages.target_language"),
+        (
+            "PuriPuly_SelfDstLang2",
+            "int",
+            "languages.secondary_target_language",
+        ),
         ("PuriPuly_PeerSrcLang", "int", "languages.peer_source_language"),
         ("PuriPuly_PeerDstLang", "int", "languages.peer_target_language"),
         ("PuriPuly_SelfASR", "int", "stt.provider"),
@@ -221,4 +234,8 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         32: "vi",
         33: "zh-CN",
         34: "zh-TW",
+    }
+    assert dict(SECONDARY_LANGUAGE_IDS) == {
+        **dict(LANGUAGE_IDS),
+        255: "",
     }

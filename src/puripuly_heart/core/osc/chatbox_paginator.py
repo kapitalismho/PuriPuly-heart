@@ -35,6 +35,9 @@ class ChatboxPaginator:
     _active_message: OSCMessage | None = field(default=None, init=False, repr=False)
     _active_page_index: int = field(default=0, init=False, repr=False)
     _active_page_count: int = field(default=0, init=False, repr=False)
+    _latest_self_turn_key: tuple[int, int] | None = field(default=None, init=False, repr=False)
+    _latest_self_utterance_id: UUID | None = field(default=None, init=False, repr=False)
+    _latest_self_revision: int = field(default=-1, init=False, repr=False)
     _typing_reasons: set[str] = field(default_factory=set, init=False, repr=False)
     _legacy_typing_active: bool = field(default=False, init=False, repr=False)
     _last_typing_state: bool = field(default=False, init=False, repr=False)
@@ -48,7 +51,21 @@ class ChatboxPaginator:
         self._pending_messages = []
 
     def enqueue(self, message: OSCMessage) -> None:
-        page_count = len(self._split_text(message.text.strip())) if message.text.strip() else 0
+        page_count = (
+            len(
+                self._split_text(
+                    message.text.strip(),
+                    preserve_newlines=message.presentation_revision > 0,
+                )
+            )
+            if message.text.strip()
+            else 0
+        )
+        if message.self_turn_key is not None and self._prepare_self_turn_enqueue(
+            message,
+            page_count=page_count,
+        ):
+            return
         if self._is_paginating():
             self._pending_messages.append(message)
             self._record_stage(
@@ -57,6 +74,11 @@ class ChatboxPaginator:
                 text_len=len(message.text),
                 page_count=page_count,
                 started=False,
+                turn_generation=message.turn_generation,
+                turn_order=message.turn_order,
+                presentation_revision=message.presentation_revision,
+                target_indexes=message.target_indexes,
+                target_languages=message.target_languages,
             )
             return
         self._record_stage(
@@ -65,8 +87,15 @@ class ChatboxPaginator:
             text_len=len(message.text),
             page_count=page_count,
             started=True,
+            turn_generation=message.turn_generation,
+            turn_order=message.turn_order,
+            presentation_revision=message.presentation_revision,
+            target_indexes=message.target_indexes,
+            target_languages=message.target_languages,
         )
         self._start_message(message)
+        if not self._is_paginating():
+            self._drain_pending_messages()
 
     def process_due(self) -> None:
         if not self._is_paginating():
@@ -162,12 +191,157 @@ class ChatboxPaginator:
     def _is_paginating(self) -> bool:
         return bool(self._pending_pages)
 
+    def _prepare_self_turn_enqueue(
+        self,
+        message: OSCMessage,
+        *,
+        page_count: int,
+    ) -> bool:
+        assert self._pending_messages is not None
+        incoming_key = message.self_turn_key
+        assert incoming_key is not None
+        if self._latest_self_turn_key is not None:
+            if self._latest_self_turn_key > incoming_key:
+                return True
+            if self._latest_self_turn_key == incoming_key:
+                if self._latest_self_utterance_id != message.utterance_id:
+                    raise ValueError("self turn key cannot identify multiple parent utterances")
+                if self._latest_self_revision >= message.presentation_revision:
+                    return True
+        active = self._active_message if self._is_paginating() else None
+        active_key = None if active is None else active.self_turn_key
+        existing_self_messages = tuple(
+            candidate
+            for candidate in (active, *self._pending_messages)
+            if candidate is not None and candidate.self_turn_key is not None
+        )
+        if any(candidate.self_turn_key > incoming_key for candidate in existing_self_messages):
+            return True
+        for candidate in existing_self_messages:
+            if (
+                candidate.self_turn_key == incoming_key
+                and candidate.utterance_id != message.utterance_id
+            ):
+                raise ValueError("self turn key cannot identify multiple parent utterances")
+        if any(
+            candidate.self_turn_key == incoming_key
+            and candidate.presentation_revision >= message.presentation_revision
+            for candidate in existing_self_messages
+        ):
+            return True
+        self._latest_self_turn_key = incoming_key
+        self._latest_self_utterance_id = message.utterance_id
+        self._latest_self_revision = message.presentation_revision
+
+        active_pruned = False
+        dropped_pages = 0
+        if active is not None and active_key == incoming_key:
+            dropped_pages = self._clear_active_message()
+            self._record_stage(
+                "chatbox_revision_replaced",
+                utterance_id=str(message.utterance_id),
+                turn_generation=message.turn_generation,
+                turn_order=message.turn_order,
+                previous_revision=active.presentation_revision,
+                presentation_revision=message.presentation_revision,
+                location="active",
+                dropped_pages=dropped_pages,
+                target_indexes=message.target_indexes,
+                target_languages=message.target_languages,
+            )
+        elif active_key is not None and active_key < incoming_key:
+            dropped_pages = self._clear_active_message()
+            active_pruned = True
+
+        replaced_pending_revision: int | None = None
+        replacement_index: int | None = None
+        pruned_messages = 0
+        next_pending: list[OSCMessage] = []
+        for candidate in self._pending_messages:
+            candidate_key = candidate.self_turn_key
+            if candidate_key is None:
+                next_pending.append(candidate)
+                continue
+            if candidate_key < incoming_key:
+                if replacement_index is None:
+                    replacement_index = len(next_pending)
+                pruned_messages += 1
+                continue
+            if candidate_key == incoming_key:
+                if replacement_index is None:
+                    replacement_index = len(next_pending)
+                replaced_pending_revision = max(
+                    candidate.presentation_revision,
+                    replaced_pending_revision or 0,
+                )
+                continue
+            next_pending.append(candidate)
+        self._pending_messages[:] = next_pending
+
+        if replaced_pending_revision is not None:
+            self._record_stage(
+                "chatbox_revision_replaced",
+                utterance_id=str(message.utterance_id),
+                turn_generation=message.turn_generation,
+                turn_order=message.turn_order,
+                previous_revision=replaced_pending_revision,
+                presentation_revision=message.presentation_revision,
+                location="pending",
+                dropped_pages=0,
+                target_indexes=message.target_indexes,
+                target_languages=message.target_languages,
+            )
+
+        if active_pruned or pruned_messages:
+            self._record_stage(
+                "chatbox_older_turn_pruned",
+                utterance_id=str(message.utterance_id),
+                turn_generation=message.turn_generation,
+                turn_order=message.turn_order,
+                presentation_revision=message.presentation_revision,
+                pruned_messages=pruned_messages,
+                pruned_pages=dropped_pages,
+                target_indexes=message.target_indexes,
+                target_languages=message.target_languages,
+            )
+
+        if self._is_paginating() and replacement_index is not None:
+            self._pending_messages.insert(replacement_index, message)
+            self._record_stage(
+                "message_enqueue",
+                utterance_id=str(message.utterance_id),
+                text_len=len(message.text),
+                page_count=page_count,
+                started=False,
+                replaced=True,
+                turn_generation=message.turn_generation,
+                turn_order=message.turn_order,
+                presentation_revision=message.presentation_revision,
+                target_indexes=message.target_indexes,
+                target_languages=message.target_languages,
+            )
+            return True
+        return False
+
+    def _clear_active_message(self) -> int:
+        assert self._pending_pages is not None
+        dropped_pages = len(self._pending_pages)
+        self._pending_pages.clear()
+        self._next_page_at = 0.0
+        self._active_message = None
+        self._active_page_index = 0
+        self._active_page_count = 0
+        return dropped_pages
+
     def _start_message(self, message: OSCMessage) -> None:
         text = message.text.strip()
         if not text:
             return
 
-        parts = self._split_text(text)
+        parts = self._split_text(
+            text,
+            preserve_newlines=message.presentation_revision > 0,
+        )
         head = parts[0]
         tail = parts[1:]
         self._active_message = message
@@ -178,15 +352,24 @@ class ChatboxPaginator:
         if tail:
             self._pending_pages.extend(tail)
             self._next_page_at = self.clock.now() + self.page_interval_s
+            return
+        self._active_message = None
+        self._active_page_index = 0
+        self._active_page_count = 0
 
     def _drain_pending_messages(self) -> None:
         while self._pending_messages and not self._is_paginating():
             next_message = self._pending_messages.pop(0)
             self._start_message(next_message)
 
-    def _split_text(self, text: str) -> list[str]:
+    def _split_text(self, text: str, *, preserve_newlines: bool = False) -> list[str]:
         if len(text) <= self.max_chars:
             return [text]
+        if preserve_newlines and "\n" in text:
+            return [
+                text[index : index + self.max_chars]
+                for index in range(0, len(text), self.max_chars)
+            ]
         return textwrap.wrap(
             text,
             width=self.max_chars,
@@ -211,6 +394,11 @@ class ChatboxPaginator:
                 page_count=self._active_page_count,
                 remaining_parts=remaining_parts,
                 text_len=len(text),
+                turn_generation=None if active is None else active.turn_generation,
+                turn_order=None if active is None else active.turn_order,
+                presentation_revision=(None if active is None else active.presentation_revision),
+                target_indexes=() if active is None else active.target_indexes,
+                target_languages=() if active is None else active.target_languages,
             )
         return True
 
@@ -242,7 +430,7 @@ class ChatboxPaginator:
     def _emit_send_attempt(self, *, mode: str, text: str, remaining_parts: int) -> None:
         self._emit_detailed(
             f"[Detailed][OSC] send mode={mode} status=attempt chars={len(text)} "
-            f"remaining_parts={remaining_parts} text={text!r}"
+            f"remaining_parts={remaining_parts}"
         )
 
     def _emit_send_delivered(self, *, mode: str, text: str, remaining_parts: int) -> None:
@@ -277,10 +465,32 @@ class ChatboxPaginatorOutputAdapter:
     include_source: bool = True
 
     async def publish_self_utterance(self, publication: SelfUtterancePublication) -> None:
+        metadata = publication.metadata
+        generation = self._non_negative_metadata_int(publication, "turn_generation")
+        order = self._non_negative_metadata_int(publication, "turn_order")
+        revision = self._non_negative_metadata_int(publication, "presentation_revision")
+        target_indexes = self._target_indexes(publication)
+        target_languages = self._target_languages(publication)
+        if "turn_generation" in metadata and generation is None:
+            raise TypeError("turn_generation must be a non-negative integer")
+        if "turn_order" in metadata and order is None:
+            raise TypeError("turn_order must be a non-negative integer")
+        if "presentation_revision" in metadata and revision is None:
+            raise TypeError("presentation_revision must be a non-negative integer")
+        if (generation is None) != (order is None):
+            raise ValueError("turn generation and order must be provided together")
+        revision = revision or 0
+        if generation is None and revision != 0:
+            raise ValueError("presentation_revision requires self turn identity")
         message = OSCMessage(
             utterance_id=UUID(publication.utterance_id),
             text=self._merge_chatbox_text(publication),
             created_at=self.paginator.clock.now(),
+            turn_generation=generation,
+            turn_order=order,
+            presentation_revision=revision,
+            target_indexes=target_indexes,
+            target_languages=target_languages,
         )
         self.paginator.enqueue(message)
         self.paginator.send_typing(False)
@@ -301,6 +511,39 @@ class ChatboxPaginatorOutputAdapter:
         if self.include_source and transcript_text:
             return f"{transcript_text} ({translation_text})"
         return translation_text
+
+    @staticmethod
+    def _non_negative_metadata_int(
+        publication: SelfUtterancePublication,
+        key: str,
+    ) -> int | None:
+        value = publication.metadata.get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            return None
+        return value
+
+    @staticmethod
+    def _target_indexes(publication: SelfUtterancePublication) -> tuple[int, ...]:
+        metadata = publication.metadata
+        if "target_indexes" not in metadata:
+            return ()
+        value = metadata["target_indexes"]
+        if not isinstance(value, str) or not value:
+            raise TypeError("target_indexes must be a comma-separated string")
+        try:
+            return tuple(int(part) for part in value.split(","))
+        except ValueError as exc:
+            raise TypeError("target_indexes must contain integers") from exc
+
+    @staticmethod
+    def _target_languages(publication: SelfUtterancePublication) -> tuple[str, ...]:
+        metadata = publication.metadata
+        if "target_languages" not in metadata:
+            return ()
+        value = metadata["target_languages"]
+        if not isinstance(value, str) or not value:
+            raise TypeError("target_languages must be a comma-separated string")
+        return tuple(value.split(","))
 
 
 def _redact_chatbox_disclosure_text(text: str) -> str:

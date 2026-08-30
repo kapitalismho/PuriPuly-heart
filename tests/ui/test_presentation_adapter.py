@@ -341,3 +341,71 @@ async def test_presentation_adapter_awaits_ui_owned_shutdown_hooks() -> None:
     await adapter.close_oauth_runtime()
 
     assert events == ["after-launch", "star-runtime", "oauth-runtime"]
+
+
+def test_set_dashboard_languages_forwards_the_secondary_target() -> None:
+    from types import SimpleNamespace
+
+    from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+
+    calls: list[tuple] = []
+    extras: list[tuple] = []
+    dashboard = SimpleNamespace(
+        set_languages_from_codes=(
+            lambda source, target, peer_source, peer_target, peer_mode, secondary: calls.append(
+                (source, target, peer_source, peer_target, peer_mode, secondary)
+            )
+        ),
+        set_recent_languages=lambda *args: extras.append(("recent", args)),
+        set_peer_auto_detect_available=lambda value: extras.append(("peer-auto", value)),
+    )
+    adapter = FletUiPresentationAdapter(SimpleNamespace(view_dashboard=dashboard))
+
+    adapter.set_dashboard_languages(
+        source_language="ko",
+        target_language="en",
+        peer_source_language="ja",
+        peer_target_language="fr",
+        peer_source_mode="manual",
+        recent_source_languages=["ko"],
+        recent_target_languages=["en"],
+        peer_auto_detect_available=True,
+        secondary_target_language="ja",
+    )
+
+    assert calls == [("ko", "en", "ja", "fr", "manual", "ja")]
+    assert extras == [("recent", (["ko"], ["en"])), ("peer-auto", True)]
+
+
+def test_set_dashboard_languages_still_supports_a_dashboard_without_the_secondary() -> None:
+    from types import SimpleNamespace
+
+    from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+
+    calls: list[tuple] = []
+    extras: list[tuple] = []
+    dashboard = SimpleNamespace(
+        set_languages_from_codes=(
+            lambda source, target, peer_source, peer_target, peer_mode: calls.append(
+                (source, target, peer_source, peer_target, peer_mode)
+            )
+        ),
+        set_recent_languages=lambda *args: extras.append(("recent", args)),
+        set_peer_auto_detect_available=lambda value: extras.append(("peer-auto", value)),
+    )
+    adapter = FletUiPresentationAdapter(SimpleNamespace(view_dashboard=dashboard))
+
+    adapter.set_dashboard_languages(
+        source_language="ko",
+        target_language="en",
+        peer_source_language="ja",
+        peer_target_language="fr",
+        peer_source_mode="manual",
+        recent_source_languages=["ko"],
+        recent_target_languages=["en"],
+        peer_auto_detect_available=True,
+        secondary_target_language="ja",
+    )
+
+    assert calls == [("ko", "en", "ja", "fr", "manual")]
+    assert extras == [("recent", (["ko"], ["en"])), ("peer-auto", True)]

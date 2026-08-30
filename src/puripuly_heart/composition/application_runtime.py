@@ -1179,6 +1179,7 @@ def compose_application_runtime(
         presentation.set_dashboard_languages(
             source_language=languages.source_language,
             target_language=languages.target_language,
+            secondary_target_language=languages.secondary_target_language,
             peer_source_language=languages.peer_source_language,
             peer_target_language=languages.peer_target_language,
             peer_source_mode=languages.peer_source_mode,
@@ -1324,6 +1325,11 @@ def compose_application_runtime(
                         merged.intent.languages,
                         source_language=configuration.source_language,
                         target_language=configuration.target_language,
+                        secondary_target_language=(
+                            configuration.self_target_languages[1]
+                            if len(configuration.self_target_languages) > 1
+                            else ""
+                        ),
                         peer_source_language=configuration.peer_source_language,
                         peer_target_language=configuration.peer_target_language,
                     ),

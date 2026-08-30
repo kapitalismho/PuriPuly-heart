@@ -166,6 +166,10 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         canonical,
         intent=replace(
             canonical.intent,
+            languages=replace(
+                canonical.intent.languages,
+                secondary_target_language="en",
+            ),
             osc=replace(
                 canonical.intent.osc,
                 vrc_mic_intercept=True,
@@ -178,6 +182,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         peer_capture=True,
         captions=True,
     )
+    assert canonical_state.self_secondary_target_language == "en"
 
     view.project_osc_control_state(
         osc_control_presentation_state(
@@ -200,6 +205,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         "PuriPuly_ChatboxSource",
         "PuriPuly_SelfSrcLang",
         "PuriPuly_SelfDstLang",
+        "PuriPuly_SelfDstLang2",
         "PuriPuly_PeerSrcLang",
         "PuriPuly_PeerDstLang",
         "PuriPuly_SelfASR",

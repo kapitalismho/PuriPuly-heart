@@ -4013,6 +4013,7 @@ class SettingsView(ft.Column):
             "PuriPuly_PeerAuto",
             "PuriPuly_SelfSrcLang",
             "PuriPuly_SelfDstLang",
+            "PuriPuly_SelfDstLang2",
             "PuriPuly_PeerSrcLang",
             "PuriPuly_PeerDstLang",
         }:

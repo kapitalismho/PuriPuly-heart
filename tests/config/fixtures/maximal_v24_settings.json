@@ -26,6 +26,7 @@
   "languages": {
     "source_language": "ja",
     "target_language": "zh-CN",
+    "secondary_target_language": "ja",
     "peer_source_language": "fr",
     "peer_target_language": "es",
     "peer_source_mode": "auto",

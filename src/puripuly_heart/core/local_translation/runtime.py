@@ -29,7 +29,7 @@ from puripuly_heart.core.local_translation.runtime_profile import (
 )
 
 GEMMA_PROMPT_TEMPLATE_VERSION = "translation-prefix-v1"
-GEMMA_SLOT_COUNT = 2
+GEMMA_SLOT_COUNT = 3
 
 
 class ManagedGemmaRuntimeError(RuntimeError):
@@ -166,7 +166,7 @@ class ManagedGemmaRuntimeOwner:
     resource_fields = ("process", "transport", "prefix_identity", "active_backend")
     stop_ingress = "reject readiness and translation after close"
     shutdown_policy = "close HTTP transport, terminate server, then kill after bounded grace"
-    late_callback_rule = "serialized operations; two resident prefix slots; LRU eviction"
+    late_callback_rule = "serialized operations; three resident prefix slots; LRU eviction"
 
     def __init__(
         self,

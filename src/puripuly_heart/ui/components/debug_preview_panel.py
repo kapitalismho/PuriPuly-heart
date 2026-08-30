@@ -14,6 +14,8 @@ from puripuly_heart.ui.theme import (
 )
 
 DEBUG_PREVIEW_PANEL_DATA_KEY = "debug-preview-panel"
+DEBUG_PREVIEW_ACTION_ROW_HEIGHT = 44
+DEBUG_PREVIEW_POPOVER_MAX_HEIGHT = 620
 
 
 def _make_text_button(label: str, **kwargs) -> ft.TextButton:
@@ -35,37 +37,39 @@ class DebugPreviewPanel(ft.Container):
     def __init__(
         self,
         *,
-        on_brake_notice: Callable[[], None],
-        on_revoked_notice: Callable[[], None],
-        on_founder_letter: Callable[[], None],
-        on_pkce_failure: Callable[[], None],
+        on_display_turn_cycle: Callable[[], None],
+        on_peer_translation_eula: Callable[[], None],
         on_discord_auth: Callable[[], None],
         on_qq_auth: Callable[[], None],
         on_qq_auth_recoverable_error: Callable[[], None],
         on_qq_auth_translation_gated: Callable[[], None],
         on_discord_callback_page: Callable[[], None],
-        on_peer_translation_eula: Callable[[], None],
+        on_founder_letter: Callable[[], None],
         on_local_qwen_hallucination_modal: Callable[[], None],
-        on_talk_together_pass_invite_progress: Callable[[], None],
-        on_capture_fault_cycle: Callable[[], None],
-        on_stt_fault_cycle: Callable[[], None],
-        on_audio_fault_clear: Callable[[], None],
-        on_gpu_state_cycle: Callable[[], None],
         on_github_star_snackbar: Callable[[], None],
+        on_talk_together_pass_invite_progress: Callable[[], None],
         on_foundation_primitives: Callable[[], None],
-        on_stt_loading_button_cycle: Callable[[], None] | None = None,
         on_http_extension_form: Callable[[], None] | None = None,
+        on_brake_notice: Callable[[], None] | None = None,
+        on_revoked_notice: Callable[[], None] | None = None,
+        on_pkce_failure: Callable[[], None] | None = None,
+        on_capture_fault_cycle: Callable[[], None] | None = None,
+        on_stt_fault_cycle: Callable[[], None] | None = None,
+        on_audio_fault_clear: Callable[[], None] | None = None,
+        on_gpu_state_cycle: Callable[[], None] | None = None,
+        on_stt_loading_button_cycle: Callable[[], None] | None = None,
     ) -> None:
         actions = [
-            _PreviewAction("brake_notice", "debug_preview.brake_notice", on_brake_notice),
-            _PreviewAction("revoked_notice", "debug_preview.revoked_notice", on_revoked_notice),
             _PreviewAction(
-                "github_star_snackbar",
-                "debug_preview.github_star_snackbar",
-                on_github_star_snackbar,
+                "display_turn_cycle",
+                "debug_preview.display_turn_cycle",
+                on_display_turn_cycle,
             ),
-            _PreviewAction("founder_letter", "debug_preview.founder_letter", on_founder_letter),
-            _PreviewAction("pkce_failure", "debug_preview.pkce_failure", on_pkce_failure),
+            _PreviewAction(
+                "peer_translation_eula",
+                "debug_preview.peer_translation_eula",
+                on_peer_translation_eula,
+            ),
             _PreviewAction("discord_auth", "debug_preview.discord_auth", on_discord_auth),
             _PreviewAction("qq_auth", "debug_preview.qq_auth", on_qq_auth),
             _PreviewAction(
@@ -83,15 +87,16 @@ class DebugPreviewPanel(ft.Container):
                 "debug_preview.discord_callback_page",
                 on_discord_callback_page,
             ),
-            _PreviewAction(
-                "peer_translation_eula",
-                "debug_preview.peer_translation_eula",
-                on_peer_translation_eula,
-            ),
+            _PreviewAction("founder_letter", "debug_preview.founder_letter", on_founder_letter),
             _PreviewAction(
                 "local_qwen_hallucination_modal",
                 "debug_preview.local_qwen_hallucination_modal",
                 on_local_qwen_hallucination_modal,
+            ),
+            _PreviewAction(
+                "github_star_snackbar",
+                "debug_preview.github_star_snackbar",
+                on_github_star_snackbar,
             ),
             _PreviewAction(
                 "talk_together_pass_invite_progress",
@@ -99,49 +104,43 @@ class DebugPreviewPanel(ft.Container):
                 on_talk_together_pass_invite_progress,
             ),
             _PreviewAction(
+                "foundation_primitives",
+                "debug_preview.foundation_primitives",
+                on_foundation_primitives,
+            ),
+        ]
+        if on_http_extension_form is not None:
+            actions.append(
+                _PreviewAction(
+                    "http_extension_form",
+                    "debug_preview.http_extension_form",
+                    on_http_extension_form,
+                )
+            )
+        extended_callbacks = (
+            ("brake_notice", "debug_preview.brake_notice", on_brake_notice),
+            ("revoked_notice", "debug_preview.revoked_notice", on_revoked_notice),
+            ("pkce_failure", "debug_preview.pkce_failure", on_pkce_failure),
+            (
                 "capture_fault_cycle",
                 "debug_preview.capture_fault_cycle",
                 on_capture_fault_cycle,
             ),
-            _PreviewAction(
-                "stt_fault_cycle",
-                "debug_preview.stt_fault_cycle",
-                on_stt_fault_cycle,
+            ("stt_fault_cycle", "debug_preview.stt_fault_cycle", on_stt_fault_cycle),
+            ("audio_fault_clear", "debug_preview.audio_fault_clear", on_audio_fault_clear),
+            ("gpu_state_cycle", "debug_preview.gpu_state_cycle", on_gpu_state_cycle),
+            (
+                "stt_loading_button_cycle",
+                "debug_preview.stt_loading_button_cycle",
+                on_stt_loading_button_cycle,
             ),
-            _PreviewAction(
-                "audio_fault_clear",
-                "debug_preview.audio_fault_clear",
-                on_audio_fault_clear,
-            ),
-            _PreviewAction(
-                "gpu_state_cycle",
-                "debug_preview.gpu_state_cycle",
-                on_gpu_state_cycle,
-            ),
-        ]
-        if on_stt_loading_button_cycle is not None:
-            actions.append(
-                _PreviewAction(
-                    "stt_loading_button_cycle",
-                    "debug_preview.stt_loading_button_cycle",
-                    on_stt_loading_button_cycle,
-                )
-            )
-        actions.append(
-            _PreviewAction(
-                "foundation_primitives",
-                "debug_preview.foundation_primitives",
-                on_foundation_primitives,
-            )
-        )
-        actions.append(
-            _PreviewAction(
-                "http_extension_form",
-                "debug_preview.http_extension_form",
-                on_http_extension_form,
-            )
         )
         self._actions = tuple(actions)
+        self._extended_actions = tuple(
+            _PreviewAction(key, label_key, callback)
+            for key, label_key, callback in extended_callbacks
+            if callback is not None
+        )
         self._toggle_button = _make_text_button(
             t("debug_preview.button"),
             tooltip=t("debug_preview.tooltip"),
@@ -151,16 +150,43 @@ class DebugPreviewPanel(ft.Container):
         self._action_buttons = {
             action.key: self._build_action_button(action) for action in self._actions
         }
+        self._extended_action_buttons = {
+            action.key: self._build_action_button(action) for action in self._extended_actions
+        }
+        self._extended_actions_container = ft.Container(
+            visible=False,
+            content=ft.Column(
+                controls=list(self._extended_action_buttons.values()),
+                spacing=2,
+                tight=True,
+            ),
+        )
+        self._extended_toggle_button = (
+            _make_text_button(
+                t("debug_preview.more_diagnostics"),
+                on_click=self._toggle_extended_actions,
+                style=self._action_style(),
+            )
+            if self._extended_actions
+            else None
+        )
+        popover_controls = list(self._action_buttons.values())
+        if self._extended_toggle_button is not None:
+            popover_controls.extend(
+                (self._extended_toggle_button, self._extended_actions_container)
+            )
+        self._popover_column = ft.Column(
+            controls=popover_controls,
+            spacing=2,
+            scroll=ft.ScrollMode.AUTO,
+            height=self._popover_height(expanded=False),
+        )
         self._popover = ft.Container(
             visible=False,
             bgcolor=COLOR_SURFACE,
             border_radius=14,
             padding=ft.Padding.symmetric(horizontal=8, vertical=8),
-            content=ft.Column(
-                controls=list(self._action_buttons.values()),
-                spacing=2,
-                tight=True,
-            ),
+            content=self._popover_column,
         )
 
         super().__init__(
@@ -173,6 +199,17 @@ class DebugPreviewPanel(ft.Container):
                 horizontal_alignment=ft.CrossAxisAlignment.END,
                 tight=True,
             ),
+        )
+
+    def _popover_height(self, *, expanded: bool) -> int:
+        row_count = len(self._actions)
+        if self._extended_actions:
+            row_count += 1
+            if expanded:
+                row_count += len(self._extended_actions)
+        return min(
+            row_count * DEBUG_PREVIEW_ACTION_ROW_HEIGHT,
+            DEBUG_PREVIEW_POPOVER_MAX_HEIGHT,
         )
 
     def _toggle_style(self) -> ft.ButtonStyle:
@@ -214,6 +251,12 @@ class DebugPreviewPanel(ft.Container):
         self._popover.visible = not self._popover.visible
         self._update_if_mounted()
 
+    def _toggle_extended_actions(self, _event) -> None:
+        expanded = not self._extended_actions_container.visible
+        self._extended_actions_container.visible = expanded
+        self._popover_column.height = self._popover_height(expanded=expanded)
+        self._update_if_mounted()
+
     def _invoke(self, callback: Callable[[], None]) -> None:
         callback()
 
@@ -222,6 +265,16 @@ class DebugPreviewPanel(ft.Container):
         self._toggle_button.tooltip = t("debug_preview.tooltip")
         for action in self._actions:
             _set_text_button_label(self._action_buttons[action.key], t(action.label_key))
+        if self._extended_toggle_button is not None:
+            _set_text_button_label(
+                self._extended_toggle_button,
+                t("debug_preview.more_diagnostics"),
+            )
+        for action in self._extended_actions:
+            _set_text_button_label(
+                self._extended_action_buttons[action.key],
+                t(action.label_key),
+            )
         self._update_if_mounted()
 
     def _is_mounted(self) -> bool:

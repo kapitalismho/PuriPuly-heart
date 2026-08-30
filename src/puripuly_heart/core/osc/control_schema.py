@@ -42,6 +42,7 @@ INTEGER_CONTROLS: Final[Mapping[str, str]] = MappingProxyType(
     {
         "PuriPuly_SelfSrcLang": "languages.source_language",
         "PuriPuly_SelfDstLang": "languages.target_language",
+        "PuriPuly_SelfDstLang2": "languages.secondary_target_language",
         "PuriPuly_PeerSrcLang": "languages.peer_source_language",
         "PuriPuly_PeerDstLang": "languages.peer_target_language",
         "PuriPuly_SelfASR": "stt.provider",
@@ -163,6 +164,10 @@ if {code for _identifier, code in _LANGUAGE_ABI_ENTRIES} != set(SUPPORTED_LANGUA
     raise RuntimeError("OSC language ABI must cover SUPPORTED_LANGUAGES exactly")
 
 LANGUAGE_IDS: Final[Mapping[int, str]] = MappingProxyType(dict(_LANGUAGE_ABI_ENTRIES))
+SECONDARY_LANGUAGE_NONE_ID: Final = 255
+SECONDARY_LANGUAGE_IDS: Final[Mapping[int, str]] = MappingProxyType(
+    {**LANGUAGE_IDS, SECONDARY_LANGUAGE_NONE_ID: ""}
+)
 ASR_ID_BY_PROVIDER: Final[Mapping[str, int]] = MappingProxyType(
     {
         **{value: identifier for identifier, value in ASR_IDS.items()},
@@ -190,10 +195,14 @@ FALLBACK_ID_BY_ALIAS: Final[Mapping[str, int]] = MappingProxyType(
 LANGUAGE_ID_BY_CODE: Final[Mapping[str, int]] = MappingProxyType(
     {value: identifier for identifier, value in LANGUAGE_IDS.items()}
 )
+SECONDARY_LANGUAGE_ID_BY_CODE: Final[Mapping[str, int]] = MappingProxyType(
+    {value: identifier for identifier, value in SECONDARY_LANGUAGE_IDS.items()}
+)
 OSC_INTEGER_REGISTRIES: Final[Mapping[str, Mapping[int, str]]] = MappingProxyType(
     {
         "PuriPuly_SelfSrcLang": LANGUAGE_IDS,
         "PuriPuly_SelfDstLang": LANGUAGE_IDS,
+        "PuriPuly_SelfDstLang2": SECONDARY_LANGUAGE_IDS,
         "PuriPuly_PeerSrcLang": LANGUAGE_IDS,
         "PuriPuly_PeerDstLang": LANGUAGE_IDS,
         "PuriPuly_SelfASR": ASR_IDS,
@@ -252,6 +261,9 @@ __all__ = [
     "OSC_PARAMETER_ADDRESS_PREFIX",
     "OSC_PARAMETER_DEFINITIONS",
     "OSC_PARAMETER_PREFIX",
+    "SECONDARY_LANGUAGE_IDS",
+    "SECONDARY_LANGUAGE_ID_BY_CODE",
+    "SECONDARY_LANGUAGE_NONE_ID",
     "OscParameterDefinition",
     "OscParameterType",
     "TRANSLATION_MODEL_IDS",

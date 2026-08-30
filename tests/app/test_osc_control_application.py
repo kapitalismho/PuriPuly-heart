@@ -327,6 +327,80 @@ async def test_set_languages_applies_when_any_value_differs() -> None:
 
 
 @pytest.mark.asyncio
+async def test_primary_osc_target_change_clears_an_equal_secondary_target() -> None:
+    current = _with_languages(
+        AppSettingsVNext(),
+        target_language="en",
+        secondary_target_language="fr",
+    )
+
+    async def apply_settings(settings: object) -> object:
+        nonlocal current
+        assert isinstance(settings, AppSettingsVNext)
+        current = settings
+        return True
+
+    application = SettingsBackedOscControlApplication(
+        settings_provider=lambda: current,
+        apply_settings=apply_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
+    )
+
+    result = await application.set_languages(
+        self_source="ko",
+        self_target="fr",
+        peer_source="en",
+        peer_target="ko",
+    )
+
+    assert result is True
+    assert current.intent.languages.target_language == "fr"
+    assert current.intent.languages.secondary_target_language == ""
+
+
+@pytest.mark.asyncio
+async def test_primary_osc_target_change_preserves_a_distinct_secondary_target() -> None:
+    current = _with_languages(
+        AppSettingsVNext(),
+        target_language="en",
+        secondary_target_language="ja",
+    )
+
+    async def apply_settings(settings: object) -> object:
+        nonlocal current
+        assert isinstance(settings, AppSettingsVNext)
+        current = settings
+        return True
+
+    application = SettingsBackedOscControlApplication(
+        settings_provider=lambda: current,
+        apply_settings=apply_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
+    )
+
+    result = await application.set_languages(
+        self_source="ko",
+        self_target="fr",
+        peer_source="en",
+        peer_target="ko",
+    )
+
+    assert result is True
+    assert current.intent.languages.target_language == "fr"
+    assert current.intent.languages.secondary_target_language == "ja"
+
+    result = await application.set_secondary_target_language("de")
+
+    assert result is True
+    assert current.intent.languages.secondary_target_language == "de"
+
+    result = await application.set_secondary_target_language("fr")
+
+    assert result is True
+    assert current.intent.languages.secondary_target_language == ""
+
+
+@pytest.mark.asyncio
 async def test_asr_controls_skip_apply_when_provider_matches() -> None:
     current = _with_peer_stt_provider(
         _with_stt_provider(AppSettingsVNext(), "deepgram"),

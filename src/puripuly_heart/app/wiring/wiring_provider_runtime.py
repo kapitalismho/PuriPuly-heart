@@ -81,6 +81,14 @@ def project_translation_runtime_settings_from_vnext(
     return TranslationRuntimeSettingsValues(
         source_language=languages.source_language,
         target_language=languages.target_language,
+        self_target_languages=tuple(
+            language
+            for language in (
+                languages.target_language,
+                languages.secondary_target_language,
+            )
+            if language
+        ),
         peer_source_language=languages.peer_source_language,
         peer_target_language=languages.peer_target_language,
         system_prompt=settings.intent.prompts.system_prompt,

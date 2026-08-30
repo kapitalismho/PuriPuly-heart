@@ -305,10 +305,42 @@ class OutputRuntime:
         translation_text: str | None,
         include_source: bool,
         publication_kind: OutputPublicationKind | None = None,
+        presentation_revision: int = 0,
+        turn_generation: int | None = None,
+        turn_order: int | None = None,
+        target_indexes: tuple[int, ...] = (),
+        target_languages: tuple[str, ...] = (),
     ) -> OutputPublicationResult:
+        message = OSCMessage(
+            utterance_id=publication_id,
+            text=self._merge_chatbox_text(
+                transcript_text=transcript_text,
+                translation_text=translation_text,
+                include_source=include_source,
+            ),
+            created_at=self.clock.now(),
+            turn_generation=turn_generation,
+            turn_order=turn_order,
+            presentation_revision=presentation_revision,
+            target_indexes=target_indexes,
+            target_languages=target_languages,
+        )
         publication_kind = publication_kind or (
             PUBLICATION_KIND_PEER_SUBTITLE if channel == "peer" else PUBLICATION_KIND_SELF_UTTERANCE
         )
+        publication_metadata: dict[str, str | int | float | bool | None] = {
+            "presentation_revision": presentation_revision,
+        }
+        if turn_generation is not None:
+            publication_metadata.update(
+                turn_generation=turn_generation,
+                turn_order=turn_order,
+            )
+        if target_indexes:
+            publication_metadata.update(
+                target_indexes=",".join(str(index) for index in target_indexes),
+                target_languages=",".join(target_languages),
+            )
         if self._state != "open":
             return self._observe_result(
                 status=OUTPUT_ROUTING_DECISION_SKIPPED,
@@ -318,7 +350,7 @@ class OutputRuntime:
                 reason=(
                     "output_runtime_closed" if self._state == "closed" else "output_runtime_closing"
                 ),
-                metadata={"channel": channel, "state": self._state},
+                metadata={"channel": channel, "state": self._state, **publication_metadata},
             )
         if self.chatbox_is_denied(channel):
             return self._observe_result(
@@ -327,29 +359,29 @@ class OutputRuntime:
                 publication_id=str(publication_id),
                 publication_kind=PUBLICATION_KIND_PEER_SUBTITLE,
                 reason="peer_chatbox_denied",
-                metadata={"channel": "peer", "attempted_route": OUTPUT_ROUTE_SELF_CHATBOX},
+                metadata={
+                    "channel": "peer",
+                    "attempted_route": OUTPUT_ROUTE_SELF_CHATBOX,
+                    **publication_metadata,
+                },
             )
         if not self.chatbox_is_eligible(channel):
             raise ValueError("unknown chatbox publication channel")
 
-        publication_key = (OUTPUT_ROUTE_SELF_CHATBOX, str(publication_id))
+        publication_key = (
+            OUTPUT_ROUTE_SELF_CHATBOX,
+            f"{publication_id}:{presentation_revision}",
+        )
         duplicate = self._duplicate_publication_result(
             publication_key=publication_key,
             publication_kind=publication_kind,
             channel=channel,
+            logical_publication_id=str(publication_id),
+            metadata=publication_metadata,
         )
         if duplicate is not None:
             return duplicate
 
-        message = OSCMessage(
-            utterance_id=publication_id,
-            text=self._merge_chatbox_text(
-                transcript_text=transcript_text,
-                translation_text=translation_text,
-                include_source=include_source,
-            ),
-            created_at=self.clock.now(),
-        )
         try:
             self.chatbox.enqueue(message)
         except Exception as exc:
@@ -359,7 +391,11 @@ class OutputRuntime:
                 publication_id=str(publication_id),
                 publication_kind=publication_kind,
                 reason="destination_publish_failed",
-                metadata={"channel": channel, "error_type": type(exc).__name__},
+                metadata={
+                    "channel": channel,
+                    "error_type": type(exc).__name__,
+                    **publication_metadata,
+                },
             )
         self._remember_delivered_publication(publication_key)
         self.set_self_chatbox_typing_reason(SELF_SPEECH_TYPING_REASON, False)
@@ -369,7 +405,7 @@ class OutputRuntime:
             publication_id=str(publication_id),
             publication_kind=publication_kind,
             reason=None,
-            metadata={"channel": channel},
+            metadata={"channel": channel, **publication_metadata},
             message=message,
         )
 
@@ -881,6 +917,8 @@ class OutputRuntime:
         publication_key: tuple[OutputRoute, str],
         publication_kind: OutputPublicationKind,
         channel: ChannelId | str | None,
+        logical_publication_id: str | None = None,
+        metadata: dict[str, str | int | float | bool | None] | None = None,
     ) -> OutputPublicationResult | None:
         if (
             publication_key not in self._delivered_publications
@@ -888,13 +926,16 @@ class OutputRuntime:
         ):
             return None
         route, publication_id = publication_key
+        decision_metadata: dict[str, str | int | float | bool | None] = {"channel": channel}
+        if metadata is not None:
+            decision_metadata.update(metadata)
         return self._observe_result(
             status=OUTPUT_ROUTING_DECISION_SKIPPED,
             route=route,
-            publication_id=publication_id,
+            publication_id=logical_publication_id or publication_id,
             publication_kind=publication_kind,
             reason="duplicate_publication",
-            metadata={"channel": channel},
+            metadata=decision_metadata,
         )
 
     def _remember_delivered_publication(

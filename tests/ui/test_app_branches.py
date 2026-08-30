@@ -1262,27 +1262,33 @@ def test_translator_app_mounts_debug_preview_when_enabled(
     assert app.debug_ui_preview is True
     assert app.debug_preview_panel is not None
     assert set(seen["callbacks"]) == {
-        "on_brake_notice",
-        "on_revoked_notice",
-        "on_github_star_snackbar",
-        "on_founder_letter",
-        "on_pkce_failure",
+        "on_display_turn_cycle",
+        "on_peer_translation_eula",
         "on_discord_auth",
         "on_qq_auth",
         "on_qq_auth_recoverable_error",
         "on_qq_auth_translation_gated",
         "on_discord_callback_page",
-        "on_peer_translation_eula",
+        "on_founder_letter",
         "on_local_qwen_hallucination_modal",
+        "on_github_star_snackbar",
         "on_talk_together_pass_invite_progress",
+        "on_foundation_primitives",
+        "on_http_extension_form",
+        "on_brake_notice",
+        "on_revoked_notice",
+        "on_pkce_failure",
         "on_capture_fault_cycle",
         "on_stt_fault_cycle",
         "on_audio_fault_clear",
         "on_gpu_state_cycle",
-        "on_foundation_primitives",
         "on_stt_loading_button_cycle",
-        "on_http_extension_form",
     }
+    display_turn = seen["callbacks"]["on_display_turn_cycle"]
+    assert getattr(display_turn, "__self__", None) is app
+    assert (
+        getattr(display_turn, "__func__", None) is TranslatorApp._cycle_debug_preview_display_turn
+    )
     discord_callback = seen["callbacks"]["on_discord_auth"]
     assert getattr(discord_callback, "__self__", None) is app
     assert getattr(discord_callback, "__func__", None) is TranslatorApp._preview_discord_auth
@@ -1318,6 +1324,38 @@ def test_translator_app_mounts_debug_preview_when_enabled(
     root = page.added[0]
     assert isinstance(root.content, ft.Stack)
     assert root.content.controls[-1] is app.debug_preview_panel
+
+
+def test_debug_preview_display_turn_cycles_source_and_translation_examples() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    displayed: list[tuple[str, str, str]] = []
+    app.view_dashboard = SimpleNamespace(
+        set_display_text=lambda text, *, language_code: displayed.append(
+            ("source", language_code, text)
+        ),
+        set_display_translation_text=lambda text, *, language_code: displayed.append(
+            ("translation", language_code, text)
+        ),
+    )
+
+    for _ in range(4):
+        app._cycle_debug_preview_display_turn()
+
+    assert displayed == [
+        ("source", "ko", "오늘 같이 뭐 하고 놀까?"),
+        ("translation", "en", "What should we do together today?"),
+        (
+            "source",
+            "ko",
+            "아까 말한 그 월드 이름이 뭐였지? 다시 가보고 싶은데 검색해도 안 나오더라.",
+        ),
+        (
+            "translation",
+            "en",
+            "What was the name of that world you mentioned earlier? "
+            "I want to visit again but searching turns up nothing.",
+        ),
+    ]
 
 
 def test_debug_preview_http_extension_form_writes_demo_extension_and_selects_it(

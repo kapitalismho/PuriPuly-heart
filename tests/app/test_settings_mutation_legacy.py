@@ -10,6 +10,7 @@ from puripuly_heart.app.services.settings_mutation_legacy import (
     ORDER24_UI_PROMPT_CLIPBOARD_STATE_SETTINGS_PATHS,
     SettingsPathMutationValidator,
     SettingsPathPatch,
+    build_stt_language_audio_settings_path_patch,
     build_translation_provider_settings_path_patch,
 )
 
@@ -67,12 +68,28 @@ def test_order21_patch_carries_custom_http_identity_fields() -> None:
     assert patch["intent.translation.previous_llm_model"] == "gemma4_26b_31b"
 
 
+def test_order22_patch_carries_a_secondary_only_target_change() -> None:
+    previous = AppSettingsVNext()
+    next_settings = replace(
+        previous,
+        intent=replace(
+            previous.intent,
+            languages=replace(previous.intent.languages, secondary_target_language="ja"),
+        ),
+    )
+
+    patch = build_stt_language_audio_settings_path_patch(previous, next_settings)
+
+    assert patch == {"intent.languages.secondary_target_language": "ja"}
+
+
 def test_order22_stt_language_audio_patch_records_initial_covered_surface_list() -> None:
     assert set(ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS) == {
         "intent.stt.provider",
         "intent.peer_stt.provider",
         "intent.languages.source_language",
         "intent.languages.target_language",
+        "intent.languages.secondary_target_language",
         "intent.languages.peer_source_language",
         "intent.languages.peer_target_language",
         "intent.languages.peer_source_mode",
@@ -377,6 +394,7 @@ async def test_order22_path_validator_accepts_only_stt_language_audio_paths() ->
             "intent.stt.provider": "soniox",
             "intent.peer_stt.provider": "local_qwen",
             "intent.languages.source_language": "ja",
+            "intent.languages.secondary_target_language": "fr",
             "intent.audio.input_device": "Headset Mic",
             "intent.desktop_audio.vad_hangover_ms": 900,
             "intent.stt.soniox.trailing_silence_ms": 150,

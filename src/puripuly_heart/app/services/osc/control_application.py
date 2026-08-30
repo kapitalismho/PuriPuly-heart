@@ -88,6 +88,20 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
             )
         )
 
+    async def set_secondary_target_language(self, language: str) -> object:
+        current = self.settings_provider()
+        if current is None:
+            raise RuntimeError("OSC control settings are unavailable")
+        normalized = "" if language == current.intent.languages.target_language else language
+        if current.intent.languages.secondary_target_language == normalized:
+            return True
+        return await self._apply_settings(
+            lambda settings: _with_languages(
+                settings,
+                secondary_target_language=normalized,
+            )
+        )
+
     async def set_peer_auto_detect(self, enabled: bool) -> object:
         current = self.settings_provider()
         if current is not None and current.intent.languages.peer_source_mode == (
@@ -224,10 +238,14 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         peer_source: str,
         peer_target: str,
     ) -> AppSettingsVNext:
+        secondary_target_language = settings.intent.languages.secondary_target_language
+        if secondary_target_language == self_target:
+            secondary_target_language = ""
         return _with_languages(
             settings,
             source_language=self_source,
             target_language=self_target,
+            secondary_target_language=secondary_target_language,
             peer_source_language=peer_source,
             peer_target_language=peer_target,
         )
@@ -312,6 +330,7 @@ def _settings_control_values_match(actual: object | None, expected: object) -> b
     fields = (
         ("intent.languages", "source_language"),
         ("intent.languages", "target_language"),
+        ("intent.languages", "secondary_target_language"),
         ("intent.languages", "peer_source_language"),
         ("intent.languages", "peer_target_language"),
         ("intent.languages", "peer_source_mode"),
