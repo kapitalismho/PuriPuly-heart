@@ -1,11 +1,34 @@
 import copy
 import hashlib
 
+import pytest
+
 from experiments.psem_sortformer_adaptation_depth import preflight
 from experiments.psem_sortformer_adaptation_depth.preflight import (
     build_preflight,
     resolve_paths,
 )
+
+
+def test_material_execution_guard_fails_closed(monkeypatch) -> None:
+    with pytest.raises(preflight.PreflightError, match="blocked_pending_lean_runner_alignment"):
+        preflight.require_material_execution_ready()
+
+    monkeypatch.setattr(preflight, "load_json", lambda _path: {})
+    with pytest.raises(preflight.PreflightError, match="unavailable"):
+        preflight.require_material_execution_ready()
+
+    monkeypatch.setattr(
+        preflight,
+        "load_json",
+        lambda _path: {
+            "material_execution": {
+                "status": "ready",
+                "required_status_for_material_execution": "ready",
+            }
+        },
+    )
+    preflight.require_material_execution_ready()
 
 
 def test_static_preflight_passes_without_external_assets(monkeypatch) -> None:
@@ -28,6 +51,7 @@ def test_runtime_preflight_fails_closed_without_external_assets(monkeypatch) -> 
     receipt = build_preflight(resolve_paths())
     assert receipt["ready_for_runtime_audit"] is False
     failed = {row["id"] for row in receipt["checks"] if not row["passed"]}
+    assert "runtime.material_execution_authorized" in failed
     assert "runtime.checkpoint_path" in failed
     assert "runtime.corpus_root" in failed
     assert "runtime.reference_root" in failed

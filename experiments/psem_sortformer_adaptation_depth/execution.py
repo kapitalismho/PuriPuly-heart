@@ -36,6 +36,7 @@ from experiments.psem_sortformer_adaptation_depth.preflight import (
     REPOSITORY_ROOT,
     SOURCE_MANIFEST_PATH,
     canonical_sha256,
+    require_material_execution_ready,
 )
 from experiments.psem_sortformer_adaptation_depth.protocol import (
     _eval_registry_marker,
@@ -741,6 +742,7 @@ def run_training_arm(
     output_root: Path,
     device: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    require_material_execution_ready()
     assert_clean_candidate()
     rows = load_sampling_rows(sampling_manifest)
     sessions = load_training_sessions(corpus_root, reference_root)
@@ -949,6 +951,7 @@ def run_canary_arm(
     staged_execution_receipt: Mapping[str, Any] | None = None,
     staged_dev_results: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    require_material_execution_ready()
     if _eval_registry_marker().exists():
         raise ExecutionError("runtime canaries are sealed after EVAL opened")
     if arm not in {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"}:
@@ -1034,6 +1037,7 @@ def run_overfit_arm_result(
     staged_execution_receipt: Mapping[str, Any] | None = None,
     staged_dev_results: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    require_material_execution_ready()
     if _eval_registry_marker().exists():
         raise ExecutionError("overfit canaries are sealed after EVAL opened")
     from experiments.psem_sortformer_adaptation_depth.protocol import (
@@ -1107,7 +1111,11 @@ def run_memory_fit_preflight(
     corpus_root: Path,
     reference_root: Path,
     sampling_manifest: Path,
-    class_weight_receipt: Mapping[str, Any],
+    include_ta: bool,
+    hourly_price_usd: float,
+    hourly_price_source: str,
+    required_inference_gpu_seconds: float,
+    conditional_ta_inference_gpu_seconds: float,
     device: str,
 ) -> dict[str, Any]:
     import gc
@@ -1115,43 +1123,98 @@ def run_memory_fit_preflight(
 
     from experiments.psem_sortformer_adaptation_depth.runtime_audit import (
         GRADIENT_CLIP_NORM,
-        build_optimizer,
+        _build_memory_fit_optimizer,
     )
     from experiments.psem_sortformer_adaptation_depth.training import (
         GRADIENT_ACCUMULATION_STEPS,
         MICRO_BATCH_SIZE,
         ClassWeights,
-        build_manifest_class_weight_receipt,
         forward_batch,
     )
 
-    if _eval_registry_marker().exists():
-        raise ExecutionError("memory-fit preflight is sealed after EVAL opened")
-    assert_clean_candidate()
+    memory_fit_started = time.perf_counter()
+    hourly_price_source = hourly_price_source.strip()
+    if not np.isfinite(hourly_price_usd) or hourly_price_usd <= 0:
+        raise ExecutionError("resource estimate hourly price must be finite and positive")
+    if not hourly_price_source:
+        raise ExecutionError("resource estimate hourly price source must be non-empty")
+    if not np.isfinite(required_inference_gpu_seconds) or required_inference_gpu_seconds < 0:
+        raise ExecutionError("required inference GPU seconds must be finite and non-negative")
+    if (
+        not np.isfinite(conditional_ta_inference_gpu_seconds)
+        or conditional_ta_inference_gpu_seconds < 0
+    ):
+        raise ExecutionError("conditional TA inference GPU seconds must be finite and non-negative")
+    if not include_ta and conditional_ta_inference_gpu_seconds != 0:
+        raise ExecutionError("conditional TA inference seconds require --include-ta")
+
+    runtime_contract = json.loads(
+        (PACKAGE_ROOT / "runtime_contract.json").read_text(encoding="utf-8")
+    )
+    optimization_contract = runtime_contract["optimization_execution"]
+    memory_fit_contract = runtime_contract["memory_fit"]
+    short_smoke_steps = optimization_contract["short_smoke_maximum_optimizer_steps"]
+    official_steps = optimization_contract["official_maximum_optimizer_steps"]
+    optimizer_steps = memory_fit_contract["optimizer_steps_per_selected_arm"]
+    default_arms = tuple(memory_fit_contract["default_arms"])
+    conditional_arm = memory_fit_contract["conditional_arm"]
+    selected_arms = (*default_arms, conditional_arm) if include_ta else default_arms
+    if (
+        not isinstance(short_smoke_steps, int)
+        or isinstance(short_smoke_steps, bool)
+        or short_smoke_steps <= 0
+        or not isinstance(official_steps, int)
+        or isinstance(official_steps, bool)
+        or official_steps <= 0
+        or optimizer_steps != 2
+        or memory_fit_contract["warmup_optimizer_steps"] != 1
+        or memory_fit_contract["timed_optimizer_step_index"] != 2
+        or memory_fit_contract["probe_rows_consumed"] != GRADIENT_ACCUMULATION_STEPS
+    ):
+        raise ExecutionError("optional resource estimator contract is invalid")
+    if (
+        memory_fit_contract["optional"] is not True
+        or memory_fit_contract["material_training_authorization"] is not False
+        or memory_fit_contract["checkpoint_persistence"] is not False
+        or memory_fit_contract["timing_statistic"] != "single_second_step"
+        or default_arms != ("H-HEAD", "T2-TOP")
+        or conditional_arm != "TA-ALL-TEMPORAL"
+    ):
+        raise ExecutionError("optional resource estimator topology is invalid")
+
     training_device = torch.device(device)
     if (
         not torch.cuda.is_available()
         or torch.cuda.device_count() != 1
         or training_device.type != "cuda"
     ):
-        raise ExecutionError("memory-fit preflight requires exactly one CUDA accelerator")
+        raise ExecutionError("optional resource estimate requires exactly one CUDA accelerator")
 
     rows = load_sampling_rows(sampling_manifest)
     sessions = load_training_sessions(corpus_root, reference_root)
-    manifest_validation = validate_sampling_manifest(sampling_manifest, sessions)
-    expected_class_weights = build_manifest_class_weight_receipt(rows, sessions, sampling_manifest)
-    if dict(class_weight_receipt) != expected_class_weights:
-        raise ExecutionError("memory-fit class weights differ from the shared TRAIN manifest")
-    class_weights = ClassWeights(
-        replacement_positive=float(class_weight_receipt["replacement_positive_weight"]),
-        anchor_positive=float(class_weight_receipt["anchor_positive_weight"]),
-    )
     probe_rows = [row for row in rows if row.get("epoch") == 1][:GRADIENT_ACCUMULATION_STEPS]
     if len(probe_rows) != GRADIENT_ACCUMULATION_STEPS or [
         row.get("epoch_index") for row in probe_rows
     ] != list(range(GRADIENT_ACCUMULATION_STEPS)):
-        raise ExecutionError("memory-fit inputs differ from the first optimizer step")
-    rows_by_id = {str(row["row_id"]): row for row in rows}
+        raise ExecutionError("resource estimate requires 16 ordered epoch-1 probe rows")
+    row_ids = [row.get("row_id") for row in probe_rows]
+    if any(not isinstance(row_id, str) for row_id in row_ids) or len(set(row_ids)) != len(
+        probe_rows
+    ):
+        raise ExecutionError("resource estimate probe row identities are invalid")
+    sampling_manifest_sha256 = sha256_file(sampling_manifest)
+    probe_validation = {
+        "artifact_role": "optional_resource_probe_validation",
+        "passed": True,
+        "manifest_sha256": sampling_manifest_sha256,
+        "source_manifest_row_count": len(rows),
+        "consumed_row_count": len(probe_rows),
+        "epoch": 1,
+        "epoch_indices": list(range(GRADIENT_ACCUMULATION_STEPS)),
+        "material_training_authorization": False,
+    }
+    class_weights = ClassWeights(replacement_positive=1.0, anchor_positive=1.0)
+    rows_by_id = {str(row["row_id"]): row for row in probe_rows}
     input_started = time.perf_counter()
     examples = [
         prepare_training_example(
@@ -1160,7 +1223,7 @@ def run_memory_fit_preflight(
             corpus_root,
             str(row["corpus"]),
             manifest_path=sampling_manifest,
-            manifest_validation=manifest_validation,
+            manifest_validation=probe_validation,
             manifest_rows_by_id=rows_by_id,
         )
         for row in probe_rows
@@ -1171,12 +1234,14 @@ def run_memory_fit_preflight(
     total_memory_bytes = int(properties.total_memory)
     arm_results: list[dict[str, Any]] = []
     runtime_identity_sha256s: set[str] = set()
-    for arm in ("H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"):
+    for arm in selected_arms:
         model = None
         optimizer = None
         result = None
         loss = None
         gradient_norm = None
+        optimizer_step_seconds_samples: list[float] = []
+        arm_started = time.perf_counter()
         gc.collect()
         torch.cuda.empty_cache()
         seed_runtime(7301)
@@ -1188,31 +1253,35 @@ def run_memory_fit_preflight(
                 training_device,
             )
             parameter_policy = apply_parameter_policy(model, arm)
-            optimizer = build_optimizer(model, arm)
+            optimizer = _build_memory_fit_optimizer(model, arm)
             model.train()
-            optimizer.zero_grad(set_to_none=True)
             torch.cuda.synchronize(training_device)
             torch.cuda.reset_peak_memory_stats(training_device)
-            step_started = time.perf_counter()
-            for example in examples:
-                result = forward_batch(model, (example,), class_weights)
-                loss = result.losses["total"]
-                if loss.ndim != 0 or not bool(torch.isfinite(loss)):
-                    raise ExecutionError("memory-fit forward produced a non-finite scalar loss")
-                (loss / GRADIENT_ACCUMULATION_STEPS).backward()
-            gradient_norm = torch.nn.utils.clip_grad_norm_(
-                [parameter for parameter in model.parameters() if parameter.requires_grad],
-                GRADIENT_CLIP_NORM,
-            )
-            if not bool(torch.isfinite(gradient_norm)):
-                raise ExecutionError("memory-fit backward produced a non-finite gradient norm")
-            optimizer.step()
-            torch.cuda.synchronize(training_device)
-            optimizer_step_seconds = time.perf_counter() - step_started
+            for _ in range(optimizer_steps):
+                optimizer.zero_grad(set_to_none=True)
+                step_started = time.perf_counter()
+                for example in examples:
+                    result = forward_batch(model, (example,), class_weights)
+                    loss = result.losses["total"]
+                    if loss.ndim != 0 or not bool(torch.isfinite(loss)):
+                        raise ExecutionError("resource estimate forward produced a non-finite loss")
+                    (loss / GRADIENT_ACCUMULATION_STEPS).backward()
+                gradient_norm = torch.nn.utils.clip_grad_norm_(
+                    [parameter for parameter in model.parameters() if parameter.requires_grad],
+                    GRADIENT_CLIP_NORM,
+                )
+                if not bool(torch.isfinite(gradient_norm)):
+                    raise ExecutionError(
+                        "resource estimate backward produced a non-finite gradient"
+                    )
+                optimizer.step()
+                torch.cuda.synchronize(training_device)
+                optimizer_step_seconds_samples.append(time.perf_counter() - step_started)
+            optimizer_step_seconds = optimizer_step_seconds_samples[1]
             peak_allocated_bytes = int(torch.cuda.max_memory_allocated(training_device))
             peak_reserved_bytes = int(torch.cuda.max_memory_reserved(training_device))
             if peak_allocated_bytes <= 0 or peak_reserved_bytes < peak_allocated_bytes:
-                raise ExecutionError("memory-fit CUDA accounting is invalid")
+                raise ExecutionError("resource estimate CUDA accounting is invalid")
             runtime_identity_sha256 = canonical_sha256(runtime_identity)
             runtime_identity_sha256s.add(runtime_identity_sha256)
             arm_results.append(
@@ -1225,8 +1294,12 @@ def run_memory_fit_preflight(
                     "device_memory_headroom_fraction": (
                         (total_memory_bytes - peak_reserved_bytes) / total_memory_bytes
                     ),
+                    "warmup_optimizer_step_seconds": optimizer_step_seconds_samples[0],
                     "optimizer_step_seconds": optimizer_step_seconds,
+                    "timed_optimizer_step_index": 2,
+                    "timing_statistic": "single_second_step",
                     "micro_batch_seconds": optimizer_step_seconds / GRADIENT_ACCUMULATION_STEPS,
+                    "arm_wall_clock_seconds": time.perf_counter() - arm_started,
                     "total_parameters": sum(parameter.numel() for parameter in model.parameters()),
                     "trainable_parameters": sum(
                         parameter.numel()
@@ -1236,7 +1309,9 @@ def run_memory_fit_preflight(
                     "parameter_policy_sha256": canonical_sha256(parameter_policy),
                     "runtime_identity_sha256": runtime_identity_sha256,
                     "optimizer_state_initialized": True,
-                    "forward_backward_micro_batches": GRADIENT_ACCUMULATION_STEPS,
+                    "optimizer_steps_executed": optimizer_steps,
+                    "forward_backward_micro_batches_per_step": GRADIENT_ACCUMULATION_STEPS,
+                    "checkpoint_persisted": False,
                 }
             )
         except torch.cuda.OutOfMemoryError as exc:
@@ -1252,6 +1327,10 @@ def run_memory_fit_preflight(
                     "peak_reserved_memory_bytes": int(
                         torch.cuda.max_memory_reserved(training_device)
                     ),
+                    "completed_optimizer_steps": len(optimizer_step_seconds_samples),
+                    "required_optimizer_steps": optimizer_steps,
+                    "arm_wall_clock_seconds": time.perf_counter() - arm_started,
+                    "checkpoint_persisted": False,
                 }
             )
         finally:
@@ -1291,12 +1370,106 @@ def run_memory_fit_preflight(
         ).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         storage = "unavailable"
+
+    estimator_wall_clock_seconds = time.perf_counter() - memory_fit_started
+    usd_per_second = hourly_price_usd / 3600.0
+    successful_by_arm = {str(row["arm"]): row for row in arm_results if row["fit"] is True}
+    if all(arm in successful_by_arm for arm in default_arms):
+        optimizer_steps_per_arm = short_smoke_steps + official_steps
+        required_training_gpu_seconds_by_arm = {
+            arm: optimizer_steps_per_arm * float(successful_by_arm[arm]["optimizer_step_seconds"])
+            for arm in default_arms
+        }
+        required_training_gpu_seconds = sum(required_training_gpu_seconds_by_arm.values())
+        required_remaining_gpu_seconds = (
+            required_training_gpu_seconds + required_inference_gpu_seconds
+        )
+        required_total_gpu_seconds = estimator_wall_clock_seconds + required_remaining_gpu_seconds
+        if include_ta and conditional_arm in successful_by_arm:
+            conditional_training_gpu_seconds = optimizer_steps_per_arm * float(
+                successful_by_arm[conditional_arm]["optimizer_step_seconds"]
+            )
+            conditional_additional_gpu_seconds = (
+                conditional_training_gpu_seconds + conditional_ta_inference_gpu_seconds
+            )
+            conditional_total_gpu_seconds = (
+                required_total_gpu_seconds + conditional_additional_gpu_seconds
+            )
+            conditional_projection = {
+                "available": True,
+                "additional_arm": conditional_arm,
+                "additional_optimizer_steps": optimizer_steps_per_arm,
+                "additional_training_gpu_seconds": conditional_training_gpu_seconds,
+                "additional_inference_gpu_seconds": conditional_ta_inference_gpu_seconds,
+                "additional_gpu_seconds": conditional_additional_gpu_seconds,
+                "additional_cost_usd": conditional_additional_gpu_seconds * usd_per_second,
+                "projected_total_gpu_seconds": conditional_total_gpu_seconds,
+                "projected_total_cost_usd": conditional_total_gpu_seconds * usd_per_second,
+            }
+        elif include_ta:
+            conditional_projection = {
+                "available": False,
+                "reason": "TA resource probe did not fit",
+            }
+        else:
+            conditional_projection = {
+                "available": False,
+                "reason": "TA resource probe was not requested",
+            }
+        cost_projection = {
+            "available": True,
+            "currency": "USD",
+            "hourly_price_usd": hourly_price_usd,
+            "hourly_price_source": hourly_price_source,
+            "method": "second_optimizer_step_time_times_contract_steps_plus_operator_inference_seconds",
+            "estimator_wall_clock_seconds": estimator_wall_clock_seconds,
+            "estimator_cost_usd": estimator_wall_clock_seconds * usd_per_second,
+            "required_scenario": {
+                "arms": list(default_arms),
+                "optimizer_steps_per_arm": {
+                    "short_smoke": short_smoke_steps,
+                    "official": official_steps,
+                    "total": optimizer_steps_per_arm,
+                },
+                "total_optimizer_steps": optimizer_steps_per_arm * len(default_arms),
+                "training_gpu_seconds_by_arm": required_training_gpu_seconds_by_arm,
+                "training_gpu_seconds": required_training_gpu_seconds,
+                "inference_gpu_seconds": required_inference_gpu_seconds,
+                "projected_remaining_gpu_seconds": required_remaining_gpu_seconds,
+                "projected_remaining_cost_usd": required_remaining_gpu_seconds * usd_per_second,
+                "projected_total_gpu_seconds": required_total_gpu_seconds,
+                "projected_total_cost_usd": required_total_gpu_seconds * usd_per_second,
+            },
+            "conditional_ta_scenario": conditional_projection,
+            "excluded_gpu_time": [
+                "checkpoint_io_outside_estimator",
+                "container_startup",
+                "retries",
+                "idle_provider_billing_outside_estimator",
+            ],
+        }
+    else:
+        cost_projection = {
+            "available": False,
+            "currency": "USD",
+            "hourly_price_usd": hourly_price_usd,
+            "hourly_price_source": hourly_price_source,
+            "reason": "H-HEAD and T2-TOP must fit before projection",
+        }
+
     payload = {
-        "schema_version": 1,
-        "artifact_role": "cloud_memory_fit_preflight",
-        "passed": len(arm_results) == 3 and all(row["fit"] is True for row in arm_results),
+        "schema_version": 3,
+        "artifact_role": "optional_cloud_resource_estimate",
+        "optional": True,
+        "material_training_authorization": False,
+        "completed": len(arm_results) == len(selected_arms),
+        "all_selected_arms_fit": len(arm_results) == len(selected_arms)
+        and all(row["fit"] is True for row in arm_results),
+        "checkpoint_persisted": False,
         "split_roles": ["PSEM-STRATEGY-TRAIN"],
         "eval_source_count": 0,
+        "selected_arms": list(selected_arms),
+        "ta_included": include_ta,
         "device": {
             "count": 1,
             "name": str(properties.name),
@@ -1314,9 +1487,14 @@ def run_memory_fit_preflight(
         "micro_batch_size": MICRO_BATCH_SIZE,
         "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
         "effective_batch_size": MICRO_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS,
-        "sampling_manifest_sha256": sha256_file(sampling_manifest),
-        "sampling_validation_sha256": canonical_sha256(manifest_validation),
-        "class_weight_receipt_sha256": class_weight_receipt["payload_sha256"],
+        "runtime_contract_sha256": canonical_sha256(runtime_contract),
+        "sampling_manifest_sha256": sampling_manifest_sha256,
+        "probe_validation_sha256": canonical_sha256(probe_validation),
+        "estimator_class_weights": {
+            "replacement_positive": 1.0,
+            "anchor_positive": 1.0,
+            "source": "unit_weights_for_resource_estimation_only",
+        },
         "probe_row_ids": [str(row["row_id"]) for row in probe_rows],
         "probe_input_identity_sha256": canonical_sha256(
             [
@@ -1343,12 +1521,13 @@ def run_memory_fit_preflight(
             if input_to_step_ratio is not None and input_to_step_ratio > 1.0
             else "not_observed_in_probe"
         ),
+        "estimator_wall_clock_seconds": estimator_wall_clock_seconds,
         "runtime_identity_sha256s": sorted(runtime_identity_sha256s),
         "arms": arm_results,
         "maximum_peak_reserved_memory_bytes": max(
             (int(row["peak_reserved_memory_bytes"]) for row in arm_results),
             default=0,
         ),
-        "candidate_code_identity_sha256": candidate_code_identity()["payload_sha256"],
+        "cost_projection": cost_projection,
     }
     return {**payload, "payload_sha256": canonical_sha256(payload)}

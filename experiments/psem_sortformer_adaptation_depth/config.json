@@ -1,6 +1,8 @@
 {
-  "schema_version": 1,
-  "experiment_id": "psem_sortformer_adaptation_depth_v1",
+  "schema_version": 2,
+  "experiment_id": "psem_sortformer_adaptation_depth_lean_v2",
+  "authority_mode": "cost_bounded_hobby_engineering_probe",
+  "material_execution_status": "blocked_pending_lean_runner_alignment",
   "sample_rate_hz": 16000,
   "native_frame_ms": 80,
   "slot_count": 4,
@@ -37,7 +39,8 @@
       "trainable": ["psem_head", "transformer_encoder.layers.16", "transformer_encoder.layers.17", "sortformer_activity_head"]
     },
     "TA-ALL-TEMPORAL": {
-      "trainable": ["psem_head", "transformer_encoder.layers.0:17", "sortformer_activity_head"]
+      "trainable": ["psem_head", "transformer_encoder.layers.0:17", "sortformer_activity_head"],
+      "conditional": true
     }
   },
   "streaming": {
@@ -48,11 +51,6 @@
     "state_reset_policy": "declared_source_or_reset_boundary_only",
     "additional_future_context_allowed": false
   },
-  "dev_checkpoint_selection": {
-    "sequence_policy": "complete_source_aligned_nonoverlapping_30_second_sequences",
-    "incomplete_source_tail_policy": "excluded_from_loss_but_included_in_product_evaluation",
-    "state_reset_at_sequence_start": true
-  },
   "loss": {
     "replacement_weight": 1.0,
     "anchor_weight": 0.5,
@@ -61,9 +59,12 @@
     "native_kind": "checkpoint_arrival_order_four_slot_loss"
   },
   "sampling": {
+    "manifest_epochs": 1,
+    "windows_per_manifest": 4096,
     "source_time_uniform_fraction": 0.5,
     "replacement_positive_fraction": 0.25,
     "hard_negative_fraction": 0.25,
+    "same_window_and_augmentation_identity_across_arms": true,
     "positive_families": ["clean_direct_different_speaker_handoff", "silence_gap_different_speaker_handoff", "overlap_takeover"],
     "hard_negative_families": ["stable_anchor_continuation", "same_speaker_silence_gap_resume", "overlap_return", "overlap_continuation"]
   },
@@ -72,36 +73,45 @@
     "optimizer": "AdamW",
     "weight_decay": 0.0001,
     "gradient_clip_norm": 1.0,
-    "maximum_epochs": 8,
-    "early_stopping_patience": 2,
     "warmup_fraction": 0.05,
     "micro_batch_size": 1,
     "gradient_accumulation_steps": 16,
     "effective_windows_per_optimizer_step": 16,
-    "optimizer_steps_per_epoch": 256,
-    "seeds": [7301, 7302],
+    "seed": 7301,
+    "confirmation_seed_allowed": false,
+    "short_smoke_maximum_optimizer_steps": 32,
+    "official_maximum_optimizer_steps": 256,
+    "checkpoint_policy": "final_optimizer_step",
+    "deterministic_resume_required": false,
+    "interrupted_run_policy": "discard_and_restart_arm_from_step_zero",
     "learning_rates": {
       "psem_head": 0.001,
       "sortformer_activity_head": 0.0001,
       "temporal_transformer": 0.00001
-    },
-    "checkpoint_metric": "dev_total_loss",
-    "checkpoint_tiebreak": "dev_duration_weighted_replacement_average_precision"
+    }
   },
-  "overfit_canary": {
-    "duration_minutes": 30,
-    "source_count_by_corpus": {"AMI": 2, "AliMeeting": 2},
-    "maximum_optimizer_steps": 500,
-    "minimum_replacement_loss_reduction": 0.3,
-    "minimum_replacement_average_precision": 0.85
+  "short_smoke": {
+    "required_arms": ["H-HEAD", "T2-TOP"],
+    "maximum_optimizer_steps": 32,
+    "finite_forward_backward_update_required": true,
+    "parameter_policy_must_hold": true,
+    "loss_rule": "final_eight_step_mean_below_first_eight_step_mean"
   },
   "evaluation": {
-    "replacement_thresholds": [0.35, 0.5, 0.65],
-    "replacement_confirmation_ms": [100, 300, 500],
-    "primary_threshold": 0.5,
-    "primary_confirmation_ms": 500,
-    "bootstrap_resamples": 2000,
-    "bootstrap_unit": "source_or_meeting",
+    "replacement_thresholds": [0.5],
+    "replacement_confirmation_ms": [500],
+    "required_metrics": ["exclusive_non_anchor_contamination_seconds_per_active_speech_hour", "false_unnecessary_cuts", "missed_replacements"],
+    "required_views": ["pooled", "AMI", "AliMeeting"],
+    "bootstrap_required": false,
+    "topology_matrix_required": false,
+    "eval_candidates": "F0_plus_dev_selected_candidate",
     "eval_threshold_selection_allowed": false
-  }
+  },
+  "cost_budget": {
+    "currency": "USD",
+    "target_total": 15.0,
+    "hard_stop_total": 30.0,
+    "actual_and_projected_cost_receipt_required": true
+  },
+  "claim_boundary": "single_seed_short_budget_internal_engineering_direction_only"
 }

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "artifact_role": "psem_sortformer_runtime_environment",
   "platform": {
     "system": "Linux",
@@ -26,10 +26,19 @@
   },
   "compute": {
     "accelerator_count": 1,
-    "accelerator_selection": "smallest compatible GPU with safe headroom after cloud memory-fit preflight",
+    "accelerator_selection": "operator-selected compatible CUDA GPU; optional memory-fit may estimate headroom",
     "mixed_precision": false,
     "micro_batch_size": 1,
     "gradient_accumulation_steps": 16
+  },
+  "cost_budget": {
+    "currency": "USD",
+    "target_total": 15.0,
+    "hard_stop_total": 30.0,
+    "hourly_price_and_source_required": true,
+    "actual_gpu_seconds_required": true,
+    "projected_remaining_cost_required_before_material_run": true,
+    "amendment_required_to_exceed_hard_stop": true
   },
   "runtime_freeze": {
     "complete_installed_distribution_inventory": true,

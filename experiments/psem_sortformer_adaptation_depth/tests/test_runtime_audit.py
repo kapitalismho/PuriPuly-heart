@@ -8,6 +8,7 @@ import pytest
 import torch
 from torch import nn
 
+from experiments.psem_sortformer_adaptation_depth import preflight, runtime_audit
 from experiments.psem_sortformer_adaptation_depth.models import PSEMHead
 from experiments.psem_sortformer_adaptation_depth.nemo_adapter import TrainableSortformerPSEM
 from experiments.psem_sortformer_adaptation_depth.parameter_policy import (
@@ -17,6 +18,8 @@ from experiments.psem_sortformer_adaptation_depth.parameter_policy import (
 from experiments.psem_sortformer_adaptation_depth.preflight import canonical_sha256
 from experiments.psem_sortformer_adaptation_depth.runtime_audit import (
     LEARNING_RATES,
+    _build_memory_fit_optimizer,
+    build_optimizer,
     build_timing_receipt,
     canary_bundle_runtime_passed,
     gradient_canary_runtime_passed,
@@ -169,6 +172,20 @@ def _fake_adaptation_model() -> TrainableSortformerPSEM:
     for parameter in model.sortformer.parameters():
         nn.init.constant_(parameter, 0.9)
     return model
+
+
+@pytest.fixture
+def material_execution_ready(monkeypatch):
+    monkeypatch.setattr(preflight, "require_material_execution_ready", lambda: None)
+
+
+def test_optimizer_gate_blocks_legacy_work_and_keeps_memory_fit_exception() -> None:
+    model = _fake_adaptation_model()
+    assert not hasattr(runtime_audit, "_build_optimizer")
+    with pytest.raises(preflight.PreflightError, match="blocked_pending_lean_runner_alignment"):
+        build_optimizer(model, "H-HEAD")
+    optimizer = _build_memory_fit_optimizer(model, "H-HEAD")
+    assert isinstance(optimizer, torch.optim.AdamW)
 
 
 class FakeGraphSortformerModules(nn.Module):
@@ -351,7 +368,9 @@ def _timing_runtime_evidence(frame_count: int) -> tuple[tuple[dict, ...], dict]:
     return trace, prefix
 
 
-def test_parameter_inventory_and_one_step_canaries_are_exact() -> None:
+def test_parameter_inventory_and_one_step_canaries_are_exact(
+    material_execution_ready,
+) -> None:
     model = _fake_adaptation_model()
     inventory = parameter_inventory(model, "T2-TOP")
     groups = {row["optimizer_group"] for row in inventory["parameters"] if row["requires_grad"]}
@@ -428,7 +447,9 @@ def test_timing_receipt_rejects_zero_context_geometry() -> None:
         )
 
 
-def test_raw_waveform_canary_rejects_a_constant_graph_input() -> None:
+def test_raw_waveform_canary_rejects_a_constant_graph_input(
+    material_execution_ready,
+) -> None:
     model = _fake_adaptation_model()
 
     def constant_runtime_canary_loss(waveform: torch.Tensor, lengths: torch.Tensor) -> torch.Tensor:
@@ -467,7 +488,10 @@ def test_prefix_causality_audit_rejects_whole_sequence_future_leakage(monkeypatc
         run_prefix_causality_audit(leaking_model, waveform, lengths)
 
 
-def test_runtime_canary_rejects_a_replaced_class_implementation(monkeypatch) -> None:
+def test_runtime_canary_rejects_a_replaced_class_implementation(
+    monkeypatch,
+    material_execution_ready,
+) -> None:
     model = _fake_adaptation_model()
     monkeypatch.setattr(
         TrainableSortformerPSEM,

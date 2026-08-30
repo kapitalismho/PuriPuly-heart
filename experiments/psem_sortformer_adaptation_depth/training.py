@@ -16,7 +16,11 @@ from experiments.psem_sortformer_adaptation_depth.nemo_adapter import (
     SortformerEvidence,
     TrainableSortformerPSEM,
 )
-from experiments.psem_sortformer_adaptation_depth.preflight import canonical_sha256, sha256_file
+from experiments.psem_sortformer_adaptation_depth.preflight import (
+    canonical_sha256,
+    require_material_execution_ready,
+    sha256_file,
+)
 from experiments.psem_sortformer_adaptation_depth.runtime_audit import (
     GRADIENT_CLIP_NORM,
     build_optimizer,
@@ -668,6 +672,7 @@ def fit_arm(
     *,
     authorization: OfficialTrainingAuthorization,
 ) -> dict[str, Any]:
+    require_material_execution_ready()
     current_head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=REPOSITORY_ROOT,
@@ -856,6 +861,7 @@ def run_overfit_arm(
     maximum_steps: int = OVERFIT_MAXIMUM_STEPS,
     authorization: OverfitAuthorization,
 ) -> dict[str, Any]:
+    require_material_execution_ready()
     examples = [example for batch in batches for example in batch]
     sources = {(example.source_id, example.corpus) for example in examples}
     identity_by_row = {

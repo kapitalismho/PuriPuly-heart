@@ -25,7 +25,7 @@ DATA_SPLIT_RECEIPT_PATH = PACKAGE_ROOT / "data_split_receipt.json"
 RUNTIME_CONTRACT_PATH = PACKAGE_ROOT / "runtime_contract.json"
 RUNTIME_ENVIRONMENT_PATH = PACKAGE_ROOT / "runtime_environment.json"
 EXPECTED_RUNTIME_ENVIRONMENT_SHA256 = (
-    "0fcd0d0ef837b3380176ea51c180b361420e6bbb35fef8790c29accadb23559d"
+    "ef988e8934c619619966a38cb6c3ac11a92fae678f19f4bfd2a76ee64f58c27b"
 )
 PINNED_CONTAINER_IMAGE_IDENTITY = (
     "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb"
@@ -39,16 +39,16 @@ SOURCE_MANIFEST_PATH = (
     / "source_manifest.jsonl"
 )
 EXPECTED_CONTRACT_CANONICAL_SHA256 = (
-    "494f46407901546ca40dcd6f76349ef0f2200a2f6672b53f924f24d135a0c176"
+    "6f2d8e6039c0d005668e965cdb7117c8e296b78a2bf9eabb019c8eafefd73374"
 )
 EXPECTED_CONFIG_CANONICAL_SHA256 = (
-    "9b195cc5bb8e73ab79318c4b7bd52a16c7498378c7d1a763b888248b8641a095"
+    "8a4722d6af4ac72b4a64a03b6df456969047b84712a01c2ed93916c10e34fbea"
 )
 EXPECTED_DATA_SPLIT_RECEIPT_CANONICAL_SHA256 = (
     "872879a463077416b12527359527b0b74ab609aebddb5631fa7a55afb8592287"
 )
 EXPECTED_RUNTIME_CONTRACT_CANONICAL_SHA256 = (
-    "911a9f7792a7a8de8e54c3c901de216dd3670f2122761da10fb0921511de0606"
+    "715fee6d3890cd85e95b573a6c8672bc9bf0b8472765bf980249721ff887e537"
 )
 EXPECTED_ARTIFACTS = {
     "freeze": (
@@ -390,7 +390,7 @@ def _runtime_environment_checks() -> list[dict[str, Any]]:
         check(
             "runtime.cuda_device_memory",
             device_memory is not None and device_memory > 0,
-            {"selection": "cloud_memory_fit_preflight"},
+            {"requirement": "one CUDA accelerator with positive reported VRAM"},
             {"bytes": device_memory},
         ),
         check(
@@ -402,11 +402,45 @@ def _runtime_environment_checks() -> list[dict[str, Any]]:
     ]
 
 
+def _material_execution_policy() -> tuple[str | None, str | None]:
+    try:
+        runtime_contract = load_json(RUNTIME_CONTRACT_PATH)
+    except (OSError, json.JSONDecodeError):
+        return None, None
+    if not isinstance(runtime_contract, dict):
+        return None, None
+    material_execution = runtime_contract.get("material_execution")
+    if not isinstance(material_execution, dict):
+        return None, None
+    status = material_execution.get("status")
+    required = material_execution.get("required_status_for_material_execution")
+    return (
+        status if isinstance(status, str) else None,
+        required if isinstance(required, str) else None,
+    )
+
+
+def require_material_execution_ready() -> None:
+    status, required = _material_execution_policy()
+    if required != "ready" or status != required:
+        observed = status if status is not None else "unavailable"
+        raise PreflightError(
+            f"material execution is not authorized: expected='ready', observed={observed!r}"
+        )
+
+
 def runtime_checks(paths: PreflightPaths) -> list[dict[str, Any]]:
     checkpoint_exists = paths.checkpoint is not None and paths.checkpoint.is_file()
     observed_hash = sha256_file(paths.checkpoint) if checkpoint_exists else None
     observed_size = paths.checkpoint.stat().st_size if checkpoint_exists else None
+    execution_status, required_execution_status = _material_execution_policy()
     return [
+        check(
+            "runtime.material_execution_authorized",
+            required_execution_status == "ready" and execution_status == "ready",
+            "ready",
+            execution_status,
+        ),
         check("runtime.platform", platform.system() == "Linux", "Linux", platform.system()),
         check(
             "runtime.checkpoint_path",

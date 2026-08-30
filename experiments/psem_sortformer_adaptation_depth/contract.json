@@ -1,10 +1,17 @@
 {
-  "schema_version": 1,
-  "experiment_id": "psem_sortformer_adaptation_depth_v1",
-  "contract_version": "issue-107-v1",
+  "schema_version": 2,
+  "experiment_id": "psem_sortformer_adaptation_depth_lean_v2",
+  "contract_version": "issue-107-lean-v2",
   "authority": {
     "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/107",
-    "sha256": "eba82c5a39421b7c8d619cfd971720d8b35b19c8d198605e6e5c0dd09fcd0a97"
+    "sha256": "d56980295d50760d258deeb2ccd319d3c5350aa356ed27896f7a431afdbe61fc",
+    "mode": "cost_bounded_hobby_engineering_probe",
+    "supersedes_conflicting_prior_issue_body_and_comments": true
+  },
+  "material_execution": {
+    "status": "blocked_pending_lean_runner_alignment",
+    "reason": "the committed runner still enforces parts of the superseded research-grade protocol",
+    "required_status_for_gpu_execution": "ready"
   },
   "predecessor": {
     "authority_ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/99",
@@ -36,7 +43,8 @@
     "backend": "vulkan",
     "preset": "low_latency",
     "native_frame_ms": 80,
-    "algorithmic_evidence_delay_ms": 1040
+    "algorithmic_evidence_delay_ms": 1040,
+    "role": "historical_context_only"
   },
   "trainable_checkpoint": {
     "repository": "nvidia/diar_streaming_sortformer_4spk-v2.1",
@@ -52,15 +60,44 @@
   },
   "runtime_environment": {
     "path": "experiments/psem_sortformer_adaptation_depth/runtime_environment.json",
-    "sha256": "003d5b701f18ed5883b4708d69e1e9952365fa17a1b01e8e7ffc0481a4f8aed5",
+    "sha256": "ef988e8934c619619966a38cb6c3ac11a92fae678f19f4bfd2a76ee64f58c27b",
     "container_image_identity": "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
     "dependency_inventory_status": "must_match_generated_complete_lock"
   },
-  "decision": "select the shallowest stable Sortformer temporal adaptation depth or stop with outcome D",
+  "decision": "choose the shallowest clear short-budget engineering direction or stop",
   "required_arms": ["F0-FROZEN-FLOAT", "H-HEAD", "T2-TOP"],
   "conditional_arm": "TA-ALL-TEMPORAL",
-  "allowed_outcomes": ["A", "B", "C", "D"],
+  "seed_policy": {
+    "primary": 7301,
+    "confirmation_seed_allowed": false
+  },
+  "execution_budget": {
+    "short_smoke_maximum_optimizer_steps_per_arm": 32,
+    "official_maximum_optimizer_steps_per_arm": 256,
+    "deterministic_resume_required": false,
+    "interrupted_run_policy": "discard_and_restart_arm_from_step_zero"
+  },
+  "cost_budget": {
+    "currency": "USD",
+    "target_total": 15.0,
+    "hard_stop_total": 30.0,
+    "new_authority_required_to_exceed_hard_stop": true
+  },
+  "evaluation": {
+    "threshold": 0.5,
+    "confirmation_ms": 500,
+    "required_metrics": ["exclusive_non_anchor_contamination_seconds_per_active_speech_hour", "false_unnecessary_cuts", "missed_replacements"],
+    "required_views": ["pooled", "AMI", "AliMeeting"],
+    "bootstrap_required": false,
+    "topology_matrix_required": false,
+    "eval_candidates": "F0_plus_dev_selected_candidate",
+    "eval_open_count": 1
+  },
+  "claim_boundary": "single_seed_short_budget_internal_engineering_direction_only",
+  "allowed_outcomes": ["H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL", "STOP"],
   "non_goals": [
+    "research_grade_significance_or_seed_stability",
+    "deterministic_resume_as_a_blocking_gate",
     "student_kd",
     "scratch_student_training",
     "native_causal_anchor_lifecycle",

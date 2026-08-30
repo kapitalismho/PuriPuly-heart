@@ -223,7 +223,11 @@ def main(argv: list[str] | None = None) -> int:
     memory_fit.add_argument("--corpus-root", type=Path, required=True)
     memory_fit.add_argument("--reference-root", type=Path, required=True)
     memory_fit.add_argument("--manifest", type=Path, required=True)
-    memory_fit.add_argument("--class-weights", type=Path, required=True)
+    memory_fit.add_argument("--include-ta", action="store_true")
+    memory_fit.add_argument("--hourly-price-usd", type=float, required=True)
+    memory_fit.add_argument("--hourly-price-source", required=True)
+    memory_fit.add_argument("--required-inference-gpu-seconds", type=float, required=True)
+    memory_fit.add_argument("--conditional-ta-inference-gpu-seconds", type=float, default=0.0)
     memory_fit.add_argument("--device", default="cuda")
     memory_fit.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -239,12 +243,16 @@ def main(argv: list[str] | None = None) -> int:
             corpus_root=args.corpus_root,
             reference_root=args.reference_root,
             sampling_manifest=args.manifest,
-            class_weight_receipt=_load_json(args.class_weights),
+            include_ta=args.include_ta,
+            hourly_price_usd=args.hourly_price_usd,
+            hourly_price_source=args.hourly_price_source,
+            required_inference_gpu_seconds=args.required_inference_gpu_seconds,
+            conditional_ta_inference_gpu_seconds=args.conditional_ta_inference_gpu_seconds,
             device=args.device,
         )
         write_json(args.output, receipt)
         print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
-        return 0 if receipt["passed"] else 2
+        return 0 if receipt["all_selected_arms_fit"] else 2
     if args.command == "data-split-receipt":
         receipt = build_data_split_receipt()
         if args.output:

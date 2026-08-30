@@ -1,6 +1,19 @@
 {
-  "schema_version": 1,
-  "runtime_contract_version": "issue-107-runtime-v1",
+  "schema_version": 2,
+  "runtime_contract_version": "issue-107-lean-runtime-v2",
+  "authority_mode": "cost_bounded_hobby_engineering_probe",
+  "material_execution": {
+    "status": "blocked_pending_lean_runner_alignment",
+    "required_status_for_material_execution": "ready",
+    "known_legacy_blockers": [
+      "sampling_and_training_still_allow_eight_epochs",
+      "overfit_path_still_requires_five_hundred_steps",
+      "protocol_still_allows_confirmation_seed_7302",
+      "evaluation_and_reporting_still_require_three_by_three_frontiers_and_bootstrap",
+      "eval_freeze_still_includes_all_candidates",
+      "cost_hard_stop_is_not_enforced"
+    ]
+  },
   "streaming": {
     "sample_rate_hz": 16000,
     "native_frame_samples": 1280,
@@ -25,13 +38,7 @@
     "lock_kind": "complete_installed_distribution_inventory",
     "platform_identity_fields": ["system", "release", "machine"],
     "container_image_identity": "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
-    "accelerator_identity_fields": [
-      "cuda_device_count",
-      "device_name",
-      "device_total_memory_bytes",
-      "nvidia_driver_version",
-      "torch_cuda_version"
-    ],
+    "accelerator_identity_fields": ["cuda_device_count", "device_name", "device_total_memory_bytes", "nvidia_driver_version", "torch_cuda_version"],
     "required_exact_packages": ["hydra-core", "lightning", "numpy", "omegaconf", "torch", "torchaudio"],
     "all_installed_distributions_must_match": true,
     "all_loaded_nemo_modules_must_resolve_under_checkout": true,
@@ -39,35 +46,60 @@
   },
   "checkpoint_loading": {
     "base_nemo_verified_bytes_restored_from_private_copy": true,
-    "trained_checkpoint_verified_bytes_are_loaded_once": true
+    "trained_checkpoint_verified_bytes_are_loaded_once": true,
+    "official_checkpoint_policy": "final_optimizer_step",
+    "deterministic_resume_required": false,
+    "interrupted_run_policy": "discard_and_restart_arm_from_step_zero"
   },
   "sampling": {
-    "manifest_epochs": 8,
-    "windows_per_epoch": 4096,
+    "manifest_epochs": 1,
+    "windows_per_manifest": 4096,
     "window_samples": 480000,
     "warmup_samples": 32000,
-    "source_time_uniform_per_epoch": 2048,
-    "replacement_positive_per_epoch": 1024,
-    "hard_negative_per_epoch": 1024,
+    "source_time_uniform": 2048,
+    "replacement_positive": 1024,
+    "hard_negative": 1024,
     "training_sequence_start_is_declared_reset": true,
     "target_recipe_version": "issue-107-oracle-anchor-frame-targets-v1",
-    "augmentation_recipe_version": "issue-107-waveform-augmentation-v1"
+    "augmentation_recipe_version": "issue-107-waveform-augmentation-v1",
+    "same_window_and_augmentation_identity_across_arms": true
   },
   "optimization_execution": {
+    "seed": 7301,
+    "confirmation_seed_allowed": false,
     "micro_batch_size": 1,
     "gradient_accumulation_steps": 16,
     "effective_windows_per_optimizer_step": 16,
-    "optimizer_steps_per_epoch": 256,
+    "short_smoke_maximum_optimizer_steps": 32,
+    "official_maximum_optimizer_steps": 256,
+    "multi_epoch_early_stopping_required": false,
     "dev_sequence_policy": "complete_source_aligned_nonoverlapping_30_second_sequences",
     "dev_incomplete_tail_policy": "excluded_from_loss_but_included_in_product_evaluation"
   },
-  "overfit": {
-    "source_rule_version": "issue-107-overfit-source-v1",
-    "window_rule_version": "issue-107-overfit-window-v1",
-    "sources_per_corpus": 2,
-    "windows_per_source": 15,
-    "duration_minutes": 30,
-    "maximum_optimizer_steps": 500
+  "short_smoke": {
+    "required_arms": ["H-HEAD", "T2-TOP"],
+    "conditional_arm": "TA-ALL-TEMPORAL",
+    "maximum_optimizer_steps": 32,
+    "finite_forward_backward_update_required": true,
+    "parameter_policy_must_hold": true,
+    "loss_rule": "final_eight_step_mean_below_first_eight_step_mean"
+  },
+  "memory_fit": {
+    "optional": true,
+    "material_training_authorization": false,
+    "default_arms": ["H-HEAD", "T2-TOP"],
+    "conditional_arm": "TA-ALL-TEMPORAL",
+    "optimizer_steps_per_selected_arm": 2,
+    "warmup_optimizer_steps": 1,
+    "timed_optimizer_step_index": 2,
+    "timing_statistic": "single_second_step",
+    "probe_rows_consumed": 16,
+    "estimator_class_weights": "unit_weights",
+    "checkpoint_persistence": false,
+    "peak_allocated_and_reserved_memory_reported": true,
+    "command_wall_clock_time_reported": true,
+    "cost_projection_reported": true,
+    "estimator_enforces_budget_threshold": false
   },
   "prediction_coordinates": {
     "source_frame_support": "zero_based_half_open_16khz_samples",
@@ -90,7 +122,6 @@
       "candidate_code_identity_sha256"
     ],
     "final_frame_policy": "waveform_length_must_be_divisible_by_1280_and_output_count_must_equal_length_div_1280",
-    "lineage_source_coverage": "zero_to_largest_complete_1280_sample_frame_with_explicit_excluded_tail",
     "state_reset_policy": "first_frame_only",
     "lifecycle_fields_are_binary": true,
     "logits_must_be_finite": true,
@@ -105,22 +136,33 @@
     "native_rows_retain_episode_and_recomputed_slot_mapping": true,
     "stale_reported_slot_is_fatal": true
   },
+  "evaluation": {
+    "replacement_thresholds": [0.5],
+    "replacement_confirmation_ms": [500],
+    "required_metrics": ["exclusive_non_anchor_contamination_seconds_per_active_speech_hour", "false_unnecessary_cuts", "missed_replacements"],
+    "required_views": ["pooled", "AMI", "AliMeeting"],
+    "bootstrap_required": false,
+    "topology_matrix_required": false,
+    "dev_compares": ["F0-FROZEN-FLOAT", "H-HEAD", "T2-TOP"],
+    "eval_candidates": "F0_plus_dev_selected_candidate",
+    "eval_open_count": 1
+  },
+  "cost_budget": {
+    "currency": "USD",
+    "target_total": 15.0,
+    "hard_stop_total": 30.0,
+    "actual_gpu_seconds_required": true,
+    "projected_remaining_cost_required": true,
+    "new_authority_required_to_exceed_hard_stop": true
+  },
   "eval_isolation": {
     "registry_environment_variable": "PSEM_PROTOCOL_REGISTRY_ROOT",
     "caller_registry_is_external_provenance_only": true,
     "authority_registry_location": "git_common_dir/psem-sortformer-adaptation-depth/authority_pin",
     "authority_registry_shared_by_clone_worktrees_and_processes": true,
-    "authority_pinned_exclusive_marker": "issue-107-eba82c5a39421b7c8d619cfd971720d8b35b19c8d198605e6e5c0dd09fcd0a97.json",
+    "authority_pinned_exclusive_marker": "issue-107-d56980295d50760d258deeb2ccd319d3c5350aa356ed27896f7a431afdbe61fc.json",
     "dev_training_refreeze_after_marker": false,
     "runtime_evidence_requires_content_addressed_authority_record": true
-  },
-  "lineage_numeric_evidence": {
-    "float_prediction_set_hash_recomputed_from_external_artifacts": true,
-    "validated_artifact_bytes_are_reused_for_numeric_recomputation": true,
-    "q8_prediction_set_sha256": "27b7eaaa5c2ee332c3b81c048f8e2666499da9a3a4d7e46e8c994876c6ddcee8",
-    "paired_bootstrap_algorithm": "paired_source_bootstrap_v1",
-    "paired_bootstrap_resamples_minimum": 2000,
-    "replicate_hash_and_interval_recomputed": true
   },
   "material_training_gate": {
     "fail_closed": true,
@@ -129,18 +171,17 @@
       "data_split_receipt",
       "sampling_manifest_validation",
       "train_class_weight_receipt",
-      "trainable_checkpoint_lineage",
-      "evaluator_reconstruction_contract",
+      "identity_and_timing_sanity",
       "model_graph_receipt",
       "parameter_inventory",
       "gradient_canary_receipt",
       "update_canary_receipt",
-      "overfit_canary",
+      "short_smoke_metrics",
+      "cost_receipt",
       "staged_execution_state"
     ],
-    "checkpoint_selection_role": "PSEM-STRATEGY-DEV",
     "eval_open_count_before_candidate_freeze": 0,
     "conditional_arm": "TA-ALL-TEMPORAL",
-    "confirmation_seed": 7302
+    "confirmation_seed": null
   }
 }

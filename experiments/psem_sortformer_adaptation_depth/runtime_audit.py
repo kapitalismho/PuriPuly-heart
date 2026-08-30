@@ -314,7 +314,15 @@ def write_parameter_inventory(model: nn.Module, arm: str, output_path: Path) -> 
     return receipt
 
 
-def build_optimizer(model: nn.Module, arm: str) -> torch.optim.AdamW:
+def _require_material_execution_ready() -> None:
+    from experiments.psem_sortformer_adaptation_depth.preflight import (
+        require_material_execution_ready,
+    )
+
+    require_material_execution_ready()
+
+
+def _optimizer_groups(model: nn.Module, arm: str) -> list[dict[str, Any]]:
     inventory = parameter_inventory(model, arm)
     if arm == "F0-FROZEN-FLOAT":
         raise RuntimeAuditError("the frozen arm has no optimizer")
@@ -335,7 +343,16 @@ def build_optimizer(model: nn.Module, arm: str) -> torch.optim.AdamW:
                     "group_name": group_name,
                 }
             )
-    return torch.optim.AdamW(groups, weight_decay=WEIGHT_DECAY)
+    return groups
+
+
+def build_optimizer(model: nn.Module, arm: str) -> torch.optim.AdamW:
+    _require_material_execution_ready()
+    return torch.optim.AdamW(_optimizer_groups(model, arm), weight_decay=WEIGHT_DECAY)
+
+
+def _build_memory_fit_optimizer(model: nn.Module, arm: str) -> torch.optim.AdamW:
+    return torch.optim.AdamW(_optimizer_groups(model, arm), weight_decay=WEIGHT_DECAY)
 
 
 def authorized_module_paths(arm: str) -> tuple[str, ...]:
@@ -978,6 +995,7 @@ def run_gradient_update_canary(
     arm: str,
     waveform: torch.Tensor,
 ) -> dict[str, Any]:
+    _require_material_execution_ready()
     if arm == "F0-FROZEN-FLOAT":
         raise RuntimeAuditError("gradient and update canaries apply to trainable arms only")
     _validate_raw_waveform(waveform)
