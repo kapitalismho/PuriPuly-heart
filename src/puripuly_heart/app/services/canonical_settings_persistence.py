@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -24,6 +24,7 @@ from puripuly_heart.app.services.provider_runtime_apply import (
 from puripuly_heart.app.services.settings_mutation_legacy import (
     apply_settings_path_patch,
 )
+from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.defaults import new_settings_for_first_run
 from puripuly_heart.config.settings_vnext.migration import (
     apply_canonical_delta,
@@ -37,7 +38,6 @@ from puripuly_heart.config.settings_vnext.schema import (
     with_telemetry_enabled,
     with_translation_runtime_policy,
 )
-from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.core.translation_policy import (
     FIXED_TRANSLATION_POLICY,
     TranslationRuntimePolicy,
@@ -259,12 +259,12 @@ class SettingsOwner:
         self,
         current_settings: AppSettingsVNext | None = None,
     ) -> AppSettingsVNext | None:
-        from puripuly_heart.config.translation_values import (
-            provider_llm_for_translation,
-        )
         from puripuly_heart.config.llm_profiles import (
             get_openrouter_llm_profile,
             get_openrouter_selection_alias_for_model_and_source,
+        )
+        from puripuly_heart.config.translation_values import (
+            provider_llm_for_translation,
         )
 
         settings = current_settings if current_settings is not None else self.canonical

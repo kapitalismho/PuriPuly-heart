@@ -1512,7 +1512,8 @@ async def test_issue_persists_managed_user_identifier_after_managed_key_success(
     )
     assert (
         load_managed_openrouter_user_identifier(
-            build_openrouter_credential_runtime_config(_canonical_settings(settings)), secrets=secrets
+            build_openrouter_credential_runtime_config(_canonical_settings(settings)),
+            secrets=secrets,
         )
         == "user-123"
     )
@@ -1761,7 +1762,8 @@ async def test_issue_keeps_ready_and_cleans_managed_user_identifier_cache_on_sec
     assert secrets.get(OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET) is None
     assert (
         load_managed_openrouter_user_identifier(
-            build_openrouter_credential_runtime_config(_canonical_settings(settings)), secrets=secrets
+            build_openrouter_credential_runtime_config(_canonical_settings(settings)),
+            secrets=secrets,
         )
         is None
     )
@@ -1814,7 +1816,8 @@ async def test_issue_omission_or_invalid_user_id_preserves_existing_managed_user
     )
     assert (
         load_managed_openrouter_user_identifier(
-            build_openrouter_credential_runtime_config(_canonical_settings(settings)), secrets=secrets
+            build_openrouter_credential_runtime_config(_canonical_settings(settings)),
+            secrets=secrets,
         )
         == "cached-user-1"
     )

@@ -181,7 +181,11 @@ def _optional_translation_model(value: object) -> TranslationModel | None:
 def _openrouter_selection_alias(value: object) -> OpenRouterSelectionAlias | None:
     if value is None or value == "":
         return None
-    return value if isinstance(value, OpenRouterSelectionAlias) else OpenRouterSelectionAlias(str(value))
+    return (
+        value
+        if isinstance(value, OpenRouterSelectionAlias)
+        else OpenRouterSelectionAlias(str(value))
+    )
 
 
 def _verified(entry: object) -> bool:
@@ -362,7 +366,10 @@ def osc_control_presentation_state(
         translation_model=translation.model,
         translation_connection=translation.connection,
         translation_connection_history=tuple(
-            sorted((str(model), str(connection)) for model, connection in translation.connection_history.items())
+            sorted(
+                (str(model), str(connection))
+                for model, connection in translation.connection_history.items()
+            )
         ),
         translation_http_extension_id=translation.http_extension_id,
         translation_previous_model=translation.previous_llm_model,

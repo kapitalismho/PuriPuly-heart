@@ -302,7 +302,9 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
     assert settings.canonical.state.provider_verification.openrouter.status == "verified"
     assert settings.canonical.intent.prompts.system_prompt == "PKCE prompt draft"
     assert settings.canonical.intent.translation.model == TranslationModel.GEMMA4.value
-    assert settings.canonical.intent.translation.connection == TranslationConnection.OPENROUTER.value
+    assert (
+        settings.canonical.intent.translation.connection == TranslationConnection.OPENROUTER.value
+    )
     assert settings.canonical.intent.local_llm.base_url == "http://staged.local:11434"
     assert settings.canonical.intent.ui.locale == "ko"
     assert len(runtime.applied) == 1
@@ -318,7 +320,9 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
     assert settings.mutation_depth == 0
     assert settings.rollback_pending is False
     assert settings.canonical is not None
-    assert settings.canonical.intent.translation.connection == TranslationConnection.OPENROUTER.value
+    assert (
+        settings.canonical.intent.translation.connection == TranslationConnection.OPENROUTER.value
+    )
 
     runtime.cancel = False
     results.current = None

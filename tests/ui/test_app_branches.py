@@ -2255,7 +2255,10 @@ def test_debug_preview_discord_auth_opens_dialog_with_close_only_actions(
         assert app.page.closed[-1] is opened_dialog
 
     assert app.page.tasks == []
-    assert settings.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
+    assert (
+        settings.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
 
 
 def test_debug_preview_qq_auth_states_are_pure_ui_without_tasks_or_persistence(
@@ -2288,7 +2291,10 @@ def test_debug_preview_qq_auth_states_are_pure_ui_without_tasks_or_persistence(
     gated_dialog = app._qq_managed_auth_dialog
     assert gated_dialog._error_text.value == app_module.t("qq_auth.error.key_unavailable")
     assert app.page.tasks == []
-    assert settings.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
+    assert (
+        settings.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
 
 
 def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -> None:
@@ -2317,7 +2323,10 @@ def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -
     target, launch_source = pkce_calls[0]
     assert launch_source == "discord_auth"
     assert target.selection_alias is OpenRouterSelectionAlias.QWEN35_FLASH_BYOK
-    assert settings.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
+    assert (
+        settings.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
 
 
 def test_discord_managed_auth_byok_clears_managed_china_translation_state() -> None:
@@ -3732,7 +3741,9 @@ def test_on_request_openrouter_pkce_reopens_existing_auth_url_while_flow_active(
     target_settings = AppSettingsVNext()
     reopen_calls: list[str] = []
 
-    async def fake_connect_openrouter_via_pkce(*, target: AppSettingsVNext, launch_source: str) -> bool:
+    async def fake_connect_openrouter_via_pkce(
+        *, target: AppSettingsVNext, launch_source: str
+    ) -> bool:
         _ = (target, launch_source)
         return False
 
@@ -3765,7 +3776,9 @@ async def test_on_request_openrouter_pkce_ignores_duplicate_while_flow_active(
     target_settings = AppSettingsVNext()
     pkce_calls: list[str] = []
 
-    async def fake_connect_openrouter_via_pkce(*, target: AppSettingsVNext, launch_source: str) -> bool:
+    async def fake_connect_openrouter_via_pkce(
+        *, target: AppSettingsVNext, launch_source: str
+    ) -> bool:
         _ = target
         pkce_calls.append(launch_source)
         return False
@@ -3807,7 +3820,9 @@ async def test_on_request_openrouter_pkce_uses_draft_preserving_refresh_on_succe
     refresh_calls: list[tuple[AppSettingsVNext, Path]] = []
     snackbar_calls: list[tuple[str, str]] = []
 
-    async def fake_connect_openrouter_via_pkce(*, target: AppSettingsVNext, launch_source: str) -> bool:
+    async def fake_connect_openrouter_via_pkce(
+        *, target: AppSettingsVNext, launch_source: str
+    ) -> bool:
         pkce_calls.append((target, launch_source))
         return True
 
@@ -3841,7 +3856,9 @@ async def test_on_request_openrouter_pkce_does_not_refresh_settings_view_on_fail
     target_settings = AppSettingsVNext()
     refresh_calls: list[tuple[AppSettingsVNext, Path]] = []
 
-    async def fake_connect_openrouter_via_pkce(*, target: AppSettingsVNext, launch_source: str) -> bool:
+    async def fake_connect_openrouter_via_pkce(
+        *, target: AppSettingsVNext, launch_source: str
+    ) -> bool:
         _ = (target, launch_source)
         return False
 

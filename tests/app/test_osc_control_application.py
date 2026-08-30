@@ -361,10 +361,13 @@ async def test_asr_controls_skip_apply_when_provider_matches() -> None:
 
 @pytest.mark.asyncio
 async def test_fallback_control_skips_apply_when_alias_matches() -> None:
-    current = _with_translation(AppSettingsVNext(), fallback=replace(
-        AppSettingsVNext().intent.translation.fallback,
-        selection_alias="none",
-    ))
+    current = _with_translation(
+        AppSettingsVNext(),
+        fallback=replace(
+            AppSettingsVNext().intent.translation.fallback,
+            selection_alias="none",
+        ),
+    )
     applied = 0
 
     async def apply_settings(settings: object) -> object:

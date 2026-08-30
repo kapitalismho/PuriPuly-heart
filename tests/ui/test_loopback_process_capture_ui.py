@@ -680,9 +680,7 @@ def test_settings_capture_target_rebase_updates_all_retained_apply_sources(
     view._provider_settings_draft = draft
     view.has_provider_changes = True
     view.has_pending_prompt_changes = True
-    view._audio_settings = SimpleNamespace(
-        desktop_output_device=initial_target.device_name or ""
-    )
+    view._audio_settings = SimpleNamespace(desktop_output_device=initial_target.device_name or "")
     view._loopback_audio_text = SimpleNamespace(
         content=SimpleNamespace(value="", size=None),
         page=None,

@@ -7,11 +7,11 @@ from puripuly_heart.app.wiring_provider_runtime_policy import (
 )
 
 from puripuly_heart.config.provider_values import OpenRouterSelectionAlias
-from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     TranslationFallbackIntent,
 )
+from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 
 
 def _signature(settings: AppSettingsVNext) -> tuple[object, ...]:

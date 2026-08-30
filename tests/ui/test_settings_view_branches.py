@@ -21,13 +21,13 @@ from puripuly_heart.app.ports.settings_view import (
     TranslationSelectionEdit,
 )
 from puripuly_heart.app.ports.ui_models import OscControlPresentationName
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    materialize_canonical_translation_settings,
+)
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
     provider_llm_for_translation,
-)
-from puripuly_heart.app.services.canonical_settings_persistence import (
-    materialize_canonical_translation_settings,
 )
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.provider_values import (
@@ -38,7 +38,6 @@ from puripuly_heart.config.provider_values import (
     LLMProviderName,
     LocalLLMBackend,
     OpenRouterCredentialSource,
-    OpenRouterFallbackSelectionAlias,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
     QwenLLMModel,
@@ -255,9 +254,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
 
 def test_settings_rejects_malformed_osc_ports_without_mutating_snapshot() -> None:
     view = settings_view.SettingsView.__new__(settings_view.SettingsView)
-    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(
-        AppSettingsVNext()
-    )
+    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(AppSettingsVNext())
     view._general_snapshot = general
 
     view._on_osc_connection_selected("manual", "invalid", "9001")
@@ -454,8 +451,7 @@ def _vnext(
         translation = replace(
             translation,
             connection_history={
-                _enum_value(key): _enum_value(value)
-                for key, value in connection_history.items()
+                _enum_value(key): _enum_value(value) for key, value in connection_history.items()
             },
         )
     if qwen_region is not None:
@@ -1085,9 +1081,7 @@ def test_restore_api_key_icons_sets_idle_success_error(monkeypatch: pytest.Monke
     view._alibaba_key_beijing.value = ""
     view._alibaba_key_singapore.value = ""
 
-    provider, _general, _prompt, _overlay = settings_view_surface_snapshots(
-        _vnext(settings)
-    )
+    provider, _general, _prompt, _overlay = settings_view_surface_snapshots(_vnext(settings))
     view._restore_api_key_icons(provider)
 
     assert view._deepgram_key._current_status == "success"
@@ -2258,10 +2252,10 @@ def test_local_llm_settings_survive_provider_draft_copy(
     settings = _vnext(
         settings,
         local_llm=LocalLLMIntent(
-        backend=LocalLLMBackend.OLLAMA.value,
-        base_url="http://127.0.0.1:11434/v1",
-        model="llama3.1:8b",
-        extra_body={"think": False},
+            backend=LocalLLMBackend.OLLAMA.value,
+            base_url="http://127.0.0.1:11434/v1",
+            model="llama3.1:8b",
+            extra_body={"think": False},
         ),
     )
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -2855,9 +2849,17 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
     assert pending.intent.translation.model == TranslationModel.GEMMA4.value
     assert pending.intent.translation.connection == TranslationConnection.OPENROUTER.value
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
-    assert pending.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
-    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.BYOK.value
-    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK.value
+    assert (
+        pending.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
+    )
+    assert (
+        pending.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.BYOK.value
+    )
+    assert (
+        pending.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.GEMMA4_BYOK.value
+    )
     assert pending.intent.prompts.system_prompt == "G"
     assert view._prompt_editor.value == "G"
     assert settings.intent.prompts.system_prompt == "G"
@@ -2872,9 +2874,11 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
         settings,
         model=TranslationModel.GEMMA4,
         connection=TranslationConnection.MANAGED,
-        connection_history={TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
+        connection_history={
+            TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
             TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA,
-            TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OFFICIAL_BYOK,},
+            TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
+        },
     )
     view, _ = _make_settings_view(monkeypatch, settings=settings)
 
@@ -2895,12 +2899,12 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
     assert pending.intent.translation.connection_history[TranslationModel.GEMMA4.value] == (
         TranslationConnection.OPENROUTER.value
     )
-    assert pending.intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value] == (
-        TranslationConnection.OFFICIAL_BYOK.value
-    )
-    assert pending.intent.translation.connection_history[TranslationModel.GEMINI_37_FLASH.value] == (
-        TranslationConnection.OFFICIAL_BYOK.value
-    )
+    assert pending.intent.translation.connection_history[
+        TranslationModel.DEEPSEEK_V4_FLASH.value
+    ] == (TranslationConnection.OFFICIAL_BYOK.value)
+    assert pending.intent.translation.connection_history[
+        TranslationModel.GEMINI_37_FLASH.value
+    ] == (TranslationConnection.OFFICIAL_BYOK.value)
 
 
 def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
@@ -2924,7 +2928,10 @@ def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
     assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH.value
     assert pending.intent.translation.connection == TranslationConnection.MANAGED.value
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
-    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
+    assert (
+        pending.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
+    )
     assert pending.intent.prompts.system_prompt == "G"
     assert view._prompt_editor.value == "G"
     assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
@@ -2944,8 +2951,10 @@ def test_on_llm_selected_restores_saved_connection_history(
         settings,
         model=TranslationModel.GEMMA4,
         connection=TranslationConnection.MANAGED,
-        connection_history={TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.OFFICIAL_BYOK,},
+        connection_history={
+            TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
+            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
+        },
     )
     settings = _vnext(settings, llm=LLMProviderName.OPENROUTER)
     settings = _vnext(settings, openrouter_source=OpenRouterCredentialSource.MANAGED)
@@ -3016,8 +3025,14 @@ def test_on_llm_selected_stages_openrouter_byok_alias_without_pkce(
     assert pending.intent.translation.model == TranslationModel.GEMMA4_26B_31B.value
     assert pending.intent.translation.connection == TranslationConnection.OPENROUTER.value
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
-    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
-    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.BYOK.value
+    assert (
+        pending.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
+    )
+    assert (
+        pending.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.BYOK.value
+    )
     assert view.has_provider_changes is True
 
 
@@ -3068,9 +3083,17 @@ def test_on_llm_selected_updates_managed_openrouter_label_and_source(
 
     assert pending is not None
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
-    assert pending.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
-    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
-    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
+    assert (
+        pending.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
+    )
+    assert (
+        pending.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
+    assert (
+        pending.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
+    )
     assert view._llm_text.content.value == t("provider.gemma4_26b_a4b_it")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.managed"
@@ -3095,8 +3118,14 @@ def test_on_llm_selected_openrouter_provider_value_defaults_to_gemma_managed(
 
     assert pending is not None
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
-    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
-    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
+    assert (
+        pending.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
+    assert (
+        pending.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
+    )
     assert view._llm_text.content.value == t("provider.gemma4_26b_a4b_it")
 
 
@@ -3119,9 +3148,15 @@ def test_on_llm_selected_sets_deepseek_managed_connection_and_label(
     assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH.value
     assert pending.intent.translation.connection == TranslationConnection.MANAGED.value
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
-    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
+    assert (
+        pending.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
+    )
     assert pending.intent.translation.openrouter_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
+    assert (
+        pending.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
     assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.managed"
@@ -3178,7 +3213,10 @@ def test_on_llm_selected_stages_byok_without_mutating_managed_identity_snapshot(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.BYOK.value
+    assert (
+        pending.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.BYOK.value
+    )
     assert pending.state.managed_connection.verified_hardware_hash == "hardware-hash"
     assert pending.state.managed_connection.verified_hardware_hash_salt_version == 7
 
@@ -3199,7 +3237,10 @@ def test_on_llm_selected_round_trips_back_to_managed_without_dropping_verified_s
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
+    assert (
+        pending.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
     assert pending.state.managed_connection.verified_hardware_hash == "hardware-hash"
     assert pending.state.managed_connection.verified_hardware_hash_salt_version == 7
 
@@ -3227,8 +3268,14 @@ def test_on_llm_selected_switching_away_from_openrouter_preserves_saved_selectio
 
     assert pending is not None
     assert _llm(pending) == LLMProviderName.QWEN.value
-    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.BYOK.value
-    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK.value
+    assert (
+        pending.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.BYOK.value
+    )
+    assert (
+        pending.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.GEMMA4_BYOK.value
+    )
 
 
 def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_gemini_and_qwen_changes(
@@ -3244,16 +3291,28 @@ def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_g
 
     assert pending is not None
     assert _llm(pending) == LLMProviderName.GEMINI.value
-    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
-    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
+    assert (
+        pending.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
+    assert (
+        pending.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
+    )
 
     view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
     assert _llm(pending) == LLMProviderName.QWEN.value
-    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
-    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
+    assert (
+        pending.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
+    assert (
+        pending.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
+    )
 
 
 def test_on_translation_connection_selected_updates_settings_and_flags(
@@ -3264,7 +3323,9 @@ def test_on_translation_connection_selected_updates_settings_and_flags(
         settings,
         model=TranslationModel.DEEPSEEK_V4_FLASH,
         connection=TranslationConnection.MANAGED,
-        connection_history={TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED,},
+        connection_history={
+            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED,
+        },
     )
     changed: list[AppSettingsVNext] = []
 
@@ -3314,7 +3375,10 @@ def test_on_translation_connection_selected_auto_applies_managed_connection(
     pending = view.build_provider_apply_settings()
     assert pending is not None
     assert pending.intent.translation.connection == TranslationConnection.MANAGED.value
-    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
+    assert (
+        pending.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
     assert provider_changes == ["apply"]
 
 
@@ -3326,7 +3390,9 @@ def test_on_translation_connection_selected_stages_deepseek_managed_china_routin
         settings,
         model=TranslationModel.DEEPSEEK_V4_FLASH,
         connection=TranslationConnection.MANAGED,
-        connection_history={TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED,},
+        connection_history={
+            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED,
+        },
     )
 
     view, _ = _make_settings_view(monkeypatch)
@@ -3343,8 +3409,14 @@ def test_on_translation_connection_selected_stages_deepseek_managed_china_routin
         == TranslationConnection.MANAGED_CHINA
     )
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
-    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
-    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
+    assert (
+        pending.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
+    assert (
+        pending.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
+    )
     assert (
         pending.intent.translation.openrouter_provider_routing
         == OpenRouterProviderRouting.DEEPSEEK_ONLY.value
@@ -5683,7 +5755,6 @@ def test_prompt_commit_emits_once_when_no_provider_changes(monkeypatch: pytest.M
     assert changed[-1].intent.prompts.system_prompt == "custom prompt"
 
 
-
 def test_prompt_commit_preserves_peer_local_qwen_before_emit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -5766,7 +5837,6 @@ def test_refresh_prompt_if_empty_stages_default_for_apply(
     assert view.has_pending_prompt_changes is True
     assert pending is not None
     assert pending.intent.prompts.system_prompt == view._prompt_editor.value
-
 
 
 def test_on_text_hover_updates_container_once(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -36,7 +36,9 @@ def test_application_composes_settings_patch_repository_owners() -> None:
     assert "create_legacy_patch_repository(" not in openrouter_pkce_source
     assert managed_account_source.count("settings.create_canonical_patch_repository(") == 1
     assert provider_settings_source.count("self.settings.create_canonical_patch_repository(") == 3
-    assert settings_application_source.count("self.settings.create_canonical_patch_repository(") == 1
+    assert (
+        settings_application_source.count("self.settings.create_canonical_patch_repository(") == 1
+    )
     assert openrouter_pkce_source.count("self.settings.create_canonical_patch_repository(") == 1
     assert "class ProviderApplicationOwner" in provider_settings_source
     assert "class SettingsApplicationOwner" in settings_application_source

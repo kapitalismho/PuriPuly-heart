@@ -20,7 +20,6 @@ from puripuly_heart.config.provider_values import (
 )
 from puripuly_heart.config.resolved import (
     ResolvedCredentialRequirement,
-    ResolvedDesktopAudioCaptureTarget,
     ResolvedSTTConfig,
 )
 from puripuly_heart.config.runtime_resolution import (
@@ -45,7 +44,7 @@ from puripuly_heart.config.runtime_resolution import (
 from puripuly_heart.config.runtime_resolution import (
     resolve_stt_config as resolve_stt_runtime_config,
 )
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, CaptureTargetIntent
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.language import get_local_qwen_language_hint
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.local_stt_assets import (
@@ -790,9 +789,7 @@ def create_stt_backend_from_resolved_config(
 
 def resolve_peer_stt_config(settings: AppSettingsVNext) -> ResolvedPeerSTTConfig:
     intent = settings.intent
-    peer_source_language = (
-        intent.languages.peer_source_language or intent.languages.source_language
-    )
+    peer_source_language = intent.languages.peer_source_language or intent.languages.source_language
     keyterms: tuple[str, ...] = ()
     provider = _stt_provider_name_or_raise(intent.peer_stt.provider, peer=True)
 

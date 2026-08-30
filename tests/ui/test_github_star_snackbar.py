@@ -232,9 +232,7 @@ async def test_launch_github_star_snackbar_counts_eligible_launches_before_first
     assert _star(first_controller).eligible_launch_count == 1
     assert _payload_star(saved_payloads[-1])["eligible_launch_count"] == 1
 
-    second_app, second_page, second_controller = _eligible_app(
-        settings=first_controller.settings
-    )
+    second_app, second_page, second_controller = _eligible_app(settings=first_controller.settings)
     second_shown = await second_app.maybe_show_github_star_prompt_after_launch()
 
     assert second_shown is False
@@ -243,9 +241,7 @@ async def test_launch_github_star_snackbar_counts_eligible_launches_before_first
     assert _star(second_controller).eligible_launch_count == 2
     assert _payload_star(saved_payloads[-1])["eligible_launch_count"] == 2
 
-    third_app, third_page, third_controller = _eligible_app(
-        settings=second_controller.settings
-    )
+    third_app, third_page, third_controller = _eligible_app(settings=second_controller.settings)
     third_shown = await third_app.maybe_show_github_star_prompt_after_launch()
 
     assert third_shown is True

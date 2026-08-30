@@ -19,8 +19,8 @@ from puripuly_heart.app.services.ui_application import (
 from puripuly_heart.app.services.ui_application import (
     UiApplicationBoundary as ProductionUiApplicationBoundary,
 )
-from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_FREEZE_INGRESS
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_FREEZE_INGRESS
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 

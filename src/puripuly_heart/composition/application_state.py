@@ -49,9 +49,7 @@ class ApplicationUiStateAdapter:
     @property
     def peer_translation_eula_accepted(self) -> bool | None:
         settings = self.settings.canonical
-        return (
-            bool(settings.state.peer_translation.eula_accepted) if settings is not None else None
-        )
+        return bool(settings.state.peer_translation.eula_accepted) if settings is not None else None
 
     @property
     def microphone_test_active(self) -> bool:

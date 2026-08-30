@@ -182,7 +182,7 @@ async def test_composition_delegates_the_evidence_specific_access_contract(
         "start-local-asr",
         ("self-request", settings, True),
         ("peer-config", settings),
-            ("peer-request", "peer-config", settings.intent.stt.gpu_device_id, False),
+        ("peer-request", "peer-config", settings.intent.stt.gpu_device_id, False),
         "retry",
         "close",
     ]

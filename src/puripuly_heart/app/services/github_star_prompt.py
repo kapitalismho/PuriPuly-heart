@@ -348,8 +348,7 @@ class GithubStarPromptOwner:
                 replacement_settings,
                 clicked=bool(replacement.clicked or current.clicked),
                 translation_success_observed=bool(
-                    replacement.translation_success_observed
-                    or current.translation_success_observed
+                    replacement.translation_success_observed or current.translation_success_observed
                 ),
                 eligible_launch_count=max(
                     github_star_prompt_non_negative_count(replacement.eligible_launch_count),

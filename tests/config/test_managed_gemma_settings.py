@@ -66,10 +66,13 @@ def test_managed_gemma_materializes_and_round_trips_as_distinct_provider(
     serialized = serialization.to_dict(settings)
     restored = serialization.from_dict(serialized)
 
-    assert provider_llm_for_translation(
-        settings.intent.translation.model,
-        settings.intent.translation.connection,
-    ) == LLMProviderName.MANAGED_GEMMA.value
+    assert (
+        provider_llm_for_translation(
+            settings.intent.translation.model,
+            settings.intent.translation.connection,
+        )
+        == LLMProviderName.MANAGED_GEMMA.value
+    )
     assert serialized["intent"]["translation"]["model"] == "managed_gemma"
     assert serialized["intent"]["translation"]["connection"] == connection.value
     assert restored.intent.translation.model == "managed_gemma"
@@ -95,10 +98,13 @@ def test_managed_gemma_12b_materializes_and_round_trips_as_gpu_local_model() -> 
     serialized = serialization.to_dict(settings)
     restored = serialization.from_dict(serialized)
 
-    assert provider_llm_for_translation(
-        settings.intent.translation.model,
-        settings.intent.translation.connection,
-    ) == LLMProviderName.MANAGED_GEMMA.value
+    assert (
+        provider_llm_for_translation(
+            settings.intent.translation.model,
+            settings.intent.translation.connection,
+        )
+        == LLMProviderName.MANAGED_GEMMA.value
+    )
     assert serialized["intent"]["translation"]["model"] == "managed_gemma_12b"
     assert serialized["intent"]["translation"]["connection"] == TranslationConnection.GPU.value
     assert restored.intent.translation.model == "managed_gemma_12b"

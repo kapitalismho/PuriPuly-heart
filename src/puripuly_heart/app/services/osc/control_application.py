@@ -138,10 +138,7 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         if (
             current is not None
             and _osc_translation_model_value(current.intent.translation.model) == model
-            and (
-                connection is None
-                or current.intent.translation.connection == connection
-            )
+            and (connection is None or current.intent.translation.connection == connection)
         ):
             return True
         return await self._apply_settings(

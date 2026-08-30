@@ -363,9 +363,7 @@ def managed_identity_state_port_from_vnext(
 
     def persist() -> None:
         live = owner.canonical or settings
-        values = {
-            field.name: getattr(bag, field.name) for field in fields(ManagedConnectionState)
-        }
+        values = {field.name: getattr(bag, field.name) for field in fields(ManagedConnectionState)}
         next_settings = replace(
             live,
             state=replace(

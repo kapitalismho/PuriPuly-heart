@@ -240,9 +240,7 @@ class SettingsRuntimeEffectsAdapter:
             peer.last_intent_enabled
             if peer.last_intent_enabled is not None
             else (
-                self._settings.peer_translation_enabled()
-                if current_settings is not None
-                else False
+                self._settings.peer_translation_enabled() if current_settings is not None else False
             )
         )
         previous_peer_activation_requested = (
@@ -325,13 +323,11 @@ class SettingsRuntimeEffectsAdapter:
         )
         peer_source_language_changed = (
             previous_peer_source_language is not None
-            and previous_peer_source_language
-            != next_settings.intent.languages.peer_source_language
+            and previous_peer_source_language != next_settings.intent.languages.peer_source_language
         )
         peer_target_language_changed = (
             previous_peer_target_language is not None
-            and previous_peer_target_language
-            != next_settings.intent.languages.peer_target_language
+            and previous_peer_target_language != next_settings.intent.languages.peer_target_language
         )
         peer_source_mode_changed = (
             previous_peer_source_mode is not None

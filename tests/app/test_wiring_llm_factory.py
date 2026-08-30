@@ -22,6 +22,7 @@ from puripuly_heart.core.openrouter_credentials import (
 from puripuly_heart.app import wiring_llm_factory
 from puripuly_heart.app.wiring import create_llm_provider_from_resolved_config
 from puripuly_heart.app.wiring.wiring_llm_factory import llm_factory_extras_from_vnext
+from puripuly_heart.config.provider_values import OpenRouterCredentialSource
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_MANAGED,
     ResolvedCredentialRequirement,
@@ -29,7 +30,6 @@ from puripuly_heart.config.resolved import (
     ResolvedLLMFallbackPlan,
     ResolvedLLMTarget,
 )
-from puripuly_heart.config.provider_values import OpenRouterCredentialSource
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.storage.secrets import InMemorySecretStore

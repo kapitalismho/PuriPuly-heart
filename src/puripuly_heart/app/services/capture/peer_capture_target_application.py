@@ -122,9 +122,7 @@ class PeerCaptureTargetApplicationOwner:
         canonical = self.settings.canonical
         if canonical is None:
             return None
-        return resolve_desktop_audio_capture_target(
-            canonical.intent.desktop_audio.capture_target
-        )
+        return resolve_desktop_audio_capture_target(canonical.intent.desktop_audio.capture_target)
 
     async def apply(self, value: str) -> None:
         current = self.settings.canonical

@@ -46,11 +46,12 @@ from puripuly_heart.app.services.application_startup import ApplicationStartupOw
 from puripuly_heart.app.services.canonical_settings_persistence import (
     materialize_canonical_translation_settings,
 )
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 def _canonical_settings(settings: object) -> object:
     return settings
+
+
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
@@ -333,7 +334,9 @@ class UiApplicationStateRuntimeStub:
     @property
     def overlay_target(self) -> str | None:
         settings = self.compatibility_settings
-        target = getattr(getattr(getattr(settings, "intent", None), "overlay", None), "target", None)
+        target = getattr(
+            getattr(getattr(settings, "intent", None), "overlay", None), "target", None
+        )
         return str(target) if target is not None else None
 
     @property

@@ -390,6 +390,7 @@ LEGACY_SETTINGS_VALUE_PAYLOAD_PREFIXES = (
     "state.provider_verification.",
 )
 
+
 def _module_name_for_path(path: Path) -> str:
     relative = path.relative_to(SOURCE_PACKAGE_ROOT).with_suffix("")
     parts = (PACKAGE_NAME, *relative.parts)

@@ -38,8 +38,8 @@ from puripuly_heart.app.services.openrouter_pkce_flow import (
 )
 from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
 from puripuly_heart.config.provider_values import OpenRouterCredentialSource
-from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,

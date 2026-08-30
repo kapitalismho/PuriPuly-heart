@@ -63,28 +63,28 @@ class SettingsProjectionOwner:
     def order22_baseline(self) -> object | None:
         return self._order22_baseline
 
-    def remember_order22(self,         settings: AppSettingsVNext | None) -> None:
+    def remember_order22(self, settings: AppSettingsVNext | None) -> None:
         self._order22_baseline = (
             settings_path_snapshot_for_stt_language_audio(settings)
             if settings is not None
             else None
         )
 
-    def remember_order23(self,         settings: AppSettingsVNext | None) -> None:
+    def remember_order23(self, settings: AppSettingsVNext | None) -> None:
         self._order23_baseline = (
             settings_path_snapshot_for_overlay_osc_output(settings)
             if settings is not None
             else None
         )
 
-    def remember_order24(self,         settings: AppSettingsVNext | None) -> None:
+    def remember_order24(self, settings: AppSettingsVNext | None) -> None:
         self._order24_baseline = (
             settings_path_snapshot_for_ui_prompt_clipboard_state(settings)
             if settings is not None
             else None
         )
 
-    def remember_all(self,         settings: AppSettingsVNext | None) -> None:
+    def remember_all(self, settings: AppSettingsVNext | None) -> None:
         self.remember_order22(settings)
         self.remember_order23(settings)
         self.remember_order24(settings)

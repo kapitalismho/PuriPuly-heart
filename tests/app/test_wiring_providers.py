@@ -9,6 +9,9 @@ from types import SimpleNamespace
 import pytest
 
 from puripuly_heart.app import wiring as wiring_module
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    materialize_canonical_translation_settings,
+)
 from puripuly_heart.app.wiring import (
     ManagedIdentityStateAdapter,
     ResolvedPeerSTTConfig,
@@ -37,6 +40,18 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
     resolve_self_stt_runtime_config_from_vnext,
     self_stt_runtime_intent_from_vnext,
 )
+from puripuly_heart.config.llm_profiles import get_openrouter_llm_profile
+from puripuly_heart.config.provider_values import (
+    CerebrasLLMModel,
+    DeepSeekLLMModel,
+    GeminiLLMModel,
+    OpenRouterCredentialSource,
+    OpenRouterLLMModel,
+    OpenRouterSelectionAlias,
+    QwenLLMModel,
+    QwenRegion,
+    STTProviderName,
+)
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_NONE,
     CREDENTIAL_SOURCE_SECRET_STORE,
@@ -50,24 +65,6 @@ from puripuly_heart.config.runtime_resolution import (
     TranslationFallbackRuntimeIntent,
     resolve_stt_config,
 )
-from puripuly_heart.app.services.canonical_settings_persistence import (
-    materialize_canonical_translation_settings,
-)
-from puripuly_heart.config.provider_values import (
-    CerebrasLLMModel,
-    DeepSeekLLMModel,
-    GeminiLLMModel,
-    OpenRouterCredentialSource,
-    OpenRouterLLMModel,
-    OpenRouterSelectionAlias,
-    QwenLLMModel,
-    QwenRegion,
-    STTProviderName,
-)
-from puripuly_heart.core.openrouter_routing import (
-    OpenRouterProviderRouting,
-    OpenRouterRoutingMode,
-)
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     DesktopFletOverlayIntent,
@@ -75,13 +72,16 @@ from puripuly_heart.config.settings_vnext.schema import (
     DesktopFletOverlayVisualIntent,
     TranslationFallbackIntent,
 )
-from puripuly_heart.config.llm_profiles import get_openrouter_llm_profile
 from puripuly_heart.core.language import (
     get_deepgram_language,
     get_qwen_asr_language,
 )
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
+from puripuly_heart.core.openrouter_routing import (
+    OpenRouterProviderRouting,
+    OpenRouterRoutingMode,
+)
 
 
 class _ConcurrencyProbeProvider(LLMProvider):
@@ -147,7 +147,6 @@ from puripuly_heart.providers.stt.local_parakeet_sherpa import (
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
 from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
-
 
 _LLM_DEFAULTS: dict[str, tuple[str, str]] = {
     "gemini": ("gemini31_flash_lite", "official_byok"),
@@ -2013,9 +2012,7 @@ def test_create_stt_backend_deepgram_uses_settings_and_secret() -> None:
     assert backend.api_key == "k3"
     assert backend.model == "nova-3"
     assert backend.sample_rate_hz == 16000
-    assert backend.language == get_deepgram_language(
-        settings.intent.languages.source_language
-    )
+    assert backend.language == get_deepgram_language(settings.intent.languages.source_language)
     assert list(backend.keyterms) == []
 
 
@@ -2287,9 +2284,7 @@ def test_peer_auto_detection_keeps_self_language_restriction_separate() -> None:
     )
 
     peer = resolve_peer_stt_runtime_config(settings)
-    self_config = resolve_stt_config(
-        self_stt_runtime_intent_from_vnext(settings)
-    )
+    self_config = resolve_stt_config(self_stt_runtime_intent_from_vnext(settings))
 
     assert peer.provider_options["enable_language_identification"] is True
     assert peer.provider_options["language_hints"] == ("ja", "zh")
@@ -2511,9 +2506,7 @@ def test_create_stt_backend_qwen_asr_uses_settings_and_secret() -> None:
     # Endpoint is derived from region (Beijing default)
     assert backend.endpoint == "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
     assert backend.sample_rate_hz == 16000
-    assert backend.language == get_qwen_asr_language(
-        settings.intent.languages.source_language
-    )
+    assert backend.language == get_qwen_asr_language(settings.intent.languages.source_language)
 
 
 def test_create_stt_backend_qwen_asr_ignores_custom_terms() -> None:
@@ -2530,9 +2523,7 @@ def test_create_stt_backend_qwen_asr_ignores_custom_terms() -> None:
     assert isinstance(backend, QwenASRRealtimeSTTBackend)
     assert backend.api_key == "k4"
     assert backend.model == "qwen3-asr-flash-realtime"
-    assert backend.language == get_qwen_asr_language(
-        settings.intent.languages.source_language
-    )
+    assert backend.language == get_qwen_asr_language(settings.intent.languages.source_language)
     assert not hasattr(backend, "keyterms")
     assert not hasattr(backend, "context_terms")
 

@@ -544,9 +544,7 @@ def compose_application_runtime(
             translation_enabled=bool(
                 config is not None and config.snapshot().value.translation_enabled
             ),
-            peer_translation_enabled=bool(
-                settings.peer_translation_enabled()
-            ),
+            peer_translation_enabled=bool(settings.peer_translation_enabled()),
         )
         return desired, settings_value
 
@@ -962,9 +960,7 @@ def compose_application_runtime(
         value = current_settings()
         if value is None:
             return not stt_available
-        return (
-            stt_requires_secret(STTProviderName(value.intent.stt.provider)) and not stt_available
-        )
+        return stt_requires_secret(STTProviderName(value.intent.stt.provider)) and not stt_available
 
     def publish_osc_state_from_runtime() -> None:
         if vrc_mic_sync is not None:

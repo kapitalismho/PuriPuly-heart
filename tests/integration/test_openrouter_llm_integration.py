@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from uuid import UUID
 
 import pytest
@@ -11,8 +12,6 @@ from puripuly_heart.app.wiring.wiring_llm_factory import (
     llm_factory_extras_from_vnext,
     runtime_resolution_input_from_vnext,
 )
-from dataclasses import replace
-
 from puripuly_heart.config.provider_values import (
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,

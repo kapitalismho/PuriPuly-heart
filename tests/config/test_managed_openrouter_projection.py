@@ -41,9 +41,11 @@ def _vnext(
         openrouter_model=openrouter_model,
         openrouter_provider_routing=openrouter_routing
         or current.intent.translation.openrouter_provider_routing,
-        connection_history=current.intent.translation.connection_history
-        if connection_history is None
-        else connection_history,
+        connection_history=(
+            current.intent.translation.connection_history
+            if connection_history is None
+            else connection_history
+        ),
     )
     return materialize_canonical_translation_settings(
         replace(current, intent=replace(current.intent, translation=translation))

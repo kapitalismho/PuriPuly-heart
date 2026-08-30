@@ -549,9 +549,7 @@ class ProviderApplicationOwner:
             if runtime_result.status != RUNTIME_APPLY_STATUS_APPLIED:
                 self._set_result(_runtime_apply_result_as_degraded_transaction(runtime_result))
             return runtime_result.status == RUNTIME_APPLY_STATUS_APPLIED
-        self.settings.begin(
-            snapshot=self.settings.projection_snapshot or self.settings.canonical
-        )
+        self.settings.begin(snapshot=self.settings.projection_snapshot or self.settings.canonical)
         committed = False
         try:
             self.capture_runtime_signatures()
