@@ -426,7 +426,7 @@ def compose_application_runtime(
     managed_account: ManagedAccountComponents | None = None
     runtime_components: RuntimeCompositionComponents | None = None
 
-    def current_settings() -> object | None:
+    def current_settings() -> AppSettingsVNext | None:
         return settings.canonical
 
     def create_settings_secret_store() -> SettingsSecretStorePort:
@@ -435,9 +435,7 @@ def compose_application_runtime(
             raise RuntimeError("Settings are not loaded")
         return create_secret_store(canonical.intent.secrets, config_path=config_path)
 
-    def canonical_settings(value) -> AppSettingsVNext:
-        if isinstance(value, AppSettingsVNext):
-            return value
+    def canonical_settings(value: AppSettingsVNext) -> AppSettingsVNext:
         return settings.project(value, authoritative=True)
 
     def peer_application_settings() -> PeerApplicationSettings | None:

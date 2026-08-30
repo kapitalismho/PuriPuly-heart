@@ -9,6 +9,7 @@ from puripuly_heart.config.process_capture_resolution import (
     ProcessCaptureCandidate,
     ProcessCaptureResolver,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.audio.process_identity import PsutilCurrentUserProcessSnapshots
 
 
@@ -48,7 +49,7 @@ class PeerCaptureTargetRuntimeEffectsAdapter:
     sync_effective_flags: Callable[[object], None]
     refresh_presentation: Callable[[], None]
 
-    async def apply_capture_target(self, settings: object) -> None:
+    async def apply_capture_target(self, settings: AppSettingsVNext) -> None:
         await self.refresh_peer()
         self.sync_effective_flags(settings)
         self.refresh_presentation()

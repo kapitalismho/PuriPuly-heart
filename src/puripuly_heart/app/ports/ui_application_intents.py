@@ -91,7 +91,7 @@ class UiSettingsRuntimePort(Protocol):
 class UiProviderRuntimePort(Protocol):
     async def apply_providers(
         self,
-        settings: object | None = None,
+        settings: AppSettingsVNext | None = None,
         *,
         force_rebuild_llm: bool = False,
         persist_settings: bool = True,

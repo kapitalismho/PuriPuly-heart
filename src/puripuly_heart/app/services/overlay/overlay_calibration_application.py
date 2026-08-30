@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, replace
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 from .overlay_application import OverlayApplicationOwner
 from .overlay_calibration import OverlayCalibrationOwner
@@ -65,10 +66,11 @@ class OverlayCalibrationApplicationOwner:
     async def emit_current(self) -> None:
         await self._owner.emit_current()
 
-    def sync_from_settings(self, settings: object | None = None) -> None:
+    def sync_from_settings(self, settings: AppSettingsVNext | None = None) -> None:
         resolved = settings if settings is not None else self.settings.canonical
-        intent = getattr(resolved, "intent", None)
-        calibration = getattr(getattr(intent, "overlay", None), "calibration", None)
+        if resolved is None:
+            return
+        calibration = resolved.intent.overlay.calibration
         if isinstance(calibration, OverlayCalibration):
             self._owner.replace_current(calibration)
 

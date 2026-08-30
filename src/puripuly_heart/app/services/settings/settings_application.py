@@ -84,9 +84,6 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     _ui_prompt_clipboard_state_runtime_degraded_transaction_result,
     _ui_prompt_clipboard_state_save_failed_transaction_result,
 )
-from puripuly_heart.config.translation_values import (
-    provider_llm_for_translation,
-)
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.provider_values import (
     LLMProviderName,
@@ -102,7 +99,11 @@ from puripuly_heart.config.settings_vnext.schema import (
     TranslationFallbackIntent,
     _infer_translation_fallback_alias,
 )
-from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
+from puripuly_heart.config.translation_values import (
+    TranslationConnection,
+    TranslationModel,
+    provider_llm_for_translation,
+)
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
@@ -740,14 +741,14 @@ class SettingsApplicationOwner:
     sync_ui: Callable[[], None]
     fallback_log_sink: SettingsFallbackLogSink
     mutation_service_provider: SettingsMutationServiceProvider
-    consume_superseded_settings: Callable[[object], bool]
+    consume_superseded_settings: Callable[[AppSettingsVNext], bool]
     active_local_asr_change: SettingsPredicate
     failure_sink: SettingsFailureSink
     results: SettingsTransactionResultOwner = field(default_factory=SettingsTransactionResultOwner)
 
     async def apply(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
         *,
         reload_settings_view: bool = True,
     ) -> bool:

@@ -107,7 +107,7 @@ class ProviderRuntimeSignatures:
 
     def sync(
         self,
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         canonical: AppSettingsVNext,
         peer: PeerApplicationOwner,
@@ -129,7 +129,7 @@ class ProviderRuntimeSignatures:
 
     def capture_peer_before_canonical_mutation(
         self,
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         canonical: AppSettingsVNext,
         peer: PeerApplicationOwner,
@@ -152,10 +152,10 @@ class ProviderRuntimeSignatures:
     def mark_llm_retry(self) -> None:
         self.last_llm_provider = ()
 
-    def mark_superseded(self, settings: object) -> None:
+    def mark_superseded(self, settings: AppSettingsVNext) -> None:
         self.superseded_settings_ids.add(id(settings))
 
-    def consume_superseded(self, settings: object) -> bool:
+    def consume_superseded(self, settings: AppSettingsVNext) -> bool:
         settings_id = id(settings)
         if settings_id not in self.superseded_settings_ids:
             return False
@@ -175,24 +175,24 @@ class ProviderRuntimeEffects:
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None]
     self_capture_owner: Callable[[], SelfCaptureSessionOwner]
     peer: Callable[[], PeerApplicationOwner]
-    peer_desired: Callable[[object], bool]
-    canonical_settings: Callable[[object], AppSettingsVNext]
+    peer_desired: Callable[[AppSettingsVNext], bool]
+    canonical_settings: Callable[[AppSettingsVNext], AppSettingsVNext]
     clear_local_pending: Callable[[], None]
     sync_local_notice: Callable[[], None]
     managed_pending_sink: Callable[[bool], None]
     managed_pending_provider: Callable[[], bool]
     dashboard_managed_pending_sink: Callable[[bool], None]
-    sync_effective_flags: Callable[[object], None]
+    sync_effective_flags: Callable[[AppSettingsVNext], None]
     refresh_overlay: Callable[[], None]
     refresh_peer_runtime: Callable[[], Awaitable[None]]
     replace_self_stt: Callable[[bool], Awaitable[None]]
     self_state_sink: Callable[[SelfCaptureSessionSnapshot], None]
     self_availability: Callable[[SelfCaptureSessionSnapshot], bool]
-    gpu_recovery: Callable[[object, ProviderRuntimeApplyPlan], Awaitable[None]]
+    gpu_recovery: Callable[[AppSettingsVNext, ProviderRuntimeApplyPlan], Awaitable[None]]
     failure_sink: Callable[[str], None]
     success_sink: Callable[[str], None]
 
-    def state(self, settings: object) -> ProviderRuntimeState:
+    def state(self, settings: AppSettingsVNext) -> ProviderRuntimeState:
         llm_runtime = self.llm_runtime_provider()
         local_asr_runtime = self.local_asr_runtime_provider()
         self_owner = self.self_capture_provider()
@@ -211,7 +211,7 @@ class ProviderRuntimeEffects:
             peer_stt_desired=self.peer_desired(settings),
         )
 
-    def apply_common(self, settings: object) -> None:
+    def apply_common(self, settings: AppSettingsVNext) -> None:
         canonical = self.canonical_settings(settings)
         translation = canonical.intent.translation
         provider_llm = provider_llm_for_translation(translation.model, translation.connection)
@@ -274,7 +274,7 @@ class ProviderRuntimeComponents:
     llm_rebuild: LlmProviderRebuildOwner
     effects: ProviderRuntimeEffects
     signatures: ProviderRuntimeSignatures
-    sync_signatures: Callable[[object], None]
+    sync_signatures: Callable[[AppSettingsVNext], None]
     capture_signatures_before_canonical_mutation: Callable[[], None]
 
 
@@ -292,20 +292,20 @@ def compose_provider_runtime(
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None],
     self_capture_owner: Callable[[], SelfCaptureSessionOwner],
     peer: Callable[[], PeerApplicationOwner],
-    peer_desired: Callable[[object], bool],
-    canonical_settings: Callable[[object], AppSettingsVNext],
+    peer_desired: Callable[[AppSettingsVNext], bool],
+    canonical_settings: Callable[[AppSettingsVNext], AppSettingsVNext],
     clear_local_pending: Callable[[], None],
     sync_local_notice: Callable[[], None],
     managed_pending_sink: Callable[[bool], None],
     managed_pending_provider: Callable[[], bool],
     dashboard_managed_pending_sink: Callable[[bool], None],
-    sync_effective_flags: Callable[[object], None],
+    sync_effective_flags: Callable[[AppSettingsVNext], None],
     refresh_overlay: Callable[[], None],
     refresh_peer_runtime: Callable[[], Awaitable[None]],
     replace_self_stt: Callable[[bool], Awaitable[None]],
     self_state_sink: Callable[[SelfCaptureSessionSnapshot], None],
     self_availability: Callable[[SelfCaptureSessionSnapshot], bool],
-    gpu_recovery: Callable[[object, ProviderRuntimeApplyPlan], Awaitable[None]],
+    gpu_recovery: Callable[[AppSettingsVNext, ProviderRuntimeApplyPlan], Awaitable[None]],
     managed_release: Callable[[], ManagedOpenRouterReleaseRuntime],
     managed_delegate_ready: Callable[[], None],
     runtime_logging: ProviderObservationPort,
@@ -313,7 +313,7 @@ def compose_provider_runtime(
     usage_refresh: Callable[[], Awaitable[None]],
     failure_sink: Callable[[str], None],
     success_sink: Callable[[str], None],
-    additional_signature_sink: Callable[[object], None],
+    additional_signature_sink: Callable[[AppSettingsVNext], None],
     managed_gemma: ManagedGemmaTranslationOwner | None = None,
     signatures: ProviderRuntimeSignatures | None = None,
 ) -> ProviderRuntimeComponents:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
@@ -19,7 +18,6 @@ from puripuly_heart.app.services.settings_application import SettingsApplication
 from puripuly_heart.config.resolved import OVERLAY_TARGET_DESKTOP, ResolvedOverlayConfig
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
-    DesktopFletOverlayIntent,
     DesktopFletOverlayPositionIntent,
 )
 from puripuly_heart.core.runtime.desktop_overlay_bounds import (
@@ -544,7 +542,7 @@ class DesktopOverlayApplicationOwner:
             next_size_preset=next_desktop.size_preset,
         )
 
-    def sync_from_settings(self, settings: Any) -> None:
+    def sync_from_settings(self, settings: AppSettingsVNext) -> None:
         overlay = self.overlay_provider()
         if (
             OverlayApplicationOwner.normalized_target(settings.intent.overlay.target)
