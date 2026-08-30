@@ -518,6 +518,7 @@ def test_dashboard_projects_osc_state_without_emitting_intents(
     settings = AppSettings()
     settings.languages.source_language = "ja"
     settings.languages.target_language = "fr"
+    settings.languages.secondary_target_language = "en"
     settings.languages.peer_source_language = "de"
     settings.languages.peer_target_language = "ko"
     settings.languages.peer_source_mode = "auto"
@@ -540,6 +541,12 @@ def test_dashboard_projects_osc_state_without_emitting_intents(
     view.project_osc_control_state(
         osc_control_presentation_state(
             "PuriPuly_SelfSrcLang",
+            settings=settings,
+        )
+    )
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_SelfDstLang2",
             settings=settings,
         )
     )
@@ -582,6 +589,7 @@ def test_dashboard_projects_osc_state_without_emitting_intents(
         dashboard_module.t("dashboard.peer_source.automatic"),
         "name-ko",
     )
+    assert view.language_card.secondary_targets[-1] == "name-en"
     assert FakeLanguageModal.disabled_codes[-2:] == [{"auto"}, set()]
     assert view.peer_button.states[-1]["is_on"] is True
     assert view.overlay_button.states[-1]["is_on"] is True

@@ -3892,6 +3892,7 @@ class SettingsView(ft.Column):
             "PuriPuly_PeerAuto",
             "PuriPuly_SelfSrcLang",
             "PuriPuly_SelfDstLang",
+            "PuriPuly_SelfDstLang2",
             "PuriPuly_PeerSrcLang",
             "PuriPuly_PeerDstLang",
         }:
@@ -3963,6 +3964,13 @@ class SettingsView(ft.Column):
             settings.languages.source_language = state.self_source_language
         elif control == "PuriPuly_SelfDstLang":
             settings.languages.target_language = state.self_target_language
+            settings.languages.secondary_target_language = (
+                state.self_secondary_target_language
+            )
+        elif control == "PuriPuly_SelfDstLang2":
+            settings.languages.secondary_target_language = (
+                state.self_secondary_target_language
+            )
         elif control == "PuriPuly_PeerSrcLang":
             settings.languages.peer_source_language = state.peer_source_language
         elif control == "PuriPuly_PeerDstLang":

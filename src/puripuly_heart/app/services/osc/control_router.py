@@ -11,6 +11,7 @@ from puripuly_heart.app.ports.osc_control import (
     ASR_IDS,
     FALLBACK_IDS,
     LANGUAGE_IDS,
+    SECONDARY_LANGUAGE_IDS,
     TRANSLATION_CONNECTION_BY_MODEL_ID,
     TRANSLATION_MODEL_IDS,
     OscControlApplicationPort,
@@ -27,6 +28,7 @@ _COALESCED_CONTROLS = frozenset(
     {
         "PuriPuly_SelfSrcLang",
         "PuriPuly_SelfDstLang",
+        "PuriPuly_SelfDstLang2",
         "PuriPuly_PeerSrcLang",
         "PuriPuly_PeerDstLang",
         "PuriPuly_SelfASR",
@@ -299,6 +301,10 @@ class OscControlRouter:
             return await app.set_mute_sync(message.value)  # type: ignore[arg-type]
         if message.name == "PuriPuly_ChatboxSource":
             return await app.set_chatbox_source(message.value)  # type: ignore[arg-type]
+        if message.name == "PuriPuly_SelfDstLang2":
+            return await app.set_secondary_target_language(
+                SECONDARY_LANGUAGE_IDS[message.value]  # type: ignore[index]
+            )
         if message.name in {
             "PuriPuly_SelfSrcLang",
             "PuriPuly_SelfDstLang",

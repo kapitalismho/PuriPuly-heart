@@ -777,7 +777,7 @@ async def test_two_identities_stay_resident_without_second_prefill(tmp_path: Pat
 
 
 @pytest.mark.asyncio
-async def test_third_identity_evicts_only_lru_slot(tmp_path: Path) -> None:
+async def test_fourth_identity_evicts_only_lru_slot(tmp_path: Path) -> None:
     owner, _commands, _processes, transports, _provision_calls, _logs = _runtime(tmp_path)
     template = "Translate {source_language} to {target_language}"
 
@@ -807,6 +807,12 @@ async def test_third_identity_evicts_only_lru_slot(tmp_path: Path) -> None:
     )
     await owner.prepare(
         backend="cpu",
+        source_language="de",
+        target_language="en",
+        system_prompt=template,
+    )
+    await owner.prepare(
+        backend="cpu",
         source_language="ko",
         target_language="en",
         system_prompt=template,
@@ -816,5 +822,6 @@ async def test_third_identity_evicts_only_lru_slot(tmp_path: Path) -> None:
         "Translate ko to en",
         "Translate en to ko",
         "Translate ja to en",
+        "Translate de to en",
     ]
-    assert transports[0].prefix_slots == [0, 1, 1]
+    assert transports[0].prefix_slots == [0, 1, 2, 1]

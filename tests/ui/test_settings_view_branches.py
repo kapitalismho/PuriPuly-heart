@@ -114,6 +114,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
     canonical = AppSettings()
     canonical.languages.source_language = "ja"
     canonical.languages.target_language = "fr"
+    canonical.languages.secondary_target_language = "en"
     canonical.languages.peer_source_language = "de"
     canonical.languages.peer_target_language = "ko"
     canonical.languages.peer_source_mode = "auto"
@@ -155,6 +156,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         "PuriPuly_ChatboxSource",
         "PuriPuly_SelfSrcLang",
         "PuriPuly_SelfDstLang",
+        "PuriPuly_SelfDstLang2",
         "PuriPuly_PeerSrcLang",
         "PuriPuly_PeerDstLang",
         "PuriPuly_SelfASR",
@@ -175,6 +177,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         assert projected_settings is not None
         assert projected_settings.languages.source_language == "ja"
         assert projected_settings.languages.target_language == "fr"
+        assert projected_settings.languages.secondary_target_language == "en"
         assert projected_settings.languages.peer_source_language == "de"
         assert projected_settings.languages.peer_target_language == "ko"
         assert projected_settings.languages.peer_source_mode == "auto"

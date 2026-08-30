@@ -583,6 +583,7 @@ class DashboardView(ft.Column):
             "PuriPuly_PeerAuto",
             "PuriPuly_SelfSrcLang",
             "PuriPuly_SelfDstLang",
+            "PuriPuly_SelfDstLang2",
             "PuriPuly_PeerSrcLang",
             "PuriPuly_PeerDstLang",
         }:
@@ -592,6 +593,7 @@ class DashboardView(ft.Column):
                 state.peer_source_language,
                 state.peer_target_language,
                 state.peer_source_mode,
+                state.self_secondary_target_language,
             )
         elif control == "PuriPuly_PeerASR":
             self.set_peer_auto_detect_available(state.peer_asr in {"soniox", "local_qwen_gpu"})

@@ -33,6 +33,7 @@ def presentation_state_from_settings(
         chatbox_source=canonical_state.chatbox_source,
         self_source_language=canonical_state.self_source_language,
         self_target_language=canonical_state.self_target_language,
+        self_secondary_target_language=canonical_state.self_secondary_target_language,
         peer_source_language=canonical_state.peer_source_language,
         peer_target_language=canonical_state.peer_target_language,
         self_asr=canonical_state.self_asr,

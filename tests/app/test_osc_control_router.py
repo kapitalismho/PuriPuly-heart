@@ -34,6 +34,10 @@ class FakeApplication:
         self.calls.append(("languages", tuple(kwargs.values())))
         return None
 
+    async def set_secondary_target_language(self, language: str) -> object:
+        self.calls.append(("secondary_language", language))
+        return None
+
     async def set_peer_auto_detect(self, enabled: bool) -> object:
         self.calls.append(("peer_auto", enabled))
         return None
@@ -135,6 +139,7 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("PuriPuly_ChatboxSource", True),
         ("PuriPuly_SelfSrcLang", 16),
         ("PuriPuly_SelfDstLang", 7),
+        ("PuriPuly_SelfDstLang2", 16),
         ("PuriPuly_PeerSrcLang", 7),
         ("PuriPuly_PeerDstLang", 17),
         ("PuriPuly_SelfASR", 7),
@@ -157,6 +162,7 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         "chatbox_source",
         "languages",
         "languages",
+        "secondary_language",
         "languages",
         "languages",
         "self_asr",
@@ -164,9 +170,10 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         "model",
         "fallback",
     ]
-    assert application.calls[-8:] == [
+    assert application.calls[-9:] == [
         ("languages", ("ja", "en", "en", "ko")),
         ("languages", ("ja", "en", "en", "ko")),
+        ("secondary_language", "ja"),
         ("languages", ("ja", "en", "en", "ko")),
         ("languages", ("ja", "en", "en", "ko")),
         ("self_asr", "soniox"),

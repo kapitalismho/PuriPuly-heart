@@ -328,6 +328,16 @@ async def test_primary_osc_target_change_preserves_a_distinct_secondary_target()
     assert current.languages.target_language == "fr"
     assert current.languages.secondary_target_language == "ja"
 
+    result = await application.set_secondary_target_language("de")
+
+    assert result is True
+    assert current.languages.secondary_target_language == "de"
+
+    result = await application.set_secondary_target_language("fr")
+
+    assert result is True
+    assert current.languages.secondary_target_language == ""
+
 
 @pytest.mark.asyncio
 async def test_asr_controls_skip_apply_when_provider_matches() -> None:
