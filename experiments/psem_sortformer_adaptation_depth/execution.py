@@ -1097,3 +1097,258 @@ def run_overfit_arm_result(
     result = {**payload, "payload_sha256": canonical_sha256(payload)}
     register_execution("overfit-arm", result)
     return result, selected
+
+
+def run_memory_fit_preflight(
+    *,
+    checkpoint_path: Path,
+    nemo_checkout: Path,
+    dependency_lock: Path,
+    corpus_root: Path,
+    reference_root: Path,
+    sampling_manifest: Path,
+    class_weight_receipt: Mapping[str, Any],
+    device: str,
+) -> dict[str, Any]:
+    import gc
+    import platform
+
+    from experiments.psem_sortformer_adaptation_depth.runtime_audit import (
+        GRADIENT_CLIP_NORM,
+        build_optimizer,
+    )
+    from experiments.psem_sortformer_adaptation_depth.training import (
+        GRADIENT_ACCUMULATION_STEPS,
+        MICRO_BATCH_SIZE,
+        ClassWeights,
+        build_manifest_class_weight_receipt,
+        forward_batch,
+    )
+
+    if _eval_registry_marker().exists():
+        raise ExecutionError("memory-fit preflight is sealed after EVAL opened")
+    assert_clean_candidate()
+    training_device = torch.device(device)
+    if (
+        not torch.cuda.is_available()
+        or torch.cuda.device_count() != 1
+        or training_device.type != "cuda"
+    ):
+        raise ExecutionError("memory-fit preflight requires exactly one CUDA accelerator")
+
+    rows = load_sampling_rows(sampling_manifest)
+    sessions = load_training_sessions(corpus_root, reference_root)
+    manifest_validation = validate_sampling_manifest(sampling_manifest, sessions)
+    expected_class_weights = build_manifest_class_weight_receipt(rows, sessions, sampling_manifest)
+    if dict(class_weight_receipt) != expected_class_weights:
+        raise ExecutionError("memory-fit class weights differ from the shared TRAIN manifest")
+    class_weights = ClassWeights(
+        replacement_positive=float(class_weight_receipt["replacement_positive_weight"]),
+        anchor_positive=float(class_weight_receipt["anchor_positive_weight"]),
+    )
+    probe_rows = [row for row in rows if row.get("epoch") == 1][:GRADIENT_ACCUMULATION_STEPS]
+    if len(probe_rows) != GRADIENT_ACCUMULATION_STEPS or [
+        row.get("epoch_index") for row in probe_rows
+    ] != list(range(GRADIENT_ACCUMULATION_STEPS)):
+        raise ExecutionError("memory-fit inputs differ from the first optimizer step")
+    rows_by_id = {str(row["row_id"]): row for row in rows}
+    input_started = time.perf_counter()
+    examples = [
+        prepare_training_example(
+            row,
+            sessions[str(row["source_id"])],
+            corpus_root,
+            str(row["corpus"]),
+            manifest_path=sampling_manifest,
+            manifest_validation=manifest_validation,
+            manifest_rows_by_id=rows_by_id,
+        )
+        for row in probe_rows
+    ]
+    input_preparation_seconds = time.perf_counter() - input_started
+
+    properties = torch.cuda.get_device_properties(training_device)
+    total_memory_bytes = int(properties.total_memory)
+    arm_results: list[dict[str, Any]] = []
+    runtime_identity_sha256s: set[str] = set()
+    for arm in ("H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"):
+        model = None
+        optimizer = None
+        result = None
+        loss = None
+        gradient_norm = None
+        gc.collect()
+        torch.cuda.empty_cache()
+        seed_runtime(7301)
+        try:
+            model, runtime_identity = load_pinned_sortformer(
+                checkpoint_path,
+                nemo_checkout,
+                dependency_lock,
+                training_device,
+            )
+            parameter_policy = apply_parameter_policy(model, arm)
+            optimizer = build_optimizer(model, arm)
+            model.train()
+            optimizer.zero_grad(set_to_none=True)
+            torch.cuda.synchronize(training_device)
+            torch.cuda.reset_peak_memory_stats(training_device)
+            step_started = time.perf_counter()
+            for example in examples:
+                result = forward_batch(model, (example,), class_weights)
+                loss = result.losses["total"]
+                if loss.ndim != 0 or not bool(torch.isfinite(loss)):
+                    raise ExecutionError("memory-fit forward produced a non-finite scalar loss")
+                (loss / GRADIENT_ACCUMULATION_STEPS).backward()
+            gradient_norm = torch.nn.utils.clip_grad_norm_(
+                [parameter for parameter in model.parameters() if parameter.requires_grad],
+                GRADIENT_CLIP_NORM,
+            )
+            if not bool(torch.isfinite(gradient_norm)):
+                raise ExecutionError("memory-fit backward produced a non-finite gradient norm")
+            optimizer.step()
+            torch.cuda.synchronize(training_device)
+            optimizer_step_seconds = time.perf_counter() - step_started
+            peak_allocated_bytes = int(torch.cuda.max_memory_allocated(training_device))
+            peak_reserved_bytes = int(torch.cuda.max_memory_reserved(training_device))
+            if peak_allocated_bytes <= 0 or peak_reserved_bytes < peak_allocated_bytes:
+                raise ExecutionError("memory-fit CUDA accounting is invalid")
+            runtime_identity_sha256 = canonical_sha256(runtime_identity)
+            runtime_identity_sha256s.add(runtime_identity_sha256)
+            arm_results.append(
+                {
+                    "arm": arm,
+                    "fit": True,
+                    "peak_allocated_memory_bytes": peak_allocated_bytes,
+                    "peak_reserved_memory_bytes": peak_reserved_bytes,
+                    "device_memory_headroom_bytes": total_memory_bytes - peak_reserved_bytes,
+                    "device_memory_headroom_fraction": (
+                        (total_memory_bytes - peak_reserved_bytes) / total_memory_bytes
+                    ),
+                    "optimizer_step_seconds": optimizer_step_seconds,
+                    "micro_batch_seconds": optimizer_step_seconds / GRADIENT_ACCUMULATION_STEPS,
+                    "total_parameters": sum(parameter.numel() for parameter in model.parameters()),
+                    "trainable_parameters": sum(
+                        parameter.numel()
+                        for parameter in model.parameters()
+                        if parameter.requires_grad
+                    ),
+                    "parameter_policy_sha256": canonical_sha256(parameter_policy),
+                    "runtime_identity_sha256": runtime_identity_sha256,
+                    "optimizer_state_initialized": True,
+                    "forward_backward_micro_batches": GRADIENT_ACCUMULATION_STEPS,
+                }
+            )
+        except torch.cuda.OutOfMemoryError as exc:
+            arm_results.append(
+                {
+                    "arm": arm,
+                    "fit": False,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                    "peak_allocated_memory_bytes": int(
+                        torch.cuda.max_memory_allocated(training_device)
+                    ),
+                    "peak_reserved_memory_bytes": int(
+                        torch.cuda.max_memory_reserved(training_device)
+                    ),
+                }
+            )
+        finally:
+            gradient_norm = None
+            loss = None
+            optimizer = None
+            result = None
+            model = None
+            gc.collect()
+            torch.cuda.empty_cache()
+
+    successful_steps = [
+        float(row["optimizer_step_seconds"]) for row in arm_results if row["fit"] is True
+    ]
+    input_to_step_ratio = (
+        input_preparation_seconds / min(successful_steps) if successful_steps else None
+    )
+    try:
+        host_pages = int(os.sysconf("SC_PHYS_PAGES"))
+        host_page_size = int(os.sysconf("SC_PAGE_SIZE"))
+        host_memory_bytes = host_pages * host_page_size
+    except (AttributeError, OSError, ValueError):
+        host_memory_bytes = None
+    try:
+        storage = subprocess.run(
+            [
+                "findmnt",
+                "--noheadings",
+                "--output",
+                "FSTYPE,SOURCE,TARGET",
+                "--target",
+                str(corpus_root.resolve()),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        storage = "unavailable"
+    payload = {
+        "schema_version": 1,
+        "artifact_role": "cloud_memory_fit_preflight",
+        "passed": len(arm_results) == 3 and all(row["fit"] is True for row in arm_results),
+        "split_roles": ["PSEM-STRATEGY-TRAIN"],
+        "eval_source_count": 0,
+        "device": {
+            "count": 1,
+            "name": str(properties.name),
+            "total_memory_bytes": total_memory_bytes,
+            "torch_cuda_version": torch.version.cuda,
+        },
+        "host": {
+            "cpu_model": platform.processor(),
+            "vcpu_count": os.cpu_count(),
+            "memory_bytes": host_memory_bytes,
+            "storage": storage,
+        },
+        "precision_mode": "float32",
+        "mixed_precision": False,
+        "micro_batch_size": MICRO_BATCH_SIZE,
+        "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
+        "effective_batch_size": MICRO_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS,
+        "sampling_manifest_sha256": sha256_file(sampling_manifest),
+        "sampling_validation_sha256": canonical_sha256(manifest_validation),
+        "class_weight_receipt_sha256": class_weight_receipt["payload_sha256"],
+        "probe_row_ids": [str(row["row_id"]) for row in probe_rows],
+        "probe_input_identity_sha256": canonical_sha256(
+            [
+                {
+                    key: row[key]
+                    for key in (
+                        "row_id",
+                        "source_id",
+                        "corpus",
+                        "window_start_sample",
+                        "window_end_sample",
+                        "target_identity_sha256",
+                        "augmentation_identity_sha256",
+                        "state_reset_at_window_start",
+                    )
+                }
+                for row in probe_rows
+            ]
+        ),
+        "input_preparation_seconds": input_preparation_seconds,
+        "input_preparation_to_fastest_optimizer_step_ratio": input_to_step_ratio,
+        "io_bottleneck_observation": (
+            "input_preparation_slower_than_fastest_optimizer_step"
+            if input_to_step_ratio is not None and input_to_step_ratio > 1.0
+            else "not_observed_in_probe"
+        ),
+        "runtime_identity_sha256s": sorted(runtime_identity_sha256s),
+        "arms": arm_results,
+        "maximum_peak_reserved_memory_bytes": max(
+            (int(row["peak_reserved_memory_bytes"]) for row in arm_results),
+            default=0,
+        ),
+        "candidate_code_identity_sha256": candidate_code_identity()["payload_sha256"],
+    }
+    return {**payload, "payload_sha256": canonical_sha256(payload)}

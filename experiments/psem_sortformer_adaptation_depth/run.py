@@ -216,7 +216,35 @@ def main(argv: list[str] | None = None) -> int:
     material_assemble = commands.add_parser("assemble-material-bundle")
     material_assemble.add_argument("inputs", type=Path)
     material_assemble.add_argument("--output", type=Path, required=True)
+    memory_fit = commands.add_parser("memory-fit")
+    memory_fit.add_argument("--checkpoint", type=Path, required=True)
+    memory_fit.add_argument("--nemo-checkout", type=Path, required=True)
+    memory_fit.add_argument("--dependency-lock", type=Path, required=True)
+    memory_fit.add_argument("--corpus-root", type=Path, required=True)
+    memory_fit.add_argument("--reference-root", type=Path, required=True)
+    memory_fit.add_argument("--manifest", type=Path, required=True)
+    memory_fit.add_argument("--class-weights", type=Path, required=True)
+    memory_fit.add_argument("--device", default="cuda")
+    memory_fit.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
+    if args.command == "memory-fit":
+        from experiments.psem_sortformer_adaptation_depth.execution import (
+            run_memory_fit_preflight,
+        )
+
+        receipt = run_memory_fit_preflight(
+            checkpoint_path=args.checkpoint,
+            nemo_checkout=args.nemo_checkout,
+            dependency_lock=args.dependency_lock,
+            corpus_root=args.corpus_root,
+            reference_root=args.reference_root,
+            sampling_manifest=args.manifest,
+            class_weight_receipt=_load_json(args.class_weights),
+            device=args.device,
+        )
+        write_json(args.output, receipt)
+        print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
+        return 0 if receipt["passed"] else 2
     if args.command == "data-split-receipt":
         receipt = build_data_split_receipt()
         if args.output:

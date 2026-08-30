@@ -25,7 +25,7 @@ DATA_SPLIT_RECEIPT_PATH = PACKAGE_ROOT / "data_split_receipt.json"
 RUNTIME_CONTRACT_PATH = PACKAGE_ROOT / "runtime_contract.json"
 RUNTIME_ENVIRONMENT_PATH = PACKAGE_ROOT / "runtime_environment.json"
 EXPECTED_RUNTIME_ENVIRONMENT_SHA256 = (
-    "003d5b701f18ed5883b4708d69e1e9952365fa17a1b01e8e7ffc0481a4f8aed5"
+    "0fcd0d0ef837b3380176ea51c180b361420e6bbb35fef8790c29accadb23559d"
 )
 PINNED_CONTAINER_IMAGE_IDENTITY = (
     "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb"
@@ -389,8 +389,8 @@ def _runtime_environment_checks() -> list[dict[str, Any]]:
         ),
         check(
             "runtime.cuda_device_memory",
-            device_memory is not None and device_memory >= compute["minimum_device_memory_bytes"],
-            {"minimum_bytes": compute["minimum_device_memory_bytes"]},
+            device_memory is not None and device_memory > 0,
+            {"selection": "cloud_memory_fit_preflight"},
             {"bytes": device_memory},
         ),
         check(

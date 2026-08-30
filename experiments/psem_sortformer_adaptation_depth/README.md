@@ -21,7 +21,7 @@ The resulting metrics support an engineering choice about the next experiment on
 
 ## Authorized runtime
 
-The frozen runtime is Linux x86_64 in `nvcr.io/nvidia/pytorch@sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb` (tag `25.01-py3`), Python 3.10 or newer, PyTorch 2.5 or newer, and exactly one CUDA accelerator with at least 80,000,000,000 bytes of device memory. NeMo must be checked out at `1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6` and installed from that checkout with the commands frozen in `runtime_environment.json`.
+The frozen runtime is Linux x86_64 in `nvcr.io/nvidia/pytorch@sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb` (tag `25.01-py3`), Python 3.10 or newer, PyTorch 2.5 or newer, and exactly one CUDA accelerator. The official GPU SKU is selected only after the cloud memory-fit preflight records all three authorized graphs with safe VRAM headroom and acceptable throughput. NeMo must be checked out at `1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6` and installed from that checkout with the commands frozen in `runtime_environment.json`.
 
 Set an immutable local image identity, not a mutable tag:
 
@@ -68,15 +68,7 @@ Use a clean committed candidate and write all large artifacts under the external
    python -m experiments.psem_sortformer_adaptation_depth.run model-graph --checkpoint "$PSEM_SORTFORMER_NEMO_PATH" --nemo-checkout <nemo-checkout> --dependency-lock <cache>/nemo_dependency_lock.json --device cuda --output <cache>/model_graph.json
    ```
 
-2. Build the pre-training float/Q8 lineage. `lineage-authorization` permits only the official frozen float checkpoint on the exact issue-99 DEV/EVAL identities; it forbids fitting, checkpoint selection, adapted weights, and EVAL-driven development.
-
-   ```bash
-   python -m experiments.psem_sortformer_adaptation_depth.run lineage-authorization --output <cache>/lineage_authorization.json
-   python -m experiments.psem_sortformer_adaptation_depth.run build-lineage --checkpoint "$PSEM_SORTFORMER_NEMO_PATH" --nemo-checkout <nemo-checkout> --dependency-lock <cache>/nemo_dependency_lock.json --corpus-root "$PSEM_CORPUS_ROOT" --reference-root "$PSEM_REFERENCE_ROOT" --output-root "$PSEM_ADAPTATION_OUTPUT_ROOT" --authorization <cache>/lineage_authorization.json --device cuda --output <cache>/trainable_checkpoint_lineage.json --runtime-identity-output <cache>/runtime_identity.json
-   python -m experiments.psem_sortformer_adaptation_depth.run validate-lineage <cache>/trainable_checkpoint_lineage.json --runtime-identity <cache>/runtime_identity.json --output <cache>/lineage_validation.json
-   ```
-
-3. Materialize and validate the one shared TRAIN manifest and TRAIN-only class weights.
+2. Materialize and validate the one shared TRAIN manifest and TRAIN-only class weights before any scientific metric is inspected.
 
    ```bash
    python -m experiments.psem_sortformer_adaptation_depth.run sampling-manifest --corpus-root "$PSEM_CORPUS_ROOT" --reference-root "$PSEM_REFERENCE_ROOT" --output <cache>/sampling_manifest.jsonl
@@ -84,11 +76,25 @@ Use a clean committed candidate and write all large artifacts under the external
    python -m experiments.psem_sortformer_adaptation_depth.run class-weights --manifest <cache>/sampling_manifest.jsonl --corpus-root "$PSEM_CORPUS_ROOT" --reference-root "$PSEM_REFERENCE_ROOT" --output <cache>/class_weights.json
    ```
 
-4. For `H-HEAD`, `T2-TOP`, and conditionally `TA-ALL-TEMPORAL`, run the raw-waveform graph/gradient/update/timing canary with `canary-arm`, then the fixed 30-minute/500-step overfit canary with `overfit-arm`. The timing canary mutates a future waveform suffix and proves that every output whose charged frontier precedes that suffix is unchanged; it also binds the observed cache/FIFO trace. `TA-ALL-TEMPORAL` additionally requires `--staged-state` and every prior `--staged-dev-result`, and cannot run before the frozen DEV escalation opens it. Assemble and validate the combined overfit receipt with `build-overfit-receipt` and `validate-overfit`. A failure is an implementation or objective failure and does not authorize a recipe change.
+3. Run the cloud memory-fit preflight. It gives `H-HEAD`, `T2-TOP`, and the `TA-ALL-TEMPORAL` graph the same first 16 manifest windows, executes one real AdamW optimizer step at micro-batch 1 and accumulation 16, and records peak allocated/reserved VRAM, device headroom, input preparation time, and step time. This execution-only probe does not open the conditional scientific arm. Select and freeze the smallest compatible GPU with safe headroom only after this receipt passes all three arms.
 
-5. Build one `material_training_authorization` per arm and authorized seed. `assemble-material-bundle` converts paths into the exact bundle consumed by `validate-material-gate`. The gate revalidates the clean Git head, split, sampling bytes, TRAIN weights, lineage, runtime identity, evaluator, parameter inventory, canaries, overfit result, and current DEV-only staged state.
+   ```bash
+   python -m experiments.psem_sortformer_adaptation_depth.run memory-fit --checkpoint "$PSEM_SORTFORMER_NEMO_PATH" --nemo-checkout <nemo-checkout> --dependency-lock <cache>/nemo_dependency_lock.json --corpus-root "$PSEM_CORPUS_ROOT" --reference-root "$PSEM_REFERENCE_ROOT" --manifest <cache>/sampling_manifest.jsonl --class-weights <cache>/class_weights.json --device cuda --output <cache>/cloud_memory_fit_preflight.json
+   ```
 
-6. Execute the fixed staged protocol:
+4. Build the pre-training float/Q8 lineage. `lineage-authorization` permits only the official frozen float checkpoint on the exact issue-99 DEV/EVAL identities; it forbids fitting, checkpoint selection, adapted weights, and EVAL-driven development.
+
+   ```bash
+   python -m experiments.psem_sortformer_adaptation_depth.run lineage-authorization --output <cache>/lineage_authorization.json
+   python -m experiments.psem_sortformer_adaptation_depth.run build-lineage --checkpoint "$PSEM_SORTFORMER_NEMO_PATH" --nemo-checkout <nemo-checkout> --dependency-lock <cache>/nemo_dependency_lock.json --corpus-root "$PSEM_CORPUS_ROOT" --reference-root "$PSEM_REFERENCE_ROOT" --output-root "$PSEM_ADAPTATION_OUTPUT_ROOT" --authorization <cache>/lineage_authorization.json --device cuda --output <cache>/trainable_checkpoint_lineage.json --runtime-identity-output <cache>/runtime_identity.json
+   python -m experiments.psem_sortformer_adaptation_depth.run validate-lineage <cache>/trainable_checkpoint_lineage.json --runtime-identity <cache>/runtime_identity.json --output <cache>/lineage_validation.json
+   ```
+
+5. For `H-HEAD`, `T2-TOP`, and conditionally `TA-ALL-TEMPORAL`, run the raw-waveform graph/gradient/update/timing canary with `canary-arm`, then the fixed 30-minute/500-step overfit canary with `overfit-arm`. The timing canary mutates a future waveform suffix and proves that every output whose charged frontier precedes that suffix is unchanged; it also binds the observed cache/FIFO trace. `TA-ALL-TEMPORAL` additionally requires `--staged-state` and every prior `--staged-dev-result`, and cannot run before the frozen DEV escalation opens it. Assemble and validate the combined overfit receipt with `build-overfit-receipt` and `validate-overfit`. A failure is an implementation or objective failure and does not authorize a recipe change.
+
+6. Build one `material_training_authorization` per arm and authorized seed. `assemble-material-bundle` converts paths into the exact bundle consumed by `validate-material-gate`. The gate revalidates the clean Git head, split, sampling bytes, TRAIN weights, lineage, runtime identity, evaluator, parameter inventory, canaries, overfit result, and current DEV-only staged state.
+
+7. Execute the fixed staged protocol:
 
    - infer and evaluate DEV for `F0-FROZEN-FLOAT`;
    - initialize state with `stage-init`;
@@ -99,9 +105,9 @@ Use a clean committed candidate and write all large artifacts under the external
 
    Training selects only by complete DEV loss with DEV replacement AP as the frozen tie-break. Each saved checkpoint and prediction row binds its source waveform, base and trained checkpoint, runtime, parameter policy, Git candidate, and code identity. Checkpoint, dependency-lock, prediction, and lineage validation hashes and consumes the same captured bytes. Runtime lineage, canaries, checkpoints, predictions, evaluations, and training results also require content-addressed records in the authority registry.
 
-7. Freeze all DEV results, prediction sets, and selected checkpoint receipts with `freeze-candidates`. This command requires the current clean candidate to match the code used for those artifacts.
+8. Freeze all DEV results, prediction sets, and selected checkpoint receipts with `freeze-candidates`. This command requires the current clean candidate to match the code used for those artifacts.
 
-8. Open EVAL exactly once:
+9. Open EVAL exactly once:
 
    ```bash
    python -m experiments.psem_sortformer_adaptation_depth.run open-eval <cache>/candidate_freeze.json --output-root "$PSEM_ADAPTATION_OUTPUT_ROOT"
@@ -109,7 +115,7 @@ Use a clean committed candidate and write all large artifacts under the external
 
    The only authorization is created with exclusive-file semantics under the clone-wide Git common directory at `psem-sortformer-adaptation-depth/<authority-pin>/issue-107-<authority-pin>.json`. This location is shared by every process and worktree in the clone, so changing the caller-provided registry or output directory cannot reopen EVAL. `$PSEM_PROTOCOL_REGISTRY_ROOT` remains an external provenance root recorded in receipts, not the owner of the global seal. EVAL inference requires the persisted authorization, `--protocol-registry-root "$PSEM_PROTOCOL_REGISTRY_ROOT"`, the frozen candidate identity, the exact authorized checkpoint, and the authorized external output root. DEV inference, lineage, canary, overfit, training, staging, and refreeze paths fail after the authority marker exists.
 
-9. Infer and evaluate every frozen candidate on EVAL, then call `final-report`. It validates the complete authorization/result/prediction/checkpoint chain and writes the required metrics, per-source rows, frontiers, topology slices, 2,000-source bootstrap intervals, timing/compute report, decision receipt, and `ADAPTATION_DECISION.md`.
+10. Infer and evaluate every frozen candidate on EVAL, then call `final-report`. It validates the complete authorization/result/prediction/checkpoint chain and writes the required metrics, per-source rows, frontiers, topology slices, 2,000-source bootstrap intervals, timing/compute report, decision receipt, and `ADAPTATION_DECISION.md`.
 
 The final report compares issue-99 `G`, issue-99 Q8 `S-current`, `F0-FROZEN-FLOAT`, and each shallower arm; reports pooled, equal-corpus macro, AMI-only, AliMeeting-only, and mandatory topology views; and chooses only outcome A, B, C, or D under the predeclared shallowest-stable-depth rule.
 

@@ -26,8 +26,7 @@
   },
   "compute": {
     "accelerator_count": 1,
-    "preferred_accelerator": "NVIDIA A100 80GB PCIe or SXM",
-    "minimum_device_memory_bytes": 80000000000,
+    "accelerator_selection": "smallest compatible GPU with safe headroom after cloud memory-fit preflight",
     "mixed_precision": false,
     "micro_batch_size": 1,
     "gradient_accumulation_steps": 16
