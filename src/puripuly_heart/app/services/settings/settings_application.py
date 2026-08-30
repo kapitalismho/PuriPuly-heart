@@ -283,6 +283,7 @@ def osc_control_presentation_state(
         chatbox_source=canonical_state.chatbox_source,
         self_source_language=canonical_state.self_source_language,
         self_target_language=canonical_state.self_target_language,
+        self_secondary_target_language=canonical_state.self_secondary_target_language,
         peer_source_language=canonical_state.peer_source_language,
         peer_target_language=canonical_state.peer_target_language,
         self_asr=canonical_state.self_asr,
@@ -683,6 +684,7 @@ class SettingsApplicationOwner:
         updated = copy.deepcopy(current)
         updated.languages.source_language = change.source_code
         updated.languages.target_language = change.target_code
+        updated.languages.secondary_target_language = change.secondary_target_code
         updated.languages.peer_source_mode = change.peer_source_mode
         updated.languages.peer_source_language = change.peer_source_code
         updated.languages.peer_target_language = change.peer_target_code

@@ -464,6 +464,7 @@ def _translation_settings_is_exact_default(settings: TranslationSettings) -> boo
 class LanguageSettings:
     source_language: str = "ko"
     target_language: str = "en"
+    secondary_target_language: str = ""
     peer_source_language: str = "en"
     peer_target_language: str = "ko"
     peer_source_mode: str = "manual"
@@ -472,10 +473,20 @@ class LanguageSettings:
     recent_target_languages: list[str] = field(default_factory=lambda: ["en", "zh-CN", "ja"])
 
     def validate(self) -> None:
+        self.target_language = (
+            self.target_language.strip() if isinstance(self.target_language, str) else ""
+        )
         if not self.source_language:
             raise ValueError("source_language must be non-empty")
         if not self.target_language:
             raise ValueError("target_language must be non-empty")
+        self.secondary_target_language = (
+            self.secondary_target_language.strip()
+            if isinstance(self.secondary_target_language, str)
+            else ""
+        )
+        if self.secondary_target_language == self.target_language:
+            self.secondary_target_language = ""
         if self.peer_source_mode not in {"manual", "auto"}:
             raise ValueError("peer_source_mode must be manual or auto")
 
@@ -1579,6 +1590,7 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
         "languages": {
             "source_language": settings.languages.source_language,
             "target_language": settings.languages.target_language,
+            "secondary_target_language": settings.languages.secondary_target_language,
             "peer_source_language": settings.languages.peer_source_language,
             "peer_target_language": settings.languages.peer_target_language,
             "peer_source_mode": settings.languages.peer_source_mode,
@@ -4107,6 +4119,9 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
         languages=LanguageSettings(
             source_language=data.get("languages", {}).get("source_language", "ko"),
             target_language=data.get("languages", {}).get("target_language", "en"),
+            secondary_target_language=data.get("languages", {}).get(
+                "secondary_target_language", ""
+            ),
             peer_source_language=str(data.get("languages", {}).get("peer_source_language", "")),
             peer_target_language=str(data.get("languages", {}).get("peer_target_language", "")),
             peer_source_mode=(

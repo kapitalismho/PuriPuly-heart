@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field, replace
 from uuid import uuid4
 
@@ -17,18 +18,30 @@ from puripuly_heart.core.orchestrator.translation_output_projection import (
     ActiveSelfProjection,
     TranslationOutputProjectionOwner,
 )
-from puripuly_heart.core.orchestrator.translation_turn import TranslationOutputSubmission
+from puripuly_heart.core.orchestrator.translation_turn import (
+    TranslationOutputSubmission,
+    TranslationTurnChild,
+    TranslationTurnOutcome,
+)
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime.output import OutputRuntime
+from puripuly_heart.core.runtime_logging import SessionLoggingMode
 from puripuly_heart.domain.events import UIEvent, UIEventType
-from puripuly_heart.domain.models import OSCMessage, Translation
+from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
+from tests.core.test_translation_owner_branch_coverage import (
+    _make_runtime_logging_capture,
+    _runtime_log_messages,
+)
 
 
 @dataclass(slots=True)
 class RecordingChatbox:
     messages: list[OSCMessage] = field(default_factory=list)
+    fail: bool = False
 
     def enqueue(self, message: OSCMessage) -> None:
+        if self.fail:
+            raise RuntimeError("chatbox failed")
         self.messages.append(message)
 
     def send_immediate(self, text: str) -> bool:
@@ -75,6 +88,7 @@ def make_owner(
     *,
     configuration: TranslationRuntimeConfig | None = None,
     overlay: RecordingOverlay | None = None,
+    chatbox: RecordingChatbox | None = None,
 ) -> tuple[
     TranslationOutputProjectionOwner,
     RecordingChatbox,
@@ -83,7 +97,7 @@ def make_owner(
 ]:
     clock = FakeClock(_now=10.0)
     config_owner = TranslationRuntimeConfigurationOwner(configuration or TranslationRuntimeConfig())
-    chatbox = RecordingChatbox()
+    chatbox = chatbox or RecordingChatbox()
     ui_messages = RecordingUiMessages()
     diagnostics = TranslationLatencyDiagnosticsOwner(
         clock=clock,
@@ -127,6 +141,84 @@ def submission(
     )
 
 
+def self_children(
+    config_owner: TranslationRuntimeConfigurationOwner,
+    *,
+    parent_id=None,
+    turn_generation: int = 0,
+    turn_order: int = 0,
+    source_parts: tuple[str, ...] = ("source text",),
+) -> tuple[TranslationTurnChild, ...]:
+    parent_id = parent_id or uuid4()
+    snapshot = config_owner.snapshot()
+    children: list[TranslationTurnChild] = []
+    sequence = 0
+    for source_part in source_parts:
+        for target_index, target_language in enumerate(snapshot.value.self_target_languages):
+            child_id = uuid4()
+            children.append(
+                TranslationTurnChild(
+                    parent_utterance_id=parent_id,
+                    utterance_id=child_id,
+                    sequence=sequence,
+                    target_index=target_index,
+                    turn_generation=turn_generation,
+                    turn_order=turn_order,
+                    transcript=Transcript(
+                        utterance_id=child_id,
+                        text=source_part,
+                        is_final=True,
+                        channel="self",
+                    ),
+                    detected_language="en",
+                    target_language=target_language,
+                    source="Mic",
+                    turn_kind="self",
+                    context_policy="integrated_preferred",
+                    config_snapshot=snapshot,
+                )
+            )
+            sequence += 1
+    return tuple(children)
+
+
+def self_submission(
+    child: TranslationTurnChild,
+    *,
+    outcome: TranslationTurnOutcome = "translated",
+    text: str = "translated",
+) -> TranslationOutputSubmission:
+    translation = (
+        Translation(
+            utterance_id=child.utterance_id,
+            text=text,
+            source_text=child.transcript.text,
+            source_language="en",
+            target_language=child.target_language,
+            channel="self",
+            logical_turn_key=f"self:{child.parent_utterance_id}",
+        )
+        if outcome == "translated"
+        else None
+    )
+    return TranslationOutputSubmission(
+        parent_utterance_id=child.parent_utterance_id,
+        child_utterance_id=child.utterance_id,
+        sequence=child.sequence,
+        channel="self",
+        source=child.source,
+        source_text=child.transcript.text,
+        source_language=child.detected_language,
+        target_language=child.target_language,
+        outcome=outcome,
+        config_snapshot=child.config_snapshot,
+        translation=translation,
+        target_index=child.target_index,
+        turn_generation=child.turn_generation,
+        turn_order=child.turn_order,
+    )
+
+
 @pytest.mark.asyncio
 async def test_translated_self_projects_ui_overlay_and_chatbox_once() -> None:
     overlay = RecordingOverlay()
@@ -160,6 +252,450 @@ async def test_translated_self_projects_ui_overlay_and_chatbox_once() -> None:
         "utterance_closed",
     ]
     assert [message.text for message in chatbox.messages] == ["source text (translated)"]
+    assert chatbox.messages[0].self_turn_key is None
+
+
+@pytest.mark.asyncio
+async def test_lifecycle_single_target_chatbox_carries_turn_identity_without_revision() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN",),
+    )
+    owner, chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    child = self_children(config_owner, turn_generation=2, turn_order=7)[0]
+    assert owner.admit_self_turn((child,))
+
+    await owner.project_translation_result(self_submission(child, text="single"))
+
+    assert [message.text for message in chatbox.messages] == ["source text (single)"]
+    assert chatbox.messages[0].self_turn_key == (2, 7)
+    assert chatbox.messages[0].presentation_revision == 0
+    assert chatbox.messages[0].target_indexes == (0,)
+    assert chatbox.messages[0].target_languages == ("zh-CN",)
+
+
+@pytest.mark.asyncio
+async def test_dual_target_projection_publishes_first_completion_then_ordered_snapshot() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    overlay = RecordingOverlay()
+    owner, chatbox, ui_messages, config_owner = make_owner(
+        configuration=configuration,
+        overlay=overlay,
+    )
+    children = self_children(config_owner, turn_order=4)
+    primary, secondary = children
+    assert owner.admit_self_turn(children)
+
+    await owner.project_translation_result(self_submission(secondary, text="こんにちは"))
+    await owner.complete_self_target(secondary, "translated")
+    assert [event.type for event in ui_messages.events] == [UIEventType.OSC_SENT]
+    assert overlay.events == []
+    await owner.project_translation_result(self_submission(primary, text="你好"))
+    await owner.complete_self_target(primary, "translated")
+
+    assert [message.utterance_id for message in chatbox.messages] == [
+        primary.parent_utterance_id,
+        primary.parent_utterance_id,
+    ]
+    assert [message.text for message in chatbox.messages] == [
+        "こんにちは",
+        "你好\nこんにちは",
+    ]
+    assert [message.self_turn_key for message in chatbox.messages] == [(0, 4), (0, 4)]
+    assert [message.presentation_revision for message in chatbox.messages] == [1, 2]
+    assert [message.target_indexes for message in chatbox.messages] == [(1,), (0, 1)]
+    assert [message.target_languages for message in chatbox.messages] == [
+        ("ja",),
+        ("zh-CN", "ja"),
+    ]
+    assert [
+        decision.metadata["presentation_revision"]
+        for decision in owner.routing_decisions
+        if decision.decision == "published"
+        and decision.route == "self_chatbox"
+        and "presentation_revision" in decision.metadata
+    ] == [1, 2]
+    assert [
+        decision.metadata["target_indexes"]
+        for decision in owner.routing_decisions
+        if decision.decision == "published"
+        and decision.route == "self_chatbox"
+        and "target_indexes" in decision.metadata
+    ] == ["1", "0,1"]
+    translation_events = [
+        event for event in ui_messages.events if event.type == UIEventType.TRANSLATION_DONE
+    ]
+    assert [event.utterance_id for event in translation_events] == [primary.utterance_id]
+    assert [event.payload.target_language for event in translation_events] == ["zh-CN"]
+    assert [event.utterance_id for event in overlay.events] == [
+        primary.utterance_id,
+        primary.utterance_id,
+    ]
+    assert owner.self_turn_aggregate_count == 0
+    assert owner.self_turn_tombstone_count == 1
+
+
+@pytest.mark.asyncio
+async def test_duplicate_or_terminal_child_output_cannot_create_another_revision() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    owner, chatbox, ui_messages, config_owner = make_owner(configuration=configuration)
+    children = self_children(config_owner)
+    assert owner.admit_self_turn(children)
+
+    first = await owner.project_translation_result(self_submission(children[0], text="first"))
+    duplicate = await owner.project_translation_result(
+        self_submission(children[0], text="changed duplicate")
+    )
+    await owner.complete_self_target(children[1], "cancelled")
+    late = await owner.project_translation_result(self_submission(children[1], text="late success"))
+
+    assert first.record_runtime_translation
+    assert not duplicate.record_runtime_translation
+    assert not late.record_runtime_translation
+    assert [message.text for message in chatbox.messages] == ["first"]
+    assert sum(event.type == UIEventType.TRANSLATION_DONE for event in ui_messages.events) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("outcomes", "expected"),
+    [
+        (("translated", "failed"), ["successful"]),
+        (("failed", "translated"), ["successful"]),
+        (("failed", "failed"), []),
+    ],
+)
+async def test_dual_target_failure_never_exposes_source_text(
+    outcomes: tuple[TranslationTurnOutcome, TranslationTurnOutcome],
+    expected: list[str],
+) -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+        fallback_transcript_only=True,
+    )
+    owner, chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    children = self_children(config_owner)
+    assert owner.admit_self_turn(children)
+
+    for child, outcome in zip(children, outcomes, strict=True):
+        await owner.project_translation_result(
+            self_submission(child, outcome=outcome, text="successful")
+        )
+        await owner.complete_self_target(child, outcome)
+
+    assert [message.text for message in chatbox.messages] == expected
+    assert all("source text" not in message.text for message in chatbox.messages)
+
+
+@pytest.mark.asyncio
+async def test_newer_visible_turn_suppresses_older_late_complete_revision() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    overlay = RecordingOverlay()
+    owner, chatbox, ui_messages, config_owner = make_owner(
+        configuration=configuration,
+        overlay=overlay,
+    )
+    older = self_children(config_owner, turn_order=10)
+    newer = self_children(config_owner, turn_order=11)
+    assert owner.admit_self_turn(older)
+    assert owner.admit_self_turn(newer)
+
+    await owner.project_translation_result(self_submission(older[0], text="old primary"))
+    await owner.complete_self_target(older[0], "translated")
+    await owner.project_translation_result(self_submission(newer[0], text="new primary"))
+    await owner.complete_self_target(newer[0], "translated")
+    older_late = await owner.project_translation_result(
+        self_submission(older[1], text="old secondary")
+    )
+    await owner.complete_self_target(older[1], "translated")
+    await owner.project_translation_result(self_submission(newer[1], text="new secondary"))
+    await owner.complete_self_target(newer[1], "translated")
+
+    assert older_late.record_runtime_translation
+    assert [message.text for message in chatbox.messages] == [
+        "old primary",
+        "new primary",
+        "new primary\nnew secondary",
+    ]
+    translation_events = [
+        event for event in ui_messages.events if event.type == UIEventType.TRANSLATION_DONE
+    ]
+    assert [event.payload.text for event in translation_events] == ["old primary", "new primary"]
+    assert [event.utterance_id for event in overlay.events] == [
+        older[0].utterance_id,
+        older[0].utterance_id,
+        newer[0].utterance_id,
+        newer[0].utterance_id,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_older_primary_arriving_after_newer_visibility_is_history_only() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    overlay = RecordingOverlay()
+    owner, chatbox, ui_messages, config_owner = make_owner(
+        configuration=configuration,
+        overlay=overlay,
+    )
+    older = self_children(config_owner, turn_order=10)
+    newer = self_children(config_owner, turn_order=11)
+    assert owner.admit_self_turn(older)
+    assert owner.admit_self_turn(newer)
+
+    await owner.project_translation_result(self_submission(newer[1], text="new secondary"))
+    older_late = await owner.project_translation_result(
+        self_submission(older[0], text="old primary")
+    )
+    await owner.project_translation_result(self_submission(newer[0], text="new primary"))
+
+    assert older_late.record_runtime_translation
+    assert [message.text for message in chatbox.messages] == [
+        "new secondary",
+        "new primary\nnew secondary",
+    ]
+    translation_events = [
+        event for event in ui_messages.events if event.type == UIEventType.TRANSLATION_DONE
+    ]
+    assert [event.payload.text for event in translation_events] == ["new primary"]
+    assert [event.utterance_id for event in overlay.events] == [
+        newer[0].utterance_id,
+        newer[0].utterance_id,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_primary_presentation_freshness_survives_chatbox_failure() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    overlay = RecordingOverlay()
+    owner, chatbox, ui_messages, config_owner = make_owner(
+        configuration=configuration,
+        overlay=overlay,
+        chatbox=RecordingChatbox(fail=True),
+    )
+    older = self_children(config_owner, turn_order=10)
+    newer = self_children(config_owner, turn_order=11)
+    assert owner.admit_self_turn(older)
+    assert owner.admit_self_turn(newer)
+
+    await owner.project_translation_result(self_submission(newer[0], text="new primary"))
+    older_late = await owner.project_translation_result(
+        self_submission(older[0], text="old primary")
+    )
+
+    assert older_late.record_runtime_translation
+    assert chatbox.messages == []
+    translation_events = [
+        event for event in ui_messages.events if event.type == UIEventType.TRANSLATION_DONE
+    ]
+    assert [event.payload.text for event in translation_events] == ["new primary"]
+    assert [event.utterance_id for event in overlay.events] == [
+        newer[0].utterance_id,
+        newer[0].utterance_id,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_near_simultaneous_target_completions_never_finish_with_partial_revision() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    owner, chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    children = self_children(config_owner)
+    assert owner.admit_self_turn(children)
+
+    await asyncio.gather(
+        owner.project_translation_result(self_submission(children[0], text="primary")),
+        owner.project_translation_result(self_submission(children[1], text="secondary")),
+    )
+    await asyncio.gather(
+        owner.complete_self_target(children[0], "translated"),
+        owner.complete_self_target(children[1], "translated"),
+    )
+
+    assert len(chatbox.messages) == 2
+    assert chatbox.messages[-1].text == "primary\nsecondary"
+
+
+@pytest.mark.asyncio
+async def test_new_generation_rejects_retired_turn_output_and_bounds_aggregate_state() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    owner, chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    retired = self_children(config_owner, turn_generation=0, turn_order=3)
+    current = self_children(config_owner, turn_generation=1, turn_order=0)
+    assert owner.admit_self_turn(retired)
+    assert owner.admit_self_turn(current)
+
+    retired_receipt = await owner.project_translation_result(
+        self_submission(retired[0], text="retired")
+    )
+    await owner.project_translation_result(self_submission(current[0], text="current"))
+
+    assert not retired_receipt.record_runtime_translation
+    assert [message.text for message in chatbox.messages] == ["current"]
+    assert owner.self_turn_aggregate_count == 1
+    assert owner.self_turn_tombstone_count == 1
+
+
+@pytest.mark.asyncio
+async def test_lifecycle_generation_retirement_rejects_output_without_new_admission() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    owner, chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
+    owner.diagnostics.runtime_logging = runtime_logging
+    retired = self_children(config_owner, turn_generation=0, turn_order=3)
+    assert owner.admit_self_turn(retired)
+
+    owner.retire_turn_generation("self", 1)
+    receipt = await owner.project_translation_result(self_submission(retired[0], text="retired"))
+
+    assert not receipt.record_runtime_translation
+    assert chatbox.messages == []
+    assert owner.self_turn_aggregate_count == 0
+    assert owner.self_turn_tombstone_count == 1
+    stale = next(
+        message
+        for message in _runtime_log_messages(log_stream)
+        if "translation_result_suppressed_stale_turn" in message
+    )
+    assert "turn_generation=0" in stale
+    assert "target_indexes=(0,)" in stale
+    assert "target_languages=('zh-CN',)" in stale
+    assert "revision=0" in stale
+
+
+@pytest.mark.asyncio
+async def test_generation_retirement_wins_before_waiting_snapshot_publication() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    owner, chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    retired = self_children(config_owner, turn_generation=0, turn_order=3)
+    current = self_children(config_owner, turn_generation=1, turn_order=0)
+    assert owner.admit_self_turn(retired)
+
+    await owner._self_publish_lock.acquire()
+    retired_output = asyncio.create_task(
+        owner.project_translation_result(self_submission(retired[0], text="retired"))
+    )
+    await asyncio.sleep(0)
+    assert owner.admit_self_turn(current)
+    owner._self_publish_lock.release()
+    receipt = await retired_output
+
+    assert not receipt.record_runtime_translation
+    assert chatbox.messages == []
+
+
+@pytest.mark.asyncio
+async def test_target_with_multiple_source_runs_publishes_only_after_all_runs_complete() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    overlay = RecordingOverlay()
+    owner, chatbox, ui_messages, config_owner = make_owner(
+        configuration=configuration,
+        overlay=overlay,
+    )
+    children = self_children(config_owner, source_parts=("first", "second"))
+    assert owner.admit_self_turn(children)
+
+    await owner.project_translation_result(self_submission(children[0], text="primary one"))
+    await owner.complete_self_target(children[0], "translated")
+    assert chatbox.messages == []
+    await owner.project_translation_result(self_submission(children[2], text="primary two"))
+    await owner.complete_self_target(children[2], "translated")
+    assert [message.text for message in chatbox.messages] == ["primary one primary two"]
+    await owner.project_translation_result(self_submission(children[1], text="secondary one"))
+    await owner.complete_self_target(children[1], "translated")
+    await owner.project_translation_result(self_submission(children[3], text="secondary two"))
+    await owner.complete_self_target(children[3], "translated")
+
+    assert chatbox.messages[-1].text == ("primary one primary two\nsecondary one secondary two")
+    translation_events = [
+        event for event in ui_messages.events if event.type == UIEventType.TRANSLATION_DONE
+    ]
+    assert [event.utterance_id for event in translation_events] == [
+        children[0].utterance_id,
+        children[2].utterance_id,
+    ]
+    assert [event.utterance_id for event in overlay.events] == [
+        children[0].utterance_id,
+        children[0].utterance_id,
+        children[2].utterance_id,
+        children[2].utterance_id,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_dual_target_publication_denial_records_identity_and_attempt_latency() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    owner, chatbox, _ui_messages, config_owner = make_owner(
+        configuration=configuration,
+        chatbox=RecordingChatbox(fail=True),
+    )
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
+    owner.diagnostics.runtime_logging = runtime_logging
+    children = self_children(config_owner, turn_generation=3, turn_order=4)
+    assert owner.admit_self_turn(children)
+
+    await owner.project_translation_result(self_submission(children[0], text="private primary"))
+    await owner.complete_self_target(children[0], "translated")
+    await owner.project_translation_result(self_submission(children[1], text="private secondary"))
+    await owner.complete_self_target(children[1], "translated")
+
+    messages = _runtime_log_messages(log_stream)
+    first_denied = next(
+        message for message in messages if "translation_first_result_publication_denied" in message
+    )
+    complete_denied = next(
+        message
+        for message in messages
+        if "translation_complete_result_publication_denied" in message
+    )
+    assert chatbox.messages == []
+    assert "turn_generation=3 turn_order=4" in first_denied
+    assert "target_indexes=(0,)" in first_denied
+    assert "target_languages=('zh-CN',)" in first_denied
+    assert "revision=1" in first_denied
+    assert "reason=destination_publish_failed" in first_denied
+    assert "publication_attempt_elapsed_ms=0" in first_denied
+    assert "first_visible_elapsed_ms=None" in first_denied
+    assert "target_indexes=(0, 1)" in complete_denied
+    assert "revision=2" in complete_denied
+    assert "complete_visible_elapsed_ms=None" in complete_denied
+    combined = "\n".join(messages)
+    assert "private primary" not in combined
+    assert "private secondary" not in combined
 
 
 @pytest.mark.asyncio

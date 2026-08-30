@@ -28,6 +28,9 @@ from puripuly_heart.core.osc.control_schema import (
     OSC_PARAMETER_ADDRESS_PREFIX,
     OSC_PARAMETER_DEFINITIONS,
     OSC_PARAMETER_PREFIX,
+    SECONDARY_LANGUAGE_ID_BY_CODE,
+    SECONDARY_LANGUAGE_IDS,
+    SECONDARY_LANGUAGE_NONE_ID,
     TRANSLATION_CONNECTION_BY_MODEL_ID,
     TRANSLATION_MODEL_ID_BY_SELECTION,
     TRANSLATION_MODEL_ID_BY_VALUE,
@@ -73,6 +76,8 @@ class OscControlApplicationPort(Protocol):
         peer_target: str,
     ) -> object: ...
 
+    async def set_secondary_target_language(self, language: str) -> object: ...
+
     async def set_peer_auto_detect(self, enabled: bool) -> object: ...
 
     async def set_self_asr(self, provider: str) -> object: ...
@@ -110,6 +115,9 @@ __all__ = [
     "OSC_PARAMETER_ADDRESS_PREFIX",
     "OSC_PARAMETER_DEFINITIONS",
     "OSC_PARAMETER_PREFIX",
+    "SECONDARY_LANGUAGE_IDS",
+    "SECONDARY_LANGUAGE_ID_BY_CODE",
+    "SECONDARY_LANGUAGE_NONE_ID",
     "OscConnectionMode",
     "OscControlApplicationPort",
     "OscControlCodecError",

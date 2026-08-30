@@ -10,6 +10,7 @@ from puripuly_heart.app.ports.osc_control import (
     FALLBACK_ID_BY_ALIAS,
     LANGUAGE_ID_BY_CODE,
     OSC_PARAMETER_ADDRESS_PREFIX,
+    SECONDARY_LANGUAGE_ID_BY_CODE,
     OscControlCodecError,
     OscSenderPort,
     translation_model_id_for_selection,
@@ -28,6 +29,7 @@ class OscCanonicalState:
     chatbox_source: bool = False
     self_source_language: str = "ko"
     self_target_language: str = "en"
+    self_secondary_target_language: str = ""
     peer_source_language: str = "en"
     peer_target_language: str = "ko"
     self_asr: str = "local_cpu_auto"
@@ -152,6 +154,9 @@ class OscStatePublisher:
             {
                 "PuriPuly_SelfSrcLang": LANGUAGE_ID_BY_CODE[fields_by_name["self_source_language"]],
                 "PuriPuly_SelfDstLang": LANGUAGE_ID_BY_CODE[fields_by_name["self_target_language"]],
+                "PuriPuly_SelfDstLang2": SECONDARY_LANGUAGE_ID_BY_CODE[
+                    fields_by_name["self_secondary_target_language"]
+                ],
                 "PuriPuly_PeerSrcLang": LANGUAGE_ID_BY_CODE[fields_by_name["peer_source_language"]],
                 "PuriPuly_PeerDstLang": LANGUAGE_ID_BY_CODE[fields_by_name["peer_target_language"]],
                 "PuriPuly_SelfASR": ASR_ID_BY_PROVIDER[fields_by_name["self_asr"]],
@@ -185,6 +190,7 @@ def state_from_settings(
         chatbox_source=bool(settings.osc.chatbox_include_source),
         self_source_language=languages.source_language,
         self_target_language=languages.target_language,
+        self_secondary_target_language=languages.secondary_target_language,
         peer_source_language=languages.peer_source_language,
         peer_target_language=languages.peer_target_language,
         self_asr=_osc_asr_provider(settings.provider.stt, settings.custom_stt.mode),

@@ -59,6 +59,7 @@ OscControlPresentationName = Literal[
     "PuriPuly_ChatboxSource",
     "PuriPuly_SelfSrcLang",
     "PuriPuly_SelfDstLang",
+    "PuriPuly_SelfDstLang2",
     "PuriPuly_PeerSrcLang",
     "PuriPuly_PeerDstLang",
     "PuriPuly_SelfASR",
@@ -80,6 +81,7 @@ class OscControlPresentationState:
     chatbox_source: bool
     self_source_language: str
     self_target_language: str
+    self_secondary_target_language: str
     peer_source_language: str
     peer_target_language: str
     self_asr: str

@@ -22,7 +22,8 @@
 | `PuriPuly_MuteSync` | VRChat mute synchronization | Bool | False | Off | Off |
 | `PuriPuly_ChatboxSource` | Include source text in Chatbox output | Bool | False | Off | Off |
 | `PuriPuly_SelfSrcLang` | Self source language | Int | 17 | Off | Off |
-| `PuriPuly_SelfDstLang` | Self target language | Int | 7 | Off | Off |
+| `PuriPuly_SelfDstLang` | Self primary target language | Int | 7 | Off | Off |
+| `PuriPuly_SelfDstLang2` | Self secondary target language; 255 disables it | Int | 255 | Off | Off |
 | `PuriPuly_PeerSrcLang` | Peer source language | Int | 7 | Off | Off |
 | `PuriPuly_PeerDstLang` | Peer target language | Int | 17 | Off | Off |
 | `PuriPuly_SelfASR` | Self ASR provider | Int | 0 | Off | Off |
@@ -65,7 +66,8 @@
 | 10 | Finnish | 22 | Norwegian | 34 | Chinese (Traditional) |
 | 11 | French | 23 | Polish | | |
 
-- Used by: `PuriPuly_SelfSrcLang`, `PuriPuly_SelfDstLang`, `PuriPuly_PeerSrcLang`, `PuriPuly_PeerDstLang`
+- Used by: `PuriPuly_SelfSrcLang`, `PuriPuly_SelfDstLang`, `PuriPuly_SelfDstLang2`, `PuriPuly_PeerSrcLang`, `PuriPuly_PeerDstLang`
+- `PuriPuly_SelfDstLang2` additionally reserves ID `255` for Off. Selecting the current primary target also normalizes the secondary target to Off.
 
 ### ASR IDs
 

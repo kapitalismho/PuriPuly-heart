@@ -339,6 +339,7 @@ async def test_in_process_complete_control_matrix_projects_final_canonical_state
         ("PuriPuly_ChatboxSource", True),
         ("PuriPuly_SelfSrcLang", 16),
         ("PuriPuly_SelfDstLang", 11),
+        ("PuriPuly_SelfDstLang2", 16),
         ("PuriPuly_PeerSrcLang", 5),
         ("PuriPuly_PeerDstLang", 7),
         ("PuriPuly_SelfASR", 7),
@@ -358,7 +359,7 @@ async def test_in_process_complete_control_matrix_projects_final_canonical_state
 
     assert [state.changed_control for state in projected] == [name for name, _value in packets]
     assert len(runtime_calls) == 4
-    assert len(settings_apply_calls) == 11
+    assert len(settings_apply_calls) == 12
     assert sender.messages == []
     await integration.close()
 
@@ -434,7 +435,7 @@ async def test_integration_shares_dynamic_receiver_and_transitions_modes() -> No
     assert service.advertisements[0].port == 49152
     assert sender.destinations[-1] == ("127.0.0.1", 9010)
     automatic_messages = len(sender.messages)
-    assert automatic_messages >= 15
+    assert automatic_messages >= 16
     diagnostics = integration.avatar_parameter_diagnostics
     assert "PuriPuly_Talk" in diagnostics["present"]
     assert "PuriPuly_SelfASR" in diagnostics["present"]
@@ -449,7 +450,7 @@ async def test_integration_shares_dynamic_receiver_and_transitions_modes() -> No
     assert receiver_owner.control_calls[-1] == (True, "127.0.0.1", 9021, True)
     assert service.stopped == 1
     assert sender.destinations[-1] == ("127.0.0.1", 9020)
-    assert len(sender.messages) == automatic_messages + 15
+    assert len(sender.messages) == automatic_messages + 16
 
     message_count = len(sender.messages)
     await integration.configure_connection(
@@ -589,7 +590,7 @@ async def test_avatar_change_requeries_and_republishes_full_state() -> None:
     await integration.query_runtime.on_avatar_change()
 
     assert service.avatar_queries > initial_queries
-    assert len(sender.messages) == 15
+    assert len(sender.messages) == 16
     await integration.close()
 
 
@@ -645,6 +646,14 @@ async def test_connection_start_fences_parameters_until_each_canonical_value_arr
     assert "PuriPuly_SelfDstLang" not in integration._resync_unsettled
     assert "PuriPuly_SelfSrcLang" in integration._resync_unsettled
     assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (11,)) is True
+
+    assert (
+        "/avatar/parameters/PuriPuly_SelfDstLang2",
+        255,
+    ) in sender.messages
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang2", (255,)) is False
+    assert "PuriPuly_SelfDstLang2" not in integration._resync_unsettled
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang2", (16,)) is True
 
     await integration.close()
 
@@ -1086,7 +1095,7 @@ async def test_invalid_control_republishes_full_canonical_state() -> None:
     control_handler = receiver_owner.packet_handlers["control_packet_handler"]
     assert control_handler("/avatar/parameters/PuriPuly_SelfASR", (99,)) is False
 
-    assert len(sender.messages) == 15
+    assert len(sender.messages) == 16
     assert {address for address, _value in sender.messages} == {
         f"/avatar/parameters/{name}"
         for name in (
@@ -1099,6 +1108,7 @@ async def test_invalid_control_republishes_full_canonical_state() -> None:
             "PuriPuly_ChatboxSource",
             "PuriPuly_SelfSrcLang",
             "PuriPuly_SelfDstLang",
+            "PuriPuly_SelfDstLang2",
             "PuriPuly_PeerSrcLang",
             "PuriPuly_PeerDstLang",
             "PuriPuly_SelfASR",
@@ -1138,7 +1148,7 @@ async def test_rejected_dashboard_command_republishes_actual_full_canonical_stat
 
     assert result.applied is False
     assert result.error == "application_rejected"
-    assert len(sender.messages) == 15
+    assert len(sender.messages) == 16
     await integration.close()
 
 
@@ -1189,6 +1199,6 @@ async def test_off_transition_drains_an_admitted_dashboard_command() -> None:
     assert result.error == "router_disabled"
     assert application.completed is True
     assert integration.connection_mode == "off"
-    assert len(sender.messages) == 16
+    assert len(sender.messages) == 17
     assert sender.messages[-1] == ("/avatar/parameters/PuriPuly_Talk", True)
     await integration.close()

@@ -26,6 +26,7 @@ def build_translation_runtime_config(
         value,
         source_language=settings.source_language,
         target_language=settings.target_language,
+        self_target_languages=settings.self_target_languages,
         peer_source_language=settings.peer_source_language,
         peer_target_language=settings.peer_target_language,
         system_prompt=settings.system_prompt,

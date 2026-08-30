@@ -507,29 +507,58 @@ class TranslatorApp:
 
     def _build_debug_preview_panel(self) -> DebugPreviewPanel:
         return DebugPreviewPanel(
-            on_brake_notice=self._preview_brake_notice,
-            on_revoked_notice=self._preview_revoked_notice,
-            on_founder_letter=self._preview_founder_letter,
-            on_pkce_failure=self._preview_pkce_failure,
+            on_display_turn_cycle=self._cycle_debug_preview_display_turn,
+            on_peer_translation_eula=self._preview_peer_translation_eula,
             on_discord_auth=self._preview_discord_auth,
             on_qq_auth=self._preview_qq_auth,
             on_qq_auth_recoverable_error=self._preview_qq_auth_recoverable_error,
             on_qq_auth_translation_gated=self._preview_qq_auth_translation_gated,
             on_discord_callback_page=self._preview_discord_callback_page,
-            on_peer_translation_eula=self._preview_peer_translation_eula,
+            on_founder_letter=self._preview_founder_letter,
             on_local_qwen_hallucination_modal=self._preview_local_qwen_hallucination_modal,
+            on_github_star_snackbar=self._preview_github_star_snackbar,
             on_talk_together_pass_invite_progress=(
                 self._preview_talk_together_pass_invite_progress
             ),
+            on_foundation_primitives=self._preview_foundation_primitives,
+            on_http_extension_form=self._preview_http_extension_form,
+            on_brake_notice=self._preview_brake_notice,
+            on_revoked_notice=self._preview_revoked_notice,
+            on_pkce_failure=self._preview_pkce_failure,
             on_capture_fault_cycle=self._preview_capture_fault_cycle,
             on_stt_fault_cycle=self._preview_stt_fault_cycle,
             on_audio_fault_clear=self._preview_audio_fault_clear,
             on_gpu_state_cycle=self._cycle_debug_preview_gpu_state,
-            on_github_star_snackbar=self._preview_github_star_snackbar,
             on_stt_loading_button_cycle=self._cycle_debug_preview_stt_loading_button,
-            on_foundation_primitives=self._preview_foundation_primitives,
-            on_http_extension_form=self._preview_http_extension_form,
         )
+
+    def _cycle_debug_preview_display_turn(self) -> None:
+        dashboard = getattr(self, "view_dashboard", None)
+        if dashboard is None:
+            return
+        steps = (
+            ("source", "ko", "오늘 같이 뭐 하고 놀까?"),
+            ("translation", "en", "What should we do together today?"),
+            (
+                "source",
+                "ko",
+                "아까 말한 그 월드 이름이 뭐였지? 다시 가보고 싶은데 검색해도 안 나오더라.",
+            ),
+            (
+                "translation",
+                "en",
+                "What was the name of that world you mentioned earlier? "
+                "I want to visit again but searching turns up nothing.",
+            ),
+        )
+        index = int(getattr(self, "_debug_preview_display_turn_index", -1)) + 1
+        index %= len(steps)
+        self._debug_preview_display_turn_index = index
+        kind, language_code, text = steps[index]
+        if kind == "source":
+            dashboard.set_display_text(text, language_code=language_code)
+            return
+        dashboard.set_display_translation_text(text, language_code=language_code)
 
     def _mark_launch_high_priority_feedback_shown(
         self,

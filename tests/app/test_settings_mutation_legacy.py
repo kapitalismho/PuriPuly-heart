@@ -8,6 +8,7 @@ from puripuly_heart.app.services.settings_mutation_legacy import (
     ORDER24_UI_PROMPT_CLIPBOARD_STATE_SETTINGS_PATHS,
     SettingsPathMutationValidator,
     SettingsPathPatch,
+    build_stt_language_audio_settings_path_patch,
     build_translation_provider_settings_path_patch,
 )
 
@@ -65,12 +66,23 @@ def test_order21_patch_carries_custom_http_identity_fields() -> None:
     assert patch["translation.previous_llm_model"] == TranslationModel.GEMMA4_26B_31B
 
 
+def test_order22_patch_carries_a_secondary_only_target_change() -> None:
+    previous = AppSettings()
+    next_settings = AppSettings()
+    next_settings.languages.secondary_target_language = "ja"
+
+    patch = build_stt_language_audio_settings_path_patch(previous, next_settings)
+
+    assert patch == {"languages.secondary_target_language": "ja"}
+
+
 def test_order22_stt_language_audio_patch_records_initial_covered_surface_list() -> None:
     assert set(ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS) == {
         "provider.stt",
         "provider.peer_stt",
         "languages.source_language",
         "languages.target_language",
+        "languages.secondary_target_language",
         "languages.peer_source_language",
         "languages.peer_target_language",
         "languages.peer_source_mode",
@@ -372,6 +384,7 @@ async def test_order22_path_validator_accepts_only_stt_language_audio_paths() ->
             "provider.stt": "soniox",
             "provider.peer_stt": "local_qwen",
             "languages.source_language": "ja",
+            "languages.secondary_target_language": "fr",
             "audio.input_device": "Headset Mic",
             "desktop_audio.vad_hangover_ms": 900,
             "soniox_stt.trailing_silence_ms": 150,

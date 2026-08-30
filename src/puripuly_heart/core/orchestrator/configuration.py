@@ -10,6 +10,7 @@ from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 TranslationRuntimeConfigField = Literal[
     "source_language",
     "target_language",
+    "self_target_languages",
     "peer_source_language",
     "peer_target_language",
     "system_prompt",
@@ -46,6 +47,7 @@ class TranslationRuntimeConfigCategory(StrEnum):
 class TranslationRuntimeConfig:
     source_language: str = "ko"
     target_language: str = "en"
+    self_target_languages: tuple[str, ...] = ()
     peer_source_language: str = ""
     peer_target_language: str = ""
     system_prompt: str = ""
@@ -66,6 +68,26 @@ class TranslationRuntimeConfig:
     low_latency_finalize_wait_ms: int = 400
     low_latency_awaiting_vad_timeout_s: float = 3.0
 
+    def __post_init__(self) -> None:
+        target_language = self.target_language.strip()
+        if not target_language:
+            raise ValueError("target_language must be non-empty")
+        provided_targets = tuple(
+            dict.fromkeys(
+                language.strip()
+                for language in self.self_target_languages
+                if isinstance(language, str) and language.strip()
+            )
+        )
+        if len(provided_targets) > 2:
+            raise ValueError("self_target_languages supports at most two targets")
+        secondary_targets = tuple(
+            language for language in provided_targets[1:] if language != target_language
+        )
+        normalized_targets = (target_language, *secondary_targets[:1])
+        object.__setattr__(self, "target_language", target_language)
+        object.__setattr__(self, "self_target_languages", normalized_targets)
+
 
 @dataclass(frozen=True, slots=True)
 class TranslationRuntimeConfigSnapshot:
@@ -84,10 +106,10 @@ class TranslationRuntimeConfigChange:
     def self_language_changed(self) -> bool:
         return (
             self.before.value.source_language,
-            self.before.value.target_language,
+            self.before.value.self_target_languages,
         ) != (
             self.after.value.source_language,
-            self.after.value.target_language,
+            self.after.value.self_target_languages,
         )
 
     @property
@@ -125,6 +147,7 @@ _FIELDS_BY_CATEGORY: dict[
         {
             "source_language",
             "target_language",
+            "self_target_languages",
             "peer_source_language",
             "peer_target_language",
         }

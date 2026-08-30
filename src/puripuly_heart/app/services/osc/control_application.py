@@ -87,6 +87,21 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
             )
         )
 
+    async def set_secondary_target_language(self, language: str) -> object:
+        current = self.settings_provider()
+        if current is None:
+            raise RuntimeError("OSC control settings are unavailable")
+        normalized = "" if language == current.languages.target_language else language
+        if current.languages.secondary_target_language == normalized:
+            return True
+        return await self._apply_settings(
+            lambda settings: setattr(
+                settings.languages,
+                "secondary_target_language",
+                normalized,
+            )
+        )
+
     async def set_peer_auto_detect(self, enabled: bool) -> object:
         current = self.settings_provider()
         if current is not None and current.languages.peer_source_mode == (
@@ -208,6 +223,8 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
     ) -> None:
         settings.languages.source_language = self_source
         settings.languages.target_language = self_target
+        if settings.languages.secondary_target_language == self_target:
+            settings.languages.secondary_target_language = ""
         settings.languages.peer_source_language = peer_source
         settings.languages.peer_target_language = peer_target
 
@@ -313,6 +330,7 @@ def _settings_control_values_match(actual: object | None, expected: object) -> b
     fields = (
         ("languages", "source_language"),
         ("languages", "target_language"),
+        ("languages", "secondary_target_language"),
         ("languages", "peer_source_language"),
         ("languages", "peer_target_language"),
         ("languages", "peer_source_mode"),

@@ -135,6 +135,7 @@ class FakeLanguageCard:
         on_peer_source_click,
         on_peer_target_click,
         on_peer_swap_click,
+        on_self_secondary_target_click=lambda: None,
     ):
         self.on_self_source_click = on_self_source_click
         self.on_self_target_click = on_self_target_click
@@ -142,7 +143,9 @@ class FakeLanguageCard:
         self.on_peer_source_click = on_peer_source_click
         self.on_peer_target_click = on_peer_target_click
         self.on_peer_swap_click = on_peer_swap_click
+        self.on_self_secondary_target_click = on_self_secondary_target_click
         self.languages: list[tuple[str, str, str, str]] = []
+        self.secondary_targets: list[str] = []
         self.row_labels: list[tuple[str, str]] = []
 
     def set_languages(
@@ -151,8 +154,10 @@ class FakeLanguageCard:
         self_target: str,
         peer_source: str,
         peer_target: str,
+        self_secondary_target: str = "",
     ) -> None:
         self.languages.append((self_source, self_target, peer_source, peer_target))
+        self.secondary_targets.append(self_secondary_target)
 
     def set_row_labels(self, self_label: str, peer_label: str) -> None:
         self.row_labels.append((self_label, peer_label))
@@ -513,6 +518,7 @@ def test_dashboard_projects_osc_state_without_emitting_intents(
     settings = AppSettings()
     settings.languages.source_language = "ja"
     settings.languages.target_language = "fr"
+    settings.languages.secondary_target_language = "en"
     settings.languages.peer_source_language = "de"
     settings.languages.peer_target_language = "ko"
     settings.languages.peer_source_mode = "auto"
@@ -535,6 +541,12 @@ def test_dashboard_projects_osc_state_without_emitting_intents(
     view.project_osc_control_state(
         osc_control_presentation_state(
             "PuriPuly_SelfSrcLang",
+            settings=settings,
+        )
+    )
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_SelfDstLang2",
             settings=settings,
         )
     )
@@ -577,6 +589,7 @@ def test_dashboard_projects_osc_state_without_emitting_intents(
         dashboard_module.t("dashboard.peer_source.automatic"),
         "name-ko",
     )
+    assert view.language_card.secondary_targets[-1] == "name-en"
     assert FakeLanguageModal.disabled_codes[-2:] == [{"auto"}, set()]
     assert view.peer_button.states[-1]["is_on"] is True
     assert view.overlay_button.states[-1]["is_on"] is True
@@ -1355,23 +1368,17 @@ def test_dashboard_peer_swap_exchanges_source_and_target(
     assert view.language_card.languages[-1] == ("name-ko", "name-en", "name-fr", "name-ja")
 
 
-def test_dashboard_self_and_peer_language_row_labels_render_from_i18n(
+def test_dashboard_language_card_has_no_row_label_channel(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(dashboard_module, "t", lambda key, **_kwargs: f"i18n:{key}")
     view = _make_dashboard(monkeypatch)
 
-    assert view.language_card.row_labels[0] == (
-        "i18n:dashboard.language.self",
-        "i18n:dashboard.language.peer",
-    )
+    assert view.language_card.row_labels == []
 
     view.apply_locale()
 
-    assert view.language_card.row_labels[-1] == (
-        "i18n:dashboard.language.self",
-        "i18n:dashboard.language.peer",
-    )
+    assert view.language_card.row_labels == []
 
 
 def test_dashboard_peer_and_overlay_button_labels_render_from_i18n(
@@ -1456,3 +1463,125 @@ def test_dashboard_bound_intents_receive_every_owned_interaction(
     assert [change.source_code for change in calls["language"]] == ["ja"]
     assert calls["retry_peer"] == []
     assert calls["gpu"] == []
+
+
+def test_dashboard_secondary_target_dialog_offers_none_and_blocks_the_primary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    attach_dummy_page(monkeypatch, view)
+    view.set_languages_from_codes("ko", "en", "ja", "fr")
+    FakeLanguageModal.opened.clear()
+    FakeLanguageModal.languages.clear()
+    FakeLanguageModal.disabled_codes.clear()
+
+    view._open_secondary_target_dialog()
+
+    assert FakeLanguageModal.languages[0] == (dashboard_module.SECONDARY_TARGET_NONE, "")
+    assert FakeLanguageModal.disabled_codes[-1] == {"en"}
+    assert FakeLanguageModal.opened[-1][0] == dashboard_module.SECONDARY_TARGET_NONE
+
+
+def test_dashboard_secondary_target_selection_emits_and_renders(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    changes: list[str] = []
+    view.on_language_change = lambda change: changes.append(change.secondary_target_code)
+    view.set_languages_from_codes("ko", "en", "ja", "fr")
+
+    view._on_secondary_target_select("ja")
+
+    assert view._secondary_target_lang_code == "ja"
+    assert changes[-1] == "ja"
+    assert view.language_card.secondary_targets[-1] == "name-ja"
+
+
+def test_dashboard_secondary_target_none_clears_the_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    changes: list[str] = []
+    view.on_language_change = lambda change: changes.append(change.secondary_target_code)
+    view.set_languages_from_codes("ko", "en", "ja", "fr")
+    view._on_secondary_target_select("ja")
+
+    view._on_secondary_target_select(dashboard_module.SECONDARY_TARGET_NONE)
+
+    assert view._secondary_target_lang_code == ""
+    assert changes[-1] == ""
+    assert view.language_card.secondary_targets[-1] == ""
+
+
+def test_dashboard_secondary_target_cannot_duplicate_the_primary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    view.set_languages_from_codes("ko", "en", "ja", "fr")
+
+    view._on_secondary_target_select("en")
+
+    assert view._secondary_target_lang_code == ""
+
+
+def test_dashboard_primary_target_change_drops_a_colliding_secondary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    view.set_languages_from_codes("ko", "en", "ja", "fr")
+    view._on_secondary_target_select("ja")
+
+    view._on_target_select("ja")
+
+    assert view._target_lang_code == "ja"
+    assert view._secondary_target_lang_code == ""
+
+
+def test_dashboard_self_swap_keeps_the_secondary_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    changes: list[tuple[str, str, str]] = []
+    view.on_language_change = lambda change: changes.append(
+        (change.source_code, change.target_code, change.secondary_target_code)
+    )
+    view.set_languages_from_codes("ko", "en", "ja", "fr")
+    view._on_secondary_target_select("ja")
+
+    view._swap_languages()
+
+    assert changes[-1] == ("en", "ko", "ja")
+
+
+def test_dashboard_self_swap_clears_a_secondary_that_would_collide(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    view.set_languages_from_codes("ko", "en", "ja", "fr")
+    view._on_secondary_target_select("ko")
+
+    view._swap_languages()
+
+    assert view._target_lang_code == "ko"
+    assert view._secondary_target_lang_code == ""
+
+
+def test_dashboard_accepts_a_secondary_target_from_settings_projection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+
+    view.set_languages_from_codes("ko", "en", "ja", "fr", "manual", "ja")
+
+    assert view._secondary_target_lang_code == "ja"
+    assert view.language_card.secondary_targets[-1] == "name-ja"
+
+
+def test_dashboard_drops_a_projected_secondary_that_equals_the_primary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+
+    view.set_languages_from_codes("ko", "en", "ja", "fr", "manual", "en")
+
+    assert view._secondary_target_lang_code == ""

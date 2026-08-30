@@ -11,14 +11,27 @@ from puripuly_heart.ui.flet_runtime import (
 )
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
+    COLOR_DISPLAY_SOURCE,
     COLOR_NEUTRAL_DARK,
     COLOR_SECONDARY,
     COLOR_SURFACE,
-    COLOR_WARNING,
 )
 
 # CJK (Chinese, Japanese, Korean) characters start at this Unicode point.
 _CJK_START = 0x3000
+
+DISPLAY_SOURCE_COLOR = COLOR_DISPLAY_SOURCE
+DISPLAY_MESSAGE_COLOR = COLOR_NEUTRAL_DARK
+DISPLAY_SOURCE_WEIGHT = ft.FontWeight.W_500
+DISPLAY_MESSAGE_WEIGHT = ft.FontWeight.BOLD
+
+DISPLAY_CARD_PADDING = 32
+
+DISPLAY_TEXT_WIDTH = 526
+DISPLAY_TEXT_HEIGHT = 210
+DISPLAY_LINE_HEIGHT_RATIO = 1.3
+DISPLAY_WEIGHTED_UNIT_WIDTH_RATIO = 0.5
+DISPLAY_SIZE_CANDIDATES: tuple[int, ...] = (48, 44, 40, 36, 32, 28, 24)
 
 
 def _weighted_len(text: str) -> int:
@@ -26,16 +39,21 @@ def _weighted_len(text: str) -> int:
     return sum(2 if ord(char) >= _CJK_START else 1 for char in text)
 
 
-def _display_size_for_length(length: int) -> int:
-    if length <= 12:
-        return 48
-    if length <= 20:
-        return 40
-    if length <= 32:
-        return 34
-    if length <= 44:
-        return 28
-    return 24
+def _lines_for_size(size: int) -> int:
+    return max(1, int(DISPLAY_TEXT_HEIGHT // (size * DISPLAY_LINE_HEIGHT_RATIO)))
+
+
+def _capacity_for_size(size: int) -> int:
+    units_per_line = DISPLAY_TEXT_WIDTH / (size * DISPLAY_WEIGHTED_UNIT_WIDTH_RATIO)
+    return int(_lines_for_size(size) * units_per_line)
+
+
+def _display_layout_for_length(length: int) -> tuple[int, int]:
+    for size in DISPLAY_SIZE_CANDIDATES:
+        if length <= _capacity_for_size(size):
+            return size, _lines_for_size(size)
+    smallest = DISPLAY_SIZE_CANDIDATES[-1]
+    return smallest, _lines_for_size(smallest)
 
 
 def _status_label(status: str) -> str:
@@ -56,7 +74,12 @@ def _apply_debug_prefix(text: str, debug_prefix: str | None) -> str:
 
 
 class DisplayCard(ft.Container):
-    """Multi-purpose display card with input field."""
+    """Single-state display card with input field.
+
+    The card shows exactly one thing at a time. A turn moves through the source
+    text and then the translation, replacing the same slot rather than stacking
+    two lines. Colour distinguishes the two.
+    """
 
     def __init__(
         self,
@@ -69,53 +92,32 @@ class DisplayCard(ft.Container):
         self._on_input_activity = on_input_activity
         self._status = "disconnected"
         self._showing_status = True
-        self._primary_value = _status_label(self._status)
-        self._secondary_value: str | None = None
-        self._primary_font_family: str | None = None
-        self._secondary_font_family: str | None = None
+        self._source_value = _status_label(self._status)
+        self._translation_value: str | None = None
+        self._source_font_family: str | None = None
+        self._translation_font_family: str | None = None
         self._debug_prefix: str | None = None
         self._notice_value: str | None = None
-        self._notice_tone: str | None = None
         self._notice_action: Callable[[], None] | None = None
         self._notice_yields_to_content = False
+        self._turn_size_cap: int | None = None
+        self._translation_is_visible = False
         self.input_is_focused = False
 
-        self._display_primary = ft.Text(
-            self._primary_value,
-            size=48,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL_DARK,
+        initial_size, initial_max_lines = _display_layout_for_length(
+            _weighted_len(self._source_value)
+        )
+        self._display_text = ft.Text(
+            self._source_value,
+            size=initial_size,
+            weight=DISPLAY_MESSAGE_WEIGHT,
+            color=DISPLAY_MESSAGE_COLOR,
             selectable=True,
             no_wrap=False,
-            max_lines=2,
+            max_lines=initial_max_lines,
             overflow=ft.TextOverflow.ELLIPSIS,
         )
 
-        self._display_secondary = ft.Text(
-            "",
-            size=48,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL_DARK,
-            selectable=True,
-            no_wrap=False,
-            max_lines=2,
-            overflow=ft.TextOverflow.ELLIPSIS,
-            visible=False,
-        )
-
-        self._notice_text = ft.Text(
-            "",
-            size=13,
-            weight=ft.FontWeight.W_600,
-            color=ft.Colors.WHITE,
-        )
-        self._notice_chip = ft.Container(
-            content=self._notice_text,
-            visible=False,
-            bgcolor=COLOR_WARNING,
-            border_radius=999,
-            padding=ft.Padding.symmetric(horizontal=10, vertical=6),
-        )
         self._notice_action_button = ft.TextButton(
             content="",
             visible=False,
@@ -139,17 +141,7 @@ class DisplayCard(ft.Container):
         display_region = ft.Container(
             content=ft.Row(
                 [
-                    ft.Container(
-                        content=ft.Column(
-                            [
-                                self._display_primary,
-                                self._display_secondary,
-                            ],
-                            spacing=4,
-                            tight=True,
-                        ),
-                        expand=True,
-                    ),
+                    ft.Container(content=self._display_text, expand=True),
                     self._notice_action_button,
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -169,13 +161,7 @@ class DisplayCard(ft.Container):
                     padding=ft.Padding.only(bottom=4),
                 ),
                 ft.Row(
-                    [
-                        ft.Container(
-                            content=ft.Text("•", size=36, color="#FFADAC"),
-                            padding=ft.Padding.only(right=8),
-                        ),
-                        self._input_field,
-                    ],
+                    [self._input_field],
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
             ],
@@ -190,8 +176,9 @@ class DisplayCard(ft.Container):
             spacing=8,
         )
 
-        # The content container handles the internal padding (32)
-        content_container = ft.Container(content=main_content, expand=True, padding=32)
+        content_container = ft.Container(
+            content=main_content, expand=True, padding=DISPLAY_CARD_PADDING
+        )
 
         super().__init__(
             content=content_container,
@@ -248,19 +235,23 @@ class DisplayCard(ft.Container):
         should_log: bool = False,
         debug_prefix: str | None = None,
     ):
-        """Update the primary display text and clear any secondary text."""
+        """Show source text and start a new turn, dropping any prior translation."""
+        _ = is_error
         self._showing_status = False
-        self._primary_value = text
-        self._primary_font_family = font_family
-        self._secondary_value = None
-        self._secondary_font_family = None
+        self._source_value = text
+        self._source_font_family = font_family
+        self._translation_value = None
+        self._translation_font_family = None
         self._debug_prefix = debug_prefix
+        self._turn_size_cap = _display_layout_for_length(
+            _weighted_len(_apply_debug_prefix(text or "", debug_prefix))
+        )[0]
         measure = should_log and runtime_log_detailed is not None
-        primary_update_issued, _, flet_update_elapsed_us = self._sync_display(
-            is_error=is_error, measure_flet_update=measure
+        display_update_issued, flet_update_elapsed_us = self._sync_display(
+            measure_flet_update=measure
         )
         if should_log:
-            self._emit_dashboard_primary_applied(
+            self._emit_dashboard_source_applied(
                 runtime_log_detailed=runtime_log_detailed,
                 update_id=update_id,
                 origin_wall_clock_ms=origin_wall_clock_ms,
@@ -268,7 +259,7 @@ class DisplayCard(ft.Container):
                 channel=channel,
                 source_text_len=source_text_len,
                 transcript_kind=transcript_kind,
-                primary_update_issued=primary_update_issued,
+                display_update_issued=display_update_issued,
                 flet_update_elapsed_us=flet_update_elapsed_us,
             )
 
@@ -288,17 +279,15 @@ class DisplayCard(ft.Container):
         logical_turn_key: str | None = None,
         debug_prefix: str | None = None,
     ) -> None:
-        """Update the secondary display text and emit a post-update visual commit marker."""
+        """Replace the visible slot with the translation and emit a visual commit marker."""
         self._showing_status = False
-        self._secondary_value = text or None
-        self._secondary_font_family = font_family if text else None
+        self._translation_value = text or None
+        self._translation_font_family = font_family if text else None
         self._debug_prefix = debug_prefix
         measure = runtime_log_detailed is not None
-        (
-            primary_update_issued,
-            secondary_update_issued,
-            flet_update_elapsed_us,
-        ) = self._sync_display(measure_flet_update=measure)
+        display_update_issued, flet_update_elapsed_us = self._sync_display(
+            measure_flet_update=measure
+        )
         self._emit_dashboard_translation_visual_commit(
             runtime_log_detailed=runtime_log_detailed,
             update_id=update_id,
@@ -309,8 +298,7 @@ class DisplayCard(ft.Container):
             source_text_hash=source_text_hash,
             source_text_len=source_text_len,
             logical_turn_key=logical_turn_key,
-            primary_update_issued=primary_update_issued,
-            secondary_update_issued=secondary_update_issued,
+            display_update_issued=display_update_issued,
             flet_update_elapsed_us=flet_update_elapsed_us,
         )
 
@@ -318,11 +306,12 @@ class DisplayCard(ft.Container):
         """Update connection status display."""
         self._status = status
         self._showing_status = True
-        self._primary_value = _status_label(status)
-        self._primary_font_family = font_family
-        self._secondary_value = None
-        self._secondary_font_family = None
+        self._source_value = _status_label(status)
+        self._source_font_family = font_family
+        self._translation_value = None
+        self._translation_font_family = None
         self._debug_prefix = None
+        self._turn_size_cap = None
         self._sync_display()
 
     def set_notice(
@@ -334,14 +323,12 @@ class DisplayCard(ft.Container):
         on_action: Callable[[], None] | None = None,
         yields_to_content: bool = False,
     ) -> None:
+        _ = tone
         self._notice_value = text or None
-        self._notice_tone = tone if self._notice_value else None
         self._notice_yields_to_content = bool(yields_to_content) if self._notice_value else False
         self._notice_action = on_action if self._notice_value and action_label else None
         self._notice_action_button.content = action_label or ""
         self._notice_action_button.visible = self._notice_action is not None
-        self._notice_text.value = ""
-        self._notice_chip.visible = False
         self._sync_display()
         update_control_if_mounted(self._notice_action_button)
 
@@ -353,7 +340,7 @@ class DisplayCard(ft.Container):
     def clear_input(self):
         """Clear the input field."""
         self._input_field.value = ""
-        self._input_field.update()
+        update_control_if_mounted(self._input_field)
 
     def set_input_font(self, font_family: str | None) -> None:
         # Force strict system fallback if None (to break theme inheritance)
@@ -382,10 +369,10 @@ class DisplayCard(ft.Container):
         else:
             update_control_if_mounted(self._input_field)
         if self._showing_status:
-            self._primary_value = _status_label(self._status)
-            self._primary_font_family = display_font_family
-            self._secondary_value = None
-            self._secondary_font_family = None
+            self._source_value = _status_label(self._status)
+            self._source_font_family = display_font_family
+            self._translation_value = None
+            self._translation_font_family = None
             self._sync_display()
 
     def _emit_dashboard_translation_visual_commit(
@@ -400,15 +387,14 @@ class DisplayCard(ft.Container):
         source_text_hash: str | None,
         source_text_len: int | None,
         logical_turn_key: str | None,
-        primary_update_issued: bool,
-        secondary_update_issued: bool,
+        display_update_issued: bool,
         flet_update_elapsed_us: int | None = None,
     ) -> None:
         if runtime_log_detailed is None or update_id is None:
             return
-        if not (primary_update_issued or secondary_update_issued):
+        if not display_update_issued:
             return
-        if not self._display_secondary.visible or not self._display_secondary.value:
+        if not self._translation_is_visible or not self._display_text.value:
             return
 
         elapsed_ms = None
@@ -425,12 +411,11 @@ class DisplayCard(ft.Container):
             f"source_text_hash={source_text_hash}",
             f"source_text_len={source_text_len}",
             f"logical_turn_key={logical_turn_key}",
-            f"primary_text_len={len(self._display_primary.value or '')}",
-            f"secondary_text_len={len(self._display_secondary.value or '')}",
-            f"secondary_visible={self._display_secondary.visible}",
+            f"source_display_text_len={len(self._source_value or '')}",
+            f"translation_text_len={len(self._translation_value or '')}",
+            f"translation_visible={self._translation_is_visible}",
             f"showing_status={self._showing_status}",
-            f"primary_update_issued={primary_update_issued}",
-            f"secondary_update_issued={secondary_update_issued}",
+            f"display_update_issued={display_update_issued}",
         ]
         if elapsed_ms is not None:
             parts.append(f"elapsed_ms={elapsed_ms}")
@@ -442,7 +427,7 @@ class DisplayCard(ft.Container):
         except Exception:
             return
 
-    def _emit_dashboard_primary_applied(
+    def _emit_dashboard_source_applied(
         self,
         *,
         runtime_log_detailed: Callable[..., bool | None] | None,
@@ -452,12 +437,12 @@ class DisplayCard(ft.Container):
         channel: str | None,
         source_text_len: int | None,
         transcript_kind: str | None,
-        primary_update_issued: bool,
+        display_update_issued: bool,
         flet_update_elapsed_us: int | None = None,
     ) -> None:
         if runtime_log_detailed is None:
             return
-        if not primary_update_issued:
+        if not display_update_issued:
             return
 
         elapsed_ms = None
@@ -465,16 +450,17 @@ class DisplayCard(ft.Container):
             elapsed_ms = max(0, int(time.time() * 1000) - origin_wall_clock_ms)
 
         parts = [
-            "[Detailed][DisplayCard] dashboard_primary_applied",
+            "[Detailed][DisplayCard] dashboard_source_applied",
             f"utterance_id={utterance_id}",
             f"channel={channel}",
             f"update_id={update_id if update_id is not None else 'none'}",
             f"origin_wall_clock_ms={origin_wall_clock_ms}",
             f"transcript_kind={transcript_kind}",
             f"source_text_len={source_text_len}",
-            f"primary_text_len={len(self._display_primary.value or '')}",
+            f"source_display_text_len={len(self._source_value or '')}",
+            f"translation_visible={self._translation_is_visible}",
             f"showing_status={self._showing_status}",
-            f"primary_update_issued={primary_update_issued}",
+            f"display_update_issued={display_update_issued}",
         ]
         if elapsed_ms is not None:
             parts.append(f"elapsed_ms={elapsed_ms}")
@@ -486,51 +472,50 @@ class DisplayCard(ft.Container):
         except Exception:
             return
 
-    def _sync_display(
-        self, *, is_error: bool = False, measure_flet_update: bool = False
-    ) -> tuple[bool, bool, int | None]:
+    def _sync_display(self, *, measure_flet_update: bool = False) -> tuple[bool, int | None]:
         notice_blocks = self._notice_value is not None and (
             not self._notice_yields_to_content or self._showing_status
         )
-        notice_text = self._notice_value if notice_blocks else None
-        primary_text = (
-            notice_text
-            if notice_text is not None
-            else _apply_debug_prefix(self._primary_value or "", self._debug_prefix)
+        if notice_blocks:
+            visible_text = self._notice_value or ""
+            font_family = self._source_font_family
+            showing_translation = False
+            showing_source = False
+        elif self._translation_value:
+            visible_text = _apply_debug_prefix(self._translation_value, self._debug_prefix)
+            font_family = self._translation_font_family
+            showing_translation = True
+            showing_source = False
+        else:
+            visible_text = _apply_debug_prefix(self._source_value or "", self._debug_prefix)
+            font_family = self._source_font_family
+            showing_translation = False
+            showing_source = not self._showing_status
+
+        self._translation_is_visible = showing_translation
+        new_size, new_max_lines = _display_layout_for_length(_weighted_len(visible_text))
+        if showing_translation and self._turn_size_cap is not None:
+            new_size = min(self._turn_size_cap, new_size)
+            new_max_lines = _lines_for_size(new_size)
+
+        self._display_text.value = visible_text
+        self._display_text.size = new_size
+        self._display_text.max_lines = new_max_lines
+        self._display_text.color = DISPLAY_SOURCE_COLOR if showing_source else DISPLAY_MESSAGE_COLOR
+        self._display_text.weight = (
+            DISPLAY_SOURCE_WEIGHT if showing_source else DISPLAY_MESSAGE_WEIGHT
         )
-        secondary_text = (
-            ""
-            if notice_text is not None
-            else _apply_debug_prefix(self._secondary_value or "", self._debug_prefix)
-        )
-        max_len = max(_weighted_len(primary_text), _weighted_len(secondary_text))
-        new_size = _display_size_for_length(max_len)
+        self._display_text.font_family = font_family
 
-        text_color = COLOR_NEUTRAL_DARK
-
-        self._display_primary.value = primary_text
-        self._display_primary.size = new_size
-        self._display_primary.color = text_color
-        self._display_primary.font_family = self._primary_font_family
-
-        self._display_secondary.value = secondary_text
-        self._display_secondary.visible = bool(self._secondary_value)
-        self._display_secondary.size = new_size
-        self._display_secondary.color = text_color
-        self._display_secondary.font_family = self._secondary_font_family
-
-        primary_update_issued = is_control_mounted(self._display_primary)
-        secondary_update_issued = is_control_mounted(self._display_secondary)
+        display_update_issued = is_control_mounted(self._display_text)
 
         flet_update_elapsed_us: int | None = None
         start_ns = time.perf_counter_ns() if measure_flet_update else 0
 
-        if primary_update_issued:
-            self._display_primary.update()
-        if secondary_update_issued:
-            self._display_secondary.update()
+        if display_update_issued:
+            self._display_text.update()
 
         if measure_flet_update:
             flet_update_elapsed_us = max(0, (time.perf_counter_ns() - start_ns) // 1000)
 
-        return primary_update_issued, secondary_update_issued, flet_update_elapsed_us
+        return display_update_issued, flet_update_elapsed_us

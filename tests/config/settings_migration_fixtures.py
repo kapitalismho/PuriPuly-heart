@@ -106,6 +106,7 @@ CURRENT_USER_INTENT_DESTINATIONS = {
     "languages.recent_target_languages": "intent.languages.recent_target_languages",
     "languages.source_language": "intent.languages.source_language",
     "languages.target_language": "intent.languages.target_language",
+    "languages.secondary_target_language": "intent.languages.secondary_target_language",
     "llm.concurrency_limit": "intent.translation.concurrency_limit",
     "gemini.llm_model": "intent.translation.gemini.llm_model",
     "local_llm.base_url": "intent.local_llm.base_url",
@@ -345,6 +346,7 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     )
     settings.languages.source_language = "ja"
     settings.languages.target_language = "zh-CN"
+    settings.languages.secondary_target_language = "ja"
     settings.languages.peer_source_language = "fr"
     settings.languages.peer_target_language = "es"
     settings.languages.peer_source_mode = "auto"

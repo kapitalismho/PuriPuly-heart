@@ -136,6 +136,65 @@ class OSCMessage:
     utterance_id: UUID
     text: str
     created_at: float  # monotonic seconds (Clock)
+    turn_generation: int | None = None
+    turn_order: int | None = None
+    presentation_revision: int = 0
+    target_indexes: tuple[int, ...] = ()
+    target_languages: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if isinstance(self.presentation_revision, bool) or not isinstance(
+            self.presentation_revision, int
+        ):
+            raise TypeError("presentation_revision must be an integer")
+        if (self.turn_generation is None) != (self.turn_order is None):
+            raise ValueError("turn generation and order must be provided together")
+        if self.turn_generation is not None:
+            if isinstance(self.turn_generation, bool) or not isinstance(self.turn_generation, int):
+                raise TypeError("turn_generation must be an integer")
+            if self.turn_generation < 0:
+                raise ValueError("turn_generation must be non-negative")
+        if self.turn_order is not None:
+            if isinstance(self.turn_order, bool) or not isinstance(self.turn_order, int):
+                raise TypeError("turn_order must be an integer")
+            if self.turn_order < 0:
+                raise ValueError("turn_order must be non-negative")
+        if self.presentation_revision < 0:
+            raise ValueError("presentation_revision must be non-negative")
+        if self.turn_generation is None and self.presentation_revision != 0:
+            raise ValueError("presentation_revision requires self turn identity")
+        if not isinstance(self.target_indexes, tuple):
+            raise TypeError("target_indexes must be a tuple")
+        if not isinstance(self.target_languages, tuple):
+            raise TypeError("target_languages must be a tuple")
+        if bool(self.target_indexes) != bool(self.target_languages):
+            raise ValueError("target indexes and languages must be provided together")
+        if len(self.target_indexes) != len(self.target_languages):
+            raise ValueError("target indexes and languages must have the same length")
+        if self.target_indexes and self.turn_generation is None:
+            raise ValueError("target metadata requires self turn identity")
+        for target_index in self.target_indexes:
+            if isinstance(target_index, bool) or not isinstance(target_index, int):
+                raise TypeError("target indexes must be integers")
+            if target_index < 0:
+                raise ValueError("target indexes must be non-negative")
+        if len(set(self.target_indexes)) != len(self.target_indexes):
+            raise ValueError("target indexes must be unique")
+        if tuple(sorted(self.target_indexes)) != self.target_indexes:
+            raise ValueError("target indexes must be in configured order")
+        for target_language in self.target_languages:
+            if not isinstance(target_language, str):
+                raise TypeError("target languages must be strings")
+            if not target_language or target_language.strip() != target_language:
+                raise ValueError("target languages must be normalized and non-empty")
+        if len(set(self.target_languages)) != len(self.target_languages):
+            raise ValueError("target languages must be unique")
+
+    @property
+    def self_turn_key(self) -> tuple[int, int] | None:
+        if self.turn_generation is None or self.turn_order is None:
+            return None
+        return (self.turn_generation, self.turn_order)
 
 
 @dataclass(slots=True)

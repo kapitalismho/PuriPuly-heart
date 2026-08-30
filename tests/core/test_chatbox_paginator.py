@@ -50,8 +50,27 @@ class SelectivelyFailingSender(FakeSender):
         super().send_chatbox(text)
 
 
-def _message(text: str, clock: FakeClock) -> OSCMessage:
-    return OSCMessage(uuid.uuid4(), text=text, created_at=clock.now())
+def _message(
+    text: str,
+    clock: FakeClock,
+    *,
+    utterance_id: uuid.UUID | None = None,
+    turn_generation: int | None = None,
+    turn_order: int | None = None,
+    presentation_revision: int = 0,
+    target_indexes: tuple[int, ...] = (),
+    target_languages: tuple[str, ...] = (),
+) -> OSCMessage:
+    return OSCMessage(
+        utterance_id or uuid.uuid4(),
+        text=text,
+        created_at=clock.now(),
+        turn_generation=turn_generation,
+        turn_order=turn_order,
+        presentation_revision=presentation_revision,
+        target_indexes=target_indexes,
+        target_languages=target_languages,
+    )
 
 
 def test_short_message_sends_immediately_without_cooldown() -> None:
@@ -64,6 +83,38 @@ def test_short_message_sends_immediately_without_cooldown() -> None:
     paginator.enqueue(_message("world", clock))
 
     assert sender.sent == ["hello", "world"]
+
+
+def test_detailed_send_attempt_records_length_without_chatbox_payload() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    runtime_logging = FakeRuntimeLogging(detailed_enabled=True)
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        runtime_logging=runtime_logging,
+    )
+    payload = "PRIVATE_PRIMARY\nPRIVATE_SECONDARY"
+
+    paginator.enqueue(
+        _message(
+            payload,
+            clock,
+            turn_generation=2,
+            turn_order=7,
+            presentation_revision=2,
+            target_indexes=(0, 1),
+            target_languages=("zh-CN", "ja"),
+        )
+    )
+
+    combined = "\n".join(message for _level, message in runtime_logging.detailed)
+    assert "status=attempt" in combined
+    assert f"chars={len(payload)}" in combined
+    assert "remaining_parts=0" in combined
+    assert "PRIVATE_PRIMARY" not in combined
+    assert "PRIVATE_SECONDARY" not in combined
+    assert "text=" not in combined
 
 
 def test_default_limits_send_144_chars_immediately_and_paginate_145_chars_every_3s() -> None:
@@ -420,3 +471,360 @@ def test_chatbox_stage_recorder_separates_enqueue_from_udp_page_send() -> None:
     ]
     assert [fields["page_index"] for fields in first_pages] == [0, 1]
     assert first_pages[1]["remaining_parts"] == 0
+
+
+def test_newer_active_revision_replaces_all_unsent_pages() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    stages: list[tuple[str, dict[str, object]]] = []
+    parent_id = uuid.uuid4()
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=4,
+        page_interval_s=3.0,
+        stage_recorder=lambda event, **fields: stages.append((event, fields)),
+    )
+
+    paginator.enqueue(
+        _message(
+            "abcdefgh",
+            clock,
+            utterance_id=parent_id,
+            turn_generation=2,
+            turn_order=7,
+            presentation_revision=1,
+            target_indexes=(1,),
+            target_languages=("ja",),
+        )
+    )
+    paginator.enqueue(
+        _message(
+            "12345678",
+            clock,
+            utterance_id=parent_id,
+            turn_generation=2,
+            turn_order=7,
+            presentation_revision=2,
+            target_indexes=(0, 1),
+            target_languages=("zh-CN", "ja"),
+        )
+    )
+    paginator.enqueue(
+        _message(
+            "abcdefgh",
+            clock,
+            utterance_id=parent_id,
+            turn_generation=2,
+            turn_order=7,
+            presentation_revision=1,
+            target_indexes=(1,),
+            target_languages=("ja",),
+        )
+    )
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.sent == ["abcd", "1234", "5678"]
+    replacement = next(fields for event, fields in stages if event == "chatbox_revision_replaced")
+    assert replacement["previous_revision"] == 1
+    assert replacement["presentation_revision"] == 2
+    assert replacement["turn_generation"] == 2
+    assert replacement["turn_order"] == 7
+    assert replacement["target_indexes"] == (0, 1)
+    assert replacement["target_languages"] == ("zh-CN", "ja")
+    assert all("abcdefgh" not in str(fields) for _event, fields in stages)
+
+
+def test_newer_pending_revision_replaces_in_place_behind_system_message() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    parent_id = uuid.uuid4()
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=4,
+        page_interval_s=3.0,
+    )
+
+    paginator.enqueue(_message("system!!", clock))
+    paginator.enqueue(
+        _message(
+            "old",
+            clock,
+            utterance_id=parent_id,
+            turn_generation=0,
+            turn_order=1,
+            presentation_revision=1,
+        )
+    )
+    paginator.enqueue(
+        _message(
+            "new",
+            clock,
+            utterance_id=parent_id,
+            turn_generation=0,
+            turn_order=1,
+            presentation_revision=2,
+        )
+    )
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.sent == ["syst", "em!!", "new"]
+
+
+def test_newer_turn_prunes_active_pages_and_preserves_system_disclosure() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    stages: list[tuple[str, dict[str, object]]] = []
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=4,
+        page_interval_s=3.0,
+        stage_recorder=lambda event, **fields: stages.append((event, fields)),
+    )
+
+    paginator.enqueue(
+        _message(
+            "old-turn",
+            clock,
+            turn_generation=0,
+            turn_order=4,
+            presentation_revision=1,
+        )
+    )
+    paginator.enqueue(_message("notice", clock))
+    paginator.enqueue(
+        _message(
+            "new",
+            clock,
+            turn_generation=0,
+            turn_order=5,
+            presentation_revision=1,
+            target_indexes=(0,),
+            target_languages=("zh-CN",),
+        )
+    )
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.sent == ["old-", "new", "noti", "ce"]
+    prune = next(fields for event, fields in stages if event == "chatbox_older_turn_pruned")
+    assert prune["pruned_pages"] == 1
+    assert prune["pruned_messages"] == 0
+    assert prune["turn_order"] == 5
+    assert prune["target_indexes"] == (0,)
+    assert prune["target_languages"] == ("zh-CN",)
+    assert all("old-turn" not in str(fields) for _event, fields in stages)
+
+
+def test_newer_turn_replaces_pending_older_turn_without_dropping_system_routes() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=4,
+        page_interval_s=3.0,
+    )
+
+    paginator.enqueue(_message("system!!", clock))
+    paginator.enqueue(
+        _message(
+            "old",
+            clock,
+            turn_generation=3,
+            turn_order=8,
+            presentation_revision=1,
+        )
+    )
+    paginator.enqueue(_message("note", clock))
+    paginator.enqueue(
+        _message(
+            "new",
+            clock,
+            turn_generation=3,
+            turn_order=9,
+            presentation_revision=1,
+        )
+    )
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.sent == ["syst", "em!!", "new", "note"]
+
+
+def test_two_line_translation_preserves_newline_across_pagination() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=5,
+        page_interval_s=3.0,
+    )
+    text = "abcd\nwxyz"
+
+    paginator.enqueue(
+        _message(
+            text,
+            clock,
+            turn_generation=1,
+            turn_order=0,
+            presentation_revision=2,
+        )
+    )
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.sent == ["abcd\n", "wxyz"]
+    assert "".join(sender.sent) == text
+    assert all(len(page) <= 5 for page in sender.sent)
+
+
+def test_metadata_free_multiline_message_keeps_legacy_wrapping() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=5,
+        page_interval_s=3.0,
+    )
+
+    paginator.enqueue(_message("abcd\nefgh", clock))
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.sent == ["abcd", "efgh"]
+
+
+def test_single_target_turn_identity_keeps_legacy_multiline_wrapping() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=5,
+        page_interval_s=3.0,
+    )
+
+    paginator.enqueue(
+        _message(
+            "abcd\nefgh",
+            clock,
+            turn_generation=1,
+            turn_order=0,
+            presentation_revision=0,
+        )
+    )
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.sent == ["abcd", "efgh"]
+
+
+@pytest.mark.parametrize(
+    ("older_revision", "newer_revision"),
+    [(1, 0), (0, 1)],
+)
+def test_newer_self_turn_prunes_active_pages_across_single_dual_transitions(
+    older_revision: int,
+    newer_revision: int,
+) -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=4,
+        page_interval_s=3.0,
+    )
+
+    paginator.enqueue(
+        _message(
+            "abcdefgh",
+            clock,
+            turn_generation=0,
+            turn_order=0,
+            presentation_revision=older_revision,
+        )
+    )
+    paginator.enqueue(
+        _message(
+            "NEW",
+            clock,
+            turn_generation=1,
+            turn_order=0,
+            presentation_revision=newer_revision,
+        )
+    )
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert sender.sent == ["abcd", "NEW"]
+
+
+def test_latest_self_turn_watermark_rejects_stale_messages_after_queue_drains() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(sender=sender, clock=clock)
+    current_id = uuid.uuid4()
+
+    paginator.enqueue(
+        _message(
+            "current",
+            clock,
+            utterance_id=current_id,
+            turn_generation=4,
+            turn_order=3,
+            presentation_revision=2,
+        )
+    )
+    paginator.enqueue(
+        _message(
+            "older revision",
+            clock,
+            utterance_id=current_id,
+            turn_generation=4,
+            turn_order=3,
+            presentation_revision=1,
+        )
+    )
+    paginator.enqueue(
+        _message(
+            "older turn",
+            clock,
+            turn_generation=4,
+            turn_order=2,
+            presentation_revision=3,
+        )
+    )
+
+    assert sender.sent == ["current"]
+
+
+@pytest.mark.parametrize(
+    ("fields", "error_type"),
+    [
+        ({"presentation_revision": True}, TypeError),
+        ({"presentation_revision": 1.5}, TypeError),
+        ({"presentation_revision": float("nan")}, TypeError),
+        ({"turn_generation": True, "turn_order": 0}, TypeError),
+        ({"turn_generation": 0, "turn_order": 1.5}, TypeError),
+        ({"presentation_revision": 1}, ValueError),
+    ],
+)
+def test_osc_message_rejects_malformed_self_turn_identity(
+    fields: dict[str, object],
+    error_type: type[Exception],
+) -> None:
+    with pytest.raises(error_type):
+        OSCMessage(
+            utterance_id=uuid.uuid4(),
+            text="translation",
+            created_at=0.0,
+            **fields,
+        )
