@@ -2122,9 +2122,7 @@ class TestSpecFinalReconciliation:
         await harness.dispatch_stt_event(
             STTFinalEvent(
                 utterance_id=utterance_id,
-                transcript=Transcript(
-                    utterance_id=utterance_id, text=revised_text, is_final=True
-                ),
+                transcript=Transcript(utterance_id=utterance_id, text=revised_text, is_final=True),
             ),
         )
 

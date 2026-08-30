@@ -3610,9 +3610,7 @@ def test_on_request_openrouter_pkce_reopens_existing_auth_url_while_flow_active(
     target_settings = AppSettings()
     reopen_calls: list[str] = []
 
-    async def fake_connect_openrouter_via_pkce(
-        *, target: AppSettings, launch_source: str
-    ) -> bool:
+    async def fake_connect_openrouter_via_pkce(*, target: AppSettings, launch_source: str) -> bool:
         _ = (target, launch_source)
         return False
 
@@ -3645,9 +3643,7 @@ async def test_on_request_openrouter_pkce_ignores_duplicate_while_flow_active(
     target_settings = AppSettings()
     pkce_calls: list[str] = []
 
-    async def fake_connect_openrouter_via_pkce(
-        *, target: AppSettings, launch_source: str
-    ) -> bool:
+    async def fake_connect_openrouter_via_pkce(*, target: AppSettings, launch_source: str) -> bool:
         _ = target
         pkce_calls.append(launch_source)
         return False
@@ -3689,9 +3685,7 @@ async def test_on_request_openrouter_pkce_uses_draft_preserving_refresh_on_succe
     refresh_calls: list[tuple[AppSettings, Path]] = []
     snackbar_calls: list[tuple[str, str]] = []
 
-    async def fake_connect_openrouter_via_pkce(
-        *, target: AppSettings, launch_source: str
-    ) -> bool:
+    async def fake_connect_openrouter_via_pkce(*, target: AppSettings, launch_source: str) -> bool:
         pkce_calls.append((target, launch_source))
         return True
 
@@ -3725,9 +3719,7 @@ async def test_on_request_openrouter_pkce_does_not_refresh_settings_view_on_fail
     target_settings = AppSettings()
     refresh_calls: list[tuple[AppSettings, Path]] = []
 
-    async def fake_connect_openrouter_via_pkce(
-        *, target: AppSettings, launch_source: str
-    ) -> bool:
+    async def fake_connect_openrouter_via_pkce(*, target: AppSettings, launch_source: str) -> bool:
         _ = (target, launch_source)
         return False
 
