@@ -351,43 +351,6 @@ EXTERNAL_MODULE_LAYERS = {
     "keyring": ADAPTERS,
 }
 
-KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset()
-
-SETTINGS_COMPATIBILITY_SOURCE_PATHS = frozenset(
-    {
-        "src/puripuly_heart/config/settings_vnext/compat.py",
-        "src/puripuly_heart/config/settings_vnext/facade.py",
-        "src/puripuly_heart/config/settings_vnext/migration.py",
-        "src/puripuly_heart/config/settings_vnext/serialization.py",
-    }
-)
-
-SETTINGS_PUBLIC_COMPATIBILITY_FACADE_PATHS = frozenset(
-    {
-        "src/puripuly_heart/app/wiring/root.py",
-    }
-)
-
-SETTINGS_PERSISTENCE_COMPOSITION_PATHS = frozenset(
-    {
-        "src/puripuly_heart/app/adapters/settings_vnext_canonical_persistence.py",
-        "src/puripuly_heart/app/services/canonical_settings_persistence.py",
-    }
-)
-
-SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS = frozenset(
-    {
-        "src/puripuly_heart/app/services/settings/settings_mutation_legacy.py",
-        "src/puripuly_heart/app/services/github_star_prompt_settings.py",
-        "src/puripuly_heart/app/services/manual_local_asr_fallback.py",
-        "src/puripuly_heart/app/services/openrouter_pkce_flow.py",
-        "src/puripuly_heart/app/services/settings/settings_application.py",
-        "src/puripuly_heart/app/services/settings/settings_runtime_effects.py",
-        "src/puripuly_heart/app/wiring/wiring_managed_auth_factory.py",
-        "src/puripuly_heart/app/wiring/wiring_managed_account.py",
-    }
-)
-
 LEGACY_SETTINGS_API_NAMES = frozenset(
     {
         "AppSettings",
@@ -412,15 +375,6 @@ FLAT_SETTINGS_PATCH_SYMBOLS = frozenset(
     }
 )
 
-CONTROLLER_FLAT_SETTINGS_PATCH_HELPERS = frozenset(
-    {
-        "_apply_settings_path_patch",
-        "_build_settings_path_patch",
-        "_get_settings_path_value",
-        "_set_settings_path_value",
-    }
-)
-
 LEGACY_SETTINGS_VALUE_PAYLOAD_KEYS = frozenset(
     {
         "api_key_verified",
@@ -436,44 +390,6 @@ LEGACY_SETTINGS_VALUE_PAYLOAD_PREFIXES = (
     "state.managed_identity.",
     "state.provider_verification.",
 )
-
-UNKNOWN_SETTINGS_RUNTIME_CONFINEMENT_RATIONALE = "unclassified order-11 settings runtime debt"
-
-KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT: frozenset[SettingsRuntimeConfinementViolation] = (
-    frozenset()
-)
-
-
-def _known_allowed_violation_gate6_rationale(violation: ImportViolation) -> str:
-    if (
-        violation.importer
-        == "src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py"
-    ):
-        return "managed OpenRouter broker adapter still consumes public settings compatibility values at the adapter boundary"
-    if violation.importer_layer == ADAPTERS and "/app/wiring/" in violation.importer:
-        return (
-            "wiring composition modules retain public settings compatibility imports; grouping the "
-            "wiring package makes the pre-existing debt layer-visible, so it is explicitly recorded "
-            "until the settings compatibility facade is retired"
-        )
-    if violation.importer_layer == RUNTIME_OWNERS:
-        return "runtime owner currently wraps a concrete adapter while preserving explicit lifecycle ownership; adapter-port extraction remains deferred work"
-    if violation.importer_layer == PROVIDERS:
-        return "provider modules retain concrete runtime logging/settings compatibility imports until provider observation ports replace adapter logging"
-    if violation.importer_layer == UI_ADAPTERS_RENDERERS:
-        if violation.imported == "puripuly_heart.config.settings":
-            return "UI boundary uses the public settings compatibility facade for user settings load/edit/save surfaces"
-        if violation.imported == "puripuly_heart.app.wiring":
-            return "UI composition still enters through the preserved public wiring facade while split factories remain behind it"
-        return "UI boundary still wires concrete adapter seams for user-facing runtime controls; concrete port extraction is deferred and explicitly guarded"
-    return UNKNOWN_SETTINGS_RUNTIME_CONFINEMENT_RATIONALE
-
-
-KNOWN_ALLOWED_VIOLATION_GATE6_RATIONALES = {
-    violation: _known_allowed_violation_gate6_rationale(violation)
-    for violation in KNOWN_ALLOWED_VIOLATIONS
-}
-
 
 def _module_name_for_path(path: Path) -> str:
     relative = path.relative_to(SOURCE_PACKAGE_ROOT).with_suffix("")
@@ -613,52 +529,6 @@ def _dependency_violations() -> frozenset[ImportViolation]:
     return frozenset(violations)
 
 
-def _format_violations(violations: list[ImportViolation]) -> str:
-    if not violations:
-        return "  <none>"
-
-    return "\n".join(
-        "  ImportViolation(\n"
-        f'      rule_id="{violation.rule_id}",\n'
-        f'      importer="{violation.importer}",\n'
-        f'      imported="{violation.imported}",\n'
-        f'      importer_layer="{violation.importer_layer}",\n'
-        f'      imported_layer="{violation.imported_layer}",\n'
-        f'      reason="{violation.reason}",\n'
-        "  ),"
-        for violation in violations
-    )
-
-
-def _format_settings_runtime_violations(
-    violations: list[SettingsRuntimeConfinementViolation],
-) -> str:
-    if not violations:
-        return "  <none>"
-
-    return "\n".join(
-        "  SettingsRuntimeConfinementViolation(\n"
-        f'      category="{violation.category}",\n'
-        f'      path="{violation.path}",\n'
-        f'      symbol="{violation.symbol}",\n'
-        f'      rationale="{violation.rationale}",\n'
-        "  ),"
-        for violation in violations
-    )
-
-
-def _known_settings_runtime_rationale(
-    *,
-    category: str,
-    path: str,
-    symbol: str,
-) -> str:
-    for violation in KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT:
-        if violation.category == category and violation.path == path and violation.symbol == symbol:
-            return violation.rationale
-    return UNKNOWN_SETTINGS_RUNTIME_CONFINEMENT_RATIONALE
-
-
 def _settings_runtime_violation(
     *,
     category: str,
@@ -669,11 +539,7 @@ def _settings_runtime_violation(
         category=category,
         path=path,
         symbol=symbol,
-        rationale=_known_settings_runtime_rationale(
-            category=category,
-            path=path,
-            symbol=symbol,
-        ),
+        rationale=category,
     )
 
 
@@ -693,15 +559,6 @@ def _legacy_settings_api_import_violations(
     tree: ast.AST,
     relative_path: str,
 ) -> set[SettingsRuntimeConfinementViolation]:
-    if relative_path in SETTINGS_COMPATIBILITY_SOURCE_PATHS:
-        return set()
-    if relative_path in SETTINGS_PUBLIC_COMPATIBILITY_FACADE_PATHS:
-        return set()
-    if relative_path in SETTINGS_PERSISTENCE_COMPOSITION_PATHS:
-        return set()
-    if relative_path in SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS:
-        return set()
-
     violations: set[SettingsRuntimeConfinementViolation] = set()
     migration_module_aliases = _settings_vnext_migration_module_aliases(tree)
     for node in ast.walk(tree):
@@ -778,11 +635,6 @@ def _dynamic_settings_shape_violations(
     tree: ast.AST,
     relative_path: str,
 ) -> set[SettingsRuntimeConfinementViolation]:
-    if relative_path in SETTINGS_COMPATIBILITY_SOURCE_PATHS:
-        return set()
-    if relative_path in SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS:
-        return set()
-
     violations: set[SettingsRuntimeConfinementViolation] = set()
     for node, qualified_name in _function_nodes_with_qualified_names(tree):
         function_symbol = _settings_shape_function_symbol(node, qualified_name)
@@ -865,9 +717,6 @@ def _flat_settings_patch_violations(
     tree: ast.AST,
     relative_path: str,
 ) -> set[SettingsRuntimeConfinementViolation]:
-    if relative_path in SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS:
-        return set()
-
     violations: set[SettingsRuntimeConfinementViolation] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module in {
@@ -883,42 +732,7 @@ def _flat_settings_patch_violations(
                             symbol=alias.name,
                         )
                     )
-        if isinstance(node, ast.ClassDef) and node.name in FLAT_SETTINGS_PATCH_SYMBOLS:
-            violations.add(
-                _settings_runtime_violation(
-                    category="legacy-flat-settings-patch-definition",
-                    path=relative_path,
-                    symbol=node.name,
-                )
-            )
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name in (
-            CONTROLLER_FLAT_SETTINGS_PATCH_HELPERS
-        ):
-            violations.add(
-                _settings_runtime_violation(
-                    category="legacy-flat-settings-patch-helper",
-                    path=relative_path,
-                    symbol=node.name,
-                )
-            )
-        if isinstance(node, ast.Assign | ast.AnnAssign):
-            for target_name in _assignment_target_names(node):
-                if target_name in FLAT_SETTINGS_PATCH_SYMBOLS:
-                    violations.add(
-                        _settings_runtime_violation(
-                            category="legacy-flat-settings-patch-definition",
-                            path=relative_path,
-                            symbol=target_name,
-                        )
-                    )
     return violations
-
-
-def _assignment_target_names(node: ast.Assign | ast.AnnAssign) -> Iterator[str]:
-    targets = node.targets if isinstance(node, ast.Assign) else (node.target,)
-    for target in targets:
-        if isinstance(target, ast.Name):
-            yield target.id
 
 
 def _legacy_settings_value_payload_key_violations(
@@ -926,8 +740,6 @@ def _legacy_settings_value_payload_key_violations(
     relative_path: str,
 ) -> set[SettingsRuntimeConfinementViolation]:
     if not relative_path.startswith("src/puripuly_heart/app/services/"):
-        return set()
-    if relative_path in SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS:
         return set()
 
     violations: set[SettingsRuntimeConfinementViolation] = set()
@@ -1257,7 +1069,6 @@ def test_a03_runtime_owner_adapter_imports_are_retired() -> None:
     }
 
     assert inherited_runtime_owner_violations.isdisjoint(_dependency_violations())
-    assert inherited_runtime_owner_violations.isdisjoint(KNOWN_ALLOWED_VIOLATIONS)
 
 
 def test_gate1_existing_replacement_private_shims_are_removed() -> None:
@@ -1521,20 +1332,8 @@ def test_absolute_from_import_resolves_layer_root_namespace_candidates(
     assert _layer_for_module("puripuly_heart.ui") == UI_ADAPTERS_RENDERERS
 
 
-def test_dependency_boundary_allowlist_matches_current_violations() -> None:
-    actual = _dependency_violations()
-
-    unexpected = sorted(actual - KNOWN_ALLOWED_VIOLATIONS)
-    stale = sorted(KNOWN_ALLOWED_VIOLATIONS - actual)
-
-    assert not unexpected and not stale, (
-        "Dependency boundary allowlist mismatch. Add only current known exceptions "
-        "to KNOWN_ALLOWED_VIOLATIONS, and remove entries as refactors eliminate them.\n"
-        "Unexpected violations:\n"
-        f"{_format_violations(unexpected)}\n"
-        "Stale allowlist entries:\n"
-        f"{_format_violations(stale)}"
-    )
+def test_dependency_violations_are_empty() -> None:
+    assert _dependency_violations() == frozenset()
 
 
 def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -> None:
@@ -1648,15 +1447,13 @@ def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
 def test_a07_managed_broker_boundary_reduces_dependency_debt_to_16() -> None:
     assert not any(
         violation.importer.endswith("managed_openrouter_broker_client.py")
-        for violation in KNOWN_ALLOWED_VIOLATIONS
+        for violation in _dependency_violations()
     )
-    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 0
-    assert len(_settings_runtime_confinement_violations()) == 0
+    assert _settings_runtime_confinement_violations() == frozenset()
 
 
 def test_a08_provider_runtime_wiring_reduces_dependency_debt_to_9() -> None:
-    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 0
-    assert len(_settings_runtime_confinement_violations()) == 0
+    assert _settings_runtime_confinement_violations() == frozenset()
     a08_paths = (
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_llm_factory.py",
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_local_asr_provider_runtime.py",
@@ -1676,14 +1473,13 @@ def test_a08_provider_runtime_wiring_reduces_dependency_debt_to_9() -> None:
         )
         assert "puripuly_heart.config.settings" not in imported_modules
         assert "puripuly_heart.config.settings_vnext.migration" not in imported_modules
-    assert {violation.importer for violation in KNOWN_ALLOWED_VIOLATIONS}.isdisjoint(
+    assert {violation.importer for violation in _dependency_violations()}.isdisjoint(
         {_relative_repo_path(path) for path in a08_paths}
     )
 
 
 def test_a09_capture_overlay_application_wiring_reduces_dependency_debt_to_4() -> None:
-    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 0
-    assert len(_settings_runtime_confinement_violations()) == 0
+    assert _settings_runtime_confinement_violations() == frozenset()
     a09_paths = (
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_capture_runtime.py",
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_local_asr_application.py",
@@ -1702,15 +1498,13 @@ def test_a09_capture_overlay_application_wiring_reduces_dependency_debt_to_4() -
             )
         )
         assert "puripuly_heart.config.settings" not in imported_modules
-    assert {violation.importer for violation in KNOWN_ALLOWED_VIOLATIONS}.isdisjoint(
+    assert {violation.importer for violation in _dependency_violations()}.isdisjoint(
         {_relative_repo_path(path) for path in a09_paths}
     )
 
 
 def test_a10_composition_managed_secrets_wiring_reduces_dependency_debt_to_0() -> None:
-    assert KNOWN_ALLOWED_VIOLATIONS == frozenset()
     assert _dependency_violations() == frozenset()
-    assert KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT == frozenset()
     assert _settings_runtime_confinement_violations() == frozenset()
     a10_paths = (
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_composition.py",
@@ -1858,40 +1652,8 @@ def test_r00_canonical_migration_loader_has_no_flat_ingress() -> None:
     assert "puripuly_heart.config.settings" not in imported_modules
 
 
-def test_dependency_boundary_allowlist_entries_have_gate6_rationale() -> None:
-    assert set(KNOWN_ALLOWED_VIOLATION_GATE6_RATIONALES) == set(KNOWN_ALLOWED_VIOLATIONS)
-    assert all(
-        rationale and rationale != UNKNOWN_SETTINGS_RUNTIME_CONFINEMENT_RATIONALE
-        for rationale in KNOWN_ALLOWED_VIOLATION_GATE6_RATIONALES.values()
-    )
-
-
-def test_settings_runtime_confinement_guard_tracks_current_debt() -> None:
-    actual = _settings_runtime_confinement_violations()
-
-    unexpected = sorted(actual - KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT)
-    stale = sorted(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT - actual)
-
-    assert not unexpected and not stale, (
-        "Settings runtime confinement guard mismatch. Legacy settings APIs, "
-        "dynamic settings-shape reads, and legacy flat payload keys must be "
-        "confined to compatibility/migration locations or listed as current "
-        "order-11 debt with an explicit rationale.\n"
-        "Unexpected violations:\n"
-        f"{_format_settings_runtime_violations(unexpected)}\n"
-        "Stale allowlist entries:\n"
-        f"{_format_settings_runtime_violations(stale)}"
-    )
-
-
-def test_settings_runtime_confinement_debt_has_current_gate6_rationale() -> None:
-    assert all(
-        violation.rationale
-        and "Gate 2" not in violation.rationale
-        and "order-11" not in violation.rationale
-        and "resolved by" not in violation.rationale.lower()
-        for violation in KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT
-    )
+def test_settings_runtime_confinement_violations_are_empty() -> None:
+    assert _settings_runtime_confinement_violations() == frozenset()
 
 
 def test_settings_runtime_confinement_guard_flags_qualified_to_legacy_dict_usage() -> None:
