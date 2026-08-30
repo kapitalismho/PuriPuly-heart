@@ -12,8 +12,9 @@ from experiments.psem_sortformer_adaptation_depth.preflight import canonical_sha
 from experiments.psem_sortformer_adaptation_depth.supervision import FRAME_COUNT, FrameSupervision
 from experiments.psem_sortformer_adaptation_depth.training import (
     _TRAINING_EXAMPLE_TOKEN,
-    EarlyStopping,
-    TrainingContractError,
+    GRADIENT_ACCUMULATION_STEPS,
+    OFFICIAL_OPTIMIZER_STEPS,
+    SMOKE_OPTIMIZER_STEPS,
     TrainingExample,
     _batch_supervision,
     _supervision_content_sha256,
@@ -73,12 +74,12 @@ def test_duration_weighted_average_precision_uses_only_unmasked_frames() -> None
     assert duration_weighted_average_precision(logits, targets, mask) == 1
 
 
-def test_warmup_is_exactly_five_percent_then_constant() -> None:
+def test_warmup_uses_the_exact_thirteen_steps_of_the_256_step_recipe() -> None:
     parameter = torch.nn.Parameter(torch.tensor(1.0))
     optimizer = torch.optim.AdamW([parameter], lr=1.0)
-    scheduler = warmup_scheduler(optimizer, 100)
-    assert optimizer.param_groups[0]["lr"] == pytest.approx(0.2)
-    for _ in range(4):
+    scheduler = warmup_scheduler(optimizer, 256, 13)
+    assert optimizer.param_groups[0]["lr"] == pytest.approx(1 / 13)
+    for _ in range(12):
         optimizer.step()
         scheduler.step()
     assert optimizer.param_groups[0]["lr"] == pytest.approx(1.0)
@@ -87,14 +88,10 @@ def test_warmup_is_exactly_five_percent_then_constant() -> None:
     assert optimizer.param_groups[0]["lr"] == pytest.approx(1.0)
 
 
-def test_early_stopping_uses_total_loss_then_ap_and_patience_two() -> None:
-    stopper = EarlyStopping()
-    assert not stopper.update(1.0, 0.5)
-    assert not stopper.update(1.0, 0.6)
-    assert not stopper.update(1.1, 0.9)
-    assert stopper.update(1.2, 0.9)
-    with pytest.raises(TrainingContractError):
-        EarlyStopping(3)
+def test_supported_training_budgets_are_the_lean_recipe() -> None:
+    assert SMOKE_OPTIMIZER_STEPS == 32
+    assert OFFICIAL_OPTIMIZER_STEPS == 256
+    assert GRADIENT_ACCUMULATION_STEPS == 16
 
 
 def test_anchor_free_uniform_window_is_safely_masked_before_oracle_mapping() -> None:
@@ -125,19 +122,18 @@ def test_anchor_free_uniform_window_is_safely_masked_before_oracle_mapping() -> 
 def test_official_authorization_binds_every_source_window_target_and_augmentation() -> None:
     rows = [
         {
-            "row_id": f"epoch-{epoch:02d}-window-{index:04d}",
-            "epoch": epoch,
+            "row_id": f"epoch-01-window-{index:04d}",
+            "epoch": 1,
             "epoch_index": index,
             "split_role": "PSEM-STRATEGY-TRAIN",
             "source_id": "source",
             "corpus": "AMI",
-            "window_start_sample": (epoch * 4096 + index) * 1280,
-            "window_end_sample": (epoch * 4096 + index) * 1280 + 480000,
+            "window_start_sample": index * 1280,
+            "window_end_sample": index * 1280 + 480000,
             "target_identity_sha256": "a" * 64,
             "augmentation_identity_sha256": "b" * 64,
             "state_reset_at_window_start": True,
         }
-        for epoch in range(1, 9)
         for index in range(4096)
     ]
     weight_payload = {

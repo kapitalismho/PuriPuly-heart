@@ -14,7 +14,7 @@ def test_static_contract_is_bound_to_authoritative_artifacts() -> None:
     assert all(row["passed"] for row in checks), checks
 
 
-def test_runtime_contract_records_lean_authority_and_blocks_legacy_runner() -> None:
+def test_runtime_contract_records_ready_lean_authority() -> None:
     contract = _load("contract.json")
     config = _load("config.json")
     runtime = _load("runtime_contract.json")
@@ -29,10 +29,11 @@ def test_runtime_contract_records_lean_authority_and_blocks_legacy_runner() -> N
         "chunk_left_context": streaming["chunk_left_context_frames"],
     }
     assert contract["authority"]["mode"] == "cost_bounded_hobby_engineering_probe"
-    assert contract["material_execution"]["status"] == "blocked_pending_lean_runner_alignment"
-    assert config["material_execution_status"] == "blocked_pending_lean_runner_alignment"
-    assert runtime["material_execution"]["status"] == "blocked_pending_lean_runner_alignment"
-    assert runtime["material_execution"]["known_legacy_blockers"]
+    assert contract["material_execution"]["status"] == "ready"
+    assert config["material_execution_status"] == "ready"
+    assert runtime["material_execution"]["status"] == "ready"
+    assert runtime["material_execution"]["required_status_for_material_execution"] == "ready"
+    assert runtime["material_execution"]["known_legacy_blockers"] == []
     assert config["optimization"]["seed"] == 7301
     assert config["optimization"]["confirmation_seed_allowed"] is False
     assert config["optimization"]["short_smoke_maximum_optimizer_steps"] == 32

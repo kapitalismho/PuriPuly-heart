@@ -2,7 +2,7 @@
   "schema_version": 2,
   "experiment_id": "psem_sortformer_adaptation_depth_lean_v2",
   "authority_mode": "cost_bounded_hobby_engineering_probe",
-  "material_execution_status": "blocked_pending_lean_runner_alignment",
+  "material_execution_status": "ready",
   "sample_rate_hz": 16000,
   "native_frame_ms": 80,
   "slot_count": 4,

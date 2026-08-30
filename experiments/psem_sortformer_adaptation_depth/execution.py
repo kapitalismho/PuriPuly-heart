@@ -59,13 +59,15 @@ from experiments.psem_sortformer_adaptation_depth.sampling import (
 )
 from experiments.psem_sortformer_adaptation_depth.training import (
     OPTIMIZER_STEPS_PER_EPOCH,
+    ClassWeights,
+    _legacy_authorize_overfit_arm,
+    _legacy_run_overfit_arm,
     authorize_official_training,
-    authorize_overfit_arm,
     evaluate_examples,
     fit_arm,
     prepare_dev_example,
     prepare_training_example,
-    run_overfit_arm,
+    run_short_smoke,
 )
 from experiments.psem_training_strategy_gate.data.reference_normalization import (
     normalize_reference_session,
@@ -76,6 +78,7 @@ from experiments.psem_training_strategy_gate.sampling import (
     DEV_ROLE,
     EVAL_ROLE,
     TOPOLOGY_MANIFEST_PATH,
+    TRAIN_ROLE,
     RuntimeSession,
     load_runtime_sessions,
     role_by_source,
@@ -130,7 +133,7 @@ def write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]
 
 
 def seed_runtime(seed: int) -> None:
-    if seed not in {7301, 7302}:
+    if seed != 7301:
         raise ExecutionError("runtime seed differs from the frozen recipe")
     random.seed(seed)
     np.random.seed(seed)
@@ -355,7 +358,7 @@ def infer_prediction_set(
     ):
         raise ExecutionError("protocol registry root is not a distinct external directory")
     if (arm == "F0-FROZEN-FLOAT" and seed is not None) or (
-        arm != "F0-FROZEN-FLOAT" and seed not in {7301, 7302}
+        arm != "F0-FROZEN-FLOAT" and seed != 7301
     ):
         raise ExecutionError("prediction arm/seed identity differs from the protocol")
     if role == DEV_ROLE and _eval_registry_marker().exists():
@@ -729,7 +732,7 @@ def _save_model_checkpoint(
     return sha256_file(path)
 
 
-def run_training_arm(
+def _legacy_run_training_arm(
     *,
     checkpoint_path: Path,
     nemo_checkout: Path,
@@ -948,23 +951,23 @@ def run_canary_arm(
     sampling_manifest: Path,
     arm: str,
     device: str,
-    staged_execution_receipt: Mapping[str, Any] | None = None,
-    staged_dev_results: Sequence[Mapping[str, Any]] = (),
+    ta_open_authorization: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     require_material_execution_ready()
     if _eval_registry_marker().exists():
         raise ExecutionError("runtime canaries are sealed after EVAL opened")
     if arm not in {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"}:
         raise ExecutionError("runtime canary arm is invalid")
-    from experiments.psem_sortformer_adaptation_depth.protocol import (
-        authorize_conditional_arm_audit,
-    )
-
-    conditional_authorization = authorize_conditional_arm_audit(
-        arm,
-        staged_execution_receipt,
-        staged_dev_results,
-    )
+    conditional_authorization = None
+    if arm == "TA-ALL-TEMPORAL":
+        if not isinstance(ta_open_authorization, Mapping):
+            raise ExecutionError("TA canary requires an explicit open_ta authorization")
+        require_bound(ta_open_authorization, "psem_sortformer_open_ta_authorization")
+        if ta_open_authorization.get("arm") != arm or ta_open_authorization.get("seed") != 7301:
+            raise ExecutionError("TA canary authorization identity is invalid")
+        conditional_authorization = dict(ta_open_authorization)
+    elif ta_open_authorization is not None:
+        raise ExecutionError("non-TA canary cannot carry a TA authorization")
     seed_runtime(7301)
     rows = load_sampling_rows(sampling_manifest)
     sessions = load_training_sessions(corpus_root, reference_root)
@@ -1023,7 +1026,7 @@ def run_canary_arm(
     return result
 
 
-def run_overfit_arm_result(
+def _legacy_run_overfit_arm_implementation(
     *,
     checkpoint_path: Path,
     nemo_checkout: Path,
@@ -1041,10 +1044,10 @@ def run_overfit_arm_result(
     if _eval_registry_marker().exists():
         raise ExecutionError("overfit canaries are sealed after EVAL opened")
     from experiments.psem_sortformer_adaptation_depth.protocol import (
-        authorize_conditional_arm_audit,
+        _legacy_authorize_conditional_arm_audit,
     )
 
-    conditional_authorization = authorize_conditional_arm_audit(
+    conditional_authorization = _legacy_authorize_conditional_arm_audit(
         arm,
         staged_execution_receipt,
         staged_dev_results,
@@ -1055,7 +1058,7 @@ def run_overfit_arm_result(
     validation = validate_sampling_manifest(sampling_manifest, sessions)
     corpus_by_source = _corpus_by_source()
     selected = list(select_overfit_rows(rows, corpus_by_source))
-    authorization = authorize_overfit_arm(
+    authorization = _legacy_authorize_overfit_arm(
         arm,
         selected,
         rows,
@@ -1085,7 +1088,7 @@ def run_overfit_arm_result(
         device,
     )
     apply_parameter_policy(model, arm)
-    raw_result = run_overfit_arm(
+    raw_result = _legacy_run_overfit_arm(
         model,
         arm,
         batches,
@@ -1531,3 +1534,300 @@ def run_memory_fit_preflight(
         "cost_projection": cost_projection,
     }
     return {**payload, "payload_sha256": canonical_sha256(payload)}
+
+
+def build_cost_receipt(
+    *,
+    hourly_price_usd: float,
+    hourly_price_source: str,
+    actual_gpu_seconds: float,
+    projected_remaining_gpu_seconds: float,
+    command: str,
+) -> dict[str, Any]:
+    values = (hourly_price_usd, actual_gpu_seconds, projected_remaining_gpu_seconds)
+    if (
+        not hourly_price_source.strip()
+        or not command.strip()
+        or not all(np.isfinite(value) for value in values)
+    ):
+        raise ExecutionError("cost receipt inputs are invalid")
+    if hourly_price_usd <= 0 or actual_gpu_seconds < 0 or projected_remaining_gpu_seconds < 0:
+        raise ExecutionError("cost receipt inputs must be non-negative with a positive price")
+    actual_cost = actual_gpu_seconds * hourly_price_usd / 3600.0
+    remaining_cost = projected_remaining_gpu_seconds * hourly_price_usd / 3600.0
+    payload = {
+        "schema_version": 1,
+        "artifact_role": "psem_sortformer_cost_receipt",
+        "hourly_price_usd": float(hourly_price_usd),
+        "hourly_price_source": hourly_price_source.strip(),
+        "actual_gpu_seconds": float(actual_gpu_seconds),
+        "projected_remaining_gpu_seconds": float(projected_remaining_gpu_seconds),
+        "actual_cost_usd": actual_cost,
+        "projected_remaining_cost_usd": remaining_cost,
+        "projected_total_gpu_seconds": float(actual_gpu_seconds + projected_remaining_gpu_seconds),
+        "projected_total_cost_usd": actual_cost + remaining_cost,
+        "target_total_usd": 15.0,
+        "hard_stop_usd": 30.0,
+        "target_is_informational": True,
+        "command": command.strip(),
+    }
+    if payload["projected_total_cost_usd"] > 30.0:
+        raise ExecutionError("projected total cost exceeds the USD-30 hard stop")
+    return {**payload, "payload_sha256": canonical_sha256(payload)}
+
+
+def run_smoke_arm(
+    *,
+    checkpoint_path: Path,
+    nemo_checkout: Path,
+    dependency_lock: Path,
+    corpus_root: Path,
+    reference_root: Path,
+    sampling_manifest: Path,
+    class_weight_receipt: Mapping[str, Any],
+    arm: str,
+    device: str,
+    ta_open_authorization: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    require_material_execution_ready()
+    if _eval_registry_marker().exists() or arm not in {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"}:
+        raise ExecutionError("smoke arm is unavailable or EVAL is already open")
+    if arm == "TA-ALL-TEMPORAL":
+        if not isinstance(ta_open_authorization, Mapping):
+            raise ExecutionError("TA smoke requires an explicit open_ta authorization")
+        authorization = require_bound(
+            ta_open_authorization, "psem_sortformer_open_ta_authorization"
+        )
+        if authorization.get("arm") != arm or authorization.get("seed") != 7301:
+            raise ExecutionError("TA smoke authorization identity is invalid")
+    elif ta_open_authorization is not None:
+        raise ExecutionError("non-TA smoke cannot carry a TA authorization")
+    seed_runtime(7301)
+    rows = load_sampling_rows(sampling_manifest)
+    sessions = load_training_sessions(corpus_root, reference_root)
+    validation = validate_sampling_manifest(sampling_manifest, sessions)
+    first_rows = rows[:512]
+    if len(first_rows) != 512 or [row.get("epoch_index") for row in first_rows] != list(range(512)):
+        raise ExecutionError("smoke requires the first 512 ordered epoch-1 rows")
+    by_id = {str(row["row_id"]): row for row in rows}
+    examples = [
+        (
+            prepare_training_example(
+                row,
+                sessions[str(row["source_id"])],
+                corpus_root,
+                str(row["corpus"]),
+                manifest_path=sampling_manifest,
+                manifest_validation=validation,
+                manifest_rows_by_id=by_id,
+            ),
+        )
+        for row in first_rows
+    ]
+    model, runtime_identity = load_pinned_sortformer(
+        checkpoint_path, nemo_checkout, dependency_lock, device
+    )
+    parameter_policy = apply_parameter_policy(model, arm)
+    weight_payload = {
+        key: value for key, value in class_weight_receipt.items() if key != "payload_sha256"
+    }
+    if (
+        class_weight_receipt.get("payload_sha256") != canonical_sha256(weight_payload)
+        or class_weight_receipt.get("artifact_role") != "train_class_weight_receipt"
+        or class_weight_receipt.get("sampling_manifest_sha256") != sha256_file(sampling_manifest)
+        or class_weight_receipt.get("row_count") != 4096
+    ):
+        raise ExecutionError("smoke class weights differ from the one-epoch manifest")
+    class_weights = ClassWeights(
+        replacement_positive=float(class_weight_receipt["replacement_positive_weight"]),
+        anchor_positive=float(class_weight_receipt["anchor_positive_weight"]),
+    )
+    result = run_short_smoke(
+        model,
+        arm,
+        class_weights,
+        examples,
+        expected_row_ids=[str(row["row_id"]) for row in first_rows],
+        parameter_policy=parameter_policy,
+    )
+    payload = {
+        **result,
+        "sampling_manifest_sha256": sha256_file(sampling_manifest),
+        "parameter_policy_sha256": canonical_sha256(parameter_policy),
+        "runtime_identity_sha256": canonical_sha256(runtime_identity),
+        "runtime_identity": runtime_identity,
+        "weights_discarded": True,
+        "ta_open_authorization_sha256": (
+            ta_open_authorization.get("payload_sha256")
+            if ta_open_authorization is not None
+            else None
+        ),
+    }
+    receipt = {**payload, "payload_sha256": canonical_sha256(payload)}
+    register_execution("short-smoke", receipt)
+    return receipt
+
+
+def run_training_arm(
+    *,
+    checkpoint_path: Path,
+    nemo_checkout: Path,
+    dependency_lock: Path,
+    corpus_root: Path,
+    reference_root: Path,
+    sampling_manifest: Path,
+    class_weight_receipt: Mapping[str, Any],
+    material_gate: Mapping[str, Any],
+    output_root: Path,
+    device: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    require_material_execution_ready()
+    assert_clean_candidate()
+    rows = load_sampling_rows(sampling_manifest)
+    sessions = load_training_sessions(corpus_root, reference_root)
+    validation = validate_sampling_manifest(sampling_manifest, sessions)
+    revalidate_material_training_gate(
+        material_gate,
+        sampling_manifest_path=sampling_manifest,
+        sampling_rows=rows,
+        training_sessions=sessions,
+        class_weight_receipt=class_weight_receipt,
+        checkpoint_path=checkpoint_path,
+        corpus_root=corpus_root,
+        reference_root=reference_root,
+        output_root=output_root,
+    )
+    if _eval_registry_marker().exists():
+        raise ExecutionError("official training cannot start after EVAL opened")
+    authorization = authorize_official_training(material_gate, rows, class_weight_receipt)
+    training_device = torch.device(device)
+    if training_device.type != "cuda" or not torch.cuda.is_available():
+        raise ExecutionError("official training requires one CUDA device")
+    seed_runtime(authorization.seed)
+    model, runtime_identity = load_pinned_sortformer(
+        checkpoint_path, nemo_checkout, dependency_lock, device
+    )
+    parameter_policy = apply_parameter_policy(model, authorization.arm)
+    output_root = output_root.resolve()
+    checkpoint_path_out = output_root / "checkpoints" / authorization.arm / "7301" / "step-256.pt"
+    checkpoint_state: dict[str, Any] = {}
+
+    def save_final(
+        current_model: TrainableSortformerPSEM, step: int, metrics: Mapping[str, Any]
+    ) -> None:
+        if step != 256 or checkpoint_state:
+            raise ExecutionError("only the final step-256 checkpoint may be persisted")
+        digest = _save_model_checkpoint(current_model, checkpoint_path_out, authorization.arm, 7301)
+        checkpoint_state.update({"step": step, "metrics": dict(metrics), "sha256": digest})
+
+    torch.cuda.reset_peak_memory_stats(training_device)
+    started = time.perf_counter()
+    training_result = fit_arm(
+        model,
+        authorization.arm,
+        authorization.class_weights,
+        lambda epoch: _training_batches(
+            epoch=epoch,
+            rows=rows,
+            sessions=sessions,
+            corpus_root=corpus_root,
+            manifest_path=sampling_manifest,
+            manifest_validation=validation,
+        ),
+        256,
+        None,
+        save_final,
+        authorization=authorization,
+    )
+    wall_clock = time.perf_counter() - started
+    if checkpoint_state.get("step") != 256:
+        raise ExecutionError("final checkpoint step is not 256")
+    total_parameters = sum(parameter.numel() for parameter in model.parameters())
+    trainable_parameters = sum(
+        parameter.numel() for parameter in model.parameters() if parameter.requires_grad
+    )
+    peak_training_memory_bytes = int(torch.cuda.max_memory_allocated(training_device))
+    if peak_training_memory_bytes <= 0:
+        raise ExecutionError("official training did not produce positive CUDA memory evidence")
+    summary = {
+        "final_step": 256,
+        "optimizer_steps": 256,
+        "scheduler_total_steps": 256,
+        "warmup_steps": 13,
+        "micro_batch_size": 1,
+        "gradient_accumulation_steps": 16,
+        "consumed_row_count": 4096,
+        "training_wall_clock_seconds": wall_clock,
+        "peak_training_memory_bytes": peak_training_memory_bytes,
+        "total_parameters": total_parameters,
+        "trainable_parameters": trainable_parameters,
+        "dev_callback_used": False,
+        "early_stopping_used": False,
+        "native_diarization_contract_passed": bool(
+            material_gate.get("passed") is True
+            and material_gate.get("short_smoke_receipt_sha256")
+            and material_gate.get("gradient_receipt_sha256")
+            and material_gate.get("timing_receipt_sha256")
+        ),
+        "native_diarization_contract_evidence_sha256": canonical_sha256(
+            {
+                "short_smoke_receipt_sha256": material_gate["short_smoke_receipt_sha256"],
+                "gradient_receipt_sha256": material_gate["gradient_receipt_sha256"],
+                "timing_receipt_sha256": material_gate["timing_receipt_sha256"],
+            }
+        ),
+    }
+    code_identity = candidate_code_identity()
+    training_payload = {
+        "schema_version": 1,
+        "artifact_role": "psem_sortformer_training_result",
+        **training_result,
+        "checkpoint_path": str(checkpoint_path_out.resolve()),
+        "checkpoint_sha256": checkpoint_state["sha256"],
+        "checkpoint_size_bytes": checkpoint_path_out.stat().st_size,
+        "training_summary": summary,
+        "runtime_identity": runtime_identity,
+        "runtime_identity_sha256": canonical_sha256(runtime_identity),
+        "parameter_policy": parameter_policy,
+        "parameter_policy_sha256": canonical_sha256(parameter_policy),
+        "candidate_code_identity_sha256": code_identity["payload_sha256"],
+        "split_roles": [TRAIN_ROLE],
+        "eval_source_count": 0,
+    }
+    training_bound = {**training_payload, "payload_sha256": canonical_sha256(training_payload)}
+    checkpoint_payload = {
+        "schema_version": 1,
+        "artifact_role": "psem_sortformer_checkpoint",
+        "arm": authorization.arm,
+        "seed": 7301,
+        "checkpoint_path": str(checkpoint_path_out.resolve()),
+        "checkpoint_sha256": checkpoint_state["sha256"],
+        "checkpoint_size_bytes": checkpoint_path_out.stat().st_size,
+        "final_step": 256,
+        "material_gate_sha256": material_gate["payload_sha256"],
+        "material_training_authorization": dict(material_gate),
+        "authorized_output_root": str(output_root),
+        "candidate_code_identity_sha256": code_identity["payload_sha256"],
+        "runtime_identity": runtime_identity,
+        "runtime_identity_sha256": canonical_sha256(runtime_identity),
+        "parameter_policy": parameter_policy,
+        "parameter_policy_sha256": canonical_sha256(parameter_policy),
+        "training_summary": summary,
+        "training_result_sha256": training_bound["payload_sha256"],
+        "training_result": training_bound,
+        "split_roles": [TRAIN_ROLE],
+        "eval_source_count": 0,
+    }
+    checkpoint_receipt = {
+        **checkpoint_payload,
+        "payload_sha256": canonical_sha256(checkpoint_payload),
+    }
+    register_execution("training-result", training_bound)
+    register_execution("checkpoint-receipt", checkpoint_receipt)
+    return training_bound, checkpoint_receipt
+
+
+def run_overfit_arm_result(
+    *args: Any, **kwargs: Any
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    raise ExecutionError("legacy overfit arm is not supported; use smoke-arm")

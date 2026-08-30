@@ -16,20 +16,17 @@ from experiments.psem_sortformer_adaptation_depth.receipts import (
     CHECKPOINT_IDENTITY,
     _validate_prediction_artifact,
     _validate_runtime_preflight,
-    _validate_staged_authorization,
     build_data_split_receipt,
     evaluator_reconstruction_contract,
     paired_source_bootstrap_v1,
     recompute_lineage_numeric_evidence,
-    validate_overfit_canary,
+    validate_cost_receipt,
 )
 from experiments.psem_sortformer_adaptation_depth.runtime_audit import (
     LEARNING_RATES,
     authorized_module_paths,
     parameter_inventory,
 )
-from experiments.psem_sortformer_adaptation_depth.sampling import select_overfit_rows
-from experiments.psem_sortformer_adaptation_depth.training import build_overfit_receipt
 from experiments.psem_training_strategy_gate.sampling import DEV_ROLE, EVAL_ROLE, TRAIN_ROLE
 
 
@@ -395,132 +392,18 @@ def _complete_canary_bundle(arm: str) -> dict:
     }
 
 
-def test_staged_execution_enforces_dev_only_ta_and_confirmation_rules() -> None:
-    base = {
-        "schema_version": 1,
-        "artifact_role": "staged_execution_state",
-        "eval_open_count": 0,
-        "eval_used_for_development": False,
-        "completed_runs": [
-            {
-                "arm": "F0-FROZEN-FLOAT",
-                "seed": None,
-                "passed": True,
-                "evaluation_roles": [DEV_ROLE],
-                "dev_evidence_sha256": "a" * 64,
-            }
-        ],
-    }
-    with pytest.raises(Exception, match="staged authorization is not reproducible"):
-        _validate_staged_authorization(_bound_staged(base), "H-HEAD", 7301, [])
-
-
-def test_overfit_receipt_recomputes_exact_rows_and_binds_actual_canaries(tmp_path) -> None:
-    corpus_by_source = {
-        **{f"ami-{index}": "AMI" for index in range(3)},
-        **{f"ali-{index}": "AliMeeting" for index in range(3)},
-    }
-    rows = [
-        {
-            "row_id": f"{source_id}-{window}",
-            "source_id": source_id,
-            "corpus": corpus_by_source[source_id],
-            "split_role": TRAIN_ROLE,
-            "window_start_sample": window * 480000,
-            "window_end_sample": (window + 1) * 480000,
-        }
-        for source_id in corpus_by_source
-        for window in range(20)
-    ]
-    manifest = tmp_path / "sampling.jsonl"
-    manifest.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
-    selected = select_overfit_rows(rows, corpus_by_source)
-    arm_results = {
-        arm: {
-            "arm": arm,
-            "sampling_manifest_sha256": sha256_file(manifest),
-            "overfit_input_identity_sha256": canonical_sha256(list(selected)),
-            "initial_replacement_loss": 1.0,
-            "final_replacement_loss": 0.6,
-            "duration_weighted_replacement_average_precision": 0.9,
-            "final_native_sortformer_loss": 0.5,
-            "optimizer_steps": 500,
-        }
-        for arm in ("H-HEAD", "T2-TOP")
-    }
-    canaries = {arm: _complete_canary_bundle(arm) for arm in arm_results}
-    receipt = build_overfit_receipt(
-        arm_results,
-        selected,
-        corpus_by_source,
-        rows,
-        manifest,
-        canaries,
+def test_cost_receipt_recomputes_formula_and_rejects_tampering() -> None:
+    receipt = execution_module.build_cost_receipt(
+        hourly_price_usd=2.0,
+        hourly_price_source="trusted operator quote",
+        actual_gpu_seconds=3600.0,
+        projected_remaining_gpu_seconds=1800.0,
+        command="train-arm H-HEAD",
     )
-    validated = validate_overfit_canary(
-        receipt,
-        sampling_rows=rows,
-        sampling_manifest_path=manifest,
-        corpus_by_source=corpus_by_source,
-        canary_receipts=canaries,
-    )
-    assert validated["passed"]
-    missing_graph = copy.deepcopy(canaries)
-    missing_graph["H-HEAD"].pop("model_graph_receipt")
-    with pytest.raises(Exception, match="overfit canary failed"):
-        validate_overfit_canary(
-            receipt,
-            sampling_rows=rows,
-            sampling_manifest_path=manifest,
-            corpus_by_source=corpus_by_source,
-            canary_receipts=missing_graph,
-        )
+    assert validate_cost_receipt(receipt) == receipt
     forged = copy.deepcopy(receipt)
-    forged["selected_row_ids"][0] = forged["selected_row_ids"][1]
+    forged["projected_total_cost_usd"] = 2.5
     payload = {key: value for key, value in forged.items() if key != "payload_sha256"}
     forged["payload_sha256"] = canonical_sha256(payload)
-    with pytest.raises(Exception, match="canonical 60 windows"):
-        validate_overfit_canary(
-            forged,
-            sampling_rows=rows,
-            sampling_manifest_path=manifest,
-            corpus_by_source=corpus_by_source,
-            canary_receipts=canaries,
-        )
-
-
-def test_material_gate_rejects_staged_dev_evidence_from_another_candidate(monkeypatch) -> None:
-    state = {
-        "schema_version": 1,
-        "artifact_role": "staged_execution_state",
-        "eval_open_count": 0,
-        "eval_used_for_development": False,
-    }
-    state["payload_sha256"] = canonical_sha256(state)
-    monkeypatch.setattr(
-        __import__(
-            "experiments.psem_sortformer_adaptation_depth.protocol",
-            fromlist=["validate_staged_execution_state"],
-        ),
-        "validate_staged_execution_state",
-        lambda receipt, results: receipt,
-    )
-    monkeypatch.setattr(
-        execution_module,
-        "candidate_code_identity",
-        lambda: {"git_head": "a" * 40, "payload_sha256": "b" * 64},
-    )
-    with pytest.raises(Exception, match="another candidate identity"):
-        _validate_staged_authorization(
-            state,
-            "H-HEAD",
-            7301,
-            [
-                {
-                    "prediction_set": {
-                        "candidate_git_head": "c" * 40,
-                        "candidate_code_identity_sha256": "d" * 64,
-                    }
-                }
-            ],
-        )
+    with pytest.raises(Exception, match="formula or USD-30 hard stop"):
+        validate_cost_receipt(forged)

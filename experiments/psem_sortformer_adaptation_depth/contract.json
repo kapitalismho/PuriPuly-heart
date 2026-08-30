@@ -9,8 +9,8 @@
     "supersedes_conflicting_prior_issue_body_and_comments": true
   },
   "material_execution": {
-    "status": "blocked_pending_lean_runner_alignment",
-    "reason": "the committed runner still enforces parts of the superseded research-grade protocol",
+    "status": "ready",
+    "reason": "lean runner, receipt, protocol, and reporting paths enforce the trusted single-operator contract",
     "required_status_for_gpu_execution": "ready"
   },
   "predecessor": {

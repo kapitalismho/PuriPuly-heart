@@ -95,17 +95,18 @@ def test_epoch_plan_is_deterministic_and_has_exact_mixture() -> None:
     assert all(candidate.window_start_sample % FRAME_SAMPLES == 0 for _, candidate in first)
 
 
-def test_uniform_windows_are_unique_across_the_full_training_budget() -> None:
+def test_uniform_windows_cover_the_single_epoch_without_duplicates() -> None:
     sessions = {"train-source": _session()}
     pools = candidate_pools(sessions)
     ranges = uniform_ranges(sessions)
     windows = [
         candidate.identity
-        for epoch in range(1, 9)
-        for role, candidate in epoch_plan(pools, ranges, epoch)
+        for role, candidate in epoch_plan(pools, ranges, 1)
         if role == "source_time_uniform"
     ]
-    assert len(windows) == len(set(windows)) == 8 * ROLE_COUNTS["source_time_uniform"]
+    assert len(windows) == len(set(windows)) == ROLE_COUNTS["source_time_uniform"]
+    with pytest.raises(Exception, match="outside the frozen training recipe"):
+        epoch_plan(pools, ranges, 2)
 
 
 def test_augmentation_is_label_independent_and_uses_only_authorized_families() -> None:
@@ -123,28 +124,9 @@ def test_augmentation_is_label_independent_and_uses_only_authorized_families() -
     assert apply_augmentation(waveform, decision).shape == waveform.shape
 
 
-def test_overfit_subset_hash_rule_selects_two_sources_and_fifteen_windows_per_corpus() -> None:
-    corpus_by_source = {
-        **{f"ami-{index}": "AMI" for index in range(3)},
-        **{f"ali-{index}": "AliMeeting" for index in range(3)},
-    }
-    rows = [
-        {
-            "source_id": source_id,
-            "split_role": TRAIN_ROLE,
-            "window_start_sample": window * WINDOW_SAMPLES,
-            "window_end_sample": (window + 1) * WINDOW_SAMPLES,
-        }
-        for source_id in corpus_by_source
-        for window in range(20)
-    ]
-    selected = select_overfit_rows(rows, corpus_by_source)
-    counts = Counter(row["source_id"] for row in selected)
-    assert len(counts) == 4
-    assert set(counts.values()) == {15}
-    assert Counter(corpus_by_source[source] for source in counts) == Counter(
-        {"AMI": 2, "AliMeeting": 2}
-    )
+def test_legacy_overfit_selection_is_not_supported() -> None:
+    with pytest.raises(Exception, match="legacy overfit selection is not supported"):
+        select_overfit_rows([], {})
 
 
 def test_materialized_manifest_round_trips_through_the_exact_validator(
@@ -176,7 +158,7 @@ def test_materialized_manifest_round_trips_through_the_exact_validator(
     path = tmp_path / "sampling.jsonl"
     receipt = materialize_sampling_manifest(sessions, path)
     validated = validate_sampling_manifest(path, sessions)
-    assert receipt["row_count"] == 8 * 4096
+    assert receipt["row_count"] == 4096
     assert validated["passed"]
     assert validated["manifest_sha256"] == receipt["manifest_sha256"]
 

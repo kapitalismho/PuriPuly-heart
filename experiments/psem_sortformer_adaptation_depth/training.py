@@ -45,13 +45,15 @@ from experiments.psem_sortformer_adaptation_depth.supervision import (
 )
 from experiments.psem_training_strategy_gate.sampling import DEV_ROLE, TRAIN_ROLE, RuntimeSession
 
-MAXIMUM_EPOCHS = 8
+MAXIMUM_EPOCHS = 1
+WARMUP_STEPS = 13
+SMOKE_OPTIMIZER_STEPS = 32
+OFFICIAL_OPTIMIZER_STEPS = 256
 EARLY_STOPPING_PATIENCE = 2
-WARMUP_FRACTION = 0.05
 OVERFIT_MAXIMUM_STEPS = 500
 MICRO_BATCH_SIZE = 1
 GRADIENT_ACCUMULATION_STEPS = 16
-OPTIMIZER_STEPS_PER_EPOCH = WINDOWS_PER_EPOCH // (MICRO_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS)
+OPTIMIZER_STEPS_PER_EPOCH = OFFICIAL_OPTIMIZER_STEPS
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -122,7 +124,7 @@ class OfficialTrainingAuthorization:
 
 
 @dataclass(frozen=True, slots=True)
-class OverfitAuthorization:
+class _LegacyOverfitAuthorization:
     arm: str
     sampling_manifest_sha256: str
     selected_input_identity_sha256: str
@@ -365,7 +367,7 @@ def authorize_official_training(
     }
     if (
         arm not in {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"}
-        or seed not in {7301, 7302}
+        or seed != 7301
         or not isinstance(manifest_sha, str)
         or not isinstance(git_head, str)
         or len(git_head) != 40
@@ -377,7 +379,7 @@ def authorize_official_training(
         raise TrainingContractError(
             "official arm, seed, manifest, or class weights are unauthorized"
         )
-    by_epoch: list[list[str]] = [[] for _ in range(MANIFEST_EPOCHS)]
+    by_epoch: list[list[str]] = [[] for _ in range(1)]
     seen: set[str] = set()
     for row in rows:
         row_id = row.get("row_id")
@@ -448,14 +450,14 @@ def authorize_official_training(
     )
 
 
-def authorize_overfit_arm(
+def _legacy_authorize_overfit_arm(
     arm: str,
     selected_rows: Sequence[Mapping[str, Any]],
     sampling_rows: Sequence[Mapping[str, Any]],
     sampling_manifest_path: Path,
     corpus_by_source: Mapping[str, str],
     class_weight_receipt: Mapping[str, Any],
-) -> OverfitAuthorization:
+) -> _LegacyOverfitAuthorization:
     if arm not in {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"}:
         raise TrainingContractError("overfit arm is unauthorized")
     if list(sampling_rows) != load_sampling_rows(sampling_manifest_path):
@@ -485,7 +487,7 @@ def authorize_overfit_arm(
     )
     if len(identities) != 60 or len({value[0] for value in identities}) != 60:
         raise TrainingContractError("overfit authorization does not contain 60 unique windows")
-    return OverfitAuthorization(
+    return _LegacyOverfitAuthorization(
         arm=arm,
         sampling_manifest_sha256=manifest_sha,
         selected_input_identity_sha256=canonical_sha256(list(selected_rows)),
@@ -627,18 +629,20 @@ def duration_weighted_average_precision(
 
 
 def warmup_scheduler(
-    optimizer: torch.optim.Optimizer, total_steps: int
+    optimizer: torch.optim.Optimizer,
+    total_steps: int,
+    warmup_steps: int | None = None,
 ) -> torch.optim.lr_scheduler.LambdaLR:
-    if total_steps <= 0:
-        raise TrainingContractError("optimizer step budget must be positive")
-    warmup_steps = max(1, math.ceil(total_steps * WARMUP_FRACTION))
+    resolved_warmup_steps = math.ceil(total_steps * 0.05) if warmup_steps is None else warmup_steps
+    if total_steps <= 0 or resolved_warmup_steps <= 0 or resolved_warmup_steps > total_steps:
+        raise TrainingContractError("optimizer step budget or warmup is invalid")
     return torch.optim.lr_scheduler.LambdaLR(
         optimizer,
-        lr_lambda=lambda step: min((step + 1) / warmup_steps, 1.0),
+        lr_lambda=lambda step: min((step + 1) / resolved_warmup_steps, 1.0),
     )
 
 
-class EarlyStopping:
+class _LegacyEarlyStopping:
     def __init__(self, patience: int = EARLY_STOPPING_PATIENCE) -> None:
         if patience != EARLY_STOPPING_PATIENCE:
             raise TrainingContractError("early-stopping patience differs from the frozen recipe")
@@ -661,7 +665,7 @@ class EarlyStopping:
         return self.bad_evaluations >= self.patience
 
 
-def fit_arm(
+def _legacy_fit_arm(
     model: TrainableSortformerPSEM,
     arm: str,
     class_weights: ClassWeights,
@@ -697,7 +701,7 @@ def fit_arm(
         raise TrainingContractError("official training requires optimizer steps")
     optimizer = build_optimizer(model, arm)
     scheduler = warmup_scheduler(optimizer, MAXIMUM_EPOCHS * steps_per_epoch)
-    stopper = EarlyStopping()
+    stopper = _LegacyEarlyStopping()
     history = []
     global_step = 0
     selected_epoch: int | None = None
@@ -852,14 +856,14 @@ def evaluate_examples(
     }
 
 
-def run_overfit_arm(
+def _legacy_run_overfit_arm(
     model: TrainableSortformerPSEM,
     arm: str,
     batches: Sequence[Sequence[TrainingExample]],
     class_weights: ClassWeights,
     *,
     maximum_steps: int = OVERFIT_MAXIMUM_STEPS,
-    authorization: OverfitAuthorization,
+    authorization: _LegacyOverfitAuthorization,
 ) -> dict[str, Any]:
     require_material_execution_ready()
     examples = [example for batch in batches for example in batch]
@@ -924,7 +928,7 @@ def run_overfit_arm(
     }
 
 
-def build_overfit_receipt(
+def _legacy_build_overfit_receipt(
     arm_results: Mapping[str, Mapping[str, Any]],
     selected_rows: Sequence[Mapping[str, Any]],
     corpus_by_source: Mapping[str, str],
@@ -1027,3 +1031,215 @@ def build_overfit_receipt(
         "arms": arms,
     }
     return {**payload, "payload_sha256": canonical_sha256(payload)}
+
+
+def fit_arm(
+    model: TrainableSortformerPSEM,
+    arm: str,
+    class_weights: ClassWeights,
+    train_batches: Callable[[int], Iterable[Sequence[TrainingExample]]],
+    steps_per_epoch: int,
+    dev_evaluate: Callable[[TrainableSortformerPSEM, int], Mapping[str, float]] | None,
+    checkpoint: Callable[[TrainableSortformerPSEM, int, Mapping[str, Any]], None],
+    *,
+    authorization: OfficialTrainingAuthorization,
+) -> dict[str, Any]:
+    require_material_execution_ready()
+    current_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    current_dirty = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    if (
+        steps_per_epoch != OFFICIAL_OPTIMIZER_STEPS
+        or arm != authorization.arm
+        or authorization.seed != 7301
+        or current_head != authorization.git_head
+        or current_dirty
+        or class_weights != authorization.class_weights
+        or dev_evaluate is not None
+        or len(authorization.row_ids_by_epoch) != 1
+        or len(authorization.row_ids_by_epoch[0]) != WINDOWS_PER_EPOCH
+    ):
+        raise TrainingContractError("official training requires the exact 256-step lean recipe")
+    optimizer = build_optimizer(model, arm)
+    scheduler = warmup_scheduler(optimizer, OFFICIAL_OPTIMIZER_STEPS, WARMUP_STEPS)
+    model.train()
+    identity_by_row = {
+        row_id: tuple(values) for row_id, *values in authorization.input_identity_by_row
+    }
+    observed_row_ids: list[str] = []
+    losses: list[float] = []
+    optimizer.zero_grad(set_to_none=True)
+    accumulated = 0
+    global_step = 0
+    for examples in train_batches(1):
+        if len(examples) != MICRO_BATCH_SIZE:
+            raise TrainingContractError("official training requires microbatch size one")
+        for example in examples:
+            expected = identity_by_row.get(example.row_id)
+            actual = (
+                example.source_id,
+                example.corpus,
+                example.window_start_sample,
+                example.window_end_sample,
+                example.target_identity_sha256,
+                example.augmentation_identity_sha256,
+                example.state_reset_at_start,
+            )
+            if (
+                example.split_role != TRAIN_ROLE
+                or example.epoch != 1
+                or example.epoch_index != len(observed_row_ids)
+                or example.sampling_manifest_sha256 != authorization.sampling_manifest_sha256
+                or expected != actual
+                or not _training_example_content_bound(example)
+            ):
+                raise TrainingContractError("training batch differs from the exact shared manifest")
+            observed_row_ids.append(example.row_id)
+        result = forward_batch(model, examples, class_weights)
+        total = result.losses["total"]
+        if not bool(torch.isfinite(total)):
+            raise TrainingContractError("official training produced a non-finite loss")
+        losses.append(float(total.detach().cpu()))
+        (total / GRADIENT_ACCUMULATION_STEPS).backward()
+        accumulated += 1
+        if accumulated == GRADIENT_ACCUMULATION_STEPS:
+            norm = torch.nn.utils.clip_grad_norm_(
+                [parameter for parameter in model.parameters() if parameter.requires_grad],
+                GRADIENT_CLIP_NORM,
+            )
+            if not bool(torch.isfinite(norm)):
+                raise TrainingContractError("official training produced a non-finite gradient")
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad(set_to_none=True)
+            accumulated = 0
+            global_step += 1
+    if (
+        accumulated != 0
+        or global_step != OFFICIAL_OPTIMIZER_STEPS
+        or observed_row_ids != list(authorization.row_ids_by_epoch[0])
+    ):
+        raise TrainingContractError("official training did not consume all 4096 rows in order")
+    final_metrics = {
+        "final_step": global_step,
+        "mean_total_loss": sum(losses) / len(losses),
+        "split_role": TRAIN_ROLE,
+        "scheduler_total_steps": OFFICIAL_OPTIMIZER_STEPS,
+        "warmup_steps": WARMUP_STEPS,
+    }
+    checkpoint(model, global_step, final_metrics)
+    return {
+        "arm": arm,
+        "seed": authorization.seed,
+        "optimizer_steps": global_step,
+        "maximum_optimizer_steps": OFFICIAL_OPTIMIZER_STEPS,
+        "micro_batch_size": MICRO_BATCH_SIZE,
+        "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
+        "consumed_row_count": len(observed_row_ids),
+        "row_order_sha256": canonical_sha256(observed_row_ids),
+        "scheduler_total_steps": OFFICIAL_OPTIMIZER_STEPS,
+        "warmup_steps": WARMUP_STEPS,
+        "dev_callback_used": False,
+        "early_stopping_used": False,
+        "checkpoint_step": global_step,
+        "loss_summary": final_metrics,
+        "authorization_sha256": authorization.material_gate_sha256,
+    }
+
+
+def run_short_smoke(
+    model: TrainableSortformerPSEM,
+    arm: str,
+    class_weights: ClassWeights,
+    batches: Iterable[Sequence[TrainingExample]],
+    *,
+    expected_row_ids: Sequence[str],
+    parameter_policy: Mapping[str, Any],
+) -> dict[str, Any]:
+    require_material_execution_ready()
+    if arm not in {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"}:
+        raise TrainingContractError("smoke arm is unauthorized")
+    if len(expected_row_ids) != 512 or len(set(expected_row_ids)) != 512:
+        raise TrainingContractError("smoke requires the first 512 manifest rows")
+    if parameter_policy.get("arm") != arm:
+        raise TrainingContractError("smoke parameter policy identity differs from the arm")
+    examples = [example for batch in batches for example in batch]
+    if len(examples) != 512 or [example.row_id for example in examples] != list(expected_row_ids):
+        raise TrainingContractError("smoke rows are not the first 512 manifest rows in order")
+    if any(
+        example.split_role != TRAIN_ROLE or not _training_example_content_bound(example)
+        for example in examples
+    ):
+        raise TrainingContractError("smoke input identity is not content-bound")
+    before = {name: value.detach().clone() for name, value in model.named_parameters()}
+    optimizer = build_optimizer(model, arm)
+    scheduler = warmup_scheduler(optimizer, SMOKE_OPTIMIZER_STEPS, 2)
+    losses: list[float] = []
+    model.train()
+    optimizer.zero_grad(set_to_none=True)
+    for step in range(SMOKE_OPTIMIZER_STEPS):
+        window_losses: list[float] = []
+        for example in examples[
+            step * GRADIENT_ACCUMULATION_STEPS : (step + 1) * GRADIENT_ACCUMULATION_STEPS
+        ]:
+            result = forward_batch(model, (example,), class_weights)
+            total = result.losses["total"]
+            if not bool(torch.isfinite(total)):
+                raise TrainingContractError("smoke forward produced a non-finite loss")
+            window_losses.append(float(total.detach().cpu()))
+            (total / GRADIENT_ACCUMULATION_STEPS).backward()
+        norm = torch.nn.utils.clip_grad_norm_(
+            [parameter for parameter in model.parameters() if parameter.requires_grad],
+            GRADIENT_CLIP_NORM,
+        )
+        if not bool(torch.isfinite(norm)):
+            raise TrainingContractError("smoke backward produced a non-finite gradient")
+        optimizer.step()
+        scheduler.step()
+        optimizer.zero_grad(set_to_none=True)
+        losses.append(sum(window_losses) / len(window_losses))
+    if not all(math.isfinite(value) for value in losses):
+        raise TrainingContractError("smoke losses are non-finite")
+    first = sum(losses[:8]) / 8
+    final = sum(losses[-8:]) / 8
+    if not final < first:
+        raise TrainingContractError("smoke loss did not improve over the required windows")
+    changed = []
+    frozen_unchanged = True
+    for name, value in model.named_parameters():
+        different = not torch.equal(before[name], value.detach())
+        if value.requires_grad:
+            changed.append((name, different))
+        else:
+            frozen_unchanged = frozen_unchanged and not different
+    if not changed or not all(different for _, different in changed) or not frozen_unchanged:
+        raise TrainingContractError("smoke parameter policy or update identity failed")
+    return {
+        "schema_version": 1,
+        "artifact_role": "short_smoke_metrics",
+        "arm": arm,
+        "seed": 7301,
+        "optimizer_steps": SMOKE_OPTIMIZER_STEPS,
+        "micro_batch_size": MICRO_BATCH_SIZE,
+        "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
+        "consumed_row_count": len(examples),
+        "row_ids_sha256": canonical_sha256(list(expected_row_ids)),
+        "first_eight_mean_total_loss": first,
+        "last_eight_mean_total_loss": final,
+        "finite_forward_backward_update": True,
+        "parameter_policy": dict(parameter_policy),
+        "updated_trainable_parameters": [name for name, _ in changed],
+        "frozen_parameters_unchanged": frozen_unchanged,
+        "weights_discarded": True,
+    }

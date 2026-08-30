@@ -847,14 +847,14 @@ def evaluator_reconstruction_contract() -> dict[str, Any]:
             "issue-99-G-causal-frontier",
             "issue-99-fixed-simple-anchor-evaluator",
         ],
-        "threshold_grid": [0.35, 0.5, 0.65],
-        "confirmation_ms_grid": [100, 300, 500],
+        "threshold_grid": [0.5],
+        "confirmation_ms_grid": [500],
         "primary_cell": {"threshold": 0.5, "confirmation_ms": 500},
         "eval_threshold_selection_allowed": False,
     }
 
 
-def validate_overfit_canary(
+def _legacy_validate_overfit_canary(
     receipt: Mapping[str, Any],
     *,
     sampling_rows: list[Mapping[str, Any]],
@@ -1036,7 +1036,7 @@ def _validate_runtime_preflight(receipt: Mapping[str, Any]) -> None:
         raise ReceiptContractError("runtime preflight does not match a current exact rerun")
 
 
-def _validate_staged_authorization(
+def _legacy_validate_staged_authorization(
     receipt: Mapping[str, Any],
     arm: str,
     seed: int,
@@ -1215,7 +1215,7 @@ def _validate_staged_authorization(
             raise ReceiptContractError("confirmation seed is not authorized by DEV evidence")
 
 
-def validate_material_training_gate(
+def _legacy_validate_material_training_gate(
     *,
     arm: str,
     seed: int,
@@ -1240,10 +1240,10 @@ def validate_material_training_gate(
     if arm not in {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"} or seed not in {7301, 7302}:
         raise ReceiptContractError("material training arm or seed is unauthorized")
     from experiments.psem_sortformer_adaptation_depth.protocol import (
-        authorize_conditional_arm_audit,
+        _legacy_authorize_conditional_arm_audit,
     )
 
-    expected_conditional_authorization = authorize_conditional_arm_audit(
+    expected_conditional_authorization = _legacy_authorize_conditional_arm_audit(
         arm,
         staged_execution_receipt if arm == "TA-ALL-TEMPORAL" else None,
         staged_dev_results if arm == "TA-ALL-TEMPORAL" else (),
@@ -1396,7 +1396,7 @@ def validate_material_training_gate(
         or current_canaries.get("model_graph_receipt") != graph
     ):
         raise ReceiptContractError("material canaries differ from the overfit canaries")
-    validated_overfit = validate_overfit_canary(
+    validated_overfit = _legacy_validate_overfit_canary(
         overfit_receipt,
         sampling_rows=list(sampling_rows),
         sampling_manifest_path=sampling_manifest_path,
@@ -1410,7 +1410,7 @@ def validate_material_training_gate(
         or arm not in overfit_payload.get("arms", {})
     ):
         raise ReceiptContractError("the arm has not passed the TRAIN-only overfit canary")
-    _validate_staged_authorization(staged_execution_receipt, arm, seed, staged_dev_results)
+    _legacy_validate_staged_authorization(staged_execution_receipt, arm, seed, staged_dev_results)
     shared_input_identity = canonical_sha256(
         [
             {
@@ -1515,7 +1515,7 @@ def validate_material_training_gate(
     return {**payload, "payload_sha256": canonical_sha256(payload)}
 
 
-def revalidate_material_training_gate(
+def _legacy_revalidate_material_training_gate(
     gate: Mapping[str, Any],
     *,
     sampling_manifest_path: Path,
@@ -1569,7 +1569,7 @@ def revalidate_material_training_gate(
     return dict(gate)
 
 
-def revalidate_material_training_gate_from_bundle(
+def _legacy_revalidate_material_training_gate_from_bundle(
     gate: Mapping[str, Any],
 ) -> dict[str, Any]:
     bundle = gate.get("validation_bundle")
@@ -1601,6 +1601,458 @@ def revalidate_material_training_gate_from_bundle(
         sampling_rows=load_sampling_rows(sampling_manifest_path),
         training_sessions=load_training_sessions(corpus_root, reference_root),
         class_weight_receipt=class_weights,
+        checkpoint_path=Path(required_paths["checkpoint_path"]),
+        corpus_root=corpus_root,
+        reference_root=reference_root,
+        output_root=Path(required_paths["output_root"]),
+    )
+
+
+def validate_cost_receipt(value: Mapping[str, Any]) -> dict[str, Any]:
+    payload = _bound_payload(value, "psem_sortformer_cost_receipt")
+    required = (
+        "hourly_price_usd",
+        "hourly_price_source",
+        "actual_gpu_seconds",
+        "projected_remaining_gpu_seconds",
+        "actual_cost_usd",
+        "projected_remaining_cost_usd",
+        "projected_total_gpu_seconds",
+        "projected_total_cost_usd",
+        "target_total_usd",
+        "hard_stop_usd",
+        "target_is_informational",
+        "command",
+    )
+    if any(key not in payload for key in required):
+        raise ReceiptContractError("cost receipt fields are incomplete")
+    numeric = (
+        "hourly_price_usd",
+        "actual_gpu_seconds",
+        "projected_remaining_gpu_seconds",
+        "actual_cost_usd",
+        "projected_remaining_cost_usd",
+        "projected_total_gpu_seconds",
+        "projected_total_cost_usd",
+        "target_total_usd",
+        "hard_stop_usd",
+    )
+    if (
+        not isinstance(payload["hourly_price_source"], str)
+        or not payload["hourly_price_source"].strip()
+        or not isinstance(payload["command"], str)
+        or not payload["command"].strip()
+        or any(not _finite_number(payload[key]) or float(payload[key]) < 0 for key in numeric)
+        or float(payload["hourly_price_usd"]) <= 0
+        or float(payload["target_total_usd"]) != 15.0
+        or float(payload["hard_stop_usd"]) != 30.0
+        or payload["target_is_informational"] is not True
+    ):
+        raise ReceiptContractError("cost receipt values are invalid")
+    price = float(payload["hourly_price_usd"])
+    actual_seconds = float(payload["actual_gpu_seconds"])
+    remaining_seconds = float(payload["projected_remaining_gpu_seconds"])
+    expected_actual = actual_seconds * price / 3600.0
+    expected_remaining = remaining_seconds * price / 3600.0
+    expected_total = (actual_seconds + remaining_seconds) * price / 3600.0
+    if (
+        not math.isclose(
+            float(payload["actual_cost_usd"]), expected_actual, rel_tol=0, abs_tol=1e-9
+        )
+        or not math.isclose(
+            float(payload["projected_remaining_cost_usd"]),
+            expected_remaining,
+            rel_tol=0,
+            abs_tol=1e-9,
+        )
+        or not math.isclose(
+            float(payload["projected_total_gpu_seconds"]),
+            actual_seconds + remaining_seconds,
+            rel_tol=0,
+            abs_tol=1e-9,
+        )
+        or not math.isclose(
+            float(payload["projected_total_cost_usd"]), expected_total, rel_tol=0, abs_tol=1e-9
+        )
+        or float(payload["projected_total_cost_usd"]) > 30.0
+    ):
+        raise ReceiptContractError("cost receipt formula or USD-30 hard stop failed")
+    return dict(value)
+
+
+def _require_bound_mapping(value: Mapping[str, Any], role: str) -> dict[str, Any]:
+    return _bound_payload(value, role)
+
+
+def validate_material_training_gate(
+    *,
+    arm: str,
+    seed: int,
+    preflight_receipt: Mapping[str, Any],
+    sampling_validation: Mapping[str, Any],
+    sampling_manifest_path: Path,
+    sampling_rows: Sequence[Mapping[str, Any]],
+    training_sessions: Mapping[str, Any],
+    class_weight_receipt: Mapping[str, Any],
+    lineage_receipt: Mapping[str, Any],
+    runtime_identity: Mapping[str, Any],
+    evaluator_contract: Mapping[str, Any],
+    parameter_inventory: Mapping[str, Any],
+    gradient_receipt: Mapping[str, Any],
+    update_receipt: Mapping[str, Any],
+    timing_receipt: Mapping[str, Any],
+    staged_execution_receipt: Mapping[str, Any],
+    staged_dev_results: Sequence[Mapping[str, Any]],
+    short_smoke_receipt: Mapping[str, Any],
+    cost_receipt: Mapping[str, Any],
+    ta_open_authorization: Mapping[str, Any] | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    if arm not in {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"} or seed != 7301:
+        raise ReceiptContractError("material training arm or seed is unauthorized")
+    _validate_runtime_preflight(preflight_receipt)
+    preflight_payload = {
+        key: value for key, value in preflight_receipt.items() if key != "payload_sha256"
+    }
+    current_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    current_dirty = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    if (
+        preflight_receipt.get("mode") != "runtime"
+        or preflight_receipt.get("ready_for_runtime_audit") is not True
+        or preflight_receipt.get("payload_sha256") != canonical_sha256(preflight_payload)
+        or preflight_payload.get("binding", {}).get("git_head") != current_head
+        or current_dirty
+    ):
+        raise ReceiptContractError("runtime preflight is not bound to a clean current candidate")
+    from experiments.psem_sortformer_adaptation_depth.execution import (
+        candidate_code_identity,
+    )
+    from experiments.psem_sortformer_adaptation_depth.training import (
+        build_manifest_class_weight_receipt,
+    )
+
+    current_identity = candidate_code_identity()
+    split = build_data_split_receipt()
+    manifest_sha = sampling_validation.get("manifest_sha256")
+    if (
+        sampling_validation.get("passed") is not True
+        or sampling_validation.get("row_count") != 4096
+        or len(sampling_rows) != 4096
+        or manifest_sha != sha256_file(sampling_manifest_path)
+        or sampling_validation.get("eval_source_count") != 0
+        or sampling_validation.get("data_split_receipt_sha256") != canonical_sha256(split)
+        or sampling_validation.get("split_manifest_sha256")
+        != split["artifact_hashes"]["split_manifest"]
+        or sampling_validation.get("source_manifest_sha256")
+        != split["artifact_hashes"]["source_manifest"]
+        or any(
+            row.get("split_role") != TRAIN_ROLE
+            or row.get("epoch") != 1
+            or row.get("epoch_index") != index
+            or row.get("row_id") != f"epoch-01-window-{index:04d}"
+            for index, row in enumerate(sampling_rows)
+        )
+    ):
+        raise ReceiptContractError(
+            "shared sampling manifest is not the exact epoch-1 TRAIN manifest"
+        )
+    expected_class_weights = build_manifest_class_weight_receipt(
+        sampling_rows, training_sessions, sampling_manifest_path
+    )
+    weight_payload = _bound_payload(class_weight_receipt, "train_class_weight_receipt")
+    if (
+        class_weight_receipt != expected_class_weights
+        or weight_payload.get("sampling_manifest_sha256") != manifest_sha
+        or weight_payload.get("split_roles") != [TRAIN_ROLE]
+        or weight_payload.get("eval_source_count") != 0
+        or weight_payload.get("row_count") != 4096
+    ):
+        raise ReceiptContractError("TRAIN class weights are not bound to the one-epoch manifest")
+    validated_lineage = validate_trainable_checkpoint_lineage(
+        lineage_receipt,
+        runtime_identity=runtime_identity,
+        evaluator_contract=evaluator_contract,
+    )
+    lineage_payload = _bound_payload(validated_lineage, "trainable_checkpoint_lineage")
+    expected_evaluator = evaluator_reconstruction_contract()
+    graph = runtime_identity.get("model_graph")
+    if (
+        lineage_receipt != validated_lineage
+        or lineage_payload.get("passed") is not True
+        or evaluator_contract != expected_evaluator
+        or lineage_payload.get("runtime_identity_sha256") != canonical_sha256(runtime_identity)
+        or lineage_payload.get("evaluator_contract_sha256") != canonical_sha256(expected_evaluator)
+        or not isinstance(graph, Mapping)
+        or not model_graph_runtime_passed(graph)
+        or not parameter_inventory_runtime_passed(
+            parameter_inventory, arm, model_graph_receipt=graph
+        )
+        or not canary_bundle_runtime_passed(
+            gradient_receipt,
+            update_receipt,
+            timing_receipt,
+            arm,
+            parameter_inventory_receipt=parameter_inventory,
+            model_graph_receipt=graph,
+        )
+    ):
+        raise ReceiptContractError("lineage, evaluator, model graph, or runtime canary failed")
+    for kind, receipt in (
+        ("lineage", lineage_receipt),
+        ("model-graph", graph),
+        ("parameter-inventory", parameter_inventory),
+        ("gradient-canary", gradient_receipt),
+        ("update-canary", update_receipt),
+        ("timing-receipt", timing_receipt),
+        ("short-smoke", short_smoke_receipt),
+    ):
+        require_registered_execution(kind, receipt)
+    smoke_payload = _bound_payload(short_smoke_receipt, "short_smoke_metrics")
+    if (
+        smoke_payload.get("arm") != arm
+        or smoke_payload.get("seed") != 7301
+        or smoke_payload.get("sampling_manifest_sha256") != manifest_sha
+        or smoke_payload.get("optimizer_steps") != 32
+        or smoke_payload.get("consumed_row_count") != 512
+        or smoke_payload.get("finite_forward_backward_update") is not True
+        or smoke_payload.get("frozen_parameters_unchanged") is not True
+        or smoke_payload.get("weights_discarded") is not True
+        or smoke_payload.get("ta_open_authorization_sha256")
+        != (
+            ta_open_authorization.get("payload_sha256")
+            if ta_open_authorization is not None
+            else None
+        )
+        or not _finite_number(smoke_payload.get("first_eight_mean_total_loss"))
+        or not _finite_number(smoke_payload.get("last_eight_mean_total_loss"))
+        or float(smoke_payload["last_eight_mean_total_loss"])
+        >= float(smoke_payload["first_eight_mean_total_loss"])
+    ):
+        raise ReceiptContractError("short smoke metrics do not pass the lean gate")
+    validate_cost_receipt(cost_receipt)
+    from experiments.psem_sortformer_adaptation_depth.protocol import (
+        validate_staged_execution_state,
+    )
+
+    validate_staged_execution_state(staged_execution_receipt, staged_dev_results)
+    staged_payload = _bound_payload(staged_execution_receipt, "staged_execution_state")
+    completed_ids = [
+        (row.get("arm"), row.get("seed")) for row in staged_payload.get("completed_runs", [])
+    ]
+    expected_completed = {
+        "H-HEAD": [("F0-FROZEN-FLOAT", None)],
+        "T2-TOP": [("F0-FROZEN-FLOAT", None), ("H-HEAD", 7301)],
+        "TA-ALL-TEMPORAL": [
+            ("F0-FROZEN-FLOAT", None),
+            ("H-HEAD", 7301),
+            ("T2-TOP", 7301),
+        ],
+    }[arm]
+    if (
+        completed_ids != expected_completed
+        or staged_payload.get("eval_open_count") != 0
+        or staged_payload.get("eval_used_for_development") is not False
+    ):
+        raise ReceiptContractError("staged DEV state does not authorize the next lean arm")
+    if arm == "TA-ALL-TEMPORAL":
+        if not isinstance(ta_open_authorization, Mapping):
+            raise ReceiptContractError("TA training requires an explicit open_ta authorization")
+        ta_payload = _bound_payload(ta_open_authorization, "psem_sortformer_open_ta_authorization")
+        if (
+            ta_payload.get("arm") != arm
+            or ta_payload.get("seed") != 7301
+            or ta_payload.get("cost_receipt_sha256") != cost_receipt.get("payload_sha256")
+        ):
+            raise ReceiptContractError("TA authorization differs from the current cost receipt")
+    elif ta_open_authorization is not None:
+        raise ReceiptContractError("non-TA training cannot carry a TA authorization")
+    observed_paths = {
+        row.get("id"): row.get("observed")
+        for row in preflight_receipt.get("checks", [])
+        if isinstance(row, Mapping)
+    }
+    required_paths = {
+        "authorized_checkpoint_path": observed_paths.get("runtime.checkpoint_path"),
+        "authorized_corpus_root": observed_paths.get("runtime.corpus_root"),
+        "authorized_reference_root": observed_paths.get("runtime.reference_root"),
+        "authorized_output_root": observed_paths.get("runtime.output_root"),
+        "authorized_protocol_registry_root": observed_paths.get("runtime.protocol_registry_root"),
+    }
+    if (
+        any(not isinstance(value, str) or not value for value in required_paths.values())
+        or required_paths["authorized_output_root"] != staged_payload.get("experiment_output_root")
+        or required_paths["authorized_protocol_registry_root"]
+        != staged_payload.get("protocol_registry_root")
+    ):
+        raise ReceiptContractError("runtime preflight paths differ from staged DEV state")
+    shared_identity = canonical_sha256(
+        [
+            {
+                key: row.get(key)
+                for key in (
+                    "row_id",
+                    "source_id",
+                    "corpus",
+                    "window_start_sample",
+                    "window_end_sample",
+                    "target_identity_sha256",
+                    "augmentation_identity_sha256",
+                    "state_reset_at_window_start",
+                )
+            }
+            for row in sampling_rows
+        ]
+    )
+    payload = {
+        "schema_version": 1,
+        "artifact_role": "material_training_authorization",
+        "passed": True,
+        "arm": arm,
+        "seed": seed,
+        "git_head": current_head,
+        "candidate_code_identity_sha256": current_identity["payload_sha256"],
+        "preflight_receipt_sha256": preflight_receipt["payload_sha256"],
+        "sampling_manifest_sha256": manifest_sha,
+        "class_weight_receipt_sha256": class_weight_receipt["payload_sha256"],
+        "short_smoke_receipt_sha256": short_smoke_receipt["payload_sha256"],
+        "cost_receipt_sha256": cost_receipt["payload_sha256"],
+        "shared_input_identity_sha256": shared_identity,
+        "runtime_identity_sha256": canonical_sha256(runtime_identity),
+        "model_graph_receipt_sha256": canonical_sha256(graph),
+        "lineage_receipt_sha256": lineage_receipt["payload_sha256"],
+        "evaluator_contract_sha256": canonical_sha256(expected_evaluator),
+        "parameter_inventory_sha256": canonical_sha256(parameter_inventory),
+        "gradient_receipt_sha256": canonical_sha256(gradient_receipt),
+        "update_receipt_sha256": canonical_sha256(update_receipt),
+        "timing_receipt_sha256": canonical_sha256(timing_receipt),
+        "staged_execution_receipt_sha256": staged_execution_receipt["payload_sha256"],
+        "ta_open_authorization_sha256": (
+            ta_open_authorization.get("payload_sha256")
+            if ta_open_authorization is not None
+            else None
+        ),
+        "dev_source_ids_sha256": canonical_sha256(split["source_ids_by_role"][DEV_ROLE]),
+        **required_paths,
+        "eval_source_count": 0,
+        "validation_bundle": {
+            "sampling_manifest_path": str(sampling_manifest_path.resolve()),
+            "class_weight_receipt": dict(class_weight_receipt),
+            "preflight_receipt": dict(preflight_receipt),
+            "sampling_validation": dict(sampling_validation),
+            "lineage_receipt": dict(lineage_receipt),
+            "runtime_identity": dict(runtime_identity),
+            "evaluator_contract": dict(evaluator_contract),
+            "parameter_inventory": dict(parameter_inventory),
+            "gradient_receipt": dict(gradient_receipt),
+            "update_receipt": dict(update_receipt),
+            "timing_receipt": dict(timing_receipt),
+            "short_smoke_receipt": dict(short_smoke_receipt),
+            "cost_receipt": dict(cost_receipt),
+            "staged_execution_receipt": dict(staged_execution_receipt),
+            "staged_dev_results": [dict(value) for value in staged_dev_results],
+            "ta_open_authorization": (
+                dict(ta_open_authorization) if ta_open_authorization is not None else None
+            ),
+        },
+    }
+    return {**payload, "payload_sha256": canonical_sha256(payload)}
+
+
+def revalidate_material_training_gate(
+    gate: Mapping[str, Any],
+    *,
+    sampling_manifest_path: Path,
+    sampling_rows: Sequence[Mapping[str, Any]],
+    training_sessions: Mapping[str, Any],
+    class_weight_receipt: Mapping[str, Any],
+    checkpoint_path: Path,
+    corpus_root: Path,
+    reference_root: Path,
+    output_root: Path,
+) -> dict[str, Any]:
+    bundle = gate.get("validation_bundle")
+    if not isinstance(bundle, Mapping):
+        raise ReceiptContractError("material gate lacks its lean validation bundle")
+    if (
+        bundle.get("sampling_manifest_path") != str(sampling_manifest_path.resolve())
+        or bundle.get("class_weight_receipt") != class_weight_receipt
+        or gate.get("authorized_checkpoint_path") != str(checkpoint_path.resolve())
+        or gate.get("authorized_corpus_root") != str(corpus_root.resolve())
+        or gate.get("authorized_reference_root") != str(reference_root.resolve())
+        or gate.get("authorized_output_root") != str(output_root.resolve())
+    ):
+        raise ReceiptContractError(
+            "material execution paths or class weights differ from preflight"
+        )
+    recomputed = validate_material_training_gate(
+        arm=str(gate.get("arm")),
+        seed=int(gate.get("seed")),
+        preflight_receipt=bundle["preflight_receipt"],
+        sampling_validation=bundle["sampling_validation"],
+        sampling_manifest_path=sampling_manifest_path,
+        sampling_rows=sampling_rows,
+        training_sessions=training_sessions,
+        class_weight_receipt=class_weight_receipt,
+        lineage_receipt=bundle["lineage_receipt"],
+        runtime_identity=bundle["runtime_identity"],
+        evaluator_contract=bundle["evaluator_contract"],
+        parameter_inventory=bundle["parameter_inventory"],
+        gradient_receipt=bundle["gradient_receipt"],
+        update_receipt=bundle["update_receipt"],
+        timing_receipt=bundle["timing_receipt"],
+        staged_execution_receipt=bundle["staged_execution_receipt"],
+        staged_dev_results=bundle.get("staged_dev_results", []),
+        short_smoke_receipt=bundle["short_smoke_receipt"],
+        cost_receipt=bundle["cost_receipt"],
+        ta_open_authorization=bundle.get("ta_open_authorization"),
+    )
+    if recomputed != dict(gate):
+        raise ReceiptContractError(
+            "material training gate differs from a current exact revalidation"
+        )
+    return dict(gate)
+
+
+def revalidate_material_training_gate_from_bundle(
+    gate: Mapping[str, Any],
+) -> dict[str, Any]:
+    bundle = gate.get("validation_bundle")
+    if not isinstance(bundle, Mapping):
+        raise ReceiptContractError("material gate lacks its lean validation bundle")
+    from experiments.psem_sortformer_adaptation_depth.sampling import (
+        load_sampling_rows,
+        load_training_sessions,
+    )
+
+    manifest = Path(str(bundle["sampling_manifest_path"]))
+    required_paths = {
+        "checkpoint_path": gate.get("authorized_checkpoint_path"),
+        "corpus_root": gate.get("authorized_corpus_root"),
+        "reference_root": gate.get("authorized_reference_root"),
+        "output_root": gate.get("authorized_output_root"),
+    }
+    if any(not isinstance(value, str) or not value for value in required_paths.values()):
+        raise ReceiptContractError("material gate execution paths are incomplete")
+    corpus_root = Path(required_paths["corpus_root"])
+    reference_root = Path(required_paths["reference_root"])
+    return revalidate_material_training_gate(
+        gate,
+        sampling_manifest_path=manifest,
+        sampling_rows=load_sampling_rows(manifest),
+        training_sessions=load_training_sessions(corpus_root, reference_root),
+        class_weight_receipt=bundle["class_weight_receipt"],
         checkpoint_path=Path(required_paths["checkpoint_path"]),
         corpus_root=corpus_root,
         reference_root=reference_root,

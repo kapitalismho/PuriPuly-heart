@@ -8,15 +8,18 @@ import torch
 
 from experiments.psem_sortformer_adaptation_depth import execution as execution_module
 from experiments.psem_sortformer_adaptation_depth import protocol as protocol_module
+from experiments.psem_sortformer_adaptation_depth.execution import build_cost_receipt
 from experiments.psem_sortformer_adaptation_depth.preflight import canonical_sha256, sha256_file
 from experiments.psem_sortformer_adaptation_depth.protocol import (
     EVAL_REGISTRY_MARKER,
     _frontier_dominates,
     _validate_checkpoint_receipt,
-    authorize_conditional_arm_audit,
+    append_dev_result,
     bind_payload,
+    build_operator_dev_decision,
     initial_staged_state,
     open_eval_once,
+    open_ta,
     validate_dev_result,
     validate_eval_authorization,
 )
@@ -257,14 +260,47 @@ def _valid_checkpoint_receipt(tmp_path, *, peak_memory: int = 1) -> dict:
     return {**checkpoint_payload, "payload_sha256": canonical_sha256(checkpoint_payload)}
 
 
-def test_protocol_opens_deep_arm_then_freezes_before_single_eval_open() -> None:
-    f0 = _dev_result("F0-FROZEN-FLOAT", None, contamination=10.0, false_cuts=10.0, misses=10.0)
-    head = _dev_result("H-HEAD", 7301, contamination=8.0, false_cuts=8.0, misses=8.0)
-    top = _dev_result("T2-TOP", 7301, contamination=6.0, false_cuts=7.0, misses=6.0)
-    ta = _dev_result("TA-ALL-TEMPORAL", 7301, contamination=5.0, false_cuts=6.5, misses=5.0)
-    for result in (f0, head, top, ta):
-        with pytest.raises(Exception, match="embed its prediction evidence"):
-            initial_staged_state(result)
+def test_protocol_stages_only_f0_h_t2_and_optional_ta_seed_7301(tmp_path, monkeypatch) -> None:
+    output = (tmp_path / "output").resolve()
+    registry = (tmp_path / "registry").resolve()
+    output.mkdir()
+    registry.mkdir()
+    monkeypatch.setattr(protocol_module, "authority_registry_root", lambda: registry)
+    monkeypatch.setattr(protocol_module, "validate_dev_result", lambda value: dict(value))
+
+    def result(arm: str, seed: int | None, index: int) -> dict:
+        return bind_payload(
+            {
+                "schema_version": 1,
+                "artifact_role": "psem_sortformer_dev_result",
+                "arm": arm,
+                "seed": seed,
+                "dev_evidence_sha256": f"{index:x}" * 64,
+                "prediction_set": {
+                    "experiment_output_root": str(output),
+                    "protocol_registry_root": str(registry),
+                },
+            }
+        )
+
+    f0 = result("F0-FROZEN-FLOAT", None, 1)
+    head = result("H-HEAD", 7301, 2)
+    top = result("T2-TOP", 7301, 3)
+    ta = result("TA-ALL-TEMPORAL", 7301, 4)
+    state = initial_staged_state(f0)
+    state = append_dev_result(state, head, [f0])
+    state = append_dev_result(state, top, [f0, head])
+    assert "ta_escalation" not in state
+    assert "confirmation_seed_authorization" not in state
+    state = append_dev_result(state, ta, [f0, head, top])
+    assert [(row["arm"], row["seed"]) for row in state["completed_runs"]] == [
+        ("F0-FROZEN-FLOAT", None),
+        ("H-HEAD", 7301),
+        ("T2-TOP", 7301),
+        ("TA-ALL-TEMPORAL", 7301),
+    ]
+    with pytest.raises(Exception, match="out of staged order"):
+        append_dev_result(state, result("H-HEAD", 7302, 5), [f0, head, top, ta])
 
 
 def test_dev_pareto_staging_uses_the_complete_equal_corpus_frontier() -> None:
@@ -300,19 +336,16 @@ def test_dev_pareto_staging_uses_the_complete_equal_corpus_frontier() -> None:
     assert not _frontier_dominates(head, top_with_frontier_gain)
 
 
-def test_dev_result_rejects_partial_frontier_or_opened_eval() -> None:
+def test_dev_result_rejects_non_singleton_frontier_or_opened_eval() -> None:
     result = _dev_result("F0-FROZEN-FLOAT", None, contamination=10.0, false_cuts=10.0, misses=10.0)
-    partial = copy.deepcopy(result)
-    partial["frontier"].pop()
-    payload = {key: value for key, value in partial.items() if key != "payload_sha256"}
-    partial = bind_payload(payload)
-    with pytest.raises(Exception, match="complete fixed frontier"):
-        validate_dev_result(partial)
+    with pytest.raises(Exception, match="lean fail-closed"):
+        validate_dev_result(result)
     opened = copy.deepcopy(result)
+    opened["frontier"] = opened["frontier"][:1]
     opened["eval_open_count"] = 1
     payload = {key: value for key, value in opened.items() if key != "payload_sha256"}
     opened = bind_payload(payload)
-    with pytest.raises(Exception, match="fail-closed"):
+    with pytest.raises(Exception, match="lean fail-closed"):
         validate_dev_result(opened)
 
 
@@ -339,7 +372,19 @@ def test_eval_open_is_global_to_the_authority_registry(tmp_path, monkeypatch) ->
                 "artifact_role": "psem_sortformer_candidate_freeze",
                 "eval_open_count": 0,
                 "eval_used_for_development": False,
-                "candidate_set": [],
+                "candidate_set": [
+                    {"arm": "F0-FROZEN-FLOAT", "seed": None},
+                    {"arm": "H-HEAD", "seed": 7301},
+                ],
+                "thresholds": [0.5],
+                "confirmation_ms": [500],
+                "cost_receipt": build_cost_receipt(
+                    hourly_price_usd=1.0,
+                    hourly_price_source="operator quote",
+                    actual_gpu_seconds=1.0,
+                    projected_remaining_gpu_seconds=1.0,
+                    command="open-eval",
+                ),
                 "candidate_code_identity_sha256": identity["payload_sha256"],
                 "candidate_git_head": identity["git_head"],
                 "candidate_artifact_sha256s": identity["artifact_sha256s"],
@@ -356,43 +401,43 @@ def test_eval_open_is_global_to_the_authority_registry(tmp_path, monkeypatch) ->
     assert first["protocol_registry_root"] == str(registry.resolve())
 
 
-def test_ta_canary_requires_opened_dev_escalation_and_unopened_eval_registry(
-    tmp_path, monkeypatch
-) -> None:
-    output = tmp_path / "output"
-    registry = tmp_path / "registry"
-    output.mkdir()
-    registry.mkdir()
-    monkeypatch.setattr(protocol_module, "authority_registry_root", lambda: registry)
-    payload = {
-        "schema_version": 1,
-        "artifact_role": "staged_execution_state",
-        "eval_open_count": 0,
-        "eval_used_for_development": False,
-        "experiment_output_root": str(output.resolve()),
-        "protocol_registry_root": str(registry.resolve()),
-        "completed_runs": [
-            {"arm": "F0-FROZEN-FLOAT", "seed": None},
-            {"arm": "H-HEAD", "seed": 7301},
-            {"arm": "T2-TOP", "seed": 7301},
-        ],
-        "ta_escalation": {
-            "decision": "opened",
-            "dev_evidence_sha256": "d" * 64,
-        },
+def test_ta_requires_an_explicit_operator_decision_and_cost_receipt(monkeypatch) -> None:
+    monkeypatch.setattr(protocol_module, "validate_dev_result", lambda value: dict(value))
+    results = {
+        "f0": bind_payload(
+            {"artifact_role": "psem_sortformer_dev_result", "arm": "F0-FROZEN-FLOAT", "seed": None}
+        ),
+        "head": bind_payload(
+            {"artifact_role": "psem_sortformer_dev_result", "arm": "H-HEAD", "seed": 7301}
+        ),
+        "top": bind_payload(
+            {"artifact_role": "psem_sortformer_dev_result", "arm": "T2-TOP", "seed": 7301}
+        ),
     }
-    state = bind_payload(payload)
-    results = [bind_payload({"artifact_role": "result", "index": index}) for index in range(3)]
-    monkeypatch.setattr(
-        protocol_module,
-        "validate_staged_execution_state",
-        lambda value, evidence: value,
+    cost = build_cost_receipt(
+        hourly_price_usd=1.0,
+        hourly_price_source="operator quote",
+        actual_gpu_seconds=1.0,
+        projected_remaining_gpu_seconds=1.0,
+        command="open-ta",
     )
-    authorization = authorize_conditional_arm_audit("TA-ALL-TEMPORAL", state, results)
+    decision = build_operator_dev_decision(
+        decision="open_ta",
+        selected_arm="TA-ALL-TEMPORAL",
+        rationale="The trusted operator elects to run the optional arm.",
+        available_dev_results=results,
+    )
+    authorization = open_ta(decision, cost_receipt=cost)
     assert authorization["arm"] == "TA-ALL-TEMPORAL"
-    (registry / EVAL_REGISTRY_MARKER).write_text("{}", encoding="utf-8")
-    with pytest.raises(Exception, match="precedes its frozen DEV escalation gate"):
-        authorize_conditional_arm_audit("TA-ALL-TEMPORAL", state, results)
+    assert authorization["seed"] == 7301
+    selected = build_operator_dev_decision(
+        decision="select_candidate",
+        selected_arm="T2-TOP",
+        rationale="T2 is selected without opening TA.",
+        available_dev_results=results,
+    )
+    with pytest.raises(Exception, match="explicit open_ta decision"):
+        open_ta(selected, cost_receipt=cost)
 
 
 def test_eval_authorization_rejects_top_level_candidate_substitution(tmp_path, monkeypatch) -> None:

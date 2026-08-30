@@ -5,111 +5,24 @@ import copy
 import pytest
 
 from experiments.psem_sortformer_adaptation_depth import evaluation as evaluation_module
+from experiments.psem_sortformer_adaptation_depth import reporting as reporting_module
 from experiments.psem_sortformer_adaptation_depth.evaluation import (
     _aggregate_frame_diagnostics,
     _aggregate_mapping_diagnostics,
-    _equal_corpus_view,
 )
 from experiments.psem_sortformer_adaptation_depth.protocol import bind_payload
 from experiments.psem_sortformer_adaptation_depth.reporting import (
-    DECISION_METRIC_DIRECTIONS,
-    _bootstrap_delta,
-    _paired_source_maps,
-    _stable_gain,
-    _timing_compute_report,
-    build_bootstrap_report,
     build_final_artifacts,
-    decide_outcome,
+    validate_eval_result,
 )
 from experiments.psem_training_strategy_gate.sampling import DEV_ROLE, EVAL_ROLE
 
-TOPOLOGY = {
-    key: {}
-    for key in (
-        "clean_direct_different_speaker_handoff",
-        "silence_gap_different_speaker_handoff",
-        "same_speaker_silence_gap_resume",
-        "overlap_return",
-        "overlap_takeover",
-        "short_backchannel_return",
-    )
-}
 
-
-def _prediction(arm: str, seed: int | None, checkpoint: str | None, auth_sha: str) -> dict:
-    return bind_payload(
-        {
-            "schema_version": 1,
-            "artifact_role": "psem_sortformer_prediction_set",
-            "arm": arm,
-            "seed": seed,
-            "split_role": EVAL_ROLE,
-            "trained_checkpoint_sha256": checkpoint,
-            "eval_authorization_sha256": auth_sha,
-        }
-    )
-
-
-def _result(
-    arm: str,
-    seed: int | None,
-    prediction_sha: str,
-    value: float,
-) -> dict:
-    full = {
-        "active_speech_hours": 1.0,
-        "exclusive_other_contamination_seconds_per_active_speech_hour": value,
-        "false_cut_count": int(value),
-        "missed_replacement_count": int(value),
-        "topology": TOPOLOGY,
-    }
+def _singleton_result(arm: str, seed: int | None, value: float) -> dict:
     metrics = {
         "contamination": value,
         "false_cuts": value,
         "missed_replacements": value,
-    }
-    frontier = [
-        {
-            "threshold": threshold,
-            "confirmation_ms": confirmation,
-            "views": {
-                "pooled": {"metrics": metrics, "full_metrics": full},
-                "equal_corpus": {"metrics": metrics},
-                "corpus_specific": {
-                    "AMI": {"metrics": metrics, "full_metrics": full},
-                    "AliMeeting": {"metrics": metrics, "full_metrics": full},
-                },
-            },
-        }
-        for threshold in (0.35, 0.5, 0.65)
-        for confirmation in (100, 300, 500)
-    ]
-    per_source = [
-        {
-            "source_id": f"{prefix}-{index}",
-            "corpus": corpus,
-            "metrics": metrics,
-        }
-        for corpus, prefix in (("AMI", "ami"), ("AliMeeting", "ali"))
-        for index in range(2)
-    ]
-    per_source.sort(key=lambda row: row["source_id"])
-    frame = {
-        row["source_id"]: {
-            "anchor_only": {},
-            "anchor_with_overlap": {},
-            "active_anchor_absent": {},
-            "gt_overlap_anchor_dropout": {},
-        }
-        for row in per_source
-    }
-    mapping = {
-        row["source_id"]: {
-            "mapping_coverage": 1.0,
-            "slot_instability_count": 0,
-            "unexpected_reset_count": 0,
-        }
-        for row in per_source
     }
     return bind_payload(
         {
@@ -123,114 +36,116 @@ def _result(
             "passed": True,
             "slot_mapping_coverage_passed": True,
             "timing_gate_passed": True,
-            "frontier": frontier,
-            "per_source_primary": per_source,
+            "frontier": [
+                {
+                    "threshold": 0.5,
+                    "confirmation_ms": 500,
+                    "views": {
+                        "pooled": {"metrics": metrics},
+                        "AMI": {"metrics": metrics},
+                        "AliMeeting": {"metrics": metrics},
+                    },
+                }
+            ],
             "per_source_rows": [],
-            "mapping_diagnostics": mapping,
-            "frame_diagnostics": frame,
-            "prediction_set_sha256": prediction_sha,
-            "eval_evidence_sha256": "e" * 64,
         }
     )
 
 
-def test_final_reporting_binds_historical_baselines_bootstrap_and_decision() -> None:
-    candidates = [
-        {"arm": "F0-FROZEN-FLOAT", "seed": None, "checkpoint_sha256": None},
-        {"arm": "H-HEAD", "seed": 7301, "checkpoint_sha256": "1" * 64},
-        {"arm": "T2-TOP", "seed": 7301, "checkpoint_sha256": "2" * 64},
-    ]
-    provisional = bind_payload(
+def _authorization(candidate_set: list[dict]) -> dict:
+    decision = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_operator_dev_decision",
+            "decision": "select_candidate",
+            "selected_arm": candidate_set[1]["arm"],
+            "rationale": "The trusted operator selected the shallower supported winner.",
+        }
+    )
+    return bind_payload(
         {
             "schema_version": 1,
             "artifact_role": "psem_sortformer_eval_open_authorization",
-            "candidate_set": candidates,
+            "candidate_set": candidate_set,
+            "candidate_freeze": {"operator_dev_decision": decision},
             "evaluation_roles": [EVAL_ROLE],
             "eval_open_count": 1,
             "eval_used_for_development": False,
         }
     )
-    predictions = [
-        _prediction(
-            row["arm"], row["seed"], row["checkpoint_sha256"], provisional["payload_sha256"]
-        )
-        for row in candidates
+
+
+def test_final_reporting_emits_singleton_f0_plus_winner_engineering_artifacts(
+    monkeypatch,
+) -> None:
+    candidates = [
+        {"arm": "F0-FROZEN-FLOAT", "seed": None},
+        {"arm": "T2-TOP", "seed": 7301},
     ]
-    authorization = provisional
+    authorization = _authorization(candidates)
     results = [
-        _result("F0-FROZEN-FLOAT", None, predictions[0]["payload_sha256"], 10.0),
-        _result("H-HEAD", 7301, predictions[1]["payload_sha256"], 8.0),
-        _result("T2-TOP", 7301, predictions[2]["payload_sha256"], 6.0),
+        _singleton_result("F0-FROZEN-FLOAT", None, 10.0),
+        _singleton_result("T2-TOP", 7301, 6.0),
     ]
-    with pytest.raises(Exception, match="EVAL authorization identity is invalid"):
+    monkeypatch.setattr(reporting_module, "validate_eval_authorization", lambda value: value)
+    monkeypatch.setattr(
+        reporting_module,
+        "_candidate_results",
+        lambda *_args: results,
+    )
+    artifacts, markdown = build_final_artifacts(
+        eval_authorization=authorization,
+        eval_results=[],
+        eval_prediction_sets=[],
+        training_results=[{"arm": "T2-TOP", "seed": 7301}],
+    )
+    assert artifacts["singleton_metrics.json"]["operating_point"] == {
+        "threshold": 0.5,
+        "confirmation_ms": 500,
+    }
+    assert set(artifacts["singleton_metrics.json"]["views"]) == {
+        "F0-FROZEN-FLOAT:None",
+        "T2-TOP:7301",
+    }
+    decision = artifacts["decision_receipt.json"]
+    assert decision["selected_arm"] == "T2-TOP"
+    assert decision["significance_claim"] is False
+    assert decision["seed_stability_claim"] is False
+    assert decision["evidence_level"] == "engineering"
+    assert "exactly F0 and the operator-selected seed-7301 candidate" in markdown
+
+
+def test_final_reporting_rejects_more_than_f0_plus_one_winner(monkeypatch) -> None:
+    authorization = _authorization(
+        [
+            {"arm": "F0-FROZEN-FLOAT", "seed": None},
+            {"arm": "H-HEAD", "seed": 7301},
+            {"arm": "T2-TOP", "seed": 7301},
+        ]
+    )
+    monkeypatch.setattr(reporting_module, "validate_eval_authorization", lambda value: value)
+    with pytest.raises(Exception, match="F0 plus one selected candidate"):
         build_final_artifacts(
             eval_authorization=authorization,
-            eval_results=results,
-            eval_prediction_sets=predictions,
+            eval_results=[],
+            eval_prediction_sets=[],
             training_results=[],
         )
 
 
-def test_bootstrap_pareto_uses_delay_boundary_and_both_overlap_metrics() -> None:
-    left = {}
-    right = {}
-    for corpus, prefix in (("AMI", "ami"), ("AliMeeting", "ali")):
-        for index in range(2):
-            source_id = f"{prefix}-{index}"
-            left[source_id] = {
-                "corpus": corpus,
-                "metrics": {
-                    metric: 1.0 if direction == "lower" else 0.9
-                    for metric, direction in DECISION_METRIC_DIRECTIONS.items()
-                },
-            }
-            right[source_id] = {
-                "corpus": corpus,
-                "metrics": {
-                    metric: 2.0 if direction == "lower" else 0.5
-                    for metric, direction in DECISION_METRIC_DIRECTIONS.items()
-                },
-            }
-    comparison = _paired_source_maps(left, right, "deep", "shallow", 0)
-    assert _stable_gain(comparison)
-    assert comparison["metrics"]["replacement_delay_p90"]["upper"] < 0
-    assert comparison["metrics"]["overlap_takeover_success"]["upper"] < 0
-    damaged = {
-        source_id: {
-            **row,
-            "metrics": {**row["metrics"], "replacement_delay_p90": 100.0},
-        }
-        for source_id, row in left.items()
-    }
-    damaged_comparison = _paired_source_maps(damaged, right, "deep", "shallow", 100)
-    assert not _stable_gain(damaged_comparison)
+def test_eval_result_requires_the_singleton_operating_point_and_views(monkeypatch) -> None:
+    monkeypatch.setattr(reporting_module, "require_registered_execution", lambda *args: {})
+    result = _singleton_result("H-HEAD", 7301, 1.0)
+    assert validate_eval_result(result) == result
+    forged = copy.deepcopy(result)
+    forged["frontier"].append(copy.deepcopy(forged["frontier"][0]))
+    payload = {key: value for key, value in forged.items() if key != "payload_sha256"}
+    forged = bind_payload(payload)
+    with pytest.raises(Exception, match="lean integrity gate"):
+        validate_eval_result(forged)
 
 
-def test_equal_corpus_and_diagnostic_views_execute_complete_metric_shapes() -> None:
-    def corpus_view(scale: float) -> dict:
-        full = {
-            "active_speech_hours": scale,
-            "speaker_induced_cut_count_per_active_speech_hour": scale,
-            "exclusive_other_contamination_seconds_per_active_speech_hour": scale * 2,
-            "replacement_emit_delay_ms": {"p50": scale * 3, "p90": scale * 4},
-            "backdated_boundary_error_ms": {"p50": scale * 5, "p90": scale * 6},
-            "overlap_return_preservation_rate": scale / 10,
-            "overlap_takeover_success_rate": scale / 20,
-            "topology": {"overlap_return": {"episode_count": scale, "success_rate": scale / 10}},
-        }
-        return {
-            "metrics": {
-                "contamination": scale * 2,
-                "false_cuts": scale * 7,
-                "missed_replacements": scale * 8,
-            },
-            "full_metrics": full,
-        }
-
-    equal = _equal_corpus_view({"AMI": corpus_view(1.0), "AliMeeting": corpus_view(3.0)})
-    assert equal["full_metrics"]["replacement_emit_delay_ms"]["p90"] == 8.0
-    assert equal["full_metrics"]["topology"]["overlap_return"]["success_rate"] == 0.2
-
+def test_diagnostic_aggregates_remain_reproducible() -> None:
     frame_rows = {
         source_id: {
             "anchor_only": {"support_frames": 10, "success_frames": successes},
@@ -247,7 +162,6 @@ def test_equal_corpus_and_diagnostic_views_execute_complete_metric_shapes() -> N
     corpora = {"ami": "AMI", "ali": "AliMeeting"}
     frame = _aggregate_frame_diagnostics(frame_rows, corpora)
     assert frame["pooled"]["anchor_only"]["recall"] == 0.7
-    assert frame["equal_corpus"]["gt_overlap_anchor_dropout"]["mean_sustained_500_ms_count"] == 3.0
 
     mapping_rows = {
         source_id: {
@@ -261,7 +175,6 @@ def test_equal_corpus_and_diagnostic_views_execute_complete_metric_shapes() -> N
     }
     mapping = _aggregate_mapping_diagnostics(mapping_rows, corpora)
     assert mapping["pooled"]["mapping_coverage"] == 0.9
-    assert mapping["equal_corpus"]["mapping_coverage"] == 0.9
 
 
 def test_evaluation_boundary_revalidates_evaluator_contract(monkeypatch) -> None:
@@ -306,159 +219,3 @@ def test_public_dev_evaluation_is_sealed_after_eval_but_historical_replay_is_pur
     )
     with pytest.raises(RuntimeError, match="historical replay reached"):
         evaluation_module.evaluate_prediction_set({}, historical_replay=True)
-
-
-def test_timing_report_rejects_zero_peak_memory_for_trained_candidate() -> None:
-    summary = {
-        "training_wall_clock_seconds": 1.0,
-        "peak_training_memory_bytes": 0,
-        "total_parameters": 2,
-        "trainable_parameters": 1,
-        "native_diarization_contract_passed": True,
-        "native_diarization_contract_evidence_sha256": "e" * 64,
-    }
-    training_payload = {
-        "schema_version": 1,
-        "artifact_role": "psem_sortformer_training_result",
-        "arm": "H-HEAD",
-        "seed": 7301,
-        "checkpoint_sha256": "c" * 64,
-        "training_summary": summary,
-        **summary,
-    }
-    training = bind_payload(training_payload)
-    candidate = {
-        "arm": "H-HEAD",
-        "seed": 7301,
-        "checkpoint_sha256": "c" * 64,
-        "checkpoint_receipt_sha256": "r" * 64,
-        "training_result_sha256": training["payload_sha256"],
-        "training_summary": summary,
-    }
-    with pytest.raises(Exception, match="compute evidence"):
-        _timing_compute_report(
-            [{"arm": "H-HEAD", "seed": 7301, "timing_gate_passed": True}],
-            [training],
-            [candidate],
-        )
-
-
-def _decision_result(arm: str, seed: int | None, value: float, integrity: bool = True) -> dict:
-    topology = {
-        name: {
-            "eligible_episode_count": 10,
-            "episodes_with_aligned_cut": round(10 - value),
-            "episodes_with_predicted_cut": round(value),
-            "episodes_with_reference_replacement": 10,
-            "overlap_return_preservation_rate": 1.0 - value / 10
-            if name == "overlap_return"
-            else None,
-            "overlap_takeover_success_rate": 1.0 - value / 10
-            if name == "overlap_takeover"
-            else None,
-        }
-        for name in TOPOLOGY
-    }
-    per_source = []
-    for corpus, source_id in (("AMI", "ami"), ("AliMeeting", "ali")):
-        per_source.append(
-            {
-                "source_id": source_id,
-                "corpus": corpus,
-                "full_metrics": {
-                    "active_speech_hours": 1.0,
-                    "exclusive_other_contamination_seconds_per_active_speech_hour": value,
-                    "speaker_induced_cut_count_per_active_speech_hour": value,
-                    "false_cut_count": int(value),
-                    "missed_replacement_count": int(value),
-                    "replacement_emit_delay_ms": {"p50": value, "p90": value},
-                    "backdated_boundary_error_ms": {"p50": value, "p90": value},
-                    "overlap_return_preservation_rate": 1.0 - value / 10,
-                    "overlap_takeover_success_rate": 1.0 - value / 10,
-                    "topology": topology,
-                },
-            }
-        )
-    return {
-        "arm": arm,
-        "seed": seed,
-        "per_source_primary": per_source,
-        "slot_mapping_coverage_passed": integrity,
-        "timing_gate_passed": integrity,
-    }
-
-
-def test_bootstrap_and_integrity_decision_paths_fail_closed() -> None:
-    with pytest.raises(Exception, match="no defined metric support"):
-        _bootstrap_delta({}, seed=1)
-    results = [
-        _decision_result("F0-FROZEN-FLOAT", None, 8.0),
-        _decision_result("H-HEAD", 7301, 4.0),
-        _decision_result("H-HEAD", 7302, 4.0),
-        _decision_result("T2-TOP", 7301, 4.0),
-    ]
-    bootstrap = build_bootstrap_report(results)
-    candidates = [
-        {
-            "arm": row["arm"],
-            "seed": row["seed"],
-            "training_summary": {"native_diarization_contract_passed": True},
-        }
-        for row in results
-    ]
-    accepted = decide_outcome(results, bootstrap, candidates)
-    assert accepted["outcome"] == "A"
-    assert accepted["evidence_level"] == "engineering"
-    assert accepted["improvement_holds_in_overlap_return"] is True
-    assert accepted["improvement_holds_in_overlap_takeover"] is True
-    damaged = [*results[:-1], {**results[-1], "timing_gate_passed": False}]
-    rejected = decide_outcome(damaged, bootstrap, candidates)
-    assert rejected["outcome"] == "D"
-    assert rejected["adapted_teacher_ready_for_native_causal_binding_gate"] is False
-    unsupported = copy.deepcopy(results)
-    unsupported[1]["per_source_primary"][0]["full_metrics"]["replacement_emit_delay_ms"]["p90"] = (
-        None
-    )
-    unsupported_bootstrap = build_bootstrap_report(unsupported)
-    unsupported_decision = decide_outcome(unsupported, unsupported_bootstrap, candidates)
-    assert unsupported_decision["outcome"] == "D"
-    comparison = next(
-        row
-        for row in unsupported_bootstrap["comparisons"]
-        if row["left_arm"] == "H-HEAD" and row["right_arm"] == "F0-FROZEN-FLOAT"
-    )
-    assert comparison["metrics"]["replacement_delay_p90"]["status"] == "unsupported"
-    assert comparison["metrics"]["replacement_delay_p90"]["invalid_source_ids"] == ["ami"]
-
-
-def test_engineering_ta_decision_retains_unsupported_nonprincipal_topology() -> None:
-    results = [
-        _decision_result("F0-FROZEN-FLOAT", None, 8.0),
-        _decision_result("H-HEAD", 7301, 6.0),
-        _decision_result("H-HEAD", 7302, 6.0),
-        _decision_result("T2-TOP", 7301, 4.0),
-        _decision_result("T2-TOP", 7302, 4.0),
-        _decision_result("TA-ALL-TEMPORAL", 7301, 2.0),
-        _decision_result("TA-ALL-TEMPORAL", 7302, 2.0),
-    ]
-    results[-1]["per_source_primary"][0]["full_metrics"]["topology"][
-        "clean_direct_different_speaker_handoff"
-    ]["episodes_with_aligned_cut"] = None
-    bootstrap = build_bootstrap_report(results)
-    candidates = [
-        {
-            "arm": row["arm"],
-            "seed": row["seed"],
-            "training_summary": {"native_diarization_contract_passed": True},
-        }
-        for row in results
-    ]
-    decision = decide_outcome(results, bootstrap, candidates)
-    assert decision["outcome"] == "C"
-    evidence = decision["ta_concentration_evidence"]
-    assert evidence["mandatory_topology_concentration_pass"] is False
-    interval = evidence["mandatory_topology_bootstrap_by_shallower_arm"]["H-HEAD"][
-        "clean_direct_different_speaker_handoff"
-    ]
-    assert interval["status"] == "unsupported"
-    assert interval["invalid_source_ids"] == ["ali", "ami"]

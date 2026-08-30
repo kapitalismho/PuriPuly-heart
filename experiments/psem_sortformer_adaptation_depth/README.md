@@ -5,10 +5,10 @@ This namespace targets the current issue-107 bounded hobby-engineering probe. Th
 ## Current execution status
 
 ```text
-blocked_pending_lean_runner_alignment
+ready
 ```
 
-The authority, config, runtime contract, environment budget, and documentation describe the lean protocol below. Material GPU execution must remain blocked until the Python runner and receipt validators enforce the same 32/256-step, single-seed, single-cell, two-candidate-EVAL, USD-30-hard-stop contract. The existing runner still contains superseded research-grade paths and must not be used for material training yet.
+The supported CLI now enforces the 32/256-step, seed-7301, singleton DEV/EVAL, F0-plus-winner, and USD-30-hard-stop contract. `ready` authorizes the local material path only after runtime preflight, short smoke, runtime canaries, staged DEV state, and cost validation all pass on a clean committed candidate; it does not authorize GPU provisioning, deployment, or remote execution.
 
 ## Local contract verification
 
@@ -17,7 +17,7 @@ uv run --project experiments\speaker_representation_scd\environment --frozen pyt
 uv run --project experiments\speaker_representation_scd\environment --frozen pytest experiments\psem_sortformer_adaptation_depth\tests -q
 ```
 
-Static verification binds the current `contract.json`, `config.json`, `runtime_contract.json`, `runtime_environment.json`, immutable V2 data artifacts, and issue-99 predecessor evidence. Runtime preflight intentionally fails `runtime.material_execution_authorized` while runner alignment is pending.
+Static verification binds the current `contract.json`, `config.json`, `runtime_contract.json`, `runtime_environment.json`, immutable V2 data artifacts, and issue-99 predecessor evidence. Runtime preflight authorizes material work only when those controls, a clean committed candidate, the pinned runtime, and all external paths are present and exact.
 
 ## Retained invariants
 
@@ -89,7 +89,7 @@ The smoke requires finite forward/backward/update behavior, the exact parameter 
 
 Deterministic resume is not required. An interrupted run is discarded and restarted from step zero with the same seed and manifest. A final model checkpoint is still required for inference.
 
-TA receives the same 32/256-step budget only if DEV shows that T2 clearly justifies deeper adaptation and projected total cost remains below USD 30.
+TA receives the same 32/256-step budget only after the trusted operator records an explicit `open_ta` decision and the current cost receipt keeps projected total spend at or below USD 30.
 
 ### Evaluation
 
@@ -112,7 +112,7 @@ Required views:
 - AMI-only;
 - AliMeeting-only.
 
-No bootstrap, complete 3x3 frontier, exhaustive topology matrix, or second seed is required. DEV compares F0/H/T2 and selects one direction. EVAL opens once for exactly F0 plus the DEV-selected candidate. EVAL confirms direction only and cannot reopen training or another arm.
+The supported operating surface is one fixed 0.50/500 ms cell, one seed, and pooled/AMI/AliMeeting views. Bootstrap intervals, a 3x3 frontier, an exhaustive topology matrix, and a second seed are outside this engineering gate. After F0, H, and T2 DEV evidence is available, the trusted operator records `select_candidate`, `open_ta`, or `stop`. EVAL opens once for exactly F0 plus the selected candidate and cannot reopen training or another arm.
 
 ## Required artifacts
 
@@ -126,19 +126,16 @@ cost_receipt.json
 LEAN_ADAPTATION_DECISION.md
 ```
 
-## Runner alignment required before material GPU execution
+## Sequential operator flow
 
-The next implementation step must remove or replace the superseded executable gates:
+1. Run static and runtime preflight on a clean committed candidate, then materialize and validate the one-epoch sampling manifest and TRAIN-only class weights.
+2. Build lineage evidence, run `canary-arm`, run the 32-step `smoke-arm`, and create a `cost-receipt` for the next material action.
+3. Initialize staged DEV state from F0. For H and then T2, assemble and validate the material bundle, run the exact 256-step `train-arm`, infer DEV predictions, evaluate the singleton cell, and append the result.
+4. Record `dev-decision`. If it is `open_ta`, create `open-ta` authorization and repeat the same canary, smoke, cost, training, and DEV sequence for TA before recording the final selection or stop decision.
+5. Freeze the candidate set with the final operator decision and cost receipt. `stop` ends with an empty freeze and cannot open EVAL; selection freezes exactly F0 plus one winner.
+6. Open EVAL once, infer and evaluate exactly the frozen pair, then emit the engineering final report. No supported command resumes training after EVAL opens.
 
-- eight-epoch sampling/training and DEV early stopping;
-- 500-step overfit canary and AP threshold;
-- seed 7302 confirmation paths;
-- 3x3 frontier, 2,000 bootstrap, equal-corpus/topology acceptance gates;
-- freezing every DEV candidate into EVAL;
-- final reporting that requires two seeds and all candidates;
-- absence of projected/accrued cost enforcement.
-
-Only after those paths and receipts match the lean contract may `material_execution.status` change from `blocked_pending_lean_runner_alignment` to `ready`.
+The old eight-epoch, 500-step overfit, seed-7302, automatic Pareto/bootstrap escalation, and all-candidate EVAL paths are not part of the supported material CLI.
 
 ## Claim boundary
 

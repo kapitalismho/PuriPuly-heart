@@ -6,10 +6,11 @@ from pathlib import Path
 
 from experiments.psem_sortformer_adaptation_depth.evaluation import evaluate_prediction_set
 from experiments.psem_sortformer_adaptation_depth.execution import (
+    build_cost_receipt,
     candidate_code_identity,
     infer_prediction_set,
     run_canary_arm,
-    run_overfit_arm_result,
+    run_smoke_arm,
     run_training_arm,
     validate_current_candidate_identity,
     write_json,
@@ -26,16 +27,17 @@ from experiments.psem_sortformer_adaptation_depth.nemo_adapter import (
 from experiments.psem_sortformer_adaptation_depth.preflight import build_preflight, resolve_paths
 from experiments.psem_sortformer_adaptation_depth.protocol import (
     append_dev_result,
+    build_operator_dev_decision,
     freeze_candidate_set,
     initial_staged_state,
     open_eval_once,
+    open_ta,
 )
 from experiments.psem_sortformer_adaptation_depth.receipts import (
-    SOURCE_MANIFEST,
     build_data_split_receipt,
     evaluator_reconstruction_contract,
+    validate_cost_receipt,
     validate_material_training_gate,
-    validate_overfit_canary,
     validate_trainable_checkpoint_lineage,
 )
 from experiments.psem_sortformer_adaptation_depth.reporting import build_final_artifacts
@@ -47,7 +49,6 @@ from experiments.psem_sortformer_adaptation_depth.sampling import (
 )
 from experiments.psem_sortformer_adaptation_depth.training import (
     build_manifest_class_weight_receipt,
-    build_overfit_receipt,
 )
 
 
@@ -89,11 +90,6 @@ def main(argv: list[str] | None = None) -> int:
     lineage.add_argument("receipt", type=Path)
     lineage.add_argument("--runtime-identity", type=Path, required=True)
     lineage.add_argument("--output", type=Path)
-    overfit = commands.add_parser("validate-overfit")
-    overfit.add_argument("receipt", type=Path)
-    overfit.add_argument("--manifest", type=Path, required=True)
-    overfit.add_argument("--canaries", type=Path, required=True)
-    overfit.add_argument("--output", type=Path)
     material = commands.add_parser("validate-material-gate")
     material.add_argument("bundle", type=Path)
     material.add_argument("--manifest", type=Path, required=True)
@@ -125,29 +121,20 @@ def main(argv: list[str] | None = None) -> int:
     canary.add_argument("--manifest", type=Path, required=True)
     canary.add_argument("--arm", choices=("H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"), required=True)
     canary.add_argument("--device", default="cuda")
-    canary.add_argument("--staged-state", type=Path)
-    canary.add_argument("--staged-dev-result", type=Path, action="append", default=[])
+    canary.add_argument("--ta-open-authorization", type=Path)
     canary.add_argument("--output", type=Path, required=True)
-    overfit_run = commands.add_parser("overfit-arm")
-    overfit_run.add_argument("--checkpoint", type=Path, required=True)
-    overfit_run.add_argument("--nemo-checkout", type=Path, required=True)
-    overfit_run.add_argument("--dependency-lock", type=Path, required=True)
-    overfit_run.add_argument("--corpus-root", type=Path, required=True)
-    overfit_run.add_argument("--reference-root", type=Path, required=True)
-    overfit_run.add_argument("--manifest", type=Path, required=True)
-    overfit_run.add_argument("--class-weights", type=Path, required=True)
-    overfit_run.add_argument(
-        "--arm", choices=("H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"), required=True
-    )
-    overfit_run.add_argument("--device", default="cuda")
-    overfit_run.add_argument("--staged-state", type=Path)
-    overfit_run.add_argument("--staged-dev-result", type=Path, action="append", default=[])
-    overfit_run.add_argument("--output", type=Path, required=True)
-    overfit_run.add_argument("--selected-rows-output", type=Path, required=True)
-    overfit_build = commands.add_parser("build-overfit-receipt")
-    overfit_build.add_argument("bundle", type=Path)
-    overfit_build.add_argument("--manifest", type=Path, required=True)
-    overfit_build.add_argument("--output", type=Path, required=True)
+    smoke = commands.add_parser("smoke-arm")
+    smoke.add_argument("--checkpoint", type=Path, required=True)
+    smoke.add_argument("--nemo-checkout", type=Path, required=True)
+    smoke.add_argument("--dependency-lock", type=Path, required=True)
+    smoke.add_argument("--corpus-root", type=Path, required=True)
+    smoke.add_argument("--reference-root", type=Path, required=True)
+    smoke.add_argument("--manifest", type=Path, required=True)
+    smoke.add_argument("--class-weights", type=Path, required=True)
+    smoke.add_argument("--arm", choices=("H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"), required=True)
+    smoke.add_argument("--device", default="cuda")
+    smoke.add_argument("--ta-open-authorization", type=Path)
+    smoke.add_argument("--output", type=Path, required=True)
     train = commands.add_parser("train-arm")
     train.add_argument("--checkpoint", type=Path, required=True)
     train.add_argument("--nemo-checkout", type=Path, required=True)
@@ -230,7 +217,92 @@ def main(argv: list[str] | None = None) -> int:
     memory_fit.add_argument("--conditional-ta-inference-gpu-seconds", type=float, default=0.0)
     memory_fit.add_argument("--device", default="cuda")
     memory_fit.add_argument("--output", type=Path, required=True)
+    cost = commands.add_parser("cost-receipt")
+    cost.add_argument("--hourly-price-usd", type=float, required=True)
+    cost.add_argument("--hourly-price-source", required=True)
+    cost.add_argument("--actual-gpu-seconds", type=float, required=True)
+    cost.add_argument("--projected-remaining-gpu-seconds", type=float, required=True)
+    cost.add_argument("--command", dest="executed_command", required=True)
+    cost.add_argument("--output", type=Path, required=True)
+    decision = commands.add_parser("dev-decision")
+    decision.add_argument(
+        "--decision", choices=("select_candidate", "open_ta", "stop"), required=True
+    )
+    decision.add_argument("--selected-arm", choices=("H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"))
+    decision.add_argument("--rationale", required=True)
+    decision.add_argument("--dev-result", type=Path, action="append", required=True)
+    decision.add_argument("--output", type=Path, required=True)
+    ta_open = commands.add_parser("open-ta")
+    ta_open.add_argument("decision", type=Path)
+    ta_open.add_argument("cost_receipt", type=Path)
+    ta_open.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
+    if args.command == "cost-receipt":
+        receipt = build_cost_receipt(
+            hourly_price_usd=args.hourly_price_usd,
+            hourly_price_source=args.hourly_price_source,
+            actual_gpu_seconds=args.actual_gpu_seconds,
+            projected_remaining_gpu_seconds=args.projected_remaining_gpu_seconds,
+            command=args.executed_command,
+        )
+        validate_cost_receipt(receipt)
+        write_json(args.output, receipt)
+        print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.command == "dev-decision":
+        available = {}
+        for path in args.dev_result:
+            result = _load_json(path)
+            available[f"{result['arm']}:{result.get('seed')}"] = result
+        receipt = build_operator_dev_decision(
+            decision=args.decision,
+            selected_arm=args.selected_arm,
+            rationale=args.rationale,
+            available_dev_results=available,
+        )
+        write_json(args.output, receipt)
+        print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.command == "open-ta":
+        receipt = open_ta(_load_json(args.decision), cost_receipt=_load_json(args.cost_receipt))
+        write_json(args.output, receipt)
+        print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.command == "canary-arm":
+        receipt = run_canary_arm(
+            checkpoint_path=args.checkpoint,
+            nemo_checkout=args.nemo_checkout,
+            dependency_lock=args.dependency_lock,
+            corpus_root=args.corpus_root,
+            reference_root=args.reference_root,
+            sampling_manifest=args.manifest,
+            arm=args.arm,
+            device=args.device,
+            ta_open_authorization=(
+                _load_json(args.ta_open_authorization) if args.ta_open_authorization else None
+            ),
+        )
+        write_json(args.output, receipt)
+        print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.command == "smoke-arm":
+        receipt = run_smoke_arm(
+            checkpoint_path=args.checkpoint,
+            nemo_checkout=args.nemo_checkout,
+            dependency_lock=args.dependency_lock,
+            corpus_root=args.corpus_root,
+            reference_root=args.reference_root,
+            sampling_manifest=args.manifest,
+            class_weight_receipt=_load_json(args.class_weights),
+            arm=args.arm,
+            device=args.device,
+            ta_open_authorization=(
+                _load_json(args.ta_open_authorization) if args.ta_open_authorization else None
+            ),
+        )
+        write_json(args.output, receipt)
+        print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
+        return 0
     if args.command == "memory-fit":
         from experiments.psem_sortformer_adaptation_depth.execution import (
             run_memory_fit_preflight,
@@ -283,21 +355,6 @@ def main(argv: list[str] | None = None) -> int:
             write_json(args.output, receipt)
         print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
         return 0
-    if args.command == "validate-overfit":
-        source_rows = [
-            json.loads(line) for line in SOURCE_MANIFEST.read_text(encoding="utf-8").splitlines()
-        ]
-        receipt = validate_overfit_canary(
-            _load_json(args.receipt),
-            sampling_rows=load_sampling_rows(args.manifest),
-            sampling_manifest_path=args.manifest,
-            corpus_by_source={row["source_id"]: row["corpus"] for row in source_rows},
-            canary_receipts=_load_json(args.canaries),
-        )
-        if args.output:
-            write_json(args.output, receipt)
-        print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
-        return 0
     if args.command == "validate-material-gate":
         bundle = _load_json(args.bundle)
         receipt = validate_material_training_gate(
@@ -316,10 +373,11 @@ def main(argv: list[str] | None = None) -> int:
             gradient_receipt=bundle["gradient_receipt"],
             update_receipt=bundle["update_receipt"],
             timing_receipt=bundle["timing_receipt"],
-            overfit_receipt=bundle["overfit_receipt"],
-            overfit_canary_receipts=bundle["overfit_canary_receipts"],
+            short_smoke_receipt=bundle["short_smoke_receipt"],
+            cost_receipt=bundle["cost_receipt"],
             staged_execution_receipt=bundle["staged_execution_receipt"],
-            staged_dev_results=bundle["staged_dev_results"],
+            staged_dev_results=bundle.get("staged_dev_results", []),
+            ta_open_authorization=bundle.get("ta_open_authorization"),
         )
         write_json(args.output, receipt)
         print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
@@ -349,57 +407,6 @@ def main(argv: list[str] | None = None) -> int:
         receipt = validate_sampling_manifest(
             args.manifest,
             load_training_sessions(args.corpus_root, args.reference_root),
-        )
-        write_json(args.output, receipt)
-        print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
-        return 0
-    if args.command == "canary-arm":
-        receipt = run_canary_arm(
-            checkpoint_path=args.checkpoint,
-            nemo_checkout=args.nemo_checkout,
-            dependency_lock=args.dependency_lock,
-            corpus_root=args.corpus_root,
-            reference_root=args.reference_root,
-            sampling_manifest=args.manifest,
-            arm=args.arm,
-            device=args.device,
-            staged_execution_receipt=(_load_json(args.staged_state) if args.staged_state else None),
-            staged_dev_results=[_load_json(path) for path in args.staged_dev_result],
-        )
-        write_json(args.output, receipt)
-        print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
-        return 0
-    if args.command == "overfit-arm":
-        result, selected = run_overfit_arm_result(
-            checkpoint_path=args.checkpoint,
-            nemo_checkout=args.nemo_checkout,
-            dependency_lock=args.dependency_lock,
-            corpus_root=args.corpus_root,
-            reference_root=args.reference_root,
-            sampling_manifest=args.manifest,
-            class_weight_receipt=_load_json(args.class_weights),
-            arm=args.arm,
-            device=args.device,
-            staged_execution_receipt=(_load_json(args.staged_state) if args.staged_state else None),
-            staged_dev_results=[_load_json(path) for path in args.staged_dev_result],
-        )
-        write_json(args.output, result)
-        write_jsonl(args.selected_rows_output, selected)
-        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
-        return 0
-    if args.command == "build-overfit-receipt":
-        bundle = _load_json(args.bundle)
-        sampling_rows = load_sampling_rows(args.manifest)
-        source_rows = [
-            json.loads(line) for line in SOURCE_MANIFEST.read_text(encoding="utf-8").splitlines()
-        ]
-        receipt = build_overfit_receipt(
-            bundle["arm_results"],
-            bundle["selected_rows"],
-            {row["source_id"]: row["corpus"] for row in source_rows},
-            sampling_rows,
-            args.manifest,
-            bundle["canary_receipts"],
         )
         write_json(args.output, receipt)
         print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
@@ -484,6 +491,8 @@ def main(argv: list[str] | None = None) -> int:
             checkpoints,
             predictions,
             candidate_code_identity(),
+            operator_decision=_load_json(Path(bundle["operator_dev_decision"])),
+            cost_receipt=_load_json(Path(bundle["cost_receipt"])),
         )
         write_json(args.output, receipt)
         print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
@@ -554,10 +563,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "assemble-material-bundle":
         inputs = _load_json(args.inputs)
-        canary = _load_json(Path(inputs["canary_bundle"]))
-        all_canaries = {
-            arm: _load_json(Path(path)) for arm, path in inputs["overfit_canary_bundles"].items()
-        }
+        runtime = _load_json(Path(inputs["runtime_evidence"]))
         bundle = {
             "arm": inputs["arm"],
             "seed": inputs["seed"],
@@ -566,17 +572,22 @@ def main(argv: list[str] | None = None) -> int:
             "class_weight_receipt": _load_json(Path(inputs["class_weight_receipt"])),
             "lineage_receipt": _load_json(Path(inputs["lineage_receipt"])),
             "runtime_identity": _load_json(Path(inputs["runtime_identity"])),
-            "parameter_inventory": canary["parameter_inventory"],
-            "gradient_receipt": canary["gradient_canary_receipt"],
-            "update_receipt": canary["update_canary_receipt"],
-            "timing_receipt": canary["timing_receipt"],
-            "overfit_receipt": _load_json(Path(inputs["overfit_receipt"])),
-            "overfit_canary_receipts": all_canaries,
+            "parameter_inventory": runtime["parameter_inventory"],
+            "gradient_receipt": runtime["gradient_canary_receipt"],
+            "update_receipt": runtime["update_canary_receipt"],
+            "timing_receipt": runtime["timing_receipt"],
+            "short_smoke_receipt": _load_json(Path(inputs["short_smoke_receipt"])),
+            "cost_receipt": _load_json(Path(inputs["cost_receipt"])),
             "staged_execution_receipt": _load_json(Path(inputs["staged_execution_receipt"])),
             "staged_dev_results": [
                 _load_json(path)
                 for path in _load_path_list(inputs["staged_dev_results"], "staged_dev_results")
             ],
+            "ta_open_authorization": (
+                _load_json(Path(inputs["ta_open_authorization"]))
+                if inputs.get("ta_open_authorization")
+                else None
+            ),
         }
         write_json(args.output, bundle)
         print(json.dumps({"output": str(args.output.resolve())}, sort_keys=True))

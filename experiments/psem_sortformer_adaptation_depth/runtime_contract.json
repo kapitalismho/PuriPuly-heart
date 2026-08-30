@@ -1,18 +1,11 @@
 {
   "schema_version": 2,
-  "runtime_contract_version": "issue-107-lean-runtime-v2",
+  "runtime_contract_version": "issue-107-lean-runtime-v3",
   "authority_mode": "cost_bounded_hobby_engineering_probe",
   "material_execution": {
-    "status": "blocked_pending_lean_runner_alignment",
+    "status": "ready",
     "required_status_for_material_execution": "ready",
-    "known_legacy_blockers": [
-      "sampling_and_training_still_allow_eight_epochs",
-      "overfit_path_still_requires_five_hundred_steps",
-      "protocol_still_allows_confirmation_seed_7302",
-      "evaluation_and_reporting_still_require_three_by_three_frontiers_and_bootstrap",
-      "eval_freeze_still_includes_all_candidates",
-      "cost_hard_stop_is_not_enforced"
-    ]
+    "known_legacy_blockers": []
   },
   "streaming": {
     "sample_rate_hz": 16000,

@@ -12,7 +12,7 @@ from experiments.psem_sortformer_adaptation_depth.preflight import (
     canonical_sha256,
 )
 
-AUTHORITY_PIN = "eba82c5a39421b7c8d619cfd971720d8b35b19c8d198605e6e5c0dd09fcd0a97"
+AUTHORITY_PIN = "d56980295d50760d258deeb2ccd319d3c5350aa356ed27896f7a431afdbe61fc"
 
 
 class AuthorityRegistryError(RuntimeError):

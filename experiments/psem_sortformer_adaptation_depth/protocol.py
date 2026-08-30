@@ -31,7 +31,7 @@ REQUIRED_PRIMARY_ARMS = ("F0-FROZEN-FLOAT", "H-HEAD", "T2-TOP")
 TRAINABLE_ARMS = ("H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL")
 LOWER_IS_BETTER = ("contamination", "false_cuts", "missed_replacements")
 EVAL_REGISTRY_MARKER = (
-    "issue-107-eba82c5a39421b7c8d619cfd971720d8b35b19c8d198605e6e5c0dd09fcd0a97.json"
+    "issue-107-d56980295d50760d258deeb2ccd319d3c5350aa356ed27896f7a431afdbe61fc.json"
 )
 
 
@@ -76,7 +76,7 @@ def _dominates(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
     )
 
 
-def validate_dev_result(value: Mapping[str, Any]) -> dict[str, Any]:
+def _legacy_validate_dev_result(value: Mapping[str, Any]) -> dict[str, Any]:
     payload = require_bound(value, "psem_sortformer_dev_result")
     arm = payload.get("arm")
     seed = payload.get("seed")
@@ -279,16 +279,6 @@ def _append_dev_result(
     if current_id not in expected:
         raise ProtocolError(f"DEV result is out of staged order: {current_id}")
     next_payload = {**payload, "completed_runs": [*completed, _completed_row(result)]}
-    merged = [*validated, current]
-    ids = {_run_id(value) for value in merged}
-    if {("H-HEAD", 7301), ("T2-TOP", 7301)} <= ids:
-        next_payload["ta_escalation"] = build_ta_escalation(merged)
-    escalation = next_payload.get("ta_escalation")
-    primary_complete = escalation is not None and (
-        escalation.get("decision") == "closed" or ("TA-ALL-TEMPORAL", 7301) in ids
-    )
-    if primary_complete:
-        next_payload["confirmation_seed_authorization"] = build_confirmation_authorization(merged)
     return bind_payload(next_payload)
 
 
@@ -316,7 +306,7 @@ def validate_staged_execution_state(
     return dict(state)
 
 
-def authorize_conditional_arm_audit(
+def _legacy_authorize_conditional_arm_audit(
     arm: str,
     state: Mapping[str, Any] | None,
     results: Sequence[Mapping[str, Any]],
@@ -367,21 +357,20 @@ def authorize_conditional_arm_audit(
 
 def _next_allowed_ids(payload: Mapping[str, Any]) -> set[tuple[str, int | None]]:
     completed = [(row.get("arm"), row.get("seed")) for row in payload.get("completed_runs", [])]
-    ids = set(completed)
     if completed == [("F0-FROZEN-FLOAT", None)]:
         return {("H-HEAD", 7301)}
-    if ("H-HEAD", 7301) in ids and ("T2-TOP", 7301) not in ids:
+    if completed == [
+        ("F0-FROZEN-FLOAT", None),
+        ("H-HEAD", 7301),
+    ]:
         return {("T2-TOP", 7301)}
-    escalation = payload.get("ta_escalation")
-    if (
-        isinstance(escalation, Mapping)
-        and escalation.get("decision") == "opened"
-        and ("TA-ALL-TEMPORAL", 7301) not in ids
-    ):
+    if completed == [
+        ("F0-FROZEN-FLOAT", None),
+        ("H-HEAD", 7301),
+        ("T2-TOP", 7301),
+    ]:
         return {("TA-ALL-TEMPORAL", 7301)}
-    confirmation = payload.get("confirmation_seed_authorization")
-    arms = confirmation.get("arms") if isinstance(confirmation, Mapping) else []
-    return {(str(arm), 7302) for arm in arms if (str(arm), 7302) not in ids}
+    return set()
 
 
 def _result_index(
@@ -890,7 +879,7 @@ def _freeze_candidate_set(
     return bind_payload(frozen_payload)
 
 
-def freeze_candidate_set(
+def _legacy_freeze_candidate_set(
     state: Mapping[str, Any],
     results: Sequence[Mapping[str, Any]],
     checkpoint_receipts: Mapping[str, Mapping[str, Any]],
@@ -907,7 +896,9 @@ def freeze_candidate_set(
     )
 
 
-def validate_candidate_freeze(candidate_freeze: Mapping[str, Any]) -> dict[str, Any]:
+def _legacy_validate_candidate_freeze(
+    candidate_freeze: Mapping[str, Any],
+) -> dict[str, Any]:
     frozen = require_bound(candidate_freeze, "psem_sortformer_candidate_freeze")
     state = frozen.get("staged_execution_state")
     results = frozen.get("dev_results")
@@ -936,14 +927,14 @@ def validate_candidate_freeze(candidate_freeze: Mapping[str, Any]) -> dict[str, 
     return dict(candidate_freeze)
 
 
-def open_eval_once(
+def _legacy_open_eval_once(
     candidate_freeze: Mapping[str, Any], experiment_output_root: str
 ) -> dict[str, Any]:
     from experiments.psem_sortformer_adaptation_depth.execution import (
         validate_current_candidate_identity,
     )
 
-    validate_candidate_freeze(candidate_freeze)
+    _legacy_validate_candidate_freeze(candidate_freeze)
     frozen = require_bound(candidate_freeze, "psem_sortformer_candidate_freeze")
     root = Path(experiment_output_root).resolve()
     if (
@@ -1021,3 +1012,424 @@ def validate_eval_authorization(authorization: Mapping[str, Any]) -> dict[str, A
     if persisted != dict(authorization):
         raise ProtocolError("EVAL authorization differs from the canonical single-open marker")
     return dict(authorization)
+
+
+def validate_dev_result(value: Mapping[str, Any]) -> dict[str, Any]:
+    payload = require_bound(value, "psem_sortformer_dev_result")
+    arm = payload.get("arm")
+    seed = payload.get("seed")
+    frontier = payload.get("frontier")
+    if (
+        arm not in ("F0-FROZEN-FLOAT", "H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL")
+        or (arm == "F0-FROZEN-FLOAT" and seed is not None)
+        or (arm != "F0-FROZEN-FLOAT" and seed != 7301)
+        or payload.get("split_role") != DEV_ROLE
+        or payload.get("evaluation_roles") != [DEV_ROLE]
+        or payload.get("eval_open_count") != 0
+        or payload.get("passed") is not True
+        or payload.get("slot_mapping_coverage_passed") is not True
+        or payload.get("timing_gate_passed") is not True
+        or not isinstance(frontier, list)
+        or len(frontier) != 1
+    ):
+        raise ProtocolError("DEV result identity or lean fail-closed gates are invalid")
+    cell = frontier[0]
+    if (
+        not isinstance(cell, Mapping)
+        or cell.get("threshold") != PRIMARY_THRESHOLD
+        or cell.get("confirmation_ms") != PRIMARY_CONFIRMATION_MS
+        or not isinstance(cell.get("views"), Mapping)
+        or set(cell["views"]) != {"pooled", "AMI", "AliMeeting"}
+    ):
+        raise ProtocolError("DEV result must contain only the singleton 0.50/500ms cell")
+    for view_name in ("pooled", "AMI", "AliMeeting"):
+        metrics = cell["views"][view_name].get("metrics")
+        if not isinstance(metrics, Mapping) or set(metrics) != set(LOWER_IS_BETTER):
+            raise ProtocolError("DEV result metrics differ from the lean decision vector")
+        _metric_vector(cell["views"][view_name])
+    per_source = payload.get("per_source_primary")
+    if not isinstance(per_source, list) or not per_source:
+        raise ProtocolError("DEV paired-source evidence is absent")
+    source_ids = []
+    for row in per_source:
+        metrics = row.get("metrics") if isinstance(row, Mapping) else None
+        if (
+            not isinstance(row, Mapping)
+            or not isinstance(row.get("source_id"), str)
+            or row.get("corpus") not in {"AMI", "AliMeeting"}
+            or not isinstance(metrics, Mapping)
+            or set(metrics) != set(LOWER_IS_BETTER)
+            or any(not _finite(metrics[metric]) for metric in LOWER_IS_BETTER)
+        ):
+            raise ProtocolError("DEV per-source primary evidence is invalid")
+        source_ids.append(row["source_id"])
+    if source_ids != sorted(source_ids) or len(set(source_ids)) != len(source_ids):
+        raise ProtocolError("DEV per-source identities are unordered or duplicated")
+    if payload.get("dev_evidence_sha256") != canonical_sha256(
+        {"frontier": frontier, "per_source_primary": per_source}
+    ):
+        raise ProtocolError("DEV evidence digest is not reproducible")
+    prediction_set = payload.get("prediction_set")
+    if not isinstance(prediction_set, Mapping):
+        raise ProtocolError("DEV result does not embed its prediction evidence")
+    from experiments.psem_sortformer_adaptation_depth.evaluation import (
+        evaluate_prediction_set,
+    )
+
+    try:
+        recomputed = evaluate_prediction_set(prediction_set, historical_replay=True)
+    except Exception as exc:
+        raise ProtocolError("DEV result prediction evidence is not reproducible") from exc
+    if recomputed != dict(value):
+        raise ProtocolError("DEV result differs from an exact prediction-set reevaluation")
+    split = build_data_split_receipt()
+    if source_ids != split["source_ids_by_role"][DEV_ROLE]:
+        raise ProtocolError("DEV result does not cover the complete frozen DEV split")
+    output_root = prediction_set.get("experiment_output_root")
+    registry_root = prediction_set.get("protocol_registry_root")
+    root = Path(output_root).resolve() if isinstance(output_root, str) else None
+    registry = Path(registry_root).resolve() if isinstance(registry_root, str) else None
+    if (
+        root is None
+        or registry is None
+        or not _safe_external_output_root(root)
+        or not _safe_external_output_root(registry)
+        or root == registry
+    ):
+        raise ProtocolError("DEV result output root is not an authorized external root")
+    return dict(value)
+
+
+def build_operator_dev_decision(
+    *,
+    decision: str,
+    selected_arm: str | None,
+    rationale: str,
+    available_dev_results: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    if decision not in {"select_candidate", "open_ta", "stop"}:
+        raise ProtocolError("operator DEV decision kind is invalid")
+    expected_arm = {
+        "select_candidate": {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"},
+        "open_ta": {"TA-ALL-TEMPORAL"},
+        "stop": {None},
+    }[decision]
+    if selected_arm not in expected_arm:
+        raise ProtocolError("operator DEV decision arm is invalid")
+    if not isinstance(rationale, str) or not rationale.strip():
+        raise ProtocolError("operator DEV decision rationale must be non-empty")
+    hashes = {}
+    for result in available_dev_results.values():
+        validated = validate_dev_result(result)
+        identity = f"{validated['arm']}:{validated.get('seed')}"
+        if identity in hashes:
+            raise ProtocolError("operator DEV result identities are duplicated")
+        hashes[identity] = validated["payload_sha256"]
+    required = {
+        "F0-FROZEN-FLOAT:None",
+        "H-HEAD:7301",
+        "T2-TOP:7301",
+    }
+    if not required.issubset(hashes):
+        raise ProtocolError("operator DEV decision requires F0, H, and T2 evidence")
+    if decision == "select_candidate" and f"{selected_arm}:7301" not in hashes:
+        raise ProtocolError("selected candidate is absent from available DEV evidence")
+    return bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_operator_dev_decision",
+            "decision": decision,
+            "selected_arm": selected_arm,
+            "rationale": rationale.strip(),
+            "available_dev_result_sha256s": dict(sorted(hashes.items())),
+            "eval_open_count": 0,
+        }
+    )
+
+
+def validate_operator_dev_decision(value: Mapping[str, Any]) -> dict[str, Any]:
+    payload = require_bound(value, "psem_sortformer_operator_dev_decision")
+    decision = payload.get("decision")
+    selected_arm = payload.get("selected_arm")
+    expected_arm = {
+        "select_candidate": {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"},
+        "open_ta": {"TA-ALL-TEMPORAL"},
+        "stop": {None},
+    }.get(decision)
+    hashes = payload.get("available_dev_result_sha256s")
+    if (
+        expected_arm is None
+        or selected_arm not in expected_arm
+        or not isinstance(payload.get("rationale"), str)
+        or not payload["rationale"].strip()
+        or not isinstance(hashes, Mapping)
+        or not {
+            "F0-FROZEN-FLOAT:None",
+            "H-HEAD:7301",
+            "T2-TOP:7301",
+        }.issubset(hashes)
+        or payload.get("eval_open_count") != 0
+        or any(
+            not isinstance(key, str) or not isinstance(digest, str) or len(digest) != 64
+            for key, digest in hashes.items()
+        )
+        or (decision == "select_candidate" and f"{selected_arm}:7301" not in hashes)
+    ):
+        raise ProtocolError("operator DEV decision is incomplete")
+    return dict(value)
+
+
+def open_ta(
+    decision: Mapping[str, Any],
+    *,
+    cost_receipt: Mapping[str, Any],
+) -> dict[str, Any]:
+    validated = validate_operator_dev_decision(decision)
+    decision_payload = require_bound(validated, "psem_sortformer_operator_dev_decision")
+    if (
+        decision_payload["decision"] != "open_ta"
+        or decision_payload["selected_arm"] != "TA-ALL-TEMPORAL"
+    ):
+        raise ProtocolError("TA may be opened only after an explicit open_ta decision")
+    from experiments.psem_sortformer_adaptation_depth.receipts import (
+        validate_cost_receipt,
+    )
+
+    validate_cost_receipt(cost_receipt)
+    cost = require_bound(cost_receipt, "psem_sortformer_cost_receipt")
+    if float(cost["projected_total_cost_usd"]) > 30.0:
+        raise ProtocolError("TA projected cost exceeds the hard stop")
+    return bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_open_ta_authorization",
+            "operator_decision_sha256": decision["payload_sha256"],
+            "cost_receipt_sha256": cost_receipt["payload_sha256"],
+            "arm": "TA-ALL-TEMPORAL",
+            "seed": 7301,
+        }
+    )
+
+
+def freeze_candidate_set(
+    state: Mapping[str, Any],
+    results: Sequence[Mapping[str, Any]],
+    checkpoint_receipts: Mapping[str, Mapping[str, Any]],
+    prediction_sets: Mapping[str, Mapping[str, Any]],
+    code_identity: Mapping[str, Any],
+    *,
+    operator_decision: Mapping[str, Any] | None = None,
+    cost_receipt: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    state_payload = require_bound(state, "staged_execution_state")
+    decision_value = operator_decision or state.get("operator_dev_decision")
+    cost_value = cost_receipt or state.get("cost_receipt")
+    if not isinstance(decision_value, Mapping) or not isinstance(cost_value, Mapping):
+        raise ProtocolError("candidate freeze requires operator decision and cost receipts")
+    decision = validate_operator_dev_decision(decision_value)
+    decision_payload = require_bound(decision, "psem_sortformer_operator_dev_decision")
+    if decision_payload["decision"] not in {"select_candidate", "stop"}:
+        raise ProtocolError("candidate freeze requires a final select_candidate or stop decision")
+    from experiments.psem_sortformer_adaptation_depth.receipts import (
+        validate_cost_receipt,
+    )
+
+    validate_cost_receipt(cost_value)
+    code_payload = require_bound(code_identity, "psem_sortformer_candidate_code_identity")
+    if code_payload.get("worktree_clean") is not True:
+        raise ProtocolError("candidate freeze requires a clean committed code identity")
+    validated_results = [validate_dev_result(result) for result in results]
+    by_id = {(result["arm"], result.get("seed")): result for result in validated_results}
+    if len(by_id) != len(validated_results):
+        raise ProtocolError("candidate freeze DEV result identities are duplicated")
+    observed_hashes = {
+        f"{result['arm']}:{result.get('seed')}": result["payload_sha256"]
+        for result in validated_results
+    }
+    if decision_payload["available_dev_result_sha256s"] != dict(sorted(observed_hashes.items())):
+        raise ProtocolError("operator decision hashes differ from frozen DEV results")
+    selected_arm = decision_payload["selected_arm"]
+    candidate_set = []
+    if decision_payload["decision"] == "select_candidate":
+        f0 = by_id.get(("F0-FROZEN-FLOAT", None))
+        selected = by_id.get((selected_arm, 7301))
+        if f0 is None or selected is None:
+            raise ProtocolError("lean freeze requires F0 and one selected seed-7301 candidate")
+        for result in (f0, selected):
+            key = (result["arm"], result.get("seed"))
+            canonical_key = f"{key[0]}:{key[1]}"
+            prediction = prediction_sets.get(canonical_key) or prediction_sets.get(key[0])
+            if (
+                not isinstance(prediction, Mapping)
+                or prediction != result.get("prediction_set")
+                or prediction.get("payload_sha256") != result.get("prediction_set_sha256")
+            ):
+                raise ProtocolError("candidate prediction evidence differs from its DEV result")
+            candidate = {
+                "arm": key[0],
+                "seed": key[1],
+                "dev_result_sha256": result["payload_sha256"],
+                "dev_prediction_set_sha256": prediction["payload_sha256"],
+            }
+            if key[0] != "F0-FROZEN-FLOAT":
+                checkpoint = checkpoint_receipts.get(canonical_key) or checkpoint_receipts.get(
+                    key[0]
+                )
+                if not isinstance(checkpoint, Mapping):
+                    raise ProtocolError("selected candidate checkpoint receipt is absent")
+                checkpoint_payload = require_bound(checkpoint, "psem_sortformer_checkpoint")
+                if (
+                    checkpoint_payload.get("arm") != key[0]
+                    or checkpoint_payload.get("seed") != 7301
+                    or checkpoint_payload.get("final_step") != 256
+                    or prediction.get("trained_checkpoint_sha256")
+                    != checkpoint_payload.get("checkpoint_sha256")
+                    or prediction.get("trained_checkpoint_receipt_sha256")
+                    != checkpoint.get("payload_sha256")
+                ):
+                    raise ProtocolError("selected checkpoint differs from DEV prediction evidence")
+                candidate.update(
+                    {
+                        "checkpoint_sha256": checkpoint_payload["checkpoint_sha256"],
+                        "checkpoint_receipt_sha256": checkpoint["payload_sha256"],
+                        "training_result_sha256": checkpoint_payload["training_result_sha256"],
+                    }
+                )
+            candidate_set.append(candidate)
+    output_root = state_payload.get("experiment_output_root")
+    registry_root = state_payload.get("protocol_registry_root")
+    output_path = Path(output_root).resolve() if isinstance(output_root, str) else None
+    registry_path = Path(registry_root).resolve() if isinstance(registry_root, str) else None
+    if (
+        state_payload.get("eval_open_count") != 0
+        or state_payload.get("eval_used_for_development") is not False
+        or output_path is None
+        or registry_path is None
+        or output_path == registry_path
+        or not _safe_external_output_root(output_path)
+        or not _safe_external_output_root(registry_path)
+    ):
+        raise ProtocolError("candidate freeze staged state or external roots are invalid")
+    payload = {
+        "schema_version": 1,
+        "artifact_role": "psem_sortformer_candidate_freeze",
+        "candidate_set": candidate_set,
+        "operator_dev_decision": dict(decision),
+        "operator_dev_decision_sha256": decision["payload_sha256"],
+        "cost_receipt": dict(cost_value),
+        "cost_receipt_sha256": cost_value["payload_sha256"],
+        "staged_execution_state_sha256": state["payload_sha256"],
+        "thresholds": [PRIMARY_THRESHOLD],
+        "confirmation_ms": [PRIMARY_CONFIRMATION_MS],
+        "decision_rule": "explicit_trusted_operator_dev_decision",
+        "report_schema": "issue-107-lean-engineering-v2",
+        "candidate_code_identity_sha256": code_identity["payload_sha256"],
+        "candidate_git_head": code_payload["git_head"],
+        "candidate_artifact_sha256s": code_payload["artifact_sha256s"],
+        "experiment_output_root": str(output_path),
+        "protocol_registry_root": str(registry_path),
+        "eval_open_count": 0,
+        "eval_used_for_development": False,
+        "staged_execution_state": dict(state),
+        "dev_results": [dict(result) for result in results],
+        "checkpoint_receipts": {
+            key: dict(value) for key, value in sorted(checkpoint_receipts.items())
+        },
+        "prediction_sets": {key: dict(value) for key, value in sorted(prediction_sets.items())},
+        "candidate_code_identity": dict(code_identity),
+    }
+    return bind_payload(payload)
+
+
+def validate_candidate_freeze(candidate_freeze: Mapping[str, Any]) -> dict[str, Any]:
+    frozen = require_bound(candidate_freeze, "psem_sortformer_candidate_freeze")
+    state = frozen.get("staged_execution_state")
+    results = frozen.get("dev_results")
+    checkpoints = frozen.get("checkpoint_receipts")
+    predictions = frozen.get("prediction_sets")
+    code_identity = frozen.get("candidate_code_identity")
+    decision = frozen.get("operator_dev_decision")
+    cost = frozen.get("cost_receipt")
+    if (
+        not isinstance(state, Mapping)
+        or not isinstance(results, list)
+        or not isinstance(checkpoints, Mapping)
+        or not isinstance(predictions, Mapping)
+        or not isinstance(code_identity, Mapping)
+        or not isinstance(decision, Mapping)
+        or not isinstance(cost, Mapping)
+    ):
+        raise ProtocolError("candidate freeze lacks its reproducible lean evidence bundle")
+    recomputed = freeze_candidate_set(
+        state,
+        results,
+        checkpoints,
+        predictions,
+        code_identity,
+        operator_decision=decision,
+        cost_receipt=cost,
+    )
+    if recomputed != dict(candidate_freeze):
+        raise ProtocolError("candidate freeze differs from an exact lean evidence replay")
+    return dict(candidate_freeze)
+
+
+def open_eval_once(
+    candidate_freeze: Mapping[str, Any], experiment_output_root: str
+) -> dict[str, Any]:
+    validate_candidate_freeze(candidate_freeze)
+    frozen = require_bound(candidate_freeze, "psem_sortformer_candidate_freeze")
+    if not frozen.get("candidate_set"):
+        raise ProtocolError("STOP candidate freeze cannot open EVAL")
+    if frozen.get("thresholds") != [0.5] or frozen.get("confirmation_ms") != [500]:
+        raise ProtocolError("candidate freeze is not the singleton lean operating point")
+    cost = frozen.get("cost_receipt")
+    if not isinstance(cost, Mapping):
+        raise ProtocolError("EVAL opening lacks a content-bound cost receipt")
+    from experiments.psem_sortformer_adaptation_depth.receipts import (
+        validate_cost_receipt,
+    )
+
+    validate_cost_receipt(cost)
+    from experiments.psem_sortformer_adaptation_depth.execution import (
+        validate_current_candidate_identity,
+    )
+
+    validate_current_candidate_identity(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_candidate_code_identity",
+            "git_head": frozen["candidate_git_head"],
+            "worktree_clean": True,
+            "artifact_sha256s": frozen["candidate_artifact_sha256s"],
+            "payload_sha256": frozen["candidate_code_identity_sha256"],
+        }
+    )
+    root = Path(experiment_output_root).resolve()
+    if root != Path(str(frozen.get("experiment_output_root"))).resolve():
+        raise ProtocolError("EVAL output root differs from candidate freeze")
+    receipt = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_eval_open_authorization",
+            "candidate_freeze_sha256": candidate_freeze["payload_sha256"],
+            "evaluation_roles": [EVAL_ROLE],
+            "eval_open_count": 1,
+            "eval_used_for_development": False,
+            "candidate_set": frozen["candidate_set"],
+            "candidate_code_identity_sha256": frozen["candidate_code_identity_sha256"],
+            "candidate_git_head": frozen["candidate_git_head"],
+            "candidate_artifact_sha256s": frozen["candidate_artifact_sha256s"],
+            "experiment_output_root": str(root),
+            "protocol_registry_root": frozen["protocol_registry_root"],
+            "candidate_freeze": dict(candidate_freeze),
+        }
+    )
+    marker = _eval_registry_marker()
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with marker.open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(receipt, ensure_ascii=False, sort_keys=True) + "\n")
+    except FileExistsError as exc:
+        raise ProtocolError("EVAL has already been opened for the pinned authority") from exc
+    return receipt

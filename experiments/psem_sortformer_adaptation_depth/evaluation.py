@@ -44,8 +44,8 @@ from experiments.psem_sortformer_adaptation_depth.receipts import (
 )
 from experiments.psem_training_strategy_gate.sampling import DEV_ROLE, EVAL_ROLE
 
-THRESHOLDS = (0.35, 0.5, 0.65)
-CONFIRMATION_MS = (100, 300, 500)
+THRESHOLDS = (0.5,)
+CONFIRMATION_MS = (500,)
 PRIMARY_THRESHOLD = 0.5
 PRIMARY_CONFIRMATION_MS = 500
 FRAME_SAMPLES = 1280
@@ -86,7 +86,7 @@ def validate_prediction_set(
         or value.get("split_role") not in {DEV_ROLE, EVAL_ROLE}
         or value.get("arm") not in {"F0-FROZEN-FLOAT", "H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"}
         or (value.get("arm") == "F0-FROZEN-FLOAT" and value.get("seed") is not None)
-        or (value.get("arm") != "F0-FROZEN-FLOAT" and value.get("seed") not in {7301, 7302})
+        or (value.get("arm") != "F0-FROZEN-FLOAT" and value.get("seed") != 7301)
         or value.get("algorithmic_evidence_delay_samples") != EVIDENCE_DELAY_SAMPLES
         or value.get("native_frame_samples") != FRAME_SAMPLES
         or type(value.get("total_parameters")) is not int
@@ -731,8 +731,7 @@ def evaluate_prediction_set(
                     "confirmation_ms": confirmation,
                     "views": {
                         "pooled": _view(cell_rows),
-                        "equal_corpus": _equal_corpus_view(corpus_views),
-                        "corpus_specific": corpus_views,
+                        **corpus_views,
                     },
                 }
             )

@@ -66,7 +66,7 @@ def _finite(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
-def validate_eval_result(value: Mapping[str, Any]) -> dict[str, Any]:
+def _legacy_validate_eval_result(value: Mapping[str, Any]) -> dict[str, Any]:
     require_registered_execution("evaluation-result", value)
     payload = require_bound(value, "psem_sortformer_eval_result")
     if (
@@ -411,7 +411,7 @@ def _paired_comparison(
     return _paired_source_maps(left, right, left_arm, right_arm, seed_offset)
 
 
-def build_bootstrap_report(
+def _legacy_build_bootstrap_report(
     results: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     arms = [arm for arm in DEPTH_ORDER if any(value["arm"] == arm for value in results)]
@@ -623,7 +623,7 @@ def _ta_concentration_evidence(
     }
 
 
-def decide_outcome(
+def _legacy_decide_outcome(
     results: Sequence[Mapping[str, Any]],
     bootstrap: Mapping[str, Any],
     candidate_set: Sequence[Mapping[str, Any]] | None = None,
@@ -1040,7 +1040,7 @@ def render_decision_markdown(
     )
 
 
-def build_final_artifacts(
+def _legacy_build_final_artifacts(
     *,
     eval_authorization: Mapping[str, Any],
     eval_results: Sequence[Mapping[str, Any]],
@@ -1056,8 +1056,8 @@ def build_final_artifacts(
     validate_current_candidate_identity(
         authorization["candidate_freeze"]["candidate_code_identity"]
     )
-    bootstrap = build_bootstrap_report(results)
-    decision = decide_outcome(results, bootstrap, authorization["candidate_set"])
+    bootstrap = _legacy_build_bootstrap_report(results)
+    decision = _legacy_decide_outcome(results, bootstrap, authorization["candidate_set"])
     staged_state = authorization["candidate_freeze"]["staged_execution_state"]
     ta_escalation = staged_state.get("ta_escalation")
     if (
@@ -1100,3 +1100,112 @@ def build_final_artifacts(
     if any(value["arm"] == "TA-ALL-TEMPORAL" for value in results):
         artifacts["all_temporal_metrics.json"] = _arm_metrics(results, "TA-ALL-TEMPORAL")
     return artifacts, render_decision_markdown(decision, results, bootstrap)
+
+
+def validate_eval_result(value: Mapping[str, Any]) -> dict[str, Any]:
+    require_registered_execution("evaluation-result", value)
+    payload = require_bound(value, "psem_sortformer_eval_result")
+    frontier = payload.get("frontier")
+    if (
+        payload.get("split_role") != EVAL_ROLE
+        or payload.get("evaluation_roles") != [EVAL_ROLE]
+        or payload.get("eval_open_count") != 1
+        or payload.get("slot_mapping_coverage_passed") is not True
+        or payload.get("timing_gate_passed") is not True
+        or payload.get("passed") is not True
+        or not isinstance(frontier, list)
+        or len(frontier) != 1
+        or payload.get("arm") not in DEPTH_ORDER
+    ):
+        raise ReportingError("EVAL result identity or lean integrity gate is invalid")
+    cell = frontier[0]
+    if (
+        cell.get("threshold") != 0.5
+        or cell.get("confirmation_ms") != 500
+        or set(cell.get("views", {})) != {"pooled", "AMI", "AliMeeting"}
+    ):
+        raise ReportingError("EVAL result must contain only the singleton required views")
+    return dict(value)
+
+
+def build_final_artifacts(
+    *,
+    eval_authorization: Mapping[str, Any],
+    eval_results: Sequence[Mapping[str, Any]],
+    eval_prediction_sets: Sequence[Mapping[str, Any]],
+    training_results: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], str]:
+    validate_eval_authorization(eval_authorization)
+    authorization = require_bound(eval_authorization, "psem_sortformer_eval_open_authorization")
+    expected = [(row["arm"], row.get("seed")) for row in authorization["candidate_set"]]
+    if len(expected) != 2 or expected[0] != ("F0-FROZEN-FLOAT", None):
+        raise ReportingError("final engineering report requires F0 plus one selected candidate")
+    results = _candidate_results(eval_authorization, eval_results, eval_prediction_sets)
+    decision = authorization["candidate_freeze"].get("operator_dev_decision")
+    if not isinstance(decision, Mapping):
+        raise ReportingError("operator DEV decision is absent from the final report")
+    decision_payload = require_bound(decision, "psem_sortformer_operator_dev_decision")
+    selected_arm = decision_payload["selected_arm"]
+    if decision_payload.get("decision") != "select_candidate" or expected[1] != (
+        selected_arm,
+        7301,
+    ):
+        raise ReportingError("operator decision differs from the frozen EVAL winner")
+    artifacts = {
+        "frozen_float_metrics.json": _arm_metrics(results, "F0-FROZEN-FLOAT"),
+        "selected_arm_metrics.json": _arm_metrics(results, selected_arm),
+        "singleton_metrics.json": {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_singleton_metrics",
+            "operating_point": {"threshold": 0.5, "confirmation_ms": 500},
+            "views": {
+                f"{value['arm']}:{value.get('seed')}": value["frontier"][0]["views"]
+                for value in results
+            },
+        },
+        "per_source_metrics.jsonl": [
+            row
+            for result in results
+            for row in result.get("per_source_rows", [])
+            if row.get("threshold") == 0.5 and row.get("confirmation_ms") == 500
+        ],
+        "timing_and_compute.json": {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_timing_and_compute",
+            "training_results": [dict(value) for value in training_results],
+        },
+        "decision_receipt.json": bind_payload(
+            {
+                "schema_version": 1,
+                "artifact_role": "psem_sortformer_adaptation_decision",
+                "selected_arm": selected_arm,
+                "operator_dev_decision_sha256": decision["payload_sha256"],
+                "rationale": decision_payload["rationale"],
+                "eval_authorization_sha256": eval_authorization["payload_sha256"],
+                "eval_result_sha256s": [value["payload_sha256"] for value in results],
+                "significance_claim": False,
+                "seed_stability_claim": False,
+                "evidence_level": "engineering",
+            }
+        ),
+    }
+    markdown = (
+        "\n".join(
+            [
+                "# PSEM Sortformer adaptation engineering decision",
+                "",
+                f"Selected arm: `{selected_arm}`",
+                "",
+                decision_payload["rationale"],
+                "",
+                "Operating point: replacement cell 0.50 / 500 ms.",
+                "Required views: pooled, AMI, AliMeeting.",
+                "",
+                "This is trusted single-operator engineering evidence. It makes no significance or seed-stability claim.",
+                "",
+                "EVAL contains exactly F0 and the operator-selected seed-7301 candidate.",
+            ]
+        )
+        + "\n"
+    )
+    return artifacts, markdown

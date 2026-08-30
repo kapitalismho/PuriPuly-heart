@@ -179,13 +179,17 @@ def material_execution_ready(monkeypatch):
     monkeypatch.setattr(preflight, "require_material_execution_ready", lambda: None)
 
 
-def test_optimizer_gate_blocks_legacy_work_and_keeps_memory_fit_exception() -> None:
+def test_optimizer_gate_allows_ready_lean_work_and_keeps_memory_fit_exception(
+    material_execution_ready,
+) -> None:
     model = _fake_adaptation_model()
     assert not hasattr(runtime_audit, "_build_optimizer")
-    with pytest.raises(preflight.PreflightError, match="blocked_pending_lean_runner_alignment"):
-        build_optimizer(model, "H-HEAD")
-    optimizer = _build_memory_fit_optimizer(model, "H-HEAD")
+    optimizer = build_optimizer(model, "H-HEAD")
     assert isinstance(optimizer, torch.optim.AdamW)
+    assert [group["group_name"] for group in optimizer.param_groups] == ["psem_head"]
+    assert optimizer.param_groups[0]["lr"] == LEARNING_RATES["psem_head"]
+    memory_fit_optimizer = _build_memory_fit_optimizer(model, "H-HEAD")
+    assert isinstance(memory_fit_optimizer, torch.optim.AdamW)
 
 
 class FakeGraphSortformerModules(nn.Module):

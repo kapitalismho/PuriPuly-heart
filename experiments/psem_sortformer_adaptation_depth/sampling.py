@@ -29,9 +29,9 @@ SAMPLE_RATE_HZ = 16000
 FRAME_SAMPLES = 1280
 WINDOW_SAMPLES = 480000
 WARMUP_SAMPLES = 32000
-MAXIMUM_EPOCHS = 8
+MAXIMUM_EPOCHS = 1
 WINDOWS_PER_EPOCH = 4096
-SEEDS = (7301, 7302)
+SEEDS = (7301,)
 ARMS = ("H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL")
 POSITIVE_FAMILIES = (
     "clean_direct_different_speaker_handoff",
@@ -535,6 +535,12 @@ def load_sampling_rows(path: Path) -> list[dict[str, Any]]:
 def select_overfit_rows(
     rows: Sequence[Mapping[str, Any]], corpus_by_source: Mapping[str, str]
 ) -> tuple[dict[str, Any], ...]:
+    raise SamplingContractError("legacy overfit selection is not supported")
+
+
+def _legacy_select_overfit_rows(
+    rows: Sequence[Mapping[str, Any]], corpus_by_source: Mapping[str, str]
+) -> tuple[dict[str, Any], ...]:
     sources_by_corpus = {
         corpus: sorted(
             {
@@ -589,8 +595,10 @@ def validate_sampling_manifest(
     split_binding = _train_split_binding(sessions)
     source_rows = _source_rows()
     rows = load_sampling_rows(path)
-    if len(rows) != MAXIMUM_EPOCHS * WINDOWS_PER_EPOCH:
-        raise SamplingContractError("sampling manifest row count differs from the frozen recipe")
+    if len(rows) != WINDOWS_PER_EPOCH or any(row.get("epoch") != 1 for row in rows):
+        raise SamplingContractError(
+            "sampling manifest must contain exactly one epoch-1 TRAIN manifest"
+        )
     pools = candidate_pools(sessions)
     ranges = uniform_ranges(sessions)
     label_hashes = {
