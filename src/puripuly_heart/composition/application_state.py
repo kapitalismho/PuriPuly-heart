@@ -14,6 +14,7 @@ from puripuly_heart.app.services.overlay_calibration_application import (
 from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
 from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 @dataclass(slots=True)
@@ -27,7 +28,7 @@ class ApplicationUiStateAdapter:
     microphone: Callable[[], MicrophoneTestRuntime | None]
 
     @property
-    def compatibility_settings(self) -> object | None:
+    def compatibility_settings(self) -> AppSettingsVNext | None:
         return self.settings.canonical
 
     @property

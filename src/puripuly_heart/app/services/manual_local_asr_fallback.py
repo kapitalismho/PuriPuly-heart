@@ -10,7 +10,7 @@ from puripuly_heart.app.services.local_asr_selection import (
     LOCAL_QWEN_PROVIDER,
     resolve_local_asr_selection,
 )
-from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +37,7 @@ class ManualLocalASRFallbackPlan:
 class ManualLocalASRFallbackOwner:
     @staticmethod
     def state(
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         cpu_auto_available: bool,
     ) -> ManualLocalASRFallbackState:
@@ -52,9 +52,9 @@ class ManualLocalASRFallbackOwner:
 
     @staticmethod
     def apply(
-        settings: object,
+        settings: AppSettingsVNext,
         plan: ManualLocalASRFallbackPlan,
-    ) -> object:
+    ) -> AppSettingsVNext:
         from dataclasses import replace
 
         normalized = copy.deepcopy(settings)

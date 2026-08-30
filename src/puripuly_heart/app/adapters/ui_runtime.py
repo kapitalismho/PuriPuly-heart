@@ -66,6 +66,7 @@ from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
 from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.http_extensions import (
     http_extension_secret_key_prefix,
 )
@@ -237,8 +238,8 @@ class UiSettingsRuntimeAdapter:
     settings: SettingsOwner
     projection: SettingsProjectionOwner
     application: SettingsApplicationOwner
-    merge_provider_settings: Callable[[object], object]
-    telemetry_enabled_settings: Callable[[object, bool], object]
+    merge_provider_settings: Callable[[AppSettingsVNext], AppSettingsVNext]
+    telemetry_enabled_settings: Callable[[AppSettingsVNext, bool], AppSettingsVNext]
 
     async def on_dashboard_language_change(
         self,
@@ -246,10 +247,10 @@ class UiSettingsRuntimeAdapter:
     ) -> None:
         await self.application.apply_language_selection(change)
 
-    def capture_settings_view_change(self, settings: object) -> object:
+    def capture_settings_view_change(self, settings: AppSettingsVNext) -> object:
         return self.projection.capture(settings)
 
-    def merge_settings_view_change_with_current(self, captured: object) -> object:
+    def merge_settings_view_change_with_current(self, captured: object) -> AppSettingsVNext:
         return self.projection.merge_with_current(captured)
 
     def refresh_settings_projection(
@@ -287,11 +288,11 @@ class UiSettingsRuntimeAdapter:
 
     def merge_settings_tab_apply_with_current_languages(
         self,
-        settings: object,
-    ) -> object:
+        settings: AppSettingsVNext,
+    ) -> AppSettingsVNext:
         return self.merge_provider_settings(settings)
 
-    async def apply_settings(self, settings: object) -> object:
+    async def apply_settings(self, settings: AppSettingsVNext) -> object:
         return await self.application.apply(settings)
 
     async def apply_telemetry_enabled(self, enabled: bool) -> object | None:
@@ -344,13 +345,13 @@ class UiProviderRuntimeAdapter:
     managed: ManagedAccountComponents
     credential_verification: ProviderCredentialVerificationInteractionOwner
     provider_settings: ProviderSettingsOwner
-    build_byok_target_settings: Callable[[object | None], object | None]
+    build_byok_target_settings: Callable[[AppSettingsVNext | None], AppSettingsVNext | None]
     managed_gemma: ManagedGemmaTranslationOwner | None = None
     llm_devices_sink: Callable[[tuple[GpuDeviceOption, ...]], None] | None = None
 
     async def apply_providers(
         self,
-        settings: object | None = None,
+        settings: AppSettingsVNext | None = None,
         *,
         force_rebuild_llm: bool = False,
         persist_settings: bool = True,

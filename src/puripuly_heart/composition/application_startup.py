@@ -26,6 +26,7 @@ from puripuly_heart.app.wiring_runtime_pipeline import (
 from puripuly_heart.app.wiring_translation_runtime_configuration import (
     replace_translation_runtime_enabled,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.runtime_logging import SessionLoggingMode
 
@@ -33,7 +34,7 @@ from puripuly_heart.core.runtime_logging import SessionLoggingMode
 @dataclass(slots=True)
 class ApplicationStartupAdapter:
     settings: SettingsOwner
-    settings_loader: Callable[[], object]
+    settings_loader: Callable[[], AppSettingsVNext]
     provisioning: LocalASRProvisioningPort
     gpu_state: Callable[[], GpuRuntimeInteractionState]
     manual_fallback: ManualLocalASRFallbackOwner
@@ -43,7 +44,7 @@ class ApplicationStartupAdapter:
     sync_presentation: Callable[[], None]
     notify_fallback: Callable[[tuple[str, ...], bool], None]
     runtime_logging: ApplicationRuntimeLoggingOwner
-    sync_runtime_signatures: Callable[[object], None]
+    sync_runtime_signatures: Callable[[AppSettingsVNext], None]
     pipeline_launcher: RuntimePipelineLauncher
     pipeline: RuntimePipelineHandle
     sync_local_asr_notice: Callable[[], None]

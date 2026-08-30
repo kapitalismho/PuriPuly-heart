@@ -45,13 +45,13 @@ from puripuly_heart.app.wiring_stt_factory import (
 from puripuly_heart.app.wiring_translation_runtime_configuration import (
     replace_translation_runtime_settings,
 )
-from puripuly_heart.config.translation_values import (
-    provider_llm_for_translation,
-)
-from puripuly_heart.config.provider_values import LLMProviderName, STT_INTERNAL_SAMPLE_RATE_HZ
+from puripuly_heart.config.provider_values import STT_INTERNAL_SAMPLE_RATE_HZ, LLMProviderName
 from puripuly_heart.config.resolved import OVERLAY_TARGET_DESKTOP
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.config.translation_values import TranslationModel
+from puripuly_heart.config.translation_values import (
+    TranslationModel,
+    provider_llm_for_translation,
+)
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigChange,
@@ -149,7 +149,7 @@ class SettingsRuntimeEffectsAdapter:
 
     @staticmethod
     def _microphone_audio(
-        settings: object | None,
+        settings: AppSettingsVNext | None,
     ) -> MicrophoneTestAudioSettings | None:
         if settings is None:
             return None
@@ -161,7 +161,7 @@ class SettingsRuntimeEffectsAdapter:
             internal_channels=1,
         )
 
-    async def preserve_before_replace(self, settings: object) -> object:
+    async def preserve_before_replace(self, settings: AppSettingsVNext) -> AppSettingsVNext:
         preserved = await self._github_prompt().preserve_before_settings_replace(settings)
         return settings if preserved is None else preserved
 
@@ -177,9 +177,9 @@ class SettingsRuntimeEffectsAdapter:
 
     async def prepare(
         self,
-        current_settings: object | None,
-        next_settings: object,
-    ) -> SettingsRuntimeTransition[object]:
+        current_settings: AppSettingsVNext | None,
+        next_settings: AppSettingsVNext,
+    ) -> SettingsRuntimeTransition[AppSettingsVNext]:
         microphone_owner = self._microphone.owner_if_created
         previous_microphone_signature = (
             self._state.microphone_audio_signature
@@ -385,15 +385,15 @@ class SettingsRuntimeEffectsAdapter:
 
     async def prepare_overlay_persistence(
         self,
-        previous_settings: object,
-        next_settings: object,
+        previous_settings: AppSettingsVNext,
+        next_settings: AppSettingsVNext,
     ) -> None:
         await self._desktop_overlay.prepare_persistence(
             previous_settings,
             next_settings,
         )
 
-    def restore_memory(self, settings: object) -> None:
+    def restore_memory(self, settings: AppSettingsVNext) -> None:
         restored_settings = copy.deepcopy(settings)
         self._settings.canonical = restored_settings
         self._calibration.sync_from_settings(restored_settings)
@@ -410,10 +410,10 @@ class SettingsRuntimeEffectsAdapter:
             )
         self._sync_signatures(restored_settings)
 
-    def sync_signatures(self, settings: object) -> None:
+    def sync_signatures(self, settings: AppSettingsVNext) -> None:
         self._sync_signatures(settings)
 
-    def state(self, settings: object) -> SettingsRuntimeState:
+    def state(self, settings: AppSettingsVNext) -> SettingsRuntimeState:
         local_asr_runtime = self._pipeline.local_asr_runtime
         llm_runtime = self._pipeline.llm_runtime
         self_capture = self._self_capture()
@@ -617,13 +617,13 @@ class SettingsRuntimeEffectsAdapter:
             if strict_runtime_errors:
                 raise
 
-    def _canonical_settings(self, settings: object) -> AppSettingsVNext:
+    def _canonical_settings(self, settings: AppSettingsVNext) -> AppSettingsVNext:
         return self._settings.project(
             settings,
             authoritative=self._settings.authoritative,
         )
 
-    def _sync_signatures(self, settings: object) -> None:
+    def _sync_signatures(self, settings: AppSettingsVNext) -> None:
         self._runtime_signatures.sync(
             settings,
             canonical=self._canonical_settings(settings),
@@ -634,7 +634,7 @@ class SettingsRuntimeEffectsAdapter:
             self._microphone_audio(settings)
         )
 
-    def _sync_effective_translation_flags(self, settings: object) -> None:
+    def _sync_effective_translation_flags(self, settings: AppSettingsVNext) -> None:
         self._peer.owner.sync_effective_flags(self._peer.state_for(None))
 
     @staticmethod

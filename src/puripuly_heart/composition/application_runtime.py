@@ -293,12 +293,12 @@ def _require_self_capture_owner(
 @dataclass(frozen=True, slots=True)
 class _LocalASRProductionCompositionAccess:
     config_path: Path
-    settings_loader: Callable[[], object]
+    settings_loader: Callable[[], AppSettingsVNext]
     runtime_initializer: Callable[..., Awaitable[None]]
     components_provider: Callable[[], RuntimePipelineComponents | None]
     gpu_retry: Callable[[], Awaitable[None]]
 
-    def load_compatibility_settings(self) -> object:
+    def load_compatibility_settings(self) -> AppSettingsVNext:
         return self.settings_loader()
 
     async def initialize(self, settings) -> None:

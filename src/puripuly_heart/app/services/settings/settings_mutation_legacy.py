@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from puripuly_heart.app.ports._settings_values import freeze_settings_values
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_TRANSACTION,
@@ -248,13 +249,13 @@ class _SettingsPathSnapshot:
     @classmethod
     def from_settings(
         cls,
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         paths: tuple[str, ...],
     ) -> _SettingsPathSnapshot:
         return cls(tuple((path, _get_settings_path_value(settings, path)) for path in paths))
 
-    def patch_to(self, settings: object) -> dict[str, object]:
+    def patch_to(self, settings: AppSettingsVNext) -> dict[str, object]:
         patch: dict[str, object] = {}
         for path, previous_value in self.values_by_path:
             next_value = _get_settings_path_value(settings, path)
@@ -262,25 +263,29 @@ class _SettingsPathSnapshot:
                 patch[path] = next_value
         return patch
 
-    def materialize_base_from(self, settings: object) -> object:
+    def materialize_base_from(self, settings: AppSettingsVNext) -> AppSettingsVNext:
         patch = {path: previous_value for path, previous_value in self.values_by_path}
         return apply_settings_path_patch(settings, patch)
 
 
-def settings_path_snapshot_for_stt_language_audio(settings: object) -> _SettingsPathSnapshot:
+def settings_path_snapshot_for_stt_language_audio(
+    settings: AppSettingsVNext,
+) -> _SettingsPathSnapshot:
     return _SettingsPathSnapshot.from_settings(
         settings, paths=ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS
     )
 
 
-def settings_path_snapshot_for_overlay_osc_output(settings: object) -> _SettingsPathSnapshot:
+def settings_path_snapshot_for_overlay_osc_output(
+    settings: AppSettingsVNext,
+) -> _SettingsPathSnapshot:
     return _SettingsPathSnapshot.from_settings(
         settings, paths=ORDER23_OVERLAY_OSC_OUTPUT_SETTINGS_PATHS
     )
 
 
 def settings_path_snapshot_for_ui_prompt_clipboard_state(
-    settings: object,
+    settings: AppSettingsVNext,
 ) -> _SettingsPathSnapshot:
     return _SettingsPathSnapshot.from_settings(
         settings, paths=ORDER24_UI_PROMPT_CLIPBOARD_STATE_SETTINGS_PATHS
@@ -288,8 +293,8 @@ def settings_path_snapshot_for_ui_prompt_clipboard_state(
 
 
 def build_translation_provider_settings_path_patch(
-    previous: object,
-    next_settings: object,
+    previous: AppSettingsVNext,
+    next_settings: AppSettingsVNext,
 ) -> dict[str, object]:
     return _build_settings_path_patch(
         previous,
@@ -299,8 +304,8 @@ def build_translation_provider_settings_path_patch(
 
 
 def build_stt_language_audio_settings_path_patch(
-    previous: object,
-    next_settings: object,
+    previous: AppSettingsVNext,
+    next_settings: AppSettingsVNext,
 ) -> dict[str, object]:
     return _build_settings_path_patch(
         previous,
@@ -310,8 +315,8 @@ def build_stt_language_audio_settings_path_patch(
 
 
 def build_overlay_osc_output_settings_path_patch(
-    previous: object,
-    next_settings: object,
+    previous: AppSettingsVNext,
+    next_settings: AppSettingsVNext,
 ) -> dict[str, object]:
     return _build_settings_path_patch(
         previous,
@@ -321,8 +326,8 @@ def build_overlay_osc_output_settings_path_patch(
 
 
 def build_ui_prompt_clipboard_state_settings_path_patch(
-    previous: object,
-    next_settings: object,
+    previous: AppSettingsVNext,
+    next_settings: AppSettingsVNext,
 ) -> dict[str, object]:
     return _build_settings_path_patch(
         previous,
@@ -331,22 +336,22 @@ def build_ui_prompt_clipboard_state_settings_path_patch(
     )
 
 
-def _canonical_settings_dict(settings: object) -> dict[str, object]:
-    from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+def _canonical_settings_dict(settings: AppSettingsVNext) -> dict[str, object]:
     from puripuly_heart.config.settings_vnext import serialization
+    from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
     if not isinstance(settings, AppSettingsVNext):
         raise TypeError("canonical settings path mutation requires AppSettingsVNext")
     return serialization.to_dict(settings)
 
 
-def _settings_from_canonical_dict(data: dict[str, object]) -> object:
+def _settings_from_canonical_dict(data: dict[str, object]) -> AppSettingsVNext:
     from puripuly_heart.config.settings_vnext import serialization
 
     return serialization.from_dict(data)
 
 
-def _get_settings_path_value(settings: object, path: str) -> object:
+def _get_settings_path_value(settings: AppSettingsVNext, path: str) -> object:
     current: object = _canonical_settings_dict(settings)
     for segment in path.split("."):
         if not isinstance(current, dict):
@@ -367,7 +372,9 @@ def _set_dict_path(data: dict[str, object], path: str, value: object) -> None:
     current[segments[-1]] = _mutable_settings_value(value)
 
 
-def apply_settings_path_patch(settings: object, patch: Mapping[str, object]) -> object:
+def apply_settings_path_patch(
+    settings: AppSettingsVNext, patch: Mapping[str, object]
+) -> AppSettingsVNext:
     data = _canonical_settings_dict(settings)
     for path, value in patch.items():
         _set_dict_path(data, path, value)
@@ -375,8 +382,8 @@ def apply_settings_path_patch(settings: object, patch: Mapping[str, object]) -> 
 
 
 def _build_settings_path_patch(
-    previous: object,
-    next_settings: object,
+    previous: AppSettingsVNext,
+    next_settings: AppSettingsVNext,
     *,
     paths: tuple[str, ...],
 ) -> dict[str, object]:
@@ -389,7 +396,9 @@ def _build_settings_path_patch(
     return patch
 
 
-def _apply_settings_path_patch(settings: object, patch: Mapping[str, object]) -> object:
+def _apply_settings_path_patch(
+    settings: AppSettingsVNext, patch: Mapping[str, object]
+) -> AppSettingsVNext:
     return apply_settings_path_patch(settings, patch)
 
 

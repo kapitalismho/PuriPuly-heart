@@ -28,6 +28,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCoordinator,
     ApplicationShutdownDiagnostic,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +66,7 @@ class UiApplicationPort(Protocol):
 
     def settings_secrets(self) -> SettingsSecretsPort: ...
 
-    def compatibility_settings(self) -> Any | None: ...
+    def compatibility_settings(self) -> AppSettingsVNext | None: ...
 
     @property
     def overlay_calibration(self) -> object | None: ...
@@ -121,9 +122,9 @@ class UiApplicationPort(Protocol):
         change: LanguageSelectionChange,
     ) -> None: ...
 
-    def capture_settings_view_change(self, settings: Any) -> object: ...
+    def capture_settings_view_change(self, settings: AppSettingsVNext) -> object: ...
 
-    def merge_settings_view_change_with_current(self, captured: object) -> Any: ...
+    def merge_settings_view_change_with_current(self, captured: object) -> AppSettingsVNext: ...
 
     def refresh_settings_projection(
         self,
@@ -133,13 +134,15 @@ class UiApplicationPort(Protocol):
 
     def refresh_settings_after_openrouter_pkce_success(self) -> bool: ...
 
-    def merge_settings_tab_apply_with_current_languages(self, settings: Any) -> Any: ...
+    def merge_settings_tab_apply_with_current_languages(
+        self, settings: AppSettingsVNext
+    ) -> AppSettingsVNext: ...
 
-    async def apply_settings(self, settings: Any) -> object: ...
+    async def apply_settings(self, settings: AppSettingsVNext) -> object: ...
 
     async def apply_providers(
         self,
-        settings: Any | None = None,
+        settings: AppSettingsVNext | None = None,
         *,
         force_rebuild_llm: bool = False,
         persist_settings: bool = True,
