@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 
 from puripuly_heart.app.wiring import create_desktop_overlay_policy
-from puripuly_heart.config import settings
 from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
     DESKTOP_FLET_DEFAULT_SIZE_PRESET,
@@ -13,11 +12,6 @@ from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_SIZE_PRESETS,
     DesktopFletOverlayVisualSettings,
 )
-
-
-def test_desktop_overlay_values_remain_legacy_settings_compatible() -> None:
-    assert settings.DESKTOP_FLET_SIZE_PRESETS is DESKTOP_FLET_SIZE_PRESETS
-    assert settings.DesktopFletOverlayVisualSettings is DesktopFletOverlayVisualSettings
 
 
 def test_desktop_overlay_visual_values_preserve_validation_behavior() -> None:

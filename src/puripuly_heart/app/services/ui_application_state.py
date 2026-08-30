@@ -9,6 +9,7 @@ from puripuly_heart.app.ports.ui_application import UiApplicationState
 from puripuly_heart.app.ports.ui_application_state import (
     UiApplicationStateRuntimePort,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 class UiApplicationStateOwner:
@@ -37,7 +38,7 @@ class UiApplicationStateOwner:
             translation_runtime_ready=runtime.translation_runtime_ready,
         )
 
-    def compatibility_settings(self) -> object | None:
+    def compatibility_settings(self) -> AppSettingsVNext | None:
         settings = self._runtime.compatibility_settings
         return copy.deepcopy(settings) if settings is not None else None
 

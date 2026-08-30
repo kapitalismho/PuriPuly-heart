@@ -10,7 +10,7 @@ from puripuly_heart.app.wiring.wiring_provider_runtime import (
 from puripuly_heart.app.wiring.wiring_translation_runtime_configuration import (
     build_translation_runtime_config,
 )
-from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigCategory,
@@ -19,10 +19,18 @@ from puripuly_heart.core.orchestrator.configuration import (
 
 
 def test_settings_projection_resolves_one_or_two_unique_targets_in_configured_order() -> None:
-    settings = AppSettings()
-    settings.languages.target_language = "zh-CN"
-    settings.languages.secondary_target_language = "ja"
-    settings.validate()
+    baseline = AppSettingsVNext()
+    settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            languages=replace(
+                baseline.intent.languages,
+                target_language="zh-CN",
+                secondary_target_language="ja",
+            ),
+        ),
+    )
 
     values = project_translation_runtime_settings(settings)
     configuration = build_translation_runtime_config(values)

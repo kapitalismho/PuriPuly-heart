@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
@@ -25,10 +25,7 @@ from puripuly_heart.app.services.settings_transaction_result import (
 )
 from puripuly_heart.config.llm_profiles import profile_for_alias
 from puripuly_heart.config.provider_values import (
-    LLMProviderName,
     OpenRouterCredentialSource,
-    OpenRouterLLMModel,
-    OpenRouterSelectionAlias,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.messages import (
@@ -124,7 +121,7 @@ class OpenRouterPkceApplicationOwner:
         target: OpenRouterPkceTarget,
         launch_source: str,
     ) -> bool:
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None:
             return False
         selection_alias = target.selection_alias
@@ -154,7 +151,7 @@ class OpenRouterPkceApplicationOwner:
             )
             return False
 
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None:
             return False
         updated = materialize_provider_apply_intent(
@@ -162,19 +159,27 @@ class OpenRouterPkceApplicationOwner:
             target.provider_intent,
             materialize_translation=self.settings.materialize_translation,
         )
-        updated.provider.llm = LLMProviderName.OPENROUTER
-        updated.openrouter.selection_alias = OpenRouterSelectionAlias(profile.alias)
-        updated.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-        updated.openrouter.llm_model = OpenRouterLLMModel(profile.openrouter_model)
-        updated.api_key_verified.openrouter = True
+        next_prompts = updated.intent.prompts
         if target.system_prompt is not None:
-            updated.system_prompt = target.system_prompt
-            updated.system_prompts = {}
+            next_prompts = replace(next_prompts, system_prompt=target.system_prompt)
+        updated = replace(
+            updated,
+            intent=replace(
+                updated.intent,
+                translation=replace(
+                    updated.intent.translation,
+                    openrouter_selection_alias=profile.alias,
+                    openrouter_selected_source="byok",
+                    openrouter_model=profile.openrouter_model,
+                ),
+                prompts=next_prompts,
+            ),
+        )
         plan = self.provider_runtime.build_plan(
             updated,
             force_rebuild_llm=True,
         )
-        settings_repository = self.settings.create_legacy_patch_repository(
+        settings_repository = self.settings.create_canonical_patch_repository(
             base_settings=current,
             committed_settings=updated,
             surface="openrouter_pkce",
@@ -197,7 +202,7 @@ class OpenRouterPkceApplicationOwner:
             surface="openrouter_pkce",
             operation="openrouter_pkce_runtime_apply",
         )
-        values = self.settings.legacy_snapshot_values(updated)
+        values = self.settings.snapshot_values(updated)
         scope = LifecycleScope("openrouter-pkce-commit")
 
         async def commit_and_apply() -> bool:

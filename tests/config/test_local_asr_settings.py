@@ -7,16 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from puripuly_heart.config.settings import (
-    AppSettings,
-    STTProviderName,
-)
-from puripuly_heart.config.settings import (
-    from_dict as legacy_from_dict,
-)
-from puripuly_heart.config.settings import (
-    to_dict as legacy_to_dict,
-)
+from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext import compat, serialization
 from puripuly_heart.config.settings_vnext.schema import (
     VNEXT_SETTINGS_SCHEMA_VERSION,
@@ -34,26 +25,32 @@ LOCAL_PROVIDER_VALUES = (
 
 
 @pytest.mark.parametrize("provider", LOCAL_PROVIDER_VALUES)
-def test_local_provider_identities_roundtrip_through_legacy_facade(
+def test_local_provider_identities_roundtrip_through_canonical_serialization(
     provider: STTProviderName,
 ) -> None:
-    settings = AppSettings()
-    settings.provider.stt = provider
-    settings.provider.peer_stt = provider
-    settings.stt.gpu_device_id = "vulkan-device-2"
+    current = AppSettingsVNext()
+    settings = replace(
+        current,
+        intent=replace(
+            current.intent,
+            stt=replace(
+                current.intent.stt,
+                provider=provider.value,
+                gpu_device_id="vulkan-device-2",
+            ),
+            peer_stt=replace(current.intent.peer_stt, provider=provider.value),
+        ),
+    )
 
-    persisted = legacy_to_dict(settings)
-    restored = legacy_from_dict(persisted)
+    persisted = serialization.to_dict(settings)
+    restored = serialization.from_dict(persisted)
 
-    assert persisted["provider"] == {
-        "stt": provider.value,
-        "peer_stt": provider.value,
-        "llm": settings.provider.llm.value,
-    }
-    assert persisted["stt"]["gpu_device_id"] == "vulkan-device-2"
-    assert restored.provider.stt == provider
-    assert restored.provider.peer_stt == provider
-    assert restored.stt.gpu_device_id == "vulkan-device-2"
+    assert persisted["intent"]["stt"]["provider"] == provider.value
+    assert persisted["intent"]["peer_stt"]["provider"] == provider.value
+    assert persisted["intent"]["stt"]["gpu_device_id"] == "vulkan-device-2"
+    assert restored.intent.stt.provider == provider.value
+    assert restored.intent.peer_stt.provider == provider.value
+    assert restored.intent.stt.gpu_device_id == "vulkan-device-2"
 
 
 @pytest.mark.parametrize(

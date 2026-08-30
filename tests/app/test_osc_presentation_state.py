@@ -1,25 +1,31 @@
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 
 import pytest
 from puripuly_heart.app.services.settings_application import osc_control_presentation_state
 
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
-from puripuly_heart.config.settings import (
-    AppSettings,
-    STTProviderName,
-    TranslationConnection,
-    TranslationModel,
-)
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 
 
 def test_presentation_state_captures_the_post_apply_canonical_snapshot() -> None:
-    settings = AppSettings()
-    settings.languages.source_language = "ja"
-    settings.provider.stt = STTProviderName.SONIOX
-    settings.translation.model = TranslationModel.GEMINI_37_FLASH
-    settings.translation.connection = TranslationConnection.OFFICIAL_BYOK
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            languages=replace(settings.intent.languages, source_language="ja"),
+            stt=replace(settings.intent.stt, provider=STTProviderName.SONIOX.value),
+            translation=replace(
+                settings.intent.translation,
+                model=TranslationModel.GEMINI_37_FLASH.value,
+                connection=TranslationConnection.OFFICIAL_BYOK.value,
+            ),
+        ),
+    )
     canonical = state_from_settings(
         settings,
         self_capture=True,

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import copy
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 from .overlay_application import OverlayApplicationOwner
 from .overlay_calibration import OverlayCalibrationOwner
@@ -27,7 +27,7 @@ class OverlayCalibrationApplicationOwner:
             schedule_task=self.schedule_task,
             persist=self._persist,
             emit=self._emit,
-            can_persist=lambda: self.settings.current is not None,
+            can_persist=lambda: self.settings.canonical is not None,
             can_emit=lambda: (
                 self.ingress_available() and self.overlay_provider().current_presenter() is not None
             ),
@@ -66,18 +66,25 @@ class OverlayCalibrationApplicationOwner:
     async def emit_current(self) -> None:
         await self._owner.emit_current()
 
-    def sync_from_settings(self, settings: object | None = None) -> None:
-        resolved = settings if settings is not None else self.settings.current
-        calibration = getattr(getattr(resolved, "overlay", None), "calibration", None)
+    def sync_from_settings(self, settings: AppSettingsVNext | None = None) -> None:
+        resolved = settings if settings is not None else self.settings.canonical
+        if resolved is None:
+            return
+        calibration = resolved.intent.overlay.calibration
         if isinstance(calibration, OverlayCalibration):
             self._owner.replace_current(calibration)
 
     async def _persist(self, calibration: OverlayCalibration) -> None:
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None:
             return
-        updated = copy.deepcopy(current)
-        updated.overlay.calibration = calibration.copy()
+        updated = replace(
+            current,
+            intent=replace(
+                current.intent,
+                overlay=replace(current.intent.overlay, calibration=calibration.copy()),
+            ),
+        )
         await self.settings_application_provider().apply_overlay_osc_output(updated)
 
     async def _emit(self, calibration: OverlayCalibration) -> None:

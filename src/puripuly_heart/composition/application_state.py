@@ -14,6 +14,7 @@ from puripuly_heart.app.services.overlay_calibration_application import (
 from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
 from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 @dataclass(slots=True)
@@ -27,8 +28,8 @@ class ApplicationUiStateAdapter:
     microphone: Callable[[], MicrophoneTestRuntime | None]
 
     @property
-    def compatibility_settings(self) -> object | None:
-        return self.settings.current
+    def compatibility_settings(self) -> AppSettingsVNext | None:
+        return self.settings.canonical
 
     @property
     def translation_enabled(self) -> bool:
@@ -47,8 +48,8 @@ class ApplicationUiStateAdapter:
 
     @property
     def peer_translation_eula_accepted(self) -> bool | None:
-        settings = self.settings.current
-        return bool(settings.ui.peer_translation_eula_accepted) if settings is not None else None
+        settings = self.settings.canonical
+        return bool(settings.state.peer_translation.eula_accepted) if settings is not None else None
 
     @property
     def microphone_test_active(self) -> bool:
@@ -57,13 +58,22 @@ class ApplicationUiStateAdapter:
 
     @property
     def provider_name(self) -> str | None:
-        settings = self.settings.current
-        return settings.provider.llm.value if settings is not None else None
+        settings = self.settings.canonical
+        if settings is None:
+            return None
+        from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
+            provider_llm_for_translation,
+        )
+
+        return provider_llm_for_translation(
+            settings.intent.translation.model,
+            settings.intent.translation.connection,
+        )
 
     @property
     def overlay_target(self) -> str | None:
-        settings = self.settings.current
-        return str(settings.overlay.target) if settings is not None else None
+        settings = self.settings.canonical
+        return str(settings.intent.overlay.target) if settings is not None else None
 
     @property
     def desktop_overlay_captions_locked(self) -> bool:

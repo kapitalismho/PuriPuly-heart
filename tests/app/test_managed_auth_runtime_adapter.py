@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from puripuly_heart.app.wiring_managed_auth_factory import (
@@ -11,13 +12,7 @@ from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    OpenRouterCredentialSource,
-    TranslationConnection,
-)
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 class SecretStore:
@@ -34,18 +29,17 @@ class SecretStore:
         self.values.pop(key, None)
 
 
-def _owner(settings: AppSettings) -> SettingsOwner:
+def _owner(settings: AppSettingsVNext) -> SettingsOwner:
     return SettingsOwner(
         path=Path("settings.json"),
         persistence=SettingsVNextCanonicalPersistenceAdapter(),
-        canonical=from_legacy_app_settings(settings),
-        current=settings,
+        canonical=settings,
         authoritative=True,
     )
 
 
 def _adapter(
-    settings: AppSettings,
+    settings: AppSettingsVNext,
     *,
     secret_store_factory,
     runtime_presence: tuple[bool, bool] = (True, True),
@@ -61,13 +55,36 @@ def _adapter(
     )
 
 
-def test_state_resolves_managed_selection_and_secret_through_injected_store() -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.translation.connection = TranslationConnection.MANAGED
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    adapter = _adapter(
+def _managed_settings(
+    *,
+    china: bool = False,
+    credential_ref: str | None = None,
+) -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    return replace(
         settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model="deepseek_v4_flash" if china else settings.intent.translation.model,
+                connection="managed_china" if china else "managed",
+                openrouter_selected_source="managed",
+            ),
+        ),
+        state=replace(
+            settings.state,
+            managed_connection=replace(
+                settings.state.managed_connection,
+                active_managed_credential_ref=credential_ref,
+            ),
+        ),
+    )
+
+
+def test_state_resolves_managed_selection_and_secret_through_injected_store() -> None:
+    adapter = _adapter(
+        _managed_settings(),
         secret_store_factory=lambda *_args, **_kwargs: SecretStore(
             {"openrouter_managed_api_key": "managed-key"}
         ),
@@ -84,15 +101,10 @@ def test_state_resolves_managed_selection_and_secret_through_injected_store() ->
 
 
 def test_state_contains_secret_resolution_failure_as_key_unavailable() -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.translation.connection = TranslationConnection.MANAGED_CHINA
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-
     def fail(*_args, **_kwargs):
         raise RuntimeError("secret store unavailable")
 
-    state = _adapter(settings, secret_store_factory=fail).state()
+    state = _adapter(_managed_settings(china=True), secret_store_factory=fail).state()
 
     assert state.managed_selected is True
     assert state.managed_china is True
@@ -100,13 +112,9 @@ def test_state_contains_secret_resolution_failure_as_key_unavailable() -> None:
 
 
 def test_transaction_settings_values_exclude_raw_secrets() -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.translation.connection = TranslationConnection.MANAGED
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.managed_identity.active_managed_credential_ref = "managed-ref"
-
-    values = _managed_connection_auth_settings_values(from_legacy_app_settings(settings))
+    values = _managed_connection_auth_settings_values(
+        _managed_settings(credential_ref="managed-ref")
+    )
     serialized = repr(values).lower()
 
     assert values["state"]["managed_connection"]["active_managed_credential_ref"] == ("managed-ref")

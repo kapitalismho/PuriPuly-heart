@@ -46,18 +46,26 @@ from puripuly_heart.app.wiring import (
     build_openrouter_credential_runtime_config,
     build_openrouter_release_runtime_config,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
+from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
-    TranslationConnection,
-    TranslationModel,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.managed_identity import ensure_managed_identity_bundle
 from puripuly_heart.core.runtime import OAuthRuntime
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.domain.models import Translation
+from tests.helpers.release_settings import (
+    ReleaseSettings,
+    canonical_settings,
+    managed_identity_payload,
+)
+
+
+def _canonical_settings(settings: ReleaseSettings) -> AppSettingsVNext:
+    return canonical_settings(settings)
 
 
 @dataclass
@@ -258,7 +266,7 @@ class FailingAckTokenSetAndManagedKeyDeleteSecretStore(InMemorySecretStore):
 def _make_service(
     *,
     client: FakeManagedReleaseClient,
-    settings: AppSettings | None = None,
+    settings: ReleaseSettings | None = None,
     secrets: InMemorySecretStore | None = None,
     persist_calls: list[tuple[str | None, str | None]] | None = None,
     raw_hardware_fingerprint_provider: Any | None = None,
@@ -266,13 +274,13 @@ def _make_service(
     discord_oauth_callback_runner: Any | None = None,
     on_discord_callback_received: Any | None = None,
     oauth_runtime: OAuthRuntime | None = None,
-) -> tuple[ManagedOpenRouterReleaseService, AppSettings, InMemorySecretStore]:
-    resolved_settings = settings or AppSettings()
+) -> tuple[ManagedOpenRouterReleaseService, ReleaseSettings, InMemorySecretStore]:
+    resolved_settings = settings or ReleaseSettings()
     resolved_settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     resolved_secrets = secrets or InMemorySecretStore()
     tracked_persist_calls = persist_calls if persist_calls is not None else []
 
-    def persist(updated: AppSettings) -> None:
+    def persist(updated: ReleaseSettings) -> None:
         tracked_persist_calls.append(
             (
                 updated.managed_identity.installation_id,
@@ -281,7 +289,9 @@ def _make_service(
         )
 
     service_kwargs: dict[str, Any] = {
-        "openrouter_config": build_openrouter_release_runtime_config(resolved_settings),
+        "openrouter_config": build_openrouter_release_runtime_config(
+            _canonical_settings(resolved_settings)
+        ),
         "managed_state": ManagedIdentityStateAdapter(resolved_settings, persist),
         "secrets": resolved_secrets,
         "client": client,
@@ -426,7 +436,7 @@ def _make_discord_start_success(
 def _make_discord_service(
     *,
     client: FakeManagedReleaseClient | None = None,
-    settings: AppSettings | None = None,
+    settings: ReleaseSettings | None = None,
     secrets: InMemorySecretStore | None = None,
     harness: FakeDiscordOAuthHarness | None = None,
     persist_calls: list[tuple[str | None, str | None]] | None = None,
@@ -435,7 +445,7 @@ def _make_discord_service(
     oauth_runtime: OAuthRuntime | None = None,
 ) -> tuple[
     ManagedOpenRouterReleaseService,
-    AppSettings,
+    ReleaseSettings,
     InMemorySecretStore,
     FakeManagedReleaseClient,
     FakeDiscordOAuthHarness,
@@ -494,7 +504,7 @@ def _expected_hardware_hash(*, fingerprint_salt: str, raw_hardware_fingerprint: 
 
 
 def _set_verified_snapshot(
-    settings: AppSettings,
+    settings: ReleaseSettings,
     *,
     hardware_hash: str = "verified-hardware-hash-1",
     salt_version: int = 7,
@@ -505,7 +515,7 @@ def _set_verified_snapshot(
 
 @pytest.mark.asyncio
 async def test_prepare_for_translation_short_circuits_when_managed_key_exists() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "managed-key")
@@ -523,7 +533,7 @@ async def test_prepare_for_translation_short_circuits_when_managed_key_exists() 
 
 @pytest.mark.asyncio
 async def test_managed_china_prepare_uses_only_qq_key_with_active_entitlement_state() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
     settings.translation.connection = TranslationConnection.MANAGED_CHINA
@@ -546,7 +556,7 @@ async def test_managed_china_prepare_uses_only_qq_key_with_active_entitlement_st
 async def test_managed_china_prepare_survives_missing_active_entitlement_state_with_local_qq_key() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
     settings.translation.connection = TranslationConnection.MANAGED_CHINA
@@ -567,7 +577,7 @@ async def test_managed_china_prepare_survives_missing_active_entitlement_state_w
 async def test_managed_china_prepare_does_not_start_standard_discord_challenge_when_qq_key_missing() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
     settings.translation.connection = TranslationConnection.MANAGED_CHINA
@@ -587,7 +597,7 @@ async def test_managed_china_prepare_does_not_start_standard_discord_challenge_w
 async def test_managed_china_llm_start_requires_qq_auth_without_standard_fallback_or_issue() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
     settings.translation.connection = TranslationConnection.MANAGED_CHINA
@@ -606,7 +616,7 @@ async def test_managed_china_llm_start_requires_qq_auth_without_standard_fallbac
 
 @pytest.mark.asyncio
 async def test_llm_start_retries_pending_delivery_ack_before_ready() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.translation.connection = TranslationConnection.MANAGED
     settings.managed_identity.active_managed_credential_ref = "managed-ref-discord"
@@ -642,7 +652,7 @@ async def test_llm_start_retries_pending_delivery_ack_before_ready() -> None:
 
 @pytest.mark.asyncio
 async def test_llm_start_with_pending_delivery_ack_failure_does_not_return_ready() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.translation.connection = TranslationConnection.MANAGED
     settings.managed_identity.active_managed_credential_ref = "managed-ref-discord"
@@ -670,7 +680,7 @@ async def test_llm_start_with_pending_delivery_ack_failure_does_not_return_ready
 
 @pytest.mark.asyncio
 async def test_standard_managed_prepare_preserves_discord_flow_without_reading_qq_key() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.translation.connection = TranslationConnection.MANAGED
     secrets = InMemorySecretStore()
@@ -705,7 +715,7 @@ async def test_prepare_for_translation_uses_oauth_runtime_for_shared_auth_task()
 
 @pytest.mark.asyncio
 async def test_discord_oauth_short_circuits_local_key_without_listener_or_broker() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "managed-key")
@@ -1008,7 +1018,7 @@ async def test_discord_issue_success_exposes_talk_together_pass_status() -> None
 
 @pytest.mark.asyncio
 async def test_discord_issue_success_defaults_referral_bonus_and_preserves_known_owned_id() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.managed_identity.referral_id = "8H3J4N"
     client = FakeManagedReleaseClient(
         discord_start_result=_make_discord_start_success(),
@@ -1029,7 +1039,7 @@ async def test_discord_issue_success_defaults_referral_bonus_and_preserves_known
 
 @pytest.mark.asyncio
 async def test_discord_issue_without_owned_id_clears_previous_qq_pass_state() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.managed_identity.referral_id = "8H3J4N"
     settings.managed_identity.referral_source = "qq"
     client = FakeManagedReleaseClient(
@@ -1053,7 +1063,7 @@ async def test_discord_issue_without_owned_id_clears_previous_qq_pass_state() ->
 async def test_discord_issue_success_ignores_malformed_referral_hints_without_clearing_known_id() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.managed_identity.referral_id = "8H3J4N"
     client = FakeManagedReleaseClient(
         discord_start_result=_make_discord_start_success(),
@@ -1080,7 +1090,7 @@ async def test_discord_issue_success_ignores_malformed_referral_hints_without_cl
 async def test_status_refresh_signs_existing_identity_request_and_persists_owned_referral_id() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     bundle = ensure_managed_identity_bundle(
@@ -1120,7 +1130,7 @@ async def test_status_refresh_signs_existing_identity_request_and_persists_owned
 
 @pytest.mark.asyncio
 async def test_qq_status_refresh_uses_only_auth_bound_to_active_managed_credential() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.managed_identity.referral_source = "qq"
     settings.managed_identity.active_managed_credential_ref = "managed-ref-qq"
@@ -1156,7 +1166,7 @@ async def test_qq_status_refresh_uses_only_auth_bound_to_active_managed_credenti
 
 @pytest.mark.asyncio
 async def test_qq_status_refresh_rejects_stale_auth_from_previous_managed_credential() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.managed_identity.referral_id = "8H3J4N"
     settings.managed_identity.referral_source = "qq"
@@ -1192,9 +1202,7 @@ async def test_qq_status_refresh_rejects_stale_auth_from_previous_managed_creden
 
 @pytest.mark.asyncio
 async def test_managed_status_refresh_returns_pass_status_without_persisting_it() -> None:
-    from puripuly_heart.config.settings import to_dict
-
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     bundle = ensure_managed_identity_bundle(
@@ -1222,13 +1230,13 @@ async def test_managed_status_refresh_returns_pass_status_without_persisting_it(
     assert result.referral_id == "7KQ9M2"
     assert result.pass_status == pass_status
     assert settings.managed_identity.referral_id == "7KQ9M2"
-    assert "invite_count" not in to_dict(settings)["managed_identity"]
+    assert "invite_count" not in managed_identity_payload(settings)
     assert client.calls[0][1]["installation_id"] == bundle.installation_id
 
 
 @pytest.mark.asyncio
 async def test_managed_status_refresh_failure_is_distinguishable_from_absent_pass_status() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.managed_identity.referral_id = "8H3J4N"
     secrets = InMemorySecretStore()
@@ -1255,7 +1263,7 @@ async def test_managed_status_refresh_failure_is_distinguishable_from_absent_pas
 async def test_status_refresh_preserves_known_owned_referral_id_when_old_broker_omits_field() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.managed_identity.referral_id = "8H3J4N"
     secrets = InMemorySecretStore()
@@ -1285,7 +1293,7 @@ async def test_status_refresh_preserves_known_owned_referral_id_when_old_broker_
 
 @pytest.mark.asyncio
 async def test_status_refresh_preserves_known_owned_referral_id_when_broker_status_fails() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.managed_identity.referral_id = "8H3J4N"
     secrets = InMemorySecretStore()
@@ -1319,7 +1327,7 @@ async def test_status_refresh_preserves_known_owned_referral_id_when_broker_stat
 
 @pytest.mark.asyncio
 async def test_status_refresh_preserves_newer_owned_referral_id_persisted_while_in_flight() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -1374,7 +1382,7 @@ async def test_status_refresh_preserves_newer_owned_referral_id_persisted_while_
 async def test_status_refresh_skips_without_identity_mutation_when_existing_bundle_is_invalid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.managed_identity.installation_id = "not-a-valid-managed-installation-id"
     settings.managed_identity.release_token = "release-token-kept"
@@ -1434,7 +1442,7 @@ async def test_status_refresh_skips_without_identity_mutation_when_existing_bund
 async def test_status_refresh_close_cancels_in_flight_status_without_persisting_stale_settings() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.managed_identity.referral_id = "8H3J4N"
     secrets = InMemorySecretStore()
@@ -1475,7 +1483,7 @@ async def test_status_refresh_close_cancels_in_flight_status_without_persisting_
 
 @pytest.mark.asyncio
 async def test_issue_persists_managed_user_identifier_after_managed_key_success() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -1504,7 +1512,8 @@ async def test_issue_persists_managed_user_identifier_after_managed_key_success(
     )
     assert (
         load_managed_openrouter_user_identifier(
-            build_openrouter_credential_runtime_config(settings), secrets=secrets
+            build_openrouter_credential_runtime_config(_canonical_settings(settings)),
+            secrets=secrets,
         )
         == "user-123"
     )
@@ -1512,7 +1521,7 @@ async def test_issue_persists_managed_user_identifier_after_managed_key_success(
 
 @pytest.mark.asyncio
 async def test_direct_issue_delivery_ack_required_stores_acks_and_clears_before_ready() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -1548,7 +1557,7 @@ async def test_direct_issue_delivery_ack_required_stores_acks_and_clears_before_
 
 @pytest.mark.asyncio
 async def test_direct_issue_delivery_ack_failure_keeps_pending_and_returns_retry() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -1583,7 +1592,7 @@ async def test_direct_issue_delivery_ack_failure_keeps_pending_and_returns_retry
 
 @pytest.mark.asyncio
 async def test_direct_issue_delivery_ack_malformed_metadata_does_not_return_ready() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -1612,7 +1621,7 @@ async def test_direct_issue_delivery_ack_malformed_metadata_does_not_return_read
 
 @pytest.mark.asyncio
 async def test_direct_issue_pending_ack_persist_failure_happens_before_local_key_write() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -1631,11 +1640,11 @@ async def test_direct_issue_pending_ack_persist_failure_happens_before_local_key
         )
     )
 
-    def fail_persist(_updated: AppSettings) -> None:
+    def fail_persist(_updated: ReleaseSettings) -> None:
         raise RuntimeError("pending persist failed")
 
     service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, fail_persist),
         secrets=secrets,
         client=client,
@@ -1653,7 +1662,7 @@ async def test_direct_issue_pending_ack_persist_failure_happens_before_local_key
 
 @pytest.mark.asyncio
 async def test_direct_issue_ack_token_store_and_key_rollback_failure_forces_future_retry() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = FailingAckTokenSetAndManagedKeyDeleteSecretStore()
     ensure_managed_identity_bundle(
@@ -1687,7 +1696,7 @@ async def test_direct_issue_ack_token_store_and_key_rollback_failure_forces_futu
 async def test_direct_issue_ack_success_token_clear_failure_keeps_pending_and_future_retry() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = FailingDeleteSecretStore(fail_on_key="openrouter_managed_delivery_ack_token")
     ensure_managed_identity_bundle(
@@ -1723,7 +1732,7 @@ async def test_direct_issue_ack_success_token_clear_failure_keeps_pending_and_fu
 async def test_issue_keeps_ready_and_cleans_managed_user_identifier_cache_on_second_write_failure() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = FailingManagedKeySecretStore(
         fail_on_key=OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET
@@ -1753,7 +1762,8 @@ async def test_issue_keeps_ready_and_cleans_managed_user_identifier_cache_on_sec
     assert secrets.get(OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET) is None
     assert (
         load_managed_openrouter_user_identifier(
-            build_openrouter_credential_runtime_config(settings), secrets=secrets
+            build_openrouter_credential_runtime_config(_canonical_settings(settings)),
+            secrets=secrets,
         )
         is None
     )
@@ -1772,7 +1782,7 @@ async def test_issue_keeps_ready_and_cleans_managed_user_identifier_cache_on_sec
 async def test_issue_omission_or_invalid_user_id_preserves_existing_managed_user_identifier_cache(
     openrouter_user_id: str | None,
 ) -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -1806,7 +1816,8 @@ async def test_issue_omission_or_invalid_user_id_preserves_existing_managed_user
     )
     assert (
         load_managed_openrouter_user_identifier(
-            build_openrouter_credential_runtime_config(settings), secrets=secrets
+            build_openrouter_credential_runtime_config(_canonical_settings(settings)),
+            secrets=secrets,
         )
         == "cached-user-1"
     )
@@ -1816,7 +1827,7 @@ async def test_issue_omission_or_invalid_user_id_preserves_existing_managed_user
 async def test_prepare_for_translation_reuses_verified_pending_release_state_and_issues_key() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -1854,7 +1865,7 @@ async def test_prepare_for_translation_reuses_verified_pending_release_state_and
 async def test_prepare_for_translation_and_ensure_key_for_llm_start_share_single_issue_task() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -1893,7 +1904,7 @@ async def test_prepare_for_translation_and_ensure_key_for_llm_start_share_single
 
 @pytest.mark.asyncio
 async def test_issue_uses_qwen_managed_model_from_selection_alias() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
     secrets = InMemorySecretStore()
@@ -1920,7 +1931,7 @@ async def test_issue_uses_qwen_managed_model_from_selection_alias() -> None:
 async def test_prepare_for_translation_restarts_when_legacy_release_token_lacks_verified_snapshot() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -1956,12 +1967,12 @@ async def test_prepare_for_translation_preserves_legacy_hardware_hash_provider_s
         discord_issue_result=ManagedOpenRouterIssueSuccess(openrouter_api_key="managed-key"),
     )
     harness = FakeDiscordOAuthHarness()
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
 
     service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
         secrets=secrets,
         client=client,
@@ -2065,7 +2076,7 @@ async def test_close_closes_underlying_client_transport_when_available() -> None
 
 @pytest.mark.asyncio
 async def test_close_continues_status_and_client_cleanup_when_oauth_close_fails() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.managed_identity.referral_id = "8H3J4N"
     secrets = InMemorySecretStore()
@@ -2175,7 +2186,7 @@ async def test_unavailable_client_discord_methods_raise_release_error_not_attrib
 
 @pytest.mark.asyncio
 async def test_issue_honors_retry_after_without_starting_parallel_retries() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -2195,7 +2206,7 @@ async def test_issue_honors_retry_after_without_starting_parallel_retries() -> N
     monotonic_now = {"value": 1_000}
 
     service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
         secrets=secrets,
         client=client,
@@ -2233,7 +2244,7 @@ async def test_issue_honors_retry_after_without_starting_parallel_retries() -> N
 
 @pytest.mark.asyncio
 async def test_prepare_for_translation_honors_retry_after_while_pending_release_exists() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -2251,7 +2262,7 @@ async def test_prepare_for_translation_honors_retry_after_while_pending_release_
         )
     )
     service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
         secrets=secrets,
         client=client,
@@ -2289,7 +2300,7 @@ async def test_prepare_for_translation_honors_retry_after_while_pending_release_
 
 @pytest.mark.asyncio
 async def test_issue_restart_clears_release_state_without_switching_sources() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -2320,7 +2331,7 @@ async def test_issue_restart_clears_release_state_without_switching_sources() ->
 
 @pytest.mark.asyncio
 async def test_issue_challenge_expired_subcode_restarts_and_clears_state() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -2352,7 +2363,7 @@ async def test_issue_challenge_expired_subcode_restarts_and_clears_state() -> No
 
 @pytest.mark.asyncio
 async def test_issue_trial_not_eligible_managed_key_unrecoverable_stops_as_not_eligible() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -2394,7 +2405,7 @@ async def test_issue_trial_not_eligible_managed_key_unrecoverable_stops_as_not_e
 
 @pytest.mark.asyncio
 async def test_issue_issuance_suspended_retries_with_brake_copy() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -2438,7 +2449,7 @@ async def test_issue_issuance_suspended_retries_with_brake_copy() -> None:
 
 @pytest.mark.asyncio
 async def test_issue_issuance_suspended_with_revoked_lifecycle_stops_with_contact_copy() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -2481,7 +2492,7 @@ async def test_issue_issuance_suspended_with_revoked_lifecycle_stops_with_contac
 
 @pytest.mark.asyncio
 async def test_issue_trial_not_eligible_with_revoked_lifecycle_stops_with_contact_copy() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -2524,7 +2535,7 @@ async def test_issue_trial_not_eligible_with_revoked_lifecycle_stops_with_contac
 
 @pytest.mark.asyncio
 async def test_issue_non_trial_code_with_revoked_lifecycle_stops_with_contact_copy() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
@@ -2567,7 +2578,7 @@ async def test_issue_non_trial_code_with_revoked_lifecycle_stops_with_contact_co
 
 @pytest.mark.asyncio
 async def test_issue_restarts_when_identity_bundle_regenerates_before_issue() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.managed_identity.installation_id = "018f1f56-9f2d-7abc-9def-1234567890ab"
     settings.managed_identity.release_token = "release-token-1"
@@ -2577,7 +2588,7 @@ async def test_issue_restarts_when_identity_bundle_regenerates_before_issue() ->
         issue_result=ManagedOpenRouterIssueSuccess(openrouter_api_key="managed-key")
     )
     service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
         secrets=InMemorySecretStore(),
         client=client,
@@ -2597,7 +2608,7 @@ async def test_issue_restarts_when_identity_bundle_regenerates_before_issue() ->
 async def test_issue_stops_cleanly_when_managed_key_persistence_fails_after_successful_issue() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = FailingManagedKeySecretStore()
     ensure_managed_identity_bundle(
@@ -2634,7 +2645,7 @@ async def test_issue_stops_cleanly_when_managed_key_persistence_fails_after_succ
 
 @pytest.mark.asyncio
 async def test_issue_stops_and_restores_pending_release_state_when_cleanup_persist_fails() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = FailingManagedKeySecretStore()
     ensure_managed_identity_bundle(
@@ -2649,7 +2660,7 @@ async def test_issue_stops_and_restores_pending_release_state_when_cleanup_persi
     )
     persist_calls: list[tuple[str | None, str | None]] = []
 
-    def persist_and_fail(updated: AppSettings) -> None:
+    def persist_and_fail(updated: ReleaseSettings) -> None:
         persist_calls.append(
             (
                 updated.managed_identity.release_token,
@@ -2659,7 +2670,7 @@ async def test_issue_stops_and_restores_pending_release_state_when_cleanup_persi
         raise RuntimeError("settings persistence failed")
 
     service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, persist_and_fail),
         secrets=secrets,
         client=client,
@@ -2768,7 +2779,7 @@ async def test_prepare_for_translation_regenerates_identity_on_binding_mismatch_
     stage: str,
     subcode: str,
 ) -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     secrets = InMemorySecretStore()
     first_bundle = ensure_managed_identity_bundle(

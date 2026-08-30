@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 import puripuly_heart.core.stt.controller as stt_controller_module
-from puripuly_heart.config.settings import STTProviderName
+from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core import messages
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.runtime_logging import SessionLoggingMode, SessionRuntimeLoggingService

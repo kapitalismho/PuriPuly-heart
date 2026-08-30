@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from puripuly_heart.app import wiring as wiring_module
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    materialize_canonical_translation_settings,
+)
 from puripuly_heart.app.wiring import (
     ManagedIdentityStateAdapter,
     ResolvedPeerSTTConfig,
@@ -36,6 +40,18 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
     resolve_self_stt_runtime_config_from_vnext,
     self_stt_runtime_intent_from_vnext,
 )
+from puripuly_heart.config.llm_profiles import get_openrouter_llm_profile
+from puripuly_heart.config.provider_values import (
+    CerebrasLLMModel,
+    DeepSeekLLMModel,
+    GeminiLLMModel,
+    OpenRouterCredentialSource,
+    OpenRouterLLMModel,
+    OpenRouterSelectionAlias,
+    QwenLLMModel,
+    QwenRegion,
+    STTProviderName,
+)
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_NONE,
     CREDENTIAL_SOURCE_SECRET_STORE,
@@ -47,43 +63,13 @@ from puripuly_heart.config.resolved import (
 )
 from puripuly_heart.config.runtime_resolution import (
     TranslationFallbackRuntimeIntent,
-    derive_translation_runtime_intent_from_compatibility,
     resolve_stt_config,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    CerebrasLLMModel,
-    CerebrasSettings,
-    DeepgramSTTSettings,
-    DeepSeekLLMModel,
-    DeepSeekSettings,
-    GeminiLLMModel,
-    GeminiSettings,
-    LLMProviderName,
-    LLMSettings,
-    OpenRouterCredentialSource,
-    OpenRouterFallbackSelectionAlias,
-    OpenRouterLLMModel,
-    OpenRouterProviderRouting,
-    OpenRouterRoutingMode,
-    OpenRouterSelectionAlias,
-    OpenRouterSettings,
-    ProviderSettings,
-    QwenASRSTTSettings,
-    QwenLLMModel,
-    QwenRegion,
-    QwenSettings,
-    SonioxSTTSettings,
-    STTProviderName,
-    STTSettings,
-    TranslationConnection,
-    TranslationFallbackSettings,
-    TranslationModel,
-    TranslationSettings,
-)
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
+    DesktopFletOverlayIntent,
+    DesktopFletOverlayPositionIntent,
+    DesktopFletOverlayVisualIntent,
     TranslationFallbackIntent,
 )
 from puripuly_heart.core.language import (
@@ -92,6 +78,10 @@ from puripuly_heart.core.language import (
 )
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
+from puripuly_heart.core.openrouter_routing import (
+    OpenRouterProviderRouting,
+    OpenRouterRoutingMode,
+)
 
 
 class _ConcurrencyProbeProvider(LLMProvider):
@@ -158,128 +148,323 @@ from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBac
 from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 
+_LLM_DEFAULTS: dict[str, tuple[str, str]] = {
+    "gemini": ("gemini31_flash_lite", "official_byok"),
+    "qwen": ("qwen35_plus", "official_byok"),
+    "deepseek": ("deepseek_v4_flash", "official_byok"),
+    "cerebras": ("gemma4_31b", "cerebras"),
+    "local_llm": ("local_llm", "ollama"),
+    "openrouter": ("gemma4", "openrouter"),
+    "managed_gemma": ("managed_gemma", "cpu"),
+}
+_OPENROUTER_ALIAS_DEFAULTS: dict[str, tuple[str, str]] = {
+    OpenRouterSelectionAlias.QWEN35_FLASH_BYOK.value: (
+        "openrouter_qwen35_flash",
+        "openrouter",
+    ),
+    OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED.value: (
+        "openrouter_qwen35_flash",
+        "managed",
+    ),
+    OpenRouterSelectionAlias.GEMMA4_BYOK.value: ("gemma4", "openrouter"),
+    OpenRouterSelectionAlias.GEMMA4_MANAGED.value: ("gemma4", "managed"),
+    OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value: (
+        "deepseek_v4_flash",
+        "openrouter",
+    ),
+    OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value: (
+        "deepseek_v4_flash",
+        "managed",
+    ),
+    OpenRouterSelectionAlias.GEMINI31_FLASH_LITE_BYOK.value: (
+        "gemini31_flash_lite",
+        "openrouter",
+    ),
+    OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK.value: (
+        "gemini37_flash",
+        "openrouter",
+    ),
+}
 
-def _translation_with_fallback(
+
+def _vnext(
     *,
-    model: TranslationModel,
-    connection: TranslationConnection,
-) -> TranslationSettings:
-    return TranslationSettings(
-        fallback=TranslationFallbackSettings(
-            enabled=True,
-            model=model,
-            connection=connection,
+    llm: str | None = None,
+    model: str | None = None,
+    connection: str | None = None,
+    concurrency_limit: int | None = None,
+    fallback_alias: str | None = None,
+    openrouter_model: str | None = None,
+    openrouter_source: str | None = None,
+    openrouter_alias: str | None = None,
+    openrouter_routing: str | None = None,
+    openrouter_routing_mode: str | None = None,
+    gemini_model: str | None = None,
+    qwen_model: str | None = None,
+    qwen_region: str | None = None,
+    cerebras_model: str | None = None,
+    deepseek_model: str | None = None,
+    stt_provider: str | None = None,
+    peer_stt_provider: str | None = None,
+    low_latency: bool | None = None,
+    local_base_url: str | None = None,
+    local_model: str | None = None,
+    local_extra_body: dict[str, object] | None = None,
+    http_extension_id: str | None = None,
+    managed_credential_ref: str | None = None,
+    deepgram_model: str | None = None,
+    source_language: str | None = None,
+    peer_source_language: str | None = None,
+    peer_source_mode: str | None = None,
+    peer_expected_languages: list[str] | None = None,
+    custom_vocabulary_enabled: bool | None = None,
+    custom_terms: dict[str, list[str]] | None = None,
+    soniox_model: str | None = None,
+    soniox_endpoint: str | None = None,
+    soniox_keepalive_interval_s: float | None = None,
+    soniox_trailing_silence_ms: int | None = None,
+    qwen_asr_model: str | None = None,
+    **stt_fields: object,
+) -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    translation = settings.intent.translation
+    if openrouter_alias is not None:
+        mapped = _OPENROUTER_ALIAS_DEFAULTS.get(openrouter_alias)
+        if mapped is not None:
+            model = model or mapped[0]
+            connection = connection or mapped[1]
+            if openrouter_model is None:
+                profile = get_openrouter_llm_profile(openrouter_alias)
+                if profile is not None and profile.openrouter_model is not None:
+                    openrouter_model = profile.openrouter_model
+    if openrouter_source == "managed" and connection is None:
+        connection = "managed"
+    elif openrouter_source == "byok" and connection is None:
+        connection = "openrouter"
+    if llm is not None:
+        default_model, default_connection = _LLM_DEFAULTS[llm]
+        translation = replace(
+            translation,
+            model=model or default_model,
+            connection=connection or default_connection,
         )
+    elif model is not None or connection is not None:
+        translation = replace(
+            translation,
+            model=model or translation.model,
+            connection=connection or translation.connection,
+        )
+    if concurrency_limit is not None:
+        translation = replace(translation, concurrency_limit=concurrency_limit)
+    translation = replace(
+        translation,
+        fallback=TranslationFallbackIntent(selection_alias=fallback_alias or "none"),
     )
-
-
-def _canonical_settings(settings: AppSettings) -> AppSettingsVNext:
-    if (
-        settings.provider.llm == LLMProviderName.OPENROUTER
-        and settings.openrouter.selected_source == OpenRouterCredentialSource.NONE
-    ):
-        raise ValueError("OpenRouter selected source must not be `none` for execution")
-    intent = derive_translation_runtime_intent_from_compatibility(
-        provider_llm=settings.provider.llm,
-        openrouter_model=settings.openrouter.llm_model,
-        openrouter_selected_source=settings.openrouter.selected_source,
-        openrouter_provider_routing=settings.openrouter.provider_routing,
-        gemini_model=settings.gemini.llm_model,
-        qwen_model=settings.qwen.llm_model,
-        cerebras_model=settings.cerebras.llm_model,
-        concurrency_limit=settings.llm.concurrency_limit,
-    )
-    model = intent.model
-    connection = intent.connection
-    if settings.translation.model == TranslationModel.CUSTOM_HTTP:
-        model = "custom_http"
-        connection = "custom_http"
-    elif settings.translation.model == TranslationModel.MANAGED_GEMMA:
-        model = "managed_gemma"
-        connection = settings.translation.connection.value
-    elif settings.translation.model == TranslationModel.MANAGED_GEMMA_12B:
-        model = "managed_gemma_12b"
-        connection = settings.translation.connection.value
-    elif settings.provider.llm == LLMProviderName.QWEN:
-        model = "qwen35_plus"
-        connection = "official_byok"
-    canonical = from_legacy_app_settings(settings)
-    translation = canonical.intent.translation
-    fallback = translation.fallback
-    if not settings.translation.fallback.enabled:
-        fallback = TranslationFallbackIntent(selection_alias="none")
-    return replace(
-        canonical,
-        intent=replace(
-            canonical.intent,
-            translation=replace(
-                translation,
-                model=model,
-                connection=connection,
-                concurrency_limit=intent.concurrency_limit,
-                fallback=fallback,
-                openrouter_model=settings.openrouter.llm_model.value,
-                openrouter_selected_source=settings.openrouter.selected_source.value,
-                openrouter_selection_alias=settings.openrouter.selection_alias.value,
-                openrouter_provider_routing=settings.openrouter.provider_routing.value,
-                openrouter_routing_mode=settings.openrouter.routing_mode.value,
+    if openrouter_routing_mode is not None:
+        translation = replace(translation, openrouter_routing_mode=openrouter_routing_mode)
+    if gemini_model is not None:
+        translation = replace(
+            translation,
+            gemini=replace(translation.gemini, llm_model=gemini_model),
+        )
+    if qwen_model is not None or qwen_region is not None:
+        translation = replace(
+            translation,
+            qwen=replace(
+                translation.qwen,
+                llm_model=qwen_model or translation.qwen.llm_model,
+                region=qwen_region or translation.qwen.region,
             ),
+        )
+    if cerebras_model is not None:
+        translation = replace(
+            translation,
+            cerebras=replace(translation.cerebras, llm_model=cerebras_model),
+        )
+    if deepseek_model is not None:
+        translation = replace(
+            translation,
+            deepseek=replace(translation.deepseek, llm_model=deepseek_model),
+        )
+    if http_extension_id is not None:
+        translation = replace(translation, http_extension_id=http_extension_id)
+    stt = settings.intent.stt
+    if stt_provider is not None:
+        stt = replace(stt, provider=stt_provider)
+    if low_latency is not None:
+        stt = replace(stt, low_latency_mode=low_latency)
+    if custom_vocabulary_enabled is not None:
+        stt = replace(stt, custom_vocabulary_enabled=custom_vocabulary_enabled)
+    if custom_terms is not None:
+        stt = replace(stt, custom_terms=custom_terms)
+    if deepgram_model is not None:
+        stt = replace(stt, deepgram=replace(stt.deepgram, model=deepgram_model))
+    if qwen_asr_model is not None:
+        stt = replace(stt, qwen_asr=replace(stt.qwen_asr, model=qwen_asr_model))
+    if (
+        soniox_model is not None
+        or soniox_endpoint is not None
+        or soniox_keepalive_interval_s is not None
+        or soniox_trailing_silence_ms is not None
+    ):
+        stt = replace(
+            stt,
+            soniox=replace(
+                stt.soniox,
+                model=soniox_model or stt.soniox.model,
+                endpoint=soniox_endpoint or stt.soniox.endpoint,
+                keepalive_interval_s=(
+                    stt.soniox.keepalive_interval_s
+                    if soniox_keepalive_interval_s is None
+                    else soniox_keepalive_interval_s
+                ),
+                trailing_silence_ms=(
+                    stt.soniox.trailing_silence_ms
+                    if soniox_trailing_silence_ms is None
+                    else soniox_trailing_silence_ms
+                ),
+            ),
+        )
+    if stt_fields:
+        stt = replace(stt, **stt_fields)
+    peer_stt = settings.intent.peer_stt
+    if peer_stt_provider is not None:
+        peer_stt = replace(peer_stt, provider=peer_stt_provider)
+    languages = settings.intent.languages
+    if source_language is not None:
+        languages = replace(languages, source_language=source_language)
+    if peer_source_language is not None:
+        languages = replace(languages, peer_source_language=peer_source_language)
+    if peer_source_mode is not None or peer_expected_languages is not None:
+        languages = replace(
+            languages,
+            peer_source_mode=peer_source_mode or languages.peer_source_mode,
+            peer_expected_languages=(
+                languages.peer_expected_languages
+                if peer_expected_languages is None
+                else peer_expected_languages
+            ),
+        )
+    local_llm = settings.intent.local_llm
+    if local_base_url is not None or local_model is not None or local_extra_body is not None:
+        local_llm = replace(
+            local_llm,
+            base_url=local_base_url or local_llm.base_url,
+            model=local_model or local_llm.model,
+            extra_body=local_extra_body if local_extra_body is not None else local_llm.extra_body,
+        )
+    state = settings.state
+    if managed_credential_ref is not None:
+        state = replace(
+            state,
+            managed_connection=replace(
+                state.managed_connection,
+                active_managed_credential_ref=managed_credential_ref,
+            ),
+        )
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=translation,
+            stt=stt,
+            peer_stt=peer_stt,
+            languages=languages,
+            local_llm=local_llm,
         ),
+        state=state,
     )
+    settings = materialize_canonical_translation_settings(settings)
+    translation = settings.intent.translation
+    overlay: dict[str, object] = {}
+    if openrouter_model is not None:
+        overlay["openrouter_model"] = openrouter_model
+    if openrouter_alias is not None:
+        overlay["openrouter_selection_alias"] = openrouter_alias
+    if openrouter_source is not None:
+        overlay["openrouter_selected_source"] = openrouter_source
+    if openrouter_routing is not None:
+        overlay["openrouter_provider_routing"] = openrouter_routing
+    if qwen_model is not None or qwen_region is not None:
+        overlay["qwen"] = replace(
+            translation.qwen,
+            llm_model=qwen_model or translation.qwen.llm_model,
+            region=qwen_region or translation.qwen.region,
+        )
+    if overlay:
+        settings = replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                translation=replace(translation, **overlay),
+            ),
+        )
+    return settings
 
 
 def create_llm_provider(
-    settings: AppSettings,
+    settings: AppSettingsVNext,
     *,
     secrets: SecretStore,
     **kwargs: object,
 ) -> LLMProvider:
-    canonical = _canonical_settings(settings)
     extras = kwargs.pop("extras", None)
-    runtime_input = runtime_resolution_input_from_vnext(canonical)
-    if settings.translation.fallback.enabled:
+    fallback_model = kwargs.pop("fallback_model", None)
+    fallback_connection = kwargs.pop("fallback_connection", None)
+    if settings.intent.translation.openrouter_selected_source == "none":
+        raise ValueError("OpenRouter selected source must not be `none` for execution")
+    runtime_input = runtime_resolution_input_from_vnext(settings)
+    fallback = settings.intent.translation.fallback
+    if fallback_model is not None and fallback_connection is not None:
         runtime_input = replace(
             runtime_input,
             translation_fallback=TranslationFallbackRuntimeIntent(
                 enabled=True,
-                model=settings.translation.fallback.model.value,
-                connection=settings.translation.fallback.connection.value,
+                model=str(fallback_model),
+                connection=str(fallback_connection),
+            ),
+        )
+    elif fallback.enabled:
+        runtime_input = replace(
+            runtime_input,
+            translation_fallback=TranslationFallbackRuntimeIntent(
+                enabled=True,
+                model=fallback.model,
+                connection=fallback.connection,
             ),
         )
     return create_llm_provider_from_runtime_input(
         runtime_input,
         secrets=secrets,
-        extras=extras if extras is not None else llm_factory_extras_from_vnext(canonical),
+        extras=extras if extras is not None else llm_factory_extras_from_vnext(settings),
         **kwargs,
     )
 
 
 def create_stt_backend(
-    settings: AppSettings,
+    settings: AppSettingsVNext,
     *,
     secrets: SecretStore,
     **kwargs: object,
 ) -> STTBackend:
-    canonical = from_legacy_app_settings(settings)
     return create_stt_backend_from_resolved_config(
-        resolve_self_stt_runtime_config_from_vnext(canonical),
+        resolve_self_stt_runtime_config_from_vnext(settings),
         secrets=secrets,
-        gpu_device_id=canonical.intent.stt.gpu_device_id,
+        gpu_device_id=settings.intent.stt.gpu_device_id,
         **kwargs,
     )
 
 
 def create_peer_stt_backend(
-    settings: AppSettings,
+    settings: AppSettingsVNext,
     *,
     secrets: SecretStore,
     **kwargs: object,
 ) -> STTBackend:
-    canonical = from_legacy_app_settings(settings)
     return create_peer_stt_backend_from_resolved_config(
-        resolve_peer_stt_runtime_config_from_vnext(canonical),
+        resolve_peer_stt_runtime_config_from_vnext(settings),
         secrets=secrets,
-        gpu_device_id=canonical.intent.stt.gpu_device_id,
+        gpu_device_id=settings.intent.stt.gpu_device_id,
         **kwargs,
     )
 
@@ -379,10 +564,7 @@ def test_legacy_resolved_peer_stt_config_constructor_exposes_old_fields() -> Non
 
 
 def test_create_llm_provider_gemini_uses_secret_and_concurrency_limit() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.GEMINI),
-        llm=LLMSettings(concurrency_limit=3),
-    )
+    settings = _vnext(llm="gemini", concurrency_limit=3)
     secrets = InMemorySecretStore()
     secrets.set("google_api_key", "k")
 
@@ -395,10 +577,7 @@ def test_create_llm_provider_gemini_uses_secret_and_concurrency_limit() -> None:
 
 
 def test_create_llm_provider_gemini_uses_selected_model() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.GEMINI),
-        gemini=GeminiSettings(llm_model=GeminiLLMModel.GEMINI_31_FLASH_LITE),
-    )
+    settings = _vnext(llm="gemini", gemini_model=GeminiLLMModel.GEMINI_31_FLASH_LITE.value)
     secrets = InMemorySecretStore()
     secrets.set("google_api_key", "k")
 
@@ -409,7 +588,7 @@ def test_create_llm_provider_gemini_uses_selected_model() -> None:
 
 
 def test_create_llm_provider_gemini_passes_runtime_logging() -> None:
-    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.GEMINI))
+    settings = _vnext(llm="gemini")
     secrets = InMemorySecretStore()
     secrets.set("google_api_key", "k")
     runtime_logging = object()
@@ -422,7 +601,7 @@ def test_create_llm_provider_gemini_passes_runtime_logging() -> None:
 
 
 def test_create_llm_provider_qwen_uses_secret() -> None:
-    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.QWEN))
+    settings = _vnext(llm="qwen")
     secrets = InMemorySecretStore()
     # Default region is Beijing, so we need alibaba_api_key_beijing
     secrets.set("alibaba_api_key_beijing", "k2")
@@ -437,7 +616,7 @@ def test_create_llm_provider_qwen_uses_secret() -> None:
 
 
 def test_create_llm_provider_qwen_low_latency_passes_runtime_logging() -> None:
-    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.QWEN))
+    settings = _vnext(llm="qwen")
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_beijing", "k2")
     runtime_logging = object()
@@ -450,9 +629,10 @@ def test_create_llm_provider_qwen_low_latency_passes_runtime_logging() -> None:
 
 
 def test_create_llm_provider_qwen_uses_singapore_region() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.QWEN),
-        qwen=QwenSettings(region=QwenRegion.SINGAPORE, llm_model=QwenLLMModel.QWEN_35_PLUS),
+    settings = _vnext(
+        llm="qwen",
+        qwen_region=QwenRegion.SINGAPORE.value,
+        qwen_model=QwenLLMModel.QWEN_35_PLUS.value,
     )
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_singapore", "k3")
@@ -466,7 +646,7 @@ def test_create_llm_provider_qwen_uses_singapore_region() -> None:
 
 
 def test_create_llm_provider_qwen_uses_legacy_alibaba_secret_key() -> None:
-    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.QWEN))
+    settings = _vnext(llm="qwen")
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key", "legacy-k2")
 
@@ -479,10 +659,10 @@ def test_create_llm_provider_qwen_uses_legacy_alibaba_secret_key() -> None:
 
 
 def test_create_llm_provider_qwen_historical_false_still_uses_async_provider() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.QWEN),
-        stt=STTSettings(low_latency_mode=False),
-        qwen=QwenSettings(llm_model=QwenLLMModel.QWEN_35_PLUS),
+    settings = _vnext(
+        llm="qwen",
+        low_latency=False,
+        qwen_model=QwenLLMModel.QWEN_35_PLUS.value,
     )
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_beijing", "k2")
@@ -496,10 +676,7 @@ def test_create_llm_provider_qwen_historical_false_still_uses_async_provider() -
 
 
 def test_create_llm_provider_qwen_historical_false_passes_runtime_logging() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.QWEN),
-        stt=STTSettings(low_latency_mode=False),
-    )
+    settings = _vnext(llm="qwen", low_latency=False)
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_beijing", "k2")
     runtime_logging = object()
@@ -512,10 +689,11 @@ def test_create_llm_provider_qwen_historical_false_passes_runtime_logging() -> N
 
 
 def test_create_llm_provider_qwen_historical_false_uses_async_singapore() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.QWEN),
-        qwen=QwenSettings(region=QwenRegion.SINGAPORE, llm_model=QwenLLMModel.QWEN_35_FLASH),
-        stt=STTSettings(low_latency_mode=False),
+    settings = _vnext(
+        llm="qwen",
+        qwen_region=QwenRegion.SINGAPORE.value,
+        qwen_model=QwenLLMModel.QWEN_35_FLASH.value,
+        low_latency=False,
     )
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_singapore", "k3")
@@ -529,10 +707,7 @@ def test_create_llm_provider_qwen_historical_false_uses_async_singapore() -> Non
 
 
 def test_create_llm_provider_deepseek_uses_secret_and_model() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.DEEPSEEK),
-        llm=LLMSettings(concurrency_limit=4),
-    )
+    settings = _vnext(llm="deepseek", concurrency_limit=4)
     secrets = InMemorySecretStore()
     secrets.set("deepseek_api_key", "ds-key")
 
@@ -547,10 +722,7 @@ def test_create_llm_provider_deepseek_uses_secret_and_model() -> None:
 
 
 def test_create_llm_provider_deepseek_uses_v4_flash_model() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.DEEPSEEK),
-    )
-    settings.deepseek.llm_model = DeepSeekLLMModel.DEEPSEEK_V4_FLASH
+    settings = _vnext(llm="deepseek", deepseek_model=DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value)
     secrets = InMemorySecretStore()
     secrets.set("deepseek_api_key", "ds-key")
 
@@ -562,7 +734,7 @@ def test_create_llm_provider_deepseek_uses_v4_flash_model() -> None:
 
 
 def test_create_llm_provider_deepseek_passes_runtime_logging() -> None:
-    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.DEEPSEEK))
+    settings = _vnext(llm="deepseek")
     secrets = InMemorySecretStore()
     secrets.set("deepseek_api_key", "ds-key")
     runtime_logging = object()
@@ -575,10 +747,10 @@ def test_create_llm_provider_deepseek_passes_runtime_logging() -> None:
 
 
 def test_create_llm_provider_cerebras_uses_secret_and_model() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.CEREBRAS),
-        cerebras=CerebrasSettings(llm_model=CerebrasLLMModel.GEMMA_4_31B),
-        llm=LLMSettings(concurrency_limit=6),
+    settings = _vnext(
+        llm="cerebras",
+        cerebras_model=CerebrasLLMModel.GEMMA_4_31B.value,
+        concurrency_limit=6,
     )
     secrets = InMemorySecretStore()
     secrets.set("cerebras_api_key", "cerebras-key")
@@ -620,11 +792,13 @@ def test_create_llm_provider_cerebras_from_resolved_config_uses_dto_and_secret_s
 def test_create_llm_provider_local_llm_uses_settings_without_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    settings.local_llm.base_url = "http://127.0.0.1:11434/v1"
-    settings.local_llm.model = "llama3.1:8b"
-    settings.local_llm.extra_body = {"think": False}
-    settings.llm.concurrency_limit = 2
+    settings = _vnext(
+        llm="local_llm",
+        local_base_url="http://127.0.0.1:11434/v1",
+        local_model="llama3.1:8b",
+        local_extra_body={"think": False},
+        concurrency_limit=2,
+    )
     secrets = InMemorySecretStore()
     monkeypatch.delenv("LOCAL_LLM_API_KEY", raising=False)
 
@@ -642,7 +816,7 @@ def test_create_llm_provider_local_llm_uses_settings_without_secret(
 def test_create_llm_provider_local_llm_ignores_optional_env_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
+    settings = _vnext(llm="local_llm")
     secrets = InMemorySecretStore()
     monkeypatch.setenv("LOCAL_LLM_API_KEY", "local-secret")
 
@@ -656,7 +830,7 @@ def test_create_llm_provider_local_llm_ignores_optional_env_key(
 def test_create_llm_provider_local_llm_uses_secret_store_key_even_when_env_is_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
+    settings = _vnext(llm="local_llm")
     secrets = InMemorySecretStore()
     secrets.set("local_llm_api_key", "store-secret")
     monkeypatch.setenv("LOCAL_LLM_API_KEY", "env-secret")
@@ -669,11 +843,13 @@ def test_create_llm_provider_local_llm_uses_secret_store_key_even_when_env_is_se
 
 
 def test_create_llm_provider_from_resolved_local_llm_uses_dto_values_and_optional_secret() -> None:
-    legacy_settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    legacy_settings.local_llm.base_url = "http://legacy.local/v1"
-    legacy_settings.local_llm.model = "legacy-model"
-    legacy_settings.local_llm.extra_body = {"legacy": True}
-    legacy_settings.llm.concurrency_limit = 1
+    legacy_settings = _vnext(
+        llm="local_llm",
+        local_base_url="http://legacy.local/v1",
+        local_model="legacy-model",
+        local_extra_body={"legacy": True},
+        concurrency_limit=1,
+    )
     resolved = ResolvedLLMConfig(
         primary=ResolvedLLMTarget(
             provider="local_llm",
@@ -694,7 +870,7 @@ def test_create_llm_provider_from_resolved_local_llm_uses_dto_values_and_optiona
     provider = create_llm_provider_from_resolved_config(
         resolved,
         secrets=secrets,
-        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(legacy_settings)),
+        extras=llm_factory_extras_from_vnext(legacy_settings),
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
@@ -707,15 +883,13 @@ def test_create_llm_provider_from_resolved_local_llm_uses_dto_values_and_optiona
 
 
 def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        llm=LLMSettings(concurrency_limit=4),
-        openrouter=OpenRouterSettings(
-            llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
-            routing_mode=OpenRouterRoutingMode.LATENCY,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-            selected_source=OpenRouterCredentialSource.BYOK,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        concurrency_limit=4,
+        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
+        openrouter_routing_mode=OpenRouterRoutingMode.LATENCY.value,
+        fallback_alias="none",
+        openrouter_source="byok",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "or-key")
@@ -765,13 +939,11 @@ def test_create_llm_provider_from_resolved_openrouter_gemini_byok_uses_google_la
 def test_create_llm_provider_openrouter_byok_still_uses_user_owned_secret_after_pkce_storage() -> (
     None
 ):
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            selected_source=OpenRouterCredentialSource.BYOK,
-            selection_alias=OpenRouterSelectionAlias.GEMMA4_BYOK,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="byok",
+        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_BYOK.value,
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "pkce-user-key")
@@ -785,14 +957,12 @@ def test_create_llm_provider_openrouter_byok_still_uses_user_owned_secret_after_
 
 
 def test_create_llm_provider_openrouter_qwen_byok_alias_uses_resolved_qwen_model() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            selected_source=OpenRouterCredentialSource.BYOK,
-            selection_alias=OpenRouterSelectionAlias.QWEN35_FLASH_BYOK,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-            routing_mode=OpenRouterRoutingMode.LATENCY,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="byok",
+        openrouter_alias=OpenRouterSelectionAlias.QWEN35_FLASH_BYOK.value,
+        fallback_alias="none",
+        openrouter_routing_mode="latency",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "qwen-byok-key")
@@ -808,14 +978,12 @@ def test_create_llm_provider_openrouter_qwen_byok_alias_uses_resolved_qwen_model
 
 
 def test_create_llm_provider_openrouter_qwen_byok_deepseek_only_skips_fallback_racing() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            selected_source=OpenRouterCredentialSource.BYOK,
-            selection_alias=OpenRouterSelectionAlias.QWEN35_FLASH_BYOK,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-            provider_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="byok",
+        openrouter_alias=OpenRouterSelectionAlias.QWEN35_FLASH_BYOK.value,
+        fallback_alias="none",
+        openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "qwen-byok-key")
@@ -830,12 +998,10 @@ def test_create_llm_provider_openrouter_qwen_byok_deepseek_only_skips_fallback_r
 
 
 def test_create_llm_provider_openrouter_passes_runtime_logging() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            selected_source=OpenRouterCredentialSource.BYOK,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="byok",
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "or-key")
@@ -850,12 +1016,10 @@ def test_create_llm_provider_openrouter_passes_runtime_logging() -> None:
 
 def test_create_llm_provider_openrouter_uses_env_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "env-or-key")
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            selected_source=OpenRouterCredentialSource.BYOK,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="byok",
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
 
@@ -867,12 +1031,10 @@ def test_create_llm_provider_openrouter_uses_env_fallback(monkeypatch: pytest.Mo
 
 
 def test_create_llm_provider_openrouter_uses_selected_managed_key() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            selected_source=OpenRouterCredentialSource.MANAGED,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="managed",
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "byok-key")
@@ -891,19 +1053,19 @@ def test_create_llm_provider_openrouter_uses_selected_managed_key() -> None:
 
 
 def test_create_llm_provider_openrouter_deepseek_only_skips_openrouter_fallback_racing() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            llm_model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH,
-            selected_source=OpenRouterCredentialSource.MANAGED,
-            selection_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-            provider_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        model="deepseek_v4_flash",
+        connection="managed_china",
+        openrouter_model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value,
+        openrouter_source="managed",
+        openrouter_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value,
+        fallback_alias="none",
+        openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
+        managed_credential_ref="managed-ref-qq",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_managed_qq_api_key", "managed-qq-key")
-    settings.managed_identity.active_managed_credential_ref = "managed-ref-qq"
 
     provider = create_llm_provider(
         settings,
@@ -918,15 +1080,13 @@ def test_create_llm_provider_openrouter_deepseek_only_skips_openrouter_fallback_
 
 
 def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_skips_fallback_racing() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            llm_model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH,
-            selected_source=OpenRouterCredentialSource.BYOK,
-            selection_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-            provider_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value,
+        openrouter_source="byok",
+        openrouter_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value,
+        fallback_alias="none",
+        openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "byok-key")
@@ -942,13 +1102,10 @@ def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_skips_fallba
 
 
 def test_create_llm_provider_deepseek_flash_official_fallback_uses_flash_model() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.DEEPSEEK),
-        deepseek=DeepSeekSettings(llm_model=DeepSeekLLMModel.DEEPSEEK_V4_FLASH),
-        translation=_translation_with_fallback(
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
-            connection=TranslationConnection.OFFICIAL_BYOK,
-        ),
+    settings = _vnext(
+        llm="deepseek",
+        deepseek_model=DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value,
+        fallback_alias="deepseek_v4_flash_official",
     )
     secrets = InMemorySecretStore()
     secrets.set("deepseek_api_key", "deepseek-key")
@@ -970,19 +1127,13 @@ def test_create_llm_provider_deepseek_flash_official_fallback_uses_flash_model()
 def test_create_llm_provider_openrouter_deepseek_china_fallback_uses_deepseek_only_routing() -> (
     None
 ):
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
-            selected_source=OpenRouterCredentialSource.BYOK,
-            selection_alias=OpenRouterSelectionAlias.GEMMA4_BYOK,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-            provider_routing=OpenRouterProviderRouting.DEFAULT,
-        ),
-        translation=_translation_with_fallback(
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
-            connection=TranslationConnection.MANAGED_CHINA,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
+        openrouter_source="byok",
+        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_BYOK.value,
+        openrouter_routing="default",
+        fallback_alias="deepseek_v4_flash_china",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "byok-key")
@@ -1104,12 +1255,10 @@ def test_create_llm_provider_from_resolved_cerebras_fallback_uses_resolved_secre
 def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_user_identifier(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            selected_source=OpenRouterCredentialSource.MANAGED,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="managed",
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_managed_api_key", "managed-key")
@@ -1145,12 +1294,10 @@ def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_use
 
 
 def test_create_llm_provider_openrouter_requires_release_service_for_managed_mode() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            selected_source=OpenRouterCredentialSource.MANAGED,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="managed",
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "byok-key")
@@ -1163,12 +1310,10 @@ def test_create_llm_provider_openrouter_requires_release_service_for_managed_mod
 def test_create_llm_provider_openrouter_uses_managed_wrapper_when_release_service_is_available() -> (
     None
 ):
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            selected_source=OpenRouterCredentialSource.MANAGED,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="managed",
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     managed_release_service = object()
@@ -1192,19 +1337,17 @@ def test_create_llm_provider_openrouter_uses_managed_wrapper_when_release_servic
 def test_create_llm_provider_openrouter_managed_delegate_factory_loads_user_identifier_lazily(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            selected_source=OpenRouterCredentialSource.MANAGED,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="managed",
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     current_user_identifier: str | None = None
     load_calls = 0
 
     def fake_load_managed_openrouter_user_identifier(
-        loaded_settings: AppSettings,
+        loaded_settings: AppSettingsVNext,
         *,
         secrets: InMemorySecretStore,
     ) -> str | None:
@@ -1241,19 +1384,13 @@ def test_create_llm_provider_openrouter_managed_delegate_factory_loads_user_iden
 def test_create_llm_provider_openrouter_wraps_primary_with_source_locked_openrouter_fallback() -> (
     None
 ):
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
-            selected_source=OpenRouterCredentialSource.BYOK,
-            routing_mode=OpenRouterRoutingMode.LATENCY,
-            selection_alias=OpenRouterSelectionAlias.GEMMA4_BYOK,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
-        translation=_translation_with_fallback(
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
-            connection=TranslationConnection.OPENROUTER,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
+        openrouter_source="byok",
+        openrouter_routing_mode="latency",
+        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_BYOK.value,
+        fallback_alias="openrouter_deepseek_v4_flash",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "or-key")
@@ -1286,25 +1423,19 @@ def test_create_llm_provider_openrouter_wraps_primary_with_source_locked_openrou
 def test_create_llm_provider_openrouter_byok_paths_omit_managed_user_identifier(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
-            selected_source=OpenRouterCredentialSource.BYOK,
-            routing_mode=OpenRouterRoutingMode.LATENCY,
-            selection_alias=OpenRouterSelectionAlias.GEMMA4_BYOK,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
-        translation=_translation_with_fallback(
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
-            connection=TranslationConnection.OPENROUTER,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
+        openrouter_source="byok",
+        openrouter_routing_mode="latency",
+        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_BYOK.value,
+        fallback_alias="openrouter_deepseek_v4_flash",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "or-key")
 
     def unexpected_load_managed_openrouter_user_identifier(
-        loaded_settings: AppSettings,
+        loaded_settings: AppSettingsVNext,
         *,
         secrets: InMemorySecretStore,
     ) -> str:
@@ -1333,20 +1464,21 @@ def test_create_llm_provider_openrouter_byok_paths_omit_managed_user_identifier(
 
 
 def test_create_llm_provider_openrouter_legacy_qwen_fallback_alias_is_ignored() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
-            selected_source=OpenRouterCredentialSource.MANAGED,
-            routing_mode=OpenRouterRoutingMode.LATENCY,
-            selection_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.QWEN35_FLASH,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
+        openrouter_source="managed",
+        openrouter_routing_mode="latency",
+        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED.value,
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     managed_release_service = ManagedOpenRouterReleaseService(
         openrouter_config=build_openrouter_release_runtime_config(settings),
-        managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
+        managed_state=ManagedIdentityStateAdapter(
+            SimpleNamespace(**asdict(settings.state.managed_connection)),
+            lambda _updated: None,
+        ),
         secrets=secrets,
         client=object(),
         app_version="2.0.0",
@@ -1362,8 +1494,13 @@ def test_create_llm_provider_openrouter_legacy_qwen_fallback_alias_is_ignored() 
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, ManagedOpenRouterLLMProvider)
     assert _unwrap_release_service(provider.inner.release_service) is managed_release_service
-    assert settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
-    assert settings.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+    assert (
+        settings.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
+    )
+    assert (
+        settings.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
+    )
 
 
 def test_create_llm_provider_openrouter_managed_deepseek_fallback_uses_fallback_specific_release_service() -> (
@@ -1373,24 +1510,21 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_uses_fallback_
 
     assert deepseek_model is not None
 
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
-            selected_source=OpenRouterCredentialSource.MANAGED,
-            routing_mode=OpenRouterRoutingMode.LATENCY,
-            selection_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
-        translation=_translation_with_fallback(
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
-            connection=TranslationConnection.MANAGED,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
+        openrouter_source="managed",
+        openrouter_routing_mode="latency",
+        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED.value,
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     managed_release_service = ManagedOpenRouterReleaseService(
         openrouter_config=build_openrouter_release_runtime_config(settings),
-        managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
+        managed_state=ManagedIdentityStateAdapter(
+            SimpleNamespace(**asdict(settings.state.managed_connection)),
+            lambda _updated: None,
+        ),
         secrets=secrets,
         client=object(),
         app_version="2.0.0",
@@ -1401,6 +1535,8 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_uses_fallback_
         settings,
         secrets=secrets,
         managed_release_service=managed_release_service,
+        fallback_model="deepseek_v4_flash",
+        fallback_connection="managed",
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
@@ -1423,8 +1559,13 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_uses_fallback_
         _resolve_managed_issue_model(fallback_release_service.openrouter_config)
         == deepseek_model.value
     )
-    assert settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
-    assert settings.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+    assert (
+        settings.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
+    )
+    assert (
+        settings.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
+    )
 
     fallback_openrouter_delegate = fallback_delegate.delegate_factory("managed-key")
 
@@ -1436,23 +1577,17 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_uses_fallback_
 def test_create_llm_provider_openrouter_managed_fallback_delegate_factory_loads_user_identifier_lazily(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            selected_source=OpenRouterCredentialSource.MANAGED,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
-        translation=_translation_with_fallback(
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
-            connection=TranslationConnection.MANAGED,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="managed",
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     current_user_identifier: str | None = None
     load_calls = 0
 
     def fake_load_managed_openrouter_user_identifier(
-        loaded_settings: AppSettings,
+        loaded_settings: AppSettingsVNext,
         *,
         secrets: InMemorySecretStore,
     ) -> str | None:
@@ -1472,6 +1607,8 @@ def test_create_llm_provider_openrouter_managed_fallback_delegate_factory_loads_
         settings,
         secrets=secrets,
         managed_release_service=object(),
+        fallback_model="deepseek_v4_flash",
+        fallback_connection="managed",
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
@@ -1495,24 +1632,21 @@ def test_create_llm_provider_openrouter_managed_fallback_delegate_factory_loads_
 def test_create_llm_provider_openrouter_managed_deepseek_fallback_clears_primary_alias_for_issue_identity() -> (
     None
 ):
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
-            selected_source=OpenRouterCredentialSource.MANAGED,
-            routing_mode=OpenRouterRoutingMode.LATENCY,
-            selection_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED,
-            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
-        ),
-        translation=_translation_with_fallback(
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
-            connection=TranslationConnection.MANAGED,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
+        openrouter_source="managed",
+        openrouter_routing_mode="latency",
+        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED.value,
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     managed_release_service = ManagedOpenRouterReleaseService(
         openrouter_config=build_openrouter_release_runtime_config(settings),
-        managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
+        managed_state=ManagedIdentityStateAdapter(
+            SimpleNamespace(**asdict(settings.state.managed_connection)),
+            lambda _updated: None,
+        ),
         secrets=secrets,
         client=object(),
         app_version="2.0.0",
@@ -1523,6 +1657,8 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_clears_primary
         settings,
         secrets=secrets,
         managed_release_service=managed_release_service,
+        fallback_model="deepseek_v4_flash",
+        fallback_connection="managed",
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
@@ -1543,8 +1679,13 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_clears_primary
         _resolve_managed_issue_model(fallback_release_service.openrouter_config)
         == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
     )
-    assert settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
-    assert settings.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+    assert (
+        settings.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
+    )
+    assert (
+        settings.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
+    )
 
     fallback_openrouter_delegate = fallback_delegate.delegate_factory("managed-key")
 
@@ -1554,12 +1695,10 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_clears_primary
 
 
 def test_create_llm_provider_openrouter_rejects_none_selected_source_even_with_keys() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
-        openrouter=OpenRouterSettings(
-            selected_source=OpenRouterCredentialSource.NONE,
-            selection_alias=None,
-        ),
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="none",
+        fallback_alias="none",
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "byok-key")
@@ -1571,7 +1710,7 @@ def test_create_llm_provider_openrouter_rejects_none_selected_source_even_with_k
 
 def test_create_llm_provider_requires_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.GEMINI))
+    settings = _vnext(llm="gemini")
     secrets = InMemorySecretStore()
     with pytest.raises(ValueError):
         create_llm_provider(settings, secrets=secrets)
@@ -1818,22 +1957,30 @@ def test_create_peer_stt_backend_from_resolved_uses_peer_dto_without_raw_self_se
 
 
 def test_resolve_overlay_config_maps_desktop_flet_to_resolved_desktop_options() -> None:
-    settings = AppSettings()
-    settings.ui.overlay_enabled = True
-    settings.overlay.target = "desktop"
-    settings.overlay.show_translation = False
-    settings.overlay.show_peer_original = True
-    settings.overlay.calibration.distance = 2.5
-    settings.overlay.desktop_flet.size_preset = "large"
-    settings.overlay.desktop_flet.position.x = 111
-    settings.overlay.desktop_flet.position.y = 222
-    settings.overlay.desktop_flet.locked = True
-    settings.overlay.desktop_flet.visual.background_alpha = 0.44
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            overlay=replace(
+                settings.intent.overlay,
+                target="desktop",
+                show_translation=False,
+                show_peer_original=True,
+                calibration=replace(settings.intent.overlay.calibration, distance=2.5),
+                desktop_flet=DesktopFletOverlayIntent(
+                    size_preset="large",
+                    position=DesktopFletOverlayPositionIntent(x=111, y=222),
+                    visual=DesktopFletOverlayVisualIntent(background_alpha=0.44),
+                ),
+            ),
+        ),
+    )
 
     resolved = wiring_module.resolve_overlay_config_from_vnext(
-        from_legacy_app_settings(settings),
-        enabled=settings.ui.overlay_enabled,
-        locked=settings.overlay.desktop_flet.locked,
+        settings,
+        enabled=True,
+        locked=True,
     )
 
     assert resolved.enabled is True
@@ -1856,11 +2003,7 @@ def test_resolve_overlay_config_maps_desktop_flet_to_resolved_desktop_options() 
 
 
 def test_create_stt_backend_deepgram_uses_settings_and_secret() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(stt=STTProviderName.DEEPGRAM),
-        deepgram_stt=DeepgramSTTSettings(model="nova-3"),
-    )
-    settings.audio.internal_sample_rate_hz = 8000
+    settings = _vnext(stt_provider="deepgram", deepgram_model="nova-3")
     secrets = InMemorySecretStore()
     secrets.set("deepgram_api_key", "k3")
 
@@ -1869,18 +2012,16 @@ def test_create_stt_backend_deepgram_uses_settings_and_secret() -> None:
     assert backend.api_key == "k3"
     assert backend.model == "nova-3"
     assert backend.sample_rate_hz == 16000
-    assert backend.language == get_deepgram_language(settings.languages.source_language)
+    assert backend.language == get_deepgram_language(settings.intent.languages.source_language)
     assert list(backend.keyterms) == []
 
 
 def test_create_stt_backend_deepgram_passes_effective_custom_terms() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(stt=STTProviderName.DEEPGRAM),
-        deepgram_stt=DeepgramSTTSettings(model="nova-3"),
-        stt=STTSettings(
-            custom_vocabulary_enabled=True,
-            custom_terms={"ko": [" Puripuly ", "", "VRChat", "Puripuly"]},
-        ),
+    settings = _vnext(
+        stt_provider="deepgram",
+        deepgram_model="nova-3",
+        custom_vocabulary_enabled=True,
+        custom_terms={"ko": [" Puripuly ", "", "VRChat", "Puripuly"]},
     )
     secrets = InMemorySecretStore()
     secrets.set("deepgram_api_key", "k3")
@@ -1892,10 +2033,7 @@ def test_create_stt_backend_deepgram_passes_effective_custom_terms() -> None:
 
 
 def test_create_stt_backend_local_qwen_uses_shared_model_path_without_secret() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(stt=STTProviderName.LOCAL_QWEN),
-    )
-    settings.audio.internal_sample_rate_hz = 8000
+    settings = _vnext(stt_provider="local_qwen")
     secrets = InMemorySecretStore()
 
     backend = create_stt_backend(settings, secrets=secrets)
@@ -1907,7 +2045,7 @@ def test_create_stt_backend_local_qwen_uses_shared_model_path_without_secret() -
 
 
 def test_create_stt_backend_local_qwen_passes_diagnostics_enabled_predicate() -> None:
-    settings = AppSettings(provider=ProviderSettings(stt=STTProviderName.LOCAL_QWEN))
+    settings = _vnext(stt_provider="local_qwen")
     secrets = InMemorySecretStore()
 
     def diagnostics_enabled() -> bool:
@@ -1924,12 +2062,14 @@ def test_create_stt_backend_local_qwen_passes_diagnostics_enabled_predicate() ->
 
 
 def test_create_stt_backend_local_qwen_passes_language_hint_without_hotwords() -> None:
-    settings = AppSettings(provider=ProviderSettings(stt=STTProviderName.LOCAL_QWEN))
-    settings.languages.source_language = "ko-KR"
-    settings.stt.custom_vocabulary_enabled = True
-    settings.stt.custom_terms = {
-        "ko": ["Puripuly", "VRChat, Japan", *[f"term-{i:02d}" for i in range(20)]],
-    }
+    settings = _vnext(
+        stt_provider="local_qwen",
+        source_language="ko-KR",
+        custom_vocabulary_enabled=True,
+        custom_terms={
+            "ko": ["Puripuly", "VRChat, Japan", *[f"term-{i:02d}" for i in range(20)]],
+        },
+    )
     secrets = InMemorySecretStore()
 
     backend = create_stt_backend(settings, secrets=secrets)
@@ -1954,14 +2094,11 @@ def test_create_stt_backend_rejects_invalid_compatibility_provider() -> None:
 
 
 def test_create_peer_stt_backend_uses_dedicated_deepgram_configuration_without_hint_terms() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(
-            stt=STTProviderName.SONIOX,
-            peer_stt=STTProviderName.DEEPGRAM,
-        ),
-        deepgram_stt=DeepgramSTTSettings(model="nova-3"),
+    settings = _vnext(
+        stt_provider="soniox",
+        peer_stt_provider="deepgram",
+        deepgram_model="nova-3",
     )
-    settings.audio.internal_sample_rate_hz = 8000
     secrets = InMemorySecretStore()
     secrets.set("deepgram_api_key", "peer-k")
 
@@ -1971,28 +2108,30 @@ def test_create_peer_stt_backend_uses_dedicated_deepgram_configuration_without_h
     assert backend.api_key == "peer-k"
     assert backend.model == "nova-3"
     assert backend.sample_rate_hz == 16000
-    assert backend.language == get_deepgram_language(settings.languages.effective_peer_source)
+    assert backend.language == get_deepgram_language(
+        settings.intent.languages.effective_peer_source
+    )
     assert list(backend.keyterms) == []
     assert backend.stream_label == "peer"
 
 
 def test_create_peer_stt_backend_uses_effective_peer_source_language_without_hint_terms() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(
-            stt=STTProviderName.SONIOX,
-            peer_stt=STTProviderName.DEEPGRAM,
-        ),
-        deepgram_stt=DeepgramSTTSettings(model="nova-3"),
+    settings = _vnext(
+        stt_provider="soniox",
+        peer_stt_provider="deepgram",
+        deepgram_model="nova-3",
+        source_language="ko",
+        peer_source_language="zh-CN",
     )
-    settings.languages.source_language = "ko"
-    settings.languages.peer_source_language = "zh-CN"
     secrets = InMemorySecretStore()
     secrets.set("deepgram_api_key", "peer-k")
 
     backend = create_peer_stt_backend(settings, secrets=secrets)
 
     assert isinstance(backend, DeepgramRealtimeSTTBackend)
-    assert backend.language == get_deepgram_language(settings.languages.effective_peer_source)
+    assert backend.language == get_deepgram_language(
+        settings.intent.languages.effective_peer_source
+    )
     assert list(backend.keyterms) == []
 
 
@@ -2000,18 +2139,8 @@ def test_self_stt_provider_setting_does_not_change_peer_backend_choice() -> None
     secrets = InMemorySecretStore()
     secrets.set("deepgram_api_key", "peer-k")
 
-    soniox_settings = AppSettings(
-        provider=ProviderSettings(
-            stt=STTProviderName.SONIOX,
-            peer_stt=STTProviderName.DEEPGRAM,
-        )
-    )
-    qwen_settings = AppSettings(
-        provider=ProviderSettings(
-            stt=STTProviderName.QWEN_ASR,
-            peer_stt=STTProviderName.DEEPGRAM,
-        )
-    )
+    soniox_settings = _vnext(stt_provider="soniox", peer_stt_provider="deepgram")
+    qwen_settings = _vnext(stt_provider="qwen_asr", peer_stt_provider="deepgram")
 
     soniox_backend = create_peer_stt_backend(soniox_settings, secrets=secrets)
     qwen_backend = create_peer_stt_backend(qwen_settings, secrets=secrets)
@@ -2021,9 +2150,7 @@ def test_self_stt_provider_setting_does_not_change_peer_backend_choice() -> None
 
 
 def test_resolve_peer_stt_config_always_uses_self_deepgram_model() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.DEEPGRAM
-    settings.deepgram_stt.model = "nova-3-general"
+    settings = _vnext(peer_stt_provider="deepgram", deepgram_model="nova-3-general")
 
     resolved = resolve_peer_stt_config(settings)
 
@@ -2032,13 +2159,14 @@ def test_resolve_peer_stt_config_always_uses_self_deepgram_model() -> None:
 
 
 def test_resolve_peer_stt_config_exposes_legacy_provider_specific_fields() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.SONIOX
-    settings.languages.peer_source_language = "zh-CN"
-    settings.soniox_stt.model = "stt-rt-v4-peer"
-    settings.soniox_stt.endpoint = "wss://peer-soniox.example/realtime"
-    settings.soniox_stt.keepalive_interval_s = 12.5
-    settings.soniox_stt.trailing_silence_ms = 700
+    settings = _vnext(
+        peer_stt_provider="soniox",
+        peer_source_language="zh-CN",
+        soniox_model="stt-rt-v4-peer",
+        soniox_endpoint="wss://peer-soniox.example/realtime",
+        soniox_keepalive_interval_s=12.5,
+        soniox_trailing_silence_ms=700,
+    )
 
     resolved = resolve_peer_stt_config(settings)
 
@@ -2057,18 +2185,25 @@ def test_resolve_peer_stt_config_exposes_legacy_provider_specific_fields() -> No
 
 
 def test_resolve_peer_stt_config_rejects_invalid_compatibility_provider() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = "corrupt-peer-stt-provider"  # type: ignore[assignment]
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            peer_stt=replace(settings.intent.peer_stt, provider="corrupt-peer-stt-provider"),
+        ),
+    )
 
     with pytest.raises(ValueError, match="Unsupported peer STT provider"):
         resolve_peer_stt_config(settings)
 
 
 def test_create_peer_stt_backend_uses_peer_selected_soniox_provider() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.SONIOX
-    settings.languages.peer_source_language = "ko"
-    settings.soniox_stt.model = "stt-rt-v4"
+    settings = _vnext(
+        peer_stt_provider="soniox",
+        peer_source_language="ko",
+        soniox_model="stt-rt-v4",
+    )
     secrets = InMemorySecretStore()
     secrets.set("soniox_api_key", "peer-soniox")
 
@@ -2080,9 +2215,7 @@ def test_create_peer_stt_backend_uses_peer_selected_soniox_provider() -> None:
 
 
 def test_create_peer_stt_backend_uses_shared_qwen_region_for_endpoint_and_secret() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.QWEN_ASR
-    settings.qwen.region = QwenRegion.SINGAPORE
+    settings = _vnext(peer_stt_provider="qwen_asr", qwen_region="singapore")
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_singapore", "peer-qwen")
 
@@ -2095,58 +2228,44 @@ def test_create_peer_stt_backend_uses_shared_qwen_region_for_endpoint_and_secret
 
 def test_self_stt_runtime_signature_from_vnext_matches_bag_restart_fields() -> None:
     cases = (
-        AppSettings(
-            provider=ProviderSettings(stt=STTProviderName.DEEPGRAM),
-            stt=STTSettings(
-                custom_vocabulary_enabled=True,
-                custom_terms={"ko": [" Puripuly ", "a,b", "VRChat"]},
-            ),
+        _vnext(
+            stt_provider="deepgram",
+            custom_vocabulary_enabled=True,
+            custom_terms={"ko": [" Puripuly ", "a,b", "VRChat"]},
         ),
-        AppSettings(
-            provider=ProviderSettings(stt=STTProviderName.LOCAL_QWEN),
-            stt=STTSettings(
-                custom_vocabulary_enabled=True,
-                custom_terms={"ko": [f"term{i}, extra" for i in range(20)]},
-            ),
+        _vnext(
+            stt_provider="local_qwen",
+            custom_vocabulary_enabled=True,
+            custom_terms={"ko": [f"term{i}, extra" for i in range(20)]},
         ),
-        AppSettings(
-            provider=ProviderSettings(stt=STTProviderName.LOCAL_QWEN_GPU),
-            stt=STTSettings(
-                custom_vocabulary_enabled=True,
-                custom_terms={"ko": ["gpu-term"]},
-            ),
+        _vnext(
+            stt_provider="local_qwen_gpu",
+            custom_vocabulary_enabled=True,
+            custom_terms={"ko": ["gpu-term"]},
         ),
-        AppSettings(
-            provider=ProviderSettings(stt=STTProviderName.SONIOX),
-            stt=STTSettings(
-                custom_vocabulary_enabled=True,
-                custom_terms={"ko": ["soniox-term"]},
-            ),
+        _vnext(
+            stt_provider="soniox",
+            custom_vocabulary_enabled=True,
+            custom_terms={"ko": ["soniox-term"]},
         ),
-        AppSettings(
-            provider=ProviderSettings(stt=STTProviderName.QWEN_ASR),
-            qwen=QwenSettings(region=QwenRegion.BEIJING),
-        ),
-        AppSettings(
-            provider=ProviderSettings(stt=STTProviderName.QWEN_ASR),
-            qwen=QwenSettings(region=QwenRegion.SINGAPORE),
-        ),
-        AppSettings(provider=ProviderSettings(stt=STTProviderName.CUSTOM)),
+        _vnext(stt_provider="qwen_asr", qwen_region="beijing"),
+        _vnext(stt_provider="qwen_asr", qwen_region="singapore"),
+        _vnext(stt_provider="custom"),
     )
     for settings in cases:
-        settings.qwen_asr_stt.endpoint = settings.qwen.get_asr_endpoint()
-        canonical = from_legacy_app_settings(settings)
+        canonical = settings
         assert build_self_stt_runtime_signature_from_vnext(
             canonical
-        ) == build_self_stt_runtime_signature(settings)
+        ) == build_self_stt_runtime_signature(canonical)
 
 
 def test_build_peer_stt_provider_signature_includes_backend_affecting_values() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.SONIOX
-    settings.languages.peer_source_language = "zh-CN"
-    settings.soniox_stt.model = "stt-rt-v4"
-    settings.soniox_stt.trailing_silence_ms = 350
+    settings = _vnext(
+        peer_stt_provider="soniox",
+        peer_source_language="zh-CN",
+        soniox_model="stt-rt-v4",
+        soniox_trailing_silence_ms=350,
+    )
 
     signature = build_peer_stt_provider_signature(settings)
 
@@ -2157,16 +2276,15 @@ def test_build_peer_stt_provider_signature_includes_backend_affecting_values() -
 
 
 def test_peer_auto_detection_keeps_self_language_restriction_separate() -> None:
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.SONIOX
-    settings.provider.peer_stt = STTProviderName.SONIOX
-    settings.languages.peer_source_mode = "auto"
-    settings.languages.peer_expected_languages = ["ja", "zh-TW"]
+    settings = _vnext(
+        stt_provider="soniox",
+        peer_stt_provider="soniox",
+        peer_source_mode="auto",
+        peer_expected_languages=["ja", "zh-TW"],
+    )
 
     peer = resolve_peer_stt_runtime_config(settings)
-    self_config = resolve_stt_config(
-        self_stt_runtime_intent_from_vnext(from_legacy_app_settings(settings))
-    )
+    self_config = resolve_stt_config(self_stt_runtime_intent_from_vnext(settings))
 
     assert peer.provider_options["enable_language_identification"] is True
     assert peer.provider_options["language_hints"] == ("ja", "zh")
@@ -2177,14 +2295,15 @@ def test_peer_auto_detection_keeps_self_language_restriction_separate() -> None:
 
 
 def test_peer_auto_detection_falls_back_to_manual_configuration_for_other_providers() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.DEEPGRAM
-    settings.languages.peer_source_mode = "auto"
-    settings.languages.peer_expected_languages = ["ja"]
+    settings = _vnext(
+        peer_stt_provider="deepgram",
+        peer_source_mode="auto",
+        peer_expected_languages=["ja"],
+    )
 
     peer = resolve_peer_stt_runtime_config(settings)
 
-    assert peer.source_language == settings.languages.effective_peer_source
+    assert peer.source_language == settings.intent.languages.effective_peer_source
     assert peer.provider_options == {}
 
 
@@ -2271,9 +2390,7 @@ def test_vnext_peer_runtime_keeps_self_and_non_soniox_paths_manual() -> None:
 
 
 def test_self_soniox_is_strict_while_manual_peer_uses_a_soft_hint() -> None:
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.SONIOX
-    settings.provider.peer_stt = STTProviderName.SONIOX
+    settings = _vnext(stt_provider="soniox", peer_stt_provider="soniox")
     secrets = InMemorySecretStore()
     secrets.set("soniox_api_key", "soniox-key")
 
@@ -2289,9 +2406,7 @@ def test_self_soniox_is_strict_while_manual_peer_uses_a_soft_hint() -> None:
 
 
 def test_build_peer_stt_provider_signature_uses_fixed_16khz_runtime_contract() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.QWEN_ASR
-    settings.audio.internal_sample_rate_hz = 8000
+    settings = _vnext(peer_stt_provider="qwen_asr")
 
     signature = build_peer_stt_provider_signature(settings)
 
@@ -2299,9 +2414,7 @@ def test_build_peer_stt_provider_signature_uses_fixed_16khz_runtime_contract() -
 
 
 def test_resolve_peer_stt_config_uses_shared_qwen_model_only() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.QWEN_ASR
-    settings.qwen_asr_stt.model = "self-qwen-asr"
+    settings = _vnext(peer_stt_provider="qwen_asr", qwen_asr_model="self-qwen-asr")
 
     resolved = resolve_peer_stt_config(settings)
 
@@ -2309,9 +2422,7 @@ def test_resolve_peer_stt_config_uses_shared_qwen_model_only() -> None:
 
 
 def test_create_peer_stt_backend_uses_peer_local_qwen_provider_and_fixed_sample_rate() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
-    settings.audio.internal_sample_rate_hz = 8000
+    settings = _vnext(peer_stt_provider="local_qwen")
     secrets = InMemorySecretStore()
 
     backend = create_peer_stt_backend(settings, secrets=secrets)
@@ -2323,8 +2434,7 @@ def test_create_peer_stt_backend_uses_peer_local_qwen_provider_and_fixed_sample_
 
 
 def test_create_peer_stt_backend_local_qwen_passes_diagnostics_enabled_predicate() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
+    settings = _vnext(peer_stt_provider="local_qwen")
     secrets = InMemorySecretStore()
 
     def diagnostics_enabled() -> bool:
@@ -2346,14 +2456,15 @@ def test_managed_stt_provider_rejects_legacy_8khz_runtime_sample_rate() -> None:
 
 
 def test_create_peer_stt_backend_local_qwen_uses_peer_language_without_hotwords() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
-    settings.languages.source_language = "ko"
-    settings.languages.peer_source_language = "zh-CN"
-    settings.stt.custom_vocabulary_enabled = True
-    settings.stt.custom_terms = {
-        "zh-CN": ["airi", "shinano", *[f"term-{i:02d}" for i in range(20)]],
-    }
+    settings = _vnext(
+        peer_stt_provider="local_qwen",
+        source_language="ko",
+        peer_source_language="zh-CN",
+        custom_vocabulary_enabled=True,
+        custom_terms={
+            "zh-CN": ["airi", "shinano", *[f"term-{i:02d}" for i in range(20)]],
+        },
+    )
     secrets = InMemorySecretStore()
 
     backend = create_peer_stt_backend(settings, secrets=secrets)
@@ -2366,12 +2477,13 @@ def test_create_peer_stt_backend_local_qwen_uses_peer_language_without_hotwords(
 def test_resolve_peer_stt_config_uses_shared_soniox_endpoint_keepalive_and_trailing_silence() -> (
     None
 ):
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.SONIOX
-    settings.soniox_stt.model = "self-soniox"
-    settings.soniox_stt.endpoint = "wss://self-soniox.example/realtime"
-    settings.soniox_stt.keepalive_interval_s = 12.5
-    settings.soniox_stt.trailing_silence_ms = 900
+    settings = _vnext(
+        peer_stt_provider="soniox",
+        soniox_model="self-soniox",
+        soniox_endpoint="wss://self-soniox.example/realtime",
+        soniox_keepalive_interval_s=12.5,
+        soniox_trailing_silence_ms=900,
+    )
 
     resolved = resolve_peer_stt_config(settings)
 
@@ -2382,13 +2494,7 @@ def test_resolve_peer_stt_config_uses_shared_soniox_endpoint_keepalive_and_trail
 
 
 def test_create_stt_backend_qwen_asr_uses_settings_and_secret() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(stt=STTProviderName.QWEN_ASR),
-        qwen_asr_stt=QwenASRSTTSettings(
-            model="qwen3-asr-flash-realtime",
-        ),
-    )
-    settings.audio.internal_sample_rate_hz = 8000
+    settings = _vnext(stt_provider="qwen_asr")
     secrets = InMemorySecretStore()
     # Default region is Beijing, so we need alibaba_api_key_beijing
     secrets.set("alibaba_api_key_beijing", "k4")
@@ -2400,17 +2506,14 @@ def test_create_stt_backend_qwen_asr_uses_settings_and_secret() -> None:
     # Endpoint is derived from region (Beijing default)
     assert backend.endpoint == "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
     assert backend.sample_rate_hz == 16000
-    assert backend.language == get_qwen_asr_language(settings.languages.source_language)
+    assert backend.language == get_qwen_asr_language(settings.intent.languages.source_language)
 
 
 def test_create_stt_backend_qwen_asr_ignores_custom_terms() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(stt=STTProviderName.QWEN_ASR),
-        stt=STTSettings(
-            custom_vocabulary_enabled=True,
-            custom_terms={"ko": ["Puripuly", "VRChat"]},
-        ),
-        qwen_asr_stt=QwenASRSTTSettings(model="qwen3-asr-flash-realtime"),
+    settings = _vnext(
+        stt_provider="qwen_asr",
+        custom_vocabulary_enabled=True,
+        custom_terms={"ko": ["Puripuly", "VRChat"]},
     )
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_beijing", "k4")
@@ -2420,17 +2523,13 @@ def test_create_stt_backend_qwen_asr_ignores_custom_terms() -> None:
     assert isinstance(backend, QwenASRRealtimeSTTBackend)
     assert backend.api_key == "k4"
     assert backend.model == "qwen3-asr-flash-realtime"
-    assert backend.language == get_qwen_asr_language(settings.languages.source_language)
+    assert backend.language == get_qwen_asr_language(settings.intent.languages.source_language)
     assert not hasattr(backend, "keyterms")
     assert not hasattr(backend, "context_terms")
 
 
 def test_create_stt_backend_qwen_asr_uses_singapore_region() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(stt=STTProviderName.QWEN_ASR),
-        qwen=QwenSettings(region=QwenRegion.SINGAPORE),
-        qwen_asr_stt=QwenASRSTTSettings(model="qwen3-asr-flash-realtime"),
-    )
+    settings = _vnext(stt_provider="qwen_asr", qwen_region="singapore")
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_singapore", "k5")
 
@@ -2440,10 +2539,7 @@ def test_create_stt_backend_qwen_asr_uses_singapore_region() -> None:
 
 
 def test_create_stt_backend_qwen_asr_uses_legacy_alibaba_secret_key() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(stt=STTProviderName.QWEN_ASR),
-        qwen_asr_stt=QwenASRSTTSettings(model="qwen3-asr-flash-realtime"),
-    )
+    settings = _vnext(stt_provider="qwen_asr")
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key", "legacy-k4")
 
@@ -2455,10 +2551,7 @@ def test_create_stt_backend_qwen_asr_uses_legacy_alibaba_secret_key() -> None:
 
 
 def test_create_stt_backend_soniox_uses_secret() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(stt=STTProviderName.SONIOX),
-        soniox_stt=SonioxSTTSettings(model="stt-rt-v4"),
-    )
+    settings = _vnext(stt_provider="soniox")
     secrets = InMemorySecretStore()
     secrets.set("soniox_api_key", "k6")
 
@@ -2469,13 +2562,10 @@ def test_create_stt_backend_soniox_uses_secret() -> None:
 
 
 def test_create_stt_backend_soniox_passes_effective_custom_terms() -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(stt=STTProviderName.SONIOX),
-        soniox_stt=SonioxSTTSettings(model="stt-rt-v4"),
-        stt=STTSettings(
-            custom_vocabulary_enabled=True,
-            custom_terms={"ko": [" Puripuly ", "VRChat", "Puripuly", " "]},
-        ),
+    settings = _vnext(
+        stt_provider="soniox",
+        custom_vocabulary_enabled=True,
+        custom_terms={"ko": [" Puripuly ", "VRChat", "Puripuly", " "]},
     )
     secrets = InMemorySecretStore()
     secrets.set("soniox_api_key", "k6")

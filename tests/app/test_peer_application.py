@@ -8,7 +8,8 @@ from puripuly_heart.app.services.peer_application import (
     PeerApplicationState,
 )
 from puripuly_heart.app.wiring import build_peer_capture_session_config
-from puripuly_heart.config.settings import AppSettings, STTProviderName
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.peer_capture import PeerCaptureProviderStatus
 from puripuly_heart.ui.overlay_peer_contract import build_overlay_peer_consumer_contract
 
@@ -79,8 +80,27 @@ class Runtime:
 
 
 @dataclass
+class _HarnessUi:
+    peer_translation_enabled: bool = False
+    overlay_enabled: bool = False
+    peer_translation_eula_accepted: bool = False
+
+
+@dataclass
+class _HarnessProvider:
+    peer_stt: STTProviderName = STTProviderName.LOCAL_CPU_AUTO
+
+
+@dataclass
+class _HarnessSettings:
+    ui: _HarnessUi = field(default_factory=_HarnessUi)
+    provider: _HarnessProvider = field(default_factory=_HarnessProvider)
+    canonical: AppSettingsVNext = field(default_factory=AppSettingsVNext)
+
+
+@dataclass
 class Harness:
-    settings: AppSettings = field(default_factory=AppSettings)
+    settings: _HarnessSettings = field(default_factory=_HarnessSettings)
     overlay_state: str = "connected"
     overlay_command_available: bool = True
     runtime_available: bool = True
@@ -122,7 +142,7 @@ class Harness:
     def owner(self) -> PeerApplicationOwner:
         return PeerApplicationOwner(
             state_provider=self.state,
-            config_factory=lambda: build_peer_capture_session_config(self.settings),
+            config_factory=lambda: build_peer_capture_session_config(self.settings.canonical),
             peer_intent_sink=lambda enabled: setattr(
                 self.settings.ui,
                 "peer_translation_enabled",
@@ -427,7 +447,7 @@ async def test_peer_owner_applies_runtime_policy_and_retains_failed_close_debt()
 
     assert len(runtime.policy_calls) == 1
     config, desired_active, stop_mode = runtime.policy_calls[0]
-    assert config == build_peer_capture_session_config(harness.settings)
+    assert config == build_peer_capture_session_config(harness.settings.canonical)
     assert desired_active is True
     assert stop_mode == "release"
     assert owner.last_runtime_signature == config.runtime_signature

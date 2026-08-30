@@ -39,9 +39,7 @@ from puripuly_heart.app.services.openrouter_pkce_flow import (
     OpenRouterPkceApplicationOwner,
     OpenRouterPkceFlowOwner,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
+from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
@@ -72,12 +70,12 @@ class MemorySecretStore:
 class AppliedProviderRuntime:
     def __init__(self, settings: SettingsOwner) -> None:
         self.settings = settings
-        self.applied: list[AppSettings] = []
+        self.applied: list[AppSettingsVNext] = []
         self.cancel = False
 
     def build_plan(
         self,
-        _settings: AppSettings,
+        _settings: AppSettingsVNext,
         *,
         force_rebuild_llm: bool,
     ) -> ProviderRuntimeApplyPlan:
@@ -90,17 +88,16 @@ class AppliedProviderRuntime:
 
     async def apply(
         self,
-        settings: AppSettings,
+        settings: AppSettingsVNext,
         _plan: ProviderRuntimeApplyPlan,
     ) -> None:
         if self.cancel:
             raise asyncio.CancelledError
-        self.settings.current = settings
         self.applied.append(copy.deepcopy(settings))
 
     def unavailable_result(
         self,
-        _settings: AppSettings,
+        _settings: AppSettingsVNext,
         _plan: ProviderRuntimeApplyPlan,
         **_kwargs: object,
     ) -> None:
@@ -205,13 +202,12 @@ async def test_owner_close_clears_client_when_runtime_close_fails() -> None:
 async def test_application_owner_commits_verified_pkce_secret_settings_and_runtime(
     tmp_path: Path,
 ) -> None:
-    current = AppSettings()
+    current = AppSettingsVNext()
     persistence = SettingsVNextCanonicalPersistenceAdapter()
     settings = SettingsOwner(
         path=tmp_path / "settings.json",
         persistence=persistence,
-        canonical=AppSettingsVNext(),
-        current=current,
+        canonical=current,
         authoritative=True,
         projection_snapshot=copy.deepcopy(current),
     )
@@ -220,7 +216,7 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
         settings=settings,
         binding=ProviderVerificationBindingOwner(
             context_provider=lambda provider: provider_verification_context(
-                settings.current,
+                settings.canonical,
                 provider,
                 low_latency=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
             )
@@ -256,10 +252,16 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
 
         async def run_flow(self) -> OpenRouterPKCEExchangeResult:
             if self.replace_current_during_flow:
-                latest = copy.deepcopy(settings.current)
+                latest = copy.deepcopy(settings.canonical)
                 assert latest is not None
-                latest.ui.locale = "ko"
-                settings.current = latest
+                latest = replace(
+                    latest,
+                    intent=replace(
+                        latest.intent,
+                        ui=replace(latest.intent.ui, locale="ko"),
+                    ),
+                )
+                settings.canonical = latest
                 settings.remember_projection(latest)
                 self.replace_current_during_flow = False
             return OpenRouterPKCEExchangeResult(
@@ -287,17 +289,24 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
 
     assert await owner.connect(target=target, launch_source="settings") is True
     assert store.values["openrouter_api_key"] == "sk-or-v1-user"
-    assert settings.current is not None
-    assert settings.current.provider.llm == LLMProviderName.OPENROUTER
-    assert settings.current.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
-    assert settings.current.openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert settings.current.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    assert settings.current.api_key_verified.openrouter is True
-    assert settings.current.system_prompt == "PKCE prompt draft"
-    assert settings.current.translation.model == TranslationModel.GEMMA4
-    assert settings.current.translation.connection == TranslationConnection.OPENROUTER
-    assert settings.current.local_llm.base_url == "http://staged.local:11434"
-    assert settings.current.ui.locale == "ko"
+    assert settings.canonical is not None
+    assert settings.canonical.intent.translation.openrouter_selection_alias == (
+        OpenRouterSelectionAlias.GEMMA4_BYOK.value
+    )
+    assert settings.canonical.intent.translation.openrouter_selected_source == (
+        OpenRouterCredentialSource.BYOK.value
+    )
+    assert settings.canonical.intent.translation.openrouter_model == (
+        OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
+    )
+    assert settings.canonical.state.provider_verification.openrouter.status == "verified"
+    assert settings.canonical.intent.prompts.system_prompt == "PKCE prompt draft"
+    assert settings.canonical.intent.translation.model == TranslationModel.GEMMA4.value
+    assert (
+        settings.canonical.intent.translation.connection == TranslationConnection.OPENROUTER.value
+    )
+    assert settings.canonical.intent.local_llm.base_url == "http://staged.local:11434"
+    assert settings.canonical.intent.ui.locale == "ko"
     assert len(runtime.applied) == 1
     assert results.current is not None
     assert results.current.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
@@ -310,8 +319,10 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
 
     assert settings.mutation_depth == 0
     assert settings.rollback_pending is False
-    assert settings.current is not None
-    assert settings.current.provider.llm == LLMProviderName.OPENROUTER
+    assert settings.canonical is not None
+    assert (
+        settings.canonical.intent.translation.connection == TranslationConnection.OPENROUTER.value
+    )
 
     runtime.cancel = False
     results.current = None

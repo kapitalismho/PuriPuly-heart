@@ -10,7 +10,7 @@ from puripuly_heart.app.services.local_asr_selection import (
     LOCAL_QWEN_PROVIDER,
     resolve_local_asr_selection,
 )
-from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,27 +37,35 @@ class ManualLocalASRFallbackPlan:
 class ManualLocalASRFallbackOwner:
     @staticmethod
     def state(
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         cpu_auto_available: bool,
     ) -> ManualLocalASRFallbackState:
+        intent = settings.intent
         return ManualLocalASRFallbackState(
-            self_provider=settings.provider.stt.value,
-            peer_provider=settings.provider.peer_stt.value,
-            self_source_language=settings.languages.source_language,
-            peer_source_language=settings.languages.effective_peer_source,
+            self_provider=str(intent.stt.provider),
+            peer_provider=str(intent.peer_stt.provider),
+            self_source_language=intent.languages.source_language,
+            peer_source_language=intent.languages.effective_peer_source,
             cpu_auto_available=cpu_auto_available,
         )
 
     @staticmethod
     def apply(
-        settings: object,
+        settings: AppSettingsVNext,
         plan: ManualLocalASRFallbackPlan,
-    ) -> object:
+    ) -> AppSettingsVNext:
+        from dataclasses import replace
+
         normalized = copy.deepcopy(settings)
-        normalized.provider.stt = STTProviderName(plan.self_provider)
-        normalized.provider.peer_stt = STTProviderName(plan.peer_provider)
-        return normalized
+        return replace(
+            normalized,
+            intent=replace(
+                normalized.intent,
+                stt=replace(normalized.intent.stt, provider=plan.self_provider),
+                peer_stt=replace(normalized.intent.peer_stt, provider=plan.peer_provider),
+            ),
+        )
 
     def plan(
         self,

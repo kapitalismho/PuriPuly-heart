@@ -3,10 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol, TypeVar, runtime_checkable
+from typing import Protocol, runtime_checkable
 
-LegacySettingsT = TypeVar("LegacySettingsT", contravariant=True)
-CanonicalSettingsT = TypeVar("CanonicalSettingsT")
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 class CanonicalSettingsPersistenceError(RuntimeError):
@@ -17,8 +16,7 @@ class CanonicalSettingsPersistenceError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class CanonicalSettingsLoadResult:
-    compatibility_settings: object
-    canonical_settings: object
+    canonical_settings: AppSettingsVNext
     migrated: bool
     backup_path: Path | None
 
@@ -34,41 +32,20 @@ class ProviderVerificationBinding:
 
 
 @runtime_checkable
-class CanonicalSettingsPersistencePort(Protocol[LegacySettingsT, CanonicalSettingsT]):
+class CanonicalSettingsPersistencePort(Protocol):
     def load_active(self, path: Path) -> CanonicalSettingsLoadResult: ...
 
-    def compatibility_projection(
-        self,
-        settings: CanonicalSettingsT,
-    ) -> LegacySettingsT: ...
-
-    def persist(self, path: Path, settings: CanonicalSettingsT) -> None: ...
-
-    def project(
-        self,
-        settings: LegacySettingsT,
-        *,
-        canonical: CanonicalSettingsT | None,
-        authoritative: bool,
-    ) -> CanonicalSettingsT: ...
-
-    def apply_legacy_delta(
-        self,
-        *,
-        canonical: CanonicalSettingsT | None,
-        base_settings: LegacySettingsT | None,
-        next_settings: LegacySettingsT,
-    ) -> CanonicalSettingsT: ...
+    def persist(self, path: Path, settings: AppSettingsVNext) -> None: ...
 
     def bind_provider_verification(
         self,
-        canonical: CanonicalSettingsT,
+        canonical: AppSettingsVNext,
         binding: ProviderVerificationBinding,
-    ) -> CanonicalSettingsT: ...
+    ) -> AppSettingsVNext: ...
 
-    def snapshot(self, canonical: CanonicalSettingsT | None) -> CanonicalSettingsT | None: ...
+    def snapshot(self, canonical: AppSettingsVNext | None) -> AppSettingsVNext | None: ...
 
-    def rollback(self, snapshot: CanonicalSettingsT | None) -> CanonicalSettingsT | None: ...
+    def rollback(self, snapshot: AppSettingsVNext | None) -> AppSettingsVNext | None: ...
 
 
 __all__ = [

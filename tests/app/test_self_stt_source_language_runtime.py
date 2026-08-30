@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from typing import Any, Literal, cast
 
 import pytest
@@ -17,7 +18,8 @@ from puripuly_heart.app.wiring_stt_factory import (
     build_self_stt_runtime_signature,
 )
 
-from puripuly_heart.config.settings import AppSettings, STTProviderName
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmission,
@@ -118,16 +120,38 @@ class _Loop:
         await self.release.wait()
 
 
-def _settings(provider: STTProviderName, language: str) -> AppSettings:
-    settings = AppSettings()
-    settings.provider.stt = provider
-    settings.languages.source_language = language
-    return settings
+def _settings(provider: STTProviderName, language: str) -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            stt=replace(settings.intent.stt, provider=provider.value),
+            languages=replace(settings.intent.languages, source_language=language),
+        ),
+    )
+
+
+def _with_custom_terms(
+    settings: AppSettingsVNext,
+    terms: dict[str, list[str]],
+) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            stt=replace(
+                settings.intent.stt,
+                custom_vocabulary_enabled=True,
+                custom_terms=terms,
+            ),
+        ),
+    )
 
 
 def _build_owner(
     provider: _RecordingProvider,
-    settings_holder: dict[str, AppSettings],
+    settings_holder: dict[str, AppSettingsVNext],
 ) -> SelfCaptureSessionOwner:
     loop = _Loop()
     return SelfCaptureSessionOwner(
@@ -147,12 +171,12 @@ def _build_owner(
 def _application_owner(
     *,
     session: SelfCaptureSessionOwner,
-    settings_holder: dict[str, AppSettings],
+    settings_holder: dict[str, AppSettingsVNext],
 ) -> SelfCaptureApplicationOwner:
     return SelfCaptureApplicationOwner(
         settings_provider=lambda: SelfCaptureApplicationSettings(
             config=build_self_capture_session_config(settings_holder["settings"]),
-            provider_id=settings_holder["settings"].provider.stt.value,
+            provider_id=settings_holder["settings"].intent.stt.provider,
             qwen_region=None,
         ),
         runtime_available=lambda: True,
@@ -220,12 +244,10 @@ def test_local_cpu_auto_model_identity_changes_with_source_language() -> None:
 
 
 def test_custom_vocabulary_still_changes_self_runtime_signature() -> None:
-    settings = _settings(STTProviderName.DEEPGRAM, "ko")
-    settings.stt.custom_vocabulary_enabled = True
-    settings.stt.custom_terms = {"ko": ["Puripuly"]}
+    settings = _with_custom_terms(_settings(STTProviderName.DEEPGRAM, "ko"), {"ko": ["Puripuly"]})
     before = build_self_stt_runtime_signature(settings)
     provider_before = build_self_stt_provider_signature(settings)
-    settings.stt.custom_terms = {"ko": ["Puripuly", "VRChat"]}
+    settings = _with_custom_terms(settings, {"ko": ["Puripuly", "VRChat"]})
 
     assert build_self_stt_runtime_signature(settings) != before
     assert build_self_stt_provider_signature(settings) == provider_before

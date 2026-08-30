@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 import copy
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
 
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, GithubStarPromptState
 from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 
 GITHUB_STAR_PROMPT_ELIGIBLE_LAUNCH_THRESHOLD = 3
@@ -14,15 +15,29 @@ GITHUB_STAR_PROMPT_RECENCY_WINDOW = timedelta(days=14)
 
 
 class GithubStarPromptUiState(Protocol):
-    github_star_prompt_clicked: bool
-    github_star_prompt_last_shown_at: str | None
-    github_star_prompt_show_count: int
-    github_star_prompt_translation_success_observed: bool
-    github_star_prompt_eligible_launch_count: int
+    clicked: bool
+    last_shown_at: str | None
+    show_count: int
+    translation_success_observed: bool
+    eligible_launch_count: int
 
 
 class GithubStarPromptSettings(Protocol):
-    ui: GithubStarPromptUiState
+    state: object
+
+
+def _star_state(settings: object) -> GithubStarPromptState:
+    return settings.state.github_star_prompt
+
+
+def _with_star_state(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext:
+    return replace(
+        settings,
+        state=replace(
+            settings.state,
+            github_star_prompt=replace(settings.state.github_star_prompt, **changes),
+        ),
+    )
 
 
 def github_star_prompt_utc_now() -> datetime:
@@ -119,11 +134,11 @@ class GithubStarPromptOwner:
         return self._runtime
 
     def initial_launch_gate_satisfied(self, settings: GithubStarPromptSettings) -> bool:
-        ui = settings.ui
-        if github_star_prompt_non_negative_count(ui.github_star_prompt_show_count) > 0:
+        prompt = _star_state(settings)
+        if github_star_prompt_non_negative_count(prompt.show_count) > 0:
             return True
         return (
-            github_star_prompt_non_negative_count(ui.github_star_prompt_eligible_launch_count)
+            github_star_prompt_non_negative_count(prompt.eligible_launch_count)
             >= GITHUB_STAR_PROMPT_ELIGIBLE_LAUNCH_THRESHOLD
         )
 
@@ -131,14 +146,14 @@ class GithubStarPromptOwner:
         settings = self.settings_provider()
         if settings is None:
             return False
-        ui = settings.ui
-        if ui.github_star_prompt_clicked:
+        prompt = _star_state(settings)
+        if prompt.clicked:
             return False
         if not self.is_eligible():
             return False
         if not self.initial_launch_gate_satisfied(settings):
             return False
-        last_shown_at = parse_github_star_prompt_timestamp(ui.github_star_prompt_last_shown_at)
+        last_shown_at = parse_github_star_prompt_timestamp(prompt.last_shown_at)
         if last_shown_at is None:
             return True
         resolved_now = now or github_star_prompt_utc_now()
@@ -151,40 +166,23 @@ class GithubStarPromptOwner:
         self,
         *,
         failure_context: str,
-        mutate: Callable[[GithubStarPromptSettings], bool],
+        mutate: Callable[[AppSettingsVNext], AppSettingsVNext | None],
     ) -> bool:
-        attempted_mutation = False
-        while True:
-            async with self.persistence_lock:
-                settings = self.settings_provider()
-                if settings is None:
-                    return False
-                snapshot = self.state_snapshot(settings)
-                base_settings = copy.deepcopy(settings)
-                if not mutate(settings):
-                    return attempted_mutation
-                attempted_mutation = True
-                try:
-                    persisted = await self.persist_settings_state(
-                        base_settings,
-                        settings,
-                    )
-                except asyncio.CancelledError:
-                    if self.settings_provider() is settings:
-                        self.restore_state_snapshot(settings, snapshot)
-                    raise
-                except Exception as exc:
-                    if self.settings_provider() is settings:
-                        self.restore_state_snapshot(settings, snapshot)
-                    self.log_save_failure(failure_context, exc)
-                    return False
-                if not persisted:
-                    if self.settings_provider() is settings:
-                        self.restore_state_snapshot(settings, snapshot)
-                    return False
-                if self.settings_provider() is settings:
-                    return True
-            await asyncio.sleep(0)
+        async with self.persistence_lock:
+            settings = self.settings_provider()
+            if settings is None or not isinstance(settings, AppSettingsVNext):
+                return False
+            base_settings = copy.deepcopy(settings)
+            updated = mutate(copy.deepcopy(settings))
+            if updated is None:
+                return False
+            try:
+                return await self.persist_settings_state(base_settings, updated)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self.log_save_failure(failure_context, exc)
+                return False
 
     async def persist_opened(
         self,
@@ -193,83 +191,73 @@ class GithubStarPromptOwner:
         should_open: Callable[[], bool] | None = None,
     ) -> bool:
         opened_timestamp = github_star_prompt_utc_timestamp(opened_at)
-        while True:
-            async with self.persistence_lock:
-                settings = self.settings_provider()
-                if settings is None:
+        async with self.persistence_lock:
+            settings = self.settings_provider()
+            if settings is None or not isinstance(settings, AppSettingsVNext):
+                return False
+            if should_open is not None and not should_open():
+                return False
+            snapshot = self.state_snapshot(settings)
+            base_settings = copy.deepcopy(settings)
+            prompt = _star_state(settings)
+            updated = _with_star_state(
+                copy.deepcopy(settings),
+                last_shown_at=opened_timestamp,
+                show_count=github_star_prompt_non_negative_count(prompt.show_count) + 1,
+            )
+            try:
+                persisted = await self.persist_settings_state(base_settings, updated)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self.log_save_failure("open state", exc)
+                return False
+            if not persisted:
+                return False
+            live = self.settings_provider()
+            if should_open is not None and not should_open():
+                if live is None or not isinstance(live, AppSettingsVNext):
                     return False
-                if should_open is not None and not should_open():
-                    return False
-                snapshot = self.state_snapshot(settings)
-                base_settings = copy.deepcopy(settings)
-                ui = settings.ui
-                ui.github_star_prompt_last_shown_at = opened_timestamp
-                ui.github_star_prompt_show_count = (
-                    github_star_prompt_non_negative_count(ui.github_star_prompt_show_count) + 1
-                )
+                restored = self.restore_state_snapshot(live, snapshot)
                 try:
-                    persisted = await self.persist_settings_state(
-                        base_settings,
-                        settings,
-                    )
+                    await self.persist_settings_state(live, restored)
                 except asyncio.CancelledError:
-                    if self.settings_provider() is settings:
-                        self.restore_state_snapshot(settings, snapshot)
                     raise
                 except Exception as exc:
-                    if self.settings_provider() is settings:
-                        self.restore_state_snapshot(settings, snapshot)
-                    self.log_save_failure("open state", exc)
-                    return False
-                if not persisted:
-                    if self.settings_provider() is settings:
-                        self.restore_state_snapshot(settings, snapshot)
-                    return False
-                if self.settings_provider() is settings:
-                    if should_open is not None and not should_open():
-                        rollback_base_settings = copy.deepcopy(settings)
-                        self.restore_state_snapshot(settings, snapshot)
-                        try:
-                            await self.persist_settings_state(
-                                rollback_base_settings,
-                                settings,
-                            )
-                        except asyncio.CancelledError:
-                            raise
-                        except Exception as exc:
-                            self.log_save_failure("open state rollback", exc)
-                        return False
-                    return True
-            await asyncio.sleep(0)
+                    self.log_save_failure("open state rollback", exc)
+                return False
+            return True
 
     async def persist_eligible_launch(self) -> bool:
         settings = self.settings_provider()
         if settings is None:
             return False
-        ui = settings.ui
-        if ui.github_star_prompt_clicked:
+        prompt = _star_state(settings)
+        if prompt.clicked:
             return False
         if not self.is_eligible():
             return False
         if self.initial_launch_gate_satisfied(settings):
             return True
 
-        def mutate(current: GithubStarPromptSettings) -> bool:
-            current_ui = current.ui
-            if current_ui.github_star_prompt_clicked:
-                return False
+        def mutate(current: AppSettingsVNext) -> AppSettingsVNext | None:
+            current_prompt = _star_state(current)
+            if current_prompt.clicked:
+                return None
             if not self.is_eligible():
-                return False
+                return None
             if self.initial_launch_gate_satisfied(current):
-                return False
+                return None
             current_count = github_star_prompt_non_negative_count(
-                current_ui.github_star_prompt_eligible_launch_count
+                current_prompt.eligible_launch_count
             )
-            current_ui.github_star_prompt_eligible_launch_count = min(
-                current_count + 1,
-                GITHUB_STAR_PROMPT_ELIGIBLE_LAUNCH_THRESHOLD,
+            return _with_star_state(
+                current,
+                eligible_launch_count=min(
+                    current_count + 1,
+                    GITHUB_STAR_PROMPT_ELIGIBLE_LAUNCH_THRESHOLD,
+                ),
             )
-            return True
 
         await self.persist_mutation(
             failure_context="eligible launch state",
@@ -278,15 +266,14 @@ class GithubStarPromptOwner:
         settings = self.settings_provider()
         return bool(
             settings is not None
-            and not settings.ui.github_star_prompt_clicked
+            and not _star_state(settings).clicked
             and self.is_eligible()
             and self.initial_launch_gate_satisfied(settings)
         )
 
     async def persist_clicked(self) -> bool:
-        def mutate(settings: GithubStarPromptSettings) -> bool:
-            settings.ui.github_star_prompt_clicked = True
-            return True
+        def mutate(settings: AppSettingsVNext) -> AppSettingsVNext | None:
+            return _with_star_state(settings, clicked=True)
 
         return await self.persist_mutation(
             failure_context="click state",
@@ -294,14 +281,12 @@ class GithubStarPromptOwner:
         )
 
     async def persist_translation_success_observed(self) -> bool:
-        def mutate(settings: GithubStarPromptSettings) -> bool:
+        def mutate(settings: AppSettingsVNext) -> AppSettingsVNext | None:
             if not self.has_user_owned_cloud_connection(settings):
-                return False
-            ui = settings.ui
-            if ui.github_star_prompt_translation_success_observed:
-                return False
-            ui.github_star_prompt_translation_success_observed = True
-            return True
+                return None
+            if _star_state(settings).translation_success_observed:
+                return None
+            return _with_star_state(settings, translation_success_observed=True)
 
         return await self.persist_mutation(
             failure_context="translation success observation",
@@ -323,7 +308,7 @@ class GithubStarPromptOwner:
             return False
         if not self.has_user_owned_cloud_connection(settings):
             return False
-        if settings.ui.github_star_prompt_translation_success_observed:
+        if _star_state(settings).translation_success_observed:
             return False
         try:
             asyncio.get_running_loop()
@@ -351,36 +336,32 @@ class GithubStarPromptOwner:
     async def preserve_before_settings_replace(
         self,
         replacement_settings: GithubStarPromptSettings,
-    ) -> None:
+    ) -> object:
         await self.drain_translation_success_observation()
         async with self.persistence_lock:
             current_settings = self.settings_provider()
-            if current_settings is None:
-                return
-            current_ui = current_settings.ui
-            replacement_ui = replacement_settings.ui
-            replacement_ui.github_star_prompt_clicked = bool(
-                replacement_ui.github_star_prompt_clicked or current_ui.github_star_prompt_clicked
-            )
-            replacement_ui.github_star_prompt_translation_success_observed = bool(
-                replacement_ui.github_star_prompt_translation_success_observed
-                or current_ui.github_star_prompt_translation_success_observed
-            )
-            replacement_ui.github_star_prompt_eligible_launch_count = max(
-                github_star_prompt_non_negative_count(
-                    replacement_ui.github_star_prompt_eligible_launch_count
+            if current_settings is None or not isinstance(replacement_settings, AppSettingsVNext):
+                return replacement_settings
+            current = _star_state(current_settings)
+            replacement = _star_state(replacement_settings)
+            return _with_star_state(
+                replacement_settings,
+                clicked=bool(replacement.clicked or current.clicked),
+                translation_success_observed=bool(
+                    replacement.translation_success_observed or current.translation_success_observed
                 ),
-                github_star_prompt_non_negative_count(
-                    current_ui.github_star_prompt_eligible_launch_count
+                eligible_launch_count=max(
+                    github_star_prompt_non_negative_count(replacement.eligible_launch_count),
+                    github_star_prompt_non_negative_count(current.eligible_launch_count),
                 ),
-            )
-            replacement_ui.github_star_prompt_show_count = max(
-                github_star_prompt_non_negative_count(replacement_ui.github_star_prompt_show_count),
-                github_star_prompt_non_negative_count(current_ui.github_star_prompt_show_count),
-            )
-            replacement_ui.github_star_prompt_last_shown_at = github_star_prompt_latest_timestamp(
-                replacement_ui.github_star_prompt_last_shown_at,
-                current_ui.github_star_prompt_last_shown_at,
+                show_count=max(
+                    github_star_prompt_non_negative_count(replacement.show_count),
+                    github_star_prompt_non_negative_count(current.show_count),
+                ),
+                last_shown_at=github_star_prompt_latest_timestamp(
+                    replacement.last_shown_at,
+                    current.last_shown_at,
+                ),
             )
 
     def stop_ingress(self) -> None:
@@ -404,20 +385,20 @@ class GithubStarPromptOwner:
 
     @staticmethod
     def state_snapshot(settings: GithubStarPromptSettings) -> tuple[object, ...]:
-        ui = settings.ui
+        prompt = _star_state(settings)
         return (
-            ui.github_star_prompt_clicked,
-            ui.github_star_prompt_last_shown_at,
-            ui.github_star_prompt_show_count,
-            ui.github_star_prompt_translation_success_observed,
-            ui.github_star_prompt_eligible_launch_count,
+            prompt.clicked,
+            prompt.last_shown_at,
+            prompt.show_count,
+            prompt.translation_success_observed,
+            prompt.eligible_launch_count,
         )
 
     @staticmethod
     def restore_state_snapshot(
         settings: GithubStarPromptSettings,
         snapshot: tuple[object, ...],
-    ) -> None:
+    ) -> object:
         (
             clicked,
             last_shown_at,
@@ -425,15 +406,15 @@ class GithubStarPromptOwner:
             translation_success_observed,
             eligible_launch_count,
         ) = snapshot
-        ui = settings.ui
-        ui.github_star_prompt_clicked = bool(clicked)
-        ui.github_star_prompt_last_shown_at = (
-            last_shown_at if isinstance(last_shown_at, str) else None
-        )
-        ui.github_star_prompt_show_count = github_star_prompt_non_negative_count(show_count)
-        ui.github_star_prompt_translation_success_observed = bool(translation_success_observed)
-        ui.github_star_prompt_eligible_launch_count = github_star_prompt_non_negative_count(
-            eligible_launch_count
+        if not isinstance(settings, AppSettingsVNext):
+            return settings
+        return _with_star_state(
+            settings,
+            clicked=bool(clicked),
+            last_shown_at=last_shown_at if isinstance(last_shown_at, str) else None,
+            show_count=github_star_prompt_non_negative_count(show_count),
+            translation_success_observed=bool(translation_success_observed),
+            eligible_launch_count=github_star_prompt_non_negative_count(eligible_launch_count),
         )
 
 

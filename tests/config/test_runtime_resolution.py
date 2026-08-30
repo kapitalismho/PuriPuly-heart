@@ -1157,40 +1157,28 @@ def test_old_openrouter_credential_source_keys_normalize_through_settings_to_res
 ) -> None:
     runtime_resolution = _runtime_resolution_module()
     resolved = _resolved_module()
-    from puripuly_heart.config.settings import AppSettings, from_dict, to_dict  # noqa: PLC0415
+    raw_openrouter = {
+        "llm_model": "google/gemma-4-26b-a4b-it",
+        legacy_key: "managed",
+        "selection_alias": "gemma4_26b_31b_managed",
+        "fallback_selection_alias": "none",
+    }
 
-    raw_settings = to_dict(AppSettings())
-    raw_settings.pop("translation", None)
-    raw_settings["provider"]["llm"] = "openrouter"
-    raw_settings["openrouter"]["llm_model"] = "google/gemma-4-26b-a4b-it"
-    raw_settings["openrouter"].pop("selected_source", None)
-    raw_settings["openrouter"][legacy_key] = "managed"
-    raw_settings["openrouter"]["selection_alias"] = "openrouter:none:google/gemma-4-26b-a4b-it"
-    raw_settings["openrouter"]["fallback_selection_alias"] = "none"
-
-    settings = from_dict(raw_settings)
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
-        provider_llm=settings.provider.llm.value,
-        model=settings.openrouter.llm_model.value,
-        selected_source=settings.openrouter.selected_source.value,
-        selection_alias=(
-            settings.openrouter.selection_alias.value
-            if settings.openrouter.selection_alias is not None
-            else None
-        ),
-        fallback_selection_alias=settings.openrouter.fallback_selection_alias.value,
-        routing_mode=settings.openrouter.routing_mode.value,
-        provider_routing=settings.openrouter.provider_routing.value,
-        broker_base_url=settings.openrouter.broker_base_url,
+        provider_llm="openrouter",
+        model=raw_openrouter["llm_model"],
+        selected_source=raw_openrouter.get("selected_source") or raw_openrouter.get(legacy_key),
+        selection_alias=raw_openrouter["selection_alias"],
+        fallback_selection_alias=raw_openrouter["fallback_selection_alias"],
     )
     translation_intent = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
-        provider_llm=settings.provider.llm.value,
+        provider_llm="openrouter",
         openrouter_model=openrouter_intent.model,
         openrouter_selected_source=openrouter_intent.selected_source,
         openrouter_provider_routing=openrouter_intent.provider_routing,
-        gemini_model=settings.gemini.llm_model.value,
-        qwen_model=settings.qwen.llm_model.value,
-        concurrency_limit=settings.llm.concurrency_limit,
+        gemini_model="gemini-3.1-flash-lite",
+        qwen_model="qwen3.5-plus",
+        concurrency_limit=5,
     )
     config = runtime_resolution.resolve_llm_config(
         runtime_resolution.RuntimeResolutionInput(
@@ -1199,9 +1187,6 @@ def test_old_openrouter_credential_source_keys_normalize_through_settings_to_res
         )
     )
 
-    assert settings.openrouter.selected_source.value == "managed"
-    assert settings.openrouter.selection_alias is not None
-    assert settings.openrouter.selection_alias.value == "gemma4_26b_31b_managed"
     assert openrouter_intent.selected_source == "managed"
     assert openrouter_intent.selection_alias == "gemma4_26b_31b_managed"
     assert config.provider == "openrouter"

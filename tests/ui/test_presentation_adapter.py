@@ -6,7 +6,7 @@ import pytest
 from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
 
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
-from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.ui.event_bridge import UIEventBridge
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from tests.helpers.osc_presentation import osc_control_presentation_state
@@ -174,8 +174,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     runtime_logging = SimpleNamespace(
         attach_realtime_sink=lambda sink: events.append(("log-sink", sink))
     )
-    settings_value = AppSettings()
-    provider, general, prompt, overlay = settings_view_surface_snapshots(settings_value)
+    provider, general, prompt, overlay = settings_view_surface_snapshots(AppSettingsVNext())
     calibration = object()
     notice = object()
     gemma_notice = object()

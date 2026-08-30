@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import threading
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -14,11 +15,10 @@ from puripuly_heart.app.ports.canonical_settings_persistence import (
 )
 from puripuly_heart.app.ports.settings_repository import SettingsCommitRequest
 from puripuly_heart.app.services.canonical_settings_persistence import (
-    LegacySettingsPatchRepository,
+    CanonicalSettingsPatchRepository,
     SettingsOwner,
-    legacy_settings_snapshot_values,
+    canonical_snapshot_values,
 )
-from puripuly_heart.config.settings import AppSettings, LLMProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
@@ -27,10 +27,6 @@ class RecordingPersistence(SettingsVNextCanonicalPersistenceAdapter):
         self.events: list[str] = []
         self.persist_thread_ids: list[int] = []
         self.fail_persist = False
-
-    def apply_legacy_delta(self, **kwargs):
-        self.events.append("update")
-        return super().apply_legacy_delta(**kwargs)
 
     def bind_provider_verification(self, canonical, binding):
         self.events.append("bind")
@@ -46,21 +42,20 @@ class RecordingPersistence(SettingsVNextCanonicalPersistenceAdapter):
 
 def _repository(
     *,
-    committed: AppSettings,
-    base: AppSettings | None = None,
+    committed: AppSettingsVNext,
+    base: AppSettingsVNext | None = None,
     surface: str = "translation_provider",
     binding: ProviderVerificationBinding | None = None,
-) -> tuple[LegacySettingsPatchRepository, SettingsOwner, RecordingPersistence]:
+) -> tuple[CanonicalSettingsPatchRepository, SettingsOwner, RecordingPersistence]:
     persistence = RecordingPersistence()
     owner = SettingsOwner(
         path=Path("settings.json"),
         persistence=persistence,
-        canonical=AppSettingsVNext(),
-        current=copy.deepcopy(base or committed),
+        canonical=copy.deepcopy(base or committed),
         authoritative=True,
         projection_snapshot=copy.deepcopy(base or committed),
     )
-    repository = LegacySettingsPatchRepository(
+    repository = CanonicalSettingsPatchRepository(
         owner=owner,
         committed_settings=committed,
         base_settings=base,
@@ -73,30 +68,30 @@ def _repository(
 
 @pytest.mark.asyncio
 async def test_repository_applies_path_patch_and_persists_off_event_loop() -> None:
-    base = AppSettings()
+    base = AppSettingsVNext()
     committed = copy.deepcopy(base)
     repository, owner, persistence = _repository(committed=committed, base=base)
     event_loop_thread_id = threading.get_ident()
 
     result = await repository.save(
         SettingsCommitRequest(
-            values={"ui.locale": "ja"},
+            values={"intent.ui.locale": "ja"},
             expected_revision=None,
             reason="settings.ui_prompt_clipboard_state",
         )
     )
 
     assert result.succeeded is True
-    assert repository.committed_settings.ui.locale == "ja"
+    assert repository.committed_settings.intent.ui.locale == "ja"
     assert persistence.persist_thread_ids != [event_loop_thread_id]
-    assert persistence.events == ["update", "persist"]
+    assert persistence.events == ["persist"]
     assert owner.projection_snapshot is not None
-    assert owner.projection_snapshot.ui.locale == "ja"
+    assert owner.projection_snapshot.intent.ui.locale == "ja"
 
 
 @pytest.mark.asyncio
 async def test_repository_applies_managed_delivery_ack_state_patch() -> None:
-    committed = AppSettings()
+    committed = AppSettingsVNext()
     repository, _owner, _persistence = _repository(
         committed=committed,
         surface="managed_connection_auth",
@@ -119,7 +114,7 @@ async def test_repository_applies_managed_delivery_ack_state_patch() -> None:
         )
     )
 
-    managed = repository.committed_settings.managed_identity
+    managed = repository.committed_settings.state.managed_connection
     assert result.succeeded is True
     assert managed.pending_delivery_ack_source == "discord"
     assert managed.pending_delivery_ack_delivery_id == "delivery-1"
@@ -137,8 +132,13 @@ async def test_repository_binds_provider_verification_before_persistence() -> No
         verifier_context={"flow": "pkce"},
         verifier_evidence={"source": "provider_verifier"},
     )
-    committed = AppSettings()
-    committed.provider.llm = LLMProviderName.OPENROUTER
+    committed = replace(
+        AppSettingsVNext(),
+        intent=replace(
+            AppSettingsVNext().intent,
+            translation=replace(AppSettingsVNext().intent.translation, connection="openrouter"),
+        ),
+    )
     repository, owner, persistence = _repository(
         committed=committed,
         binding=binding,
@@ -146,7 +146,7 @@ async def test_repository_binds_provider_verification_before_persistence() -> No
 
     result = await repository.save(
         SettingsCommitRequest(
-            values=legacy_settings_snapshot_values(committed),
+            values=canonical_snapshot_values(committed),
             expected_revision=None,
             reason="openrouter_pkce",
         )
@@ -160,7 +160,7 @@ async def test_repository_binds_provider_verification_before_persistence() -> No
 
 @pytest.mark.asyncio
 async def test_repository_rolls_back_and_returns_safe_diagnostics_on_save_failure() -> None:
-    committed = AppSettings()
+    committed = AppSettingsVNext()
     repository, owner, persistence = _repository(
         committed=committed,
         surface="provider_secret_change",
@@ -169,7 +169,7 @@ async def test_repository_rolls_back_and_returns_safe_diagnostics_on_save_failur
 
     result = await repository.save(
         SettingsCommitRequest(
-            values={"ui.locale": "ko"},
+            values={"intent.ui.locale": "ko"},
             expected_revision=None,
             reason="provider_secret_change",
         )
@@ -180,21 +180,23 @@ async def test_repository_rolls_back_and_returns_safe_diagnostics_on_save_failur
     assert result.diagnostics is not None
     assert result.diagnostics.code == "settings_save_failed"
     assert result.diagnostics.fields["surface"] == "provider_secret_change"
-    assert repository.committed_settings.ui.locale != "ko"
+    assert repository.committed_settings.intent.ui.locale != "ko"
     assert owner.mutation_depth == 0
     assert persistence.events == [
-        "update",
         "persist",
         "Failed to save settings mutation",
     ]
 
 
-def test_legacy_settings_snapshot_values_normalizes_enums_and_tuples() -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.managed_identity.local_managed_claim_sources = ("discord",)
+def test_canonical_snapshot_values_serialize_nested_intent() -> None:
+    settings = replace(
+        AppSettingsVNext(),
+        intent=replace(
+            AppSettingsVNext().intent,
+            translation=replace(AppSettingsVNext().intent.translation, connection="openrouter"),
+        ),
+    )
 
-    values = legacy_settings_snapshot_values(settings)
+    values = canonical_snapshot_values(settings)
 
-    assert values["provider"]["llm"] == "openrouter"
-    assert values["managed_identity"]["local_managed_claim_sources"] == ["discord"]
+    assert values["intent"]["translation"]["connection"] == "openrouter"

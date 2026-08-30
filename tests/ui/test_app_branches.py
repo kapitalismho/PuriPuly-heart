@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 import json
 from collections.abc import Awaitable, Callable
 from datetime import datetime as real_datetime
@@ -12,10 +11,15 @@ from unittest.mock import AsyncMock
 import pytest
 
 pytest.importorskip("flet")
+from dataclasses import replace
+
 import flet as ft
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 import puripuly_heart.ui.app as app_module
+from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
+    SettingsVNextCanonicalPersistenceAdapter,
+)
 from puripuly_heart.app.ports.settings_view import (
     OpenRouterPkceTarget,
     OverlaySettingsSnapshot,
@@ -25,25 +29,24 @@ from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    SettingsOwner,
+    materialize_canonical_translation_settings,
+)
 from puripuly_heart.app.services.http_extension_registry import HttpExtensionRegistryService
 from puripuly_heart.app.services.telemetry_reporting import APP_ACTIVE_DAY_RETRY_DELAY_S
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.composition.ui_application import compose_ui_application
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
+from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
-    OpenRouterProviderRouting,
     OpenRouterSelectionAlias,
-    ProviderSettings,
-    TranslationConnection,
-    TranslationModel,
-    TranslationSettings,
-    build_managed_openrouter_byok_target_settings,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS
+from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
@@ -52,12 +55,101 @@ from tests.helpers.ui_application import compose_test_ui_application_boundary
 MISSING = object()
 
 
-def _byok_pkce_target(settings: AppSettings) -> OpenRouterPkceTarget | None:
+def _vnext(
+    *,
+    llm: str | None = None,
+    model: str | None = None,
+    connection: str | None = None,
+    openrouter_source: str | None = None,
+    openrouter_alias: str | None = None,
+    openrouter_model: str | None = None,
+    openrouter_routing: str | None = None,
+    connection_history: dict[str, str] | None = None,
+    telemetry_last_sent: str | None = None,
+    overlay_pos_x: int | float | None = None,
+    overlay_pos_y: int | float | None = None,
+    target_language: str | None = None,
+) -> AppSettingsVNext:
+    current = AppSettingsVNext()
+    translation = current.intent.translation
+    if llm == "gemini":
+        model = model or "gemini31_flash_lite"
+        connection = connection or "official_byok"
+    elif llm == "local_llm":
+        model = model or "local_llm"
+        connection = connection or "ollama"
+    elif llm == "openrouter":
+        if openrouter_source == "managed":
+            model = model or "gemma4"
+            connection = connection or "managed"
+        else:
+            model = model or "gemma4"
+            connection = connection or "openrouter"
+    if model is not None or connection is not None:
+        translation = replace(
+            translation,
+            model=model or translation.model,
+            connection=connection or translation.connection,
+        )
+    if openrouter_source is not None:
+        translation = replace(translation, openrouter_selected_source=openrouter_source)
+    if openrouter_alias is not None:
+        translation = replace(translation, openrouter_selection_alias=openrouter_alias)
+    if openrouter_model is not None:
+        translation = replace(translation, openrouter_model=openrouter_model)
+    if openrouter_routing is not None:
+        translation = replace(translation, openrouter_provider_routing=openrouter_routing)
+    if connection_history is not None:
+        translation = replace(translation, connection_history=connection_history)
+    languages = current.intent.languages
+    if target_language is not None:
+        languages = replace(languages, target_language=target_language)
+    overlay = current.intent.overlay
+    if overlay_pos_x is not None or overlay_pos_y is not None:
+        overlay = replace(
+            overlay,
+            desktop_flet=replace(
+                overlay.desktop_flet,
+                position=replace(
+                    overlay.desktop_flet.position,
+                    x=overlay.desktop_flet.position.x if overlay_pos_x is None else overlay_pos_x,
+                    y=overlay.desktop_flet.position.y if overlay_pos_y is None else overlay_pos_y,
+                ),
+            ),
+        )
+    state = current.state
+    if telemetry_last_sent is not None:
+        state = replace(
+            state,
+            telemetry=replace(state.telemetry, last_sent_date_utc=telemetry_last_sent),
+        )
+    current = replace(
+        current,
+        intent=replace(
+            current.intent,
+            translation=translation,
+            languages=languages,
+            overlay=overlay,
+        ),
+        state=state,
+    )
+    return materialize_canonical_translation_settings(current)
+
+
+def _byok_pkce_target(settings: AppSettingsVNext) -> OpenRouterPkceTarget | None:
     """Mirror the provider adapter's projection-to-PKCE-target wrapping."""
-    target_settings = build_managed_openrouter_byok_target_settings(settings)
-    if target_settings is None or target_settings.openrouter.selection_alias is None:
+    owner = SettingsOwner(
+        path=Path("settings.json"),
+        persistence=SettingsVNextCanonicalPersistenceAdapter(),
+        canonical=settings,
+    )
+    target_settings = owner.build_managed_openrouter_byok_target(settings)
+    if target_settings is None:
         return None
-    return OpenRouterPkceTarget(target_settings.openrouter.selection_alias)
+    alias = target_settings.intent.translation.openrouter_selection_alias
+    if alias is None:
+        return None
+    return OpenRouterPkceTarget(OpenRouterSelectionAlias(alias))
 
 
 def _application_boundary_with_stop(backend: object) -> UiApplicationBoundary:
@@ -203,7 +295,7 @@ def _dialog_containers(dialog) -> list[ft.Container]:
 
 
 class FakeTelemetryApplication:
-    def __init__(self, settings: AppSettings) -> None:
+    def __init__(self, settings: AppSettingsVNext) -> None:
         self.settings = settings
         self.applied: list[bool] = []
         self.active_day_results: list[object] = []
@@ -212,12 +304,24 @@ class FakeTelemetryApplication:
     async def apply_telemetry_enabled(self, enabled: bool) -> None:
         self.applied.append(enabled)
         if enabled is False:
-            self.settings.telemetry.enabled = False
-            self.settings.telemetry_state.anonymous_id = None
-            self.settings.telemetry_state.last_sent_date_utc = None
+            self.settings = replace(
+                self.settings,
+                intent=replace(
+                    self.settings.intent,
+                    telemetry=replace(self.settings.intent.telemetry, enabled=False),
+                ),
+                state=replace(
+                    self.settings.state,
+                    telemetry=replace(
+                        self.settings.state.telemetry,
+                        anonymous_id=None,
+                        last_sent_date_utc=None,
+                    ),
+                ),
+            )
 
     def settings_general_snapshot(self):
-        return SimpleNamespace(telemetry_enabled=self.settings.telemetry.enabled)
+        return SimpleNamespace(telemetry_enabled=self.settings.intent.telemetry.enabled)
 
     async def record_app_active_day(self, active_date_utc: str) -> object:
         self.active_day_dates.append(active_date_utc)
@@ -254,8 +358,7 @@ def _make_telemetry_owner(
 
 
 def test_telemetry_enabled_choice_persists_and_syncs_settings_view() -> None:
-    settings = AppSettings()
-    settings.telemetry_state.last_sent_date_utc = "2026-07-01"
+    settings = _vnext(telemetry_last_sent="2026-07-01")
     application = FakeTelemetryApplication(settings)
     synced: list[object] = []
     tasks: list[object] = []
@@ -265,9 +368,9 @@ def test_telemetry_enabled_choice_persists_and_syncs_settings_view() -> None:
     assert len(tasks) == 1
     asyncio.run(tasks.pop(0)())
     assert application.applied == [False]
-    assert settings.telemetry.enabled is False
-    assert settings.telemetry_state.anonymous_id is None
-    assert settings.telemetry_state.last_sent_date_utc is None
+    assert application.settings.intent.telemetry.enabled is False
+    assert application.settings.state.telemetry.anonymous_id is None
+    assert application.settings.state.telemetry.last_sent_date_utc is None
     assert synced[-1].telemetry_enabled is False
 
     owner.apply_telemetry_enabled(True)
@@ -276,7 +379,7 @@ def test_telemetry_enabled_choice_persists_and_syncs_settings_view() -> None:
 
 
 def test_telemetry_setting_action_does_not_send() -> None:
-    application = FakeTelemetryApplication(AppSettings())
+    application = FakeTelemetryApplication(AppSettingsVNext())
     tasks: list[object] = []
     owner = _make_telemetry_owner(application, background=tasks)
 
@@ -289,7 +392,7 @@ def test_telemetry_setting_action_does_not_send() -> None:
 def test_app_active_day_report_captures_utc_date_before_queue(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    application = FakeTelemetryApplication(AppSettings())
+    application = FakeTelemetryApplication(AppSettingsVNext())
     queued: list[object] = []
 
     class CapturedDateTime(real_datetime):
@@ -308,7 +411,7 @@ def test_app_active_day_report_captures_utc_date_before_queue(
 def test_app_active_day_report_retries_once_after_60_seconds_on_same_utc_date(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    application = FakeTelemetryApplication(AppSettings())
+    application = FakeTelemetryApplication(AppSettingsVNext())
     application.active_day_results = [
         SimpleNamespace(status="send_failed"),
         SimpleNamespace(status="sent"),
@@ -348,7 +451,7 @@ def test_app_active_day_report_retries_once_after_60_seconds_on_same_utc_date(
 def test_app_active_day_report_does_not_retry_after_utc_date_changes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    application = FakeTelemetryApplication(AppSettings())
+    application = FakeTelemetryApplication(AppSettingsVNext())
     application.active_day_results = [SimpleNamespace(status="send_failed")]
     queued: list[object] = []
     background: list[object] = []
@@ -385,7 +488,7 @@ def test_app_active_day_report_does_not_retry_after_utc_date_changes(
 def test_app_active_day_report_does_not_retry_when_queue_crosses_utc_midnight(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    application = FakeTelemetryApplication(AppSettings())
+    application = FakeTelemetryApplication(AppSettingsVNext())
     application.active_day_results = [SimpleNamespace(status="send_failed")]
     queued: list[object] = []
     background: list[object] = []
@@ -425,7 +528,7 @@ def test_app_active_day_report_does_not_retry_when_queue_crosses_utc_midnight(
 async def test_app_active_day_retry_does_not_block_settings_mutation_queue(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    application = FakeTelemetryApplication(AppSettings())
+    application = FakeTelemetryApplication(AppSettingsVNext())
     application.active_day_results = [
         SimpleNamespace(status="send_failed"),
         SimpleNamespace(status="sent"),
@@ -519,7 +622,7 @@ async def test_app_active_day_retry_does_not_block_settings_mutation_queue(
 async def test_close_after_launch_tasks_cancels_app_active_day_retry() -> None:
     from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
 
-    application = FakeTelemetryApplication(AppSettings())
+    application = FakeTelemetryApplication(AppSettingsVNext())
     retry_started = asyncio.Event()
     retry_cancelled = asyncio.Event()
 
@@ -1058,22 +1161,42 @@ async def test_desktop_gui_state_actions_refresh_settings_view_after_runtime_upd
         application_factory=_construction_application_factory,
     )
     backend = _construction_backends[-1]
-    backend.settings = AppSettings()
-    backend.settings.overlay.desktop_flet.position.x = 80
-    backend.settings.overlay.desktop_flet.position.y = 90
+    backend.settings = _vnext(overlay_pos_x=80, overlay_pos_y=90)
 
     async def fake_set_locked(locked: bool) -> None:
-        backend.settings.overlay.desktop_flet.locked = locked
+        backend.desktop_overlay_captions_locked = locked
 
     async def fake_set_desktop_overlay_size_preset(size_preset: str) -> None:
-        updated = copy.deepcopy(backend.settings)
-        updated.overlay.desktop_flet.size_preset = size_preset
-        backend.settings = updated
+        backend.settings = replace(
+            backend.settings,
+            intent=replace(
+                backend.settings.intent,
+                overlay=replace(
+                    backend.settings.intent.overlay,
+                    desktop_flet=replace(
+                        backend.settings.intent.overlay.desktop_flet,
+                        size_preset=size_preset,
+                    ),
+                ),
+            ),
+        )
 
     async def fake_reset_desktop_overlay_position() -> None:
-        backend.settings.overlay.desktop_flet.position.x = None
-        backend.settings.overlay.desktop_flet.position.y = None
-        backend.settings.overlay.desktop_flet.locked = False
+        overlay = backend.settings.intent.overlay
+        backend.settings = replace(
+            backend.settings,
+            intent=replace(
+                backend.settings.intent,
+                overlay=replace(
+                    overlay,
+                    desktop_flet=replace(
+                        overlay.desktop_flet,
+                        position=replace(overlay.desktop_flet.position, x=None, y=None),
+                    ),
+                ),
+            ),
+        )
+        backend.desktop_overlay_captions_locked = False
 
     backend.set_desktop_overlay_captions_locked = fake_set_locked
     backend.set_desktop_overlay_size_preset = fake_set_desktop_overlay_size_preset
@@ -1092,9 +1215,9 @@ async def test_desktop_gui_state_actions_refresh_settings_view_after_runtime_upd
     assert len(synced_settings) == 3
     assert synced_settings[1].desktop_size_preset == "xlarge"
     assert synced_settings[2].desktop_size_preset == "xlarge"
-    assert backend.settings.overlay.desktop_flet.position.x is None
-    assert backend.settings.overlay.desktop_flet.position.y is None
-    assert backend.settings.overlay.desktop_flet.locked is False
+    assert backend.settings.intent.overlay.desktop_flet.position.x is None
+    assert backend.settings.intent.overlay.desktop_flet.position.y is None
+    assert getattr(backend, "desktop_overlay_captions_locked", False) is False
 
 
 def test_translator_app_does_not_mount_debug_preview_by_default(
@@ -2115,10 +2238,11 @@ def test_debug_preview_discord_auth_opens_dialog_with_close_only_actions(
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
+    settings = _vnext(
+        llm="openrouter",
+        openrouter_source="managed",
+        openrouter_alias=OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED.value,
+    )
     monkeypatch.setattr(
         app,
         "_start_discord_managed_auth",
@@ -2169,7 +2293,10 @@ def test_debug_preview_discord_auth_opens_dialog_with_close_only_actions(
         assert app.page.closed[-1] is opened_dialog
 
     assert app.page.tasks == []
-    assert settings.openrouter.selected_source is OpenRouterCredentialSource.MANAGED
+    assert (
+        settings.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
 
 
 def test_debug_preview_qq_auth_states_are_pure_ui_without_tasks_or_persistence(
@@ -2177,9 +2304,7 @@ def test_debug_preview_qq_auth_states_are_pure_ui_without_tasks_or_persistence(
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings = _vnext(llm="openrouter", openrouter_source="managed")
     monkeypatch.setattr(
         app,
         "_start_qq_managed_auth",
@@ -2204,16 +2329,21 @@ def test_debug_preview_qq_auth_states_are_pure_ui_without_tasks_or_persistence(
     gated_dialog = app._qq_managed_auth_dialog
     assert gated_dialog._error_text.value == app_module.t("qq_auth.error.key_unavailable")
     assert app.page.tasks == []
-    assert settings.openrouter.selected_source is OpenRouterCredentialSource.MANAGED
+    assert (
+        settings.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
 
 
 def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
-    settings.openrouter.llm_model = OpenRouterLLMModel.QWEN_35_FLASH_02_23
+    settings = _vnext(
+        model="openrouter_qwen35_flash",
+        connection="managed",
+        openrouter_source="managed",
+        openrouter_alias=OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED.value,
+        openrouter_model=OpenRouterLLMModel.QWEN_35_FLASH_02_23.value,
+    )
     app._ui_application = SimpleNamespace(
         build_managed_openrouter_byok_target=lambda: _byok_pkce_target(settings),
     )
@@ -2231,24 +2361,26 @@ def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -
     target, launch_source = pkce_calls[0]
     assert launch_source == "discord_auth"
     assert target.selection_alias is OpenRouterSelectionAlias.QWEN35_FLASH_BYOK
-    assert settings.openrouter.selected_source is OpenRouterCredentialSource.MANAGED
+    assert (
+        settings.intent.translation.openrouter_selected_source
+        == OpenRouterCredentialSource.MANAGED.value
+    )
 
 
 def test_discord_managed_auth_byok_clears_managed_china_translation_state() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.translation = TranslationSettings(
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.MANAGED_CHINA,
+    settings = _vnext(
+        llm="openrouter",
+        model=TranslationModel.DEEPSEEK_V4_FLASH.value,
+        connection=TranslationConnection.MANAGED_CHINA.value,
+        openrouter_source="managed",
+        openrouter_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value,
+        openrouter_model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value,
+        openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
         connection_history={
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA,
+            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA.value,
         },
     )
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.openrouter.selection_alias = OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-    settings.openrouter.llm_model = OpenRouterLLMModel.DEEPSEEK_V4_FLASH
-    settings.openrouter.provider_routing = OpenRouterProviderRouting.DEEPSEEK_ONLY
     app._ui_application = SimpleNamespace(
         build_managed_openrouter_byok_target=lambda: _byok_pkce_target(settings),
     )
@@ -3258,12 +3390,11 @@ async def test_prompt_apply_keeps_dashboard_target_for_next_request() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
     pending_settings = PromptApplyIntent("new prompt")
-    current_settings = AppSettings()
-    current_settings.languages.target_language = "ja"
+    current_settings = _vnext(target_language="ja")
     applied_targets: list[str] = []
 
-    async def fake_apply_settings(settings: AppSettings) -> None:
-        applied_targets.append(settings.languages.target_language)
+    async def fake_apply_settings(settings) -> None:
+        applied_targets.append(settings.intent.languages.target_language)
 
     controller = SimpleNamespace(
         settings=current_settings,
@@ -3632,7 +3763,7 @@ def test_on_request_openrouter_pkce_uses_settings_mutation_queue(
         config_path=Path("settings.json"),
         application_factory=_construction_application_factory,
     )
-    target_settings = AppSettings()
+    target_settings = AppSettingsVNext()
     queued: list[object] = []
     monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
 
@@ -3645,17 +3776,19 @@ def test_on_request_openrouter_pkce_reopens_existing_auth_url_while_flow_active(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    target_settings = AppSettings()
+    target_settings = AppSettingsVNext()
     reopen_calls: list[str] = []
 
-    async def fake_connect_openrouter_via_pkce(*, target: AppSettings, launch_source: str) -> bool:
+    async def fake_connect_openrouter_via_pkce(
+        *, target: AppSettingsVNext, launch_source: str
+    ) -> bool:
         _ = (target, launch_source)
         return False
 
     controller = SimpleNamespace(
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         reopen_openrouter_pkce_authorization_url=lambda: reopen_calls.append("reopen") or True,
-        settings=AppSettings(),
+        settings=AppSettingsVNext(),
         config_path=Path("settings.json"),
     )
     app._ui_application = compose_test_ui_application_boundary(controller)
@@ -3678,10 +3811,12 @@ async def test_on_request_openrouter_pkce_ignores_duplicate_while_flow_active(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    target_settings = AppSettings()
+    target_settings = AppSettingsVNext()
     pkce_calls: list[str] = []
 
-    async def fake_connect_openrouter_via_pkce(*, target: AppSettings, launch_source: str) -> bool:
+    async def fake_connect_openrouter_via_pkce(
+        *, target: AppSettingsVNext, launch_source: str
+    ) -> bool:
         _ = target
         pkce_calls.append(launch_source)
         return False
@@ -3689,7 +3824,7 @@ async def test_on_request_openrouter_pkce_ignores_duplicate_while_flow_active(
     controller = SimpleNamespace(
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         reopen_openrouter_pkce_authorization_url=lambda: False,
-        settings=AppSettings(),
+        settings=AppSettingsVNext(),
         config_path=Path("settings.json"),
     )
     app._ui_application = compose_test_ui_application_boundary(controller)
@@ -3717,13 +3852,15 @@ async def test_on_request_openrouter_pkce_uses_draft_preserving_refresh_on_succe
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    target_settings = AppSettings()
-    updated_settings = AppSettings()
-    pkce_calls: list[tuple[AppSettings, str]] = []
-    refresh_calls: list[tuple[AppSettings, Path]] = []
+    target_settings = AppSettingsVNext()
+    updated_settings = AppSettingsVNext()
+    pkce_calls: list[tuple[AppSettingsVNext, str]] = []
+    refresh_calls: list[tuple[AppSettingsVNext, Path]] = []
     snackbar_calls: list[tuple[str, str]] = []
 
-    async def fake_connect_openrouter_via_pkce(*, target: AppSettings, launch_source: str) -> bool:
+    async def fake_connect_openrouter_via_pkce(
+        *, target: AppSettingsVNext, launch_source: str
+    ) -> bool:
         pkce_calls.append((target, launch_source))
         return True
 
@@ -3754,19 +3891,21 @@ async def test_on_request_openrouter_pkce_does_not_refresh_settings_view_on_fail
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    target_settings = AppSettings()
-    refresh_calls: list[tuple[AppSettings, Path]] = []
+    target_settings = AppSettingsVNext()
+    refresh_calls: list[tuple[AppSettingsVNext, Path]] = []
 
-    async def fake_connect_openrouter_via_pkce(*, target: AppSettings, launch_source: str) -> bool:
+    async def fake_connect_openrouter_via_pkce(
+        *, target: AppSettingsVNext, launch_source: str
+    ) -> bool:
         _ = (target, launch_source)
         return False
 
     controller = SimpleNamespace(
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
-        settings=AppSettings(),
+        settings=AppSettingsVNext(),
         config_path=Path("settings.json"),
         refresh_settings_after_openrouter_pkce_success=lambda: (
-            refresh_calls.append((AppSettings(), Path("settings.json"))) or True
+            refresh_calls.append((AppSettingsVNext(), Path("settings.json"))) or True
         ),
     )
     app._ui_application = compose_test_ui_application_boundary(controller)
@@ -4074,7 +4213,7 @@ async def test_local_llm_secret_changed_forces_local_llm_rebuild() -> None:
     ) -> None:
         calls.append(force_rebuild_llm)
 
-    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
+    settings = _vnext(llm="local_llm")
     controller = SimpleNamespace(settings=settings, apply_providers=fake_apply_providers)
     app._ui_application = compose_test_ui_application_boundary(controller)
 
@@ -4098,7 +4237,7 @@ async def test_local_llm_secret_changed_ignores_non_local_llm_provider() -> None
     ) -> None:
         calls.append(force_rebuild_llm)
 
-    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.GEMINI))
+    settings = _vnext(llm="gemini")
     controller = SimpleNamespace(settings=settings, apply_providers=fake_apply_providers)
     app._ui_application = compose_test_ui_application_boundary(controller)
 
@@ -4178,10 +4317,7 @@ def test_on_overlay_state_changed_routes_runtime_logs() -> None:
 async def test_on_language_change_updates_settings_and_shows_warning(monkeypatch) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    settings = SimpleNamespace(
-        languages=SimpleNamespace(source_language="ko", target_language="en"),
-        provider=SimpleNamespace(stt=SimpleNamespace(value="deepgram")),
-    )
+    settings = AppSettingsVNext()
     seen = []
 
     async def fake_on_dashboard_language_change(change) -> None:
@@ -4208,8 +4344,8 @@ async def test_on_language_change_updates_settings_and_shows_warning(monkeypatch
     )
     app._on_language_change(change)
 
-    assert settings.languages.source_language == "ko"
-    assert settings.languages.target_language == "en"
+    assert settings.intent.languages.source_language == "ko"
+    assert settings.intent.languages.target_language == "en"
     assert len(app.page.opened) == 1
     assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
@@ -4222,10 +4358,7 @@ async def test_on_language_change_forwards_automatic_peer_mode(
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    settings = SimpleNamespace(
-        languages=SimpleNamespace(source_language="ko", target_language="en"),
-        provider=SimpleNamespace(stt=SimpleNamespace(value="deepgram")),
-    )
+    settings = AppSettingsVNext()
     seen = []
 
     async def callback(change) -> None:
@@ -4376,7 +4509,7 @@ def test_show_founder_letter_dialog_opens_with_locale_readme_action(
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
     captured: dict[str, object] = {}
-    pkce_calls: list[tuple[AppSettings, str]] = []
+    pkce_calls: list[tuple[AppSettingsVNext, str]] = []
     opened_urls: list[str] = []
     previous_locale = i18n_module.get_locale()
 
@@ -4426,7 +4559,7 @@ def test_show_founder_letter_dialog_does_not_prepare_byok_alias_when_opened(
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
     captured: dict[str, object] = {}
-    pkce_calls: list[tuple[AppSettings, str]] = []
+    pkce_calls: list[tuple[AppSettingsVNext, str]] = []
 
     class FakeFounderLetterDialog:
         def __init__(self, _page, *, on_readme=None, on_connect=None, on_contact=None):

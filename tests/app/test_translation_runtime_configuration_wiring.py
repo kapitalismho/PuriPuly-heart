@@ -14,8 +14,7 @@ from puripuly_heart.app.wiring_translation_runtime_configuration import (
     replace_translation_runtime_settings,
 )
 
-from puripuly_heart.config.settings import AppSettings
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigurationOwner,
@@ -31,20 +30,30 @@ def test_settings_replace_is_one_atomic_revision_and_preserves_runtime_only_valu
         low_latency_finalize_wait_ms=225,
     )
     owner = TranslationRuntimeConfigurationOwner(initial)
-    settings = AppSettings()
-    settings.languages.source_language = "ja"
-    settings.languages.target_language = "fr"
-    settings.languages.peer_source_language = "ko"
-    settings.languages.peer_target_language = "en"
-    settings.system_prompt = "runtime prompt"
-    settings.osc.chatbox_include_source = False
-    settings.stt.low_latency_merge_gap_ms = 725
-    settings.stt.low_latency_spec_retry_max = 3
-    settings.stt.low_latency_vad_hangover_ms = 815
-    settings.desktop_audio.vad_hangover_ms = 935
-    settings_values = project_translation_runtime_settings_from_vnext(
-        from_legacy_app_settings(settings)
+    baseline = AppSettingsVNext()
+    settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            languages=replace(
+                baseline.intent.languages,
+                source_language="ja",
+                target_language="fr",
+                peer_source_language="ko",
+                peer_target_language="en",
+            ),
+            prompts=replace(baseline.intent.prompts, system_prompt="runtime prompt"),
+            osc=replace(baseline.intent.osc, chatbox_include_source=False),
+            stt=replace(
+                baseline.intent.stt,
+                low_latency_merge_gap_ms=725,
+                low_latency_spec_retry_max=3,
+                low_latency_vad_hangover_ms=815,
+            ),
+            desktop_audio=replace(baseline.intent.desktop_audio, vad_hangover_ms=935),
+        ),
     )
+    settings_values = project_translation_runtime_settings_from_vnext(settings)
 
     change = replace_translation_runtime_settings(
         owner,

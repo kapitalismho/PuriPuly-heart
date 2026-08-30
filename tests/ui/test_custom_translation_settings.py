@@ -13,16 +13,11 @@ from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    QwenLLMModel,
-    QwenRegion,
-    TranslationConnection,
-    TranslationFallbackSettings,
-    TranslationModel,
-    TranslationSettings,
+from puripuly_heart.config.settings_vnext.schema import (
+    AppSettingsVNext,
+    TranslationFallbackIntent,
 )
+from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.ui.views import settings as settings_view
 
@@ -87,24 +82,42 @@ def _view(
     return view
 
 
-def _custom_settings() -> AppSettings:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.QWEN
-    settings.qwen.region = QwenRegion.SINGAPORE
-    settings.qwen.llm_model = QwenLLMModel.QWEN_35_PLUS
-    settings.translation = TranslationSettings(
-        model=TranslationModel.QWEN_35_PLUS,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-        connection_history={
-            TranslationModel.QWEN_35_PLUS.value: TranslationConnection.OFFICIAL_BYOK,
-        },
-        fallback=TranslationFallbackSettings(
-            enabled=True,
-            model=TranslationModel.GEMMA4,
-            connection=TranslationConnection.OPENROUTER,
+def _custom_settings() -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model="qwen35_plus",
+                connection="official_byok",
+                connection_history={"qwen35_plus": "official_byok"},
+                qwen=replace(
+                    settings.intent.translation.qwen,
+                    region="singapore",
+                    llm_model="qwen3.5-plus",
+                ),
+                fallback=TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_a4b"),
+            ),
         ),
     )
-    return settings
+
+
+def _custom_http_settings(*, http_extension_id: str = "demo") -> AppSettingsVNext:
+    settings = _custom_settings()
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model="custom_http",
+                connection="custom_http",
+                http_extension_id=http_extension_id,
+            ),
+        ),
+    )
 
 
 def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
@@ -119,16 +132,17 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     settings = _custom_settings()
     view.load_from_settings(settings, config_path=tmp_path / "settings.json")
 
-    fallback = settings.translation.fallback
+    fallback = settings.intent.translation.fallback
     view._on_llm_selected(TranslationModel.CUSTOM_HTTP.value)
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.model is TranslationModel.CUSTOM_HTTP
-    assert pending.translation.connection is TranslationConnection.CUSTOM_HTTP
-    assert pending.translation.previous_llm_model is TranslationModel.QWEN_35_PLUS
-    assert pending.provider.llm is LLMProviderName.QWEN
-    assert pending.translation.fallback == fallback
+    assert pending.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
+    assert pending.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
+    assert pending.intent.translation.previous_llm_model == TranslationModel.QWEN_35_PLUS.value
+    assert pending.intent.translation.fallback.enabled == fallback.enabled
+    assert pending.intent.translation.fallback.model == fallback.model
+    assert pending.intent.translation.fallback.connection == fallback.connection
     assert view._http_extension_row.visible is True
     assert view._http_extension_host.visible is True
     assert view._translation_connection_row.visible is False
@@ -143,7 +157,7 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.http_extension_id == "demo"
+    assert pending.intent.translation.http_extension_id == "demo"
     assert set(view._http_extension_secret_fields) == {"api_key"}
     assert view._http_extension_secret_fields["api_key"].value == "saved-secret"
     assert view._http_extension_secret_fields["api_key"].password is True
@@ -153,11 +167,12 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.model is TranslationModel.QWEN_35_PLUS
-    assert pending.translation.connection is TranslationConnection.OFFICIAL_BYOK
-    assert pending.translation.previous_llm_model is None
-    assert pending.translation.fallback == fallback
-    assert pending.provider.llm is LLMProviderName.QWEN
+    assert pending.intent.translation.model == TranslationModel.QWEN_35_PLUS.value
+    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
+    assert pending.intent.translation.previous_llm_model is None
+    assert pending.intent.translation.fallback.enabled == fallback.enabled
+    assert pending.intent.translation.fallback.model == fallback.model
+    assert pending.intent.translation.fallback.connection == fallback.connection
 
 
 def test_custom_http_credentials_use_namespaced_secret_callback_and_reload_isolated_errors(
@@ -169,10 +184,7 @@ def test_custom_http_credentials_use_namespaced_secret_callback_and_reload_isola
     registry.reload()
     store = SecretStore({"http_extension.demo.api_key": "saved-secret"})
     view = _view(monkeypatch, registry, store)
-    settings = _custom_settings()
-    settings.translation.model = TranslationModel.CUSTOM_HTTP
-    settings.translation.connection = TranslationConnection.CUSTOM_HTTP
-    settings.translation.http_extension_id = "demo"
+    settings = _custom_http_settings()
     callbacks: list[tuple[str, str]] = []
     notices: list[str] = []
 
@@ -228,10 +240,7 @@ def test_custom_http_reload_uses_active_engine_with_unsaved_llm_draft(
     registry = HttpExtensionRegistry(tmp_path)
     registry.reload()
     view = _view(monkeypatch, registry, SecretStore())
-    settings = _custom_settings()
-    settings.translation.model = TranslationModel.CUSTOM_HTTP
-    settings.translation.connection = TranslationConnection.CUSTOM_HTTP
-    settings.translation.http_extension_id = "demo"
+    settings = _custom_http_settings()
     view.load_from_settings(settings, config_path=tmp_path / "settings.json")
 
     draft = view._ensure_provider_settings_draft()
@@ -264,10 +273,7 @@ def test_custom_http_card_surfaces_missing_selected_extension_without_fallback(
     registry.reload()
     store = SecretStore()
     view = _view(monkeypatch, registry, store)
-    settings = _custom_settings()
-    settings.translation.model = TranslationModel.CUSTOM_HTTP
-    settings.translation.connection = TranslationConnection.CUSTOM_HTTP
-    settings.translation.http_extension_id = "demo"
+    settings = _custom_http_settings()
     changed: list[bool] = []
     view.on_providers_changed = lambda: changed.append(True)
     view.load_from_settings(settings, config_path=tmp_path / "settings.json")
@@ -279,7 +285,7 @@ def test_custom_http_card_surfaces_missing_selected_extension_without_fallback(
         "settings.http_extension.none"
     )
     assert view._http_extension_selected_id == "demo"
-    assert view.build_provider_apply_settings().translation.http_extension_id == "demo"
+    assert view.build_provider_apply_settings().intent.translation.http_extension_id == "demo"
     assert len(view._http_extension_credentials.controls) == 0
     assert changed == [True]
 
@@ -297,10 +303,7 @@ def test_custom_http_form_shows_only_when_extension_declares_secrets(
     registry = HttpExtensionRegistry(tmp_path)
     registry.reload()
     view = _view(monkeypatch, registry, SecretStore())
-    settings = _custom_settings()
-    settings.translation.model = TranslationModel.CUSTOM_HTTP
-    settings.translation.connection = TranslationConnection.CUSTOM_HTTP
-    settings.translation.http_extension_id = "demo"
+    settings = _custom_http_settings()
     view.load_from_settings(settings, config_path=tmp_path / "settings.json")
 
     assert view._http_extension_credentials in view._api_keys_column.controls

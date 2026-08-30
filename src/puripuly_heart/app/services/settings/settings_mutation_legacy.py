@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from puripuly_heart.app.ports._settings_values import freeze_settings_values
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_TRANSACTION,
@@ -24,109 +25,111 @@ from .settings_mutation import (
 )
 
 ORDER21_TRANSLATION_PROVIDER_SETTINGS_PATHS: Final[tuple[str, ...]] = (
-    "translation.model",
-    "translation.connection",
-    "translation.connection_history",
-    "translation.fallback",
-    "translation.http_extension_id",
-    "translation.previous_llm_model",
-    "translation.gpu_device_id",
-    "provider.llm",
-    "gemini.llm_model",
-    "openrouter.llm_model",
-    "openrouter.routing_mode",
-    "openrouter.provider_routing",
-    "openrouter.selected_source",
-    "openrouter.selection_alias",
-    "openrouter.broker_base_url",
-    "qwen.llm_model",
-    "qwen.region",
-    "deepseek.llm_model",
-    "local_llm.backend",
-    "local_llm.base_url",
-    "local_llm.model",
-    "local_llm.extra_body",
-    "llm.concurrency_limit",
+    "intent.translation.model",
+    "intent.translation.connection",
+    "intent.translation.connection_history",
+    "intent.translation.fallback",
+    "intent.translation.http_extension_id",
+    "intent.translation.previous_llm_model",
+    "intent.translation.gpu_device_id",
+    "intent.translation.gemini.llm_model",
+    "intent.translation.openrouter_model",
+    "intent.translation.openrouter_routing_mode",
+    "intent.translation.openrouter_provider_routing",
+    "intent.translation.openrouter_selected_source",
+    "intent.translation.openrouter_selection_alias",
+    "intent.translation.openrouter_broker_base_url",
+    "intent.translation.qwen.llm_model",
+    "intent.translation.qwen.region",
+    "intent.translation.deepseek.llm_model",
+    "intent.local_llm.backend",
+    "intent.local_llm.base_url",
+    "intent.local_llm.model",
+    "intent.local_llm.extra_body",
+    "intent.translation.concurrency_limit",
 )
 
 ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS: Final[tuple[str, ...]] = (
-    "provider.stt",
-    "provider.peer_stt",
-    "languages.source_language",
-    "languages.target_language",
-    "languages.secondary_target_language",
-    "languages.peer_source_language",
-    "languages.peer_target_language",
-    "languages.peer_source_mode",
-    "languages.peer_expected_languages",
-    "languages.recent_source_languages",
-    "languages.recent_target_languages",
-    "audio.internal_sample_rate_hz",
-    "audio.internal_channels",
-    "audio.ring_buffer_ms",
-    "audio.input_host_api",
-    "audio.input_device",
-    "desktop_audio.output_device",
-    "desktop_audio.vad_speech_threshold",
-    "desktop_audio.vad_hangover_ms",
-    "desktop_audio.vad_pre_roll_ms",
-    "stt.drain_timeout_s",
-    "stt.vad_speech_threshold",
-    "stt.low_latency_vad_hangover_ms",
-    "stt.low_latency_merge_gap_ms",
-    "stt.low_latency_spec_retry_max",
-    "stt.custom_vocabulary_enabled",
-    "stt.custom_terms",
-    "stt.gpu_device_id",
-    "deepgram_stt.model",
-    "qwen_asr_stt.model",
-    "soniox_stt.model",
-    "soniox_stt.endpoint",
-    "soniox_stt.keepalive_interval_s",
-    "soniox_stt.trailing_silence_ms",
+    "intent.stt.provider",
+    "intent.peer_stt.provider",
+    "intent.languages.source_language",
+    "intent.languages.target_language",
+    "intent.languages.secondary_target_language",
+    "intent.languages.peer_source_language",
+    "intent.languages.peer_target_language",
+    "intent.languages.peer_source_mode",
+    "intent.languages.peer_expected_languages",
+    "intent.languages.recent_source_languages",
+    "intent.languages.recent_target_languages",
+    "intent.audio.ring_buffer_ms",
+    "intent.audio.input_host_api",
+    "intent.audio.input_device",
+    "intent.desktop_audio.output_device",
+    "intent.desktop_audio.vad_speech_threshold",
+    "intent.desktop_audio.vad_hangover_ms",
+    "intent.desktop_audio.vad_pre_roll_ms",
+    "intent.stt.drain_timeout_s",
+    "intent.stt.vad_speech_threshold",
+    "intent.stt.low_latency_vad_hangover_ms",
+    "intent.stt.low_latency_merge_gap_ms",
+    "intent.stt.low_latency_spec_retry_max",
+    "intent.stt.custom_vocabulary_enabled",
+    "intent.stt.custom_terms",
+    "intent.stt.gpu_device_id",
+    "intent.stt.deepgram.model",
+    "intent.stt.qwen_asr.model",
+    "intent.stt.soniox.model",
+    "intent.stt.soniox.endpoint",
+    "intent.stt.soniox.keepalive_interval_s",
+    "intent.stt.soniox.trailing_silence_ms",
+    "intent.stt.custom.mode",
+    "intent.stt.custom.compatibility",
+    "intent.stt.custom.endpoint",
+    "intent.stt.custom.model",
+    "intent.stt.custom.extra",
 )
 
 ORDER23_OVERLAY_OSC_OUTPUT_SETTINGS_PATHS: Final[tuple[str, ...]] = (
-    "overlay.target",
-    "overlay.show_translation",
-    "overlay.show_peer_original",
-    "overlay.calibration.anchor",
-    "overlay.calibration.offset_x",
-    "overlay.calibration.offset_y",
-    "overlay.calibration.distance",
-    "overlay.calibration.text_scale",
-    "overlay.calibration.background_alpha",
-    "overlay.desktop_flet.size_preset",
-    "overlay.desktop_flet.position.x",
-    "overlay.desktop_flet.position.y",
-    "overlay.desktop_flet.swap_caption_languages",
-    "overlay.desktop_flet.visual.background_alpha",
-    "osc.host",
-    "osc.port",
-    "osc.connection_mode",
-    "osc.send_port",
-    "osc.receive_port",
-    "osc.chatbox_address",
-    "osc.chatbox_send",
-    "osc.chatbox_clear",
-    "osc.chatbox_max_chars",
-    "osc.vrc_mic_intercept",
-    "osc.chatbox_include_source",
+    "intent.overlay.target",
+    "intent.overlay.show_translation",
+    "intent.overlay.show_peer_original",
+    "intent.overlay.calibration.anchor",
+    "intent.overlay.calibration.offset_x",
+    "intent.overlay.calibration.offset_y",
+    "intent.overlay.calibration.distance",
+    "intent.overlay.calibration.text_scale",
+    "intent.overlay.calibration.background_alpha",
+    "intent.overlay.desktop_flet.size_preset",
+    "intent.overlay.desktop_flet.position.x",
+    "intent.overlay.desktop_flet.position.y",
+    "intent.overlay.desktop_flet.swap_caption_languages",
+    "intent.overlay.desktop_flet.visual.background_alpha",
+    "intent.osc.host",
+    "intent.osc.port",
+    "intent.osc.connection_mode",
+    "intent.osc.send_port",
+    "intent.osc.receive_port",
+    "intent.osc.chatbox_address",
+    "intent.osc.chatbox_send",
+    "intent.osc.chatbox_clear",
+    "intent.osc.chatbox_max_chars",
+    "intent.osc.vrc_mic_intercept",
+    "intent.osc.chatbox_include_source",
 )
 
 ORDER24_UI_PROMPT_CLIPBOARD_STATE_SETTINGS_PATHS: Final[tuple[str, ...]] = (
-    "secrets.backend",
-    "secrets.encrypted_file_path",
-    "ui.locale",
-    "ui.peer_translation_eula_accepted",
-    "ui.integrated_context_bootstrapped",
-    "ui.clipboard_auto_translate_enabled",
-    "ui.github_star_prompt_clicked",
-    "ui.github_star_prompt_last_shown_at",
-    "ui.github_star_prompt_show_count",
-    "ui.github_star_prompt_translation_success_observed",
-    "ui.github_star_prompt_eligible_launch_count",
-    "system_prompt",
+    "intent.secrets.backend",
+    "intent.secrets.encrypted_file_path",
+    "intent.ui.locale",
+    "state.peer_translation.eula_accepted",
+    "state.integrated_context.bootstrapped",
+    "intent.clipboard.auto_translate_enabled",
+    "state.github_star_prompt.clicked",
+    "state.github_star_prompt.last_shown_at",
+    "state.github_star_prompt.show_count",
+    "state.github_star_prompt.translation_success_observed",
+    "state.github_star_prompt.eligible_launch_count",
+    "intent.prompts.system_prompt",
 )
 
 _SURFACE_ALLOWED_PATHS: Final[dict[str, tuple[str, ...]]] = {
@@ -247,13 +250,13 @@ class _SettingsPathSnapshot:
     @classmethod
     def from_settings(
         cls,
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         paths: tuple[str, ...],
     ) -> _SettingsPathSnapshot:
         return cls(tuple((path, _get_settings_path_value(settings, path)) for path in paths))
 
-    def patch_to(self, settings: object) -> dict[str, object]:
+    def patch_to(self, settings: AppSettingsVNext) -> dict[str, object]:
         patch: dict[str, object] = {}
         for path, previous_value in self.values_by_path:
             next_value = _get_settings_path_value(settings, path)
@@ -261,27 +264,29 @@ class _SettingsPathSnapshot:
                 patch[path] = next_value
         return patch
 
-    def materialize_base_from(self, settings: object) -> object:
-        base_settings = copy.deepcopy(settings)
-        for path, previous_value in self.values_by_path:
-            _set_settings_path_value(base_settings, path, previous_value)
-        return base_settings
+    def materialize_base_from(self, settings: AppSettingsVNext) -> AppSettingsVNext:
+        patch = {path: previous_value for path, previous_value in self.values_by_path}
+        return apply_settings_path_patch(settings, patch)
 
 
-def settings_path_snapshot_for_stt_language_audio(settings: object) -> _SettingsPathSnapshot:
+def settings_path_snapshot_for_stt_language_audio(
+    settings: AppSettingsVNext,
+) -> _SettingsPathSnapshot:
     return _SettingsPathSnapshot.from_settings(
         settings, paths=ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS
     )
 
 
-def settings_path_snapshot_for_overlay_osc_output(settings: object) -> _SettingsPathSnapshot:
+def settings_path_snapshot_for_overlay_osc_output(
+    settings: AppSettingsVNext,
+) -> _SettingsPathSnapshot:
     return _SettingsPathSnapshot.from_settings(
         settings, paths=ORDER23_OVERLAY_OSC_OUTPUT_SETTINGS_PATHS
     )
 
 
 def settings_path_snapshot_for_ui_prompt_clipboard_state(
-    settings: object,
+    settings: AppSettingsVNext,
 ) -> _SettingsPathSnapshot:
     return _SettingsPathSnapshot.from_settings(
         settings, paths=ORDER24_UI_PROMPT_CLIPBOARD_STATE_SETTINGS_PATHS
@@ -289,8 +294,8 @@ def settings_path_snapshot_for_ui_prompt_clipboard_state(
 
 
 def build_translation_provider_settings_path_patch(
-    previous: object,
-    next_settings: object,
+    previous: AppSettingsVNext,
+    next_settings: AppSettingsVNext,
 ) -> dict[str, object]:
     return _build_settings_path_patch(
         previous,
@@ -300,8 +305,8 @@ def build_translation_provider_settings_path_patch(
 
 
 def build_stt_language_audio_settings_path_patch(
-    previous: object,
-    next_settings: object,
+    previous: AppSettingsVNext,
+    next_settings: AppSettingsVNext,
 ) -> dict[str, object]:
     return _build_settings_path_patch(
         previous,
@@ -311,8 +316,8 @@ def build_stt_language_audio_settings_path_patch(
 
 
 def build_overlay_osc_output_settings_path_patch(
-    previous: object,
-    next_settings: object,
+    previous: AppSettingsVNext,
+    next_settings: AppSettingsVNext,
 ) -> dict[str, object]:
     return _build_settings_path_patch(
         previous,
@@ -322,8 +327,8 @@ def build_overlay_osc_output_settings_path_patch(
 
 
 def build_ui_prompt_clipboard_state_settings_path_patch(
-    previous: object,
-    next_settings: object,
+    previous: AppSettingsVNext,
+    next_settings: AppSettingsVNext,
 ) -> dict[str, object]:
     return _build_settings_path_patch(
         previous,
@@ -332,24 +337,54 @@ def build_ui_prompt_clipboard_state_settings_path_patch(
     )
 
 
-def _get_settings_path_value(settings: object, path: str) -> object:
-    current: object = settings
+def _canonical_settings_dict(settings: AppSettingsVNext) -> dict[str, object]:
+    from puripuly_heart.config.settings_vnext import serialization
+    from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+
+    if not isinstance(settings, AppSettingsVNext):
+        raise TypeError("canonical settings path mutation requires AppSettingsVNext")
+    return serialization.to_dict(settings)
+
+
+def _settings_from_canonical_dict(data: dict[str, object]) -> AppSettingsVNext:
+    from puripuly_heart.config.settings_vnext import serialization
+
+    return serialization.from_dict(data)
+
+
+def _get_settings_path_value(settings: AppSettingsVNext, path: str) -> object:
+    current: object = _canonical_settings_dict(settings)
     for segment in path.split("."):
-        current = getattr(current, segment)
+        if not isinstance(current, dict):
+            raise KeyError(path)
+        current = current[segment]
     return copy.deepcopy(current)
 
 
-def _set_settings_path_value(settings: object, path: str, value: object) -> None:
-    current: object = settings
+def _set_dict_path(data: dict[str, object], path: str, value: object) -> None:
+    current: dict[str, object] = data
     segments = path.split(".")
     for segment in segments[:-1]:
-        current = getattr(current, segment)
-    setattr(current, segments[-1], _mutable_settings_value(value))
+        nested = current.get(segment)
+        if not isinstance(nested, dict):
+            nested = {}
+            current[segment] = nested
+        current = nested
+    current[segments[-1]] = _mutable_settings_value(value)
+
+
+def apply_settings_path_patch(
+    settings: AppSettingsVNext, patch: Mapping[str, object]
+) -> AppSettingsVNext:
+    data = _canonical_settings_dict(settings)
+    for path, value in patch.items():
+        _set_dict_path(data, path, value)
+    return _settings_from_canonical_dict(data)
 
 
 def _build_settings_path_patch(
-    previous: object,
-    next_settings: object,
+    previous: AppSettingsVNext,
+    next_settings: AppSettingsVNext,
     *,
     paths: tuple[str, ...],
 ) -> dict[str, object]:
@@ -362,9 +397,10 @@ def _build_settings_path_patch(
     return patch
 
 
-def _apply_settings_path_patch(settings: object, patch: Mapping[str, object]) -> None:
-    for path, value in patch.items():
-        _set_settings_path_value(settings, path, value)
+def _apply_settings_path_patch(
+    settings: AppSettingsVNext, patch: Mapping[str, object]
+) -> AppSettingsVNext:
+    return apply_settings_path_patch(settings, patch)
 
 
 def _mutable_settings_value(value: object) -> object:
@@ -389,7 +425,7 @@ __all__ = [
     "_build_settings_path_patch",
     "_get_settings_path_value",
     "_mutable_settings_value",
-    "_set_settings_path_value",
+    "apply_settings_path_patch",
     "build_overlay_osc_output_settings_path_patch",
     "build_stt_language_audio_settings_path_patch",
     "build_translation_provider_settings_path_patch",

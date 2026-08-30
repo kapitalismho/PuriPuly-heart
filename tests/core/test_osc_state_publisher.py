@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from puripuly_heart.app.services.osc.state_publisher import (
@@ -7,12 +9,9 @@ from puripuly_heart.app.services.osc.state_publisher import (
     OscStatePublisher,
     state_from_settings,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    STTProviderName,
-    TranslationConnection,
-    TranslationModel,
-)
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 
 
 class FakeSender:
@@ -77,9 +76,18 @@ def test_state_publisher_uses_translation_selection_ids(
     connection: TranslationConnection,
     expected_id: int,
 ) -> None:
-    settings = AppSettings()
-    settings.translation.model = model
-    settings.translation.connection = connection
+    baseline = AppSettingsVNext()
+    settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            translation=replace(
+                baseline.intent.translation,
+                model=model.value,
+                connection=connection.value,
+            ),
+        ),
+    )
     state = state_from_settings(settings)
     sender = FakeSender()
 
@@ -122,10 +130,20 @@ def test_state_from_settings_publishes_each_fallback_alias(
     connection: TranslationConnection,
     expected: str,
 ) -> None:
-    settings = AppSettings()
-    settings.translation.fallback.enabled = True
-    settings.translation.fallback.model = model
-    settings.translation.fallback.connection = connection
+    baseline = AppSettingsVNext()
+    settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            translation=replace(
+                baseline.intent.translation,
+                fallback=replace(
+                    baseline.intent.translation.fallback,
+                    selection_alias=expected,
+                ),
+            ),
+        ),
+    )
 
     assert state_from_settings(settings).fallback == expected
 
@@ -142,8 +160,14 @@ def test_state_publisher_publishes_custom_asr_ids(
     provider: STTProviderName,
     expected_id: int,
 ) -> None:
-    settings = AppSettings()
-    settings.provider.stt = provider
+    baseline = AppSettingsVNext()
+    settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            stt=replace(baseline.intent.stt, provider=provider.value),
+        ),
+    )
     sender = FakeSender()
 
     OscStatePublisher(sender).start(state_from_settings(settings))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -7,24 +8,36 @@ import pytest
 
 from puripuly_heart.app.adapters.ui_runtime import UiProviderRuntimeAdapter
 from puripuly_heart.app.ports.ui_models import GpuDeviceOption
-from puripuly_heart.config.settings import (
-    AppSettings,
-    TranslationConnection,
-    TranslationModel,
-    TranslationSettings,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.local_translation.devices import LlamaVulkanDevice
 
 
+def _custom_http_settings() -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model=TranslationModel.CUSTOM_HTTP.value,
+                connection=TranslationConnection.CUSTOM_HTTP.value,
+                http_extension_id="demo",
+            ),
+        ),
+    )
+
+
 def _adapter(
-    settings: AppSettings,
+    settings: AppSettingsVNext,
     *,
     change_secret: AsyncMock,
     apply: AsyncMock,
     managed_gemma: object | None = None,
 ) -> UiProviderRuntimeAdapter:
     return UiProviderRuntimeAdapter(
-        settings=SimpleNamespace(current=settings),
+        settings=SimpleNamespace(canonical=settings),
         provider_application=SimpleNamespace(apply=apply),
         gpu=object(),
         managed=object(),
@@ -37,12 +50,7 @@ def _adapter(
 
 @pytest.mark.asyncio
 async def test_active_custom_http_secret_change_rebuilds_runtime_backend() -> None:
-    settings = AppSettings()
-    settings.translation = TranslationSettings(
-        model=TranslationModel.CUSTOM_HTTP,
-        connection=TranslationConnection.CUSTOM_HTTP,
-        http_extension_id="demo",
-    )
+    settings = _custom_http_settings()
     change_secret = AsyncMock(return_value=True)
     apply = AsyncMock(return_value=True)
     adapter = _adapter(settings, change_secret=change_secret, apply=apply)
@@ -66,12 +74,7 @@ async def test_active_custom_http_secret_change_rebuilds_runtime_backend() -> No
 
 @pytest.mark.asyncio
 async def test_inactive_custom_http_secret_change_does_not_rebuild_active_runtime() -> None:
-    settings = AppSettings()
-    settings.translation = TranslationSettings(
-        model=TranslationModel.CUSTOM_HTTP,
-        connection=TranslationConnection.CUSTOM_HTTP,
-        http_extension_id="demo",
-    )
+    settings = _custom_http_settings()
     change_secret = AsyncMock(return_value=True)
     apply = AsyncMock(return_value=True)
     adapter = _adapter(settings, change_secret=change_secret, apply=apply)
@@ -86,7 +89,7 @@ async def test_inactive_custom_http_secret_change_does_not_rebuild_active_runtim
 
 @pytest.mark.asyncio
 async def test_managed_gemma_notice_cancel_targets_owned_prepare() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     cancel_calls: list[bool] = []
     adapter = _adapter(
         settings,
@@ -105,7 +108,7 @@ async def test_gpu_discovery_publishes_llama_devices(
 ) -> None:
     published: list[tuple[GpuDeviceOption, ...]] = []
     adapter = _adapter(
-        AppSettings(),
+        AppSettingsVNext(),
         change_secret=AsyncMock(),
         apply=AsyncMock(),
     )

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import asdict, replace
+from types import SimpleNamespace
+
 import pytest
 from puripuly_heart.app.wiring_managed_auth_factory import (
     ManagedIdentityStateAdapter,
@@ -19,6 +22,7 @@ from puripuly_heart.core.openrouter_credentials import (
 from puripuly_heart.app import wiring_llm_factory
 from puripuly_heart.app.wiring import create_llm_provider_from_resolved_config
 from puripuly_heart.app.wiring.wiring_llm_factory import llm_factory_extras_from_vnext
+from puripuly_heart.config.provider_values import OpenRouterCredentialSource
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_MANAGED,
     ResolvedCredentialRequirement,
@@ -26,14 +30,7 @@ from puripuly_heart.config.resolved import (
     ResolvedLLMFallbackPlan,
     ResolvedLLMTarget,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    OpenRouterCredentialSource,
-    TranslationConnection,
-    TranslationModel,
-)
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.providers.llm.managed_gemma import ManagedGemmaLLMProvider
@@ -64,14 +61,49 @@ class RecordingReleaseService:
         )
 
 
-def _managed_china_settings() -> AppSettings:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
-    settings.translation.connection = TranslationConnection.MANAGED_CHINA
-    settings.managed_identity.active_managed_credential_ref = "qq-managed-ref"
-    return settings
+def _managed_china_settings() -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model="deepseek_v4_flash",
+                connection="managed_china",
+                openrouter_selected_source="managed",
+            ),
+        ),
+        state=replace(
+            settings.state,
+            managed_connection=replace(
+                settings.state.managed_connection,
+                active_managed_credential_ref="qq-managed-ref",
+            ),
+        ),
+    )
+
+
+def _managed_settings() -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                connection="managed",
+                openrouter_selected_source="managed",
+            ),
+        ),
+    )
+
+
+def _identity_adapter(settings: AppSettingsVNext) -> ManagedIdentityStateAdapter:
+    return ManagedIdentityStateAdapter(
+        SimpleNamespace(**asdict(settings.state.managed_connection)),
+        lambda _updated: None,
+    )
 
 
 def _managed_china_resolved_config() -> ResolvedLLMConfig:
@@ -152,7 +184,7 @@ def test_managed_china_direct_provider_uses_qq_managed_secret() -> None:
         _managed_china_resolved_config(),
         secrets=secrets,
         managed_release_service=object(),
-        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
+        extras=llm_factory_extras_from_vnext(settings),
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
@@ -162,7 +194,16 @@ def test_managed_china_direct_provider_uses_qq_managed_secret() -> None:
 
 def test_managed_china_direct_provider_survives_missing_active_managed_state() -> None:
     settings = _managed_china_settings()
-    settings.managed_identity.active_managed_credential_ref = None
+    settings = replace(
+        settings,
+        state=replace(
+            settings.state,
+            managed_connection=replace(
+                settings.state.managed_connection,
+                active_managed_credential_ref=None,
+            ),
+        ),
+    )
     secrets = InMemorySecretStore()
     secrets.set(OPENROUTER_MANAGED_QQ_API_KEY_SECRET, "qq-managed-key")
 
@@ -170,7 +211,7 @@ def test_managed_china_direct_provider_survives_missing_active_managed_state() -
         _managed_china_resolved_config(),
         secrets=secrets,
         managed_release_service=object(),
-        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
+        extras=llm_factory_extras_from_vnext(settings),
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
@@ -188,37 +229,33 @@ def test_managed_china_blocks_opposite_discord_managed_secret() -> None:
             _managed_china_resolved_config(),
             secrets=secrets,
             managed_release_service=object(),
-            extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
+            extras=llm_factory_extras_from_vnext(settings),
         )
 
 
 def test_resolved_qq_managed_credential_projects_release_runtime_kind_without_mutating_intent() -> (
     None
 ):
-    settings = AppSettings()
-    settings.translation.connection = TranslationConnection.MANAGED
+    settings = _managed_settings()
 
     projected = wiring_llm_factory._openrouter_release_config_from_resolved_fields(
-        model=settings.openrouter.llm_model,
+        model=settings.intent.translation.openrouter_model,
         credential=_qq_managed_credential(),
         selected_source=OpenRouterCredentialSource.MANAGED,
         include_selection_alias=True,
     )
 
-    assert settings.translation.connection == TranslationConnection.MANAGED
+    assert settings.intent.translation.connection == "managed"
     assert projected.managed_credential_kind == "qq"
 
 
 @pytest.mark.asyncio
 async def test_mixed_managed_fallback_rebuilds_release_service_for_fallback_kind() -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.translation.connection = TranslationConnection.MANAGED
+    settings = _managed_settings()
     secrets = InMemorySecretStore()
     release_service = ManagedOpenRouterReleaseService(
         openrouter_config=build_openrouter_release_runtime_config(settings),
-        managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
+        managed_state=_identity_adapter(settings),
         secrets=secrets,
         client=UnavailableManagedOpenRouterReleaseClient(),
         app_version="test",
@@ -235,7 +272,7 @@ async def test_mixed_managed_fallback_rebuilds_release_service_for_fallback_kind
         config,
         secrets=secrets,
         managed_release_service=release_service,
-        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
+        extras=llm_factory_extras_from_vnext(settings),
     )
 
     primary_release = provider.inner.primary.release_service  # type: ignore[attr-defined]
@@ -250,9 +287,7 @@ async def test_mixed_managed_fallback_rebuilds_release_service_for_fallback_kind
 
 @pytest.mark.asyncio
 async def test_standard_lazy_managed_provider_blocks_qq_claim_before_release_ensure() -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings = _managed_settings()
     managed_state = RecordingManagedState(local_claim_sources=("qq",))
     release_service = RecordingReleaseService(managed_state)
 
@@ -260,7 +295,7 @@ async def test_standard_lazy_managed_provider_blocks_qq_claim_before_release_ens
         _standard_managed_resolved_config(),
         secrets=InMemorySecretStore(),
         managed_release_service=release_service,
-        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
+        extras=llm_factory_extras_from_vnext(settings),
     )
 
     result = await provider.inner.release_service.ensure_key_for_llm_start()  # type: ignore[attr-defined]
@@ -272,9 +307,7 @@ async def test_standard_lazy_managed_provider_blocks_qq_claim_before_release_ens
 
 @pytest.mark.asyncio
 async def test_standard_lazy_managed_provider_records_discord_claim_after_release_ready() -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings = _managed_settings()
     managed_state = RecordingManagedState()
     release_service = RecordingReleaseService(managed_state)
 
@@ -282,7 +315,7 @@ async def test_standard_lazy_managed_provider_records_discord_claim_after_releas
         _standard_managed_resolved_config(),
         secrets=InMemorySecretStore(),
         managed_release_service=release_service,
-        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
+        extras=llm_factory_extras_from_vnext(settings),
     )
 
     result = await provider.inner.release_service.ensure_key_for_llm_start()  # type: ignore[attr-defined]

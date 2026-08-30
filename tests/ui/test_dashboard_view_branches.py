@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import replace
 
 import pytest
 
 ft = pytest.importorskip("flet")
 
 from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
-from puripuly_heart.config.settings import AppSettings, STTProviderName
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.ui.dashboard import capture as dashboard_capture_module
 from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
@@ -515,14 +517,23 @@ def test_dashboard_projects_osc_state_without_emitting_intents(
     view.on_toggle_peer_translation = lambda value: emitted.append(("peer", value))
     view.on_toggle_overlay = lambda value: emitted.append(("captions", value))
     view.on_language_change = lambda value: emitted.append(("languages", value))
-    settings = AppSettings()
-    settings.languages.source_language = "ja"
-    settings.languages.target_language = "fr"
-    settings.languages.secondary_target_language = "en"
-    settings.languages.peer_source_language = "de"
-    settings.languages.peer_target_language = "ko"
-    settings.languages.peer_source_mode = "auto"
-    settings.provider.peer_stt = STTProviderName.SONIOX
+    baseline = AppSettingsVNext()
+    settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            languages=replace(
+                baseline.intent.languages,
+                source_language="ja",
+                target_language="fr",
+                secondary_target_language="en",
+                peer_source_language="de",
+                peer_target_language="ko",
+                peer_source_mode="auto",
+            ),
+            peer_stt=replace(baseline.intent.peer_stt, provider=STTProviderName.SONIOX.value),
+        ),
+    )
 
     view.project_osc_control_state(
         osc_control_presentation_state(
@@ -550,8 +561,16 @@ def test_dashboard_projects_osc_state_without_emitting_intents(
             settings=settings,
         )
     )
-    unavailable_settings = AppSettings()
-    unavailable_settings.provider.peer_stt = STTProviderName.LOCAL_PARAKEET_V3
+    unavailable_settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            peer_stt=replace(
+                baseline.intent.peer_stt,
+                provider=STTProviderName.LOCAL_PARAKEET_V3.value,
+            ),
+        ),
+    )
     view.project_osc_control_state(
         osc_control_presentation_state(
             "PuriPuly_PeerASR",

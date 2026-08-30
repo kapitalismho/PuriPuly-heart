@@ -39,14 +39,12 @@
     "settings_runtime_compatibility": {
       "classification": "public_compatibility_preserve",
       "source_of_truth_refs": [
-        "src/puripuly_heart/config/settings.py",
         "src/puripuly_heart/config/settings_vnext/schema.py",
         "src/puripuly_heart/config/settings_vnext/migration.py",
         "src/puripuly_heart/config/settings_vnext/serialization.py",
         "tests/config/settings_migration_fixtures.py"
       ],
       "fixture_or_guard_refs": [
-        "tests/config/test_settings_migration_fixtures.py",
         "tests/config/test_settings_vnext_migration_serialization.py"
       ],
       "detail_owner_work_ref": "freeze-settings-secrets-and-persisted-state-fixtures"
@@ -55,11 +53,11 @@
       "classification": "public_compatibility_preserve",
       "source_of_truth_refs": [
         "src/puripuly_heart/config/settings_vnext/schema.py::PersistedOperationalState",
-        "tests/config/settings_migration_fixtures.py::CURRENT_OPERATIONAL_STATE_DESTINATIONS",
+        "src/puripuly_heart/config/settings_vnext/schema.py::PersistedOperationalState",
         "src/puripuly_heart/core/local_asr/local_stt_assets.py::LOCAL_STT_INSTALLED_MANIFEST_FILENAME"
       ],
       "fixture_or_guard_refs": [
-        "tests/config/test_settings_migration_fixtures.py::test_vnext_schema_persisted_leaves_are_classified_from_current_settings",
+        "tests/config/test_settings_vnext_schema.py::test_vnext_schema_represents_current_intent_and_state_leaves",
         "tests/config/test_local_stt_assets.py",
         "tests/core/test_local_stt_runtime_installer.py"
       ],
@@ -86,13 +84,13 @@
       "classification": "public_compatibility_preserve",
       "source_of_truth_refs": [
         "src/puripuly_heart/config/llm_profiles.py",
-        "src/puripuly_heart/config/settings.py::OpenRouterSelectionAlias",
-        "src/puripuly_heart/config/settings.py::OpenRouterFallbackSelectionAlias",
+        "src/puripuly_heart/config/provider_values.py::OpenRouterSelectionAlias",
+        "src/puripuly_heart/config/provider_values.py::OpenRouterFallbackSelectionAlias",
         "tests/config/public_compatibility_surfaces_snapshot.json::provider_aliases"
       ],
       "fixture_or_guard_refs": [
         "tests/config/test_public_compatibility_surfaces.py::test_provider_alias_snapshot_matches_current_aliases_and_legacy_acceptance",
-        "tests/config/test_config_and_secrets.py::test_from_dict_disables_legacy_openrouter_fallback_aliases",
+        "tests/config/test_config_and_secrets.py::test_openrouter_alias_for_fields_does_not_expose_deepseek_v4_pro",
         "tests/config/test_runtime_resolution.py::test_legacy_openrouter_selection_aliases_normalize_before_resolved_runtime"
       ],
       "detail_owner_work_ref": "freeze-provider-config-prompt-and-i18n-fixtures"
@@ -285,62 +283,7 @@
         "target_role": "thin_reexport",
         "implementation_owner": "canonical_vnext_owner"
       },
-      "exports": [{"name": "settings", "kind": "submodule"}]
-    },
-    {
-      "module": "puripuly_heart.config.settings",
-      "source_rule": "approved facade",
-      "source_of_truth_refs": ["src/puripuly_heart/config/settings.py", "tests/config/test_settings_migration_fixtures.py"],
-      "runtime_all_matches_exports": false,
-      "facade_contract": {
-        "preserve_import_path": true,
-        "target_role": "compatibility_boundary_owner",
-        "implementation_owner": "compatibility_boundary"
-      },
-      "exports": [
-        {"name": "SETTINGS_SCHEMA_VERSION", "kind": "attribute"},
-        {"name": "AppSettings", "kind": "attribute"},
-        {"name": "ApiKeyVerificationSettings", "kind": "attribute"},
-        {"name": "AudioSettings", "kind": "attribute"},
-        {"name": "DeepSeekLLMModel", "kind": "attribute"},
-        {"name": "DeepSeekSettings", "kind": "attribute"},
-        {"name": "DeepgramSTTSettings", "kind": "attribute"},
-        {"name": "DesktopAudioSettings", "kind": "attribute"},
-        {"name": "DesktopFletOverlaySettings", "kind": "attribute"},
-        {"name": "DesktopFletOverlayVisualSettings", "kind": "attribute"},
-        {"name": "GeminiLLMModel", "kind": "attribute"},
-        {"name": "GeminiSettings", "kind": "attribute"},
-        {"name": "LLMProviderName", "kind": "attribute"},
-        {"name": "LLMSettings", "kind": "attribute"},
-        {"name": "LanguageSettings", "kind": "attribute"},
-        {"name": "LocalLLMSettings", "kind": "attribute"},
-        {"name": "ManagedIdentitySettings", "kind": "attribute"},
-        {"name": "OSCSettings", "kind": "attribute"},
-        {"name": "OpenRouterCredentialSource", "kind": "attribute"},
-        {"name": "OpenRouterFallbackSelectionAlias", "kind": "attribute"},
-        {"name": "OpenRouterLLMModel", "kind": "attribute"},
-        {"name": "OpenRouterProviderRouting", "kind": "attribute"},
-        {"name": "OpenRouterRoutingMode", "kind": "attribute"},
-        {"name": "OpenRouterSelectionAlias", "kind": "attribute"},
-        {"name": "OpenRouterSettings", "kind": "attribute"},
-        {"name": "OverlaySettings", "kind": "attribute"},
-        {"name": "ProviderSettings", "kind": "attribute"},
-        {"name": "QwenASRSTTSettings", "kind": "attribute"},
-        {"name": "QwenLLMModel", "kind": "attribute"},
-        {"name": "QwenRegion", "kind": "attribute"},
-        {"name": "QwenSettings", "kind": "attribute"},
-        {"name": "STTProviderName", "kind": "attribute"},
-        {"name": "STTSettings", "kind": "attribute"},
-        {"name": "SecretsBackend", "kind": "attribute"},
-        {"name": "SecretsSettings", "kind": "attribute"},
-        {"name": "SonioxSTTSettings", "kind": "attribute"},
-        {"name": "TranslationConnection", "kind": "attribute"},
-        {"name": "TranslationModel", "kind": "attribute"},
-        {"name": "TranslationSettings", "kind": "attribute"},
-        {"name": "UiSettings", "kind": "attribute"},
-        {"name": "from_dict", "kind": "attribute"},
-        {"name": "to_dict", "kind": "attribute"}
-      ]
+      "exports": [{"name": "settings_vnext", "kind": "submodule"}]
     },
     {
       "module": "puripuly_heart.config.settings_vnext",
@@ -370,12 +313,7 @@
         "implementation_owner": "compatibility_boundary"
       },
       "exports": [
-        {"name": "FacadeSettingsLoadResult", "kind": "attribute"},
-        {"name": "load_settings", "kind": "attribute"},
-        {"name": "load_settings_with_result", "kind": "attribute"},
         {"name": "load_vnext_settings", "kind": "attribute"},
-        {"name": "save_settings", "kind": "attribute"},
-        {"name": "save_settings_with_result", "kind": "attribute"},
         {"name": "save_vnext_settings", "kind": "attribute"}
       ]
     },
@@ -399,11 +337,12 @@
       "runtime_all_matches_exports": true,
       "facade_contract": null,
       "exports": [
+        {"name": "LEGACY_TIMESTAMP_PROMPT", "kind": "attribute"},
+        {"name": "apply_canonical_delta", "kind": "attribute"},
         {"name": "from_dict", "kind": "attribute"},
-        {"name": "from_legacy_app_settings", "kind": "attribute"},
         {"name": "is_vnext_shape_dict", "kind": "attribute"},
         {"name": "is_vnext_settings_dict", "kind": "attribute"},
-        {"name": "to_legacy_dict", "kind": "attribute"}
+        {"name": "merge_canonical_payload", "kind": "attribute"}
       ]
     },
     {

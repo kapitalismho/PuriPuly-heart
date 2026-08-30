@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -11,8 +12,8 @@ from puripuly_heart.app.services.self_capture_application import (
 from puripuly_heart.app.wiring_capture_runtime import CaptureOwnerFactory
 from puripuly_heart.app.wiring_stt_factory import build_self_capture_session_config
 
-from puripuly_heart.config.settings import AppSettings, STTProviderName
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.self_capture import SelfCaptureProviderStatus
 
 
@@ -25,11 +26,20 @@ async def test_replace_provider_propagates_updated_config_by_capture_activity(
     desired_active: bool,
     expected_operation: str,
 ) -> None:
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.DEEPGRAM
-    settings.languages.source_language = "ko"
-    settings.stt.custom_vocabulary_enabled = True
-    settings.stt.custom_terms = {"ko": ["Puripuly", "VRChat"]}
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            stt=replace(
+                settings.intent.stt,
+                provider=STTProviderName.DEEPGRAM.value,
+                custom_vocabulary_enabled=True,
+                custom_terms={"ko": ["Puripuly", "VRChat"]},
+            ),
+            languages=replace(settings.intent.languages, source_language="ko"),
+        ),
+    )
     capture_config = build_self_capture_session_config(settings)
     calls: list[tuple[str, object, dict[str, object]]] = []
 
@@ -94,7 +104,7 @@ async def test_replace_provider_propagates_updated_config_by_capture_activity(
     )
 
     factory = CaptureOwnerFactory(
-        canonical_provider=lambda: from_legacy_app_settings(settings),
+        canonical_provider=lambda: settings,
         self_admission=cast(Any, None),
         ensure_peer_local_ready=cast(Any, None),
         clock=cast(Any, None),

@@ -1,0 +1,249 @@
+{
+  "settings_version": 17,
+  "provider": {
+    "stt": "deepgram",
+    "peer_stt": "soniox",
+    "llm": "local_llm"
+  },
+  "translation": {
+    "model": "local_llm",
+    "connection": "ollama",
+    "connection_history": {
+      "gemma4": "openrouter",
+      "deepseek_v4_flash": "managed_china",
+      "gemini37_flash": "official_byok",
+      "gemini31_flash_lite": "official_byok",
+      "qwen35_plus": "official_byok",
+      "local_llm": "ollama"
+    },
+    "fallback": {
+      "enabled": true,
+      "model": "gemini37_flash",
+      "connection": "openrouter"
+    },
+    "gpu_device_id": "Vulkan1"
+  },
+  "languages": {
+    "source_language": "ja",
+    "target_language": "zh-CN",
+    "peer_source_language": "fr",
+    "peer_target_language": "es",
+    "peer_source_mode": "auto",
+    "peer_expected_languages": [
+      "fr",
+      "ja"
+    ],
+    "recent_source_languages": [
+      "fr",
+      "de",
+      "it"
+    ],
+    "recent_target_languages": [
+      "es",
+      "th",
+      "vi"
+    ]
+  },
+  "audio": {
+    "internal_sample_rate_hz": 8000,
+    "internal_channels": "1",
+    "ring_buffer_ms": 750,
+    "input_host_api": "Windows DirectSound",
+    "input_device": "Fixture Microphone"
+  },
+  "desktop_audio": {
+    "output_device": "Fixture Speakers",
+    "vad_speech_threshold": 0.4,
+    "vad_hangover_ms": 650,
+    "vad_pre_roll_ms": 250
+  },
+  "overlay": {
+    "target": "desktop",
+    "desktop_flet": {
+      "size_preset": "large",
+      "position": {
+        "x": 321,
+        "y": 654
+      },
+      "swap_caption_languages": true,
+      "visual": {
+        "background_alpha": 0.42
+      },
+      "locked": true
+    }
+  },
+  "stt": {
+    "drain_timeout_s": 3.5,
+    "vad_speech_threshold": 0.3,
+    "low_latency_mode": false,
+    "low_latency_vad_hangover_ms": 700,
+    "low_latency_merge_gap_ms": 550,
+    "low_latency_spec_retry_max": 5,
+    "custom_vocabulary_enabled": false,
+    "custom_terms": {
+      "en": [
+        "fixture-term"
+      ],
+      "ja": [
+        "フィクスチャ"
+      ]
+    },
+    "gpu_device_id": "vulkan-device-fixture"
+  },
+  "deepgram_stt": {
+    "model": "nova-2"
+  },
+  "qwen_asr_stt": {
+    "model": "qwen-asr-fixture",
+    "endpoint": "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+  },
+  "soniox_stt": {
+    "model": "stt-rt-fixture",
+    "endpoint": "wss://soniox.fixture.test/transcribe",
+    "keepalive_interval_s": 12.5,
+    "trailing_silence_ms": 250
+  },
+  "custom_stt": {
+    "mode": "realtime",
+    "compatibility": "openai_realtime",
+    "endpoint": "https://custom-stt.fixture.test",
+    "model": "fixture-transcribe",
+    "extra": {
+      "prompt": "fixture-prompt",
+      "max_tokens": 16
+    }
+  },
+  "gemini": {
+    "llm_model": "gemini-3.7-flash"
+  },
+  "openrouter": {
+    "llm_model": "qwen/qwen3.5-flash-02-23",
+    "routing_mode": "latency",
+    "provider_routing": "deepseek_only",
+    "selected_source": "byok",
+    "selection_alias": "qwen35_flash_byok",
+    "fallback_selection_alias": "qwen35_flash",
+    "broker_base_url": "https://broker.fixture.test",
+    "credential_source": "byok",
+    "selected_credential_source": "managed"
+  },
+  "qwen": {
+    "region": "singapore",
+    "llm_model": "qwen3.5-flash"
+  },
+  "deepseek": {
+    "llm_model": "deepseek-v4-flash"
+  },
+  "cerebras": {
+    "llm_model": "gemma-4-31b"
+  },
+  "local_llm": {
+    "backend": "fixture_backend",
+    "base_url": "http://127.0.0.1:12345/v1",
+    "model": "fixture-local-model",
+    "extra_body": {
+      "temperature": 0.25,
+      "reasoning_effort": "low"
+    }
+  },
+  "llm": {
+    "concurrency_limit": 7
+  },
+  "osc": {
+    "host": "192.0.2.25",
+    "port": 9012,
+    "chatbox_address": "/fixture/chatbox",
+    "chatbox_send": false,
+    "chatbox_clear": true,
+    "chatbox_max_chars": 96,
+    "vrc_mic_intercept": true,
+    "chatbox_include_source": true,
+    "connection_mode": "manual",
+    "send_port": 9012,
+    "receive_port": 9013,
+    "cooldown_s": 1.5,
+    "ttl_s": 7.0
+  },
+  "secrets": {
+    "backend": "encrypted_file",
+    "encrypted_file_path": "fixture-secrets.json"
+  },
+  "ui": {
+    "locale": "ja",
+    "peer_translation_eula_accepted": true,
+    "integrated_context_enabled": false,
+    "integrated_context_bootstrapped": true,
+    "clipboard_auto_translate_enabled": true,
+    "github_star_prompt_clicked": true,
+    "github_star_prompt_last_shown_at": "2026-06-08T00:00:00Z",
+    "github_star_prompt_show_count": 2,
+    "github_star_prompt_translation_success_observed": true,
+    "github_star_prompt_eligible_launch_count": 3,
+    "show_overlay_translation": false,
+    "show_overlay_peer_original": false,
+    "overlay_enabled": true,
+    "peer_translation_enabled": true
+  },
+  "telemetry": {
+    "consent": "allow"
+  },
+  "telemetry_state": {
+    "anonymous_id": "fixture-telemetry-anonymous-id",
+    "sent_translation_success_dates_utc": [
+      "2026-07-01",
+      "2026-07-02"
+    ]
+  },
+  "api_key_verified": {
+    "deepgram": true,
+    "soniox": true,
+    "google": true,
+    "openrouter": true,
+    "deepseek": true,
+    "alibaba_beijing": true,
+    "alibaba_singapore": true,
+    "cerebras": true
+  },
+  "managed_identity": {
+    "installation_id": "fixture-installation-id",
+    "release_token": "fixture-release-token",
+    "release_token_expires_at": "2026-07-08T00:00:00Z",
+    "verified_hardware_hash": "fixture-hardware-hash",
+    "verified_hardware_hash_salt_version": 7,
+    "active_managed_credential_ref": "fixture-credential-ref",
+    "active_managed_expires_at": "2026-07-09T00:00:00Z",
+    "founder_letter_seen_credential_ref": "fixture-founder-ref",
+    "referral_id": "7KQ9M2",
+    "local_managed_claim_sources": [
+      "discord"
+    ],
+    "pending_delivery_ack_source": "discord",
+    "pending_delivery_ack_delivery_id": "fixture-delivery-id",
+    "pending_delivery_ack_managed_credential_ref": "fixture-pending-credential-ref",
+    "pending_delivery_ack_expires_at": "2026-07-10T00:00:00Z"
+  },
+  "system_prompt": "Fixture system prompt text.",
+  "overlay_calibration": {
+    "offset_x": 0.42,
+    "offset_y": -0.12,
+    "distance": 1.6,
+    "text_scale": 1.2,
+    "background_alpha": 0.33
+  },
+  "peer_deepgram_stt": {
+    "model": "legacy-peer-deepgram-model"
+  },
+  "peer_qwen_asr_stt": {
+    "model": "legacy-peer-qwen-model",
+    "region": "singapore"
+  },
+  "peer_soniox_stt": {
+    "model": "legacy-peer-soniox-model",
+    "endpoint": "wss://legacy-soniox.fixture.test/transcribe",
+    "keepalive_interval_s": 13.0,
+    "trailing_silence_ms": 275
+  },
+  "system_prompts": {
+    "legacy": "legacy fixture prompt"
+  }
+}

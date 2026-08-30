@@ -204,13 +204,13 @@ Do not retain references across replacement unless the API explicitly allows it.
 ### Persisted intent
 
 - Canonical schema: `AppSettingsVNext`
-- Compatibility projection: `AppSettings`
 - Owner: canonical settings persistence service
+- Persistence: `config/settings_vnext/compat.py` (first-run, current load, recognized vNext-to-vNext migration, R00 archive-then-reset)
 - Desktop overlay defaults, limits, presets, ordering, and visual values: `config/desktop_overlay_values.py`
 - Provider selection enums and normalization values: `config/provider_values.py`
 - Translation model and connection values: `config/translation_values.py`
 
-`SettingsView` consumes only frozen surface snapshots and emits focused typed intents. The settings application owner projects the compatibility model and replays those intents onto the latest canonical settings before persistence and runtime application.
+`SettingsView` consumes only frozen surface snapshots and emits focused typed intents. The settings application owner replays those intents onto the latest canonical settings before persistence and runtime application.
 
 Contains user selections, not active runtime resources.
 

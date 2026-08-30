@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 from puripuly_heart.app.ports.canonical_settings_persistence import (
@@ -25,7 +25,7 @@ from puripuly_heart.app.services.settings_mutation import (
     TranslationProviderSettingsMutation,
 )
 from puripuly_heart.app.services.settings_mutation_legacy import (
-    _apply_settings_path_patch,
+    apply_settings_path_patch,
     build_stt_language_audio_settings_path_patch,
     build_translation_provider_settings_path_patch,
     settings_path_mutation_validator_for_command,
@@ -33,6 +33,7 @@ from puripuly_heart.app.services.settings_mutation_legacy import (
 from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
+from puripuly_heart.config.settings_vnext.schema import ProviderVerificationEntry
 from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -62,7 +63,8 @@ from .provider_verification_binding import (
 
 
 class ProviderCompatibilityProjection(Protocol):
-    ui: object
+    intent: object
+    state: object
 
 
 ProviderSecretStoreFactory = Callable[[ProviderCompatibilityProjection], SecretStorePort]
@@ -131,10 +133,12 @@ class ProviderApplicationOwner:
         persist_settings: bool = True,
         refresh_ui: bool = True,
     ) -> bool:
-        next_settings = self.settings.current if pending is None else self.merge_settings(pending)
+        next_settings = self.settings.canonical if pending is None else self.merge_settings(pending)
         if next_settings is None:
             return False
-        await self.preserve_before_replace(next_settings)
+        preserved = await self.preserve_before_replace(next_settings)
+        if preserved is not None:
+            next_settings = preserved
         try:
             if persist_settings and pending is not None and not force_rebuild_llm:
                 if await self._apply_combined(next_settings):
@@ -153,7 +157,7 @@ class ProviderApplicationOwner:
                 self.sync_ui()
 
     async def _apply_combined(self, next_settings: ProviderCompatibilityProjection) -> bool:
-        base_settings = self.settings.current
+        base_settings = self.settings.canonical
         if base_settings is None:
             return False
         order21_values = build_translation_provider_settings_path_patch(
@@ -176,11 +180,10 @@ class ProviderApplicationOwner:
             values: dict[str, object],
             route: ProviderSettingsRoute,
         ) -> bool:
-            current = self.settings.current
+            current = self.settings.canonical
             if current is None:
                 return False
-            patch_settings = copy.deepcopy(current)
-            _apply_settings_path_patch(patch_settings, values)
+            patch_settings = apply_settings_path_patch(current, values)
             if not await route(patch_settings):
                 return False
             result = self.results.current
@@ -199,26 +202,21 @@ class ProviderApplicationOwner:
             if not self._last_result_committed():
                 return True
         if order24_values:
-            current = self.settings.current
+            current = self.settings.canonical
             if current is None:
                 return True
-            order24_settings = copy.deepcopy(current)
-            _apply_settings_path_patch(order24_settings, order24_values)
-            order24_settings.ui.overlay_enabled = bool(next_settings.ui.overlay_enabled)
-            order24_settings.ui.peer_translation_enabled = bool(
-                next_settings.ui.peer_translation_enabled
-            )
+            order24_settings = apply_settings_path_patch(current, order24_values)
             if not await self.apply_order24(order24_settings):
                 return False
             if not self._last_result_committed():
                 return True
 
         committed_before_full_draft = (
-            copy.deepcopy(self.settings.current) if self.settings.current is not None else None
+            copy.deepcopy(self.settings.canonical) if self.settings.canonical is not None else None
         )
-        if self.settings.current is not None and self.settings.legacy_snapshot_values(
-            self.settings.current
-        ) != self.settings.legacy_snapshot_values(next_settings):
+        if self.settings.canonical is not None and self.settings.snapshot_values(
+            self.settings.canonical
+        ) != self.settings.snapshot_values(next_settings):
             try:
                 await self._apply_direct(
                     next_settings,
@@ -263,7 +261,7 @@ class ProviderApplicationOwner:
         return True
 
     async def _apply_translation(self, next_settings: ProviderCompatibilityProjection) -> bool:
-        base_settings = self.settings.current
+        base_settings = self.settings.canonical
         if base_settings is None:
             return False
         patch_values = build_translation_provider_settings_path_patch(
@@ -273,19 +271,19 @@ class ProviderApplicationOwner:
         if not patch_values:
             return False
         committed_settings = copy.deepcopy(base_settings)
-        _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = self.settings.legacy_snapshot_values(
+        committed_settings = apply_settings_path_patch(committed_settings, patch_values)
+        has_out_of_scope_draft = self.settings.snapshot_values(
             committed_settings
-        ) != self.settings.legacy_snapshot_values(next_settings)
+        ) != self.settings.snapshot_values(next_settings)
         plan = self.runtime.build_plan(
             committed_settings,
             force_rebuild_llm=False,
-            canonical_settings=self.settings.project_legacy_delta(
+            canonical_settings=self.settings.project_canonical_delta(
                 base_settings,
                 committed_settings,
             ),
         )
-        repository = self.settings.create_legacy_patch_repository(
+        repository = self.settings.create_canonical_patch_repository(
             base_settings=base_settings,
             committed_settings=committed_settings,
             save_failure_sink=self.save_failure_sink,
@@ -321,12 +319,12 @@ class ProviderApplicationOwner:
         self._set_result(result)
         if not _settings_mutation_committed(result):
             return True
-        self.settings.current = committed_settings
+        self.settings.canonical = committed_settings
         if has_out_of_scope_draft:
             fallback_plan = self.runtime.build_plan(
                 next_settings,
                 force_rebuild_llm=False,
-                canonical_settings=self.settings.project_legacy_delta(
+                canonical_settings=self.settings.project_canonical_delta(
                     committed_settings,
                     next_settings,
                 ),
@@ -371,13 +369,13 @@ class ProviderApplicationOwner:
                     self._set_result(_runtime_apply_result_as_degraded_transaction(unavailable))
         elif result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
             self.sync_signatures(committed_settings)
-        self.remember_order22(self.settings.current)
+        self.remember_order22(self.settings.canonical)
         return True
 
     async def _apply_stt_language_audio(
         self, next_settings: ProviderCompatibilityProjection
     ) -> bool:
-        base_settings = self.settings.current
+        base_settings = self.settings.canonical
         if base_settings is None:
             return False
         patch_values = build_stt_language_audio_settings_path_patch(
@@ -387,19 +385,19 @@ class ProviderApplicationOwner:
         if not patch_values:
             return False
         committed_settings = copy.deepcopy(base_settings)
-        _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = self.settings.legacy_snapshot_values(
+        committed_settings = apply_settings_path_patch(committed_settings, patch_values)
+        has_out_of_scope_draft = self.settings.snapshot_values(
             committed_settings
-        ) != self.settings.legacy_snapshot_values(next_settings)
+        ) != self.settings.snapshot_values(next_settings)
         plan = self.runtime.build_plan(
             committed_settings,
             force_rebuild_llm=False,
-            canonical_settings=self.settings.project_legacy_delta(
+            canonical_settings=self.settings.project_canonical_delta(
                 base_settings,
                 committed_settings,
             ),
         )
-        repository = self.settings.create_legacy_patch_repository(
+        repository = self.settings.create_canonical_patch_repository(
             base_settings=base_settings,
             committed_settings=committed_settings,
             surface="stt_language_audio",
@@ -439,11 +437,11 @@ class ProviderApplicationOwner:
             raise RuntimeError("provider settings mutation completed without a result")
         self._set_result(result)
         if not _settings_mutation_committed(result):
-            self.settings.current = copy.deepcopy(base_settings)
-            self.remember_order22(self.settings.current)
+            self.settings.canonical = copy.deepcopy(base_settings)
+            self.remember_order22(self.settings.canonical)
             return True
         if self.consume_superseded_settings(committed_settings):
-            self.remember_order22(self.settings.current)
+            self.remember_order22(self.settings.canonical)
             return True
         if (
             not has_out_of_scope_draft
@@ -460,13 +458,13 @@ class ProviderApplicationOwner:
                 )
             except Exception:
                 self.save_failure_sink("Failed to compensate local ASR provider settings apply")
-            self.remember_order22(self.settings.current)
+            self.remember_order22(self.settings.canonical)
             return True
         if has_out_of_scope_draft:
             fallback_plan = self.runtime.build_plan(
                 next_settings,
                 force_rebuild_llm=False,
-                canonical_settings=self.settings.project_legacy_delta(
+                canonical_settings=self.settings.project_canonical_delta(
                     committed_settings,
                     next_settings,
                 ),
@@ -511,10 +509,10 @@ class ProviderApplicationOwner:
                 if unavailable is not None:
                     self._set_result(_runtime_apply_result_as_degraded_transaction(unavailable))
         else:
-            self.settings.current = committed_settings
+            self.settings.canonical = committed_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
                 self.sync_signatures(committed_settings)
-        self.remember_order22(self.settings.current)
+        self.remember_order22(self.settings.canonical)
         return True
 
     async def _apply_direct(
@@ -543,7 +541,7 @@ class ProviderApplicationOwner:
                 plan=plan,
             ).apply_runtime(
                 RuntimeApplyRequest(
-                    settings_values=self.settings.legacy_snapshot_values(next_settings),
+                    settings_values=self.settings.snapshot_values(next_settings),
                     reason="provider_runtime_only",
                     correlation_id=None,
                 )
@@ -551,14 +549,12 @@ class ProviderApplicationOwner:
             if runtime_result.status != RUNTIME_APPLY_STATUS_APPLIED:
                 self._set_result(_runtime_apply_result_as_degraded_transaction(runtime_result))
             return runtime_result.status == RUNTIME_APPLY_STATUS_APPLIED
-        self.settings.begin(
-            legacy_snapshot=self.settings.projection_snapshot or self.settings.current
-        )
+        self.settings.begin(snapshot=self.settings.projection_snapshot or self.settings.canonical)
         committed = False
         try:
             self.capture_runtime_signatures()
-            self.settings.apply_legacy_delta(
-                self.settings.projection_snapshot or self.settings.current,
+            self.settings.apply_canonical_delta(
+                self.settings.projection_snapshot or self.settings.canonical,
                 next_settings,
             )
             if plan is None:
@@ -566,7 +562,7 @@ class ProviderApplicationOwner:
                     next_settings,
                     force_rebuild_llm=force_rebuild_llm,
                 )
-            self.settings.current = next_settings
+            self.settings.canonical = next_settings
             if strict_persistence_errors:
                 try:
                     self.settings.persist()
@@ -591,7 +587,7 @@ class ProviderApplicationOwner:
                 plan=plan,
             ).apply_runtime(
                 RuntimeApplyRequest(
-                    settings_values=self.settings.legacy_snapshot_values(next_settings),
+                    settings_values=self.settings.snapshot_values(next_settings),
                     reason="provider_direct",
                     correlation_id=None,
                 )
@@ -606,7 +602,7 @@ class ProviderApplicationOwner:
                 )
             else:
                 self._set_result(_runtime_apply_result_as_degraded_transaction(runtime_result))
-            self.remember_order22(self.settings.current)
+            self.remember_order22(self.settings.canonical)
             return True
         except ProviderStrictSettingsSaveFailed:
             raise
@@ -654,10 +650,11 @@ def provider_verification_context(
 ) -> dict[str, object]:
     if settings is None:
         return {}
+    translation = settings.intent.translation
     if provider == "google":
-        return {"model": settings.gemini.llm_model.value}
+        return {"model": translation.gemini.llm_model}
     if provider == "cerebras":
-        return {"model": settings.cerebras.llm_model.value}
+        return {"model": translation.cerebras.llm_model}
     if provider in {"alibaba_beijing", "alibaba_singapore"}:
         return {
             "base_url": (
@@ -665,7 +662,7 @@ def provider_verification_context(
                 if provider == "alibaba_beijing"
                 else "https://dashscope-intl.aliyuncs.com/api/v1"
             ),
-            "model": settings.qwen.llm_model.value,
+            "model": translation.qwen.llm_model,
             "low_latency": low_latency,
         }
     return {}
@@ -748,7 +745,7 @@ class ProviderSettingsOwner:
                 provider="http_extension",
                 secret_key=secret_key,
                 secret_value=value,
-                settings_values=self.settings.legacy_snapshot_values(current),
+                settings_values=self.settings.snapshot_values(current),
             ),
             result_handler=lambda result, _succeeded: self.results.set(result),
         )
@@ -760,9 +757,17 @@ class ProviderSettingsOwner:
     ) -> ProviderSecretChangeExecution:
         current = self._current()
         provider = self.binding.provider_for_secret_key(secret_key)
-        updated = copy.deepcopy(current)
-        setattr(updated.api_key_verified, provider, False)
-        repository = self.settings.create_legacy_patch_repository(
+        updated = replace(
+            current,
+            state=replace(
+                current.state,
+                provider_verification=replace(
+                    current.state.provider_verification,
+                    **{provider: ProviderVerificationEntry(status="unknown")},
+                ),
+            ),
+        )
+        repository = self.settings.create_canonical_patch_repository(
             base_settings=current,
             committed_settings=updated,
             surface="provider_secret_change",
@@ -778,7 +783,7 @@ class ProviderSettingsOwner:
                 provider=provider,
                 secret_key=secret_key,
                 secret_value=value,
-                settings_values=self.settings.legacy_snapshot_values(updated),
+                settings_values=self.settings.snapshot_values(updated),
             ),
             result_handler=lambda result, succeeded: self._apply_secret_change_result(
                 repository.committed_settings,
@@ -796,14 +801,14 @@ class ProviderSettingsOwner:
         self.results.set(result)
         if not succeeded:
             return
-        self.settings.current = committed_settings
+        self.settings.canonical = committed_settings
         self.settings.remember_projection(committed_settings)
         self.settings.complete()
 
     def _current(self) -> ProviderCompatibilityProjection:
-        if self.settings.current is None:
-            raise RuntimeError("settings owner has no compatibility settings")
-        return self.settings.current
+        if self.settings.canonical is None:
+            raise RuntimeError("settings owner has no canonical settings")
+        return self.settings.canonical
 
 
 __all__ = [

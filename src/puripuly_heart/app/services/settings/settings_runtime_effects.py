@@ -45,10 +45,13 @@ from puripuly_heart.app.wiring_stt_factory import (
 from puripuly_heart.app.wiring_translation_runtime_configuration import (
     replace_translation_runtime_settings,
 )
-from puripuly_heart.config.provider_values import LLMProviderName
+from puripuly_heart.config.provider_values import STT_INTERNAL_SAMPLE_RATE_HZ, LLMProviderName
 from puripuly_heart.config.resolved import OVERLAY_TARGET_DESKTOP
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.config.translation_values import TranslationModel
+from puripuly_heart.config.translation_values import (
+    TranslationModel,
+    provider_llm_for_translation,
+)
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigChange,
@@ -67,18 +70,19 @@ def managed_gemma_prefix_refresh_required(
     transition: SettingsRuntimeTransition[object],
 ) -> bool:
     settings = transition.settings
-    if settings.translation.model not in {
-        TranslationModel.MANAGED_GEMMA,
-        TranslationModel.MANAGED_GEMMA_12B,
+    model = settings.intent.translation.model
+    if model not in {
+        TranslationModel.MANAGED_GEMMA.value,
+        TranslationModel.MANAGED_GEMMA_12B.value,
     }:
         return False
     previous = transition.previous_settings
     return bool(
         previous is None
-        or previous.translation.model != settings.translation.model
+        or previous.intent.translation.model != model
         or transition.source_language_changed
         or transition.target_language_changed
-        or previous.system_prompt != settings.system_prompt
+        or previous.intent.prompts.system_prompt != settings.intent.prompts.system_prompt
     )
 
 
@@ -145,22 +149,24 @@ class SettingsRuntimeEffectsAdapter:
 
     @staticmethod
     def _microphone_audio(
-        settings: object | None,
+        settings: AppSettingsVNext | None,
     ) -> MicrophoneTestAudioSettings | None:
         if settings is None:
             return None
+        audio = settings.intent.audio
         return MicrophoneTestAudioSettings(
-            input_host_api=settings.audio.input_host_api,
-            input_device=settings.audio.input_device,
-            internal_sample_rate_hz=settings.audio.internal_sample_rate_hz,
-            internal_channels=settings.audio.internal_channels,
+            input_host_api=audio.input_host_api,
+            input_device=audio.input_device,
+            internal_sample_rate_hz=STT_INTERNAL_SAMPLE_RATE_HZ,
+            internal_channels=1,
         )
 
-    async def preserve_before_replace(self, settings: object) -> None:
-        await self._github_prompt().preserve_before_settings_replace(settings)
+    async def preserve_before_replace(self, settings: AppSettingsVNext) -> AppSettingsVNext:
+        preserved = await self._github_prompt().preserve_before_settings_replace(settings)
+        return settings if preserved is None else preserved
 
     def capture_runtime_signatures(self) -> None:
-        settings = self._settings.current
+        settings = self._settings.canonical
         if settings is None:
             return
         self._runtime_signatures.capture_peer_before_canonical_mutation(
@@ -171,9 +177,9 @@ class SettingsRuntimeEffectsAdapter:
 
     async def prepare(
         self,
-        current_settings: object | None,
-        next_settings: object,
-    ) -> SettingsRuntimeTransition[object]:
+        current_settings: AppSettingsVNext | None,
+        next_settings: AppSettingsVNext,
+    ) -> SettingsRuntimeTransition[AppSettingsVNext]:
         microphone_owner = self._microphone.owner_if_created
         previous_microphone_signature = (
             self._state.microphone_audio_signature
@@ -190,24 +196,20 @@ class SettingsRuntimeEffectsAdapter:
             await self._microphone.stop()
 
         previous_locale = self._presentation.current_locale()
-        previous_overlay_enabled = (
-            current_settings.ui.overlay_enabled if current_settings is not None else False
-        )
+        previous_overlay_enabled = self._settings.overlay_enabled()
         previous_settings = (
             copy.deepcopy(current_settings) if current_settings is not None else None
         )
         previous_settings_overlay_target = self._overlay.target_for_state(
             self._overlay_state_provider(
                 None if current_settings is None else self._canonical_settings(current_settings),
-                overlay_enabled=(
-                    False if current_settings is None else bool(current_settings.ui.overlay_enabled)
-                ),
+                overlay_enabled=self._settings.overlay_enabled(),
             )
         )
         next_overlay_target = self._overlay.target_for_state(
             self._overlay_state_provider(
                 self._canonical_settings(next_settings),
-                overlay_enabled=bool(next_settings.ui.overlay_enabled),
+                overlay_enabled=self._settings.overlay_enabled(),
             )
         )
         if self._overlay.snapshot.fallback_active:
@@ -219,14 +221,13 @@ class SettingsRuntimeEffectsAdapter:
         if (
             previous_overlay_target != next_overlay_target
             and previous_overlay_enabled
-            and next_settings.ui.overlay_enabled
+            and self._settings.overlay_enabled()
             and self._overlay.runtime_is_active()
         ):
             self._runtime_logging.emit_basic(
                 "[Overlay] Target changed while running; stopping current overlay before switch"
             )
-            next_settings = copy.deepcopy(next_settings)
-            next_settings.ui.overlay_enabled = False
+            self._settings.set_overlay_enabled(False)
             self._overlay.clear_fallback()
         desktop_runtime_controls = tuple(
             self._desktop_overlay.prepare_settings_update(
@@ -239,9 +240,7 @@ class SettingsRuntimeEffectsAdapter:
             peer.last_intent_enabled
             if peer.last_intent_enabled is not None
             else (
-                current_settings.ui.peer_translation_enabled
-                if current_settings is not None
-                else False
+                self._settings.peer_translation_enabled() if current_settings is not None else False
             )
         )
         previous_peer_activation_requested = (
@@ -249,8 +248,8 @@ class SettingsRuntimeEffectsAdapter:
             if peer.last_activation_requested is not None
             else (
                 peer.activation_requested(
-                    intent_enabled=current_settings.ui.peer_translation_enabled,
-                    eula_accepted=current_settings.ui.peer_translation_eula_accepted,
+                    intent_enabled=self._settings.peer_translation_enabled(),
+                    eula_accepted=current_settings.state.peer_translation.eula_accepted,
                 )
                 if current_settings is not None
                 else False
@@ -278,7 +277,9 @@ class SettingsRuntimeEffectsAdapter:
             else None
         )
         previous_peer_source_mode = (
-            previous_settings.languages.peer_source_mode if previous_settings is not None else None
+            previous_settings.intent.languages.peer_source_mode
+            if previous_settings is not None
+            else None
         )
         previous_effective_peer_source = (
             self._effective_peer_language(
@@ -298,47 +299,47 @@ class SettingsRuntimeEffectsAdapter:
         )
         source_language_changed = (
             previous_source_language is not None
-            and previous_source_language != next_settings.languages.source_language
+            and previous_source_language != next_settings.intent.languages.source_language
         )
         target_language_changed = (
             previous_target_language is not None
-            and previous_target_language != next_settings.languages.target_language
+            and previous_target_language != next_settings.intent.languages.target_language
         )
         effective_peer_source_changed = (
             previous_effective_peer_source is not None
             and previous_effective_peer_source
             != self._effective_peer_language(
-                next_settings.languages.source_language,
-                next_settings.languages.peer_source_language,
+                next_settings.intent.languages.source_language,
+                next_settings.intent.languages.peer_source_language,
             )
         )
         effective_peer_target_changed = (
             previous_effective_peer_target is not None
             and previous_effective_peer_target
             != self._effective_peer_language(
-                next_settings.languages.target_language,
-                next_settings.languages.peer_target_language,
+                next_settings.intent.languages.target_language,
+                next_settings.intent.languages.peer_target_language,
             )
         )
         peer_source_language_changed = (
             previous_peer_source_language is not None
-            and previous_peer_source_language != next_settings.languages.peer_source_language
+            and previous_peer_source_language != next_settings.intent.languages.peer_source_language
         )
         peer_target_language_changed = (
             previous_peer_target_language is not None
-            and previous_peer_target_language != next_settings.languages.peer_target_language
+            and previous_peer_target_language != next_settings.intent.languages.peer_target_language
         )
         peer_source_mode_changed = (
             previous_peer_source_mode is not None
-            and previous_peer_source_mode != next_settings.languages.peer_source_mode
+            and previous_peer_source_mode != next_settings.intent.languages.peer_source_mode
         )
         if source_language_changed or target_language_changed:
             presenter = self._overlay.current_presenter()
             bridge = self._overlay.current_bridge()
             self._runtime_logging.emit_basic(
                 "[Settings] Applying languages: "
-                f"source={previous_source_language}->{next_settings.languages.source_language} "
-                f"target={previous_target_language}->{next_settings.languages.target_language}"
+                f"source={previous_source_language}->{next_settings.intent.languages.source_language} "
+                f"target={previous_target_language}->{next_settings.intent.languages.target_language}"
             )
             self._runtime_logging.emit_detailed(
                 "[Settings] Language apply detail: "
@@ -380,17 +381,17 @@ class SettingsRuntimeEffectsAdapter:
 
     async def prepare_overlay_persistence(
         self,
-        previous_settings: object,
-        next_settings: object,
+        previous_settings: AppSettingsVNext,
+        next_settings: AppSettingsVNext,
     ) -> None:
         await self._desktop_overlay.prepare_persistence(
             previous_settings,
             next_settings,
         )
 
-    def restore_memory(self, settings: object) -> None:
+    def restore_memory(self, settings: AppSettingsVNext) -> None:
         restored_settings = copy.deepcopy(settings)
-        self._settings.current = restored_settings
+        self._settings.canonical = restored_settings
         self._calibration.sync_from_settings(restored_settings)
         config_owner = self._pipeline.translation_runtime_configuration
         if config_owner is not None:
@@ -405,10 +406,10 @@ class SettingsRuntimeEffectsAdapter:
             )
         self._sync_signatures(restored_settings)
 
-    def sync_signatures(self, settings: object) -> None:
+    def sync_signatures(self, settings: AppSettingsVNext) -> None:
         self._sync_signatures(settings)
 
-    def state(self, settings: object) -> SettingsRuntimeState:
+    def state(self, settings: AppSettingsVNext) -> SettingsRuntimeState:
         local_asr_runtime = self._pipeline.local_asr_runtime
         llm_runtime = self._pipeline.llm_runtime
         self_capture = self._self_capture()
@@ -427,8 +428,12 @@ class SettingsRuntimeEffectsAdapter:
                 and local_asr_runtime.snapshot.channel_for("peer").provider_id is not None
             ),
             qwen_llm_desired=(
-                settings.translation.model != TranslationModel.CUSTOM_HTTP
-                and settings.provider.llm == LLMProviderName.QWEN
+                settings.intent.translation.model != TranslationModel.CUSTOM_HTTP.value
+                and provider_llm_for_translation(
+                    settings.intent.translation.model,
+                    settings.intent.translation.connection,
+                )
+                == LLMProviderName.QWEN.value
             ),
             llm_available=llm_runtime is not None and llm_runtime.provider is not None,
         )
@@ -446,7 +451,7 @@ class SettingsRuntimeEffectsAdapter:
         self._clipboard.strict_runtime_errors = strict_runtime_errors
         try:
             await self._clipboard.sync(
-                enabled=settings.ui.clipboard_auto_translate_enabled,
+                enabled=settings.intent.clipboard.auto_translate_enabled,
             )
         finally:
             self._clipboard.strict_runtime_errors = previous_strict_runtime_errors
@@ -486,34 +491,34 @@ class SettingsRuntimeEffectsAdapter:
         presenter = self._overlay.current_presenter()
         if presenter is not None:
             await presenter.update_display_preferences(
-                show_translation=settings.overlay.show_translation,
-                show_peer_original=settings.overlay.show_peer_original,
+                show_translation=settings.intent.overlay.show_translation,
+                show_peer_original=settings.intent.overlay.show_peer_original,
             )
 
-        if transition.previous_overlay_enabled != settings.ui.overlay_enabled:
-            await self._overlay.set_enabled(settings.ui.overlay_enabled)
+        if transition.previous_overlay_enabled != self._settings.overlay_enabled():
+            await self._overlay.set_enabled(self._settings.overlay_enabled())
 
         configure_connection = getattr(self._vrc_mic_sync, "configure_connection", None)
         if callable(configure_connection):
             await configure_connection(
-                mode=settings.osc.connection_mode,
-                send_port=settings.osc.send_port or settings.osc.port,
-                receive_port=settings.osc.receive_port,
-                host=settings.osc.host,
+                mode=settings.intent.osc.connection_mode,
+                send_port=settings.intent.osc.send_port or settings.intent.osc.port,
+                receive_port=settings.intent.osc.receive_port,
+                host=settings.intent.osc.host,
             )
 
-        if self._vrc_mic_sync.last_enabled != settings.osc.vrc_mic_intercept:
+        if self._vrc_mic_sync.last_enabled != settings.intent.osc.vrc_mic_intercept:
             self._runtime_logging.emit_detailed(
-                f"[Settings] VRC mic sync enabled: {settings.osc.vrc_mic_intercept}"
+                f"[Settings] VRC mic sync enabled: {settings.intent.osc.vrc_mic_intercept}"
             )
-            await self._vrc_mic_sync.configure(enabled=settings.osc.vrc_mic_intercept)
+            await self._vrc_mic_sync.configure(enabled=settings.intent.osc.vrc_mic_intercept)
 
         canonical = self._canonical_settings(settings)
         current_self_signature = build_self_stt_runtime_signature_from_vnext(canonical)
         current_peer_signature = build_peer_stt_runtime_signature_from_vnext(canonical)
         next_peer_activation_requested = self._peer.owner.activation_requested(
-            intent_enabled=settings.ui.peer_translation_enabled,
-            eula_accepted=settings.ui.peer_translation_eula_accepted,
+            intent_enabled=self._settings.peer_translation_enabled(),
+            eula_accepted=settings.state.peer_translation.eula_accepted,
         )
         should_restart_stt = (
             transition.previous_self_signature is not None
@@ -522,7 +527,8 @@ class SettingsRuntimeEffectsAdapter:
         should_refresh_peer = (
             transition.previous_peer_signature is None
             or current_peer_signature != transition.previous_peer_signature
-            or transition.previous_peer_translation_enabled != settings.ui.peer_translation_enabled
+            or transition.previous_peer_translation_enabled
+            != self._settings.peer_translation_enabled()
             or transition.previous_peer_activation_requested != next_peer_activation_requested
         )
 
@@ -534,7 +540,7 @@ class SettingsRuntimeEffectsAdapter:
                 f"should_restart_stt={should_restart_stt} "
                 f"should_refresh_peer={should_refresh_peer} "
                 f"prev_overlay_enabled={transition.previous_overlay_enabled} "
-                f"next_overlay_enabled={settings.ui.overlay_enabled}"
+                f"next_overlay_enabled={self._settings.overlay_enabled()}"
             )
 
         if should_refresh_peer and self._pipeline.peer_translation_channel is not None:
@@ -563,8 +569,8 @@ class SettingsRuntimeEffectsAdapter:
                 preserve_custom_vocab_draft=True,
             )
 
-        if transition.previous_locale != settings.ui.locale:
-            self._presentation.set_locale(settings.ui.locale)
+        if transition.previous_locale != settings.intent.ui.locale:
+            self._presentation.set_locale(settings.intent.ui.locale)
             try:
                 self._presentation.apply_locale()
             except Exception:
@@ -607,23 +613,24 @@ class SettingsRuntimeEffectsAdapter:
             if strict_runtime_errors:
                 raise
 
-    def _canonical_settings(self, settings: object) -> AppSettingsVNext:
+    def _canonical_settings(self, settings: AppSettingsVNext) -> AppSettingsVNext:
         return self._settings.project(
             settings,
             authoritative=self._settings.authoritative,
         )
 
-    def _sync_signatures(self, settings: object) -> None:
+    def _sync_signatures(self, settings: AppSettingsVNext) -> None:
         self._runtime_signatures.sync(
             settings,
             canonical=self._canonical_settings(settings),
             peer=self._peer.owner,
+            peer_translation_enabled=self._settings.peer_translation_enabled(),
         )
         self._state.microphone_audio_signature = self._microphone.audio_signature(
             self._microphone_audio(settings)
         )
 
-    def _sync_effective_translation_flags(self, settings: object) -> None:
+    def _sync_effective_translation_flags(self, settings: AppSettingsVNext) -> None:
         self._peer.owner.sync_effective_flags(self._peer.state_for(None))
 
     @staticmethod

@@ -10,25 +10,12 @@ from typing import Any
 
 import pytest
 
-from puripuly_heart.config.settings import (
-    SETTINGS_SCHEMA_VERSION,
-    AppSettings,
-    from_dict,
-    load_settings,
-    load_settings_with_result,
-    new_settings_for_first_run,
-    save_settings,
-    to_dict,
-)
 from puripuly_heart.config.settings_vnext.schema import (
     VNEXT_SETTINGS_SCHEMA_VERSION,
     AppSettingsVNext,
     CaptureTargetIntent,
     PersistedOperationalState,
     ProcessCaptureTargetIntent,
-    ProviderVerificationEntry,
-    ProviderVerificationState,
-    TelemetryIntent,
     TelemetryOperationalState,
     TranslationFallbackIntent,
     with_capture_target,
@@ -69,10 +56,6 @@ def _compat() -> ModuleType:
     return _load_module("puripuly_heart.config.settings_vnext.compat")
 
 
-def _facade() -> ModuleType:
-    return _load_module("puripuly_heart.config.settings_vnext.facade")
-
-
 def _write_json_bytes(path: Path, data: dict[str, Any]) -> bytes:
     raw_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
     path.write_bytes(raw_bytes)
@@ -92,23 +75,6 @@ def test_canonical_migration_loader_rejects_flat_shape(settings_version: int) ->
 
     with pytest.raises(ValueError, match="canonical settings"):
         migration.from_dict(raw)
-
-
-def test_peer_auto_detection_intent_roundtrips_through_legacy_compatibility_projection() -> None:
-    migration = _migration()
-    serialization = _serialization()
-    legacy = AppSettings()
-    legacy.languages.peer_source_mode = "auto"
-    legacy.languages.peer_expected_languages = ["ja", "zh-TW", "ja"]
-
-    vnext = migration.from_legacy_app_settings(legacy)
-    serialized = serialization.to_dict(vnext)
-    projected = migration.to_legacy_dict(vnext)
-
-    assert serialized["intent"]["languages"]["peer_source_mode"] == "auto"
-    assert serialized["intent"]["languages"]["peer_expected_languages"] == ["ja", "zh-TW"]
-    assert projected["languages"]["peer_source_mode"] == "auto"
-    assert projected["languages"]["peer_expected_languages"] == ["ja", "zh-TW"]
 
 
 def test_v30_soniox_auto_is_backed_up_and_migrated_once(tmp_path: Path) -> None:
@@ -189,34 +155,6 @@ def test_final_dev_v30_flat_fixture_archives_then_resets_without_value_continuit
     assert list(tmp_path.glob("*.bak")) == [first.backup_path]
 
 
-def test_flat_reset_projection_can_save_new_changes_without_restoring_retired_values(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    compat = _compat()
-    monkeypatch.setattr(compat.defaults, "detect_system_locale", lambda: "en_US")
-    path = tmp_path / "settings.json"
-    _write_json_bytes(path, _final_dev_v30_fixture())
-    loaded = load_settings(path)
-    reset_recent_source_languages = list(loaded.languages.recent_source_languages)
-
-    loaded.ui.locale = "ko"
-    loaded.audio.ring_buffer_ms = 875
-    save_settings(path, loaded)
-    reloaded = load_settings(path)
-
-    assert reloaded.ui.locale == "ko"
-    assert reloaded.audio.ring_buffer_ms == 875
-    assert reloaded.translation.model.value == "gemma4_26b_31b"
-    assert reloaded.languages.recent_source_languages == reset_recent_source_languages
-    assert reloaded.languages.recent_source_languages != ["fr", "de", "it", "ko", "en", "zh-CN"]
-    assert reloaded.managed_identity.pending_delivery_ack_delivery_id is None
-    assert all(
-        getattr(reloaded.api_key_verified, provider) is False
-        for provider in PROVIDER_VERIFICATION_FIELDS
-    )
-
-
 def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 
@@ -251,8 +189,8 @@ def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
 
 def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
     from puripuly_heart.config.prompts import load_prompt_for_provider
-    from puripuly_heart.config.settings import LEGACY_TIMESTAMP_PROMPT
     from puripuly_heart.config.settings_vnext import migration, serialization
+    from puripuly_heart.config.settings_vnext.migration import LEGACY_TIMESTAMP_PROMPT
 
     canonical = serialization.to_dict(AppSettingsVNext())
     canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
@@ -276,8 +214,8 @@ def test_vnext_dict_preserves_custom_prompt_through_migration() -> None:
 
 
 def test_vnext_dict_preserves_prompt_with_boundary_whitespace() -> None:
-    from puripuly_heart.config.settings import LEGACY_TIMESTAMP_PROMPT
     from puripuly_heart.config.settings_vnext import migration, serialization
+    from puripuly_heart.config.settings_vnext.migration import LEGACY_TIMESTAMP_PROMPT
 
     stored_prompt = f"  {LEGACY_TIMESTAMP_PROMPT}  "
     canonical = serialization.to_dict(AppSettingsVNext())
@@ -313,169 +251,6 @@ def test_vnext_dict_migrates_disabled_gemini_3_flash_fallback_to_none() -> None:
         "connection": "official_byok",
         "selection_alias": "none",
     }
-
-
-def test_public_facade_save_does_not_fabricate_legacy_verification_provenance(
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "settings.json"
-    settings = AppSettings()
-    for provider in PROVIDER_VERIFICATION_FIELDS:
-        setattr(settings.api_key_verified, provider, True)
-
-    save_settings(path, settings)
-
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    assert set(raw) == {"settings_version", "intent", "state"}
-    assert raw["settings_version"] == VNEXT_SETTINGS_SCHEMA_VERSION
-    assert {
-        provider: raw["state"]["provider_verification"][provider]
-        for provider in PROVIDER_VERIFICATION_FIELDS
-    } == {provider: {"status": "unknown"} for provider in PROVIDER_VERIFICATION_FIELDS}
-
-    loaded = load_settings(path)
-    assert all(
-        getattr(loaded.api_key_verified, provider) is False
-        for provider in PROVIDER_VERIFICATION_FIELDS
-    )
-
-
-def test_public_facade_save_preserves_existing_credential_bound_verification(
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "settings.json"
-    verified = ProviderVerificationEntry(
-        status="verified",
-        provider="openrouter",
-        secret_key="openrouter_api_key",
-        secret_revision=None,
-        secret_fingerprint="sha256:credential-bound",
-        verifier_context={"flow": "settings_api_key_verification"},
-        verifier_evidence={"source": "provider_verifier"},
-    )
-    canonical = AppSettingsVNext(
-        state=PersistedOperationalState(
-            provider_verification=ProviderVerificationState(openrouter=verified)
-        )
-    )
-    save_settings(path, canonical)
-    legacy = load_settings(path)
-    legacy.ui.locale = "ja"
-
-    save_settings(path, legacy)
-
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    assert raw["intent"]["ui"]["locale"] == "ja"
-    assert raw["state"]["provider_verification"]["openrouter"] == {
-        "status": "verified",
-        "provider": "openrouter",
-        "secret_key": "openrouter_api_key",
-        "secret_revision": None,
-        "secret_fingerprint": "sha256:credential-bound",
-        "verifier_context": {"flow": "settings_api_key_verification"},
-        "verifier_evidence": {"source": "provider_verifier"},
-    }
-
-
-def test_evidence_bound_verified_entry_serializes_and_projects_legacy_true(
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "settings.json"
-    verified_openrouter = ProviderVerificationEntry(
-        status="verified",
-        provider="openrouter",
-        secret_key="openrouter_api_key",
-        secret_revision="secret-r1",
-        secret_fingerprint="sha256:0123456789abcdef",
-        verifier_context={"flow": "settings.verify_api_key"},
-        verifier_evidence={"verifier": "openrouter", "latency_ms": 12.5},
-    )
-    settings = AppSettingsVNext(
-        state=PersistedOperationalState(
-            provider_verification=ProviderVerificationState(openrouter=verified_openrouter)
-        )
-    )
-
-    save_settings(path, settings)
-
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    openrouter_entry = raw["state"]["provider_verification"]["openrouter"]
-    assert openrouter_entry == {
-        "status": "verified",
-        "provider": "openrouter",
-        "secret_key": "openrouter_api_key",
-        "secret_revision": "secret-r1",
-        "secret_fingerprint": "sha256:0123456789abcdef",
-        "verifier_context": {"flow": "settings.verify_api_key"},
-        "verifier_evidence": {"verifier": "openrouter", "latency_ms": 12.5},
-    }
-
-    loaded = load_settings(path)
-    assert loaded.api_key_verified.openrouter is True
-    assert loaded.api_key_verified.deepgram is False
-
-
-def test_cerebras_evidence_bound_provider_verification_entry_projects_legacy_true(
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "settings.json"
-    verified_cerebras = ProviderVerificationEntry(
-        status="verified",
-        provider="cerebras",
-        secret_key="cerebras_api_key",
-        secret_revision=None,
-        secret_fingerprint="sha256:cerebras-test-fingerprint",
-        verifier_context={"flow": "settings.verify_api_key"},
-        verifier_evidence={"verifier": "cerebras"},
-    )
-    settings = AppSettingsVNext(
-        state=PersistedOperationalState(
-            provider_verification=ProviderVerificationState(cerebras=verified_cerebras)
-        )
-    )
-
-    save_settings(path, settings)
-
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    assert raw["state"]["provider_verification"]["cerebras"] == {
-        "status": "verified",
-        "provider": "cerebras",
-        "secret_key": "cerebras_api_key",
-        "secret_revision": None,
-        "secret_fingerprint": "sha256:cerebras-test-fingerprint",
-        "verifier_context": {"flow": "settings.verify_api_key"},
-        "verifier_evidence": {"verifier": "cerebras"},
-    }
-
-    loaded = load_settings(path)
-    assert loaded.api_key_verified.cerebras is True
-
-
-def test_china_first_run_defaults_project_to_vnext_intent() -> None:
-    migration = _migration()
-    serialization = _serialization()
-
-    settings = new_settings_for_first_run("zh-CN")
-    serialized = serialization.to_dict(migration.from_legacy_app_settings(settings))
-
-    assert serialized["intent"]["ui"]["locale"] == "zh-CN"
-    assert serialized["intent"]["translation"]["model"] == "deepseek_v4_flash"
-    assert serialized["intent"]["translation"]["connection"] == "managed_china"
-    assert serialized["intent"]["translation"]["openrouter_model"] == (
-        "deepseek/deepseek-v4-flash-0731"
-    )
-    assert serialized["intent"]["translation"]["openrouter_selected_source"] == "managed"
-    assert serialized["intent"]["translation"]["openrouter_selection_alias"] == (
-        "deepseek_v4_flash_managed"
-    )
-    assert serialized["intent"]["translation"]["openrouter_provider_routing"] == ("deepseek_only")
-    assert serialized["intent"]["translation"]["fallback"] == {
-        "enabled": True,
-        "model": "gemma4_26b_31b",
-        "connection": "openrouter",
-        "selection_alias": "openrouter_gemma4_26b_31b",
-    }
-    assert "openrouter_fallback_selection_alias" not in serialized["intent"]["translation"]
 
 
 @pytest.mark.parametrize(
@@ -787,32 +562,6 @@ def test_present_malformed_telemetry_blocks_fail_closed(malformed: object) -> No
     ):
         migration.from_dict(raw)
 
-    legacy = from_dict({"telemetry": malformed})
-
-    assert legacy.telemetry.enabled is False
-    assert legacy.telemetry_state.anonymous_id is None
-
-
-def test_direct_settings_serialization_enforces_telemetry_state_lifecycle() -> None:
-    migration = _migration()
-    serialization = _serialization()
-    legacy = AppSettings()
-    legacy.telemetry.enabled = False
-    disabled_canonical = migration.from_legacy_app_settings(legacy)
-    enabled_without_id = AppSettingsVNext(
-        state=PersistedOperationalState(telemetry=TelemetryOperationalState(anonymous_id=None))
-    )
-    disabled_with_id = AppSettingsVNext(
-        intent=replace(AppSettingsVNext().intent, telemetry=TelemetryIntent(enabled=False))
-    )
-
-    assert disabled_canonical.state.telemetry.anonymous_id is None
-    assert serialization.to_dict(enabled_without_id)["state"]["telemetry"]["anonymous_id"]
-    assert serialization.to_dict(disabled_with_id)["state"]["telemetry"] == {
-        "anonymous_id": None,
-        "last_sent_date_utc": None,
-    }
-
 
 def test_telemetry_enabled_transitions_manage_operational_state() -> None:
     base = AppSettingsVNext(
@@ -850,68 +599,6 @@ def test_malformed_telemetry_last_sent_date_is_ignored() -> None:
 
     assert loaded.state.telemetry.anonymous_id == "telemetry-id"
     assert loaded.state.telemetry.last_sent_date_utc is None
-
-
-def test_current_vnext_status_only_provider_verification_entries_load_as_unknown() -> None:
-    migration = _migration()
-    serialization = _serialization()
-    raw = serialization.to_dict(AppSettingsVNext())
-    raw["state"]["provider_verification"] = {
-        "deepgram": {"status": "verified"},
-        "soniox": {"status": "failed"},
-        "google": {"status": "skipped"},
-        "openrouter": {"status": "verified"},
-        "deepseek": {"status": "failed"},
-        "cerebras": {"status": "verified"},
-        "alibaba_beijing": {"status": "skipped"},
-        "alibaba_singapore": {"status": "verified"},
-    }
-
-    for loader in (serialization.from_dict, migration.from_dict):
-        settings = loader(raw)
-        serialized = serialization.to_dict(settings)
-
-        assert serialized["state"]["provider_verification"] == {
-            provider: {
-                "status": "unknown",
-                "provider": None,
-                "secret_key": None,
-                "secret_revision": None,
-                "secret_fingerprint": None,
-                "verifier_context": {},
-                "verifier_evidence": {},
-            }
-            for provider in PROVIDER_VERIFICATION_FIELDS
-        }
-        assert migration.to_legacy_dict(settings)["api_key_verified"] == {
-            provider: False for provider in PROVIDER_VERIFICATION_FIELDS
-        }
-
-
-def test_current_vnext_evidence_bound_provider_verification_entry_survives_compatibility_shim() -> (
-    None
-):
-    migration = _migration()
-    serialization = _serialization()
-    raw = serialization.to_dict(AppSettingsVNext())
-    raw["state"]["provider_verification"]["openrouter"] = {
-        "status": "verified",
-        "provider": "openrouter",
-        "secret_key": "openrouter_api_key",
-        "secret_revision": None,
-        "secret_fingerprint": "sha256:0123456789abcdef",
-        "verifier_context": {"flow": "settings.verify_api_key"},
-        "verifier_evidence": {"verifier": "openrouter"},
-    }
-
-    settings = migration.from_dict(raw)
-    serialized = serialization.to_dict(settings)
-
-    assert (
-        serialized["state"]["provider_verification"]["openrouter"]
-        == raw["state"]["provider_verification"]["openrouter"]
-    )
-    assert migration.to_legacy_dict(settings)["api_key_verified"]["openrouter"] is True
 
 
 def test_current_vnext_dict_reads_and_serializes_idempotently() -> None:
@@ -982,57 +669,6 @@ def test_pre_v27_canonical_vnext_output_device_migration_backs_up_before_rewrite
         "process": None,
     }
     assert persisted["intent"]["desktop_audio"]["output_device"] == legacy_output_device
-
-
-@pytest.mark.parametrize(
-    ("input_channel", "channel", "basename"),
-    [
-        ("STABLE", "stable", "Discord.exe"),
-        ("PTB", "ptb", "DiscordPTB.exe"),
-        ("Canary", "canary", "DiscordCanary.exe"),
-    ],
-)
-def test_process_capture_target_round_trips_with_discord_update_resistant_identity(
-    input_channel: str,
-    channel: str,
-    basename: str,
-) -> None:
-    serialization = _serialization()
-    migration = _migration()
-    from puripuly_heart.config.capture_target_resolution import resolve_desktop_audio_capture_target
-
-    settings = with_telemetry_enabled(
-        AppSettingsVNext(
-            intent=replace(
-                AppSettingsVNext().intent,
-                desktop_audio=replace(
-                    AppSettingsVNext().intent.desktop_audio,
-                    capture_target=CaptureTargetIntent.process_target(
-                        ProcessCaptureTargetIntent.discord(input_channel)
-                    ),
-                ),
-            ),
-        ),
-        True,
-        identifier_factory=lambda: "capture-target-test-id",
-    )
-
-    serialized = serialization.to_dict(settings)
-    restored = migration.from_dict(serialized)
-
-    target = serialized["intent"]["desktop_audio"]["capture_target"]
-    assert target["kind"] == "process"
-    assert target["process"] == {
-        "kind": "discord",
-        "executable_identity": None,
-        "discord_channel": channel,
-        "executable_basename": basename,
-    }
-    assert restored == settings
-    resolved = resolve_desktop_audio_capture_target(settings.intent.desktop_audio.capture_target)
-    assert resolved.discord_channel == channel
-    assert resolved.executable_basename == basename
-    assert migration.to_legacy_dict(settings)["desktop_audio"]["output_device"] == ""
 
 
 def test_generic_process_identity_is_normalized_without_relocation() -> None:
@@ -1368,113 +1004,6 @@ def test_capture_target_resolution_covers_all_target_kinds(
         assert getattr(resolved, field) == value
 
 
-@pytest.mark.parametrize(
-    ("target", "legacy_output_device"),
-    [
-        (CaptureTargetIntent.default_output_device(), ""),
-        (CaptureTargetIntent.named_output_device("Fixture Speakers"), "Fixture Speakers"),
-        (
-            CaptureTargetIntent.process_target(
-                ProcessCaptureTargetIntent.generic_executable(r"C:\Apps\example.exe")
-            ),
-            "",
-        ),
-    ],
-)
-def test_capture_target_legacy_facade_projection(
-    target: CaptureTargetIntent,
-    legacy_output_device: str,
-) -> None:
-    migration = _migration()
-    settings = with_capture_target(AppSettingsVNext(), target)
-
-    legacy = migration.to_legacy_dict(settings)
-
-    assert legacy["desktop_audio"]["output_device"] == legacy_output_device
-
-
-@pytest.mark.parametrize(
-    ("target", "legacy_output_device"),
-    [
-        (CaptureTargetIntent.default_output_device(), ""),
-        (CaptureTargetIntent.named_output_device("Fixture Speakers"), "Fixture Speakers"),
-        (
-            CaptureTargetIntent.process_target(
-                ProcessCaptureTargetIntent.generic_executable(r"C:\Apps\Game\Game.exe")
-            ),
-            "",
-        ),
-    ],
-)
-def test_legacy_facade_save_preserves_existing_canonical_process_target(
-    tmp_path: Path,
-    target: CaptureTargetIntent,
-    legacy_output_device: str,
-) -> None:
-    facade = _facade()
-    path = tmp_path / "settings.json"
-    settings = with_capture_target(AppSettingsVNext(), target)
-    facade.save_vnext_settings(path, settings)
-
-    legacy = facade.load_settings(path)
-    facade.save_settings(path, legacy)
-    reloaded = facade.load_vnext_settings(path)
-
-    assert legacy.desktop_audio.output_device == legacy_output_device
-    assert reloaded.settings is not None
-    assert reloaded.settings.intent.desktop_audio.capture_target == target
-
-
-def test_legacy_facade_device_change_replaces_process_projection_with_named_device(
-    tmp_path: Path,
-) -> None:
-    facade = _facade()
-    path = tmp_path / "settings.json"
-    process_target = CaptureTargetIntent.process_target(
-        ProcessCaptureTargetIntent.generic_executable(r"C:\Apps\Game\Game.exe")
-    )
-    settings = with_capture_target(AppSettingsVNext(), process_target)
-    facade.save_vnext_settings(path, settings)
-
-    legacy = facade.load_settings(path)
-    legacy.desktop_audio.output_device = "Replacement Speakers"
-    from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
-
-    legacy.desktop_audio.runtime_capture_target = ResolvedDesktopAudioCaptureTarget(
-        kind="named_output_device",
-        device_name="Replacement Speakers",
-    )
-    facade.save_settings(path, legacy)
-    reloaded = facade.load_vnext_settings(path)
-
-    assert reloaded.settings is not None
-    assert reloaded.settings.intent.desktop_audio.capture_target == (
-        CaptureTargetIntent.named_output_device("Replacement Speakers")
-    )
-
-
-def test_legacy_facade_device_change_without_runtime_projection_replaces_process_target(
-    tmp_path: Path,
-) -> None:
-    facade = _facade()
-    path = tmp_path / "settings.json"
-    process_target = CaptureTargetIntent.process_target(
-        ProcessCaptureTargetIntent.generic_executable(r"C:\Apps\Game\Game.exe")
-    )
-    facade.save_vnext_settings(path, with_capture_target(AppSettingsVNext(), process_target))
-
-    legacy = facade.load_settings(path)
-    legacy.desktop_audio.output_device = "Replacement Speakers"
-    legacy.desktop_audio.runtime_capture_target = None
-    facade.save_settings(path, legacy)
-    reloaded = facade.load_vnext_settings(path)
-
-    assert reloaded.settings is not None
-    assert reloaded.settings.intent.desktop_audio.capture_target == (
-        CaptureTargetIntent.named_output_device("Replacement Speakers")
-    )
-
-
 def test_capture_target_resolution_excludes_pids_and_runtime_state() -> None:
     from puripuly_heart.config.capture_target_resolution import resolve_desktop_audio_capture_target
 
@@ -1500,6 +1029,30 @@ def test_capture_target_resolution_excludes_pids_and_runtime_state() -> None:
     assert not {"pid", "active", "warning", "retry", "capture_state"}.intersection(
         serialized["intent"]["desktop_audio"]["capture_target"]
     )
+
+
+def test_current_vnext_unknown_fields_round_trip_through_compatibility_extensions(
+    tmp_path: Path,
+) -> None:
+    serialization = _serialization()
+    compat = _compat()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["future_product_flag"] = True
+    raw["intent"]["ui"]["future_toggle"] = "keep-me"
+    path = tmp_path / "settings.json"
+    _write_json_bytes(path, raw)
+
+    persisted = serialization.to_dict(serialization.from_dict(raw))
+    assert persisted["future_product_flag"] is True
+    assert persisted["intent"]["ui"]["future_toggle"] == "keep-me"
+
+    result = compat.load_vnext_settings(path)
+    assert result.ok
+    assert result.migrated is False
+    assert result.settings is not None
+    saved = serialization.to_dict(result.settings)
+    assert saved["future_product_flag"] is True
+    assert saved["intent"]["ui"]["future_toggle"] == "keep-me"
 
 
 def test_save_vnext_settings_normalizes_stale_settings_version_to_current(
@@ -1980,69 +1533,3 @@ def test_older_vnext_version_is_backed_up_and_forward_migrated(
     assert json.loads(path.read_text(encoding="utf-8"))["settings_version"] == (
         VNEXT_SETTINGS_SCHEMA_VERSION
     )
-
-
-def test_facade_projection_failure_returns_explicit_result_without_overwrite(
-    tmp_path: Path,
-) -> None:
-    compat = _compat()
-    serialization = _serialization()
-    path = tmp_path / "settings.json"
-    settings = with_telemetry_enabled(
-        AppSettingsVNext(),
-        True,
-        identifier_factory=lambda: "projection-failure-test-id",
-    )
-    raw = serialization.to_dict(settings)
-    raw["intent"]["osc"]["port"] = "not-an-int"
-    original_bytes = _write_json_bytes(path, raw)
-
-    result = load_settings_with_result(path)
-
-    assert result.status == compat.SettingsPersistenceStatus.MIGRATION_FAILED
-    assert result.settings is None
-    assert result.error is not None
-    assert result.error.message == "migration_failed:ValueError"
-    assert "not-an-int" not in result.error.message
-    assert path.read_bytes() == original_bytes
-    with pytest.raises(RuntimeError, match="migration_failed:ValueError") as exc_info:
-        load_settings(path)
-    assert "not-an-int" not in str(exc_info.value)
-
-
-def test_public_settings_facade_keeps_legacy_imports_and_reads_vnext_dict() -> None:
-    settings_module = import_module("puripuly_heart.config.settings")
-    serialization = _serialization()
-
-    assert settings_module.AppSettings is AppSettings
-    assert settings_module.AppSettingsVNext is AppSettingsVNext
-    assert "provider" in to_dict(AppSettings())
-    assert set(serialization.to_dict(AppSettingsVNext())) == {"settings_version", "intent", "state"}
-
-    vnext = replace(
-        AppSettingsVNext(),
-        settings_version=VNEXT_SETTINGS_SCHEMA_VERSION,
-    )
-    legacy = from_dict(serialization.to_dict(vnext))
-
-    assert isinstance(legacy, AppSettings)
-    assert legacy.settings_version == SETTINGS_SCHEMA_VERSION
-    assert hasattr(settings_module, "load_vnext_settings")
-    assert hasattr(settings_module, "save_settings_with_result")
-
-
-def test_public_settings_facade_load_save_functions_are_owned_by_vnext_facade() -> None:
-    settings_module = import_module("puripuly_heart.config.settings")
-    facade = _facade()
-
-    assert settings_module.FacadeSettingsLoadResult is facade.FacadeSettingsLoadResult
-    assert settings_module._FacadeSettingsLoadResult is facade.FacadeSettingsLoadResult
-    for name in (
-        "load_settings",
-        "load_settings_with_result",
-        "save_settings",
-        "save_settings_with_result",
-        "load_vnext_settings",
-        "save_vnext_settings",
-    ):
-        assert getattr(settings_module, name) is getattr(facade, name)

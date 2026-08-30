@@ -1,52 +1,51 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
-from puripuly_heart.config.settings import AppSettings, from_dict, to_dict
 from puripuly_heart.config.settings_vnext import migration, serialization
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, LanguageIntent
 
 
 def test_existing_settings_without_secondary_target_load_as_single_target() -> None:
-    raw = to_dict(AppSettings())
-    raw["languages"].pop("secondary_target_language")
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["languages"].pop("secondary_target_language")
 
-    loaded = from_dict(raw)
+    loaded = serialization.from_dict(raw)
 
-    assert loaded.languages.target_language == "en"
-    assert loaded.languages.secondary_target_language == ""
+    assert loaded.intent.languages.target_language == "en"
+    assert loaded.intent.languages.secondary_target_language == ""
 
 
-def test_secondary_target_roundtrips_through_canonical_and_compatibility_settings() -> None:
-    legacy = AppSettings()
-    legacy.languages.target_language = " zh-CN "
-    legacy.languages.secondary_target_language = " ja "
-    legacy.validate()
-
-    canonical = migration.from_legacy_app_settings(legacy)
+def test_secondary_target_roundtrips_through_canonical_settings() -> None:
+    baseline = AppSettingsVNext()
+    canonical = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            languages=LanguageIntent(
+                source_language=baseline.intent.languages.source_language,
+                target_language=" zh-CN ",
+                secondary_target_language=" ja ",
+            ),
+        ),
+    )
     persisted = serialization.to_dict(canonical)
     restored = migration.from_dict(persisted)
-    projected = migration.to_legacy_dict(restored)
 
     assert canonical.intent.languages.target_language == "zh-CN"
     assert canonical.intent.languages.secondary_target_language == "ja"
     assert persisted["intent"]["languages"]["secondary_target_language"] == "ja"
-    assert projected["languages"]["secondary_target_language"] == "ja"
+    assert restored.intent.languages.secondary_target_language == "ja"
 
 
 def test_duplicate_secondary_target_normalizes_to_single_target() -> None:
-    legacy = AppSettings()
-    legacy.languages.target_language = " ja "
-    legacy.languages.secondary_target_language = "ja"
-
-    legacy.validate()
     canonical = LanguageIntent(
         target_language=" ja ",
         secondary_target_language="ja",
     )
 
-    assert legacy.languages.target_language == "ja"
-    assert legacy.languages.secondary_target_language == ""
     assert canonical.target_language == "ja"
     assert canonical.secondary_target_language == ""
 
@@ -106,14 +105,14 @@ def test_apply_language_selection_writes_the_secondary_target() -> None:
         SettingsApplicationOwner,
     )
 
-    applied: list[AppSettings] = []
+    applied: list[AppSettingsVNext] = []
 
     class Stub:
         def __init__(self) -> None:
-            self.settings = type("S", (), {"current": AppSettings()})()
+            self.settings = type("S", (), {"canonical": AppSettingsVNext()})()
             self.projection = type("P", (), {"render": lambda self, *a, **k: None})()
 
-        async def apply(self, updated: AppSettings) -> None:
+        async def apply(self, updated: AppSettingsVNext) -> None:
             applied.append(updated)
 
     stub = Stub()
@@ -130,8 +129,8 @@ def test_apply_language_selection_writes_the_secondary_target() -> None:
 
     asyncio.run(SettingsApplicationOwner.apply_language_selection(stub, change))
 
-    assert applied[-1].languages.secondary_target_language == "ja"
-    assert applied[-1].languages.target_language == "en"
+    assert applied[-1].intent.languages.secondary_target_language == "ja"
+    assert applied[-1].intent.languages.target_language == "en"
 
 
 def test_apply_language_selection_clears_the_secondary_target() -> None:
@@ -142,16 +141,22 @@ def test_apply_language_selection_clears_the_secondary_target() -> None:
         SettingsApplicationOwner,
     )
 
-    applied: list[AppSettings] = []
-    current = AppSettings()
-    current.languages.secondary_target_language = "ja"
+    applied: list[AppSettingsVNext] = []
+    baseline = AppSettingsVNext()
+    current = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            languages=replace(baseline.intent.languages, secondary_target_language="ja"),
+        ),
+    )
 
     class Stub:
         def __init__(self) -> None:
-            self.settings = type("S", (), {"current": current})()
+            self.settings = type("S", (), {"canonical": current})()
             self.projection = type("P", (), {"render": lambda self, *a, **k: None})()
 
-        async def apply(self, updated: AppSettings) -> None:
+        async def apply(self, updated: AppSettingsVNext) -> None:
             applied.append(updated)
 
     change = LanguageSelectionChange(
@@ -166,15 +171,12 @@ def test_apply_language_selection_clears_the_secondary_target() -> None:
 
     asyncio.run(SettingsApplicationOwner.apply_language_selection(Stub(), change))
 
-    assert applied[-1].languages.secondary_target_language == ""
+    assert applied[-1].intent.languages.secondary_target_language == ""
 
 
 @pytest.mark.parametrize("secondary", ["", "ja"])
 def test_apply_language_selection_survives_validation(secondary: str) -> None:
-    settings = AppSettings()
-    settings.languages.target_language = "en"
-    settings.languages.secondary_target_language = secondary
-
-    settings.validate()
-
-    assert settings.languages.secondary_target_language == secondary
+    LanguageIntent(
+        target_language="en",
+        secondary_target_language=secondary,
+    )

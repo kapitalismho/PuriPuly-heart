@@ -2083,7 +2083,7 @@ def test_desktop_overlay_preview_guard_stops_before_rendering_unsafe_fixture_dat
 def test_desktop_overlay_preview_guard_avoids_provider_broker_stt_translation_secretstore_and_settings_save_calls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from puripuly_heart.config import settings as settings_module
+    from puripuly_heart.config.settings_vnext import compat as settings_module
 
     forbidden_prefixes = (
         "puripuly_heart.app.wiring",
@@ -2114,7 +2114,7 @@ def test_desktop_overlay_preview_guard_avoids_provider_broker_stt_translation_se
         raise AssertionError("preview must not persist fixture or settings data")
 
     monkeypatch.setattr(builtins, "__import__", guarded_import)
-    monkeypatch.setattr(settings_module, "save_settings", fail_settings_save)
+    monkeypatch.setattr(settings_module, "save_vnext_settings", fail_settings_save)
     monkeypatch.setattr(Path, "write_text", fail_write_text)
 
     app = FakeFletApp()

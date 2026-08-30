@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from puripuly_heart.config.settings import from_dict, to_dict
 from puripuly_heart.config.settings_vnext.schema import VNEXT_SETTINGS_SCHEMA_VERSION
 
 CANONICAL_SETTINGS_TOP_LEVEL_KEYS = {"settings_version", "intent", "state"}
@@ -23,9 +22,13 @@ def assert_raw_vnext_settings_file(path: Path) -> dict[str, Any]:
 
 
 def legacy_projected_settings_dict(raw_vnext: dict[str, Any]) -> dict[str, Any]:
+    return assert_raw_vnext_dict(raw_vnext)
+
+
+def assert_raw_vnext_dict(raw_vnext: dict[str, Any]) -> dict[str, Any]:
     assert set(raw_vnext) == CANONICAL_SETTINGS_TOP_LEVEL_KEYS
     assert raw_vnext["settings_version"] == VNEXT_SETTINGS_SCHEMA_VERSION
-    return to_dict(from_dict(raw_vnext))
+    return raw_vnext
 
 
 def legacy_projected_settings_file(path: Path) -> dict[str, Any]:

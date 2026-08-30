@@ -1,33 +1,82 @@
 from __future__ import annotations
 
-import copy
+from dataclasses import replace
 
 import pytest
 
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    materialize_canonical_translation_settings,
+)
 from puripuly_heart.app.services.osc.control_application import (
     OscControlApplyResult,
     SettingsBackedOscControlApplication,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    DeepSeekLLMModel,
-    LLMProviderName,
-    STTProviderName,
-    TranslationConnection,
-    TranslationModel,
-    materialize_translation_settings,
+from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
+    provider_llm_for_translation,
 )
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
+
+
+def _with_translation(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(settings.intent.translation, **changes),
+        ),
+    )
+
+
+def _with_languages(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            languages=replace(settings.intent.languages, **changes),
+        ),
+    )
+
+
+def _with_stt_provider(settings: AppSettingsVNext, provider: str) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            stt=replace(settings.intent.stt, provider=provider),
+        ),
+    )
+
+
+def _with_peer_stt_provider(settings: AppSettingsVNext, provider: str) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            peer_stt=replace(settings.intent.peer_stt, provider=provider),
+        ),
+    )
+
+
+def _with_osc(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            osc=replace(settings.intent.osc, **changes),
+        ),
+    )
 
 
 @pytest.mark.asyncio
 async def test_translation_model_control_materializes_provider_and_connection() -> None:
-    current = AppSettings()
-    current.translation.connection = TranslationConnection.MANAGED
-    applied: list[AppSettings] = []
+    current = _with_translation(AppSettingsVNext(), connection=TranslationConnection.MANAGED.value)
+    applied: list[AppSettingsVNext] = []
 
     async def apply_settings(settings: object) -> object:
         nonlocal current
-        assert isinstance(settings, AppSettings)
+        assert isinstance(settings, AppSettingsVNext)
         applied.append(settings)
         current = settings
         return settings
@@ -35,32 +84,32 @@ async def test_translation_model_control_materializes_provider_and_connection() 
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     result = await application.set_translation_model(TranslationModel.DEEPSEEK_V4_FLASH.value)
 
     assert result is applied[0]
     updated = applied[0]
-    assert updated.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
-    assert updated.translation.connection == TranslationConnection.MANAGED
+    assert updated.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH.value
+    assert updated.intent.translation.connection == TranslationConnection.MANAGED.value
     assert (
-        updated.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value]
-        == TranslationConnection.MANAGED
+        provider_llm_for_translation(
+            updated.intent.translation.model,
+            updated.intent.translation.connection,
+        )
+        == "openrouter"
     )
-    assert updated.provider.llm == LLMProviderName.OPENROUTER
-    assert updated.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH
 
 
 @pytest.mark.asyncio
 async def test_managed_local_models_control_materializes_provider_and_connection() -> None:
-    current = AppSettings()
-    current.translation.connection = TranslationConnection.MANAGED
-    applied: list[AppSettings] = []
+    current = _with_translation(AppSettingsVNext(), connection=TranslationConnection.MANAGED.value)
+    applied: list[AppSettingsVNext] = []
 
     async def apply_settings(settings: object) -> object:
         nonlocal current
-        assert isinstance(settings, AppSettings)
+        assert isinstance(settings, AppSettingsVNext)
         applied.append(settings)
         current = settings
         return settings
@@ -68,7 +117,7 @@ async def test_managed_local_models_control_materializes_provider_and_connection
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     await application.set_translation_model(
@@ -77,9 +126,15 @@ async def test_managed_local_models_control_materializes_provider_and_connection
     )
 
     updated = applied[0]
-    assert updated.translation.model == TranslationModel.MANAGED_GEMMA
-    assert updated.translation.connection == TranslationConnection.CPU
-    assert updated.provider.llm == LLMProviderName.MANAGED_GEMMA
+    assert updated.intent.translation.model == TranslationModel.MANAGED_GEMMA.value
+    assert updated.intent.translation.connection == TranslationConnection.CPU.value
+    assert (
+        provider_llm_for_translation(
+            updated.intent.translation.model,
+            updated.intent.translation.connection,
+        )
+        == "managed_gemma"
+    )
 
     await application.set_translation_model(
         TranslationModel.MANAGED_GEMMA.value,
@@ -87,9 +142,8 @@ async def test_managed_local_models_control_materializes_provider_and_connection
     )
 
     updated = applied[1]
-    assert updated.translation.model == TranslationModel.MANAGED_GEMMA
-    assert updated.translation.connection == TranslationConnection.GPU
-    assert updated.provider.llm == LLMProviderName.MANAGED_GEMMA
+    assert updated.intent.translation.model == TranslationModel.MANAGED_GEMMA.value
+    assert updated.intent.translation.connection == TranslationConnection.GPU.value
 
     await application.set_translation_model(
         TranslationModel.MANAGED_GEMMA_12B.value,
@@ -97,43 +151,46 @@ async def test_managed_local_models_control_materializes_provider_and_connection
     )
 
     updated = applied[2]
-    assert updated.translation.model == TranslationModel.MANAGED_GEMMA_12B
-    assert updated.translation.connection == TranslationConnection.GPU
-    assert updated.provider.llm == LLMProviderName.MANAGED_GEMMA
+    assert updated.intent.translation.model == TranslationModel.MANAGED_GEMMA_12B.value
+    assert updated.intent.translation.connection == TranslationConnection.GPU.value
 
 
 @pytest.mark.asyncio
 async def test_custom_http_control_preserves_the_previous_llm_selection() -> None:
-    current = AppSettings()
-    current.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
-    current.translation.connection = TranslationConnection.OFFICIAL_BYOK
-    current.translation.http_extension_id = "demo"
+    current = _with_translation(
+        AppSettingsVNext(),
+        model=TranslationModel.DEEPSEEK_V4_FLASH.value,
+        connection=TranslationConnection.OFFICIAL_BYOK.value,
+        http_extension_id="demo",
+    )
 
     async def apply_settings(settings: object) -> object:
         nonlocal current
-        assert isinstance(settings, AppSettings)
+        assert isinstance(settings, AppSettingsVNext)
         current = settings
         return settings
 
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     await application.set_translation_model(TranslationModel.CUSTOM_HTTP.value)
 
-    assert current.translation.model is TranslationModel.CUSTOM_HTTP
-    assert current.translation.connection is TranslationConnection.CUSTOM_HTTP
-    assert current.translation.http_extension_id == "demo"
-    assert current.translation.previous_llm_model is TranslationModel.DEEPSEEK_V4_FLASH
+    assert current.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
+    assert current.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
+    assert current.intent.translation.http_extension_id == "demo"
+    assert current.intent.translation.previous_llm_model == TranslationModel.DEEPSEEK_V4_FLASH.value
 
 
 @pytest.mark.asyncio
 async def test_gemma_31b_control_keeps_an_active_cerebras_selection() -> None:
-    current = AppSettings()
-    current.translation.model = TranslationModel.GEMMA4_31B
-    current.translation.connection = TranslationConnection.CEREBRAS
+    current = _with_translation(
+        AppSettingsVNext(),
+        model=TranslationModel.GEMMA4_31B.value,
+        connection=TranslationConnection.CEREBRAS.value,
+    )
     applied = 0
 
     async def apply_settings(_settings: object) -> object:
@@ -144,20 +201,20 @@ async def test_gemma_31b_control_keeps_an_active_cerebras_selection() -> None:
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     result = await application.set_translation_model(TranslationModel.GEMMA4_31B.value)
 
     assert result is True
     assert applied == 0
-    assert current.translation.model is TranslationModel.GEMMA4_31B
-    assert current.translation.connection is TranslationConnection.CEREBRAS
+    assert current.intent.translation.model == TranslationModel.GEMMA4_31B.value
+    assert current.intent.translation.connection == TranslationConnection.CEREBRAS.value
 
 
 @pytest.mark.asyncio
 async def test_settings_control_rejects_when_application_keeps_the_previous_state() -> None:
-    current = AppSettings()
+    current = AppSettingsVNext()
 
     async def apply_settings(_settings: object) -> object:
         return True
@@ -165,31 +222,29 @@ async def test_settings_control_rejects_when_application_keeps_the_previous_stat
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     result = await application.set_mute_sync(True)
 
     assert result is False
-    assert current.osc.vrc_mic_intercept is False
+    assert current.intent.osc.vrc_mic_intercept is False
 
 
 @pytest.mark.asyncio
 async def test_settings_control_reports_a_committed_normalized_canonical_state() -> None:
-    current = AppSettings()
-    current.provider.stt = STTProviderName.DEEPGRAM
+    current = _with_stt_provider(AppSettingsVNext(), STTProviderName.DEEPGRAM.value)
 
     async def apply_settings(settings: object) -> object:
         nonlocal current
-        assert isinstance(settings, AppSettings)
-        current = copy.deepcopy(settings)
-        current.provider.stt = STTProviderName.LOCAL_CPU_AUTO
+        assert isinstance(settings, AppSettingsVNext)
+        current = _with_stt_provider(settings, STTProviderName.LOCAL_CPU_AUTO.value)
         return True
 
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     result = await application.set_self_asr(STTProviderName.LOCAL_QWEN_GPU.value)
@@ -198,16 +253,18 @@ async def test_settings_control_reports_a_committed_normalized_canonical_state()
         applied=False,
         canonical_state_changed=True,
     )
-    assert current.provider.stt is STTProviderName.LOCAL_CPU_AUTO
+    assert current.intent.stt.provider == STTProviderName.LOCAL_CPU_AUTO.value
 
 
 @pytest.mark.asyncio
 async def test_set_languages_skips_apply_when_every_value_matches() -> None:
-    current = AppSettings()
-    current.languages.source_language = "fr"
-    current.languages.target_language = "fr"
-    current.languages.peer_source_language = "fr"
-    current.languages.peer_target_language = "fr"
+    current = _with_languages(
+        AppSettingsVNext(),
+        source_language="fr",
+        target_language="fr",
+        peer_source_language="fr",
+        peer_target_language="fr",
+    )
     applied = 0
 
     async def apply_settings(_settings: object) -> object:
@@ -218,7 +275,7 @@ async def test_set_languages_skips_apply_when_every_value_matches() -> None:
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     result = await application.set_languages(
@@ -234,27 +291,27 @@ async def test_set_languages_skips_apply_when_every_value_matches() -> None:
 
 @pytest.mark.asyncio
 async def test_set_languages_applies_when_any_value_differs() -> None:
-    current = AppSettings()
-    current.languages.source_language = "ko"
-    current.languages.target_language = "en"
-    current.languages.peer_source_language = "en"
-    current.languages.peer_target_language = "ko"
+    current = _with_languages(
+        AppSettingsVNext(),
+        source_language="ko",
+        target_language="en",
+        peer_source_language="en",
+        peer_target_language="ko",
+    )
     applied = 0
 
     async def apply_settings(settings: object) -> object:
+        nonlocal current
         nonlocal applied
-        assert isinstance(settings, AppSettings)
+        assert isinstance(settings, AppSettingsVNext)
         applied += 1
-        current.languages.source_language = settings.languages.source_language
-        current.languages.target_language = settings.languages.target_language
-        current.languages.peer_source_language = settings.languages.peer_source_language
-        current.languages.peer_target_language = settings.languages.peer_target_language
+        current = settings
         return True
 
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     result = await application.set_languages(
@@ -266,25 +323,27 @@ async def test_set_languages_applies_when_any_value_differs() -> None:
 
     assert result is True
     assert applied == 1
-    assert current.languages.target_language == "fr"
+    assert current.intent.languages.target_language == "fr"
 
 
 @pytest.mark.asyncio
 async def test_primary_osc_target_change_clears_an_equal_secondary_target() -> None:
-    current = AppSettings()
-    current.languages.target_language = "en"
-    current.languages.secondary_target_language = "fr"
+    current = _with_languages(
+        AppSettingsVNext(),
+        target_language="en",
+        secondary_target_language="fr",
+    )
 
     async def apply_settings(settings: object) -> object:
         nonlocal current
-        assert isinstance(settings, AppSettings)
-        current = copy.deepcopy(settings)
+        assert isinstance(settings, AppSettingsVNext)
+        current = settings
         return True
 
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     result = await application.set_languages(
@@ -295,26 +354,28 @@ async def test_primary_osc_target_change_clears_an_equal_secondary_target() -> N
     )
 
     assert result is True
-    assert current.languages.target_language == "fr"
-    assert current.languages.secondary_target_language == ""
+    assert current.intent.languages.target_language == "fr"
+    assert current.intent.languages.secondary_target_language == ""
 
 
 @pytest.mark.asyncio
 async def test_primary_osc_target_change_preserves_a_distinct_secondary_target() -> None:
-    current = AppSettings()
-    current.languages.target_language = "en"
-    current.languages.secondary_target_language = "ja"
+    current = _with_languages(
+        AppSettingsVNext(),
+        target_language="en",
+        secondary_target_language="ja",
+    )
 
     async def apply_settings(settings: object) -> object:
         nonlocal current
-        assert isinstance(settings, AppSettings)
-        current = copy.deepcopy(settings)
+        assert isinstance(settings, AppSettingsVNext)
+        current = settings
         return True
 
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     result = await application.set_languages(
@@ -325,39 +386,40 @@ async def test_primary_osc_target_change_preserves_a_distinct_secondary_target()
     )
 
     assert result is True
-    assert current.languages.target_language == "fr"
-    assert current.languages.secondary_target_language == "ja"
+    assert current.intent.languages.target_language == "fr"
+    assert current.intent.languages.secondary_target_language == "ja"
 
     result = await application.set_secondary_target_language("de")
 
     assert result is True
-    assert current.languages.secondary_target_language == "de"
+    assert current.intent.languages.secondary_target_language == "de"
 
     result = await application.set_secondary_target_language("fr")
 
     assert result is True
-    assert current.languages.secondary_target_language == ""
+    assert current.intent.languages.secondary_target_language == ""
 
 
 @pytest.mark.asyncio
 async def test_asr_controls_skip_apply_when_provider_matches() -> None:
-    current = AppSettings()
-    current.provider.stt = type(current.provider.stt)("deepgram")
-    current.provider.peer_stt = type(current.provider.peer_stt)("soniox")
+    current = _with_peer_stt_provider(
+        _with_stt_provider(AppSettingsVNext(), "deepgram"),
+        "soniox",
+    )
     applied = 0
 
     async def apply_settings(settings: object) -> object:
+        nonlocal current
         nonlocal applied
-        assert isinstance(settings, AppSettings)
+        assert isinstance(settings, AppSettingsVNext)
         applied += 1
-        current.provider.stt = settings.provider.stt
-        current.provider.peer_stt = settings.provider.peer_stt
+        current = settings
         return True
 
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     assert (await application.set_self_asr("deepgram")) is True
@@ -367,26 +429,33 @@ async def test_asr_controls_skip_apply_when_provider_matches() -> None:
     assert (await application.set_self_asr("local_parakeet_v3")) is True
 
     assert applied == 1
-    assert current.provider.stt.value == "local_parakeet_v3"
-    assert current.provider.peer_stt.value == "soniox"
+    assert current.intent.stt.provider == "local_parakeet_v3"
+    assert current.intent.peer_stt.provider == "soniox"
 
 
 @pytest.mark.asyncio
 async def test_fallback_control_skips_apply_when_alias_matches() -> None:
-    current = AppSettings()
+    current = _with_translation(
+        AppSettingsVNext(),
+        fallback=replace(
+            AppSettingsVNext().intent.translation.fallback,
+            selection_alias="none",
+        ),
+    )
     applied = 0
 
     async def apply_settings(settings: object) -> object:
+        nonlocal current
         nonlocal applied
-        assert isinstance(settings, AppSettings)
+        assert isinstance(settings, AppSettingsVNext)
         applied += 1
-        current.translation.fallback = settings.translation.fallback
+        current = settings
         return True
 
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     assert (await application.set_fallback("none")) is True
@@ -394,9 +463,9 @@ async def test_fallback_control_skips_apply_when_alias_matches() -> None:
 
     assert (await application.set_fallback("cerebras_gemma4_31b")) is True
     assert applied == 1
-    assert current.translation.fallback.enabled is True
-    assert current.translation.fallback.model.value == "gemma4_31b"
-    assert current.translation.fallback.connection.value == "cerebras"
+    assert current.intent.translation.fallback.enabled is True
+    assert current.intent.translation.fallback.model == "gemma4_31b"
+    assert current.intent.translation.fallback.connection == "cerebras"
 
     assert (await application.set_fallback("cerebras_gemma4_31b")) is True
     assert applied == 1
@@ -404,25 +473,28 @@ async def test_fallback_control_skips_apply_when_alias_matches() -> None:
 
 @pytest.mark.asyncio
 async def test_auxiliary_controls_skip_apply_when_unchanged() -> None:
-    current = AppSettings()
-    current.osc.vrc_mic_intercept = False
-    current.osc.chatbox_include_source = False
-    current.languages.peer_source_mode = "manual"
+    current = _with_languages(
+        _with_osc(
+            AppSettingsVNext(),
+            vrc_mic_intercept=False,
+            chatbox_include_source=False,
+        ),
+        peer_source_mode="manual",
+    )
     applied = 0
 
     async def apply_settings(settings: object) -> object:
+        nonlocal current
         nonlocal applied
-        assert isinstance(settings, AppSettings)
+        assert isinstance(settings, AppSettingsVNext)
         applied += 1
-        current.osc.vrc_mic_intercept = settings.osc.vrc_mic_intercept
-        current.osc.chatbox_include_source = settings.osc.chatbox_include_source
-        current.languages.peer_source_mode = settings.languages.peer_source_mode
+        current = settings
         return True
 
     application = SettingsBackedOscControlApplication(
         settings_provider=lambda: current,
         apply_settings=apply_settings,
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
     assert (await application.set_mute_sync(False)) is True
@@ -432,12 +504,12 @@ async def test_auxiliary_controls_skip_apply_when_unchanged() -> None:
 
     assert (await application.set_mute_sync(True)) is True
     assert applied == 1
-    assert current.osc.vrc_mic_intercept is True
+    assert current.intent.osc.vrc_mic_intercept is True
 
     assert (await application.set_chatbox_source(True)) is True
     assert applied == 2
-    assert current.osc.chatbox_include_source is True
+    assert current.intent.osc.chatbox_include_source is True
 
     assert (await application.set_peer_auto_detect(True)) is True
     assert applied == 3
-    assert current.languages.peer_source_mode == "auto"
+    assert current.intent.languages.peer_source_mode == "auto"

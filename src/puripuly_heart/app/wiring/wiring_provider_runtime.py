@@ -60,39 +60,17 @@ from .wiring_translation_runtime_configuration import (
 )
 
 
-def _runtime_peer_translation_enabled(settings: object) -> bool:
-    ui = getattr(settings, "ui", None)
-    return bool(getattr(ui, "peer_translation_enabled", False))
+def _runtime_peer_translation_enabled(owner: object) -> bool:
+    flag = getattr(owner, "peer_translation_enabled", None)
+    if callable(flag):
+        return bool(flag())
+    return False
 
 
 def project_translation_runtime_settings(
-    settings: object,
+    settings: AppSettingsVNext,
 ) -> TranslationRuntimeSettingsValues:
-    return TranslationRuntimeSettingsValues(
-        source_language=settings.languages.source_language,
-        target_language=settings.languages.target_language,
-        self_target_languages=tuple(
-            language
-            for language in (
-                settings.languages.target_language,
-                settings.languages.secondary_target_language,
-            )
-            if language
-        ),
-        peer_source_language=settings.languages.peer_source_language,
-        peer_target_language=settings.languages.peer_target_language,
-        system_prompt=settings.system_prompt,
-        chatbox_include_source=settings.osc.chatbox_include_source,
-        hangover_s=(
-            settings.stt.low_latency_vad_hangover_ms / 1000.0
-            if FIXED_TRANSLATION_POLICY.fast_translation_enabled
-            else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
-        ),
-        peer_hangover_s=settings.desktop_audio.vad_hangover_ms / 1000.0,
-        low_latency_mode=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
-        low_latency_merge_gap_ms=settings.stt.low_latency_merge_gap_ms,
-        low_latency_spec_retry_max=settings.stt.low_latency_spec_retry_max,
-    )
+    return project_translation_runtime_settings_from_vnext(settings)
 
 
 def project_translation_runtime_settings_from_vnext(
@@ -137,10 +115,11 @@ class ProviderRuntimeSignatures:
 
     def sync(
         self,
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         canonical: AppSettingsVNext,
         peer: PeerApplicationOwner,
+        peer_translation_enabled: bool = False,
     ) -> None:
         self.last_self_runtime = build_self_stt_runtime_signature_from_vnext(canonical)
         self.last_self_provider = build_self_stt_provider_signature_from_vnext(canonical)
@@ -150,7 +129,7 @@ class ProviderRuntimeSignatures:
         )
         peer.last_runtime_signature = build_peer_stt_runtime_signature_from_vnext(canonical)
         peer.last_provider_signature = build_peer_stt_provider_signature_from_vnext(canonical)
-        peer.last_intent_enabled = _runtime_peer_translation_enabled(settings)
+        peer.last_intent_enabled = bool(peer_translation_enabled)
         peer.last_activation_requested = peer.activation_requested(
             intent_enabled=peer.last_intent_enabled,
             eula_accepted=canonical.state.peer_translation.eula_accepted,
@@ -158,7 +137,7 @@ class ProviderRuntimeSignatures:
 
     def capture_peer_before_canonical_mutation(
         self,
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         canonical: AppSettingsVNext,
         peer: PeerApplicationOwner,
@@ -181,10 +160,10 @@ class ProviderRuntimeSignatures:
     def mark_llm_retry(self) -> None:
         self.last_llm_provider = ()
 
-    def mark_superseded(self, settings: object) -> None:
+    def mark_superseded(self, settings: AppSettingsVNext) -> None:
         self.superseded_settings_ids.add(id(settings))
 
-    def consume_superseded(self, settings: object) -> bool:
+    def consume_superseded(self, settings: AppSettingsVNext) -> bool:
         settings_id = id(settings)
         if settings_id not in self.superseded_settings_ids:
             return False
@@ -204,24 +183,24 @@ class ProviderRuntimeEffects:
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None]
     self_capture_owner: Callable[[], SelfCaptureSessionOwner]
     peer: Callable[[], PeerApplicationOwner]
-    peer_desired: Callable[[object], bool]
-    canonical_settings: Callable[[object], AppSettingsVNext]
+    peer_desired: Callable[[AppSettingsVNext], bool]
+    canonical_settings: Callable[[AppSettingsVNext], AppSettingsVNext]
     clear_local_pending: Callable[[], None]
     sync_local_notice: Callable[[], None]
     managed_pending_sink: Callable[[bool], None]
     managed_pending_provider: Callable[[], bool]
     dashboard_managed_pending_sink: Callable[[bool], None]
-    sync_effective_flags: Callable[[object], None]
+    sync_effective_flags: Callable[[AppSettingsVNext], None]
     refresh_overlay: Callable[[], None]
     refresh_peer_runtime: Callable[[], Awaitable[None]]
     replace_self_stt: Callable[[bool], Awaitable[None]]
     self_state_sink: Callable[[SelfCaptureSessionSnapshot], None]
     self_availability: Callable[[SelfCaptureSessionSnapshot], bool]
-    gpu_recovery: Callable[[object, ProviderRuntimeApplyPlan], Awaitable[None]]
+    gpu_recovery: Callable[[AppSettingsVNext, ProviderRuntimeApplyPlan], Awaitable[None]]
     failure_sink: Callable[[str], None]
     success_sink: Callable[[str], None]
 
-    def state(self, settings: object) -> ProviderRuntimeState:
+    def state(self, settings: AppSettingsVNext) -> ProviderRuntimeState:
         llm_runtime = self.llm_runtime_provider()
         local_asr_runtime = self.local_asr_runtime_provider()
         self_owner = self.self_capture_provider()
@@ -240,11 +219,11 @@ class ProviderRuntimeEffects:
             peer_stt_desired=self.peer_desired(settings),
         )
 
-    def apply_common(self, settings: object) -> None:
+    def apply_common(self, settings: AppSettingsVNext) -> None:
         canonical = self.canonical_settings(settings)
         translation = canonical.intent.translation
         provider_llm = provider_llm_for_translation(translation.model, translation.connection)
-        self.settings.current = settings
+        self.settings.canonical = settings
         self.clear_local_pending()
         self.sync_local_notice()
         if (
@@ -268,7 +247,7 @@ class ProviderRuntimeEffects:
 
     async def refresh_peer(self) -> None:
         await self.refresh_peer_runtime()
-        current = self.settings.current
+        current = self.settings.canonical
         if current is not None:
             self.sync_effective_flags(current)
         self.refresh_overlay()
@@ -281,7 +260,7 @@ class ProviderRuntimeEffects:
         await self.rebuild_self_stt()
 
     async def rebuild_self_stt(self) -> None:
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None or self.local_asr_runtime_provider() is None:
             return
         owner = self.self_capture_owner()
@@ -303,7 +282,7 @@ class ProviderRuntimeComponents:
     llm_rebuild: LlmProviderRebuildOwner
     effects: ProviderRuntimeEffects
     signatures: ProviderRuntimeSignatures
-    sync_signatures: Callable[[object], None]
+    sync_signatures: Callable[[AppSettingsVNext], None]
     capture_signatures_before_canonical_mutation: Callable[[], None]
 
 
@@ -321,20 +300,20 @@ def compose_provider_runtime(
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None],
     self_capture_owner: Callable[[], SelfCaptureSessionOwner],
     peer: Callable[[], PeerApplicationOwner],
-    peer_desired: Callable[[object], bool],
-    canonical_settings: Callable[[object], AppSettingsVNext],
+    peer_desired: Callable[[AppSettingsVNext], bool],
+    canonical_settings: Callable[[AppSettingsVNext], AppSettingsVNext],
     clear_local_pending: Callable[[], None],
     sync_local_notice: Callable[[], None],
     managed_pending_sink: Callable[[bool], None],
     managed_pending_provider: Callable[[], bool],
     dashboard_managed_pending_sink: Callable[[bool], None],
-    sync_effective_flags: Callable[[object], None],
+    sync_effective_flags: Callable[[AppSettingsVNext], None],
     refresh_overlay: Callable[[], None],
     refresh_peer_runtime: Callable[[], Awaitable[None]],
     replace_self_stt: Callable[[bool], Awaitable[None]],
     self_state_sink: Callable[[SelfCaptureSessionSnapshot], None],
     self_availability: Callable[[SelfCaptureSessionSnapshot], bool],
-    gpu_recovery: Callable[[object, ProviderRuntimeApplyPlan], Awaitable[None]],
+    gpu_recovery: Callable[[AppSettingsVNext, ProviderRuntimeApplyPlan], Awaitable[None]],
     managed_release: Callable[[], ManagedOpenRouterReleaseRuntime],
     managed_delegate_ready: Callable[[], None],
     runtime_logging: ProviderObservationPort,
@@ -342,7 +321,7 @@ def compose_provider_runtime(
     usage_refresh: Callable[[], Awaitable[None]],
     failure_sink: Callable[[str], None],
     success_sink: Callable[[str], None],
-    additional_signature_sink: Callable[[object], None],
+    additional_signature_sink: Callable[[AppSettingsVNext], None],
     managed_gemma: ManagedGemmaTranslationOwner | None = None,
     signatures: ProviderRuntimeSignatures | None = None,
 ) -> ProviderRuntimeComponents:
@@ -380,7 +359,7 @@ def compose_provider_runtime(
     )
 
     def llm_context() -> LlmProviderRebuildContext | None:
-        current = settings.current
+        current = settings.canonical
         runtime = llm_runtime_provider()
         if current is None or runtime is None:
             return None
@@ -434,7 +413,7 @@ def compose_provider_runtime(
                 translation_enabled=bool(
                     config is not None and config.snapshot().value.translation_enabled
                 ),
-                peer_translation_enabled=_runtime_peer_translation_enabled(settings_value),
+                peer_translation_enabled=settings.peer_translation_enabled(),
             )
             if not translation_on:
                 return _translation_backend_from_canonical(
@@ -483,11 +462,12 @@ def compose_provider_runtime(
             current,
             canonical=canonical_settings(current),
             peer=peer(),
+            peer_translation_enabled=settings.peer_translation_enabled(),
         )
         additional_signature_sink(current)
 
     def capture_signatures_before_canonical_mutation() -> None:
-        current = settings.current
+        current = settings.canonical
         if current is None:
             return
         signature_state.capture_peer_before_canonical_mutation(
@@ -505,7 +485,7 @@ def compose_provider_runtime(
         refresh_self_stt=effects.refresh_self_stt,
         signature_sink=sync_signatures,
         llm_retry_sink=signature_state.mark_llm_retry,
-        current_settings_provider=lambda: settings.current,
+        current_settings_provider=lambda: settings.canonical,
         signature_cache_provider=lambda: signature_state.cache(peer()),
         self_signature_builder=lambda current: build_self_stt_provider_signature_from_vnext(
             canonical_settings(current)
