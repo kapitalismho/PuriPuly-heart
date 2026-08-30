@@ -1,15 +1,20 @@
-"""API key input field with auto-verification on blur."""
+"""API key input field with auto-verification on blur.
+
+The blur -> save -> verify coordination lives in the UI-independent
+``ApiKeyVerificationController``; this widget binds it to Flet controls.
+"""
 
 from __future__ import annotations
 
-import hashlib
-import inspect
 from typing import Callable
 
 import flet as ft
 from flet import Colors as colors
 from flet import Icons as icons
 
+from puripuly_heart.ui.components.settings.api_key_verification_controller import (
+    ApiKeyVerificationController,
+)
 from puripuly_heart.ui.flet_runtime import control_page, update_control_if_mounted
 from puripuly_heart.ui.i18n import provider_label, t
 from puripuly_heart.ui.theme import (
@@ -19,6 +24,26 @@ from puripuly_heart.ui.theme import (
     COLOR_SECONDARY,
     COLOR_WARNING,
 )
+
+_STATUS_MESSAGES = {
+    "success": ("snackbar.verification_ok", colors.GREEN_400),
+    "error": ("snackbar.verification_failed", colors.RED_400),
+}
+
+
+_STATUS_KEYS = {
+    "idle": "api_key.status.idle",
+    "verifying": "api_key.status.verifying",
+    "success": "api_key.status.success",
+    "error": "api_key.status.error",
+}
+
+_STATUS_ICONS = {
+    "idle": (icons.HELP_OUTLINE_ROUNDED, COLOR_SECONDARY),
+    "verifying": (icons.HOURGLASS_TOP_ROUNDED, COLOR_SECONDARY),
+    "success": (icons.CHECK_CIRCLE_ROUNDED, COLOR_PRIMARY),
+    "error": (icons.WARNING_ROUNDED, COLOR_WARNING),
+}
 
 
 class ApiKeyField(ft.Row):
@@ -37,15 +62,9 @@ class ApiKeyField(ft.Row):
         self._label_key = label_key
         self._secret_key = secret_key
         self._provider = provider
-        self._on_verify = on_verify
-        self._on_save = on_save
         self._show_snackbar_cb = show_snackbar
         self._show_status = show_status
-        self._value_dirty = False
-        self._last_verified_hash = ""
-        self._is_verifying = False
 
-        # Custom reveal password toggle button
         self._reveal_button = ft.IconButton(
             icon=icons.VISIBILITY_OFF_ROUNDED,
             icon_color=COLOR_DIVIDER,
@@ -86,6 +105,17 @@ class ApiKeyField(ft.Row):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
+        self._controller = ApiKeyVerificationController(
+            secret_key=secret_key,
+            provider=provider,
+            on_verify=on_verify,
+            on_save=on_save,
+            on_status=self._apply_status,
+            on_message=self._show_controller_message,
+            show_status=show_status,
+        )
+        self._controller.set_value_getter(lambda: self._text_field.value or "")
+
     @property
     def value(self) -> str:
         """Get current field value."""
@@ -95,14 +125,26 @@ class ApiKeyField(ft.Row):
     def value(self, val: str) -> None:
         """Set field value."""
         self._text_field.value = val
-        self._value_dirty = False
+        self._controller.replace_value()
         update_control_if_mounted(self._text_field)
 
+    @property
+    def controller(self) -> ApiKeyVerificationController:
+        return self._controller
+
+    @property
+    def _last_verified_hash(self) -> str:
+        return self._controller.last_verified_hash
+
+    @_last_verified_hash.setter
+    def _last_verified_hash(self, value: str) -> None:
+        self._controller.last_verified_hash = value
+
     def _get_key_hash(self, key: str) -> str:
-        """Get SHA-256 hash of the key."""
-        if not key:
-            return ""
-        return hashlib.sha256(key.encode()).hexdigest()
+        return ApiKeyVerificationController.key_hash(key)
+
+    def _set_status(self, status: str) -> None:
+        self._controller.force_status(status)
 
     def _toggle_password_visibility(self, e) -> None:
         """Toggle password visibility and update eye icon."""
@@ -116,133 +158,71 @@ class ApiKeyField(ft.Row):
     def _handle_change(self, e) -> None:
         """Mark the field dirty after user edits."""
         _ = e
-        self._value_dirty = True
+        self._controller.notify_edit()
 
-    def _set_status(self, status: str) -> None:
-        """Update status icon based on verification state."""
+    def _apply_status(self, status: str) -> None:
+        self._current_status = status
         if not self._show_status:
             return
-
-        icon_map = {
-            "idle": (icons.HELP_OUTLINE_ROUNDED, COLOR_SECONDARY, "api_key.status.idle"),
-            "verifying": (icons.HOURGLASS_TOP_ROUNDED, COLOR_SECONDARY, "api_key.status.verifying"),
-            "success": (icons.CHECK_CIRCLE_ROUNDED, COLOR_PRIMARY, "api_key.status.success"),
-            "error": (icons.WARNING_ROUNDED, COLOR_WARNING, "api_key.status.error"),
-        }
-        icon, color, tooltip_key = icon_map.get(status, icon_map["idle"])
-        self._current_status = status
+        icon, color = _STATUS_ICONS.get(status, _STATUS_ICONS["idle"])
         self._status_icon.icon = icon
         self._status_icon.color = color
-        self._status_icon.tooltip = t(tooltip_key)
+        self._status_icon.tooltip = t(_STATUS_KEYS.get(status, "api_key.status.idle"))
         update_control_if_mounted(self._status_icon)
 
     def _handle_blur(self, e) -> None:
-        """Handle blur event - save and verify."""
-        key = self.value
-
-        needs_save = self._value_dirty
-        if needs_save:
-            self._value_dirty = False
-        elif not self._show_status:
+        """Handle blur event - save and verify via the controller."""
+        _ = e
+        self._controller.handle_blur(self.value)
+        drain = self._controller.run_pending()
+        if drain is None:
             return
-
-        if not self._show_status:
-            if needs_save and self._on_save:
-                self._on_save(self._secret_key, key)
-            return
-        if not self._on_verify:
-            return
-
-        key_hash = self._get_key_hash(key)
-        if not needs_save and key_hash == self._last_verified_hash:
-            return
-
-        self._pending_key = key
-        self._pending_hash = key_hash
-        self._pending_save = needs_save
-        if self._is_verifying:
-            return
-
         page = control_page(self)
-        if page is not None:
-            page.run_task(self._run_verification)
+        if page is None:
+            self._pending_drain = drain
+            return
+        page.run_task(self._drain_pending_verification, drain)
+
+    async def _drain_pending_verification(self, drain) -> None:
+        """Schedule a controller drain coroutine on the page event loop."""
+        await drain
+
+    async def _verify_async(self, key: str, key_hash: str) -> None:
+        """Verify one key/hash pair directly, bypassing blur gating."""
+        _ = key_hash
+        await self._controller.verify_direct(key)
 
     async def _run_verification(self) -> None:
-        """Wrapper for run_task compatibility."""
-        if self._is_verifying:
+        """Test/compatibility entry point draining pending verification."""
+        drain = getattr(self, "_pending_drain", None)
+        if drain is not None:
+            self._pending_drain = None
+            await drain
             return
-        self._is_verifying = True
-        try:
-            while True:
-                key = getattr(self, "_pending_key", "")
-                key_hash = getattr(self, "_pending_hash", "")
-                needs_save = bool(getattr(self, "_pending_save", False))
-                if not key_hash and not needs_save:
-                    return
+        task = self._controller.run_pending()
+        if task is not None:
+            await task
 
-                for pending_name in ("_pending_key", "_pending_hash", "_pending_save"):
-                    if hasattr(self, pending_name):
-                        delattr(self, pending_name)
-                if needs_save and self._on_save:
-                    save_result = self._on_save(self._secret_key, key)
-                    if inspect.isawaitable(save_result):
-                        save_result = await save_result
-                    if save_result is False:
-                        self._set_status("error")
-                        self._last_verified_hash = ""
-                        continue
-                if not key:
-                    self._set_status("idle")
-                    self._last_verified_hash = ""
-                    continue
-                await self._verify_async(key, key_hash, _manage_lifecycle=False)
-        finally:
-            self._is_verifying = False
+    def _show_controller_message(self, message_key: str, message: str) -> None:
+        kwargs: dict[str, object] = {}
+        if message_key == "snackbar.verification_ok":
+            kwargs["provider"] = provider_label(self._provider)
+            bgcolor = colors.GREEN_400
+        elif message_key == "snackbar.verification_error":
+            kwargs["message"] = self._friendly_message(message)
+            bgcolor = colors.RED_400
+        else:
+            kwargs["message"] = self._friendly_message(message)
+            bgcolor = colors.RED_400
+        self._show_snackbar(t(message_key, **kwargs), bgcolor)
 
-    async def _verify_async(
-        self,
-        key: str,
-        key_hash: str,
-        *,
-        _manage_lifecycle: bool = True,
-    ) -> None:
-        """Run verification asynchronously."""
-        if _manage_lifecycle:
-            self._is_verifying = True
-        self._set_status("verifying")
-
-        try:
-            success, msg = await self._on_verify(self._provider, key)
-            if self._get_key_hash(self.value) != key_hash:
-                return
-
-            if success:
-                self._set_status("success")
-                self._last_verified_hash = key_hash
-                self._show_snackbar(
-                    t("snackbar.verification_ok", provider=provider_label(self._provider)),
-                    colors.GREEN_400,
-                )
-            else:
-                self._set_status("error")
-                self._last_verified_hash = ""
-                self._show_snackbar(
-                    t("snackbar.verification_failed", message=self._translate_error(msg)),
-                    colors.RED_400,
-                )
-        except Exception as exc:
-            if self._get_key_hash(self.value) != key_hash:
-                return
-
-            self._set_status("error")
-            self._last_verified_hash = ""
-            self._show_snackbar(
-                t("snackbar.verification_error", message=self._translate_error(str(exc))),
-                colors.RED_400,
-            )
-        finally:
-            if _manage_lifecycle:
-                self._is_verifying = False
+    def _friendly_message(self, raw: str) -> str:
+        if raw.startswith("error.qwen_model_unavailable:"):
+            model = raw.split(":", 1)[1] if ":" in raw else "unknown"
+            return t("error.qwen_model_unavailable", model=model or "unknown")
+        if raw.startswith("error."):
+            return t(raw)
+        return raw
 
     def _show_snackbar(self, message: str, bgcolor) -> None:
         """Show a toast via App-level callback or fallback to page."""
@@ -264,34 +244,11 @@ class ApiKeyField(ft.Row):
                 )
             )
 
-    def _translate_error(self, msg: str) -> str:
-        """Translate common error messages to user-friendly text."""
-        msg_lower = msg.lower()
-        if msg_lower.startswith("qwen_model_unavailable:"):
-            model = msg.split(":", 1)[1].strip() if ":" in msg else ""
-            return t("error.qwen_model_unavailable", model=model or "unknown")
-        if "401" in msg or "unauthorized" in msg_lower:
-            return t("error.api_key_invalid")
-        if "403" in msg or "forbidden" in msg_lower:
-            return t("error.api_key_invalid")
-        if "timeout" in msg_lower or "timed out" in msg_lower:
-            return t("error.network_timeout")
-        if "connection" in msg_lower or "network" in msg_lower:
-            return t("error.network_error")
-        return msg
-
     def apply_locale(self) -> None:
         """Update labels and tooltips when locale changes."""
         self._text_field.label = t(self._label_key)
         if self._show_status:
-            # Update tooltip based on current status
-            tooltip_keys = {
-                "idle": "api_key.status.idle",
-                "verifying": "api_key.status.verifying",
-                "success": "api_key.status.success",
-                "error": "api_key.status.error",
-            }
-            tooltip_key = tooltip_keys.get(self._current_status, "api_key.status.idle")
+            tooltip_key = _STATUS_KEYS.get(self._current_status, "api_key.status.idle")
             self._status_icon.tooltip = t(tooltip_key)
         update_control_if_mounted(self._text_field)
         if self._show_status:

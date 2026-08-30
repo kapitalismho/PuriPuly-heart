@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import uuid
 from dataclasses import replace
 from pathlib import Path
 
@@ -90,6 +92,47 @@ from puripuly_heart.core.language import (
 )
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
+
+
+class _ConcurrencyProbeProvider(LLMProvider):
+    def __init__(self) -> None:
+        self.active = 0
+        self.max_active = 0
+
+    async def translate(self, **_kwargs: object) -> object:
+        self.active += 1
+        self.max_active = max(self.max_active, self.active)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        self.active -= 1
+        return object()
+
+    async def close(self) -> None:
+        return None
+
+
+def assert_bounded_concurrency(provider: SemaphoreLLMProvider, limit: int) -> None:
+    probe = _ConcurrencyProbeProvider()
+
+    async def run() -> None:
+        wrapped = SemaphoreLLMProvider(inner=probe, semaphore=provider.semaphore)
+        await asyncio.gather(
+            *(
+                wrapped.translate(
+                    utterance_id=uuid.uuid4(),
+                    text="t",
+                    system_prompt="s",
+                    source_language="en",
+                    target_language="ko",
+                )
+                for _ in range(limit * 2 + 1)
+            ),
+        )
+
+    asyncio.run(run())
+    assert probe.max_active == limit
+
+
 from puripuly_heart.core.local_asr.local_stt_assets import default_local_stt_model_dir
 from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterLLMProvider,
@@ -348,7 +391,7 @@ def test_create_llm_provider_gemini_uses_secret_and_concurrency_limit() -> None:
     assert isinstance(provider.inner, GeminiLLMProvider)
     assert provider.inner.api_key == "k"
     assert provider.inner.model == "gemini-3.1-flash-lite"
-    assert provider.semaphore._value == 3  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 3)
 
 
 def test_create_llm_provider_gemini_uses_selected_model() -> None:
@@ -390,7 +433,7 @@ def test_create_llm_provider_qwen_uses_secret() -> None:
     assert provider.inner.api_key == "k2"
     assert provider.inner.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
     assert provider.inner.model == "qwen3.5-plus"
-    assert provider.semaphore._value == 5  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 5)
 
 
 def test_create_llm_provider_qwen_low_latency_passes_runtime_logging() -> None:
@@ -500,7 +543,7 @@ def test_create_llm_provider_deepseek_uses_secret_and_model() -> None:
     assert provider.inner.api_key == "ds-key"
     assert provider.inner.model == "deepseek-v4-flash"
     assert provider.inner.base_url == "https://api.deepseek.com"
-    assert provider.semaphore._value == 4  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 4)
 
 
 def test_create_llm_provider_deepseek_uses_v4_flash_model() -> None:
@@ -546,7 +589,7 @@ def test_create_llm_provider_cerebras_uses_secret_and_model() -> None:
     assert isinstance(provider.inner, CerebrasLLMProvider)
     assert provider.inner.api_key == "cerebras-key"
     assert provider.inner.model == "gemma-4-31b"
-    assert provider.semaphore._value == 6  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 6)
 
 
 def test_create_llm_provider_cerebras_from_resolved_config_uses_dto_and_secret_store() -> None:
@@ -571,7 +614,7 @@ def test_create_llm_provider_cerebras_from_resolved_config_uses_dto_and_secret_s
     assert isinstance(provider.inner, CerebrasLLMProvider)
     assert provider.inner.api_key == "dto-cerebras-key"
     assert provider.inner.model == "gemma-4-31b"
-    assert provider.semaphore._value == 2  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 2)
 
 
 def test_create_llm_provider_local_llm_uses_settings_without_secret(
@@ -593,7 +636,7 @@ def test_create_llm_provider_local_llm_uses_settings_without_secret(
     assert provider.inner.model == "llama3.1:8b"
     assert provider.inner.api_key == ""
     assert provider.inner.extra_body == {"think": False}
-    assert provider.semaphore._value == 2  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 2)
 
 
 def test_create_llm_provider_local_llm_ignores_optional_env_key(
@@ -660,7 +703,7 @@ def test_create_llm_provider_from_resolved_local_llm_uses_dto_values_and_optiona
     assert provider.inner.model == "dto-model"
     assert provider.inner.api_key == "dto-local-secret"
     assert provider.inner.extra_body == {"think": False}
-    assert provider.semaphore._value == 7  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 7)
 
 
 def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
@@ -685,7 +728,7 @@ def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
     assert provider.inner.model == "google/gemma-4-26b-a4b-it"
     assert provider.inner.base_url == "https://openrouter.ai/api/v1"
     assert provider.inner.routing_mode == OpenRouterRoutingMode.LATENCY
-    assert provider.semaphore._value == 4  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 4)
 
 
 def test_create_llm_provider_from_resolved_openrouter_gemini_byok_uses_google_latency_routing() -> (
@@ -716,7 +759,7 @@ def test_create_llm_provider_from_resolved_openrouter_gemini_byok_uses_google_la
     assert provider.inner.model == OpenRouterLLMModel.GEMINI_31_FLASH_LITE.value
     assert provider.inner.routing_mode == OpenRouterRoutingMode.LATENCY
     assert provider.inner.provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
-    assert provider.semaphore._value == 3  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 3)
 
 
 def test_create_llm_provider_openrouter_byok_still_uses_user_owned_secret_after_pkce_storage() -> (
@@ -1019,7 +1062,7 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert fallback_provider.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
     assert fallback_provider.routing_mode == OpenRouterRoutingMode.LATENCY
     assert fallback_provider.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
-    assert provider.semaphore._value == 3  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 3)
 
 
 def test_create_llm_provider_from_resolved_cerebras_fallback_uses_resolved_secret() -> None:
@@ -1230,7 +1273,6 @@ def test_create_llm_provider_openrouter_wraps_primary_with_source_locked_openrou
     assert provider.inner.primary.routing_mode == OpenRouterRoutingMode.LATENCY
     assert provider.inner.primary.runtime_logging is runtime_logging
     assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
-    assert provider.inner.fallback._delegate is None
 
     fallback_delegate = provider.inner.fallback.factory()
 

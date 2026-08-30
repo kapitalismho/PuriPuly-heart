@@ -56,7 +56,7 @@ jobs:
           sync-args: --extra dev
 
       - name: Run contract tests
-        run: uv run pytest tests/domain tests/config
+        run: uv run pytest tests/domain tests/config tests/core
 
   python-suite:
     name: ${{ matrix.name }}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+from collections.abc import Awaitable, Callable
 from datetime import datetime as real_datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -16,7 +17,7 @@ from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatu
 
 import puripuly_heart.ui.app as app_module
 from puripuly_heart.app.ports.settings_view import (
-    GeneralSettingsSnapshot,
+    OpenRouterPkceTarget,
     OverlaySettingsSnapshot,
     PromptApplyIntent,
 )
@@ -25,6 +26,7 @@ from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.http_extension_registry import HttpExtensionRegistryService
+from puripuly_heart.app.services.telemetry_reporting import APP_ACTIVE_DAY_RETRY_DELAY_S
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.composition.ui_application import compose_ui_application
 from puripuly_heart.config.settings import (
@@ -35,12 +37,10 @@ from puripuly_heart.config.settings import (
     OpenRouterProviderRouting,
     OpenRouterSelectionAlias,
     ProviderSettings,
-    STTProviderName,
     TranslationConnection,
     TranslationModel,
     TranslationSettings,
     build_managed_openrouter_byok_target_settings,
-    with_telemetry_enabled,
 )
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS
@@ -52,37 +52,27 @@ from tests.helpers.ui_application import compose_test_ui_application_boundary
 MISSING = object()
 
 
-def _application_boundary_with_stop(controller: object) -> UiApplicationBoundary:
-    boundary = compose_test_ui_application_boundary(controller)
+def _byok_pkce_target(settings: AppSettings) -> OpenRouterPkceTarget | None:
+    """Mirror the provider adapter's projection-to-PKCE-target wrapping."""
+    target_settings = build_managed_openrouter_byok_target_settings(settings)
+    if target_settings is None or target_settings.openrouter.selection_alias is None:
+        return None
+    return OpenRouterPkceTarget(target_settings.openrouter.selection_alias)
+
+
+def _application_boundary_with_stop(backend: object) -> UiApplicationBoundary:
+    boundary = compose_test_ui_application_boundary(backend)
     boundary.register_application_shutdown_callbacks(
         (
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
                 owner_name="ApplicationTestRuntime",
                 callback_name="stop",
-                callback=controller.stop,
+                callback=backend.stop,
             ),
         )
     )
     return boundary
-
-
-@pytest.fixture(autouse=True)
-def _compose_explicit_application_test_double(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    application_getter = TranslatorApp.application.fget
-
-    def resolve_application(self: TranslatorApp):
-        if getattr(self, "_ui_application", None) is None and hasattr(self, "controller"):
-            self._ui_application = compose_test_ui_application_boundary(self.controller)
-        return application_getter(self)
-
-    monkeypatch.setattr(
-        TranslatorApp,
-        "application",
-        property(resolve_application),
-    )
 
 
 class DummyPage:
@@ -187,36 +177,6 @@ class RuntimeLoggingController:
         self.detailed_messages.append(message)
 
 
-class TelemetryController:
-    def __init__(self, settings: AppSettings) -> None:
-        self.settings = settings
-        self.applied: list[AppSettings] = []
-        self.active_day_results: list[object] = []
-        self.active_day_dates: list[str] = []
-
-    async def apply_settings(self, settings: AppSettings) -> None:
-        self.settings = settings
-        self.applied.append(settings)
-
-    async def apply_telemetry_enabled(self, enabled: bool) -> AppSettings:
-        await self.apply_settings(with_telemetry_enabled(self.settings, enabled))
-        return self.settings
-
-    async def record_app_active_day(self, active_date_utc: str) -> object:
-        self.active_day_dates.append(active_date_utc)
-        if self.active_day_results:
-            return self.active_day_results.pop(0)
-        return SimpleNamespace(status="sent")
-
-
-class TelemetrySettingsView:
-    def __init__(self) -> None:
-        self.synced: list[GeneralSettingsSnapshot] = []
-
-    def sync_telemetry_settings(self, settings: GeneralSettingsSnapshot) -> None:
-        self.synced.append(settings)
-
-
 def _iter_control_tree(control):
     if control is None:
         return
@@ -242,112 +202,154 @@ def _dialog_containers(dialog) -> list[ft.Container]:
     return [node for node in _iter_control_tree(dialog) if isinstance(node, ft.Container)]
 
 
+class FakeTelemetryApplication:
+    def __init__(self, settings: AppSettings) -> None:
+        self.settings = settings
+        self.applied: list[bool] = []
+        self.active_day_results: list[object] = []
+        self.active_day_dates: list[str] = []
+
+    async def apply_telemetry_enabled(self, enabled: bool) -> None:
+        self.applied.append(enabled)
+        if enabled is False:
+            self.settings.telemetry.enabled = False
+            self.settings.telemetry_state.anonymous_id = None
+            self.settings.telemetry_state.last_sent_date_utc = None
+
+    def settings_general_snapshot(self):
+        return SimpleNamespace(telemetry_enabled=self.settings.telemetry.enabled)
+
+    async def record_app_active_day(self, active_date_utc: str) -> object:
+        self.active_day_dates.append(active_date_utc)
+        if self.active_day_results:
+            return self.active_day_results.pop(0)
+        return SimpleNamespace(status="sent")
+
+
+def _make_telemetry_owner(
+    application: FakeTelemetryApplication,
+    *,
+    queued: list | None = None,
+    background: list | None = None,
+    clock=None,
+    sleep=None,
+    shutting_down: bool = False,
+    synced: list | None = None,
+):
+    from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
+
+    return TelemetryReportingOwner(
+        application,
+        run_background=(
+            background.append if background is not None else (lambda coroutine, *args: None)
+        ),
+        queue_settings_mutation=(
+            queued.append if queued is not None else (lambda task_factory: None)
+        ),
+        is_shutting_down=lambda: shutting_down,
+        sync_telemetry=synced.append if synced is not None else None,
+        clock=clock,
+        sleep=sleep,
+    )
+
+
 def test_telemetry_enabled_choice_persists_and_syncs_settings_view() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    page = DummyPage()
-    app.page = page
     settings = AppSettings()
     settings.telemetry_state.last_sent_date_utc = "2026-07-01"
-    app.controller = TelemetryController(settings)
-    app.view_settings = TelemetrySettingsView()
+    application = FakeTelemetryApplication(settings)
+    synced: list[object] = []
+    tasks: list[object] = []
+    owner = _make_telemetry_owner(application, background=tasks, synced=synced)
 
-    app._on_telemetry_enabled_change(False)
-    assert len(page.tasks) == 1
-    asyncio.run(page.tasks.pop(0)())
-    assert app.controller.settings.telemetry.enabled is False
-    assert app.controller.settings.telemetry_state.anonymous_id is None
-    assert app.controller.settings.telemetry_state.last_sent_date_utc is None
-    assert app.view_settings.synced[-1].telemetry_enabled is False
+    owner.apply_telemetry_enabled(False)
+    assert len(tasks) == 1
+    asyncio.run(tasks.pop(0)())
+    assert application.applied == [False]
+    assert settings.telemetry.enabled is False
+    assert settings.telemetry_state.anonymous_id is None
+    assert settings.telemetry_state.last_sent_date_utc is None
+    assert synced[-1].telemetry_enabled is False
 
-    app._on_telemetry_enabled_change(True)
-    asyncio.run(page.tasks.pop(0)())
-    assert app.controller.settings.telemetry.enabled is True
-    assert app.controller.settings.telemetry_state.anonymous_id
+    owner.apply_telemetry_enabled(True)
+    asyncio.run(tasks.pop(0)())
+    assert application.applied == [False, True]
 
 
 def test_telemetry_setting_action_does_not_send() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app.controller = TelemetryController(AppSettings())
-    app.view_settings = TelemetrySettingsView()
+    application = FakeTelemetryApplication(AppSettings())
+    tasks: list[object] = []
+    owner = _make_telemetry_owner(application, background=tasks)
 
-    app._on_telemetry_enabled_change(False)
+    owner.apply_telemetry_enabled(False)
 
-    assert len(app.page.tasks) == 1
-    assert not hasattr(app, "telemetry_client")
+    assert len(tasks) == 1
+    assert application.active_day_dates == []
 
 
 def test_app_active_day_report_captures_utc_date_before_queue(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.controller = TelemetryController(AppSettings())
+    application = FakeTelemetryApplication(AppSettings())
     queued: list[object] = []
-    monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
 
-    class CapturedDateTime:
+    class CapturedDateTime(real_datetime):
         @classmethod
-        def now(cls, timezone):
-            _ = timezone
+        def now(cls, tz=None):
             return real_datetime.fromisoformat("2026-07-03T23:59:59+00:00")
 
-    monkeypatch.setattr(app_module, "datetime", CapturedDateTime)
-    app._schedule_app_active_day_report()
+    owner = _make_telemetry_owner(application, queued=queued, clock=CapturedDateTime.now)
+    owner.schedule_app_active_day_report()
 
     assert len(queued) == 1
-    asyncio.run(queued[0]())
-    assert app.controller.active_day_dates == ["2026-07-03"]
+    asyncio.run(queued.pop(0)())
+    assert application.active_day_dates == ["2026-07-03"]
 
 
 def test_app_active_day_report_retries_once_after_60_seconds_on_same_utc_date(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    controller = TelemetryController(AppSettings())
-    controller.active_day_results = [
+    application = FakeTelemetryApplication(AppSettings())
+    application.active_day_results = [
         SimpleNamespace(status="send_failed"),
         SimpleNamespace(status="sent"),
     ]
-    app.controller = controller
-    app._shutting_down = False
     queued: list[object] = []
     background: list[object] = []
     sleeps: list[float] = []
-    monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
-    monkeypatch.setattr(app, "_run_page_task", background.append)
 
-    class CapturedDateTime:
+    class CapturedDateTime(real_datetime):
         @classmethod
-        def now(cls, timezone):
-            _ = timezone
+        def now(cls, tz=None):
             return real_datetime.fromisoformat("2026-07-03T12:00:00+00:00")
 
     async def fake_sleep(delay_s: float) -> None:
         sleeps.append(delay_s)
 
-    monkeypatch.setattr(app_module, "datetime", CapturedDateTime)
-    monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    app._schedule_app_active_day_report()
+    owner = _make_telemetry_owner(
+        application,
+        queued=queued,
+        background=background,
+        clock=CapturedDateTime.now,
+        sleep=fake_sleep,
+    )
+    owner.schedule_app_active_day_report()
     asyncio.run(queued.pop(0)())
 
-    assert controller.active_day_dates == ["2026-07-03"]
+    assert application.active_day_dates == ["2026-07-03"]
     assert len(background) == 1
     asyncio.run(background.pop(0)())
     assert len(queued) == 1
     asyncio.run(queued.pop(0)())
 
-    assert controller.active_day_dates == ["2026-07-03", "2026-07-03"]
-    assert sleeps == [app_module.APP_ACTIVE_DAY_RETRY_DELAY_S]
+    assert application.active_day_dates == ["2026-07-03", "2026-07-03"]
+    assert sleeps == [APP_ACTIVE_DAY_RETRY_DELAY_S]
 
 
 def test_app_active_day_report_does_not_retry_after_utc_date_changes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    controller = TelemetryController(AppSettings())
-    controller.active_day_results = [SimpleNamespace(status="send_failed")]
-    app.controller = controller
-    app._shutting_down = False
+    application = FakeTelemetryApplication(AppSettings())
+    application.active_day_results = [SimpleNamespace(status="send_failed")]
     queued: list[object] = []
     background: list[object] = []
     now_values = iter(
@@ -356,36 +358,35 @@ def test_app_active_day_report_does_not_retry_after_utc_date_changes(
             real_datetime.fromisoformat("2026-07-04T00:00:01+00:00"),
         )
     )
-    monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
-    monkeypatch.setattr(app, "_run_page_task", background.append)
 
-    class CapturedDateTime:
+    class CapturedDateTime(real_datetime):
         @classmethod
-        def now(cls, timezone):
-            _ = timezone
+        def now(cls, tz=None):
             return next(now_values)
 
     async def fake_sleep(delay_s: float) -> None:
-        assert delay_s == app_module.APP_ACTIVE_DAY_RETRY_DELAY_S
+        assert delay_s == APP_ACTIVE_DAY_RETRY_DELAY_S
 
-    monkeypatch.setattr(app_module, "datetime", CapturedDateTime)
-    monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    app._schedule_app_active_day_report()
+    owner = _make_telemetry_owner(
+        application,
+        queued=queued,
+        background=background,
+        clock=CapturedDateTime.now,
+        sleep=fake_sleep,
+    )
+    owner.schedule_app_active_day_report()
     asyncio.run(queued.pop(0)())
     asyncio.run(background.pop(0)())
 
-    assert controller.active_day_dates == ["2026-07-03"]
+    assert application.active_day_dates == ["2026-07-03"]
     assert queued == []
 
 
 def test_app_active_day_report_does_not_retry_when_queue_crosses_utc_midnight(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    controller = TelemetryController(AppSettings())
-    controller.active_day_results = [SimpleNamespace(status="send_failed")]
-    app.controller = controller
-    app._shutting_down = False
+    application = FakeTelemetryApplication(AppSettings())
+    application.active_day_results = [SimpleNamespace(status="send_failed")]
     queued: list[object] = []
     background: list[object] = []
     now_values = iter(
@@ -395,101 +396,130 @@ def test_app_active_day_report_does_not_retry_when_queue_crosses_utc_midnight(
             real_datetime.fromisoformat("2026-07-04T00:00:01+00:00"),
         )
     )
-    monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
-    monkeypatch.setattr(app, "_run_page_task", background.append)
 
-    class CapturedDateTime:
+    class CapturedDateTime(real_datetime):
         @classmethod
-        def now(cls, timezone):
-            _ = timezone
+        def now(cls, tz=None):
             return next(now_values)
 
     async def fake_sleep(delay_s: float) -> None:
-        assert delay_s == app_module.APP_ACTIVE_DAY_RETRY_DELAY_S
+        assert delay_s == APP_ACTIVE_DAY_RETRY_DELAY_S
 
-    monkeypatch.setattr(app_module, "datetime", CapturedDateTime)
-    monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    app._schedule_app_active_day_report()
+    owner = _make_telemetry_owner(
+        application,
+        queued=queued,
+        background=background,
+        clock=CapturedDateTime.now,
+        sleep=fake_sleep,
+    )
+    owner.schedule_app_active_day_report()
     asyncio.run(queued.pop(0)())
     asyncio.run(background.pop(0)())
 
     assert len(queued) == 1
     asyncio.run(queued.pop(0)())
-    assert controller.active_day_dates == ["2026-07-03"]
+    assert application.active_day_dates == ["2026-07-03"]
 
 
 @pytest.mark.asyncio
 async def test_app_active_day_retry_does_not_block_settings_mutation_queue(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    controller = TelemetryController(AppSettings())
-    controller.active_day_results = [
+    application = FakeTelemetryApplication(AppSettings())
+    application.active_day_results = [
         SimpleNamespace(status="send_failed"),
         SimpleNamespace(status="sent"),
     ]
     retry_recorded = asyncio.Event()
-    original_record = controller.record_app_active_day
+    original_record = application.record_app_active_day
 
     async def record_app_active_day(active_date_utc: str) -> object:
         result = await original_record(active_date_utc)
-        if len(controller.active_day_dates) == 2:
+        if len(application.active_day_dates) == 2:
             retry_recorded.set()
         return result
 
-    controller.record_app_active_day = record_app_active_day
-    app.controller = controller
-    app._shutting_down = False
-    app._settings_mutation_queue = []
-    app._settings_mutation_worker_active = False
-    app._app_active_day_retry_task_handle = None
+    application.record_app_active_day = record_app_active_day
+
+    from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
+
+    queue: list[Callable[[], Awaitable[None]]] = []
+    worker_active = False
     retry_sleep_started = asyncio.Event()
     release_retry_sleep = asyncio.Event()
     later_mutation_ran = asyncio.Event()
     tasks: list[asyncio.Task[None]] = []
 
-    def run_page_task(task_factory) -> asyncio.Task[None]:
-        task = asyncio.create_task(task_factory())
+    def run_background(coroutine_factory, *args):
+        task = asyncio.create_task(coroutine_factory(*args))
         tasks.append(task)
         return task
 
+    async def queue_worker() -> None:
+        nonlocal worker_active
+        try:
+            while queue:
+                next_task = queue.pop(0)
+                await next_task()
+        finally:
+            worker_active = False
+
+    def queue_settings_mutation(task_factory) -> None:
+        nonlocal worker_active
+        queue.append(task_factory)
+        if worker_active:
+            return
+        worker_active = True
+        tasks.append(asyncio.create_task(queue_worker()))
+
     async def fake_sleep(delay_s: float) -> None:
-        assert delay_s == app_module.APP_ACTIVE_DAY_RETRY_DELAY_S
+        assert delay_s == APP_ACTIVE_DAY_RETRY_DELAY_S
         retry_sleep_started.set()
         await release_retry_sleep.wait()
 
     async def later_settings_mutation() -> None:
         later_mutation_ran.set()
 
-    class CapturedDateTime:
-        @classmethod
-        def now(cls, timezone):
-            _ = timezone
-            return real_datetime.fromisoformat("2026-07-03T12:00:00+00:00")
+    now_values = iter(
+        (
+            real_datetime.fromisoformat("2026-07-03T12:00:00+00:00"),
+            real_datetime.fromisoformat("2026-07-03T12:00:00+00:00"),
+            real_datetime.fromisoformat("2026-07-03T12:00:00+00:00"),
+        )
+    )
 
-    monkeypatch.setattr(app, "_run_page_task", run_page_task)
-    monkeypatch.setattr(app_module, "datetime", CapturedDateTime)
-    monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    app._schedule_app_active_day_report()
-    app._queue_settings_mutation_task(later_settings_mutation)
+    class CapturedDateTime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return next(now_values)
+
+    owner = TelemetryReportingOwner(
+        application,
+        run_background=run_background,
+        queue_settings_mutation=queue_settings_mutation,
+        sleep=fake_sleep,
+        clock=CapturedDateTime.now,
+    )
+    owner.schedule_app_active_day_report()
+    queue_settings_mutation(later_settings_mutation)
 
     await asyncio.wait_for(retry_sleep_started.wait(), timeout=1)
     await asyncio.wait_for(later_mutation_ran.wait(), timeout=1)
-    assert controller.active_day_dates == ["2026-07-03"]
+    assert application.active_day_dates == ["2026-07-03"]
 
     release_retry_sleep.set()
     await asyncio.wait_for(retry_recorded.wait(), timeout=1)
     await asyncio.gather(*tasks)
 
-    assert controller.active_day_dates == ["2026-07-03", "2026-07-03"]
-    assert app._app_active_day_retry_task_handle is None
+    assert application.active_day_dates == ["2026-07-03", "2026-07-03"]
+    assert owner._retry_task_handle is None
 
 
 @pytest.mark.asyncio
 async def test_close_after_launch_tasks_cancels_app_active_day_retry() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app._after_launch_task_handle = None
-    app._github_star_prompt_launch_pending = True
+    from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
+
+    application = FakeTelemetryApplication(AppSettings())
     retry_started = asyncio.Event()
     retry_cancelled = asyncio.Event()
 
@@ -500,14 +530,71 @@ async def test_close_after_launch_tasks_cancels_app_active_day_retry() -> None:
         finally:
             retry_cancelled.set()
 
+    owner = TelemetryReportingOwner(
+        application,
+        run_background=lambda coroutine, *args: asyncio.create_task(coroutine()),
+        queue_settings_mutation=lambda task_factory: None,
+    )
     handle = asyncio.create_task(retry_task())
-    app._app_active_day_retry_task_handle = handle
+    owner._retry_task_handle = handle
     await retry_started.wait()
-    await app._close_after_launch_ui_tasks()
+    await owner.cancel_retry()
 
     assert handle.cancelled()
     assert retry_cancelled.is_set()
-    assert app._app_active_day_retry_task_handle is None
+    assert owner._retry_task_handle is None
+
+
+def test_translator_app_telemetry_binding_delegates_to_owner() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    calls: list[object] = []
+
+    class _Owner:
+        def apply_telemetry_enabled(self, enabled: bool) -> None:
+            calls.append(("apply", enabled))
+
+        def schedule_app_active_day_report(self) -> None:
+            calls.append(("schedule",))
+
+    app._telemetry_reporting = _Owner()
+    app._on_telemetry_enabled_change(True)
+    app._schedule_app_active_day_report()
+    assert calls == [("apply", True), ("schedule",)]
+
+
+@pytest.mark.asyncio
+async def test_close_after_launch_cancels_existing_telemetry_retry_only() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    cancelled: list[bool] = []
+
+    class _Owner:
+        async def cancel_retry(self) -> None:
+            cancelled.append(True)
+
+    app._telemetry_reporting = _Owner()
+    app._github_star_prompt_launch_pending = True
+
+    async def _close_handle(_name: str) -> None:
+        return None
+
+    app._close_ui_task_handle = _close_handle  # type: ignore[method-assign]
+    await app._close_after_launch_ui_tasks()
+    assert cancelled == [True]
+    assert app._github_star_prompt_launch_pending is False
+
+
+@pytest.mark.asyncio
+async def test_close_after_launch_skips_telemetry_cancel_when_owner_absent() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app._github_star_prompt_launch_pending = True
+
+    async def _close_handle(_name: str) -> None:
+        return None
+
+    app._close_ui_task_handle = _close_handle  # type: ignore[method-assign]
+    await app._close_after_launch_ui_tasks()
+    assert getattr(app, "_telemetry_reporting", None) is None
+    assert app._github_star_prompt_launch_pending is False
 
 
 class ConstructionDummyController:
@@ -686,6 +773,9 @@ class ConstructionDummyLogsView(ft.Container):
         _ = (message, level)
 
 
+_construction_backends: list[ConstructionDummyController] = []
+
+
 def _construction_application_factory(
     *,
     presentation,
@@ -697,13 +787,13 @@ def _construction_application_factory(
         runtime_logging_sinks,
         vrchat_osc_presence,
     )
-    controller = ConstructionDummyController(
+    backend = ConstructionDummyController(
         page=None,
         app=presentation,
         config_path=config_path,
     )
-    presentation._app.controller = controller
-    return compose_test_ui_application_boundary(controller)
+    _construction_backends.append(backend)
+    return compose_test_ui_application_boundary(backend)
 
 
 def _patch_app_construction(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -734,8 +824,9 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
         config_path=Path("settings.json"),
         application_factory=_construction_application_factory,
     )
+    backend = _construction_backends[-1]
 
-    assert app.controller.config_path == Path("settings.json")
+    assert backend.config_path == Path("settings.json")
     assert page.title == app_module.t("app.title")
     assert page.window.frameless is True
     assert page.window.resizable is False
@@ -774,8 +865,8 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.view_logs.runtime_logging_mode == "detailed"
     assert isinstance(app.application, UiApplicationBoundary)
     assert app.application is app._ui_application
-    assert isinstance(app.controller.app, FletUiPresentationAdapter)
-    assert app.controller.app is app._presentation_adapter
+    assert isinstance(backend.app, FletUiPresentationAdapter)
+    assert backend.app is app._presentation_adapter
 
 
 def test_application_property_preserves_factory_port_without_controller_compatibility() -> None:
@@ -876,7 +967,6 @@ async def test_main_gui_constructs_the_real_application_and_presentation_boundar
             app=presentation,
             config_path=config_path,
         )
-        presentation._app.controller = controller
         constructed["controller"] = controller
         return compose_test_ui_application_boundary(controller)
 
@@ -915,6 +1005,7 @@ async def test_desktop_gui_state_actions_are_dispatched_through_translator_app(
         config_path=Path("settings.json"),
         application_factory=_construction_application_factory,
     )
+    backend = _construction_backends[-1]
     locked_requests: list[bool] = []
     size_requests: list[str] = []
     retry_requests: list[bool] = []
@@ -932,10 +1023,10 @@ async def test_desktop_gui_state_actions_are_dispatched_through_translator_app(
     async def fake_reset_desktop_overlay_position() -> None:
         desktop_reset_requests.append(True)
 
-    app.controller.set_desktop_overlay_captions_locked = fake_set_locked
-    app.controller.set_desktop_overlay_size_preset = fake_set_desktop_overlay_size_preset
-    app.controller.set_overlay_enabled = fake_set_overlay_enabled
-    app.controller.reset_desktop_overlay_position = fake_reset_desktop_overlay_position
+    backend.set_desktop_overlay_captions_locked = fake_set_locked
+    backend.set_desktop_overlay_size_preset = fake_set_desktop_overlay_size_preset
+    backend.set_overlay_enabled = fake_set_overlay_enabled
+    backend.reset_desktop_overlay_position = fake_reset_desktop_overlay_position
 
     app._on_desktop_overlay_lock_change(False)
     app._on_desktop_overlay_size_change("xlarge")
@@ -966,26 +1057,27 @@ async def test_desktop_gui_state_actions_refresh_settings_view_after_runtime_upd
         config_path=Path("settings.json"),
         application_factory=_construction_application_factory,
     )
-    app.controller.settings = AppSettings()
-    app.controller.settings.overlay.desktop_flet.position.x = 80
-    app.controller.settings.overlay.desktop_flet.position.y = 90
+    backend = _construction_backends[-1]
+    backend.settings = AppSettings()
+    backend.settings.overlay.desktop_flet.position.x = 80
+    backend.settings.overlay.desktop_flet.position.y = 90
 
     async def fake_set_locked(locked: bool) -> None:
-        app.controller.settings.overlay.desktop_flet.locked = locked
+        backend.settings.overlay.desktop_flet.locked = locked
 
     async def fake_set_desktop_overlay_size_preset(size_preset: str) -> None:
-        updated = copy.deepcopy(app.controller.settings)
+        updated = copy.deepcopy(backend.settings)
         updated.overlay.desktop_flet.size_preset = size_preset
-        app.controller.settings = updated
+        backend.settings = updated
 
     async def fake_reset_desktop_overlay_position() -> None:
-        app.controller.settings.overlay.desktop_flet.position.x = None
-        app.controller.settings.overlay.desktop_flet.position.y = None
-        app.controller.settings.overlay.desktop_flet.locked = False
+        backend.settings.overlay.desktop_flet.position.x = None
+        backend.settings.overlay.desktop_flet.position.y = None
+        backend.settings.overlay.desktop_flet.locked = False
 
-    app.controller.set_desktop_overlay_captions_locked = fake_set_locked
-    app.controller.set_desktop_overlay_size_preset = fake_set_desktop_overlay_size_preset
-    app.controller.reset_desktop_overlay_position = fake_reset_desktop_overlay_position
+    backend.set_desktop_overlay_captions_locked = fake_set_locked
+    backend.set_desktop_overlay_size_preset = fake_set_desktop_overlay_size_preset
+    backend.reset_desktop_overlay_position = fake_reset_desktop_overlay_position
 
     app._on_desktop_overlay_lock_change(True)
     app._on_desktop_overlay_size_change("xlarge")
@@ -1000,9 +1092,9 @@ async def test_desktop_gui_state_actions_refresh_settings_view_after_runtime_upd
     assert len(synced_settings) == 3
     assert synced_settings[1].desktop_size_preset == "xlarge"
     assert synced_settings[2].desktop_size_preset == "xlarge"
-    assert app.controller.settings.overlay.desktop_flet.position.x is None
-    assert app.controller.settings.overlay.desktop_flet.position.y is None
-    assert app.controller.settings.overlay.desktop_flet.locked is False
+    assert backend.settings.overlay.desktop_flet.position.x is None
+    assert backend.settings.overlay.desktop_flet.position.y is None
+    assert backend.settings.overlay.desktop_flet.locked is False
 
 
 def test_translator_app_does_not_mount_debug_preview_by_default(
@@ -1143,20 +1235,9 @@ def test_debug_preview_local_qwen_modal_opens_production_dialog_without_state_or
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.DEEPGRAM
-    app.controller = SimpleNamespace(
-        settings=settings,
+    controller = SimpleNamespace(
         _local_qwen_hallucination_detection_count=1,
         _local_qwen_hallucination_modal_shown=False,
-        _save_settings=lambda: pytest.fail("debug modal preview must not save settings"),
-        persist_settings=lambda: pytest.fail("debug modal preview must not persist settings"),
-        apply_settings=lambda *_args, **_kwargs: pytest.fail(
-            "debug modal preview must not apply settings"
-        ),
-        apply_providers=lambda *_args, **_kwargs: pytest.fail(
-            "debug modal preview must not apply providers"
-        ),
     )
     captured: dict[str, object] = {}
 
@@ -1188,8 +1269,8 @@ def test_debug_preview_local_qwen_modal_opens_production_dialog_without_state_or
         getattr(captured["on_open_guide"], "__func__", None) is TranslatorApp._open_local_qwen_guide
     )
     assert app._local_qwen_hallucination_dialog.__class__ is FakeLocalQwenHallucinationDialog
-    assert app.controller._local_qwen_hallucination_detection_count == 1
-    assert app.controller._local_qwen_hallucination_modal_shown is False
+    assert controller._local_qwen_hallucination_detection_count == 1
+    assert controller._local_qwen_hallucination_modal_shown is False
     assert app.page.tasks == []
 
 
@@ -1210,6 +1291,7 @@ def test_debug_preview_panel_wires_audio_fault_actions(monkeypatch) -> None:
         application_factory=_construction_application_factory,
         debug_ui_preview=True,
     )
+    backend = _construction_backends[-1]
     monkeypatch.setattr(
         app, "_show_snackbar", lambda message, color=None: snackbars.append((message, color))
     )
@@ -1220,9 +1302,9 @@ def test_debug_preview_panel_wires_audio_fault_actions(monkeypatch) -> None:
     captured_kwargs["on_capture_fault_cycle"]()
     captured_kwargs["on_stt_fault_cycle"]()
     captured_kwargs["on_audio_fault_clear"]()
-    assert app.controller.capture_fault_cycled is True
-    assert app.controller.stt_fault_cycled is True
-    assert app.controller.audio_faults_cleared is True
+    assert backend.capture_fault_cycled is True
+    assert backend.stt_fault_cycled is True
+    assert backend.audio_faults_cleared is True
     assert snackbars[0][0] == app_module.t(
         "debug_preview.capture_fault_snackbar", profile="capture_attenuate_40db"
     )
@@ -1308,10 +1390,9 @@ def test_local_qwen_guidance_modal_open_guide_opens_github_api_key_guide_safely(
         application_factory=_construction_application_factory,
     )
     monkeypatch.setattr(app.content_area, "update", lambda: None)
-    app.controller.apply_settings = lambda *args, **kwargs: forbidden_calls.append("apply_settings")
-    app.controller.apply_providers = lambda *args, **kwargs: forbidden_calls.append(
-        "apply_providers"
-    )
+    backend = _construction_backends[-1]
+    backend.apply_settings = lambda *args, **kwargs: forbidden_calls.append("apply_settings")
+    backend.apply_providers = lambda *args, **kwargs: forbidden_calls.append("apply_providers")
     app.view_settings.has_provider_changes = True
 
     app.show_local_qwen_hallucination_dialog()
@@ -1449,7 +1530,6 @@ def test_translator_app_keeps_debug_ui_preview_out_of_controller(
             vrchat_osc_presence,
         )
         controller = RecordingController(None, presentation, config_path)
-        presentation._app.controller = controller
         return compose_test_ui_application_boundary(controller)
 
     app = TranslatorApp(
@@ -1589,7 +1669,6 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
             vrchat_osc_presence,
         )
         controller = DummyController(None, presentation, config_path)
-        presentation._app.controller = controller
         return compose_test_ui_application_boundary(controller)
 
     app = TranslatorApp(
@@ -1677,12 +1756,13 @@ def test_on_runtime_logging_mode_change_updates_controller_and_logs_view() -> No
 
     def fake_set_mode(mode: str) -> None:
         seen.append(mode)
-        app.controller.runtime_logging_mode = mode
+        controller.runtime_logging_mode = mode
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         runtime_logging_mode="basic",
         set_runtime_logging_mode=fake_set_mode,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
     app.view_logs = SimpleNamespace(
         set_runtime_logging_mode=lambda mode: seen.append(f"view:{mode}")
     )
@@ -1872,12 +1952,6 @@ def test_debug_preview_founder_letter_opens_dialog_with_readme_action(
     opened_urls: list[str] = []
     previous_locale = i18n_module.get_locale()
 
-    def fail_save(*_args, **_kwargs):
-        pytest.fail("debug founder-letter preview must not save settings")
-
-    app.controller = SimpleNamespace(
-        settings=AppSettings(), _save_settings=fail_save, persist_settings=fail_save
-    )
     monkeypatch.setattr(
         app,
         "_on_request_openrouter_pkce",
@@ -2007,23 +2081,6 @@ def test_debug_preview_discord_auth_opens_dialog_with_close_only_actions(
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
-    app.controller = SimpleNamespace(
-        settings=settings,
-        config_path=Path("settings.json"),
-        _save_settings=lambda: pytest.fail("debug Discord-auth preview must not save settings"),
-        persist_settings=lambda: pytest.fail(
-            "debug Discord-auth preview must not persist settings"
-        ),
-        start_discord_managed_auth=lambda *_args, **_kwargs: pytest.fail(
-            "debug Discord-auth preview must not start broker OAuth"
-        ),
-        reopen_discord_managed_auth_browser=lambda *_args, **_kwargs: pytest.fail(
-            "debug Discord-auth preview must not reopen broker OAuth"
-        ),
-        cancel_discord_managed_auth=lambda *_args, **_kwargs: pytest.fail(
-            "debug Discord-auth preview must not cancel broker OAuth"
-        ),
-    )
     monkeypatch.setattr(
         app,
         "_start_discord_managed_auth",
@@ -2085,18 +2142,6 @@ def test_debug_preview_qq_auth_states_are_pure_ui_without_tasks_or_persistence(
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    app.controller = SimpleNamespace(
-        settings=settings,
-        config_path=Path("settings.json"),
-        _save_settings=lambda: pytest.fail("debug QQ-auth preview must not save settings"),
-        persist_settings=lambda: pytest.fail("debug QQ-auth preview must not persist settings"),
-        start_qq_managed_auth_from_dialog=lambda *_args, **_kwargs: pytest.fail(
-            "debug QQ-auth preview must not call QQ auth service"
-        ),
-        set_translation_enabled=lambda *_args, **_kwargs: pytest.fail(
-            "debug QQ-auth preview must not mutate runtime translation"
-        ),
-    )
     monkeypatch.setattr(
         app,
         "_start_qq_managed_auth",
@@ -2131,15 +2176,12 @@ def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
     settings.openrouter.llm_model = OpenRouterLLMModel.QWEN_35_FLASH_02_23
-    app.controller = SimpleNamespace(
-        settings=settings,
-        build_managed_openrouter_byok_target_settings=(
-            lambda: build_managed_openrouter_byok_target_settings(settings)
-        ),
+    app._ui_application = SimpleNamespace(
+        build_managed_openrouter_byok_target=lambda: _byok_pkce_target(settings),
     )
     pkce_calls: list[tuple[object, str]] = []
-    app._on_request_openrouter_pkce = lambda target, *, launch_source="settings": (
-        pkce_calls.append((target, launch_source))
+    app._on_request_openrouter_pkce = lambda target, *, launch_source="settings": pkce_calls.append(
+        (target, launch_source)
     )
     app._show_snackbar = lambda *_args, **_kwargs: pytest.fail(
         "managed Discord auth BYOK should build a valid OpenRouter target"
@@ -2169,11 +2211,8 @@ def test_discord_managed_auth_byok_clears_managed_china_translation_state() -> N
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
     settings.openrouter.llm_model = OpenRouterLLMModel.DEEPSEEK_V4_FLASH
     settings.openrouter.provider_routing = OpenRouterProviderRouting.DEEPSEEK_ONLY
-    app.controller = SimpleNamespace(
-        settings=settings,
-        build_managed_openrouter_byok_target_settings=(
-            lambda: build_managed_openrouter_byok_target_settings(settings)
-        ),
+    app._ui_application = SimpleNamespace(
+        build_managed_openrouter_byok_target=lambda: _byok_pkce_target(settings),
     )
 
     target = app._build_managed_openrouter_byok_target()
@@ -2209,11 +2248,12 @@ async def test_start_discord_managed_auth_uses_run_task_and_success_enables_tran
         hub.translation_enabled = enabled
         return True
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         hub=hub,
         start_discord_managed_auth_from_dialog=fake_start_discord_managed_auth_from_dialog,
         set_translation_enabled=fake_set_translation_enabled,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_discord_managed_auth()
 
@@ -2264,11 +2304,12 @@ async def test_start_qq_managed_auth_uses_run_task_and_success_closes_dialog() -
         hub.translation_enabled = enabled
         return True
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         hub=hub,
         start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
         set_translation_enabled=fake_set_translation_enabled,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_qq_managed_auth()
 
@@ -2297,13 +2338,14 @@ def test_managed_china_dashboard_prompt_opens_qq_auth_not_discord() -> None:
     qq_calls: list[str] = []
     app.show_discord_managed_auth_dialog = lambda *, preview=False: discord_calls.append(preview)
     app.show_qq_managed_auth_dialog = lambda: qq_calls.append("qq")
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         dashboard_managed_auth_action=lambda: "prompt",
         dashboard_managed_auth_prompt_kind=lambda: "qq",
         set_translation_enabled=lambda _enabled: pytest.fail(
             "dashboard QQ prompt should not bypass auth dialog"
         ),
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
     app._log_basic = lambda *_args, **_kwargs: None
     app._log_detailed = lambda *_args, **_kwargs: None
 
@@ -2338,9 +2380,10 @@ async def test_start_qq_managed_auth_renders_recoverable_error_without_closing()
     async def fake_start_qq_managed_auth_from_dialog(**_kwargs):
         return "qq_auth.error.rate_limited", {"retry_after_ms": 3000}
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_qq_managed_auth()
     await app.page.tasks[0]()
@@ -2380,10 +2423,11 @@ async def test_start_qq_managed_auth_key_unavailable_stays_recoverable_and_trans
     async def fake_set_translation_enabled(_enabled: bool):
         pytest.fail("key unavailable must not enable translation")
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
         set_translation_enabled=fake_set_translation_enabled,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_qq_managed_auth()
     await app.page.tasks[0]()
@@ -2411,9 +2455,10 @@ async def test_start_qq_managed_auth_exception_uses_safe_bounded_log() -> None:
     async def fake_start_qq_managed_auth_from_dialog(**_kwargs):
         raise RuntimeError("raw broker payload and raw-credential must not leak")
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_qq_managed_auth()
     await app.page.tasks[0]()
@@ -2431,11 +2476,12 @@ def test_start_discord_managed_auth_registers_page_task_with_oauth_runtime() -> 
     app._discord_managed_auth_dialog = SimpleNamespace(referral_id="", set_waiting=lambda: None)
     app._show_snackbar = lambda *_args, **_kwargs: None
     app.view_dashboard = SimpleNamespace(set_translation_enabled=lambda _enabled: None)
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         hub=SimpleNamespace(llm=object(), translation_enabled=False),
         start_discord_managed_auth_from_dialog=lambda **_kwargs: False,
         set_translation_enabled=lambda _enabled: None,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
     app._start_discord_managed_auth()
 
     assert app.application.managed_auth_task_names() == ("discord-managed-auth-dialog",)
@@ -2453,9 +2499,10 @@ async def test_start_discord_managed_auth_skips_controller_start_for_stale_gener
         start_calls.append("start")
         return False
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_discord_managed_auth_from_dialog=fake_start_discord_managed_auth_from_dialog,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_discord_managed_auth()
     app._discord_managed_auth_generation += 1
@@ -2493,11 +2540,12 @@ async def test_close_oauth_runtime_blocks_late_discord_auth_ui_mutation() -> Non
         hub.translation_enabled = enabled
         return True
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         hub=hub,
         start_discord_managed_auth_from_dialog=fake_start_discord_managed_auth_from_dialog,
         set_translation_enabled=fake_set_translation_enabled,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_discord_managed_auth()
     auth_task = asyncio.create_task(app.page.tasks[0]())
@@ -2531,10 +2579,11 @@ async def test_start_discord_managed_auth_passes_dialog_referral_id_to_controlle
     async def fake_set_translation_enabled(enabled: bool) -> None:
         enable_calls.append(enabled)
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_discord_managed_auth_from_dialog=fake_start_discord_managed_auth_from_dialog,
         set_translation_enabled=fake_set_translation_enabled,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_discord_managed_auth()
     await app.page.tasks[0]()
@@ -2572,7 +2621,7 @@ async def test_start_discord_managed_auth_shows_referral_reward_snackbar_when_bo
 
     controller.start_discord_managed_auth_from_dialog = fake_start_discord_managed_auth_from_dialog
     controller.set_translation_enabled = fake_set_translation_enabled
-    app.controller = controller
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     try:
         app._start_discord_managed_auth()
@@ -2615,7 +2664,7 @@ async def test_start_discord_managed_auth_omits_referral_snackbar_without_boolea
 
     controller.start_discord_managed_auth_from_dialog = fake_start_discord_managed_auth_from_dialog
     controller.set_translation_enabled = fake_set_translation_enabled
-    app.controller = controller
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_discord_managed_auth()
     await app.page.tasks[0]()
@@ -2644,10 +2693,11 @@ async def test_start_discord_managed_auth_no_success_when_enable_fails() -> None
         enable_calls.append(enabled)
         return False
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_discord_managed_auth_from_dialog=fake_start_discord_managed_auth_from_dialog,
         set_translation_enabled=fake_set_translation_enabled,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_discord_managed_auth()
     await app.page.tasks[0]()
@@ -2678,11 +2728,12 @@ async def test_start_discord_managed_auth_no_success_when_llm_unavailable_after_
         enable_calls.append(enabled)
         return True
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         hub=SimpleNamespace(llm=None, translation_enabled=False),
         start_discord_managed_auth_from_dialog=fake_start_discord_managed_auth_from_dialog,
         set_translation_enabled=fake_set_translation_enabled,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_discord_managed_auth()
     await app.page.tasks[0]()
@@ -2707,10 +2758,11 @@ async def test_start_discord_managed_auth_failure_does_not_show_success_snackbar
     async def fake_set_translation_enabled(enabled: bool) -> None:
         enable_calls.append(enabled)
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_discord_managed_auth_from_dialog=fake_start_discord_managed_auth_from_dialog,
         set_translation_enabled=fake_set_translation_enabled,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_discord_managed_auth()
     await app.page.tasks[0]()
@@ -2745,10 +2797,11 @@ async def test_cancel_discord_managed_auth_prevents_late_success_and_enable() ->
         enable_calls.append(enabled)
         return True
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_discord_managed_auth_from_dialog=fake_start_discord_managed_auth_from_dialog,
         set_translation_enabled=fake_set_translation_enabled,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._start_discord_managed_auth()
     task = asyncio.create_task(app.page.tasks[0]())
@@ -2767,7 +2820,8 @@ async def test_cancel_discord_managed_auth_prevents_late_success_and_enable() ->
 def test_discord_managed_auth_waiting_hides_reopen_when_controller_cannot_reopen() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    app.controller = SimpleNamespace()
+    controller = SimpleNamespace()
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app.show_discord_managed_auth_dialog(preview=False)
     dialog = app._discord_managed_auth_dialog
@@ -2779,147 +2833,74 @@ def test_discord_managed_auth_waiting_hides_reopen_when_controller_cannot_reopen
     ]
 
 
-def test_peer_translation_toggle_first_enable_opens_eula_without_running_task(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def _peer_translation_binding_app(
+    *,
+    eula_accepted: bool,
+):
     app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    settings = AppSettings()
-    settings.ui.peer_translation_eula_accepted = False
-    app.controller = SimpleNamespace(settings=settings)
-    seen: dict[str, object] = {}
-    monkeypatch.setattr(
-        app,
-        "_show_peer_translation_eula",
-        lambda on_accept: seen.setdefault("on_accept", on_accept),
+    app._log_basic = lambda *_args, **_kwargs: None
+    app._log_detailed = lambda *_args, **_kwargs: None
+    tasks: list[object] = []
+    shown: list[object] = []
+    enabled: list[bool] = []
+    accepted: list[bool] = []
+
+    async def set_peer_translation_enabled(value: bool) -> None:
+        enabled.append(value)
+
+    async def accept_peer_translation_eula_and_enable() -> None:
+        accepted.append(True)
+
+    app._run_page_task = lambda coroutine, *args: tasks.append(coroutine)
+    app._show_peer_translation_eula = shown.append
+    app._ui_application = SimpleNamespace(
+        state=lambda: SimpleNamespace(peer_translation_eula_accepted=eula_accepted),
+        set_peer_translation_enabled=set_peer_translation_enabled,
+        accept_peer_translation_eula_and_enable=accept_peer_translation_eula_and_enable,
     )
+    return app, tasks, shown, enabled, accepted
+
+
+def test_peer_translation_toggle_first_enable_opens_eula_without_running_task() -> None:
+    app, tasks, shown, enabled, _accepted = _peer_translation_binding_app(eula_accepted=False)
 
     app._on_peer_translation_toggle(True)
 
-    assert "on_accept" in seen
-    assert app.page.tasks == []
-    assert settings.ui.peer_translation_eula_accepted is False
+    assert shown == [app._accept_peer_translation_eula_and_enable]
+    assert tasks == []
+    assert enabled == []
 
 
-@pytest.mark.asyncio
-async def test_peer_translation_toggle_after_eula_acceptance_routes_and_enables(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    settings = AppSettings()
-    settings.ui.peer_translation_eula_accepted = False
-    calls: list[bool] = []
-    applied: list[AppSettings] = []
-
-    async def fake_enable(enabled: bool):
-        calls.append(enabled)
-
-    async def fake_apply_settings(updated: AppSettings) -> None:
-        applied.append(updated)
-        app.controller.settings = updated
-
-    app.controller = SimpleNamespace(
-        settings=settings,
-        config_path="settings.json",
-        apply_settings=fake_apply_settings,
-        set_peer_translation_enabled=fake_enable,
-    )
-    saves: list[tuple[str, AppSettings]] = []
-    app.controller._save_settings = lambda: saves.append(("controller", settings))
+def test_peer_translation_accept_binding_runs_application_port() -> None:
+    app, tasks, _shown, _enabled, accepted = _peer_translation_binding_app(eula_accepted=False)
 
     app._accept_peer_translation_eula_and_enable()
-    await app.page.tasks[0]()
+    assert len(tasks) == 1
+    asyncio.run(tasks.pop(0)())
 
-    assert settings.ui.peer_translation_eula_accepted is False
-    assert len(applied) == 1
-    assert applied[0].ui.peer_translation_eula_accepted is True
-    assert calls == [True]
-    assert saves == []
+    assert accepted == [True]
 
 
-@pytest.mark.asyncio
-async def test_peer_translation_eula_acceptance_routes_settings_patch_before_enable() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    settings = AppSettings()
-    settings.ui.peer_translation_eula_accepted = False
-    applied: list[AppSettings] = []
-    enable_calls: list[bool] = []
-
-    async def fake_apply_settings(updated: AppSettings) -> None:
-        applied.append(updated)
-        app.controller.settings = updated
-
-    async def fake_enable(enabled: bool) -> None:
-        enable_calls.append(enabled)
-
-    app.controller = SimpleNamespace(
-        settings=settings,
-        apply_settings=fake_apply_settings,
-        set_peer_translation_enabled=fake_enable,
-    )
-
-    app._accept_peer_translation_eula_and_enable()
-    await app.page.tasks[0]()
-
-    assert len(applied) == 1
-    assert applied[0] is not settings
-    assert applied[0].ui.peer_translation_eula_accepted is True
-    assert settings.ui.peer_translation_eula_accepted is False
-    assert enable_calls == [True]
-
-
-@pytest.mark.asyncio
-async def test_peer_translation_toggle_with_existing_acceptance_enables_directly(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    settings = AppSettings()
-    settings.ui.peer_translation_eula_accepted = True
-    calls: list[bool] = []
-    monkeypatch.setattr(
-        app,
-        "_show_peer_translation_eula",
-        lambda _on_accept: pytest.fail("accepted peer translation should not reopen EULA"),
-    )
-
-    async def fake_enable(enabled: bool):
-        calls.append(enabled)
-
-    app.controller = SimpleNamespace(settings=settings, set_peer_translation_enabled=fake_enable)
+def test_peer_translation_toggle_with_existing_acceptance_enables_directly() -> None:
+    app, tasks, shown, enabled, _accepted = _peer_translation_binding_app(eula_accepted=True)
 
     app._on_peer_translation_toggle(True)
-    await app.page.tasks[0]()
+    assert shown == []
+    assert len(tasks) == 1
+    asyncio.run(tasks.pop(0)())
 
-    assert calls == [True]
+    assert enabled == [True]
 
 
-@pytest.mark.asyncio
-async def test_peer_translation_disable_does_not_open_eula(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    settings = AppSettings()
-    settings.ui.peer_translation_eula_accepted = False
-    calls: list[bool] = []
-    monkeypatch.setattr(
-        app,
-        "_show_peer_translation_eula",
-        lambda _on_accept: pytest.fail("disabling peer translation should not show EULA"),
-    )
-
-    async def fake_enable(enabled: bool):
-        calls.append(enabled)
-
-    app.controller = SimpleNamespace(settings=settings, set_peer_translation_enabled=fake_enable)
+def test_peer_translation_disable_does_not_open_eula() -> None:
+    app, tasks, shown, enabled, _accepted = _peer_translation_binding_app(eula_accepted=False)
 
     app._on_peer_translation_toggle(False)
-    await app.page.tasks[0]()
+    assert shown == []
+    assert len(tasks) == 1
+    asyncio.run(tasks.pop(0)())
 
-    assert calls == [False]
+    assert enabled == [False]
 
 
 @pytest.mark.asyncio
@@ -2948,11 +2929,12 @@ async def test_on_nav_change_merges_current_languages_into_prompt_only_apply() -
     async def fake_apply_settings(settings) -> None:
         events.append(("apply", settings))
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         merge_settings_tab_apply_with_current_languages=fake_merge_settings,
         apply_settings=fake_apply_settings,
         apply_providers=lambda _settings=None: asyncio.sleep(0),
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_nav_change(0)
 
@@ -2986,10 +2968,11 @@ async def test_on_nav_change_applies_provider_changes_when_leaving_settings() ->
     async def fake_auto_install() -> None:
         auto_installs.append("started")
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         apply_providers=fake_apply_providers,
         install_selected_gpu_model_if_needed=fake_auto_install,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_nav_change(0)
     assert app.content_area.content is app.view_dashboard
@@ -3020,10 +3003,11 @@ async def test_on_nav_change_does_not_auto_install_when_provider_apply_fails() -
     async def fake_apply_providers(_settings) -> bool:
         return False
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         apply_providers=fake_apply_providers,
         install_selected_gpu_model_if_needed=auto_install,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_nav_change(0)
     await app.page.tasks[0]()
@@ -3044,10 +3028,11 @@ def test_gpu_provider_selection_alone_does_not_start_install() -> None:
         refresh_prompt_if_empty=lambda: None,
     )
     app.content_area = DummyContent()
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         apply_providers=AsyncMock(),
         install_selected_gpu_model_if_needed=AsyncMock(),
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_nav_change(1)
 
@@ -3070,7 +3055,8 @@ async def test_on_providers_changed_applies_consumed_provider_draft() -> None:
     async def fake_apply_providers(settings=None) -> None:
         seen.append(settings)
 
-    app.controller = SimpleNamespace(apply_providers=fake_apply_providers)
+    controller = SimpleNamespace(apply_providers=fake_apply_providers)
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_providers_changed()
 
@@ -3105,7 +3091,8 @@ async def test_on_providers_changed_runtime_only_reload_does_not_consume_provide
         assert force_rebuild_llm is False
         seen.append((persist_settings, refresh_ui))
 
-    app.controller = SimpleNamespace(apply_providers=fake_apply_providers)
+    controller = SimpleNamespace(apply_providers=fake_apply_providers)
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_providers_changed()
     assert len(app.page.tasks) == 1
@@ -3139,10 +3126,11 @@ async def test_on_nav_change_refreshes_prompt_and_schedules_log_scroll() -> None
     async def fake_auto_install() -> None:
         auto_installs["count"] += 1
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         apply_providers=lambda _settings=None: asyncio.sleep(0),
         install_selected_gpu_model_if_needed=fake_auto_install,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_nav_change(1)
     assert app.content_area.content is app.view_settings
@@ -3183,11 +3171,12 @@ async def test_on_nav_change_applies_pending_prompt_changes_when_leaving_setting
     async def fake_apply_settings(settings) -> None:
         seen.append(settings)
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         merge_settings_tab_apply_with_current_languages=fake_merge_settings,
         apply_settings=fake_apply_settings,
         apply_providers=lambda _settings=None: asyncio.sleep(0),
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_nav_change(0)
 
@@ -3213,10 +3202,11 @@ async def test_on_prompt_apply_settings_merges_current_languages_before_apply_se
     async def fake_apply_settings(settings) -> None:
         events.append(("apply", settings))
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         merge_settings_tab_apply_with_current_languages=fake_merge_settings,
         apply_settings=fake_apply_settings,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_prompt_apply_settings(pending_settings)
 
@@ -3237,10 +3227,11 @@ async def test_prompt_apply_keeps_dashboard_target_for_next_request() -> None:
     async def fake_apply_settings(settings: AppSettings) -> None:
         applied_targets.append(settings.languages.target_language)
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         settings=current_settings,
         apply_settings=fake_apply_settings,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_prompt_apply_settings(pending_settings)
 
@@ -3272,12 +3263,13 @@ async def test_on_settings_changed_captures_patch_before_queued_apply() -> None:
     async def fake_apply_settings(settings) -> None:
         seen.append(settings)
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         merge_settings_tab_apply_with_current_languages=fake_merge_settings,
         capture_settings_view_change=fake_capture_settings_view_change,
         merge_settings_view_change_with_current=fake_merge_settings_view_change,
         apply_settings=fake_apply_settings,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_settings_changed(raw_settings)
 
@@ -3298,11 +3290,12 @@ async def test_start_microphone_test_success_opens_percentage_modal() -> None:
         kwargs["meter_callback"](0.37)
         return True
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_microphone_test=fake_start_microphone_test,
         stop_microphone_test=lambda: None,
         microphone_test_active=True,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_start_microphone_test()
     await app.page.tasks[0]()
@@ -3354,7 +3347,8 @@ async def test_start_microphone_test_callback_uses_page_run_task() -> None:
         calls.append("start")
         return True
 
-    app.controller = SimpleNamespace(start_microphone_test=fake_start_microphone_test)
+    controller = SimpleNamespace(start_microphone_test=fake_start_microphone_test)
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_start_microphone_test()
 
@@ -3374,9 +3368,10 @@ async def test_start_microphone_test_false_opens_failure_modal() -> None:
     async def fake_start_microphone_test(**_kwargs) -> bool:
         return False
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_microphone_test=fake_start_microphone_test,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_start_microphone_test()
     await app.page.tasks[0]()
@@ -3399,7 +3394,8 @@ async def test_start_microphone_test_false_modal_has_no_close_button() -> None:
     async def fake_start_microphone_test(**_kwargs) -> bool:
         return False
 
-    app.controller = SimpleNamespace(start_microphone_test=fake_start_microphone_test)
+    controller = SimpleNamespace(start_microphone_test=fake_start_microphone_test)
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_start_microphone_test()
     await app.page.tasks[0]()
@@ -3421,11 +3417,12 @@ async def test_microphone_test_meter_callback_updates_modal_percentage() -> None
         callbacks.append(kwargs["meter_callback"])
         return True
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_microphone_test=fake_start_microphone_test,
         stop_microphone_test=lambda: None,
         microphone_test_active=True,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_start_microphone_test()
     await app.page.tasks[0]()
@@ -3447,11 +3444,12 @@ async def test_stop_microphone_test_stops_runtime_through_settings_queue() -> No
     async def fake_stop_microphone_test() -> None:
         stop_calls.append("stop")
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_microphone_test=fake_start_microphone_test,
         stop_microphone_test=fake_stop_microphone_test,
         microphone_test_active=True,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_stop_microphone_test()
 
@@ -3474,11 +3472,12 @@ async def test_microphone_test_backdrop_dismiss_stops_runtime() -> None:
     async def fake_stop_microphone_test() -> None:
         stop_calls.append("stop")
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_microphone_test=fake_start_microphone_test,
         stop_microphone_test=fake_stop_microphone_test,
         microphone_test_active=True,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_start_microphone_test()
     await app.page.tasks[0]()
@@ -3504,11 +3503,12 @@ async def test_navigation_cleanup_closes_microphone_test_modal_and_stops_runtime
     async def fake_stop_microphone_test() -> None:
         stop_calls.append("stop")
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         start_microphone_test=fake_start_microphone_test,
         stop_microphone_test=fake_stop_microphone_test,
         microphone_test_active=True,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_start_microphone_test()
     await app.page.tasks[0]()
@@ -3544,7 +3544,7 @@ async def test_settings_apply_closes_microphone_test_modal_after_audio_cleanup()
     controller.start_microphone_test = fake_start_microphone_test
     controller.apply_settings = fake_apply_settings
     controller.stop_microphone_test = fake_stop_microphone_test
-    app.controller = controller
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_start_microphone_test()
     await app.page.tasks[0]()
@@ -3571,10 +3571,11 @@ async def test_start_microphone_test_waits_for_pending_settings_queue() -> None:
         events.append("start")
         return True
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         apply_settings=fake_apply_settings,
         start_microphone_test=fake_start_microphone_test,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_settings_changed("audio")
     app._on_start_microphone_test()
@@ -3609,18 +3610,17 @@ def test_on_request_openrouter_pkce_reopens_existing_auth_url_while_flow_active(
     target_settings = AppSettings()
     reopen_calls: list[str] = []
 
-    async def fake_connect_openrouter_via_pkce(
-        *, target_settings: AppSettings, launch_source: str
-    ) -> bool:
-        _ = (target_settings, launch_source)
+    async def fake_connect_openrouter_via_pkce(*, target: AppSettings, launch_source: str) -> bool:
+        _ = (target, launch_source)
         return False
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         reopen_openrouter_pkce_authorization_url=lambda: reopen_calls.append("reopen") or True,
         settings=AppSettings(),
         config_path=Path("settings.json"),
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
     app.view_settings = SimpleNamespace(
         refresh_after_openrouter_pkce_success=lambda *_args, **_kwargs: None,
         load_from_settings=lambda *_args, **_kwargs: None,
@@ -3643,19 +3643,18 @@ async def test_on_request_openrouter_pkce_ignores_duplicate_while_flow_active(
     target_settings = AppSettings()
     pkce_calls: list[str] = []
 
-    async def fake_connect_openrouter_via_pkce(
-        *, target_settings: AppSettings, launch_source: str
-    ) -> bool:
-        _ = target_settings
+    async def fake_connect_openrouter_via_pkce(*, target: AppSettings, launch_source: str) -> bool:
+        _ = target
         pkce_calls.append(launch_source)
         return False
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         reopen_openrouter_pkce_authorization_url=lambda: False,
         settings=AppSettings(),
         config_path=Path("settings.json"),
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
     app.view_settings = SimpleNamespace(
         refresh_after_openrouter_pkce_success=lambda *_args, **_kwargs: None,
         load_from_settings=lambda *_args, **_kwargs: None,
@@ -3686,13 +3685,11 @@ async def test_on_request_openrouter_pkce_uses_draft_preserving_refresh_on_succe
     refresh_calls: list[tuple[AppSettings, Path]] = []
     snackbar_calls: list[tuple[str, str]] = []
 
-    async def fake_connect_openrouter_via_pkce(
-        *, target_settings: AppSettings, launch_source: str
-    ) -> bool:
-        pkce_calls.append((target_settings, launch_source))
+    async def fake_connect_openrouter_via_pkce(*, target: AppSettings, launch_source: str) -> bool:
+        pkce_calls.append((target, launch_source))
         return True
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         settings=updated_settings,
         config_path=Path("settings.json"),
@@ -3700,6 +3697,7 @@ async def test_on_request_openrouter_pkce_uses_draft_preserving_refresh_on_succe
             refresh_calls.append((updated_settings, Path("settings.json"))) or True
         ),
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
     app._show_snackbar = lambda message, bgcolor: snackbar_calls.append((message, bgcolor))
     queued: list[object] = []
     monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
@@ -3721,13 +3719,11 @@ async def test_on_request_openrouter_pkce_does_not_refresh_settings_view_on_fail
     target_settings = AppSettings()
     refresh_calls: list[tuple[AppSettings, Path]] = []
 
-    async def fake_connect_openrouter_via_pkce(
-        *, target_settings: AppSettings, launch_source: str
-    ) -> bool:
-        _ = (target_settings, launch_source)
+    async def fake_connect_openrouter_via_pkce(*, target: AppSettings, launch_source: str) -> bool:
+        _ = (target, launch_source)
         return False
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         settings=AppSettings(),
         config_path=Path("settings.json"),
@@ -3735,6 +3731,7 @@ async def test_on_request_openrouter_pkce_does_not_refresh_settings_view_on_fail
             refresh_calls.append((AppSettings(), Path("settings.json"))) or True
         ),
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
     queued: list[object] = []
     monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
 
@@ -3761,10 +3758,11 @@ async def test_queue_orders_generic_settings_change_before_prompt_apply() -> Non
     async def fake_apply_settings(settings) -> None:
         events.append(("apply", settings))
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         merge_settings_tab_apply_with_current_languages=fake_merge_settings,
         apply_settings=fake_apply_settings,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_settings_changed(raw_settings)
     app._on_prompt_apply_settings(pending_settings)
@@ -3805,11 +3803,12 @@ async def test_queue_orders_generic_settings_change_before_provider_apply_on_set
         events.append(("providers", settings))
         return True
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         apply_settings=fake_apply_settings,
         apply_providers=fake_apply_providers,
         install_selected_gpu_model_if_needed=AsyncMock(),
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_settings_changed(raw_settings)
     app._on_nav_change(0)
@@ -3861,7 +3860,8 @@ def test_on_nav_change_closes_open_dialog_before_switching_tabs() -> None:
     app.view_logs = SimpleNamespace(scroll_to_bottom=lambda: asyncio.sleep(0))
     app.view_about = object()
     app.content_area = RecordingContent(app.view_dashboard)
-    app.controller = SimpleNamespace(apply_providers=lambda _settings=None: asyncio.sleep(0))
+    controller = SimpleNamespace(apply_providers=lambda _settings=None: asyncio.sleep(0))
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_nav_change(1)
 
@@ -3925,7 +3925,8 @@ def test_on_overlay_state_changed_updates_settings_view_runtime_state() -> None:
     )
     seen: list[tuple[str, str | None, str | None, bool | None]] = []
     refreshed: list[object] = []
-    app.controller = SimpleNamespace(overlay_peer_presentation_state=lambda: state)
+    controller = SimpleNamespace(overlay_peer_presentation_state=lambda: state)
+    app._ui_application = compose_test_ui_application_boundary(controller)
     app.view_dashboard = SimpleNamespace(
         set_overlay_peer_contract=lambda incoming: refreshed.append(("dashboard", incoming))
     )
@@ -3985,7 +3986,7 @@ async def test_debug_preview_submit_toggle_and_settings_wrappers_schedule_contro
     def fake_manual_activity(has_text: bool) -> None:
         seen.append(("manual_activity", has_text))
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         submit_text=fake_submit,
         set_manual_input_activity=fake_manual_activity,
         set_translation_enabled=fake_translation,
@@ -3995,6 +3996,7 @@ async def test_debug_preview_submit_toggle_and_settings_wrappers_schedule_contro
         apply_settings=fake_apply_settings,
         apply_providers=fake_apply_providers,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_manual_submit("You", "hello")
     app._on_message_input_activity(True)
@@ -4035,7 +4037,8 @@ async def test_local_llm_secret_changed_forces_local_llm_rebuild() -> None:
         calls.append(force_rebuild_llm)
 
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    app.controller = SimpleNamespace(settings=settings, apply_providers=fake_apply_providers)
+    controller = SimpleNamespace(settings=settings, apply_providers=fake_apply_providers)
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_local_llm_secret_changed()
 
@@ -4058,7 +4061,8 @@ async def test_local_llm_secret_changed_ignores_non_local_llm_provider() -> None
         calls.append(force_rebuild_llm)
 
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.GEMINI))
-    app.controller = SimpleNamespace(settings=settings, apply_providers=fake_apply_providers)
+    controller = SimpleNamespace(settings=settings, apply_providers=fake_apply_providers)
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_local_llm_secret_changed()
 
@@ -4088,18 +4092,18 @@ def test_toggle_handlers_route_basic_and_detailed_runtime_logs() -> None:
     controller.set_translation_enabled = fake_translation
     controller.set_stt_enabled = fake_stt
     controller.set_overlay_enabled = fake_overlay
-    app.controller = controller
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     app._on_translation_toggle(True)
     app._on_stt_toggle(False)
     app._on_overlay_toggle(True)
 
-    assert app.controller.basic_messages == [
+    assert controller.basic_messages == [
         "[Dashboard] Translation toggle requested: enabled=True",
         "[Dashboard] STT toggle requested: enabled=False",
         "[Dashboard] Overlay toggle requested: enabled=True",
     ]
-    assert app.controller.detailed_messages == [
+    assert controller.detailed_messages == [
         "[Dashboard] Translation toggle detail: dashboard_state=False overlay_state=connected",
         "[Dashboard] STT toggle detail: dashboard_state=True overlay_state=connected",
         "[Dashboard] Overlay toggle detail: overlay_state=connected failure_reason=runtime_crashed",
@@ -4109,7 +4113,7 @@ def test_toggle_handlers_route_basic_and_detailed_runtime_logs() -> None:
 def test_on_overlay_state_changed_routes_runtime_logs() -> None:
     controller = RuntimeLoggingController()
     app = TranslatorApp.__new__(TranslatorApp)
-    app.controller = controller
+    app._ui_application = compose_test_ui_application_boundary(controller)
     seen: list[tuple[str, str | None, str | None, bool | None]] = []
     app.overlay_state = "off"
     app.view_settings = SimpleNamespace(
@@ -4149,10 +4153,11 @@ async def test_on_language_change_updates_settings_and_shows_warning(monkeypatch
     monkeypatch.setattr(
         app_module, "get_stt_compatibility_warning", lambda *_args, **_kwargs: warning
     )
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         settings=settings,
         on_dashboard_language_change=fake_on_dashboard_language_change,
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     change = app_module.LanguageSelectionChange(
         source_code="ja",
@@ -4189,7 +4194,8 @@ async def test_on_language_change_forwards_automatic_peer_mode(
         seen.append(change)
 
     monkeypatch.setattr(app_module, "get_stt_compatibility_warning", lambda *_args: None)
-    app.controller = SimpleNamespace(settings=settings, on_dashboard_language_change=callback)
+    controller = SimpleNamespace(settings=settings, on_dashboard_language_change=callback)
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     change = app_module.LanguageSelectionChange(
         source_code="ko",
@@ -4243,12 +4249,13 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
         setattr(settings.api_key_verified, provider, success)
         saves.append((provider, key, success))
 
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         verify_api_key=fake_verify,
         persist_api_key_verification=persist_verification,
         settings=settings,
         config_path="settings.json",
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     deepgram_result = await app._on_verify_api_key("deepgram", "k")
     google_result = await app._on_verify_api_key("google", "k")
@@ -4295,7 +4302,7 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
         )
     )
     saves: list[tuple[str, str, bool]] = []
-    app.controller = SimpleNamespace(
+    controller = SimpleNamespace(
         verify_api_key=fake_verify,
         persist_api_key_verification=lambda provider, key, success: saves.append(
             (provider, key, success)
@@ -4303,6 +4310,7 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
         settings=settings,
         config_path="settings.json",
     )
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     result = await app._on_verify_api_key("google", "old-key")
 
@@ -4329,13 +4337,6 @@ def test_show_founder_letter_dialog_opens_with_locale_readme_action(
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
-    settings.openrouter.llm_model = OpenRouterLLMModel.QWEN_35_FLASH_02_23
-    app.controller = SimpleNamespace(settings=settings)
-
     captured: dict[str, object] = {}
     pkce_calls: list[tuple[AppSettings, str]] = []
     opened_urls: list[str] = []
@@ -4386,13 +4387,6 @@ def test_show_founder_letter_dialog_does_not_prepare_byok_alias_when_opened(
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.openrouter.selection_alias = None
-    settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    app.controller = SimpleNamespace(settings=settings)
-
     captured: dict[str, object] = {}
     pkce_calls: list[tuple[AppSettings, str]] = []
 
@@ -4466,7 +4460,8 @@ async def test_check_and_notify_update_handles_none_and_available(
 async def test_check_and_notify_update_swallows_exceptions(monkeypatch: pytest.MonkeyPatch) -> None:
     page = DummyPage()
     app = TranslatorApp.__new__(TranslatorApp)
-    app.controller = RuntimeLoggingController()
+    controller = RuntimeLoggingController()
+    app._ui_application = compose_test_ui_application_boundary(controller)
 
     async def raise_error():
         raise RuntimeError("network down")
@@ -4477,8 +4472,8 @@ async def test_check_and_notify_update_swallows_exceptions(monkeypatch: pytest.M
         load_update_info=raise_error,
     )
     assert page.opened == []
-    assert app.controller.basic_messages == []
-    assert app.controller.detailed_messages == ["[Update] Check notification failed: network down"]
+    assert controller.basic_messages == []
+    assert controller.detailed_messages == ["[Update] Check notification failed: network down"]
 
 
 @pytest.mark.asyncio
@@ -4500,8 +4495,8 @@ async def test_shutdown_is_idempotent_and_cancels_tracked_page_tasks() -> None:
 
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    app.controller = Controller()
-    app._ui_application = _application_boundary_with_stop(app.controller)
+    controller = Controller()
+    app._ui_application = _application_boundary_with_stop(controller)
     app._shutdown_lock = None
     app._shutdown_complete = False
     app._shutting_down = False

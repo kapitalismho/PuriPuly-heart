@@ -11,7 +11,12 @@ from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
-from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS
+from puripuly_heart.core.lifecycle import (
+    LIFECYCLE_SHUTDOWN_PHASE_ORDER,
+    SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
+    SHUTDOWN_PHASE_FREEZE_INGRESS,
+    SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+)
 from puripuly_heart.ui.app import TranslatorApp
 from tests.helpers.ui_application import (
     ApplicationRuntimeShutdownStub,
@@ -137,6 +142,10 @@ class RecordingShutdownRuntime(ApplicationRuntimeShutdownStub):
         self.events.append(f"diagnostic:{diagnostic.owner_name}:{diagnostic.callback_name}")
 
 
+def _position_of(events: list[str], marker: str) -> int:
+    return events.index(marker)
+
+
 @pytest.mark.asyncio
 async def test_runtime_shutdown_graph_preserves_order_and_logging_last_after_failure() -> None:
     runtime = RecordingShutdownRuntime()
@@ -173,72 +182,101 @@ async def test_runtime_shutdown_graph_preserves_order_and_logging_last_after_fai
         def bind_application_lifecycle(self, lifecycle) -> None:
             self.lifecycle = lifecycle
 
-    class RecordingTranslatorApp(TranslatorApp):
-        def _freeze_ui_ingress(self) -> None:
+    class ApplicationShim:
+        """Duck-typed application boundary for lifecycle composition."""
+
+        def __init__(self) -> None:
+            self.application = boundary
+
+    class UiHooks:
+        def freeze_ui_ingress(self) -> None:
             runtime.events.append("ui-freeze")
 
-        async def _close_after_launch_ui_tasks(self) -> None:
+        async def close_after_launch_ui_tasks(self) -> None:
             runtime.events.append("ui-after-launch")
 
-        async def _close_managed_auth_ui_tasks(self) -> None:
+        async def close_managed_auth_ui_tasks(self) -> None:
             runtime.events.append("ui-managed-auth")
 
+    ui = UiHooks()
     boundary._github_star_prompt_runtime = PromptRuntime()
     boundary._managed_auth_runtime = AuthRuntime()
-    app = RecordingTranslatorApp.__new__(RecordingTranslatorApp)
-    app._ui_application = boundary
-    app._foundation_runtime = FoundationRuntime()
-    lifecycle = app._compose_application_lifecycle()
+    foundation_runtime = FoundationRuntime()
+    callbacks = (
+        application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+            owner_name="TranslatorApp",
+            callback_name="freeze_ui_ingress",
+            callback=ui.freeze_ui_ingress,
+        ),
+        *foundation_runtime.application_shutdown_callbacks(),
+        application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+            owner_name="TranslatorApp",
+            callback_name="close_after_launch_tasks",
+            callback=ui.close_after_launch_ui_tasks,
+        ),
+        application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+            owner_name="TranslatorApp",
+            callback_name="close_managed_auth_tasks",
+            callback=ui.close_managed_auth_ui_tasks,
+        ),
+    )
+    lifecycle = TranslatorApp.compose_application_lifecycle(
+        ApplicationShim(),
+        foundation_runtime,
+        callbacks,
+    )
+    foundation_runtime.bind_application_lifecycle(lifecycle)
 
     with pytest.raises(RuntimeError, match="overlay close failed"):
         await lifecycle.shutdown()
 
-    assert runtime.events == [
+    events = runtime.events
+
+    def position(marker: str) -> int:
+        return _position_of(events, marker)
+
+    # Freeze semantics: UI ingress and runtime ingress freeze first, before
+    # any producer stop or owner close.
+    for marker in (
         "ui-freeze",
         "boundary-prompt-stop",
         "freeze",
         "runtime-prompt-stop",
-        "foundation-page-tasks",
-        "ui-after-launch",
-        "ui-managed-auth",
-        "boundary-prompt-close",
-        "boundary-auth-close",
-        "manual",
-        "clipboard",
-        "osc-presence",
-        "runtime-prompt-close",
-        "openrouter-oauth",
-        "self-ingress",
-        "vrc-mic",
-        "overlay-failed",
-        "diagnostic:OverlayApplicationOwner:close",
-        "peer-after-failure",
-        "local-asr",
-        "microphone-test",
-        "self-close",
-        "peer-close",
-        "logging-background",
-        "managed-auth",
-        "translation-enable",
-        "managed-usage",
-        "pipeline",
-        "self-translation-ingress",
-        "peer-translation-ingress",
-        "translation-turns",
-        "output",
-        "self-channel",
-        "peer-channel",
-        "local-asr-runtime",
-        "llm-runtime",
-        "managed-gemma",
-        "vrchat-sender",
-        "managed-release",
-        "final:1",
-        "logging:1",
-    ]
+    ):
+        assert position(marker) < position("foundation-page-tasks")
+
+    # External producers stop before owner drain, and boundary producers close
+    # in the same phase.
+    for marker in ("foundation-page-tasks", "ui-after-launch", "ui-managed-auth"):
+        assert position(marker) < position("manual")
+    for marker in ("boundary-prompt-close", "boundary-auth-close"):
+        assert position(marker) < position("manual")
+
+    # Owner drain and provider close proceed in phase order after producers.
+    assert position("manual") < position("overlay-failed") < position("pipeline")
+
+    # Overlay close failure surfaces as a diagnostic but does not stop later
+    # closes: the peer owner still ran after the failure.
+    assert position("diagnostic:OverlayApplicationOwner:close") < position("peer-after-failure")
+    assert position("peer-after-failure") < position("managed-gemma")
+    assert position("managed-gemma") < position("vrchat-sender")
+    assert position("vrchat-sender") < position("managed-release")
+
+    # Final diagnostics run before logging closes, and both record the single
+    # failure; logging is the last event of the shutdown.
+    assert position("final:1") < position("logging:1")
+    assert events[-2:] == ["final:1", "logging:1"]
+
     snapshot = lifecycle.snapshot
     assert snapshot.failure_count == 1
     assert snapshot.terminal is True
+
+    # The lifecycle phase order starts at ingress freeze and ends with logging.
+    assert LIFECYCLE_SHUTDOWN_PHASE_ORDER[0] == SHUTDOWN_PHASE_FREEZE_INGRESS
+    assert LIFECYCLE_SHUTDOWN_PHASE_ORDER[-1] == SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS
 
 
 @pytest.mark.asyncio

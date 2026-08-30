@@ -23,7 +23,6 @@ from puripuly_heart.app.ports.settings_view import (
     OpenRouterPkceTarget,
     PromptApplyIntent,
     ProviderApplyIntent,
-    TranslationSelectionEdit,
 )
 from puripuly_heart.app.ports.ui_application_intents import (
     UiDiagnosticsRuntimePort,
@@ -161,43 +160,11 @@ class UiApplicationRuntimeStub:
         launch_source: str,
     ) -> bool:
         connect = getattr(self._backend, "connect_openrouter_via_pkce")
-        try:
-            return bool(await connect(target=target, launch_source=launch_source))
-        except TypeError:
-            return bool(await connect(target_settings=target, launch_source=launch_source))
+        return bool(await connect(target=target, launch_source=launch_source))
 
     def build_managed_openrouter_byok_target(self) -> OpenRouterPkceTarget | None:
         build = getattr(self._backend, "build_managed_openrouter_byok_target", None)
-        if callable(build):
-            return build()
-        legacy_build = getattr(
-            self._backend,
-            "build_managed_openrouter_byok_target_settings",
-            None,
-        )
-        if not callable(legacy_build):
-            return None
-        settings = legacy_build()
-        if settings is None or settings.openrouter.selection_alias is None:
-            return None
-        provider, _general, _prompt, _overlay = settings_view_surface_snapshots(settings)
-        return OpenRouterPkceTarget(
-            settings.openrouter.selection_alias,
-            provider_intent=ProviderApplyIntent(
-                (
-                    TranslationSelectionEdit(
-                        provider.translation,
-                        (
-                            (
-                                provider.translation.model,
-                                provider.translation.connection,
-                            ),
-                        ),
-                    ),
-                )
-            ),
-            system_prompt=settings.system_prompt,
-        )
+        return build() if callable(build) else None
 
     def refresh_settings_projection(
         self,
