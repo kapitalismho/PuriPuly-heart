@@ -1151,6 +1151,29 @@ def build_final_artifacts(
         7301,
     ):
         raise ReportingError("operator decision differs from the frozen EVAL winner")
+    selected_candidate = authorization["candidate_set"][1]
+    training = training_results[0] if len(training_results) == 1 else None
+    training_payload = (
+        {key: value for key, value in training.items() if key != "payload_sha256"}
+        if isinstance(training, Mapping)
+        else None
+    )
+    if (
+        training_payload is None
+        or training.get("artifact_role") != "psem_sortformer_training_result"
+        or training.get("payload_sha256") != bind_payload(training_payload)["payload_sha256"]
+        or training.get("payload_sha256") != selected_candidate.get("training_result_sha256")
+        or training.get("arm") != selected_arm
+        or training.get("seed") != 7301
+        or training.get("checkpoint_sha256") != selected_candidate.get("checkpoint_sha256")
+        or training.get("candidate_code_identity_sha256")
+        != authorization.get("candidate_code_identity_sha256")
+        or training.get("training_summary") != selected_candidate.get("training_summary")
+        or not isinstance(selected_candidate.get("checkpoint_receipt_sha256"), str)
+        or len(selected_candidate["checkpoint_receipt_sha256"]) != 64
+    ):
+        raise ReportingError("selected training result differs from the frozen candidate")
+    require_registered_execution("training-result", training)
     artifacts = {
         "frozen_float_metrics.json": _arm_metrics(results, "F0-FROZEN-FLOAT"),
         "selected_arm_metrics.json": _arm_metrics(results, selected_arm),
@@ -1172,7 +1195,7 @@ def build_final_artifacts(
         "timing_and_compute.json": {
             "schema_version": 1,
             "artifact_role": "psem_sortformer_timing_and_compute",
-            "training_results": [dict(value) for value in training_results],
+            "training_results": [dict(training)],
         },
         "decision_receipt.json": bind_payload(
             {

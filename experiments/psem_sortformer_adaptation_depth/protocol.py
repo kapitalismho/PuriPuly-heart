@@ -1183,6 +1183,8 @@ def open_ta(
     decision: Mapping[str, Any],
     *,
     cost_receipt: Mapping[str, Any],
+    staged_execution_receipt: Mapping[str, Any],
+    staged_dev_results: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     validated = validate_operator_dev_decision(decision)
     decision_payload = require_bound(validated, "psem_sortformer_operator_dev_decision")
@@ -1191,6 +1193,32 @@ def open_ta(
         or decision_payload["selected_arm"] != "TA-ALL-TEMPORAL"
     ):
         raise ProtocolError("TA may be opened only after an explicit open_ta decision")
+    validated_state = validate_staged_execution_state(staged_execution_receipt, staged_dev_results)
+    state_payload = require_bound(validated_state, "staged_execution_state")
+    validated_results = [validate_dev_result(value) for value in staged_dev_results]
+    staged_result_sha256s = dict(
+        sorted(
+            (
+                f"{result['arm']}:{result.get('seed')}",
+                result["payload_sha256"],
+            )
+            for result in validated_results
+        )
+    )
+    expected_runs = [
+        ("F0-FROZEN-FLOAT", None),
+        ("H-HEAD", 7301),
+        ("T2-TOP", 7301),
+    ]
+    if (
+        [(row.get("arm"), row.get("seed")) for row in state_payload.get("completed_runs", [])]
+        != expected_runs
+        or [_run_id(result) for result in validated_results] != expected_runs
+        or decision_payload.get("available_dev_result_sha256s") != staged_result_sha256s
+        or state_payload.get("eval_open_count") != 0
+        or state_payload.get("eval_used_for_development") is not False
+    ):
+        raise ProtocolError("TA decision differs from the exact staged F0/H/T2 DEV state")
     from experiments.psem_sortformer_adaptation_depth.receipts import (
         validate_cost_receipt,
     )
@@ -1204,6 +1232,9 @@ def open_ta(
             "schema_version": 1,
             "artifact_role": "psem_sortformer_open_ta_authorization",
             "operator_decision_sha256": decision["payload_sha256"],
+            "operator_decision": dict(validated),
+            "staged_execution_receipt_sha256": staged_execution_receipt["payload_sha256"],
+            "staged_dev_result_sha256s": staged_result_sha256s,
             "cost_receipt_sha256": cost_receipt["payload_sha256"],
             "arm": "TA-ALL-TEMPORAL",
             "seed": 7301,

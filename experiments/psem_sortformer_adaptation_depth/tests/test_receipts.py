@@ -10,6 +10,7 @@ import pytest
 from torch import nn
 
 from experiments.psem_sortformer_adaptation_depth import execution as execution_module
+from experiments.psem_sortformer_adaptation_depth import protocol as protocol_module
 from experiments.psem_sortformer_adaptation_depth import receipts as receipts_module
 from experiments.psem_sortformer_adaptation_depth.preflight import canonical_sha256, sha256_file
 from experiments.psem_sortformer_adaptation_depth.receipts import (
@@ -407,3 +408,165 @@ def test_cost_receipt_recomputes_formula_and_rejects_tampering() -> None:
     forged["payload_sha256"] = canonical_sha256(payload)
     with pytest.raises(Exception, match="formula or USD-30 hard stop"):
         validate_cost_receipt(forged)
+
+
+def test_material_gate_smoke_provenance_requires_exact_weights_runtime_and_base() -> None:
+    class_weights = _bound_staged(
+        {
+            "schema_version": 1,
+            "artifact_role": "train_class_weight_receipt",
+        }
+    )
+    runtime_identity = {
+        "checkpoint_sha256": CHECKPOINT_IDENTITY["sha256"],
+        "dependency_lock_sha256": "d" * 64,
+    }
+    smoke_payload = {
+        "schema_version": 1,
+        "artifact_role": "short_smoke_metrics",
+        "arm": "H-HEAD",
+        "seed": 7301,
+        "sampling_manifest_sha256": "m" * 64,
+        "class_weight_receipt_sha256": class_weights["payload_sha256"],
+        "runtime_identity": runtime_identity,
+        "runtime_identity_sha256": canonical_sha256(runtime_identity),
+        "base_checkpoint_sha256": CHECKPOINT_IDENTITY["sha256"],
+        "dependency_lock_sha256": "d" * 64,
+        "optimizer_steps": 32,
+        "consumed_row_count": 512,
+        "finite_forward_backward_update": True,
+        "frozen_parameters_unchanged": True,
+        "weights_discarded": True,
+        "ta_open_authorization_sha256": None,
+        "first_eight_mean_total_loss": 2.0,
+        "last_eight_mean_total_loss": 1.0,
+    }
+    smoke = _bound_staged(smoke_payload)
+    assert (
+        receipts_module._validate_short_smoke_provenance(
+            smoke,
+            arm="H-HEAD",
+            manifest_sha256="m" * 64,
+            class_weight_receipt=class_weights,
+            runtime_identity=runtime_identity,
+            ta_open_authorization=None,
+        )
+        == smoke_payload
+    )
+
+    mutations = {
+        "class_weight_receipt_sha256": "w" * 64,
+        "runtime_identity": {**runtime_identity, "checkpoint_sha256": "r" * 64},
+        "base_checkpoint_sha256": "b" * 64,
+        "dependency_lock_sha256": "l" * 64,
+    }
+    for field, value in mutations.items():
+        forged_payload = {**smoke_payload, field: value}
+        forged = _bound_staged(forged_payload)
+        with pytest.raises(Exception, match="short smoke metrics"):
+            receipts_module._validate_short_smoke_provenance(
+                forged,
+                arm="H-HEAD",
+                manifest_sha256="m" * 64,
+                class_weight_receipt=class_weights,
+                runtime_identity=runtime_identity,
+                ta_open_authorization=None,
+            )
+
+
+def test_material_gate_ta_authorization_replays_exact_staged_dev_context(monkeypatch) -> None:
+    monkeypatch.setattr(
+        protocol_module,
+        "validate_staged_execution_state",
+        lambda state, _results: dict(state),
+    )
+    monkeypatch.setattr(protocol_module, "validate_dev_result", lambda value: dict(value))
+    monkeypatch.setattr(
+        protocol_module,
+        "validate_operator_dev_decision",
+        lambda value: dict(value),
+    )
+    results = [
+        _bound_staged(
+            {
+                "artifact_role": "psem_sortformer_dev_result",
+                "arm": arm,
+                "seed": seed,
+            }
+        )
+        for arm, seed in (
+            ("F0-FROZEN-FLOAT", None),
+            ("H-HEAD", 7301),
+            ("T2-TOP", 7301),
+        )
+    ]
+    result_sha256s = {
+        f"{result['arm']}:{result.get('seed')}": result["payload_sha256"] for result in results
+    }
+    staged = _bound_staged(
+        {
+            "schema_version": 1,
+            "artifact_role": "staged_execution_state",
+            "completed_runs": [
+                {"arm": result["arm"], "seed": result.get("seed")} for result in results
+            ],
+            "eval_open_count": 0,
+            "eval_used_for_development": False,
+        }
+    )
+    decision = _bound_staged(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_operator_dev_decision",
+            "decision": "open_ta",
+            "selected_arm": "TA-ALL-TEMPORAL",
+            "rationale": "Run the optional arm.",
+            "available_dev_result_sha256s": result_sha256s,
+            "eval_open_count": 0,
+        }
+    )
+    cost = execution_module.build_cost_receipt(
+        hourly_price_usd=1.0,
+        hourly_price_source="operator quote",
+        actual_gpu_seconds=1.0,
+        projected_remaining_gpu_seconds=1.0,
+        command="open-ta",
+    )
+    authorization_payload = {
+        "schema_version": 1,
+        "artifact_role": "psem_sortformer_open_ta_authorization",
+        "operator_decision_sha256": decision["payload_sha256"],
+        "operator_decision": decision,
+        "staged_execution_receipt_sha256": staged["payload_sha256"],
+        "staged_dev_result_sha256s": result_sha256s,
+        "cost_receipt_sha256": cost["payload_sha256"],
+        "arm": "TA-ALL-TEMPORAL",
+        "seed": 7301,
+    }
+    authorization = _bound_staged(authorization_payload)
+    assert (
+        receipts_module._validate_ta_authorization_provenance(
+            authorization,
+            cost_receipt=cost,
+            staged_execution_receipt=staged,
+            staged_dev_results=results,
+        )
+        == authorization_payload
+    )
+
+    forged = _bound_staged(
+        {
+            **authorization_payload,
+            "staged_dev_result_sha256s": {
+                **result_sha256s,
+                "T2-TOP:7301": "f" * 64,
+            },
+        }
+    )
+    with pytest.raises(Exception, match="staged DEV evidence"):
+        receipts_module._validate_ta_authorization_provenance(
+            forged,
+            cost_receipt=cost,
+            staged_execution_receipt=staged,
+            staged_dev_results=results,
+        )

@@ -401,8 +401,13 @@ def test_eval_open_is_global_to_the_authority_registry(tmp_path, monkeypatch) ->
     assert first["protocol_registry_root"] == str(registry.resolve())
 
 
-def test_ta_requires_an_explicit_operator_decision_and_cost_receipt(monkeypatch) -> None:
+def test_ta_requires_exact_staged_dev_evidence_and_cost_receipt(monkeypatch) -> None:
     monkeypatch.setattr(protocol_module, "validate_dev_result", lambda value: dict(value))
+    monkeypatch.setattr(
+        protocol_module,
+        "validate_staged_execution_state",
+        lambda state, _results: dict(state),
+    )
     results = {
         "f0": bind_payload(
             {"artifact_role": "psem_sortformer_dev_result", "arm": "F0-FROZEN-FLOAT", "seed": None}
@@ -414,6 +419,19 @@ def test_ta_requires_an_explicit_operator_decision_and_cost_receipt(monkeypatch)
             {"artifact_role": "psem_sortformer_dev_result", "arm": "T2-TOP", "seed": 7301}
         ),
     }
+    staged = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "staged_execution_state",
+            "completed_runs": [
+                {"arm": "F0-FROZEN-FLOAT", "seed": None},
+                {"arm": "H-HEAD", "seed": 7301},
+                {"arm": "T2-TOP", "seed": 7301},
+            ],
+            "eval_open_count": 0,
+            "eval_used_for_development": False,
+        }
+    )
     cost = build_cost_receipt(
         hourly_price_usd=1.0,
         hourly_price_source="operator quote",
@@ -427,9 +445,35 @@ def test_ta_requires_an_explicit_operator_decision_and_cost_receipt(monkeypatch)
         rationale="The trusted operator elects to run the optional arm.",
         available_dev_results=results,
     )
-    authorization = open_ta(decision, cost_receipt=cost)
+    staged_results = [results["f0"], results["head"], results["top"]]
+    authorization = open_ta(
+        decision,
+        cost_receipt=cost,
+        staged_execution_receipt=staged,
+        staged_dev_results=staged_results,
+    )
     assert authorization["arm"] == "TA-ALL-TEMPORAL"
     assert authorization["seed"] == 7301
+    assert authorization["operator_decision"] == decision
+    assert authorization["staged_execution_receipt_sha256"] == staged["payload_sha256"]
+    assert authorization["staged_dev_result_sha256s"] == decision["available_dev_result_sha256s"]
+
+    substituted_top = bind_payload(
+        {
+            "artifact_role": "psem_sortformer_dev_result",
+            "arm": "T2-TOP",
+            "seed": 7301,
+            "substitution": True,
+        }
+    )
+    with pytest.raises(Exception, match="exact staged F0/H/T2 DEV state"):
+        open_ta(
+            decision,
+            cost_receipt=cost,
+            staged_execution_receipt=staged,
+            staged_dev_results=[results["f0"], results["head"], substituted_top],
+        )
+
     selected = build_operator_dev_decision(
         decision="select_candidate",
         selected_arm="T2-TOP",
@@ -437,7 +481,12 @@ def test_ta_requires_an_explicit_operator_decision_and_cost_receipt(monkeypatch)
         available_dev_results=results,
     )
     with pytest.raises(Exception, match="explicit open_ta decision"):
-        open_ta(selected, cost_receipt=cost)
+        open_ta(
+            selected,
+            cost_receipt=cost,
+            staged_execution_receipt=staged,
+            staged_dev_results=staged_results,
+        )
 
 
 def test_eval_authorization_rejects_top_level_candidate_substitution(tmp_path, monkeypatch) -> None:

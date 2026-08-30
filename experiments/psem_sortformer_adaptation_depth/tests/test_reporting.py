@@ -68,6 +68,7 @@ def _authorization(candidate_set: list[dict]) -> dict:
             "artifact_role": "psem_sortformer_eval_open_authorization",
             "candidate_set": candidate_set,
             "candidate_freeze": {"operator_dev_decision": decision},
+            "candidate_code_identity_sha256": "c" * 64,
             "evaluation_roles": [EVAL_ROLE],
             "eval_open_count": 1,
             "eval_used_for_development": False,
@@ -75,29 +76,67 @@ def _authorization(candidate_set: list[dict]) -> dict:
     )
 
 
+def _selected_candidate_and_training(arm: str) -> tuple[dict, dict]:
+    summary = {
+        "training_wall_clock_seconds": 1.0,
+        "peak_training_memory_bytes": 1,
+        "total_parameters": 10,
+        "trainable_parameters": 2,
+    }
+    training = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_training_result",
+            "arm": arm,
+            "seed": 7301,
+            "checkpoint_sha256": "d" * 64,
+            "candidate_code_identity_sha256": "c" * 64,
+            "training_summary": summary,
+        }
+    )
+    return (
+        {
+            "arm": arm,
+            "seed": 7301,
+            "training_result_sha256": training["payload_sha256"],
+            "checkpoint_sha256": "d" * 64,
+            "checkpoint_receipt_sha256": "e" * 64,
+            "training_summary": summary,
+        },
+        training,
+    )
+
+
 def test_final_reporting_emits_singleton_f0_plus_winner_engineering_artifacts(
     monkeypatch,
 ) -> None:
+    selected_candidate, training = _selected_candidate_and_training("T2-TOP")
     candidates = [
         {"arm": "F0-FROZEN-FLOAT", "seed": None},
-        {"arm": "T2-TOP", "seed": 7301},
+        selected_candidate,
     ]
     authorization = _authorization(candidates)
     results = [
         _singleton_result("F0-FROZEN-FLOAT", None, 10.0),
         _singleton_result("T2-TOP", 7301, 6.0),
     ]
+    registered = []
     monkeypatch.setattr(reporting_module, "validate_eval_authorization", lambda value: value)
     monkeypatch.setattr(
         reporting_module,
         "_candidate_results",
         lambda *_args: results,
     )
+    monkeypatch.setattr(
+        reporting_module,
+        "require_registered_execution",
+        lambda kind, value: registered.append((kind, value)),
+    )
     artifacts, markdown = build_final_artifacts(
         eval_authorization=authorization,
         eval_results=[],
         eval_prediction_sets=[],
-        training_results=[{"arm": "T2-TOP", "seed": 7301}],
+        training_results=[training],
     )
     assert artifacts["singleton_metrics.json"]["operating_point"] == {
         "threshold": 0.5,
@@ -107,6 +146,8 @@ def test_final_reporting_emits_singleton_f0_plus_winner_engineering_artifacts(
         "F0-FROZEN-FLOAT:None",
         "T2-TOP:7301",
     }
+    assert artifacts["timing_and_compute.json"]["training_results"] == [training]
+    assert registered == [("training-result", training)]
     decision = artifacts["decision_receipt.json"]
     assert decision["selected_arm"] == "T2-TOP"
     assert decision["significance_claim"] is False
@@ -219,3 +260,38 @@ def test_public_dev_evaluation_is_sealed_after_eval_but_historical_replay_is_pur
     )
     with pytest.raises(RuntimeError, match="historical replay reached"):
         evaluation_module.evaluate_prediction_set({}, historical_replay=True)
+
+
+def test_final_reporting_rejects_missing_or_substituted_training_result(monkeypatch) -> None:
+    selected_candidate, training = _selected_candidate_and_training("T2-TOP")
+    authorization = _authorization(
+        [
+            {"arm": "F0-FROZEN-FLOAT", "seed": None},
+            selected_candidate,
+        ]
+    )
+    results = [
+        _singleton_result("F0-FROZEN-FLOAT", None, 10.0),
+        _singleton_result("T2-TOP", 7301, 6.0),
+    ]
+    monkeypatch.setattr(reporting_module, "validate_eval_authorization", lambda value: value)
+    monkeypatch.setattr(reporting_module, "_candidate_results", lambda *_args: results)
+
+    with pytest.raises(Exception, match="selected training result"):
+        build_final_artifacts(
+            eval_authorization=authorization,
+            eval_results=[],
+            eval_prediction_sets=[],
+            training_results=[],
+        )
+
+    substituted_payload = {key: value for key, value in training.items() if key != "payload_sha256"}
+    substituted_payload["candidate_code_identity_sha256"] = "f" * 64
+    substituted = bind_payload(substituted_payload)
+    with pytest.raises(Exception, match="selected training result"):
+        build_final_artifacts(
+            eval_authorization=authorization,
+            eval_results=[],
+            eval_prediction_sets=[],
+            training_results=[substituted],
+        )

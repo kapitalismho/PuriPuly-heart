@@ -235,6 +235,8 @@ def main(argv: list[str] | None = None) -> int:
     ta_open = commands.add_parser("open-ta")
     ta_open.add_argument("decision", type=Path)
     ta_open.add_argument("cost_receipt", type=Path)
+    ta_open.add_argument("staged_execution_receipt", type=Path)
+    ta_open.add_argument("--dev-result", type=Path, action="append", required=True)
     ta_open.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     if args.command == "cost-receipt":
@@ -264,7 +266,12 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
         return 0
     if args.command == "open-ta":
-        receipt = open_ta(_load_json(args.decision), cost_receipt=_load_json(args.cost_receipt))
+        receipt = open_ta(
+            _load_json(args.decision),
+            cost_receipt=_load_json(args.cost_receipt),
+            staged_execution_receipt=_load_json(args.staged_execution_receipt),
+            staged_dev_results=[_load_json(path) for path in args.dev_result],
+        )
         write_json(args.output, receipt)
         print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
         return 0

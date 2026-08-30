@@ -1624,20 +1624,21 @@ def run_smoke_arm(
         )
         for row in first_rows
     ]
+    from experiments.psem_sortformer_adaptation_depth.training import (
+        build_manifest_class_weight_receipt,
+    )
+
+    expected_class_weights = build_manifest_class_weight_receipt(rows, sessions, sampling_manifest)
+    if class_weight_receipt != expected_class_weights:
+        raise ExecutionError("smoke class weights differ from the one-epoch manifest")
     model, runtime_identity = load_pinned_sortformer(
         checkpoint_path, nemo_checkout, dependency_lock, device
     )
+    if runtime_identity.get("checkpoint_sha256") != CHECKPOINT_SHA256 or runtime_identity.get(
+        "dependency_lock_sha256"
+    ) != runtime_identity.get("dependency_lock", {}).get("sha256"):
+        raise ExecutionError("smoke runtime identity differs from the pinned runtime")
     parameter_policy = apply_parameter_policy(model, arm)
-    weight_payload = {
-        key: value for key, value in class_weight_receipt.items() if key != "payload_sha256"
-    }
-    if (
-        class_weight_receipt.get("payload_sha256") != canonical_sha256(weight_payload)
-        or class_weight_receipt.get("artifact_role") != "train_class_weight_receipt"
-        or class_weight_receipt.get("sampling_manifest_sha256") != sha256_file(sampling_manifest)
-        or class_weight_receipt.get("row_count") != 4096
-    ):
-        raise ExecutionError("smoke class weights differ from the one-epoch manifest")
     class_weights = ClassWeights(
         replacement_positive=float(class_weight_receipt["replacement_positive_weight"]),
         anchor_positive=float(class_weight_receipt["anchor_positive_weight"]),
@@ -1653,9 +1654,12 @@ def run_smoke_arm(
     payload = {
         **result,
         "sampling_manifest_sha256": sha256_file(sampling_manifest),
+        "class_weight_receipt_sha256": class_weight_receipt["payload_sha256"],
         "parameter_policy_sha256": canonical_sha256(parameter_policy),
         "runtime_identity_sha256": canonical_sha256(runtime_identity),
         "runtime_identity": runtime_identity,
+        "base_checkpoint_sha256": runtime_identity["checkpoint_sha256"],
+        "dependency_lock_sha256": runtime_identity["dependency_lock_sha256"],
         "weights_discarded": True,
         "ta_open_authorization_sha256": (
             ta_open_authorization.get("payload_sha256")

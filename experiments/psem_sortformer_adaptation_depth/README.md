@@ -123,7 +123,7 @@ short_training_metrics.json
 dev_primary_metrics.json
 eval_primary_metrics.json
 cost_receipt.json
-LEAN_ADAPTATION_DECISION.md
+ADAPTATION_DECISION.md
 ```
 
 ## Sequential operator flow

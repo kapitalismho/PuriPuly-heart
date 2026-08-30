@@ -1684,6 +1684,111 @@ def _require_bound_mapping(value: Mapping[str, Any], role: str) -> dict[str, Any
     return _bound_payload(value, role)
 
 
+def _validate_short_smoke_provenance(
+    short_smoke_receipt: Mapping[str, Any],
+    *,
+    arm: str,
+    manifest_sha256: str,
+    class_weight_receipt: Mapping[str, Any],
+    runtime_identity: Mapping[str, Any],
+    ta_open_authorization: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    payload = _bound_payload(short_smoke_receipt, "short_smoke_metrics")
+    if (
+        payload.get("arm") != arm
+        or payload.get("seed") != 7301
+        or payload.get("sampling_manifest_sha256") != manifest_sha256
+        or payload.get("class_weight_receipt_sha256") != class_weight_receipt.get("payload_sha256")
+        or payload.get("runtime_identity") != runtime_identity
+        or payload.get("runtime_identity_sha256") != canonical_sha256(runtime_identity)
+        or payload.get("base_checkpoint_sha256") != runtime_identity.get("checkpoint_sha256")
+        or payload.get("dependency_lock_sha256") != runtime_identity.get("dependency_lock_sha256")
+        or payload.get("optimizer_steps") != 32
+        or payload.get("consumed_row_count") != 512
+        or payload.get("finite_forward_backward_update") is not True
+        or payload.get("frozen_parameters_unchanged") is not True
+        or payload.get("weights_discarded") is not True
+        or payload.get("ta_open_authorization_sha256")
+        != (
+            ta_open_authorization.get("payload_sha256")
+            if ta_open_authorization is not None
+            else None
+        )
+        or not _finite_number(payload.get("first_eight_mean_total_loss"))
+        or not _finite_number(payload.get("last_eight_mean_total_loss"))
+        or float(payload["last_eight_mean_total_loss"])
+        >= float(payload["first_eight_mean_total_loss"])
+    ):
+        raise ReceiptContractError("short smoke metrics do not pass the lean gate")
+    return payload
+
+
+def _validate_ta_authorization_provenance(
+    ta_open_authorization: Mapping[str, Any],
+    *,
+    cost_receipt: Mapping[str, Any],
+    staged_execution_receipt: Mapping[str, Any],
+    staged_dev_results: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    from experiments.psem_sortformer_adaptation_depth.protocol import (
+        validate_dev_result,
+        validate_operator_dev_decision,
+        validate_staged_execution_state,
+    )
+
+    validate_staged_execution_state(staged_execution_receipt, staged_dev_results)
+    staged_payload = _bound_payload(staged_execution_receipt, "staged_execution_state")
+    validated_results = [validate_dev_result(value) for value in staged_dev_results]
+    result_sha256s = dict(
+        sorted(
+            (
+                f"{result['arm']}:{result.get('seed')}",
+                result["payload_sha256"],
+            )
+            for result in validated_results
+        )
+    )
+    expected_runs = [
+        ("F0-FROZEN-FLOAT", None),
+        ("H-HEAD", 7301),
+        ("T2-TOP", 7301),
+    ]
+    payload = _bound_payload(ta_open_authorization, "psem_sortformer_open_ta_authorization")
+    decision = payload.get("operator_decision")
+    validated_decision = (
+        validate_operator_dev_decision(decision) if isinstance(decision, Mapping) else None
+    )
+    decision_payload = (
+        _bound_payload(validated_decision, "psem_sortformer_operator_dev_decision")
+        if isinstance(validated_decision, Mapping)
+        else None
+    )
+    if (
+        decision_payload is None
+        or [(row.get("arm"), row.get("seed")) for row in staged_payload.get("completed_runs", [])]
+        != expected_runs
+        or [(result.get("arm"), result.get("seed")) for result in validated_results]
+        != expected_runs
+        or staged_payload.get("eval_open_count") != 0
+        or staged_payload.get("eval_used_for_development") is not False
+        or payload.get("arm") != "TA-ALL-TEMPORAL"
+        or payload.get("seed") != 7301
+        or payload.get("cost_receipt_sha256") != cost_receipt.get("payload_sha256")
+        or payload.get("operator_decision") != validated_decision
+        or payload.get("operator_decision_sha256") != validated_decision.get("payload_sha256")
+        or payload.get("staged_execution_receipt_sha256")
+        != staged_execution_receipt.get("payload_sha256")
+        or payload.get("staged_dev_result_sha256s") != result_sha256s
+        or decision_payload.get("decision") != "open_ta"
+        or decision_payload.get("selected_arm") != "TA-ALL-TEMPORAL"
+        or decision_payload.get("available_dev_result_sha256s") != result_sha256s
+    ):
+        raise ReceiptContractError(
+            "TA authorization differs from the current cost or staged DEV evidence"
+        )
+    return payload
+
+
 def validate_material_training_gate(
     *,
     arm: str,
@@ -1819,35 +1924,23 @@ def validate_material_training_gate(
         ("short-smoke", short_smoke_receipt),
     ):
         require_registered_execution(kind, receipt)
-    smoke_payload = _bound_payload(short_smoke_receipt, "short_smoke_metrics")
-    if (
-        smoke_payload.get("arm") != arm
-        or smoke_payload.get("seed") != 7301
-        or smoke_payload.get("sampling_manifest_sha256") != manifest_sha
-        or smoke_payload.get("optimizer_steps") != 32
-        or smoke_payload.get("consumed_row_count") != 512
-        or smoke_payload.get("finite_forward_backward_update") is not True
-        or smoke_payload.get("frozen_parameters_unchanged") is not True
-        or smoke_payload.get("weights_discarded") is not True
-        or smoke_payload.get("ta_open_authorization_sha256")
-        != (
-            ta_open_authorization.get("payload_sha256")
-            if ta_open_authorization is not None
-            else None
-        )
-        or not _finite_number(smoke_payload.get("first_eight_mean_total_loss"))
-        or not _finite_number(smoke_payload.get("last_eight_mean_total_loss"))
-        or float(smoke_payload["last_eight_mean_total_loss"])
-        >= float(smoke_payload["first_eight_mean_total_loss"])
-    ):
-        raise ReceiptContractError("short smoke metrics do not pass the lean gate")
+    _validate_short_smoke_provenance(
+        short_smoke_receipt,
+        arm=arm,
+        manifest_sha256=manifest_sha,
+        class_weight_receipt=class_weight_receipt,
+        runtime_identity=runtime_identity,
+        ta_open_authorization=ta_open_authorization,
+    )
     validate_cost_receipt(cost_receipt)
     from experiments.psem_sortformer_adaptation_depth.protocol import (
+        validate_dev_result,
         validate_staged_execution_state,
     )
 
     validate_staged_execution_state(staged_execution_receipt, staged_dev_results)
     staged_payload = _bound_payload(staged_execution_receipt, "staged_execution_state")
+    validated_staged_results = [validate_dev_result(value) for value in staged_dev_results]
     completed_ids = [
         (row.get("arm"), row.get("seed")) for row in staged_payload.get("completed_runs", [])
     ]
@@ -1862,6 +1955,8 @@ def validate_material_training_gate(
     }[arm]
     if (
         completed_ids != expected_completed
+        or [(value.get("arm"), value.get("seed")) for value in validated_staged_results]
+        != expected_completed
         or staged_payload.get("eval_open_count") != 0
         or staged_payload.get("eval_used_for_development") is not False
     ):
@@ -1869,13 +1964,12 @@ def validate_material_training_gate(
     if arm == "TA-ALL-TEMPORAL":
         if not isinstance(ta_open_authorization, Mapping):
             raise ReceiptContractError("TA training requires an explicit open_ta authorization")
-        ta_payload = _bound_payload(ta_open_authorization, "psem_sortformer_open_ta_authorization")
-        if (
-            ta_payload.get("arm") != arm
-            or ta_payload.get("seed") != 7301
-            or ta_payload.get("cost_receipt_sha256") != cost_receipt.get("payload_sha256")
-        ):
-            raise ReceiptContractError("TA authorization differs from the current cost receipt")
+        _validate_ta_authorization_provenance(
+            ta_open_authorization,
+            cost_receipt=cost_receipt,
+            staged_execution_receipt=staged_execution_receipt,
+            staged_dev_results=staged_dev_results,
+        )
     elif ta_open_authorization is not None:
         raise ReceiptContractError("non-TA training cannot carry a TA authorization")
     observed_paths = {
