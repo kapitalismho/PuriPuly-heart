@@ -358,6 +358,17 @@ def test_public_freeze_to_final_report_preserves_selected_training_summary(
             "artifact_role": "psem_sortformer_prediction_set",
             "arm": "F0-FROZEN-FLOAT",
             "seed": None,
+            "experiment_output_root": str(output),
+            "protocol_registry_root": str(registry),
+        }
+    )
+    head_prediction = bind_payload(
+        {
+            "artifact_role": "psem_sortformer_prediction_set",
+            "arm": "H-HEAD",
+            "seed": 7301,
+            "experiment_output_root": str(output),
+            "protocol_registry_root": str(registry),
         }
     )
     selected_prediction = bind_payload(
@@ -367,6 +378,8 @@ def test_public_freeze_to_final_report_preserves_selected_training_summary(
             "seed": 7301,
             "trained_checkpoint_sha256": checkpoint["checkpoint_sha256"],
             "trained_checkpoint_receipt_sha256": checkpoint["payload_sha256"],
+            "experiment_output_root": str(output),
+            "protocol_registry_root": str(registry),
         }
     )
     frozen_result = bind_payload(
@@ -374,6 +387,7 @@ def test_public_freeze_to_final_report_preserves_selected_training_summary(
             "artifact_role": "psem_sortformer_dev_result",
             "arm": "F0-FROZEN-FLOAT",
             "seed": None,
+            "dev_evidence_sha256": "1" * 64,
             "prediction_set": frozen_prediction,
             "prediction_set_sha256": frozen_prediction["payload_sha256"],
         }
@@ -383,6 +397,9 @@ def test_public_freeze_to_final_report_preserves_selected_training_summary(
             "artifact_role": "psem_sortformer_dev_result",
             "arm": "H-HEAD",
             "seed": 7301,
+            "dev_evidence_sha256": "2" * 64,
+            "prediction_set": head_prediction,
+            "prediction_set_sha256": head_prediction["payload_sha256"],
         }
     )
     selected_result = bind_payload(
@@ -390,6 +407,7 @@ def test_public_freeze_to_final_report_preserves_selected_training_summary(
             "artifact_role": "psem_sortformer_dev_result",
             "arm": "T2-TOP",
             "seed": 7301,
+            "dev_evidence_sha256": "3" * 64,
             "prediction_set": selected_prediction,
             "prediction_set_sha256": selected_prediction["payload_sha256"],
         }
@@ -409,15 +427,12 @@ def test_public_freeze_to_final_report_preserves_selected_training_summary(
             "eval_open_count": 0,
         }
     )
-    state = bind_payload(
-        {
-            "schema_version": 1,
-            "artifact_role": "staged_execution_state",
-            "experiment_output_root": str(output),
-            "protocol_registry_root": str(registry),
-            "eval_open_count": 0,
-            "eval_used_for_development": False,
-        }
+    state = protocol_module.initial_staged_state(frozen_result)
+    state = protocol_module.append_dev_result(state, head_result, [frozen_result])
+    state = protocol_module.append_dev_result(
+        state,
+        selected_result,
+        [frozen_result, head_result],
     )
     cost = build_cost_receipt(
         hourly_price_usd=1.0,
@@ -426,18 +441,33 @@ def test_public_freeze_to_final_report_preserves_selected_training_summary(
         projected_remaining_gpu_seconds=1.0,
         command="freeze-candidates",
     )
+    checkpoint_receipts = {"T2-TOP": checkpoint}
+    prediction_sets = {
+        "F0-FROZEN-FLOAT": frozen_prediction,
+        "T2-TOP": selected_prediction,
+    }
     candidate_freeze = protocol_module.freeze_candidate_set(
         state,
         dev_results,
-        {"T2-TOP": checkpoint},
-        {
-            "F0-FROZEN-FLOAT": frozen_prediction,
-            "T2-TOP": selected_prediction,
-        },
+        checkpoint_receipts,
+        prediction_sets,
         code_identity,
         operator_decision=decision,
         cost_receipt=cost,
     )
+    stale_payload = {key: value for key, value in state.items() if key != "payload_sha256"}
+    stale_payload["completed_runs"] = stale_payload["completed_runs"][:-1]
+    stale_state = bind_payload(stale_payload)
+    with pytest.raises(Exception, match="exact DEV evidence replay"):
+        protocol_module.freeze_candidate_set(
+            stale_state,
+            dev_results,
+            checkpoint_receipts,
+            prediction_sets,
+            code_identity,
+            operator_decision=decision,
+            cost_receipt=cost,
+        )
     authorization = protocol_module.open_eval_once(candidate_freeze, str(output))
     assert authorization["candidate_set"][1]["training_summary"] == summary
 

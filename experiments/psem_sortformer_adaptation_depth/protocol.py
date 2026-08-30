@@ -1252,7 +1252,8 @@ def freeze_candidate_set(
     operator_decision: Mapping[str, Any] | None = None,
     cost_receipt: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    state_payload = require_bound(state, "staged_execution_state")
+    validated_state = validate_staged_execution_state(state, results)
+    state_payload = require_bound(validated_state, "staged_execution_state")
     decision_value = operator_decision or state.get("operator_dev_decision")
     cost_value = cost_receipt or state.get("cost_receipt")
     if not isinstance(decision_value, Mapping) or not isinstance(cost_value, Mapping):
