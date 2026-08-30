@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
-from puripuly_heart.config.settings import (
+from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_DEFAULT_HEIGHT,
     DESKTOP_FLET_DEFAULT_SIZE_PRESET,
     DESKTOP_FLET_DEFAULT_WIDTH,

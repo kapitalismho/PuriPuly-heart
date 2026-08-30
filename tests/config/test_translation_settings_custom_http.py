@@ -22,7 +22,7 @@ from puripuly_heart.config.settings_vnext import migration, serialization
 
 def _custom_settings() -> AppSettings:
     settings = AppSettings()
-    settings.telemetry.consent = "allow"
+    settings.telemetry.enabled = True
     settings.telemetry_state.anonymous_id = "custom-translation-test"
     settings.provider.llm = LLMProviderName.QWEN
     settings.qwen.region = QwenRegion.SINGAPORE
@@ -146,8 +146,3 @@ def test_vnext_custom_http_migration_is_idempotent_and_projects_legacy_provider(
     assert projected["translation"]["http_extension_id"] == "libretranslate"
     assert projected["translation"]["previous_llm_model"] == TranslationModel.QWEN_35_PLUS.value
     assert projected["provider"]["llm"] == LLMProviderName.QWEN.value
-
-    legacy_roundtrip = migration.from_dict(to_dict(legacy))
-    assert serialization.to_dict(legacy_roundtrip)["intent"]["translation"]["model"] == (
-        TranslationModel.CUSTOM_HTTP.value
-    )

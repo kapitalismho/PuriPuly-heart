@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import cast
 
 from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory
-from puripuly_heart.config.settings import STTProviderName
+from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,

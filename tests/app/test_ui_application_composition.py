@@ -2,6 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import puripuly_heart.composition.ui_application as composition_module
+from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
@@ -24,7 +25,6 @@ def test_composition_forwards_explicit_options_without_a_flet_page(
     application = composition_module.compose_ui_application(
         presentation=presentation,
         config_path=Path("settings.json"),
-        allow_stable_settings_import=True,
         runtime_logging_sinks=logging_sinks,
         vrchat_osc_presence=presence,
     )
@@ -33,7 +33,6 @@ def test_composition_forwards_explicit_options_without_a_flet_page(
     assert captured == {
         "presentation": presentation,
         "config_path": Path("settings.json"),
-        "allow_stable_settings_import": True,
         "runtime_logging_sinks": logging_sinks,
         "vrchat_osc_presence": presence,
     }
@@ -51,3 +50,4 @@ def test_real_composition_returns_the_application_boundary(tmp_path: Path) -> No
     )
 
     assert isinstance(application, UiApplicationBoundary)
+    assert isinstance(application.settings_secrets(), SettingsSecretsOwner)

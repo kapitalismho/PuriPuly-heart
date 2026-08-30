@@ -4,6 +4,7 @@ import app from '../src/index';
 import {
   checkEndpointRateLimit,
   getBrokerAbuseControlsConfig,
+  getBrokerAbuseRuntimeState,
 } from '../src/abuse-controls';
 import {
   TEST_DEFAULT_ABUSE_CONTROLS,
@@ -152,19 +153,12 @@ describe('broker abuse-controls runtime config validation', () => {
     expect(blockedResponse.status).toBe(429);
   });
 
-  it('seeds the approved immediate alert and ASN fast-path defaults', () => {
+  it('seeds the approved warning and automatic-brake defaults', () => {
     const env = createTestBrokerEnv();
 
     expect(readAbuseControls(env).immediateAlerts).toEqual({
-      warn1: 10,
-      warn2: 25,
-      warn3: 50,
-      critical: 70,
-    });
-    expect(readAbuseControls(env).asnFastPath).toEqual({
-      enabled: true,
-      minIssueSuccess1h: 20,
-      minTopAsnSharePct: 70,
+      warning: 10,
+      brake: 70,
     });
   });
 
@@ -297,13 +291,24 @@ describe('broker abuse-controls runtime config validation', () => {
     });
   });
 
-  it('falls back to default abuse controls when immediate-alert thresholds are not strictly increasing', async () => {
+  it('normalizes issue-success retention to the completed-day report minimum', async () => {
     const env = createTestBrokerEnv();
     updateAbuseControls(env, (controls) => {
-      controls.immediateAlerts.warn1 = 10;
-      controls.immediateAlerts.warn2 = 25;
-      controls.immediateAlerts.warn3 = 20;
-      controls.immediateAlerts.critical = 70;
+      controls.trialChallenge.maxRequests = 17;
+      controls.retention.issueSuccessDays = 1;
+    });
+
+    const controls = await getBrokerAbuseControlsConfig(env.BROKER_DB);
+
+    expect(controls.trialChallenge.maxRequests).toBe(17);
+    expect(controls.retention.issueSuccessDays).toBe(2);
+  });
+
+  it('falls back to default abuse controls when warning is not below brake', async () => {
+    const env = createTestBrokerEnv();
+    updateAbuseControls(env, (controls) => {
+      controls.immediateAlerts.warning = 70;
+      controls.immediateAlerts.brake = 70;
     });
 
     await expect(getBrokerAbuseControlsConfig(env.BROKER_DB)).resolves.toEqual(
@@ -321,8 +326,7 @@ describe('broker abuse-controls runtime config validation', () => {
       state.brake.reason = 'manual';
       state.brake.changedAt = '2026-04-08T06:05:00Z';
       state.brake.changedBy = 'operator';
-      state.alertLatches.warn1 = true;
-      state.alertLatches.warn3 = true;
+      state.alertLatches.warning = true;
       state.dailyReport.lastDeliveredAt = '2026-04-08T06:10:00Z';
       state.dailyReport.lastDeliveredDateUtc = '2026-04-08';
     });
@@ -335,15 +339,44 @@ describe('broker abuse-controls runtime config validation', () => {
         changedBy: 'operator',
       },
       alertLatches: {
-        warn1: true,
-        warn2: false,
-        warn3: true,
-        critical: false,
+        warning: true,
+        warningObservedAt: null,
       },
       dailyReport: {
         lastDeliveredAt: '2026-04-08T06:10:00Z',
         lastDeliveredDateUtc: '2026-04-08',
       },
+    });
+  });
+
+  it('preserves an active brake when a previous Worker replaces the warning latch object', async () => {
+    const env = createTestBrokerEnv();
+    env.__db
+      .prepare("UPDATE broker_config SET value = ? WHERE key = 'abuse_runtime_state'")
+      .run(
+        JSON.stringify({
+          brake: {
+            active: true,
+            reason: 'global_threshold',
+            changedAt: '2026-04-08T06:05:00.000Z',
+            changedBy: 'system',
+          },
+          alertLatches: {
+            warn1: true,
+            warn2: false,
+            warn3: false,
+            critical: false,
+          },
+          dailyReport: {
+            lastDeliveredAt: null,
+            lastDeliveredDateUtc: null,
+          },
+        }),
+      );
+
+    await expect(getBrokerAbuseRuntimeState(env.BROKER_DB)).resolves.toMatchObject({
+      brake: { active: true, reason: 'global_threshold' },
+      alertLatches: { warning: true, warningObservedAt: null },
     });
   });
 });

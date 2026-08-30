@@ -1,9 +1,7 @@
-import type { BrokerAsnKind } from './abuse-controls';
-import type { TelemetryUsageDailyMetrics } from './telemetry';
+import type { AppUsageDailyMetrics } from './telemetry';
 
 const DAILY_HEARTBEAT_COLOR_OK = 0x5865f2;
 const DAILY_HEARTBEAT_COLOR_ACTIVE = 0xfee75c;
-const DAILY_HEARTBEAT_COLOR_BRAKED = 0xed4245;
 const DISCORD_EMBED_DESCRIPTION_LIMIT = 4096;
 
 interface DiscordJsonCodeBlockInput {
@@ -27,26 +25,14 @@ export interface DiscordEmbedInput {
 }
 
 export interface DailyReportPayload {
-  schema_version: 'broker_daily_heartbeat.v1';
-  generated_at: string;
-  window_start_24h: string;
-  window_end_24h: string;
-  summary: {
-    challenge_24h: number;
-    verify_24h: number;
-    issue_success_24h: number;
-    highest_alert_level_24h: 'warn1' | 'warn2' | 'warn3' | 'critical' | null;
-    brake_triggered_24h: boolean;
-    top_asns: Array<{
-      asn: number;
-      count: number;
-      share: number;
-      kind: BrokerAsnKind;
-      display_name: string | null;
-    }>;
-    cloud_asn_share_24h: number;
-    manual_revocations_24h: number;
-    translation_usage: TelemetryUsageDailyMetrics;
+  schema_version: 'puripuly_daily_summary.v2';
+  report_date_utc: string;
+  window_start: string;
+  window_end: string;
+  summary: AppUsageDailyMetrics & {
+    keys_delivered_total: number;
+    keys_delivered_discord: number;
+    keys_delivered_qq: number;
   };
 }
 
@@ -102,83 +88,38 @@ export async function sendDailyReport(
   packet: DailyReportPayload,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
-  const topAsnSummary =
-    packet.summary.top_asns.length === 0
-      ? 'none observed'
-      : packet.summary.top_asns
-          .map((entry) => {
-            const displayName = entry.display_name
-              ? ` (${entry.display_name})`
-              : '';
-            return `AS${entry.asn}${displayName}: ${entry.count} (${entry.share}%)`;
-          })
-          .join('\n');
-  const translationUsage = packet.summary.translation_usage;
-  const retentionSummary = [
-    `D1=${formatRetentionSignal(translationUsage.retention.d1)}`,
-    `D7=${formatRetentionSignal(translationUsage.retention.d7)}`,
-    `D30=${formatRetentionSignal(translationUsage.retention.d30)}`,
-  ].join('\n');
+  const summary = packet.summary;
 
   await sendDiscordEmbed(
     webhookUrl,
     {
-      title: 'Broker daily heartbeat',
+      title: `PuriPuly daily summary — ${packet.report_date_utc} UTC`,
       color: resolveDailyHeartbeatColor(packet),
-      description: 'Daily operator heartbeat for broker abuse monitoring.',
+      description: `${packet.window_start} ≤ observed_at < ${packet.window_end}`,
       content: ['```json', JSON.stringify(packet), '```'].join('\n'),
       fields: [
         {
-          name: '24h request counts',
+          name: 'Managed key issuance',
           value: [
-            `challenge=${packet.summary.challenge_24h}`,
-            `verify=${packet.summary.verify_24h}`,
-            `issue_success=${packet.summary.issue_success_24h}`,
+            `keys_delivered=${summary.keys_delivered_total}`,
+            `discord=${summary.keys_delivered_discord}`,
+            `qq=${summary.keys_delivered_qq}`,
           ].join('\n'),
           inline: true,
         },
         {
-          name: 'Alert + brake',
+          name: 'App usage',
           value: [
-            `highest_alert=${packet.summary.highest_alert_level_24h ?? 'none'}`,
-            `brake_triggered=${packet.summary.brake_triggered_24h}`,
-            `manual_revocations=${packet.summary.manual_revocations_24h}`,
+            `dau=${summary.app_dau}`,
+            `wau=${summary.app_wau}`,
+            `mau=${summary.app_mau}`,
           ].join('\n'),
           inline: true,
-        },
-        {
-          name: 'ASN concentration',
-          value: [
-            `cloud_asn_share_24h=${packet.summary.cloud_asn_share_24h}%`,
-            topAsnSummary,
-          ].join('\n'),
-        },
-        {
-          name: 'Translation usage',
-          value: [
-            `active_24h=${translationUsage.active_users_24h}`,
-            `active_7d=${translationUsage.active_users_7d}`,
-            `active_30d=${translationUsage.active_users_30d}`,
-            `dau_mau_stickiness=${formatNullablePct(translationUsage.dau_mau_stickiness_pct)}`,
-            `first_active_24h=${translationUsage.first_active_users_24h}`,
-            `returning_active_24h=${translationUsage.returning_active_users_24h}`,
-            retentionSummary,
-          ].join('\n'),
         },
       ],
     },
     fetchImpl,
   );
-}
-
-function formatRetentionSignal(
-  signal: TelemetryUsageDailyMetrics['retention']['d1'],
-): string {
-  return `${signal.retained_users}/${signal.eligible_users} (${formatNullablePct(signal.retention_pct)}) cohort=${signal.cohort_date_utc}`;
-}
-
-function formatNullablePct(value: number | null): string {
-  return value === null ? 'n/a' : `${value}%`;
 }
 
 function buildDiscordWebhookPayload(input: DiscordEmbedInput): DiscordWebhookPayload {
@@ -255,11 +196,7 @@ function wrapJsonCodeBlock(value: string): string {
 }
 
 function resolveDailyHeartbeatColor(packet: DailyReportPayload): number {
-  if (packet.summary.brake_triggered_24h) {
-    return DAILY_HEARTBEAT_COLOR_BRAKED;
-  }
-
-  if (packet.summary.issue_success_24h > 0) {
+  if (packet.summary.keys_delivered_total > 0) {
     return DAILY_HEARTBEAT_COLOR_ACTIVE;
   }
 

@@ -299,6 +299,7 @@ async def test_google_genai_client_formats_prompt_and_context(
     assert result == "OK"
     assert state["contents"] == "<context>\na -> b\n</context>\n\n<input>\nhello\n</input>"
     assert state["config"].system_instruction == "Translate ko to en."
+    assert state["config"].temperature == 0.6
     assert state["config"].thinking_config.thinking_level == "low"
     assert state["config"].automatic_function_calling.disable is True
     assert (

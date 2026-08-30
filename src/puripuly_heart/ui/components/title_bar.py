@@ -35,14 +35,6 @@ class TitleBar(ft.Container):
             on_hover=self._on_btn_hover,
         )
 
-        self._maximize_btn = ft.Container(
-            content=ft.Icon(ft.Icons.CROP_SQUARE, size=16, color=COLOR_SECONDARY),
-            width=40,
-            height=40,
-            alignment=ft.Alignment.CENTER,
-            disabled=True,
-        )
-
         self._close_btn = ft.Container(
             content=ft.Icon(ft.Icons.CLOSE, size=18, color=COLOR_SECONDARY),
             width=40,
@@ -54,7 +46,7 @@ class TitleBar(ft.Container):
         )
 
         window_controls = ft.Row(
-            [minimize_btn, self._maximize_btn, self._close_btn],
+            [minimize_btn, self._close_btn],
             spacing=0,
         )
 

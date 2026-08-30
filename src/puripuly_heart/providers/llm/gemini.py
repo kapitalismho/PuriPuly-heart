@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 from uuid import UUID
 
-from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
@@ -31,7 +31,7 @@ def _model_entry_matches(entry: object, requested_model: str) -> bool:
 
 def _log_basic_request(
     *,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     text: str,
     source_language: str,
@@ -52,7 +52,7 @@ def _log_basic_request(
 
 
 def _log_basic_response(
-    *, runtime_logging: SessionRuntimeLoggingService | None, operation: str, text: str
+    *, runtime_logging: ProviderObservationPort | None, operation: str, text: str
 ) -> None:
     message = "[Basic][LLM] Gemini response [%s]: %r" % (operation, text)
     if runtime_logging is not None:
@@ -62,7 +62,7 @@ def _log_basic_response(
 
 
 def _log_basic_missing_text(
-    *, runtime_logging: SessionRuntimeLoggingService | None, operation: str
+    *, runtime_logging: ProviderObservationPort | None, operation: str
 ) -> None:
     message = "[Basic][LLM] Gemini response missing text [%s]" % operation
     if runtime_logging is not None:
@@ -89,7 +89,7 @@ class GeminiClient(Protocol):
 class GeminiLLMProvider:
     api_key: str
     model: str = GEMINI_31_FLASH_LITE_GA_MODEL
-    runtime_logging: SessionRuntimeLoggingService | None = None
+    runtime_logging: ProviderObservationPort | None = None
     client: GeminiClient | None = None
     _internal_client: GeminiClient | None = field(init=False, default=None, repr=False)
 
@@ -164,7 +164,7 @@ class GeminiLLMProvider:
 class GoogleGenaiGeminiClient:
     api_key: str
     model: str
-    runtime_logging: SessionRuntimeLoggingService | None = None
+    runtime_logging: ProviderObservationPort | None = None
     _client: Any = field(init=False, default=None, repr=False)
 
     def _get_client(self) -> Any:
@@ -235,6 +235,7 @@ class GoogleGenaiGeminiClient:
             contents=user_message,
             config=types.GenerateContentConfig(
                 system_instruction=formatted_system_prompt,
+                temperature=0.6,
                 thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             ),

@@ -80,7 +80,8 @@ interface IssueSuccessEventRow {
 
 interface ReferralCodeRow {
   referral_id: string;
-  owner_discord_user_ref: string;
+  owner_source: 'discord' | 'qq';
+  owner_subject_ref: string;
   owner_installation_id: string | null;
   status: string;
 }
@@ -135,7 +136,7 @@ describe('Discord issue gate', () => {
     expect(payload.talk_together_pass).toEqual({
       pass_id: payload.referral_id,
       invite_count: 0,
-      invite_limit: 5,
+      invite_limit: 3,
       bonus_translations_per_friend: 200,
     });
     const serializedTalkTogetherPass = JSON.stringify(payload.talk_together_pass);
@@ -187,7 +188,8 @@ describe('Discord issue gate', () => {
     expect(readReferralCodeForOwner(started.env, expectedDiscordUserRef)).toEqual(
       expect.objectContaining({
         referral_id: payload.referral_id,
-        owner_discord_user_ref: expectedDiscordUserRef,
+        owner_source: 'discord',
+        owner_subject_ref: expectedDiscordUserRef,
         owner_installation_id: started.installationId,
         status: 'active',
       }),
@@ -215,7 +217,8 @@ describe('Discord issue gate', () => {
       beforeFirst({ sql }) {
         if (
           sql.includes('FROM referral_rewards counted') &&
-          sql.includes('counted.referrer_discord_user_ref = ?')
+          sql.includes('counted.referrer_source = ?') &&
+          sql.includes('counted.referrer_subject_ref = ?')
         ) {
           throw new Error('forced Talk Together Pass count failure');
         }
@@ -785,103 +788,115 @@ describe('Discord issue gate', () => {
     expect(countDiscordEntitlements(env)).toBe(0);
   });
 
-  it('hardware duplicate rejects legacy installation evidence before creating a child key', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(NOW_ISO));
+  it.each(['active', 'expired', 'revoked'] as const)(
+    'hardware duplicate rejects legacy %s installation evidence before creating a child key',
+    async (storedStatus) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_ISO));
 
-    const env = createTestBrokerEnv();
-    insertInstallation(env, {
-      installationId: 'install-discord-hardware-legacy-existing',
-      devicePublicKey: 'legacy-device-public-key',
-      hardwareHash: 'hardware-hash-duplicate-legacy',
-      hardwareHashSaltVersion: 7,
-    });
-    insertEntitlement(env, {
-      installation_id: 'install-discord-hardware-legacy-existing',
-      status: 'active',
-      budget_usd: 0.07,
-      managed_credential_ref: 'legacy-managed-key',
-      issued_at: NOW_ISO,
-      expires_at: '2026-07-30T06:00:00.000Z',
-    });
+      const env = createTestBrokerEnv();
+      insertInstallation(env, {
+        installationId: 'install-discord-hardware-legacy-existing',
+        devicePublicKey: 'legacy-device-public-key',
+        hardwareHash: 'hardware-hash-duplicate-legacy',
+        hardwareHashSaltVersion: 7,
+      });
+      insertEntitlement(env, {
+        installation_id: 'install-discord-hardware-legacy-existing',
+        status: storedStatus,
+        budget_usd: 0.07,
+        managed_credential_ref: 'legacy-managed-key',
+        issued_at: NOW_ISO,
+        expires_at: '2026-07-30T06:00:00.000Z',
+      });
 
-    const started = await startDiscordSession('install-discord-hardware-legacy-new', env);
-    const discordApi = mockDiscordApi();
-    const response = await postDiscordIssue(
-      env,
-      await signedIssueRequest(started, {
-        code: 'discord-oauth-code-hardware-legacy',
-        hardware_hash: 'hardware-hash-duplicate-legacy',
-      }),
-    );
+      const started = await startDiscordSession(
+        'install-discord-hardware-legacy-new',
+        env,
+      );
+      const discordApi = mockDiscordApi();
+      const response = await postDiscordIssue(
+        env,
+        await signedIssueRequest(started, {
+          code: 'discord-oauth-code-hardware-legacy',
+          hardware_hash: 'hardware-hash-duplicate-legacy',
+        }),
+      );
 
-    expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual(
-      normalizedErrorEnvelope({
-        code: 'trial_not_eligible',
-        class: 'terminal',
-        subcode: 'hardware_duplicate',
-        message: 'This device has already used a managed trial',
-      }),
-    );
-    expect(discordApi.openRouterCreateCalls).toHaveLength(0);
-    expect(countDiscordIdentities(env)).toBe(0);
-    expect(countDiscordEntitlements(env)).toBe(1);
-  });
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual(
+        normalizedErrorEnvelope({
+          code: 'trial_not_eligible',
+          class: 'terminal',
+          subcode: 'hardware_duplicate',
+          message: 'This device has already used a managed trial',
+        }),
+      );
+      expect(discordApi.openRouterCreateCalls).toHaveLength(0);
+      expect(countDiscordIdentities(env)).toBe(0);
+      expect(countDiscordEntitlements(env)).toBe(1);
+    },
+  );
 
-  it('hardware duplicate rejects delivered Discord entitlement evidence before creating a child key', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(NOW_ISO));
+  it.each(['active', 'expired', 'revoked'] as const)(
+    'hardware duplicate rejects delivered Discord %s entitlement evidence before creating a child key',
+    async (storedStatus) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_ISO));
 
-    const env = createTestBrokerEnv();
-    insertInstallation(env, {
-      installationId: 'install-discord-hardware-entitlement-existing',
-      devicePublicKey: 'entitlement-device-public-key',
-      hardwareHash: null,
-      hardwareHashSaltVersion: null,
-    });
-    insertEntitlement(env, {
-      installation_id: 'install-discord-hardware-entitlement-existing',
-      status: 'active',
-      budget_usd: 0.07,
-      managed_credential_ref: 'discord-managed-key-existing',
-      issued_at: NOW_ISO,
-      expires_at: '2026-07-30T06:00:00.000Z',
-      verified_hardware_hash: 'hardware-hash-duplicate-entitlement',
-      verified_hardware_hash_salt_version: 7,
-      discord_issue_status: 'active',
-      discord_issue_reserved_at: NOW_ISO,
-      discord_issue_delivered_at: NOW_ISO,
-    });
+      const env = createTestBrokerEnv();
+      insertInstallation(env, {
+        installationId: 'install-discord-hardware-entitlement-existing',
+        devicePublicKey: 'entitlement-device-public-key',
+        hardwareHash: null,
+        hardwareHashSaltVersion: null,
+      });
+      insertEntitlement(env, {
+        installation_id: 'install-discord-hardware-entitlement-existing',
+        status: storedStatus,
+        budget_usd: 0.07,
+        managed_credential_ref: 'discord-managed-key-existing',
+        issued_at: NOW_ISO,
+        expires_at: '2026-07-30T06:00:00.000Z',
+        verified_hardware_hash: 'hardware-hash-duplicate-entitlement',
+        verified_hardware_hash_salt_version: 7,
+        discord_issue_status: 'active',
+        discord_issue_reserved_at: NOW_ISO,
+        discord_issue_delivered_at: NOW_ISO,
+      });
 
-    const started = await startDiscordSession('install-discord-hardware-entitlement-new', env);
-    const discordApi = mockDiscordApi({
-      user: {
-        id: discordSnowflakeForAgeDays(32),
-        verified: true,
-      },
-    });
-    const response = await postDiscordIssue(
-      env,
-      await signedIssueRequest(started, {
-        code: 'discord-oauth-code-hardware-entitlement',
-        hardware_hash: 'hardware-hash-duplicate-entitlement',
-      }),
-    );
+      const started = await startDiscordSession(
+        'install-discord-hardware-entitlement-new',
+        env,
+      );
+      const discordApi = mockDiscordApi({
+        user: {
+          id: discordSnowflakeForAgeDays(32),
+          verified: true,
+        },
+      });
+      const response = await postDiscordIssue(
+        env,
+        await signedIssueRequest(started, {
+          code: 'discord-oauth-code-hardware-entitlement',
+          hardware_hash: 'hardware-hash-duplicate-entitlement',
+        }),
+      );
 
-    expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual(
-      normalizedErrorEnvelope({
-        code: 'trial_not_eligible',
-        class: 'terminal',
-        subcode: 'hardware_duplicate',
-        message: 'This device has already used a managed trial',
-      }),
-    );
-    expect(discordApi.openRouterCreateCalls).toHaveLength(0);
-    expect(countDiscordIdentities(env)).toBe(0);
-    expect(countDiscordEntitlements(env)).toBe(1);
-  });
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual(
+        normalizedErrorEnvelope({
+          code: 'trial_not_eligible',
+          class: 'terminal',
+          subcode: 'hardware_duplicate',
+          message: 'This device has already used a managed trial',
+        }),
+      );
+      expect(discordApi.openRouterCreateCalls).toHaveLength(0);
+      expect(countDiscordIdentities(env)).toBe(0);
+      expect(countDiscordEntitlements(env)).toBe(1);
+    },
+  );
 
   it('same installation hardware duplicate rejects a previously delivered entitlement before creating a child key', async () => {
     vi.useFakeTimers();
@@ -1044,23 +1059,57 @@ describe('Discord issue gate', () => {
 
     const env = createTestBrokerEnv();
     updateAbuseControls(env, (controls) => {
-      controls.newActiveEntitlementsPerDay.maxCount = 1;
+      controls.newActiveEntitlementsPerDay.maxCount = 3;
     });
+    env.__db
+      .prepare(
+        `INSERT INTO qq_managed_entitlements (
+            qq_subject_ref, status, issue_ref, managed_credential_ref,
+            budget_usd, reserved_at, issued_at, expires_at, delivered_at
+          ) VALUES (?, 'delivery_pending', ?, ?, ?, ?, ?, ?, NULL)`,
+      )
+      .run(
+        'ph-qq-subject-v1_discord-cap-existing',
+        'qq-issue-discord-cap-existing',
+        'hash_qq_discord_cap_existing',
+        0.07,
+        NOW_ISO,
+        NOW_ISO,
+        '2026-07-30T06:00:00.000Z',
+      );
     insertInstallation(env, {
-      installationId: 'install-discord-cap-existing',
-      devicePublicKey: 'cap-existing-device-public-key',
-      hardwareHash: 'hardware-hash-cap-existing',
+      installationId: 'install-discord-cap-revoked',
+      devicePublicKey: 'cap-revoked-device-public-key',
+      hardwareHash: 'hardware-hash-cap-revoked',
       hardwareHashSaltVersion: 7,
     });
     insertEntitlement(env, {
-      installation_id: 'install-discord-cap-existing',
-      status: 'active',
+      installation_id: 'install-discord-cap-revoked',
+      status: 'revoked',
       budget_usd: 0.07,
-      managed_credential_ref: 'cap-existing-managed-key',
+      managed_credential_ref: 'hash_discord_cap_revoked',
       issued_at: NOW_ISO,
       expires_at: '2026-07-30T06:00:00.000Z',
       discord_issue_status: 'active',
+      discord_issue_reserved_at: NOW_ISO,
       discord_issue_delivered_at: NOW_ISO,
+    });
+    insertInstallation(env, {
+      installationId: 'install-discord-cap-cleanup',
+      devicePublicKey: 'cap-cleanup-device-public-key',
+      hardwareHash: 'hardware-hash-cap-cleanup',
+      hardwareHashSaltVersion: 7,
+    });
+    insertEntitlement(env, {
+      installation_id: 'install-discord-cap-cleanup',
+      status: 'pending_release',
+      budget_usd: 0.07,
+      managed_credential_ref: null,
+      issued_at: null,
+      expires_at: null,
+      discord_issue_status: 'cleanup_required',
+      discord_issue_reserved_at: NOW_ISO,
+      discord_issue_delivered_at: null,
     });
 
     const started = await startDiscordSession('install-discord-cap-new', env);
@@ -1284,6 +1333,81 @@ describe('Discord issue gate', () => {
     expect(retryResponse.status).toBe(200);
   });
 
+  it.each(['create_network_failure', 'create_retryable_failure'] as const)(
+    'preserves lifetime blocking and notifies when child-key creation may have succeeded after %s',
+    async (createMode) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_ISO));
+
+      const discordUserId = discordSnowflakeForAgeDays(31);
+      const env = createTestBrokerEnv();
+      const started = await startDiscordSession(
+        'install-discord-indeterminate-child-key',
+        env,
+      );
+      const discordApi = mockDiscordApi({
+        openRouterMode: createMode,
+        user: {
+          id: discordUserId,
+          verified: true,
+        },
+      });
+
+      const response = await postDiscordIssue(
+        env,
+        await signedIssueRequest(started, {
+          code: 'discord-oauth-code-indeterminate-child-key',
+          hardware_hash: 'hardware-hash-indeterminate-child-key',
+        }),
+      );
+
+      expect(response.status).toBe(500);
+      expect(discordApi.openRouterCreateCalls).toHaveLength(1);
+      await expect(readEntitlement(env, started.installationId)).resolves.toEqual(
+        expect.objectContaining({
+          status: 'pending_release',
+          managed_credential_ref: null,
+          discord_issue_status: 'cleanup_required',
+        }),
+      );
+      const expectedDiscordUserRef = await deriveExpectedDiscordUserRef(
+        env.DISCORD_USER_REF_SECRET,
+        discordUserId,
+      );
+      await expect(readDiscordIdentity(env, expectedDiscordUserRef)).resolves.toEqual(
+        expect.objectContaining({ status: 'cleanup_required' }),
+      );
+      const cleanupIncidentCalls = discordApi.fetchMock.mock.calls.filter(
+        ([request]) => String(request) === env.DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL,
+      );
+      expect(cleanupIncidentCalls).toHaveLength(1);
+      expect(String(cleanupIncidentCalls[0]?.[1]?.body)).toContain(
+        'Broker managed-key cleanup incident',
+      );
+
+      const retry = await startDiscordSession(
+        'install-discord-indeterminate-child-key-retry',
+        env,
+      );
+      const retryDiscordApi = mockDiscordApi({
+        user: {
+          id: discordUserId,
+          verified: true,
+        },
+      });
+      const retryResponse = await postDiscordIssue(
+        env,
+        await signedIssueRequest(retry, {
+          code: 'discord-oauth-code-indeterminate-child-key-retry',
+          hardware_hash: 'hardware-hash-indeterminate-child-key-retry',
+        }),
+      );
+
+      expect(retryResponse.status).toBe(409);
+      expect(retryDiscordApi.openRouterCreateCalls).toHaveLength(0);
+    },
+  );
+
   it('guardrail assignment failure after child-key creation cleans up and releases Discord eligibility for fresh OAuth', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW_ISO));
@@ -1339,6 +1463,68 @@ describe('Discord issue gate', () => {
       }),
     );
     expect(retryResponse.status).toBe(200);
+  });
+
+  it('keeps Discord release state atomic and notifies when local cleanup persistence fails', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW_ISO));
+
+    const env = createTestBrokerEnv({
+      beforeRun: ({ sql }) => {
+        if (
+          sql.includes('DELETE FROM openrouter_entitlements') &&
+          sql.includes("discord_issue_status IN ('issuing', 'delivery_pending', 'active', 'cleanup_required')")
+        ) {
+          throw new Error('synthetic Discord release persistence failure');
+        }
+      },
+    });
+    const discordUserId = discordSnowflakeForAgeDays(31);
+    const expectedDiscordUserRef = await deriveExpectedDiscordUserRef(
+      env.DISCORD_USER_REF_SECRET,
+      discordUserId,
+    );
+    const started = await startDiscordSession(
+      'install-discord-release-persistence-failure',
+      env,
+    );
+    const discordApi = mockDiscordApi({
+      openRouterMode: 'guardrail_failure',
+      user: {
+        id: discordUserId,
+        verified: true,
+      },
+    });
+
+    const response = await postDiscordIssue(
+      env,
+      await signedIssueRequest(started, {
+        code: 'discord-oauth-code-release-persistence-failure',
+        hardware_hash: 'hardware-hash-release-persistence-failure',
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(discordApi.openRouterCleanupCalls.map(({ init }) => init?.method)).toEqual([
+      'PATCH',
+      'DELETE',
+    ]);
+    await expect(readEntitlement(env, started.installationId)).resolves.toEqual(
+      expect.objectContaining({
+        status: 'pending_release',
+        discord_issue_status: 'issuing',
+      }),
+    );
+    await expect(readDiscordIdentity(env, expectedDiscordUserRef)).resolves.toEqual(
+      expect.objectContaining({ status: 'issuing' }),
+    );
+    const cleanupIncidentCalls = discordApi.fetchMock.mock.calls.filter(
+      ([request]) => String(request) === env.DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL,
+    );
+    expect(cleanupIncidentCalls).toHaveLength(1);
+    expect(String(cleanupIncidentCalls[0]?.[1]?.body)).toContain(
+      'cleanup_required state could not be confirmed',
+    );
   });
 
   it('guardrail assignment failure with cleanup failure records cleanup_required without leaking sensitive values', async () => {
@@ -1423,6 +1609,16 @@ describe('Discord issue gate', () => {
         status: 'cleanup_required',
       }),
     );
+    const cleanupIncidentCalls = discordApi.fetchMock.mock.calls.filter(
+      ([input]) => String(input) === env.DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL,
+    );
+    expect(cleanupIncidentCalls).toHaveLength(1);
+    const cleanupIncidentBody = String(
+      (cleanupIncidentCalls[0]?.[1] as RequestInit | undefined)?.body,
+    );
+    expect(cleanupIncidentBody).toContain('Broker managed-key cleanup incident');
+    expect(cleanupIncidentBody).toContain('cleanup_required');
+    expectTextNotToContainSensitiveValues(cleanupIncidentBody, sensitiveValues);
     await expect(readSessionByState(env, started.state)).resolves.toEqual(
       expect.objectContaining({
         status: 'failed',
@@ -1754,11 +1950,8 @@ describe('Discord issue gate', () => {
       },
     });
     updateAbuseControls(env, (controls) => {
-      controls.immediateAlerts.warn1 = 1;
-      controls.immediateAlerts.warn2 = 2;
-      controls.immediateAlerts.warn3 = 3;
-      controls.immediateAlerts.critical = 4;
-      controls.asnFastPath.enabled = false;
+      controls.immediateAlerts.warning = 1;
+      controls.immediateAlerts.brake = 4;
     });
     insertInstallation(env, {
       installationId: 'install-discord-monitoring-existing',
@@ -2127,13 +2320,15 @@ function readReferralCodeForOwner(
   const row = env.__db
     .prepare(
       `SELECT referral_id,
-              owner_discord_user_ref,
+              owner_source,
+              owner_subject_ref,
               owner_installation_id,
               status
          FROM referral_codes
-        WHERE owner_discord_user_ref = ?`,
+        WHERE owner_source = ?
+          AND owner_subject_ref = ?`,
     )
-    .get(discordUserRef) as ReferralCodeRow | undefined;
+    .get('discord', discordUserRef) as ReferralCodeRow | undefined;
 
   return row ?? null;
 }
@@ -2361,6 +2556,8 @@ function mockDiscordApi(options: {
   openRouterMode?:
     | 'success'
     | 'create_failure'
+    | 'create_network_failure'
+    | 'create_retryable_failure'
     | 'guardrail_failure'
     | 'guardrail_failure_cleanup_failure'
     | 'cleanup_failure';
@@ -2411,7 +2608,13 @@ function mockDiscordApi(options: {
     if (url === OPENROUTER_KEYS_URL && method === 'POST') {
       openRouterCreateCalls.push({ input, init });
       if (options.openRouterMode === 'create_failure') {
-        return jsonResponse({ error: { message: 'create failed before key delivery' } }, 500);
+        return jsonResponse({ error: { message: 'create failed before key delivery' } }, 400);
+      }
+      if (options.openRouterMode === 'create_retryable_failure') {
+        return jsonResponse({ error: { message: 'create temporarily failed' } }, 503);
+      }
+      if (options.openRouterMode === 'create_network_failure') {
+        throw new TypeError('OpenRouter create response was interrupted');
       }
 
       const sequence = openRouterCreateCalls.length;
@@ -2480,6 +2683,10 @@ function mockDiscordApi(options: {
         );
       }
 
+      return new Response(null, { status: 204 });
+    }
+
+    if (url === 'https://discord.test/immediate-alert' && method === 'POST') {
       return new Response(null, { status: 204 });
     }
 

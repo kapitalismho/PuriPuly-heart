@@ -2,7 +2,9 @@
   <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — VRChat 实时双向语音翻译工具" width="128" />
 </p>
 
-<h1 align="center">PuriPuly — VRChat 实时双向语音翻译工具</h1>
+<h1 align="center">PuriPuly<br>
+  <sub>VRChat 实时双向语音翻译工具</sub>
+</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.5.0-blue" alt="Version" />
@@ -85,8 +87,9 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 ---
 
 ## 翻译比较
-![翻译质量基准测试图表。按模型排列的每句平均错误惩罚（越低越好）排行榜：第 1 名 Gemma 4 31B (0.353)，第 2 名 Gemma 4 26B A4B (0.387)，第 3 名 DeepSeek V4 Flash 0731 (0.571)，第 4 名 Gemma 4 E4B QAT Q4 (1.577)，第 5 名 Papago (2.699)，第 6 名 Gemini 3.5 Live Translate (2.991)，第 7 名 MiLMMT 46-4B (3.087)，第 8 名 DeepL (3.914)，第 9 名 Google Cloud Translation Basic (5.731)。](docs/images/performance/1.png)
+![韩语→英语/日语/中文（简体）翻译的每句平均错误惩罚图表。216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是 PuriPuly 中可用的模型：第 1 名 Gemma 4 31B (0.353)，第 2 名 Gemma 4 26B A4B (0.387)，第 3 名 DeepSeek-V4 Flash 0731 (0.571)，第 4 名 Gemma 4 12B QAT Q4 (0.855)，第 5 名 Gemma 4 E4B QAT Q4 (1.577)。橙色柱状图是外部基线：Hy-MT-7B (1.863)、Papago (2.699)、Gemini 3.5 Live Translate (2.991)、MiLMMT 46-4B (3.087)、DeepL (3.914)、Google Cloud Translation Basic (5.731)。](docs/images/performance/2.png)
 
+- 蓝色柱状图是PuriPuly中可用的模型。
 - 我们使用微软的 Gemba MQM 框架进行实验。
 - 为贴近真实对话环境，采用了多轮对话设置。
 - 完整实验结果请参阅[此处](https://github.com/kapitalismho/korean-llm-context-translation-benchmark)。
@@ -180,7 +183,7 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 
 ---
 
-# 如果遇到问题或有不明确的地方，欢迎随时通过 [Twitter/X](https://x.com/kapitalismho) 发 DM 联系我。
+# 如果遇到问题，请通过 [Twitter/X](https://x.com/kapitalismho) 发 DM 联系我。
 
 ## 使用方法
 
@@ -432,6 +435,8 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 ---
 
 ## 架构
+
+![PuriPuly Heart 六边形架构图](docs/architecture-light.png)
 
 参见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
 

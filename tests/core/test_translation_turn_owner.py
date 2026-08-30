@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -10,9 +9,6 @@ import pytest
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
-)
-from puripuly_heart.core.orchestrator.peer_translation_channel import (
-    PeerTranslationChannelOwner,
 )
 from puripuly_heart.core.orchestrator.self_translation_channel import (
     SelfTranslationChannelOwner,
@@ -156,19 +152,12 @@ def test_speculative_configuration_match_includes_secondary_target() -> None:
 
 def test_channel_owners_use_one_injected_generic_translation_owner() -> None:
     harness = compose_translation_test_harness(stt=None, llm=None, osc=object())
-    peer_owner_source = inspect.getsource(inspect.getmodule(PeerTranslationChannelOwner))
-    self_source = inspect.getsource(inspect.getmodule(SelfTranslationChannelOwner))
     assert harness.self_owner.translation_turns is harness.translation_turns
     assert harness.peer_owner.translation_turns is harness.translation_turns
     assert type(harness.translation_turns.output).__name__ == ("TranslationChannelOwnerCallbacks")
     assert harness.translation_turns.lifecycle_owner_snapshot()["owner"] == (
         "TranslationTurnLifecycleOwner"
     )
-    assert "PeerFinalRunsLifecycleOwner" not in peer_owner_source
-    assert "TranslationTurnLifecycleOwner(" not in peer_owner_source
-    assert peer_owner_source.count('self.translation_turns.cancel_pending(channel="peer")') == 3
-    assert self_source.count('self.translation_turns.cancel_pending(channel="self")') == 2
-    assert "self.translation_turns.cancel_pending()" not in peer_owner_source
 
     source_root = Path(__file__).resolve().parents[2] / "src" / "puripuly_heart"
     legacy_owner_references = {

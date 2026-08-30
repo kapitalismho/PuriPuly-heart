@@ -383,7 +383,7 @@ class TestContextFormatting:
 
 
 class TestContextInternalPaths:
-    def test_context_resolver_formats_local_without_relative_age(self):
+    def test_context_resolver_formats_entries_without_relative_age(self):
         runtime = compose_translation_test_harness(
             stt=None,
             llm=FakeLLMProvider(),
@@ -393,16 +393,16 @@ class TestContextInternalPaths:
         runtime.remember_context("hello there", timestamp=100.0)
         resolver = ContextResolver(clock=FakeClock(initial_time=112.0))
 
-        context, mode = resolver.resolve_local(
+        entries = resolver.get_entries(
             runtime=runtime,
             source_language="en",
             target_language="ko",
         )
+        context = resolver.format_entries(entries)
 
-        assert mode == "local"
         assert context == '- [self] "hello there"'
 
-    def test_translation_fixture_uses_local_context_when_peer_translation_is_off(self):
+    def test_translation_fixture_uses_integrated_context_when_peer_translation_is_off(self):
         harness = compose_translation_test_harness(
             stt=None,
             llm=None,
@@ -416,13 +416,11 @@ class TestContextInternalPaths:
         context, mode = harness.translation_requests.context_resolver.resolve_for_request(
             runtime=harness.self_runtime,
             other_runtime=harness.peer_runtime,
-            requested_mode="integrated",
-            peer_translation_enabled=harness.configuration.snapshot().value.peer_translation_enabled,
             source_language="en",
             target_language="ko",
         )
 
-        assert mode == "local"
+        assert mode == "integrated"
         assert context == '- [self] "self only"'
 
     def test_context_resolver_formats_integrated_with_channel_prefix(self):
@@ -448,8 +446,6 @@ class TestContextInternalPaths:
         context, mode = resolver.resolve_for_request(
             runtime=self_runtime,
             other_runtime=peer_runtime,
-            requested_mode="integrated",
-            peer_translation_enabled=True,
             source_language="en",
             target_language="ko",
         )
@@ -457,7 +453,7 @@ class TestContextInternalPaths:
         assert mode == "integrated"
         assert context == ('- [self] "I am ready"\n- [peer] "hello from peer"')
 
-    def test_context_resolver_always_uses_integrated_when_peer_enabled(self):
+    def test_context_resolver_always_uses_integrated_context(self):
         self_runtime = compose_translation_test_harness(
             stt=None,
             llm=None,
@@ -480,8 +476,6 @@ class TestContextInternalPaths:
         context, mode = resolver.resolve_for_request(
             runtime=self_runtime,
             other_runtime=peer_runtime,
-            requested_mode="integrated",
-            peer_translation_enabled=True,
             source_language="en",
             target_language="ko",
         )
@@ -489,7 +483,7 @@ class TestContextInternalPaths:
         assert mode == "integrated"
         assert '- [peer] "peer line"' in context
 
-    def test_context_resolver_falls_back_to_local_when_peer_context_is_empty(self):
+    def test_context_resolver_uses_available_self_context_when_peer_context_is_empty(self):
         self_runtime = ChannelRuntime(channel="self")
         peer_runtime = ChannelRuntime(channel="peer")
         self_runtime.remember_context(
@@ -501,15 +495,13 @@ class TestContextInternalPaths:
         resolver = ContextResolver(clock=FakeClock(initial_time=112.0))
 
         context, mode = resolver.resolve_for_request(
-            runtime=self_runtime,
-            other_runtime=peer_runtime,
-            requested_mode="integrated",
-            peer_translation_enabled=True,
+            runtime=peer_runtime,
+            other_runtime=self_runtime,
             source_language="en",
             target_language="ko",
         )
 
-        assert mode == "local"
+        assert mode == "integrated"
         assert context == '- [self] "safe local line"'
 
     def test_integrated_context_uses_40_second_window_before_entry_budget(self):
@@ -537,8 +529,6 @@ class TestContextInternalPaths:
         context, mode = harness.translation_requests.context_resolver.resolve_for_request(
             runtime=harness.self_runtime,
             other_runtime=harness.peer_runtime,
-            requested_mode="integrated",
-            peer_translation_enabled=True,
             source_language="en",
             target_language="ko",
             other_source_language="en",
@@ -579,8 +569,6 @@ class TestContextInternalPaths:
         context, mode = harness.translation_requests.context_resolver.resolve_for_request(
             runtime=harness.self_runtime,
             other_runtime=harness.peer_runtime,
-            requested_mode="integrated",
-            peer_translation_enabled=True,
             source_language="en",
             target_language="ko",
             other_source_language="en",
@@ -621,8 +609,6 @@ class TestContextInternalPaths:
         context, mode = resolver.resolve_for_request(
             runtime=self_runtime,
             other_runtime=peer_runtime,
-            requested_mode="integrated",
-            peer_translation_enabled=True,
             source_language="en",
             target_language="ko",
             other_source_language="en",
@@ -669,8 +655,8 @@ class TestContextSerializationContract:
             timestamp=100.0,
         )
 
-        first = ContextResolver(clock=FakeClock(initial_time=105.0)).format_local([entry])
-        second = ContextResolver(clock=FakeClock(initial_time=115.0)).format_local([entry])
+        first = ContextResolver(clock=FakeClock(initial_time=105.0)).format_entries([entry])
+        second = ContextResolver(clock=FakeClock(initial_time=115.0)).format_entries([entry])
 
         assert first == '- [self] "hello"'
         assert second == '- [self] "hello"'
@@ -694,7 +680,7 @@ class TestContextSerializationContract:
             ),
         ]
 
-        context = ContextResolver(clock=FakeClock(initial_time=110.0)).format_local(entries)
+        context = ContextResolver(clock=FakeClock(initial_time=110.0)).format_entries(entries)
 
         assert context == '- [self] "hello"\n- [peer] "hi"'
         assert "ago" not in context
@@ -743,9 +729,9 @@ class TestContextLogging:
         with caplog.at_level(logging.INFO, logger="puripuly_heart.core.orchestrator.translation"):
             harness.prepare_translation_request("입력")
 
-        assert "[Translation] Context mode: channel=self mode=local" in caplog.messages
+        assert "[Translation] Context mode: channel=self mode=integrated" in caplog.messages
         assert (
-            "[Translation] Context apply: channel=self mode=local "
+            "[Translation] Context apply: channel=self mode=integrated "
             "request_chars=2 entries=0 self_entries=0 peer_entries=0 context_chars=0"
         ) in caplog.messages
 
@@ -770,11 +756,11 @@ class TestContextLogging:
         with caplog.at_level(logging.INFO, logger="puripuly_heart.core.orchestrator.translation"):
             harness.prepare_translation_request("secret request")
 
-        assert "[Translation] Context mode: channel=self mode=local" in caplog.messages
+        assert "[Translation] Context mode: channel=self mode=integrated" in caplog.messages
         assert not any("secret request" in message for message in caplog.messages)
         assert not any("secret context" in message for message in caplog.messages)
         assert (
-            "[Translation] Context apply: channel=self mode=local "
+            "[Translation] Context apply: channel=self mode=integrated "
             f"request_chars=14 entries=1 self_entries=1 peer_entries=0 "
             f"context_chars={len(expected_context)}"
         ) in caplog.messages
@@ -803,11 +789,11 @@ class TestContextLogging:
             )
 
         assert context == expected_context
-        assert "[Translation] Context mode: channel=peer mode=local" in caplog.messages
+        assert "[Translation] Context mode: channel=peer mode=integrated" in caplog.messages
         assert not any("secret request" in message for message in caplog.messages)
         assert not any("secret peer context" in message for message in caplog.messages)
         assert (
-            "[Translation] Context apply: channel=peer mode=local "
+            "[Translation] Context apply: channel=peer mode=integrated "
             f"request_chars=14 entries=1 self_entries=0 peer_entries=1 "
             f"context_chars={len(expected_context)}"
         ) in caplog.messages
@@ -894,7 +880,6 @@ class TestContextLogging:
             if message.startswith("[Translation] Context mode:")
         ]
         assert mode_logs == [
-            "[Translation] Context mode: channel=self mode=local",
             "[Translation] Context mode: channel=self mode=integrated",
         ]
 

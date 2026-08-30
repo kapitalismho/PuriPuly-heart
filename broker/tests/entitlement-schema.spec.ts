@@ -154,6 +154,7 @@ const QQ_MANAGED_ENTITLEMENT_COLUMNS = [
   'delivered_at',
   'created_at',
   'updated_at',
+  'child_key_creation_started_at',
 ];
 
 describe('QQ managed entitlement schema', () => {
@@ -191,13 +192,13 @@ describe('QQ managed entitlement schema', () => {
           'requires managed_credential_ref, issued_at, and expires_at; delivered_at remains null until ACK succeeds',
         cleanup_required: 'requires managed_credential_ref',
         issuing:
-          'may be stale-reclaimed only when managed_credential_ref is NULL; issuing with a credential ref requires cleanup/remediation',
+          'may be stale-reclaimed only when managed_credential_ref and child_key_creation_started_at are NULL; any started child-key creation requires manual remediation or cleanup',
         revoked: 'blocks automatic reissue',
       },
       staleIssuingPolicy: {
         ttlMinutes: 15,
         withoutManagedCredentialRef:
-          'eligible for same-subject release/reclaim by a later valid request after TTL',
+          'eligible for same-subject release/reclaim by a later valid request after TTL only when child-key creation never started',
         withManagedCredentialRef:
           'cleanup/remediation candidate; must not be silently overwritten',
       },
@@ -243,7 +244,7 @@ describe('QQ managed entitlement schema', () => {
       rawAckTokenStorage: false,
       rawOpenRouterKeyStorage: false,
       stalePendingCleanup:
-        'pending rows remain pending after expired ACK attempts until cleanup owner marks expired or cleanup_required',
+        'expired rows are claimed exclusively; abandoned claims recover only after the scheduled invocation limit, and terminal owner/ledger transitions are atomic',
     });
   });
 

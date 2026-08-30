@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self] 방금 들어온 분, 한국인인 것 같아요.
+[${inputChannel}] 방금 들어온 분, 한국인인 것 같아요.
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Your response:
 
 ### Context Ignore Example
 <context>
-[self] 아까 갔던 월드 정말 예뻤어요.
+[${inputChannel}] 아까 갔던 월드 정말 예뻤어요.
 </context>
 
 <input>

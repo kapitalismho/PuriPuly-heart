@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self] Unityでずっとエラーが出てるんですよ。
+[${inputChannel}] Unityでずっとエラーが出てるんですよ。
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Your response:
 
 ### Context Ignore Example
 <context>
-[self] 昨日買ったアバター、すごく可愛かったんですよ。
+[${inputChannel}] 昨日買ったアバター、すごく可愛かったんですよ。
 </context>
 
 <input>

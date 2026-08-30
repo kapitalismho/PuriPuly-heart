@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { applyAbuseMonitoringRetention } from '../src/abuse-monitoring';
-import { applyTelemetryActiveDayRetention } from '../src/telemetry';
+import { applyAppActiveDayRetention } from '../src/telemetry';
 import { updateAbuseControls } from './test-support/abuse-controls';
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
 
@@ -76,7 +76,7 @@ describe('broker persistence retention model', () => {
   it('deletes expired request events, issue-success events, and runtime-audit rows using the configured retention windows', async () => {
     const env = createTestBrokerEnv();
     updateAbuseControls(env, (controls) => {
-      controls.retention.requestEventsDays = 7;
+      controls.retention.requestEventSafetyMarginDays = 7;
       controls.retention.issueSuccessDays = 3;
       controls.retention.runtimeAuditDays = 10;
     });
@@ -118,13 +118,13 @@ describe('broker persistence retention model', () => {
       'POST /v1/trial/challenge',
       '203.0.113.1',
       'install-retention-old',
-      '2026-04-01T00:00:00.000Z',
+      '2026-04-01 00:00:00',
     );
     insertRequestEvent.run(
       'POST /v1/trial/challenge',
       '203.0.113.2',
       'install-retention-new',
-      '2026-04-17T00:00:00.000Z',
+      '2026-04-17 00:00:00',
     );
 
     const insertIssueSuccess = env.__db.prepare(
@@ -156,7 +156,7 @@ describe('broker persistence retention model', () => {
       'TLSv1.3',
       'TLS_AES_128_GCM_SHA256',
       'low',
-      '2026-03-31T00:00:00.000Z',
+      '2026-03-31 00:00:00',
     );
     insertIssueSuccess.run(
       'install-retention-new',
@@ -170,7 +170,7 @@ describe('broker persistence retention model', () => {
       'TLSv1.3',
       'TLS_AES_128_GCM_SHA256',
       'low',
-      '2026-04-17T00:00:00.000Z',
+      '2026-04-17 00:00:00',
     );
 
     const insertRuntimeAudit = env.__db.prepare(
@@ -181,13 +181,13 @@ describe('broker persistence retention model', () => {
       'brake_transition',
       'global_threshold',
       '{"old":true}',
-      '2026-04-01T00:00:00.000Z',
+      '2026-04-01 00:00:00',
     );
     insertRuntimeAudit.run(
       'brake_transition',
       'global_threshold',
       '{"new":true}',
-      '2026-04-17T00:00:00.000Z',
+      '2026-04-17 00:00:00',
     );
 
     const result = await applyAbuseMonitoringRetention(
@@ -218,70 +218,164 @@ describe('broker persistence retention model', () => {
     ).toEqual({ count: 1 });
   });
 
-  it('deletes telemetry active-day rows older than 400 days and keeps rows at the cutoff or newer', async () => {
+  it('keeps request events for the longest active enforcement window plus the configured safety margin', async () => {
+    const env = createTestBrokerEnv();
+    updateAbuseControls(env, (controls) => {
+      controls.retention.requestEventSafetyMarginDays = 1;
+    });
+    env.__db
+      .prepare(
+        `INSERT INTO broker_velocity_cap_hooks (
+            subject_type,
+            subject_value,
+            max_requests,
+            window_minutes,
+            outcome_code,
+            outcome_class,
+            active,
+            created_at
+          ) VALUES ('ip', ?, 2, 4320, 'rate_limited', 'retryable', 1, ?)`,
+      )
+      .run('203.0.113.44', '2026-04-01T00:00:00.000Z');
+    const insert = env.__db.prepare(
+      `INSERT INTO broker_request_events (
+          endpoint,
+          ip,
+          installation_id,
+          observed_at
+        ) VALUES (?, ?, ?, ?)`,
+    );
+    insert.run(
+      'POST /v1/trial/challenge',
+      '203.0.113.44',
+      'retention-outside-safety',
+      '2026-04-15T00:00:00.000Z',
+    );
+    insert.run(
+      'POST /v1/trial/challenge',
+      '203.0.113.44',
+      'retention-inside-safety',
+      '2026-04-16T12:00:00.000Z',
+    );
+
+    const result = await applyAbuseMonitoringRetention(
+      env.BROKER_DB,
+      new Date('2026-04-20T00:00:00.000Z'),
+    );
+
+    expect(result.requestEventsDeleted).toBe(1);
+    expect(
+      env.__db
+        .prepare(
+          `SELECT installation_id
+             FROM broker_request_events
+            ORDER BY installation_id`,
+        )
+        .all(),
+    ).toEqual([{ installation_id: 'retention-inside-safety' }]);
+  });
+
+  it('includes the pending Discord OAuth IP window in request-event retention', async () => {
+    const env = createTestBrokerEnv();
+    updateAbuseControls(env, (controls) => {
+      controls.pendingDiscordOAuthSessions.windowMinutes = 4320;
+      controls.retention.requestEventSafetyMarginDays = 1;
+    });
+    const insert = env.__db.prepare(
+      `INSERT INTO broker_request_events (
+          endpoint,
+          ip,
+          installation_id,
+          observed_at
+        ) VALUES (?, ?, ?, ?)`,
+    );
+    insert.run(
+      'POST /v1/auth/discord/start',
+      '203.0.113.45',
+      'pending-oauth-outside-window',
+      '2026-04-15T23:59:59.000Z',
+    );
+    insert.run(
+      'POST /v1/auth/discord/start',
+      '203.0.113.45',
+      'pending-oauth-at-cutoff',
+      '2026-04-16T00:00:00.000Z',
+    );
+
+    const result = await applyAbuseMonitoringRetention(
+      env.BROKER_DB,
+      new Date('2026-04-20T00:00:00.000Z'),
+    );
+
+    expect(result.requestEventsDeleted).toBe(1);
+    expect(
+      env.__db
+        .prepare(
+          `SELECT installation_id
+             FROM broker_request_events
+            ORDER BY installation_id`,
+        )
+        .all(),
+    ).toEqual([{ installation_id: 'pending-oauth-at-cutoff' }]);
+  });
+
+  it('deletes app active-day rows older than 35 days and keeps rows at the cutoff or newer', async () => {
     const env = createTestBrokerEnv();
 
-    insertTelemetryActiveDay(env, 'subject-old', '2025-03-13');
-    insertTelemetryActiveDay(env, 'subject-cutoff', '2025-03-14');
-    insertTelemetryActiveDay(env, 'subject-new', '2026-04-18');
+    insertAppActiveDay(env, 'subject-old', '2026-03-13');
+    insertAppActiveDay(env, 'subject-cutoff', '2026-03-14');
+    insertAppActiveDay(env, 'subject-new', '2026-04-18');
 
-    const result = await applyTelemetryActiveDayRetention(
+    const result = await applyAppActiveDayRetention(
       env.BROKER_DB,
       new Date('2026-04-18T22:00:00.000Z'),
     );
 
     expect(result).toEqual({
       deleted: 1,
-      cutoffDateUtc: '2025-03-14',
+      cutoffDateUtc: '2026-03-14',
     });
-    expect(readTelemetryActiveDays(env)).toEqual([
-      { subject_ref: validTelemetrySubjectRef('subject-cutoff'), active_date_utc: '2025-03-14' },
-      { subject_ref: validTelemetrySubjectRef('subject-new'), active_date_utc: '2026-04-18' },
+    expect(readAppActiveDays(env)).toEqual([
+      { subject_ref: validAppSubjectRef('subject-cutoff'), active_date_utc: '2026-03-14' },
+      { subject_ref: validAppSubjectRef('subject-new'), active_date_utc: '2026-04-18' },
     ]);
     expect(JSON.stringify(result)).not.toContain('subject-old');
   });
 });
 
-function insertTelemetryActiveDay(
+function insertAppActiveDay(
   env: ReturnType<typeof createTestBrokerEnv>,
   subjectRef: string,
   activeDateUtc: string,
 ): void {
   env.__db
     .prepare(
-      `INSERT INTO telemetry_active_days (
+      `INSERT INTO app_active_days (
           subject_ref,
-          active_date_utc,
-          first_received_at,
-          last_received_at
-        ) VALUES (?, ?, ?, ?)`,
+          active_date_utc
+        ) VALUES (?, ?)`,
     )
-    .run(
-      validTelemetrySubjectRef(subjectRef),
-      activeDateUtc,
-      `${activeDateUtc}T00:00:00.000Z`,
-      `${activeDateUtc}T00:00:00.000Z`,
-    );
+    .run(validAppSubjectRef(subjectRef), activeDateUtc);
 }
 
-function readTelemetryActiveDays(env: ReturnType<typeof createTestBrokerEnv>): Array<{
+function readAppActiveDays(env: ReturnType<typeof createTestBrokerEnv>): Array<{
   subject_ref: string;
   active_date_utc: string;
 }> {
   return env.__db
     .prepare(
       `SELECT subject_ref, active_date_utc
-         FROM telemetry_active_days
+         FROM app_active_days
         ORDER BY active_date_utc ASC, subject_ref ASC`,
     )
     .all() as Array<{ subject_ref: string; active_date_utc: string }>;
 }
 
-function validTelemetrySubjectRef(label: string): string {
+function validAppSubjectRef(label: string): string {
   let hash = 0;
   for (const character of label) {
     hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
   }
 
-  return `ph-telemetry-subject-v1_${hash.toString(16).padStart(64, '0')}`;
+  return `ph-app-subject-v1_${hash.toString(16).padStart(64, '0')}`;
 }

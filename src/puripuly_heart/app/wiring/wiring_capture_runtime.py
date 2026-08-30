@@ -8,7 +8,7 @@ from puripuly_heart.app.ports.capture_vad_runtime import (
     SelfCaptureVadEventRuntime,
 )
 from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
-from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.audio.diagnostics import AudioFaultProfile, DiagnosticAudioSource
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.audio.source import AudioSource
@@ -48,7 +48,7 @@ from .wiring_composition import (
 )
 from .wiring_stt_factory import (
     build_peer_stt_provider_request,
-    build_self_stt_provider_request,
+    build_self_stt_provider_request_from_vnext,
 )
 
 
@@ -107,7 +107,7 @@ class CaptureDiagnosticsAdapter:
 
 @dataclass(frozen=True, slots=True)
 class CaptureOwnerFactory:
-    settings_provider: Callable[[], AppSettings | None]
+    canonical_provider: Callable[[], AppSettingsVNext | None]
     self_admission: SelfCaptureAdmissionPort
     ensure_peer_local_ready: Callable[[int | None], Awaitable[bool]]
     clock: Clock
@@ -162,7 +162,7 @@ class CaptureOwnerFactory:
             channel_reset=channel_reset,
             admission=create_peer_capture_admission_adapter(
                 runtime_available=lambda: (
-                    self.settings_provider() is not None and vad_runtime is not None
+                    self.canonical_provider() is not None and vad_runtime is not None
                 ),
                 ensure_local_ready=lambda: self.ensure_peer_local_ready(None),
             ),
@@ -170,7 +170,7 @@ class CaptureOwnerFactory:
             clock=self.clock,
             provider_request_factory=lambda config, warmup: build_peer_stt_provider_request(
                 config,
-                gpu_device_id=self._settings().stt.gpu_device_id,
+                gpu_device_id=self._canonical().intent.stt.gpu_device_id,
                 warmup=warmup,
             ),
             source_factory=create_peer_capture_source_adapter(
@@ -198,12 +198,12 @@ class CaptureOwnerFactory:
         warmup: bool,
     ) -> ProviderRuntimeBuildRequest:
         _ = config
-        return build_self_stt_provider_request(self._settings(), warmup=warmup)
+        return build_self_stt_provider_request_from_vnext(self._canonical(), warmup=warmup)
 
-    def _settings(self) -> AppSettings:
-        settings = self.settings_provider()
+    def _canonical(self) -> AppSettingsVNext:
+        settings = self.canonical_provider()
         if settings is None:
-            raise RuntimeError("Capture provider request requires settings")
+            raise RuntimeError("Capture provider request requires canonical settings")
         return settings
 
 

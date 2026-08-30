@@ -3,8 +3,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
 
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.ui.event_bridge import UIEventBridge
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from tests.helpers.osc_presentation import osc_control_presentation_state
@@ -62,7 +64,6 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
         clear_managed_auth_pending_state=lambda: events.append(("clear-auth",)),
         show_snackbar=lambda *args, **kwargs: events.append(("snackbar", args, kwargs)),
         on_github_star_translation_success=lambda: events.append(("star",)),
-        on_telemetry_translation_success=lambda: events.append(("telemetry",)),
         on_overlay_state_changed=lambda **kwargs: events.append(("overlay", kwargs)),
         on_desktop_overlay_state_changed=lambda *args, **kwargs: events.append(
             ("desktop-overlay", args, kwargs)
@@ -96,7 +97,6 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
     adapter.clear_managed_auth_pending_state()
     adapter.show_snackbar("message", "orange")
     adapter.on_github_star_translation_success()
-    adapter.on_telemetry_translation_success()
     adapter.on_overlay_state_changed(state="connected")
     adapter.on_desktop_overlay_state_changed("connected", interaction_mode="locked")
     adapter.show_qq_managed_auth_dialog()
@@ -111,7 +111,6 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
         ("clear-auth",),
         ("snackbar", ("message", "orange"), {}),
         ("star",),
-        ("telemetry",),
         ("overlay", {"state": "connected"}),
         ("desktop-overlay", ("connected",), {"interaction_mode": "locked"}),
         ("qq",),
@@ -169,14 +168,14 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
         clear_managed_auth_pending_state=lambda: None,
         show_snackbar=lambda *args, **kwargs: None,
         on_github_star_translation_success=lambda: None,
-        on_telemetry_translation_success=lambda: None,
         on_overlay_state_changed=lambda **kwargs: None,
     )
     adapter = FletUiPresentationAdapter(host)
     runtime_logging = SimpleNamespace(
         attach_realtime_sink=lambda sink: events.append(("log-sink", sink))
     )
-    settings_value = object()
+    settings_value = AppSettings()
+    provider, general, prompt, overlay = settings_view_surface_snapshots(settings_value)
     calibration = object()
     notice = object()
     gemma_notice = object()
@@ -215,13 +214,20 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
         recent_target_languages=["en"],
         peer_auto_detect_available=True,
     )
-    assert adapter.render_settings(settings_value, config_path=tmp_path / "settings.json")
+    assert adapter.render_settings(
+        provider=provider,
+        general=general,
+        prompt=prompt,
+        overlay=overlay,
+        config_path=tmp_path / "settings.json",
+    )
     assert adapter.refresh_settings_after_openrouter_pkce_success(
-        settings_value,
+        provider=provider,
+        prompt=prompt,
         config_path=tmp_path / "settings.json",
     )
     adapter.set_settings_overlay_calibration(calibration)
-    adapter.refresh_settings_loopback_capture_target(settings_value)
+    adapter.refresh_settings_loopback_capture_target(general)
     adapter.set_settings_local_cpu_auto_available(True)
     adapter.set_settings_managed_key_state(
         visible=True,
@@ -240,13 +246,20 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     assert ("gemma-notice", gemma_notice) in events
     assert (
         "load-settings",
-        (settings_value,),
-        {"config_path": tmp_path / "settings.json", "preserve_custom_vocab_draft": False},
+        (),
+        {
+            "provider": provider,
+            "general": general,
+            "prompt": prompt,
+            "overlay": overlay,
+            "config_path": tmp_path / "settings.json",
+            "preserve_custom_vocab_draft": False,
+        },
     ) in events
     assert (
         "pkce-refresh",
-        (settings_value,),
-        {"config_path": tmp_path / "settings.json"},
+        (),
+        {"provider": provider, "prompt": prompt, "config_path": tmp_path / "settings.json"},
     ) in events
     assert (
         "managed-key",
@@ -264,7 +277,6 @@ def test_presentation_adapter_owns_ui_event_bridge_composition() -> None:
         clear_managed_auth_pending_state=lambda: None,
         show_snackbar=lambda *args: None,
         on_github_star_translation_success=lambda: None,
-        on_telemetry_translation_success=lambda: None,
         on_overlay_state_changed=lambda **kwargs: None,
     )
     adapter = FletUiPresentationAdapter(host)

@@ -95,6 +95,8 @@ class QqManagedAssertionRequest:
     credential: str = field(repr=False)
     asserted_at: str
     metadata: Mapping[str, DiagnosticFieldValue]
+    referral_id: str | None = None
+    installation_id: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metadata", _freeze_fields(self.metadata))
@@ -117,7 +119,23 @@ class QqManagedAssertionResult:
     retry_after_ms: int | None
     message: UserMessageRef | None
     diagnostics: ErrorDiagnostics | None
+    referral_bonus_applied: bool = False
+    referral_id: str | None = None
+    pass_status: object | None = field(default=None, repr=False)
     delivery_ack: ManagedKeyDeliveryAckMetadata | None = field(default=None, repr=False)
+
+
+@dataclass(frozen=True, slots=True)
+class QqManagedStatusRequest:
+    qq_identity: str = field(repr=False)
+    credential: str = field(repr=False)
+    installation_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class QqManagedStatusResult:
+    referral_id: str | None
+    pass_status: object | None = field(default=None, repr=False)
 
 
 class BrokerClientPort(Protocol):
@@ -130,6 +148,11 @@ class BrokerClientPort(Protocol):
         self,
         request: QqManagedAssertionRequest,
     ) -> QqManagedAssertionResult: ...
+
+    async def get_qq_managed_status(
+        self,
+        request: QqManagedStatusRequest,
+    ) -> QqManagedStatusResult: ...
 
     async def acknowledge_managed_key_delivery(
         self,
@@ -148,4 +171,6 @@ __all__ = [
     "QqManagedAssertionRequest",
     "QqManagedAssertionResult",
     "QqManagedEntitlementSnapshot",
+    "QqManagedStatusRequest",
+    "QqManagedStatusResult",
 ]

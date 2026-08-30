@@ -10,42 +10,15 @@ import pytest
 pytest.importorskip("flet")
 
 from puripuly_heart.ui.components.debug_preview_panel import (  # noqa: E402
+    DEBUG_PREVIEW_ACTION_ROW_HEIGHT,
     DEBUG_PREVIEW_PANEL_DATA_KEY,
+    DEBUG_PREVIEW_POPOVER_MAX_HEIGHT,
     DebugPreviewPanel,
 )
 import puripuly_heart.ui.components.debug_preview_panel as panel_module  # noqa: E402
 
-DEBUG_PREVIEW_I18N_KEYS = {
-    "debug_preview.button",
-    "debug_preview.tooltip",
-    "debug_preview.github_star_snackbar",
-    "debug_preview.telemetry_consent",
-    "debug_preview.founder_letter",
-    "debug_preview.discord_auth",
-    "debug_preview.qq_auth",
-    "debug_preview.qq_auth_recoverable_error",
-    "debug_preview.qq_auth_translation_gated",
-    "debug_preview.discord_callback_page",
-    "debug_preview.peer_translation_eula",
-    "debug_preview.local_qwen_hallucination_modal",
-    "debug_preview.talk_together_pass_invite_progress",
-    "debug_preview.foundation_primitives",
-    "debug_preview.http_extension_form",
-    "debug_preview.display_turn_cycle",
-    "foundation.preview.title",
-    "foundation.preview.body",
-    "foundation.preview.ready",
-    "foundation.preview.action",
-    "foundation.preview.unavailable",
-    "peer_translation_eula.body",
-    "peer_translation_eula.accept",
-    "peer_translation_eula.cancel",
-    "peer_translation.disclosure",
-}
-
-ACTION_KEYS = [
+PRIMARY_ACTION_KEYS = [
     "display_turn_cycle",
-    "telemetry_consent",
     "peer_translation_eula",
     "discord_auth",
     "qq_auth",
@@ -59,17 +32,45 @@ ACTION_KEYS = [
     "foundation_primitives",
     "http_extension_form",
 ]
+EXTENDED_ACTION_KEYS = [
+    "brake_notice",
+    "revoked_notice",
+    "pkce_failure",
+    "capture_fault_cycle",
+    "stt_fault_cycle",
+    "audio_fault_clear",
+    "gpu_state_cycle",
+    "stt_loading_button_cycle",
+]
+DEBUG_PREVIEW_I18N_KEYS = {
+    "debug_preview.button",
+    "debug_preview.tooltip",
+    "debug_preview.more_diagnostics",
+    *(f"debug_preview.{key}" for key in PRIMARY_ACTION_KEYS + EXTENDED_ACTION_KEYS),
+    "foundation.preview.title",
+    "foundation.preview.body",
+    "foundation.preview.ready",
+    "foundation.preview.action",
+    "foundation.preview.unavailable",
+    "peer_translation_eula.body",
+    "peer_translation_eula.accept",
+    "peer_translation_eula.cancel",
+    "peer_translation.disclosure",
+}
 
 
 def _callbacks(seen: list[str]):
-    return {f"on_{key}": (lambda key=key: seen.append(key)) for key in ACTION_KEYS}
+    return {
+        f"on_{action_key}": lambda action_key=action_key: seen.append(action_key)
+        for action_key in PRIMARY_ACTION_KEYS + EXTENDED_ACTION_KEYS
+    }
 
 
 def _button_label(button) -> str:
     return button.content
 
 
-def test_debug_preview_panel_starts_collapsed_with_dbg_button() -> None:
+def test_debug_preview_panel_starts_with_curated_actions_and_collapsed_diagnostics() -> None:
     seen: list[str] = []
 
     panel = DebugPreviewPanel(**_callbacks(seen))
@@ -78,8 +79,42 @@ def test_debug_preview_panel_starts_collapsed_with_dbg_button() -> None:
     assert _button_label(panel._toggle_button) == panel_module.t("debug_preview.button")
     assert panel._toggle_button.tooltip == panel_module.t("debug_preview.tooltip")
     assert panel._popover.visible is False
-    assert list(panel._action_buttons) == ACTION_KEYS
+    assert list(panel._action_buttons) == PRIMARY_ACTION_KEYS
+    assert list(panel._extended_action_buttons) == EXTENDED_ACTION_KEYS
+    assert panel._extended_actions_container.visible is False
+    assert panel._popover.content.scroll == panel_module.ft.ScrollMode.AUTO
+    assert panel._popover.content.height == min(
+        (len(PRIMARY_ACTION_KEYS) + 1) * DEBUG_PREVIEW_ACTION_ROW_HEIGHT,
+        DEBUG_PREVIEW_POPOVER_MAX_HEIGHT,
+    )
     assert seen == []
+
+
+def test_debug_preview_panel_expands_diagnostics_with_bounded_scroll_height() -> None:
+    panel = DebugPreviewPanel(**_callbacks([]))
+
+    panel._toggle_extended_actions(None)
+
+    assert panel._extended_actions_container.visible is True
+    assert panel._popover.content.height == DEBUG_PREVIEW_POPOVER_MAX_HEIGHT
+    assert panel._popover.content.scroll == panel_module.ft.ScrollMode.AUTO
+
+    panel._toggle_extended_actions(None)
+    assert panel._extended_actions_container.visible is False
+    assert panel._popover.content.height < DEBUG_PREVIEW_POPOVER_MAX_HEIGHT
+
+
+def test_debug_preview_panel_omits_optional_http_and_extended_actions() -> None:
+    callbacks = _callbacks([])
+    callbacks["on_http_extension_form"] = None
+    for key in EXTENDED_ACTION_KEYS:
+        callbacks[f"on_{key}"] = None
+
+    panel = DebugPreviewPanel(**callbacks)
+
+    assert list(panel._action_buttons) == PRIMARY_ACTION_KEYS[:-1]
+    assert panel._extended_action_buttons == {}
+    assert panel._extended_toggle_button is None
 
 
 def test_debug_preview_panel_toggle_shows_and_hides_popover() -> None:
@@ -104,20 +139,25 @@ def test_debug_preview_panel_skips_update_when_detached(
     monkeypatch.setattr(DebugPreviewPanel, "update", fail_update)
 
     panel._toggle(None)
+    panel._toggle_extended_actions(None)
     panel.apply_locale()
 
     assert panel._popover.visible is True
+    assert panel._extended_actions_container.visible is True
 
 
-def test_debug_preview_panel_invokes_each_callback_without_auto_collapsing() -> None:
+def test_debug_preview_panel_invokes_primary_and_extended_callbacks() -> None:
     seen: list[str] = []
     panel = DebugPreviewPanel(**_callbacks(seen))
     panel._toggle(None)
 
-    for action_key in ACTION_KEYS:
+    for action_key in PRIMARY_ACTION_KEYS:
         panel._action_buttons[action_key].on_click(None)
+    panel._toggle_extended_actions(None)
+    for action_key in EXTENDED_ACTION_KEYS:
+        panel._extended_action_buttons[action_key].on_click(None)
 
-    assert seen == ACTION_KEYS
+    assert seen == PRIMARY_ACTION_KEYS + EXTENDED_ACTION_KEYS
     assert panel._popover.visible is True
 
 
@@ -131,8 +171,15 @@ def test_debug_preview_panel_apply_locale_refreshes_labels(
 
     assert _button_label(panel._toggle_button) == "label:debug_preview.button"
     assert panel._toggle_button.tooltip == "label:debug_preview.tooltip"
-    for key in ACTION_KEYS:
-        assert _button_label(panel._action_buttons[key]) == f"label:debug_preview.{key}"
+    assert _button_label(panel._extended_toggle_button) == ("label:debug_preview.more_diagnostics")
+    for action_key in PRIMARY_ACTION_KEYS:
+        assert _button_label(panel._action_buttons[action_key]) == (
+            f"label:debug_preview.{action_key}"
+        )
+    for action_key in EXTENDED_ACTION_KEYS:
+        assert _button_label(panel._extended_action_buttons[action_key]) == (
+            f"label:debug_preview.{action_key}"
+        )
 
 
 def test_debug_preview_panel_uses_flet_086_text_button_content_api(
@@ -153,7 +200,9 @@ def test_debug_preview_panel_uses_flet_086_text_button_content_api(
 
     assert [button.content for button in created] == [
         panel_module.t("debug_preview.button"),
-        *(panel_module.t(f"debug_preview.{action_key}") for action_key in ACTION_KEYS),
+        *(panel_module.t(f"debug_preview.{key}") for key in PRIMARY_ACTION_KEYS),
+        *(panel_module.t(f"debug_preview.{key}") for key in EXTENDED_ACTION_KEYS),
+        panel_module.t("debug_preview.more_diagnostics"),
     ]
 
 

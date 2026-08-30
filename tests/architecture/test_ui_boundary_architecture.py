@@ -20,7 +20,7 @@ APPLICATION_RUNTIME_PATH = (
 
 UI_APPLICATION_NON_INTENT_MEMBERS = {
     "application_lifecycle",
-    "build_managed_openrouter_byok_target_settings",
+    "build_managed_openrouter_byok_target",
     "cancel_managed_auth_task",
     "clear_managed_auth_task",
     "close_github_star_prompt_runtime",
@@ -51,6 +51,9 @@ UI_APPLICATION_NON_INTENT_MEMBERS = {
     "refresh_settings_projection",
     "register_application_shutdown_callbacks",
     "should_show_github_star_prompt",
+    "settings_general_snapshot",
+    "settings_overlay_snapshot",
+    "settings_secrets",
     "state",
     "stop",
     "stop_github_star_prompt_ingress",

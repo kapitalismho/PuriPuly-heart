@@ -33,8 +33,7 @@ def test_title_bar_window_controls_and_hover(monkeypatch: pytest.MonkeyPatch) ->
 
     bar._minimize(None)
     assert page.window.minimized is True
-    assert bar._maximize_btn.disabled is True
-    assert bar._maximize_btn.on_click is None
+    assert not hasattr(bar, "_maximize_btn")
     assert page.window.maximized is False
 
     bar._close(None)

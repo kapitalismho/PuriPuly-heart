@@ -13,7 +13,6 @@ from puripuly_heart.app.services.microphone_test import (
     MicrophoneTestSessionOwner,
     MicrophoneTestSessionRequest,
 )
-from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.core.audio.source import (
     SoundDeviceAudioSource,
     determine_self_mic_capture_channels,
@@ -27,9 +26,25 @@ from .wiring_composition import create_microphone_test_capture_adapter
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True, slots=True)
+class MicrophoneTestAudioSettings:
+    input_host_api: str
+    input_device: str
+    internal_sample_rate_hz: int
+    internal_channels: int
+
+    def signature(self) -> tuple[str, str, int, int]:
+        return (
+            self.input_host_api,
+            self.input_device,
+            self.internal_sample_rate_hz,
+            self.internal_channels,
+        )
+
+
 @dataclass(slots=True)
 class MicrophoneTestRuntime:
-    settings_provider: Callable[[], AppSettings | None]
+    audio_provider: Callable[[], MicrophoneTestAudioSettings | None]
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None]
     local_pending_provider: Callable[[], bool]
     disable_self_capture: Callable[[], Awaitable[object]]
@@ -64,16 +79,11 @@ class MicrophoneTestRuntime:
 
     @staticmethod
     def audio_signature(
-        settings: AppSettings | None,
-    ) -> tuple[object, ...] | None:
-        if settings is None:
+        audio: MicrophoneTestAudioSettings | None,
+    ) -> tuple[str, str, int, int] | None:
+        if audio is None:
             return None
-        return (
-            settings.audio.input_host_api,
-            settings.audio.input_device,
-            settings.audio.internal_sample_rate_hz,
-            settings.audio.internal_channels,
-        )
+        return audio.signature()
 
     def self_capture_state(self) -> MicrophoneTestSelfCaptureState:
         owner = self.self_capture_provider()
@@ -102,7 +112,7 @@ class MicrophoneTestRuntime:
         meter_callback: Callable[[float], object] | None,
         level_log_interval_s: float,
     ) -> bool:
-        signature = self.audio_signature(self.settings_provider())
+        signature = self.audio_signature(self.audio_provider())
         if signature is None:
             return False
         return await self.owner().start(
@@ -141,13 +151,13 @@ class MicrophoneTestRuntime:
         meter_callback: Callable[[float], object] | None,
         level_log_interval_s: float,
     ) -> MicrophoneTestCaptureRequest:
-        settings = self.settings_provider()
-        if settings is None:
-            raise RuntimeError("Microphone test capture requires settings")
+        audio = self.audio_provider()
+        if audio is None:
+            raise RuntimeError("Microphone test capture requires audio settings")
         return MicrophoneTestCaptureRequest(
-            saved_host_api=settings.audio.input_host_api,
-            requested_device=settings.audio.input_device,
-            internal_channels=settings.audio.internal_channels,
+            saved_host_api=audio.input_host_api,
+            requested_device=audio.input_device,
+            internal_channels=audio.internal_channels,
             generation=generation,
             meter_callback=meter_callback,
             level_log_interval_s=level_log_interval_s,
@@ -180,4 +190,4 @@ class MicrophoneTestRuntime:
         )
 
 
-__all__ = ["MicrophoneTestRuntime"]
+__all__ = ["MicrophoneTestAudioSettings", "MicrophoneTestRuntime"]

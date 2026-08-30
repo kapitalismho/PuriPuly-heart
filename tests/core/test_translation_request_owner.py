@@ -227,7 +227,7 @@ def test_prepare_uses_detected_language_and_integrated_peer_context() -> None:
     assert prepared.applied_context_mode == "integrated"
 
 
-def test_prepare_falls_back_to_local_context_without_eligible_peer_entry() -> None:
+def test_prepare_uses_integrated_context_without_eligible_peer_entry() -> None:
     fixture = build_owner(RecordingProvider())
     fixture.self_runtime.remember_context(
         "previous self text",
@@ -239,7 +239,7 @@ def test_prepare_falls_back_to_local_context_without_eligible_peer_entry() -> No
     prepared = fixture.owner.prepare("안녕")
 
     assert "previous self text" in prepared.context
-    assert prepared.applied_context_mode == "local"
+    assert prepared.applied_context_mode == "integrated"
 
 
 def test_parent_admission_freezes_target_specific_context_before_registering_current_turn() -> None:

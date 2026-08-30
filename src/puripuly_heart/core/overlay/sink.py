@@ -10,7 +10,7 @@ from puripuly_heart.core.messages import DiagnosticFieldValue
 from puripuly_heart.core.output.subtitle import PeerSubtitlePublication
 from puripuly_heart.domain.models import ChannelId, Transcript
 
-AppliedContextMode = Literal["local", "integrated"]
+AppliedContextMode = Literal["integrated"]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import contextlib
 import os
-from dataclasses import dataclass
 from pathlib import Path
 
-from puripuly_heart.config.paths import STABLE_APP_DIR_NAME, VNEXT_APP_DIR_NAME
-from puripuly_heart.config.settings import SecretsBackend, SecretsSettings
+from puripuly_heart.config.paths import STABLE_APP_DIR_NAME
+from puripuly_heart.config.provider_values import SecretsBackend
+from puripuly_heart.config.settings_vnext.schema import SecretsIntent
 from puripuly_heart.core.storage.secrets import (
     EncryptedFileSecretStore,
     KeyringSecretStore,
@@ -15,35 +15,10 @@ from puripuly_heart.core.storage.secrets import (
 
 SECRETS_PASSPHRASE_ENV = "PURIPULY_HEART_SECRETS_PASSPHRASE"
 STABLE_KEYRING_SERVICE_NAME = STABLE_APP_DIR_NAME
-VNEXT_KEYRING_SERVICE_NAME = VNEXT_APP_DIR_NAME
-VNEXT_IMPORT_SECRET_KEYS = (
-    "google_api_key",
-    "openrouter_api_key",
-    "deepseek_api_key",
-    "deepgram_api_key",
-    "soniox_api_key",
-    "alibaba_api_key_beijing",
-    "alibaba_api_key_singapore",
-    "alibaba_api_key",
-    "local_llm_api_key",
-    "custom_stt_api_key",
-)
-
-
-@dataclass(frozen=True, slots=True)
-class SecretNamespaceImportResult:
-    copied_keys: tuple[str, ...]
-    skipped_keys: tuple[str, ...]
-    failed_keys: tuple[str, ...]
-    error: str | None = None
-
-    @property
-    def ok(self) -> bool:
-        return self.error is None and not self.failed_keys
 
 
 def create_secret_store(
-    settings: SecretsSettings,
+    settings: SecretsIntent,
     *,
     config_path: Path,
     passphrase: str | None = None,
@@ -69,82 +44,10 @@ def create_secret_store(
     raise ValueError(f"Unsupported secrets backend: {settings.backend}")
 
 
-def copy_stable_secrets_to_vnext_namespace(
-    settings: object,
-    *,
-    stable_config_path: Path,
-    vnext_config_path: Path,
-    vnext_settings: object | None = None,
-    passphrase: str | None = None,
-    keys: tuple[str, ...] = VNEXT_IMPORT_SECRET_KEYS,
-) -> SecretNamespaceImportResult:
-    if vnext_settings is None:
-        vnext_settings = settings
-    if _stable_encrypted_file_missing(settings, config_path=stable_config_path):
-        return SecretNamespaceImportResult(
-            copied_keys=(),
-            skipped_keys=keys,
-            failed_keys=(),
-        )
-    try:
-        stable_store = create_secret_store(
-            settings,
-            config_path=stable_config_path,
-            passphrase=passphrase,
-            keyring_service_name=STABLE_KEYRING_SERVICE_NAME,
-        )
-        vnext_store = create_secret_store(
-            vnext_settings,
-            config_path=vnext_config_path,
-            passphrase=passphrase,
-            keyring_service_name=VNEXT_KEYRING_SERVICE_NAME,
-        )
-    except Exception as exc:
-        return SecretNamespaceImportResult(
-            copied_keys=(),
-            skipped_keys=keys,
-            failed_keys=(),
-            error=f"{type(exc).__name__}: {exc}",
-        )
-
-    copied: list[str] = []
-    skipped: list[str] = []
-    failed: list[str] = []
-    for key in keys:
-        try:
-            value = stable_store.get(key)
-            if not value or vnext_store.get(key):
-                skipped.append(key)
-                continue
-            vnext_store.set(key, value)
-            copied.append(key)
-        except Exception:
-            failed.append(key)
-    return SecretNamespaceImportResult(
-        copied_keys=tuple(copied),
-        skipped_keys=tuple(skipped),
-        failed_keys=tuple(failed),
-    )
-
-
 def _secrets_backend_value(value: object) -> str:
     if isinstance(value, SecretsBackend):
         return value.value
     return str(value)
-
-
-def _stable_encrypted_file_missing(settings: object, *, config_path: Path) -> bool:
-    backend = _secrets_backend_value(settings.backend)
-    if backend != SecretsBackend.ENCRYPTED_FILE.value:
-        return False
-    return not _encrypted_file_path(settings, config_path=config_path).exists()
-
-
-def _encrypted_file_path(settings: object, *, config_path: Path) -> Path:
-    path = Path(settings.encrypted_file_path)
-    if path.is_absolute():
-        return path
-    return config_path.parent / path
 
 
 def _get_secret(

@@ -1,152 +1,112 @@
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import app from '../src/index';
 import {
-  deriveTelemetrySubjectRef,
-  recordTelemetryActiveDay,
-  TELEMETRY_SIGNAL_KIND,
+  deriveAppSubjectRef,
+  recordAppActiveDay,
 } from '../src/telemetry';
-import { updateAbuseControls } from './test-support/abuse-controls';
-import { normalizedErrorEnvelope } from './test-support/errors';
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
 
 const VALID_IDENTIFIER = 'telemetry_identifier_0123456789ABCDEF';
 const VALID_PAYLOAD = {
-  signal: TELEMETRY_SIGNAL_KIND,
-  telemetry_identifier: VALID_IDENTIFIER,
-  active_date_utc: '2026-07-02',
+  anonymous_id: VALID_IDENTIFIER,
+  active_date_utc: '2026-08-28',
 };
 
-describe('telemetry active-day ingest', () => {
+describe('app active-day ingest', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
-  it('creates the active-day schema with uniqueness and no raw identifier column', async () => {
+  it('stores only a derived subject reference and UTC date', async () => {
     const env = createTestBrokerEnv();
     const columns = env.__db
-      .prepare("SELECT name FROM pragma_table_info('telemetry_active_days') ORDER BY cid")
+      .prepare("SELECT name FROM pragma_table_info('app_active_days') ORDER BY cid")
       .all() as Array<{ name: string }>;
 
     expect(columns.map(({ name }) => name)).toEqual([
       'subject_ref',
       'active_date_utc',
-      'first_received_at',
-      'last_received_at',
     ]);
 
-    const subjectRef = await deriveTelemetrySubjectRef(
+    const subjectRef = await deriveAppSubjectRef(
       env.TELEMETRY_SUBJECT_HMAC_SECRET,
       VALID_IDENTIFIER,
     );
-
-    await recordTelemetryActiveDay(env.BROKER_DB, {
+    await recordAppActiveDay(env.BROKER_DB, {
       subjectRef,
-      activeDateUtc: '2026-07-02',
-      receivedAt: '2026-07-02T00:00:00.000Z',
+      activeDateUtc: '2026-08-28',
     });
-    await recordTelemetryActiveDay(env.BROKER_DB, {
+    await recordAppActiveDay(env.BROKER_DB, {
       subjectRef,
-      activeDateUtc: '2026-07-02',
-      receivedAt: '2026-07-02T00:01:00.000Z',
+      activeDateUtc: '2026-08-28',
     });
 
-    const row = env.__db
-      .prepare('SELECT COUNT(*) AS count, MIN(first_received_at) AS first, MAX(last_received_at) AS last FROM telemetry_active_days')
-      .get() as { count: number; first: string; last: string };
-    expect(row).toEqual({
-      count: 1,
-      first: '2026-07-02T00:00:00.000Z',
-      last: '2026-07-02T00:01:00.000Z',
-    });
-
-    expect(() =>
+    expect(
       env.__db
-        .prepare(
-          'INSERT INTO telemetry_active_days (subject_ref, active_date_utc, first_received_at, last_received_at) VALUES (?, ?, ?, ?)',
-        )
-        .run('raw-telemetry-identifier', '2026-07-03', '2026-07-03T00:00:00.000Z', '2026-07-03T00:00:00.000Z'),
-    ).toThrow(/constraint/i);
-
-    expect(() =>
-      env.__db
-        .prepare(
-          'INSERT INTO telemetry_active_days (subject_ref, active_date_utc, first_received_at, last_received_at) VALUES (?, ?, ?, ?)',
-        )
-        .run(
-          `ph-telemetry-subject-v1_${'a'.repeat(63)}g`,
-          '2026-07-03',
-          '2026-07-03T00:00:00.000Z',
-          '2026-07-03T00:00:00.000Z',
-        ),
-    ).toThrow(/constraint/i);
-  });
-
-  it('accepts valid payloads, stores HMAC subject_ref, and collapses duplicates', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-07-02T12:34:56.000Z'));
-
-    const env = createTestBrokerEnv();
-    const first = await postTelemetry(env, VALID_PAYLOAD);
-    const second = await postTelemetry(env, VALID_PAYLOAD);
-
-    expect(first.status).toBe(200);
-    await expect(first.json()).resolves.toEqual({ ok: true });
-    expect(second.status).toBe(200);
-
-    const rows = env.__db
-      .prepare('SELECT subject_ref, active_date_utc, first_received_at, last_received_at FROM telemetry_active_days')
-      .all() as Array<{
-      subject_ref: string;
-      active_date_utc: string;
-      first_received_at: string;
-      last_received_at: string;
-    }>;
-    const expectedSubjectRef = await deriveTelemetrySubjectRef(
-      env.TELEMETRY_SUBJECT_HMAC_SECRET,
-      VALID_IDENTIFIER,
-    );
-
-    expect(rows).toEqual([
+        .prepare('SELECT subject_ref, active_date_utc FROM app_active_days')
+        .all(),
+    ).toEqual([
       {
-        subject_ref: expectedSubjectRef,
-        active_date_utc: '2026-07-02',
-        first_received_at: '2026-07-02T12:34:56.000Z',
-        last_received_at: '2026-07-02T12:34:56.000Z',
+        subject_ref: subjectRef,
+        active_date_utc: '2026-08-28',
       },
     ]);
-    expect(JSON.stringify(rows)).not.toContain(VALID_IDENTIFIER);
+    expect(JSON.stringify(env.__db.prepare('SELECT * FROM app_active_days').all()))
+      .not.toContain(VALID_IDENTIFIER);
+  });
+
+  it('accepts today and the previous UTC date and collapses duplicates', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-28T12:34:56.000Z'));
+    const env = createTestBrokerEnv();
+
+    const today = await postTelemetry(env, VALID_PAYLOAD);
+    const duplicate = await postTelemetry(env, VALID_PAYLOAD);
+    const previous = await postTelemetry(env, {
+      ...VALID_PAYLOAD,
+      active_date_utc: '2026-08-27',
+    });
+
+    expect(today.status).toBe(200);
+    await expect(today.json()).resolves.toEqual({ ok: true });
+    expect(duplicate.status).toBe(200);
+    expect(previous.status).toBe(200);
+    expect(countAppActiveDays(env)).toBe(2);
   });
 
   it.each([
-    ['wrong signal', { ...VALID_PAYLOAD, signal: 'app_launch' }],
-    ['missing identifier', { signal: TELEMETRY_SIGNAL_KIND, active_date_utc: '2026-07-02' }],
-    ['invalid identifier', { ...VALID_PAYLOAD, telemetry_identifier: 'short' }],
+    ['missing identifier', { active_date_utc: '2026-08-28' }],
+    ['invalid identifier', { ...VALID_PAYLOAD, anonymous_id: 'short' }],
     ['invalid calendar date', { ...VALID_PAYLOAD, active_date_utc: '2026-02-30' }],
-    ['timestamp instead of UTC date', { ...VALID_PAYLOAD, active_date_utc: '2026-07-02T00:00:00Z' }],
-    ['additional field', { ...VALID_PAYLOAD, model: 'not-allowed' }],
-  ])('rejects %s safely', async (_name, payload) => {
+    ['timestamp instead of UTC date', { ...VALID_PAYLOAD, active_date_utc: '2026-08-28T00:00:00Z' }],
+    ['future date', { ...VALID_PAYLOAD, active_date_utc: '2026-08-29' }],
+    ['older date', { ...VALID_PAYLOAD, active_date_utc: '2026-08-26' }],
+    ['additional metadata', { ...VALID_PAYLOAD, app_version: '2.5.1' }],
+    ['legacy signal', { ...VALID_PAYLOAD, signal: 'translation_success_day' }],
+  ])('rejects %s without persistence', async (_name, payload) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-28T12:34:56.000Z'));
     const env = createTestBrokerEnv();
+
     const response = await postTelemetry(env, payload);
 
     expect(response.status).toBe(400);
-    const body = await response.json();
-    expect(body).toMatchObject({
+    await expect(response.json()).resolves.toMatchObject({
       error: {
         code: 'invalid_request',
         class: 'terminal',
         retry_after_ms: null,
       },
     });
-    expect(JSON.stringify(body)).not.toContain(VALID_IDENTIFIER);
-    expect(countTelemetryRows(env)).toBe(0);
+    expect(countAppActiveDays(env)).toBe(0);
   });
 
   it('rejects malformed JSON without persistence', async () => {
     const env = createTestBrokerEnv();
     const response = await app.request(
-      'http://broker.test/v1/telemetry/translation-success-day',
+      'http://broker.test/v1/telemetry/app-active-day',
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -156,42 +116,58 @@ describe('telemetry active-day ingest', () => {
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({
-      error: { code: 'invalid_request', class: 'terminal' },
-    });
-    expect(countTelemetryRows(env)).toBe(0);
+    expect(countAppActiveDays(env)).toBe(0);
   });
 
-  it('rate limits telemetry by client IP without requiring app identity', async () => {
+  it('does not rate limit or persist request IP events', async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-07-02T12:00:00.000Z'));
-
+    vi.setSystemTime(new Date('2026-08-28T12:34:56.000Z'));
     const env = createTestBrokerEnv();
-    updateAbuseControls(env, (controls) => {
-      controls.telemetryTranslationSuccessDayIp.maxRequests = 2;
-    });
 
-    expect((await postTelemetry(env, { ...VALID_PAYLOAD, active_date_utc: '2026-07-01' }, '203.0.113.99')).status).toBe(200);
-    expect((await postTelemetry(env, VALID_PAYLOAD, '203.0.113.99')).status).toBe(200);
+    const responses = await Promise.all(
+      Array.from({ length: 65 }, (_, index) =>
+        postTelemetry(
+          env,
+          {
+            anonymous_id: `anonymous-installation-${index.toString().padStart(3, '0')}`,
+            active_date_utc: '2026-08-28',
+          },
+          '203.0.113.99',
+        ),
+      ),
+    );
 
-    const blocked = await postTelemetry(
+    expect(responses.every((response) => response.status === 200)).toBe(true);
+    expect(countAppActiveDays(env)).toBe(65);
+    expect(
+      env.__db
+        .prepare(
+          `SELECT COUNT(*) AS count
+             FROM broker_request_events
+            WHERE endpoint = ?`,
+        )
+        .get('POST /v1/telemetry/app-active-day'),
+    ).toEqual({ count: 0 });
+  });
+
+  it('does not mix legacy translation telemetry into app activity', async () => {
+    const env = createTestBrokerEnv();
+    const response = await app.request(
+      'http://broker.test/v1/telemetry/translation-success-day',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          signal: 'translation_success_day',
+          telemetry_identifier: VALID_IDENTIFIER,
+          active_date_utc: '2026-08-28',
+        }),
+      },
       env,
-      { ...VALID_PAYLOAD, active_date_utc: '2026-07-03' },
-      '203.0.113.99',
     );
 
-    expect(blocked.status).toBe(429);
-    await expect(blocked.json()).resolves.toEqual(
-      normalizedErrorEnvelope({
-        code: 'rate_limited',
-        class: 'retryable',
-        subcode: 'ip_rate_limited',
-        retryAfterMs: 900000,
-        message:
-          'request rate limit exceeded for POST /v1/telemetry/translation-success-day',
-      }),
-    );
-    expect(countTelemetryRows(env)).toBe(2);
+    expect(response.status).toBe(404);
+    expect(countAppActiveDays(env)).toBe(0);
   });
 });
 
@@ -201,7 +177,7 @@ async function postTelemetry(
   ip = '198.51.100.7',
 ): Promise<Response> {
   return app.request(
-    'http://broker.test/v1/telemetry/translation-success-day',
+    'http://broker.test/v1/telemetry/app-active-day',
     {
       method: 'POST',
       headers: {
@@ -214,9 +190,9 @@ async function postTelemetry(
   );
 }
 
-function countTelemetryRows(env: ReturnType<typeof createTestBrokerEnv>): number {
+function countAppActiveDays(env: ReturnType<typeof createTestBrokerEnv>): number {
   const row = env.__db
-    .prepare('SELECT COUNT(*) AS count FROM telemetry_active_days')
+    .prepare('SELECT COUNT(*) AS count FROM app_active_days')
     .get() as { count: number };
   return row.count;
 }

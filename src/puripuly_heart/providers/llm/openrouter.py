@@ -9,11 +9,14 @@ from uuid import UUID
 import httpx
 
 from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
-from puripuly_heart.config.settings import OpenRouterProviderRouting, OpenRouterRoutingMode
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter_credentials import normalize_managed_openrouter_user_identifier
 from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
-from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
+from puripuly_heart.core.openrouter_routing import (
+    OpenRouterProviderRouting,
+    OpenRouterRoutingMode,
+)
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
@@ -23,7 +26,7 @@ _OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"
 
 def _log_basic_request(
     *,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     text: str,
     source_language: str,
@@ -44,7 +47,7 @@ def _log_basic_request(
 
 
 def _log_basic_response(
-    *, runtime_logging: SessionRuntimeLoggingService | None, operation: str, text: str
+    *, runtime_logging: ProviderObservationPort | None, operation: str, text: str
 ) -> None:
     message = "[Basic][LLM] OpenRouter response [%s]: %r" % (operation, text)
     if runtime_logging is not None:
@@ -55,7 +58,7 @@ def _log_basic_response(
 
 def _log_basic_request_failure(
     *,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     status: int,
     message: str,
@@ -238,7 +241,7 @@ class OpenRouterLLMProvider:
     provider_routing: OpenRouterProviderRouting = OpenRouterProviderRouting.DEFAULT
     max_tokens: int = 100
     timeout: float = 30.0
-    runtime_logging: SessionRuntimeLoggingService | None = None
+    runtime_logging: ProviderObservationPort | None = None
     client: OpenRouterClient | None = None
     _internal_client: OpenRouterClient | None = field(init=False, default=None, repr=False)
 
@@ -345,7 +348,7 @@ class HttpxOpenRouterClient:
     provider_routing: OpenRouterProviderRouting = OpenRouterProviderRouting.DEFAULT
     max_tokens: int = 100
     timeout: float = 30.0
-    runtime_logging: SessionRuntimeLoggingService | None = None
+    runtime_logging: ProviderObservationPort | None = None
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _client_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
 
@@ -388,6 +391,7 @@ class HttpxOpenRouterClient:
                 {"role": "user", "content": user_message},
             ],
             "reasoning": {"effort": "none"},
+            "temperature": 0.6,
             "provider": _build_provider_preferences(
                 self.provider_routing,
                 model=self.model,

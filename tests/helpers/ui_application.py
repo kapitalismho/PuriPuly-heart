@@ -5,11 +5,24 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
+from puripuly_heart.app.services.settings_application import (
+    materialize_immediate_settings_intent,
+    materialize_prompt_apply_intent,
+    materialize_provider_apply_intent,
+    settings_view_surface_snapshots,
+)
+
 from puripuly_heart.app.ports.application_runtime_logging import (
     ApplicationRuntimeLoggingPort,
 )
 from puripuly_heart.app.ports.application_runtime_shutdown import (
     ApplicationRuntimeShutdownPort,
+)
+from puripuly_heart.app.ports.settings_view import (
+    ImmediateSettingsIntent,
+    OpenRouterPkceTarget,
+    PromptApplyIntent,
+    ProviderApplyIntent,
 )
 from puripuly_heart.app.ports.ui_application_intents import (
     UiDiagnosticsRuntimePort,
@@ -30,6 +43,10 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownDiagnostic,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    materialize_compatibility_translation_settings,
+)
+from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
 
@@ -60,6 +77,17 @@ class ApplicationRuntimeLoggingStub:
         return exception is not None
 
 
+class EmptySettingsSecretStore:
+    def get(self, _key: str) -> str | None:
+        return None
+
+    def set(self, _key: str, _value: str) -> None:
+        return None
+
+    def delete(self, _key: str) -> None:
+        return None
+
+
 class UiApplicationRuntimeStub:
     def __init__(self, backend: object) -> None:
         self._backend = backend
@@ -74,6 +102,69 @@ class UiApplicationRuntimeStub:
     def merge_settings_view_change_with_current(self, captured: object) -> object:
         merge = getattr(self._backend, "merge_settings_view_change_with_current", None)
         return merge(captured) if callable(merge) else captured
+
+    def _compatibility_settings(self):
+        return getattr(self._backend, "settings", None)
+
+    def general_snapshot(self):
+        settings = self._compatibility_settings()
+        return None if settings is None else settings_view_surface_snapshots(settings)[1]
+
+    def overlay_snapshot(self):
+        settings = self._compatibility_settings()
+        return None if settings is None else settings_view_surface_snapshots(settings)[3]
+
+    async def apply_settings_intent(self, intent: ImmediateSettingsIntent) -> object:
+        apply_intent = getattr(self._backend, "apply_settings_intent", None)
+        if callable(apply_intent):
+            return await apply_intent(intent)
+        apply_settings = getattr(self._backend, "apply_settings")
+        current = self._compatibility_settings()
+        pending = (
+            materialize_immediate_settings_intent(current, intent)
+            if current is not None and not isinstance(intent, str)
+            else intent
+        )
+        return await apply_settings(pending)
+
+    async def apply_prompt_intent(self, intent: PromptApplyIntent) -> object:
+        apply_intent = getattr(self._backend, "apply_prompt_intent", None)
+        if callable(apply_intent):
+            return await apply_intent(intent)
+        apply_settings = getattr(self._backend, "apply_settings")
+        current = self._compatibility_settings()
+        pending = (
+            materialize_prompt_apply_intent(current, intent)
+            if current is not None and isinstance(intent, PromptApplyIntent)
+            else intent
+        )
+        return await apply_settings(pending)
+
+    def materialize_provider_intent(self, intent: ProviderApplyIntent) -> object:
+        materialize = getattr(self._backend, "materialize_provider_intent", None)
+        if callable(materialize):
+            return materialize(intent)
+        current = self._compatibility_settings()
+        if current is not None and isinstance(intent, ProviderApplyIntent):
+            return materialize_provider_apply_intent(
+                current,
+                intent,
+                materialize_translation=materialize_compatibility_translation_settings,
+            )
+        return intent
+
+    async def connect_openrouter_via_pkce(
+        self,
+        *,
+        target: OpenRouterPkceTarget,
+        launch_source: str,
+    ) -> bool:
+        connect = getattr(self._backend, "connect_openrouter_via_pkce")
+        return bool(await connect(target=target, launch_source=launch_source))
+
+    def build_managed_openrouter_byok_target(self) -> OpenRouterPkceTarget | None:
+        build = getattr(self._backend, "build_managed_openrouter_byok_target", None)
+        return build() if callable(build) else None
 
     def refresh_settings_projection(
         self,
@@ -119,9 +210,9 @@ class UiApplicationRuntimeStub:
         prompt = getattr(self._backend, "dashboard_managed_auth_prompt_kind", None)
         return str(prompt()) if callable(prompt) else "discord"
 
-    async def apply_telemetry_consent(self, consent: str) -> object | None:
-        apply = getattr(self._backend, "apply_telemetry_consent", None)
-        return await apply(consent) if callable(apply) else None
+    async def apply_telemetry_enabled(self, enabled: bool) -> object | None:
+        apply = getattr(self._backend, "apply_telemetry_enabled", None)
+        return await apply(enabled) if callable(apply) else None
 
     def reopen_openrouter_pkce_authorization_url(self) -> object:
         reopen = getattr(
@@ -136,14 +227,13 @@ class UiApplicationRuntimeStub:
         if callable(clear):
             clear(provider)
 
-    async def record_telemetry_translation_success_day(self) -> None:
+    async def record_app_active_day(self, active_date_utc: str) -> object | None:
         record = getattr(
             self._backend,
-            "record_telemetry_translation_success_day",
+            "record_app_active_day",
             None,
         )
-        if callable(record):
-            await record()
+        return await record(active_date_utc) if callable(record) else None
 
     def should_show_github_star_prompt(self) -> bool:
         should_show = getattr(self._backend, "should_show_github_star_prompt", None)
@@ -399,5 +489,8 @@ def compose_test_ui_application_boundary(
         ),
         runtime_shutdown=runtime_shutdown or ApplicationRuntimeShutdownStub(backend),
         runtime_logging=logging_port,
+        settings_secrets=SettingsSecretsOwner(
+            secret_store_factory=EmptySettingsSecretStore,
+        ),
         osc_state_publisher=osc_state_publisher,
     )

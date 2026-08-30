@@ -60,6 +60,7 @@ def _owner(
     async def execute_qq(
         _qq_identity: str,
         _credential: str,
+        _referral_id: str | None,
     ) -> ManagedAuthExecutionResult:
         return qq_result or ManagedAuthExecutionResult(succeeded=True)
 
@@ -166,7 +167,7 @@ async def test_discord_success_sequences_pending_result_runtime_view_and_refresh
     pass_status = TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=2,
-        invite_limit=5,
+        invite_limit=3,
     )
     transaction = TransactionResult(
         status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
@@ -231,10 +232,38 @@ async def test_discord_failure_contains_safe_message_and_restores_state() -> Non
     assert pending == [True, False]
     assert messages == [("discord_auth.error.expired", {"retry_after_ms": 50})]
     assert logs == [
-        "[ManagedAuth] Discord auth failed: " "message_key=discord_auth.error.expired class=auth"
+        "[ManagedAuth] Discord auth failed: message_key=discord_auth.error.expired class=auth"
     ]
     assert owner.discord_in_progress is False
     assert owner.callback_received_hook is None
+
+
+@pytest.mark.asyncio
+async def test_discord_delivery_ack_pending_keeps_issued_pass_visible_and_refreshes() -> None:
+    views: list[tuple[str | None, TalkTogetherPassStatus | None]] = []
+    refreshes: list[str] = []
+    pass_status = TalkTogetherPassStatus(
+        pass_id="7KQ9M2",
+        invite_count=0,
+        invite_limit=3,
+    )
+    owner = _owner(
+        [_state()],
+        discord_result=ManagedAuthExecutionResult(
+            succeeded=False,
+            delivery_ack_pending=True,
+            referral_id="7KQ9M2",
+            pass_status=pass_status,
+            message_key="discord_auth.error.retry",
+        ),
+        views=views,
+        refreshes=refreshes,
+    )
+
+    assert await owner.start_discord() is False
+
+    assert views == [("7KQ9M2", pass_status)]
+    assert refreshes == ["refresh"]
 
 
 @pytest.mark.asyncio

@@ -119,7 +119,7 @@ CURRENT_USER_INTENT_DESTINATIONS = {
     "openrouter.routing_mode": "intent.translation.openrouter_routing_mode",
     "openrouter.selected_source": "intent.translation.openrouter_selected_source",
     "openrouter.selection_alias": "intent.translation.openrouter_selection_alias",
-    "telemetry.consent": "intent.telemetry.consent",
+    "telemetry.enabled": "intent.telemetry.enabled",
     "translation.fallback.connection": "intent.translation.fallback.connection",
     "translation.fallback.enabled": "intent.translation.fallback.enabled",
     "translation.fallback.model": "intent.translation.fallback.model",
@@ -220,6 +220,7 @@ CURRENT_OPERATIONAL_STATE_DESTINATIONS = {
         "state.managed_connection.pending_delivery_ack_source"
     ),
     "managed_identity.referral_id": "state.managed_connection.referral_id",
+    "managed_identity.referral_source": "state.managed_connection.referral_source",
     "managed_identity.release_token": "state.managed_connection.release_token",
     "managed_identity.release_token_expires_at": (
         "state.managed_connection.release_token_expires_at"
@@ -229,9 +230,7 @@ CURRENT_OPERATIONAL_STATE_DESTINATIONS = {
         "state.managed_connection.verified_hardware_hash_salt_version"
     ),
     "telemetry_state.anonymous_id": "state.telemetry.anonymous_id",
-    "telemetry_state.sent_translation_success_dates_utc": (
-        "state.telemetry.sent_translation_success_dates_utc"
-    ),
+    "telemetry_state.last_sent_date_utc": "state.telemetry.last_sent_date_utc",
     "ui.github_star_prompt_clicked": "state.github_star_prompt.clicked",
     "ui.github_star_prompt_eligible_launch_count": (
         "state.github_star_prompt.eligible_launch_count"
@@ -307,6 +306,7 @@ EXPLICIT_MISSING_FIELD_DEFAULT_EXPECTATIONS: dict[str, Any] = {
     "ui.github_star_prompt_show_count": 0,
     # Missing referral identity state remains absent rather than inventing a value.
     "managed_identity.referral_id": None,
+    "managed_identity.referral_source": None,
     "languages.peer_source_mode": "manual",
     "languages.peer_expected_languages": [],
 }
@@ -451,6 +451,7 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     settings.managed_identity.active_managed_expires_at = "2026-07-09T00:00:00Z"
     settings.managed_identity.founder_letter_seen_credential_ref = "fixture-founder-ref"
     settings.managed_identity.referral_id = "7KQ9M2"
+    settings.managed_identity.referral_source = "qq"
     settings.managed_identity.local_managed_claim_sources = ("discord",)
     settings.managed_identity.pending_delivery_ack_source = "discord"
     settings.managed_identity.pending_delivery_ack_delivery_id = "fixture-delivery-id"
@@ -458,9 +459,9 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
         "fixture-pending-credential-ref"
     )
     settings.managed_identity.pending_delivery_ack_expires_at = "2026-07-10T00:00:00Z"
-    settings.telemetry.consent = "allow"
+    settings.telemetry.enabled = True
     settings.telemetry_state.anonymous_id = "fixture-telemetry-anonymous-id"
-    settings.telemetry_state.sent_translation_success_dates_utc = ["2026-07-01", "2026-07-02"]
+    settings.telemetry_state.last_sent_date_utc = "2026-07-02"
     settings.system_prompt = "Fixture system prompt text."
     settings.validate()
 
@@ -477,6 +478,11 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
 
 def legacy_compatibility_settings_fixture() -> dict[str, Any]:
     data = copy.deepcopy(maximal_v24_settings_fixture())
+    data["telemetry"] = {"consent": "allow"}
+    data["telemetry_state"] = {
+        "anonymous_id": "fixture-telemetry-anonymous-id",
+        "sent_translation_success_dates_utc": ["2026-07-01", "2026-07-02"],
+    }
     data["settings_version"] = 17
     data["openrouter"]["credential_source"] = OpenRouterCredentialSource.BYOK.value
     data["openrouter"]["selected_credential_source"] = OpenRouterCredentialSource.MANAGED.value
@@ -607,6 +613,18 @@ def _current_migration_classification() -> dict[str, FieldClassification]:
 V24_MIGRATION_CLASSIFICATION = _current_migration_classification()
 
 LEGACY_MIGRATION_CLASSIFICATION: dict[str, FieldClassification] = {
+    "telemetry.consent": FieldClassification(
+        category="legacy_input",
+        destination="intent.telemetry.enabled",
+        status="normalized_to_boolean",
+        fixture=LEGACY_COMPATIBILITY_FIXTURE_NAME,
+    ),
+    "telemetry_state.sent_translation_success_dates_utc": FieldClassification(
+        category="legacy_input",
+        destination="state.telemetry.last_sent_date_utc",
+        status="collapsed_to_latest_date",
+        fixture=LEGACY_COMPATIBILITY_FIXTURE_NAME,
+    ),
     "openrouter.credential_source": FieldClassification(
         category="legacy_input",
         destination="intent.translation.openrouter.selected_source",

@@ -109,7 +109,7 @@ class TranslationOutputSubmission:
     outcome: TranslationTurnOutcome
     config_snapshot: TranslationRuntimeConfigSnapshot
     translation: Translation | None = None
-    applied_context_mode: Literal["local", "integrated"] | None = None
+    applied_context_mode: Literal["integrated"] | None = None
     failure_code: str | None = None
     target_index: int = 0
     turn_generation: int | None = None

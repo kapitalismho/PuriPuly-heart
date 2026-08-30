@@ -6,6 +6,7 @@ import logging
 import tempfile
 import webbrowser
 from pathlib import Path
+from typing import Any
 
 import flet as ft
 from puripuly_heart.core.discord_oauth_loopback import (
@@ -14,6 +15,11 @@ from puripuly_heart.core.discord_oauth_loopback import (
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.ports.settings_view import (
+    ImmediateSettingsIntent,
+    OpenRouterPkceTarget,
+    PromptApplyIntent,
+)
 from puripuly_heart.app.ports.ui_application import (
     UiApplicationFactoryPort,
     UiApplicationPort,
@@ -23,6 +29,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCoordinator,
     application_shutdown_callback,
 )
+from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
@@ -38,18 +45,23 @@ from puripuly_heart.ui.components.local_qwen_hallucination_dialog import (
 from puripuly_heart.ui.components.microphone_test_dialog import MicrophoneTestDialog
 from puripuly_heart.ui.components.peer_translation_eula_dialog import PeerTranslationEulaDialog
 from puripuly_heart.ui.components.qq_managed_auth_dialog import QqManagedAuthDialog
-from puripuly_heart.ui.components.telemetry_consent_dialog import TelemetryConsentDialog
 from puripuly_heart.ui.components.title_bar import TitleBar
 from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
     DashboardTranslationIntents,
 )
-from puripuly_heart.ui.fonts import font_for_language, register_fonts
+from puripuly_heart.ui.fonts import (
+    font_for_language,
+    locale_body_letter_spacing,
+    register_fonts,
+)
 from puripuly_heart.ui.foundation.adapter import FletFoundationAdapter
 from puripuly_heart.ui.foundation.preview import FoundationPreviewSurface
 from puripuly_heart.ui.foundation.resources import DEFAULT_FOUNDATION_RESOURCES
 from puripuly_heart.ui.foundation.runtime import FletFoundationRuntime
 from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
+from puripuly_heart.ui.gpu_device import GpuDeviceOption
+from puripuly_heart.ui.gpu_notice import GpuDashboardNotice
 from puripuly_heart.ui.i18n import (
     get_locale,
     language_name,
@@ -163,7 +175,6 @@ class TranslatorApp:
         config_path,
         application_factory: UiApplicationFactoryPort,
         debug_ui_preview: bool = False,
-        allow_stable_settings_import: bool = False,
         runtime_logging_sinks=None,
         vrchat_osc_presence=None,
     ):
@@ -172,7 +183,6 @@ class TranslatorApp:
         application = application_factory(
             presentation=self._presentation_adapter,
             config_path=config_path,
-            allow_stable_settings_import=allow_stable_settings_import,
             runtime_logging_sinks=runtime_logging_sinks,
             vrchat_osc_presence=vrchat_osc_presence,
         )
@@ -197,12 +207,12 @@ class TranslatorApp:
         self._qq_managed_auth_task_handle = None
         self._github_star_prompt_launch_pending = True
         self._after_launch_task_handle = None
+        self._telemetry_reporting: TelemetryReportingOwner | None = None
         self._launch_high_priority_feedback_shown = False
         self._launch_high_priority_feedback_reason: str | None = None
         self._launch_high_priority_snackbar = None
         self._github_star_prompt_shown_this_launch = False
         self._microphone_test_dialog: MicrophoneTestDialog | None = None
-        self._telemetry_consent_dialog: TelemetryConsentDialog | None = None
         self._foundation_preview_dialog: ft.AlertDialog | None = None
         self._foundation_adapter = FletFoundationAdapter(
             self.application,
@@ -260,10 +270,11 @@ class TranslatorApp:
                 local_llm_secret_changed=self._on_local_llm_secret_changed,
                 custom_stt_secret_changed=self._on_custom_stt_secret_changed,
                 gpu_discovery_requested=self._on_gpu_discovery_requested,
+                settings_secrets=self.application.settings_secrets(),
             ),
             general=SettingsGeneralIntents(
                 start_microphone_test=self._on_start_microphone_test,
-                telemetry_consent_change=self._on_telemetry_consent_change,
+                telemetry_enabled_change=self._on_telemetry_enabled_change,
                 list_loopback_capture_options=(
                     lambda: self.application.list_loopback_capture_options()
                 ),
@@ -356,18 +367,28 @@ class TranslatorApp:
 
     def _compose_application_lifecycle(self) -> ApplicationShutdownCoordinator:
         foundation_runtime = self._ensure_foundation_runtime()
-        self.application.register_application_shutdown_callbacks(
-            self._application_shutdown_callbacks()
+        return TranslatorApp.compose_application_lifecycle(
+            self,
+            foundation_runtime,
+            self._application_shutdown_callbacks(),
         )
-        lifecycle = self.application.application_lifecycle()
-        foundation_runtime.bind_application_lifecycle(lifecycle)
-        return lifecycle
 
     def _get_application_lifecycle(self) -> ApplicationShutdownCoordinator:
         lifecycle = getattr(self, "_application_lifecycle", None)
         if lifecycle is None:
             lifecycle = self._compose_application_lifecycle()
             self._application_lifecycle = lifecycle
+        return lifecycle
+
+    @staticmethod
+    def compose_application_lifecycle(
+        application: Any,
+        foundation_runtime: Any,
+        callbacks: tuple[ApplicationShutdownCallback, ...],
+    ) -> ApplicationShutdownCoordinator:
+        application.application.register_application_shutdown_callbacks(callbacks)
+        lifecycle = application.application.application_lifecycle()
+        foundation_runtime.bind_application_lifecycle(lifecycle)
         return lifecycle
 
     def _application_shutdown_callbacks(self) -> tuple[ApplicationShutdownCallback, ...]:
@@ -425,7 +446,10 @@ class TranslatorApp:
         self.page.title = t("app.title")
         self.page.theme_mode = ft.ThemeMode.LIGHT
         register_fonts(self.page)
-        self.page.theme = get_app_theme(font_family=font_for_language(get_locale()))
+        self.page.theme = get_app_theme(
+            font_family=font_for_language(get_locale()),
+            body_letter_spacing=locale_body_letter_spacing(get_locale()),
+        )
         self.page.bgcolor = COLOR_BACKGROUND
         self.page.padding = 0
         self.page.window.frameless = FOUNDATION_DESIGN_TOKENS.window.frameless
@@ -484,7 +508,6 @@ class TranslatorApp:
     def _build_debug_preview_panel(self) -> DebugPreviewPanel:
         return DebugPreviewPanel(
             on_display_turn_cycle=self._cycle_debug_preview_display_turn,
-            on_telemetry_consent=self._preview_telemetry_consent,
             on_peer_translation_eula=self._preview_peer_translation_eula,
             on_discord_auth=self._preview_discord_auth,
             on_qq_auth=self._preview_qq_auth,
@@ -499,7 +522,43 @@ class TranslatorApp:
             ),
             on_foundation_primitives=self._preview_foundation_primitives,
             on_http_extension_form=self._preview_http_extension_form,
+            on_brake_notice=self._preview_brake_notice,
+            on_revoked_notice=self._preview_revoked_notice,
+            on_pkce_failure=self._preview_pkce_failure,
+            on_capture_fault_cycle=self._preview_capture_fault_cycle,
+            on_stt_fault_cycle=self._preview_stt_fault_cycle,
+            on_audio_fault_clear=self._preview_audio_fault_clear,
+            on_gpu_state_cycle=self._cycle_debug_preview_gpu_state,
+            on_stt_loading_button_cycle=self._cycle_debug_preview_stt_loading_button,
         )
+
+    def _cycle_debug_preview_display_turn(self) -> None:
+        dashboard = getattr(self, "view_dashboard", None)
+        if dashboard is None:
+            return
+        steps = (
+            ("source", "ko", "오늘 같이 뭐 하고 놀까?"),
+            ("translation", "en", "What should we do together today?"),
+            (
+                "source",
+                "ko",
+                "아까 말한 그 월드 이름이 뭐였지? 다시 가보고 싶은데 검색해도 안 나오더라.",
+            ),
+            (
+                "translation",
+                "en",
+                "What was the name of that world you mentioned earlier? "
+                "I want to visit again but searching turns up nothing.",
+            ),
+        )
+        index = int(getattr(self, "_debug_preview_display_turn_index", -1)) + 1
+        index %= len(steps)
+        self._debug_preview_display_turn_index = index
+        kind, language_code, text = steps[index]
+        if kind == "source":
+            dashboard.set_display_text(text, language_code=language_code)
+            return
+        dashboard.set_display_translation_text(text, language_code=language_code)
 
     def _mark_launch_high_priority_feedback_shown(
         self,
@@ -579,6 +638,7 @@ class TranslatorApp:
         handle = getattr(self, "_after_launch_task_handle", None)
         if handle is not None and not handle.done():
             return
+        self._schedule_app_active_day_report()
         self._after_launch_task_handle = self._run_page_task(self._run_after_launch_tasks)
 
     async def _run_after_launch_tasks(self) -> None:
@@ -656,25 +716,32 @@ class TranslatorApp:
                 level=logging.WARNING,
             )
 
+    async def _close_ui_task_handle(self, attribute_name: str) -> None:
+        handle = getattr(self, attribute_name, None)
+        if handle is None:
+            return
+        if not handle.done():
+            handle.cancel()
+        try:
+            if isinstance(handle, asyncio.Future):
+                await asyncio.gather(handle, return_exceptions=True)
+            elif inspect.isawaitable(handle):
+                await handle
+            else:
+                await asyncio.wrap_future(handle)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
+        finally:
+            if getattr(self, attribute_name, None) is handle:
+                setattr(self, attribute_name, None)
+
     async def _close_after_launch_ui_tasks(self) -> None:
-        handle = getattr(self, "_after_launch_task_handle", None)
-        if handle is not None:
-            if not handle.done():
-                handle.cancel()
-            try:
-                if isinstance(handle, asyncio.Future):
-                    await asyncio.gather(handle, return_exceptions=True)
-                elif inspect.isawaitable(handle):
-                    await handle
-                else:
-                    await asyncio.wrap_future(handle)
-            except asyncio.CancelledError:
-                pass
-            except Exception:
-                pass
-            finally:
-                if self._after_launch_task_handle is handle:
-                    self._after_launch_task_handle = None
+        await self._close_ui_task_handle("_after_launch_task_handle")
+        owner = getattr(self, "_telemetry_reporting", None)
+        if owner is not None:
+            await owner.cancel_retry()
         self._github_star_prompt_launch_pending = False
 
     async def close_after_launch_tasks(self) -> None:
@@ -760,14 +827,11 @@ class TranslatorApp:
         snackbar = self._build_github_star_prompt_snackbar(_open_repository)
         self.page.show_dialog(snackbar)
 
-    def _preview_telemetry_consent(self) -> None:
-        dialog = TelemetryConsentDialog(
-            self.page,
-            on_allow=self._debug_preview_noop,
-            on_decline=self._debug_preview_noop,
-        )
-        self._telemetry_consent_dialog = dialog
-        dialog.open()
+    def _preview_brake_notice(self) -> None:
+        self._show_snackbar(t("managed_release.brake"), ft.Colors.ORANGE_700)
+
+    def _preview_revoked_notice(self) -> None:
+        self._show_snackbar(t("managed_release.revoked_contact"), ft.Colors.ORANGE_700)
 
     def _debug_preview_noop(self) -> None:
         return None
@@ -776,6 +840,9 @@ class TranslatorApp:
         dialog = FounderLetterDialog(self.page, on_readme=self._on_founder_letter_readme)
         self._founder_letter_dialog = dialog
         dialog.open()
+
+    def _preview_pkce_failure(self) -> None:
+        self._show_snackbar(t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)
 
     def _preview_discord_auth(self) -> None:
         self.show_discord_managed_auth_dialog(preview=True)
@@ -823,10 +890,26 @@ class TranslatorApp:
             pass_status=TalkTogetherPassStatus(
                 pass_id=DEBUG_PREVIEW_TALK_TOGETHER_PASS_ID,
                 invite_count=1,
-                invite_limit=5,
+                invite_limit=3,
                 bonus_translations_per_friend=200,
             ),
         )
+
+    def _preview_capture_fault_cycle(self) -> None:
+        profile = self.application.cycle_debug_capture_fault_profile()
+        self._show_snackbar(
+            t("debug_preview.capture_fault_snackbar", profile=profile), ft.Colors.ORANGE_700
+        )
+
+    def _preview_stt_fault_cycle(self) -> None:
+        profile = self.application.cycle_debug_stt_fault_profile()
+        self._show_snackbar(
+            t("debug_preview.stt_fault_snackbar", profile=profile), ft.Colors.ORANGE_700
+        )
+
+    def _preview_audio_fault_clear(self) -> None:
+        self.application.clear_debug_audio_fault_profiles()
+        self._show_snackbar(t("debug_preview.audio_fault_clear"), ft.Colors.GREEN_700)
 
     def _preview_foundation_primitives(self) -> None:
         if not self._foundation_adapter.debug_preview_enabled:
@@ -893,20 +976,8 @@ class TranslatorApp:
         self._peer_translation_eula_dialog = dialog
         dialog.open()
 
-    def maybe_show_telemetry_consent_dialog(self) -> bool:
-        return False
-
-    def _on_telemetry_consent_change(self, consent: str) -> None:
-        if consent not in {"allow", "decline"}:
-            return
-
-        async def _task() -> None:
-            settings = await self.application.apply_telemetry_consent(consent)
-            sync_telemetry = getattr(self.view_settings, "sync_telemetry_settings", None)
-            if callable(sync_telemetry) and settings is not None:
-                sync_telemetry(settings)
-
-        self._run_page_task(_task)
+    def _on_telemetry_enabled_change(self, enabled: bool) -> None:
+        self._telemetry_reporting_owner().apply_telemetry_enabled(enabled)
 
     def show_local_qwen_hallucination_dialog(self) -> None:
         dialog = LocalQwenHallucinationDialog(
@@ -984,7 +1055,7 @@ class TranslatorApp:
                     self.view_settings.has_provider_changes = False
 
                     async def _task():
-                        await self.application.apply_providers(pending_settings)
+                        await self.application.apply_provider_intent(pending_settings)
 
                     self._queue_settings_mutation_task(_task)
             elif getattr(self.view_settings, "has_pending_prompt_changes", False):
@@ -992,12 +1063,7 @@ class TranslatorApp:
                 if pending_settings is not None:
 
                     async def _task():
-                        merged_settings = (
-                            self.application.merge_settings_tab_apply_with_current_languages(
-                                pending_settings
-                            )
-                        )
-                        await self.application.apply_settings(merged_settings)
+                        await self.application.apply_prompt_intent(pending_settings)
 
                     self._queue_settings_mutation_task(_task)
 
@@ -1043,7 +1109,10 @@ class TranslatorApp:
 
     def apply_locale(self) -> None:
         self.page.title = t("app.title")
-        self.page.theme = get_app_theme(font_family=font_for_language(get_locale()))
+        self.page.theme = get_app_theme(
+            font_family=font_for_language(get_locale()),
+            body_letter_spacing=locale_body_letter_spacing(get_locale()),
+        )
         self.title_bar.set_title(t("app.title"))
         self.view_dashboard.apply_locale()
         self.view_settings.apply_locale()
@@ -1058,33 +1127,58 @@ class TranslatorApp:
             foundation_preview_dialog.content = FoundationPreviewSurface(get_locale())
         self.page.update()
 
-    def _cycle_debug_preview_display_turn(self) -> None:
-        dashboard = getattr(self, "view_dashboard", None)
-        if dashboard is None:
-            return
-        steps = (
-            ("source", "ko", "오늘 같이 뭐 하고 놀까?"),
-            ("translation", "en", "What should we do together today?"),
-            (
-                "source",
-                "ko",
-                "아까 말한 그 월드 이름이 뭐였지? 다시 가보고 싶은데 검색해도 안 나오더라.",
-            ),
-            (
-                "translation",
-                "en",
-                "What was the name of that world you mentioned earlier? "
-                "I want to visit again but searching turns up nothing.",
-            ),
+    def _cycle_debug_preview_stt_loading_button(self) -> None:
+        states = ("off", "starting", "on")
+        index = int(getattr(self, "_debug_preview_stt_loading_button_index", -1)) + 1
+        index %= len(states)
+        self._debug_preview_stt_loading_button_index = index
+        state = states[index]
+        self.view_dashboard.stt_button.set_state(
+            state == "on",
+            is_starting=state == "starting",
         )
-        index = int(getattr(self, "_debug_preview_display_turn_index", -1)) + 1
-        index %= len(steps)
-        self._debug_preview_display_turn_index = index
-        kind, language_code, text = steps[index]
-        if kind == "source":
-            dashboard.set_display_text(text, language_code=language_code)
-            return
-        dashboard.set_display_translation_text(text, language_code=language_code)
+
+    def _cycle_debug_preview_gpu_state(self) -> None:
+        states = (
+            "discovery_failed",
+            "not_installed",
+            "invalid",
+            "installing",
+            "install_failed",
+            "unsupported",
+            "unavailable_device",
+            "activation_failed",
+        )
+        index = int(getattr(self, "_debug_preview_gpu_state_index", -1)) + 1
+        index %= len(states)
+        self._debug_preview_gpu_state_index = index
+        devices = (
+            GpuDeviceOption("vulkan-index-0", "Debug GPU 0", "Vulkan0"),
+            GpuDeviceOption("vulkan-index-1", "Debug GPU 1", "Vulkan1"),
+        )
+        set_devices = getattr(self.view_settings, "set_gpu_devices", None)
+        if callable(set_devices):
+            set_devices(devices=devices)
+        action_by_state = {
+            "discovery_failed": "rediscover",
+            "activation_failed": "restart",
+        }
+        notice = GpuDashboardNotice(
+            status=states[index],
+            progress_percent=42 if states[index] == "installing" else None,
+            action=action_by_state.get(states[index]),
+        )
+        set_notice = getattr(getattr(self, "view_dashboard", None), "set_gpu_notice", None)
+        if callable(set_notice):
+            set_notice(notice)
+        else:
+            legacy_setter = getattr(self.view_settings, "set_gpu_runtime_state", None)
+            if callable(legacy_setter):
+                legacy_setter(
+                    states[index],
+                    devices=devices,
+                    progress_percent=notice.progress_percent,
+                )
 
     def refresh_overlay_peer_contract(self) -> None:
         presentation = getattr(self, "_presentation_adapter", None)
@@ -1139,7 +1233,7 @@ class TranslatorApp:
         self._run_page_task(_task)
 
     def _refresh_settings_desktop_overlay_state(self) -> None:
-        settings = self.application.compatibility_settings()
+        settings = self.application.settings_overlay_snapshot()
         view_settings = getattr(self, "view_settings", None)
         sync_settings = getattr(view_settings, "sync_desktop_overlay_settings", None)
         if settings is not None and callable(sync_settings):
@@ -1345,14 +1439,9 @@ class TranslatorApp:
 
         self._queue_settings_mutation_task(_task)
 
-    def _on_settings_changed(self, settings) -> None:
-        captured_change = self.application.capture_settings_view_change(settings)
-
+    def _on_settings_changed(self, intent: ImmediateSettingsIntent) -> None:
         async def _task():
-            next_settings = self.application.merge_settings_view_change_with_current(
-                captured_change
-            )
-            await self.application.apply_settings(next_settings)
+            await self.application.apply_settings_intent(intent)
             self._sync_microphone_test_dialog_if_inactive()
 
         self._queue_settings_mutation_task(_task)
@@ -1401,12 +1490,9 @@ class TranslatorApp:
             return
         self._close_microphone_test_dialog()
 
-    def _on_prompt_apply_settings(self, settings) -> None:
+    def _on_prompt_apply_settings(self, intent: PromptApplyIntent) -> None:
         async def _task():
-            merged_settings = self.application.merge_settings_tab_apply_with_current_languages(
-                settings
-            )
-            await self.application.apply_settings(merged_settings)
+            await self.application.apply_prompt_intent(intent)
 
         self._queue_settings_mutation_task(_task)
 
@@ -1434,7 +1520,7 @@ class TranslatorApp:
             self._queue_settings_mutation_task(_runtime_only_task)
             return
 
-        pending_settings = None
+        pending_intent = None
         consume_provider_apply_settings = getattr(
             view_settings,
             "consume_provider_apply_settings",
@@ -1445,14 +1531,14 @@ class TranslatorApp:
             "has_provider_changes",
             False,
         ):
-            pending_settings = consume_provider_apply_settings()
+            pending_intent = consume_provider_apply_settings()
             view_settings.has_provider_changes = False
 
         async def _task():
-            if pending_settings is None:
+            if pending_intent is None:
                 await self.application.apply_providers()
             else:
-                await self.application.apply_providers(pending_settings)
+                await self.application.apply_provider_intent(pending_intent)
 
         self._queue_settings_mutation_task(_task)
 
@@ -1475,7 +1561,7 @@ class TranslatorApp:
 
     def _on_request_openrouter_pkce(
         self,
-        target_settings: object,
+        target: OpenRouterPkceTarget,
         *,
         launch_source: str = "settings",
     ) -> None:
@@ -1493,7 +1579,7 @@ class TranslatorApp:
         async def _task() -> None:
             try:
                 ok = await self.application.connect_openrouter_via_pkce(
-                    target_settings=target_settings,
+                    target=target,
                     launch_source=launch_source,
                 )
                 if ok:
@@ -1575,6 +1661,10 @@ class TranslatorApp:
         dialog = getattr(self, "_qq_managed_auth_dialog", None)
         qq_identity = getattr(dialog, "qq_identity", "")
         credential = getattr(dialog, "credential", "")
+        raw_referral_id = getattr(dialog, "referral_id", "")
+        referral_id = (
+            raw_referral_id if isinstance(raw_referral_id, str) and raw_referral_id else None
+        )
         set_waiting = getattr(dialog, "set_waiting", None)
         if callable(set_waiting):
             set_waiting()
@@ -1588,6 +1678,7 @@ class TranslatorApp:
                 result = await application.start_qq_managed_auth_from_dialog(
                     qq_identity=qq_identity,
                     credential=credential,
+                    referral_id=referral_id,
                 )
             except asyncio.CancelledError:
                 return
@@ -1781,25 +1872,25 @@ class TranslatorApp:
         self._discord_managed_auth_task_handle = None
         self._close_discord_managed_auth_dialog()
 
-    def _build_managed_openrouter_byok_target_settings(self) -> object | None:
-        return self.application.build_managed_openrouter_byok_target_settings()
+    def _build_managed_openrouter_byok_target(self) -> OpenRouterPkceTarget | None:
+        return self.application.build_managed_openrouter_byok_target()
 
-    def _build_founder_letter_target_settings(self) -> object | None:
-        return self._build_managed_openrouter_byok_target_settings()
+    def _build_founder_letter_target(self) -> OpenRouterPkceTarget | None:
+        return self._build_managed_openrouter_byok_target()
 
     def _on_discord_managed_auth_byok(self) -> None:
-        target_settings = self._build_managed_openrouter_byok_target_settings()
-        if target_settings is None:
+        target = self._build_managed_openrouter_byok_target()
+        if target is None:
             self._show_snackbar(t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)
             return
-        self._on_request_openrouter_pkce(target_settings, launch_source="discord_auth")
+        self._on_request_openrouter_pkce(target, launch_source="discord_auth")
 
     def _on_founder_letter_connect(self) -> None:
-        target_settings = self._build_founder_letter_target_settings()
-        if target_settings is None:
+        target = self._build_founder_letter_target()
+        if target is None:
             self._show_snackbar(t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)
             return
-        self._on_request_openrouter_pkce(target_settings, launch_source="letter")
+        self._on_request_openrouter_pkce(target, launch_source="letter")
 
     def _on_founder_letter_contact(self) -> None:
         webbrowser.open(FOUNDER_CONTACT_URL)
@@ -1944,11 +2035,31 @@ class TranslatorApp:
     def on_github_star_translation_success(self) -> None:
         self.application.schedule_github_star_prompt_translation_success_observed()
 
-    def on_telemetry_translation_success(self) -> None:
-        async def _task() -> None:
-            await self.application.record_telemetry_translation_success_day()
+    def _schedule_app_active_day_report(self) -> None:
+        self._telemetry_reporting_owner().schedule_app_active_day_report()
 
-        self._queue_settings_mutation_task(_task)
+    def _sync_telemetry_settings_view(self, settings) -> None:
+        view_settings = getattr(self, "view_settings", None)
+        sync_telemetry = (
+            getattr(view_settings, "sync_telemetry_settings", None)
+            if view_settings is not None
+            else None
+        )
+        if callable(sync_telemetry):
+            sync_telemetry(settings)
+
+    def _telemetry_reporting_owner(self) -> TelemetryReportingOwner:
+        owner = getattr(self, "_telemetry_reporting", None)
+        if owner is None:
+            owner = TelemetryReportingOwner(
+                self.application,
+                run_background=self._run_page_task,
+                queue_settings_mutation=self._queue_settings_mutation_task,
+                is_shutting_down=lambda: getattr(self, "_shutting_down", False),
+                sync_telemetry=self._sync_telemetry_settings_view,
+            )
+            self._telemetry_reporting = owner
+        return owner
 
     def on_overlay_state_changed(
         self,
@@ -1973,7 +2084,6 @@ async def main_gui(
     config_path,
     application_factory: UiApplicationFactoryPort,
     debug_ui_preview: bool = False,
-    allow_stable_settings_import: bool = False,
     runtime_logging_sinks=None,
     vrchat_osc_presence=None,
 ):
@@ -1982,7 +2092,6 @@ async def main_gui(
         config_path=config_path,
         application_factory=application_factory,
         debug_ui_preview=debug_ui_preview,
-        allow_stable_settings_import=allow_stable_settings_import,
         runtime_logging_sinks=runtime_logging_sinks,
         vrchat_osc_presence=vrchat_osc_presence,
     )

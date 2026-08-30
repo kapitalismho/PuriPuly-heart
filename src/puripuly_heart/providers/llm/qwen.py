@@ -10,7 +10,7 @@ from uuid import UUID
 import httpx
 
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
-from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
@@ -21,7 +21,7 @@ _QWEN_PROBE_MODEL = "qwen3.5-plus"
 
 def _log_basic_request(
     *,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     text: str,
     source_language: str,
@@ -42,7 +42,7 @@ def _log_basic_request(
 
 
 def _log_basic_response(
-    *, runtime_logging: SessionRuntimeLoggingService | None, operation: str, text: str
+    *, runtime_logging: ProviderObservationPort | None, operation: str, text: str
 ) -> None:
     message = "[Basic][LLM] Qwen response [%s]: %r" % (operation, text)
     if runtime_logging is not None:
@@ -53,7 +53,7 @@ def _log_basic_response(
 
 def _log_basic_request_failure(
     *,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     status: int | None,
     message: str,
@@ -161,7 +161,7 @@ class QwenLLMProvider:
     api_key: str
     base_url: str = "https://dashscope.aliyuncs.com/api/v1"
     model: str = "qwen3.5-plus"
-    runtime_logging: SessionRuntimeLoggingService | None = None
+    runtime_logging: ProviderObservationPort | None = None
     client: QwenClient | None = None
 
     async def translate(
@@ -253,7 +253,7 @@ class DashScopeQwenClient:
     api_key: str
     model: str
     base_url: str = "https://dashscope.aliyuncs.com/api/v1"
-    runtime_logging: SessionRuntimeLoggingService | None = None
+    runtime_logging: ProviderObservationPort | None = None
 
     @staticmethod
     def _normalize_language_code(code: str) -> str:

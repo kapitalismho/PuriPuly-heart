@@ -589,7 +589,6 @@ async def test_main_gui_runs_github_star_prompt_after_update_check(
             config_path,
             application_factory,
             debug_ui_preview=False,
-            allow_stable_settings_import=False,
             runtime_logging_sinks=None,
             vrchat_osc_presence=None,
         ):  # noqa: ANN001
@@ -597,7 +596,6 @@ async def test_main_gui_runs_github_star_prompt_after_update_check(
                 config_path,
                 application_factory,
                 debug_ui_preview,
-                allow_stable_settings_import,
                 runtime_logging_sinks,
                 vrchat_osc_presence,
             )
@@ -900,7 +898,6 @@ def test_debug_preview_panel_includes_github_star_snackbar_action() -> None:
         on_foundation_primitives=noop,
         on_display_turn_cycle=noop,
         on_github_star_snackbar=lambda: invoked.append("github-star"),
-        on_telemetry_consent=noop,
     )
 
     action = panel._action_buttons["github_star_snackbar"]  # noqa: SLF001

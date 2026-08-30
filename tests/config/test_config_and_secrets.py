@@ -94,7 +94,7 @@ def test_settings_roundtrip(tmp_path):
     shared_prompt = load_prompt_for_provider("gemini")
     expected.system_prompt = shared_prompt
     expected.system_prompts = {}
-    expected.telemetry.consent = "allow"
+    expected.telemetry.enabled = True
     expected.telemetry_state.anonymous_id = loaded.telemetry_state.anonymous_id
     expected.translation.fallback = TranslationFallbackSettings(
         enabled=True,
@@ -356,63 +356,6 @@ def test_migrate_v18_preserves_directsound_when_removing_legacy_osc_rate_limits(
     assert migrated["osc"] == expected_osc
 
 
-def test_load_settings_persists_v17_directsound_preservation(tmp_path) -> None:
-    path = tmp_path / "settings.json"
-    raw = to_dict(AppSettings())
-    raw["settings_version"] = 16
-    raw["audio"]["input_host_api"] = WINDOWS_DIRECTSOUND_HOST_API
-    raw["audio"]["input_device"] = "Manual DirectSound Mic"
-    path.write_text(json.dumps(raw), encoding="utf-8")
-
-    loaded = load_settings(path)
-    stored = legacy_projected_settings_file(path)
-
-    assert loaded.audio.input_host_api == WINDOWS_DIRECTSOUND_HOST_API
-    assert loaded.audio.input_device == "Manual DirectSound Mic"
-    assert stored["settings_version"] == SETTINGS_SCHEMA_VERSION
-    assert stored["audio"]["input_host_api"] == WINDOWS_DIRECTSOUND_HOST_API
-    assert stored["audio"]["input_device"] == "Manual DirectSound Mic"
-
-
-def test_load_settings_persists_v18_osc_rate_limit_key_removal(tmp_path) -> None:
-    assert SETTINGS_SCHEMA_VERSION == 25
-
-    path = tmp_path / "settings.json"
-    raw = to_dict(AppSettings())
-    raw["settings_version"] = 17
-    raw["osc"]["host"] = "192.0.2.20"
-    raw["osc"].pop("connection_mode", None)
-    raw["osc"].pop("send_port", None)
-    raw["osc"].pop("receive_port", None)
-    raw["osc"]["port"] = 9011
-    raw["osc"]["chatbox_max_chars"] = 96
-    raw["osc"]["vrc_mic_intercept"] = True
-    raw["osc"]["cooldown_s"] = 1.5
-    raw["osc"]["ttl_s"] = 7.0
-    expected_osc = dict(raw["osc"])
-    expected_osc.pop("cooldown_s")
-    expected_osc.pop("ttl_s")
-    expected_osc.update(
-        {
-            "connection_mode": "automatic",
-            "send_port": 9011,
-            "receive_port": 9001,
-        }
-    )
-    path.write_text(json.dumps(raw), encoding="utf-8")
-
-    loaded = load_settings(path)
-    stored = legacy_projected_settings_file(path)
-
-    assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
-    assert loaded.osc.host == "192.0.2.20"
-    assert loaded.osc.port == 9011
-    assert loaded.osc.chatbox_max_chars == 96
-    assert loaded.osc.vrc_mic_intercept is True
-    assert stored["settings_version"] == SETTINGS_SCHEMA_VERSION
-    assert stored["osc"] == expected_osc
-
-
 def test_from_dict_ignores_legacy_osc_rate_limit_keys() -> None:
     raw = to_dict(AppSettings())
     raw["osc"]["cooldown_s"] = "bad"
@@ -498,7 +441,7 @@ def test_local_llm_settings_default_and_roundtrip() -> None:
     assert settings.local_llm.backend == LocalLLMBackend.OLLAMA
     assert settings.local_llm.base_url == "http://127.0.0.1:11434/v1"
     assert settings.local_llm.model == "llama3.1:8b"
-    assert settings.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert settings.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
 
     settings.translation = TranslationSettings(
         model=TranslationModel.LOCAL_LLM,
@@ -735,7 +678,7 @@ def test_from_dict_defaults_malformed_local_llm_settings() -> None:
     assert loaded.local_llm.backend == LocalLLMBackend.OLLAMA
     assert loaded.local_llm.base_url == "http://127.0.0.1:11434/v1"
     assert loaded.local_llm.model == "llama3.1:8b"
-    assert loaded.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert loaded.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
 
 
 @pytest.mark.parametrize(
@@ -756,7 +699,7 @@ def test_from_dict_defaults_local_llm_non_standard_json_constants_extra_body(val
         }
     )
 
-    assert loaded.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert loaded.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
 
 
 def test_schema21_migration_adds_local_llm_defaults(tmp_path: Path) -> None:
@@ -770,7 +713,7 @@ def test_schema21_migration_adds_local_llm_defaults(tmp_path: Path) -> None:
     persisted = legacy_projected_settings_file(path)
 
     assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
-    assert loaded.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert loaded.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
     assert persisted["local_llm"]["base_url"] == "http://127.0.0.1:11434/v1"
 
@@ -793,8 +736,8 @@ def test_schema22_repair_persists_malformed_local_llm(tmp_path: Path) -> None:
 
     assert loaded.local_llm.base_url == "http://127.0.0.1:11434/v1"
     assert loaded.local_llm.model == "llama3.1:8b"
-    assert loaded.local_llm.extra_body == {"reasoning_effort": "none"}
-    assert persisted["local_llm"]["extra_body"] == {"reasoning_effort": "none"}
+    assert loaded.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert persisted["local_llm"]["extra_body"] == {"reasoning_effort": "none", "temperature": 0.6}
 
 
 @pytest.mark.parametrize(
@@ -816,8 +759,8 @@ def test_schema22_repair_persists_default_for_local_llm_non_standard_json_consta
     loaded = load_settings(path)
     persisted = legacy_projected_settings_file(path)
 
-    assert loaded.local_llm.extra_body == {"reasoning_effort": "none"}
-    assert persisted["local_llm"]["extra_body"] == {"reasoning_effort": "none"}
+    assert loaded.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert persisted["local_llm"]["extra_body"] == {"reasoning_effort": "none", "temperature": 0.6}
 
 
 def test_schema22_repair_persists_missing_local_llm(tmp_path: Path) -> None:
@@ -833,12 +776,12 @@ def test_schema22_repair_persists_missing_local_llm(tmp_path: Path) -> None:
     assert loaded.local_llm.backend == LocalLLMBackend.OLLAMA
     assert loaded.local_llm.base_url == "http://127.0.0.1:11434/v1"
     assert loaded.local_llm.model == "llama3.1:8b"
-    assert loaded.local_llm.extra_body == {"reasoning_effort": "none"}
+    assert loaded.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert persisted["local_llm"] == {
         "backend": "ollama",
         "base_url": "http://127.0.0.1:11434/v1",
         "model": "llama3.1:8b",
-        "extra_body": {"reasoning_effort": "none"},
+        "extra_body": {"reasoning_effort": "none", "temperature": 0.6},
     }
 
 
@@ -1154,24 +1097,6 @@ def test_qwen_asr_endpoint_is_normalized_from_region_on_load_and_save() -> None:
     assert persisted["qwen_asr_stt"]["endpoint"] == loaded.qwen.get_asr_endpoint()
 
 
-def test_load_settings_infers_missing_qwen_region_from_legacy_asr_endpoint(tmp_path) -> None:
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy["qwen"] = {
-        "llm_model": QwenLLMModel.QWEN_35_PLUS.value,
-    }
-    legacy["qwen_asr_stt"]["endpoint"] = "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.qwen.region == QwenRegion.SINGAPORE
-    assert loaded.qwen_asr_stt.endpoint == loaded.qwen.get_asr_endpoint()
-    assert persisted["qwen"]["region"] == QwenRegion.SINGAPORE.value
-    assert persisted["qwen_asr_stt"]["endpoint"] == loaded.qwen.get_asr_endpoint()
-
-
 def test_from_dict_defaults_missing_stt_provider_to_local_cpu_auto() -> None:
     data = to_dict(AppSettings())
     data["provider"].pop("stt", None)
@@ -1268,27 +1193,6 @@ def test_from_dict_defaults_missing_llm_provider_to_legacy_gemini_and_inactive_o
     assert loaded.openrouter.selection_alias is None
 
 
-def test_load_settings_backfills_peer_provider_defaults_without_copying_self_values(
-    tmp_path,
-) -> None:
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy["provider"].pop("peer_stt", None)
-    legacy.pop("peer_deepgram_stt", None)
-    legacy.pop("peer_qwen_asr_stt", None)
-    legacy.pop("peer_soniox_stt", None)
-    legacy["deepgram_stt"]["model"] = "nova-3-medical"
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.provider.peer_stt == STTProviderName.DEEPGRAM
-    assert loaded.deepgram_stt.model == "nova-3-medical"
-    assert persisted["provider"]["peer_stt"] == STTProviderName.DEEPGRAM.value
-    assert "peer_deepgram_stt" not in persisted
-
-
 def test_load_settings_migrates_peer_local_qwen_to_cpu_auto(tmp_path) -> None:
     path = tmp_path / "settings.json"
     legacy = to_dict(AppSettings())
@@ -1319,126 +1223,6 @@ def test_from_dict_recovers_malformed_peer_soniox_override_values() -> None:
     assert loaded.peer_soniox_stt.trailing_silence_ms is None
 
 
-def test_load_settings_backfills_v4_peer_blocks_from_schema3_fixture(tmp_path) -> None:
-    path = tmp_path / "settings.json"
-    legacy = {
-        "settings_version": 3,
-        "provider": {
-            "stt": STTProviderName.LOCAL_QWEN.value,
-            "llm": LLMProviderName.GEMINI.value,
-            "peer_soniox_stt": "broken",
-        },
-        "languages": {
-            "source_language": "ko",
-            "target_language": "en",
-            "peer_source_language": "",
-            "peer_target_language": "",
-            "recent_source_languages": ["en", "zh-CN", "ja"],
-            "recent_target_languages": ["en", "zh-CN", "ja"],
-        },
-        "audio": {
-            "internal_sample_rate_hz": 16000,
-            "internal_channels": 1,
-            "ring_buffer_ms": 500,
-            "input_host_api": "Windows DirectSound",
-            "input_device": "",
-        },
-        "desktop_audio": {
-            "output_device": "",
-            "vad_speech_threshold": 0.5,
-            "vad_hangover_ms": 900,
-            "vad_pre_roll_ms": 500,
-        },
-        "overlay_calibration": AppSettings().overlay_calibration.to_dict(),
-        "stt": {
-            "drain_timeout_s": 2.0,
-            "vad_speech_threshold": 0.35,
-            "low_latency_mode": True,
-            "low_latency_vad_hangover_ms": 600,
-            "low_latency_merge_gap_ms": 600,
-            "low_latency_spec_retry_max": 10,
-            "custom_vocabulary_enabled": True,
-            "custom_terms": {
-                "ko": ["아이리", "시나노"],
-                "en": ["airi", "shinano"],
-                "zh-CN": ["airi", "shinano"],
-                "ja": ["airi", "shinano"],
-            },
-        },
-        "deepgram_stt": {"model": "nova-3"},
-        "qwen_asr_stt": {
-            "model": "qwen3-asr-flash-realtime",
-            "endpoint": "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime",
-        },
-        "soniox_stt": {
-            "model": "stt-rt-v3",
-            "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket",
-            "keepalive_interval_s": 10.0,
-            "trailing_silence_ms": 100,
-        },
-        "peer_deepgram_stt": "broken",
-        "peer_qwen_asr_stt": ["broken"],
-        "peer_soniox_stt": {"model": "", "endpoint": ""},
-        "gemini": {"llm_model": GeminiLLMModel.GEMINI_31_FLASH_LITE.value},
-        "qwen": {
-            "region": QwenRegion.BEIJING.value,
-            "llm_model": QwenLLMModel.QWEN_35_PLUS.value,
-        },
-        "llm": {"concurrency_limit": 5},
-        "osc": {
-            "host": "127.0.0.1",
-            "port": 9000,
-            "chatbox_address": "/chatbox/input",
-            "chatbox_send": True,
-            "chatbox_clear": False,
-            "chatbox_max_chars": 144,
-            "cooldown_s": 1.5,
-            "ttl_s": 7.0,
-            "vrc_mic_intercept": False,
-            "chatbox_include_source": True,
-        },
-        "secrets": {
-            "backend": "keyring",
-            "encrypted_file_path": "secrets.json",
-        },
-        "ui": {
-            "locale": "en",
-            "show_overlay_translation": True,
-            "show_overlay_peer_original": True,
-            "peer_translation_enabled": False,
-            "integrated_context_enabled": False,
-            "integrated_context_bootstrapped": False,
-        },
-        "api_key_verified": {
-            "deepgram": False,
-            "soniox": False,
-            "google": False,
-            "alibaba_beijing": False,
-            "alibaba_singapore": False,
-        },
-        "system_prompt": "",
-        "system_prompts": {},
-    }
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
-    assert loaded.provider.peer_stt == STTProviderName.DEEPGRAM
-    assert loaded.peer_qwen_asr_stt.model is None
-    assert loaded.peer_qwen_asr_stt.region is None
-    assert loaded.peer_soniox_stt.model is None
-    assert loaded.peer_soniox_stt.endpoint is None
-    assert loaded.peer_soniox_stt.keepalive_interval_s is None
-    assert loaded.peer_soniox_stt.trailing_silence_ms is None
-    assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
-    assert persisted["provider"]["peer_stt"] == STTProviderName.DEEPGRAM.value
-    assert "peer_deepgram_stt" not in persisted
-    assert "peer_qwen_asr_stt" not in persisted
-    assert "peer_soniox_stt" not in persisted
-
-
 def test_from_dict_ignores_legacy_peer_deepgram_override_block() -> None:
     data = to_dict(AppSettings())
     data["peer_deepgram_stt"] = {"model": "nova-3-general"}
@@ -1467,34 +1251,6 @@ def test_from_dict_recovers_non_dict_provider_payload_to_deepgram() -> None:
 
     assert loaded.provider.stt == STTProviderName.DEEPGRAM
     assert loaded.provider.llm == LLMProviderName.GEMINI
-
-
-def test_load_settings_persists_invalid_stt_provider_as_deepgram(tmp_path) -> None:
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy["provider"]["stt"] = "broken-provider"
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-
-    assert loaded.provider.stt == STTProviderName.DEEPGRAM
-    persisted = legacy_projected_settings_file(path)
-    assert persisted["provider"]["stt"] == STTProviderName.DEEPGRAM.value
-
-
-def test_load_settings_persists_non_dict_provider_payload_as_deepgram(tmp_path) -> None:
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy.pop("translation", None)
-    legacy["provider"] = []
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-
-    assert loaded.provider.stt == STTProviderName.DEEPGRAM
-    persisted = legacy_projected_settings_file(path)
-    assert persisted["provider"]["stt"] == STTProviderName.DEEPGRAM.value
-    assert persisted["provider"]["llm"] == LLMProviderName.GEMINI.value
 
 
 def test_load_settings_migrates_legacy_concurrency_limit_and_persists(tmp_path):
@@ -1574,22 +1330,6 @@ def test_load_settings_rewrites_migrated_8khz_audio_via_normal_save_path(
     assert persisted["audio"]["internal_sample_rate_hz"] == 16000
 
 
-def test_load_settings_migration_preserves_custom_concurrency_limit(tmp_path):
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy.pop("settings_version", None)
-    legacy["llm"]["concurrency_limit"] = 3
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
-    assert loaded.llm.concurrency_limit == 3
-
-    persisted = legacy_projected_settings_file(path)
-    assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
-    assert persisted["llm"]["concurrency_limit"] == 3
-
-
 def test_qwen_llm_model_roundtrip(tmp_path):
     path = tmp_path / "settings.json"
     settings = AppSettings()
@@ -1653,29 +1393,6 @@ def test_load_settings_migrates_preview_gemini_flash_lite_to_ga(tmp_path):
 
     persisted = legacy_projected_settings_file(path)
     assert persisted["gemini"]["llm_model"] == "gemini-3.1-flash-lite"
-
-
-def test_load_settings_migrates_gemini_3_flash_preview_to_3_7_flash(tmp_path):
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy["gemini"]["llm_model"] = "gemini-3-flash-preview"
-    legacy["translation"]["model"] = "gemini3_flash"
-    legacy["translation"]["connection_history"] = {
-        "gemini3_flash": "official_byok",
-    }
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    assert loaded.gemini.llm_model == GeminiLLMModel.GEMINI_37_FLASH
-    assert loaded.translation.model == TranslationModel.GEMINI_37_FLASH
-    assert loaded.translation.connection_history.get("gemini37_flash") == (
-        TranslationConnection.OFFICIAL_BYOK
-    )
-
-    persisted = legacy_projected_settings_file(path)
-    assert persisted["gemini"]["llm_model"] == "gemini-3.7-flash"
-    assert persisted["translation"]["model"] == "gemini37_flash"
-    assert "gemini3_flash" not in persisted["translation"]["connection_history"]
 
 
 def test_from_dict_defaults_missing_gemini_model_to_flash_lite():
@@ -1808,23 +1525,6 @@ def test_stt_custom_vocabulary_missing_keys_default():
 
     assert loaded.stt.custom_vocabulary_enabled is False
     assert loaded.stt.custom_terms == {}
-
-
-def test_load_settings_backfills_empty_custom_vocabulary_defaults(tmp_path):
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy.setdefault("stt", {}).pop("custom_vocabulary_enabled", None)
-    legacy["stt"].pop("custom_terms", None)
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-
-    assert loaded.stt.custom_vocabulary_enabled is False
-    assert loaded.stt.custom_terms == {}
-
-    persisted = legacy_projected_settings_file(path)
-    assert persisted["stt"]["custom_vocabulary_enabled"] is False
-    assert persisted["stt"]["custom_terms"] == {}
 
 
 @pytest.mark.parametrize(
@@ -2022,72 +1722,6 @@ def test_to_dict_explicit_translation_wins_over_conflicting_runtime_fields() -> 
     assert serialized["translation"]["connection"] == TranslationConnection.OFFICIAL_BYOK.value
     assert serialized["provider"]["llm"] == LLMProviderName.DEEPSEEK.value
     assert serialized["deepseek"]["llm_model"] == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
-
-
-def test_load_settings_translation_block_wins_over_stale_openrouter_deepseek_fields(tmp_path):
-    path = tmp_path / "settings.json"
-    data = to_dict(AppSettings())
-    data["translation"] = {
-        "model": TranslationModel.GEMMA4.value,
-        "connection": TranslationConnection.OPENROUTER.value,
-        "connection_history": {
-            TranslationModel.GEMMA4.value: TranslationConnection.OPENROUTER.value,
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED.value,
-        },
-    }
-    data["provider"]["llm"] = LLMProviderName.OPENROUTER.value
-    data["openrouter"]["llm_model"] = OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    data["openrouter"]["selected_source"] = OpenRouterCredentialSource.MANAGED.value
-    data["openrouter"]["selection_alias"] = OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
-    path.write_text(json.dumps(data), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.translation.model == TranslationModel.GEMMA4_26B_31B
-    assert loaded.translation.connection == TranslationConnection.OPENROUTER
-    assert loaded.provider.llm == LLMProviderName.OPENROUTER
-    assert loaded.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    assert loaded.openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
-    assert persisted["translation"]["model"] == TranslationModel.GEMMA4_26B_31B.value
-    assert persisted["translation"]["connection"] == TranslationConnection.OPENROUTER.value
-    assert persisted["openrouter"]["llm_model"] == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
-    assert persisted["openrouter"]["selected_source"] == OpenRouterCredentialSource.BYOK.value
-    assert (
-        persisted["openrouter"]["selection_alias"]
-        == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
-    )
-
-
-def test_load_settings_translation_block_wins_for_gemini_over_stale_openrouter_fields(tmp_path):
-    path = tmp_path / "settings.json"
-    data = to_dict(AppSettings())
-    data["translation"] = {
-        "model": TranslationModel.GEMINI_31_FLASH_LITE.value,
-        "connection": TranslationConnection.OFFICIAL_BYOK.value,
-        "connection_history": {
-            TranslationModel.GEMINI_31_FLASH_LITE.value: TranslationConnection.OFFICIAL_BYOK.value,
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED.value,
-        },
-    }
-    data["provider"]["llm"] = LLMProviderName.OPENROUTER.value
-    data["openrouter"]["llm_model"] = OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    data["openrouter"]["selected_source"] = OpenRouterCredentialSource.MANAGED.value
-    data["openrouter"]["selection_alias"] = OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
-    path.write_text(json.dumps(data), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.translation.model == TranslationModel.GEMINI_31_FLASH_LITE
-    assert loaded.translation.connection == TranslationConnection.OFFICIAL_BYOK
-    assert loaded.provider.llm == LLMProviderName.GEMINI
-    assert loaded.gemini.llm_model == GeminiLLMModel.GEMINI_31_FLASH_LITE
-    assert persisted["translation"]["model"] == TranslationModel.GEMINI_31_FLASH_LITE.value
-    assert persisted["translation"]["connection"] == TranslationConnection.OFFICIAL_BYOK.value
-    assert persisted["provider"]["llm"] == LLMProviderName.GEMINI.value
-    assert persisted["gemini"]["llm_model"] == GeminiLLMModel.GEMINI_31_FLASH_LITE.value
 
 
 def test_from_dict_translation_block_wins_over_stale_openrouter_deepseek_fields() -> None:
@@ -2367,30 +2001,6 @@ def test_load_settings_persists_translation_section_for_legacy_file(tmp_path) ->
     )
 
 
-def test_load_settings_persists_default_translation_for_malformed_non_dict_section(
-    tmp_path,
-) -> None:
-    path = tmp_path / "settings.json"
-    raw = to_dict(AppSettings())
-    raw["translation"] = ["broken"]
-    path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.translation.model == TranslationModel.GEMMA4_26B_31B
-    assert loaded.translation.connection == TranslationConnection.MANAGED
-    assert persisted["translation"] == {
-        "model": TranslationModel.GEMMA4_26B_31B.value,
-        "connection": TranslationConnection.MANAGED.value,
-        "connection_history": {
-            TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
-        },
-        "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
-        "gpu_device_id": "auto",
-    }
-
-
 def test_migrate_v20_marks_valid_translation_schema_version_changed() -> None:
     raw = to_dict(AppSettings())
     raw["settings_version"] = 19
@@ -2428,71 +2038,6 @@ def test_invalid_translation_connection_falls_back_to_model_default() -> None:
         "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
         "gpu_device_id": "auto",
     }
-
-
-def test_load_settings_persists_normalized_translation_section(tmp_path) -> None:
-    path = tmp_path / "settings.json"
-    raw = to_dict(AppSettings())
-    raw["translation"] = {
-        "model": TranslationModel.GEMINI_31_FLASH_LITE.value,
-        "connection": TranslationConnection.OPENROUTER.value,
-        "connection_history": {
-            TranslationModel.GEMINI_31_FLASH_LITE.value: TranslationConnection.MANAGED.value,
-        },
-    }
-    path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.translation.model == TranslationModel.GEMINI_31_FLASH_LITE
-    assert loaded.translation.connection == TranslationConnection.OPENROUTER
-    assert persisted["translation"] == {
-        "model": TranslationModel.GEMINI_31_FLASH_LITE.value,
-        "connection": TranslationConnection.OPENROUTER.value,
-        "connection_history": {
-            TranslationModel.GEMINI_31_FLASH_LITE.value: TranslationConnection.OPENROUTER.value,
-        },
-        "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
-        "gpu_device_id": "auto",
-    }
-
-
-def test_load_settings_persists_materialized_runtime_fields_for_current_translation_schema(
-    tmp_path,
-) -> None:
-    path = tmp_path / "settings.json"
-    raw = to_dict(AppSettings())
-    raw["settings_version"] = SETTINGS_SCHEMA_VERSION
-    raw["translation"] = {
-        "model": TranslationModel.DEEPSEEK_V4_FLASH.value,
-        "connection": TranslationConnection.OFFICIAL_BYOK.value,
-        "connection_history": {
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
-        },
-    }
-    raw["provider"]["llm"] = LLMProviderName.OPENROUTER.value
-    raw["openrouter"]["llm_model"] = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
-    raw["openrouter"]["selected_source"] = OpenRouterCredentialSource.MANAGED.value
-    raw["openrouter"]["selection_alias"] = OpenRouterSelectionAlias.GEMMA4_MANAGED.value
-    raw["openrouter"]["routing_mode"] = OpenRouterRoutingMode.LATENCY.value
-    raw["openrouter"][
-        "fallback_selection_alias"
-    ] = OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value
-    path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
-    assert loaded.translation.connection == TranslationConnection.OFFICIAL_BYOK
-    assert loaded.provider.llm == LLMProviderName.DEEPSEEK
-    assert persisted["provider"]["llm"] == LLMProviderName.DEEPSEEK.value
-    assert persisted["deepseek"]["llm_model"] == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
-    assert persisted["openrouter"]["routing_mode"] == OpenRouterRoutingMode.LATENCY.value
-    assert persisted["openrouter"]["fallback_selection_alias"] == (
-        OpenRouterFallbackSelectionAlias.NONE.value
-    )
 
 
 def test_qwen_flash_main_migration_uses_deepseek_connection_history() -> None:
@@ -2783,71 +2328,6 @@ def test_openrouter_settings_derives_deepseek_byok_alias_without_explicit_alias(
     assert settings.selection_alias == deepseek_byok
 
 
-def test_openrouter_qwen_flash_main_roundtrip_migrates_to_deepseek_and_disables_legacy_fallback(
-    tmp_path,
-) -> None:
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy.pop("translation", None)
-    legacy["provider"]["llm"] = LLMProviderName.OPENROUTER.value
-    legacy["openrouter"]["llm_model"] = OpenRouterLLMModel.QWEN_35_FLASH_02_23.value
-    legacy["openrouter"]["routing_mode"] = OpenRouterRoutingMode.LATENCY.value
-    legacy["openrouter"]["selected_source"] = OpenRouterCredentialSource.MANAGED.value
-    legacy["openrouter"]["selection_alias"] = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED.value
-    legacy["openrouter"]["fallback_selection_alias"] = "gemini25_flash_lite"
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert isinstance(loaded.openrouter.selection_alias, OpenRouterSelectionAlias)
-    assert isinstance(loaded.openrouter.fallback_selection_alias, OpenRouterFallbackSelectionAlias)
-    assert loaded.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
-    assert loaded.translation.connection == TranslationConnection.MANAGED
-    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-    assert loaded.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE
-    assert loaded.translation.fallback == TranslationFallbackSettings()
-    assert loaded.openrouter.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
-    assert loaded.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert (
-        persisted["openrouter"]["selection_alias"]
-        == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
-    )
-    assert persisted["openrouter"]["llm_model"] == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert persisted["openrouter"]["selected_source"] == OpenRouterCredentialSource.MANAGED.value
-    assert persisted["openrouter"]["fallback_selection_alias"] == (
-        OpenRouterFallbackSelectionAlias.NONE.value
-    )
-    assert persisted["translation"]["fallback"] == DEFAULT_TRANSLATION_FALLBACK_DICT
-
-
-def test_load_settings_backfills_openrouter_blocks_and_persists(tmp_path):
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy["settings_version"] = 4
-    legacy.pop("translation", None)
-    legacy["provider"]["llm"] = LLMProviderName.GEMINI.value
-    legacy.pop("openrouter", None)
-    legacy.setdefault("api_key_verified", {}).pop("openrouter", None)
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
-    assert loaded.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    assert loaded.openrouter.routing_mode == OpenRouterRoutingMode.LATENCY
-    assert loaded.openrouter.selected_source == OpenRouterCredentialSource.NONE
-    assert loaded.openrouter.selection_alias is None
-    assert loaded.api_key_verified.openrouter is False
-    assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
-    assert persisted["openrouter"]["llm_model"] == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
-    assert persisted["openrouter"]["routing_mode"] == OpenRouterRoutingMode.LATENCY.value
-    assert persisted["openrouter"]["selected_source"] == OpenRouterCredentialSource.NONE.value
-    assert persisted["openrouter"]["selection_alias"] is None
-    assert persisted["api_key_verified"]["openrouter"] is False
-
-
 def test_load_settings_backfills_openrouter_aliases_from_legacy_fields(tmp_path) -> None:
     path = tmp_path / "settings.json"
     legacy = to_dict(AppSettings())
@@ -2875,57 +2355,6 @@ def test_load_settings_backfills_openrouter_aliases_from_legacy_fields(tmp_path)
     )
     assert persisted["openrouter"]["fallback_selection_alias"] == (
         OpenRouterFallbackSelectionAlias.NONE.value
-    )
-
-
-def test_load_settings_backfills_openrouter_selected_source_to_byok_for_legacy_openrouter_provider(
-    tmp_path,
-):
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy["settings_version"] = 9
-    legacy.pop("translation", None)
-    legacy["provider"]["llm"] = LLMProviderName.OPENROUTER.value
-    legacy["openrouter"]["llm_model"] = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
-    legacy["openrouter"].pop("selected_source", None)
-    legacy["openrouter"].pop("selection_alias", None)
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
-    assert persisted["openrouter"]["selected_source"] == OpenRouterCredentialSource.BYOK.value
-    assert (
-        persisted["openrouter"]["selection_alias"]
-        == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
-    )
-
-
-def test_load_settings_normalizes_legacy_active_openrouter_none_selected_source_to_byok(
-    tmp_path,
-) -> None:
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy["settings_version"] = 10
-    legacy.pop("translation", None)
-    legacy["provider"]["llm"] = LLMProviderName.OPENROUTER.value
-    legacy["openrouter"]["llm_model"] = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
-    legacy["openrouter"]["selected_source"] = OpenRouterCredentialSource.NONE.value
-    legacy["openrouter"].pop("selection_alias", None)
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
-    assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
-    assert persisted["openrouter"]["selected_source"] == OpenRouterCredentialSource.BYOK.value
-    assert (
-        persisted["openrouter"]["selection_alias"]
-        == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
     )
 
 
@@ -3025,20 +2454,6 @@ def test_load_settings_migrates_legacy_timestamp_prompt_to_new_default(tmp_path)
     assert persisted["system_prompt"] == shared_prompt
 
 
-def test_load_settings_preserves_custom_prompt_when_upgrading_schema(tmp_path) -> None:
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy["settings_version"] = SETTINGS_SCHEMA_VERSION - 1
-    legacy["system_prompt"] = "my customized prompt"
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.system_prompt == "my customized prompt"
-    assert persisted["system_prompt"] == "my customized prompt"
-
-
 def test_migrate_settings_dict_prompt_upgrade_is_idempotent() -> None:
     raw = to_dict(AppSettings())
     raw["settings_version"] = SETTINGS_SCHEMA_VERSION - 1
@@ -3062,20 +2477,6 @@ def test_migrate_settings_dict_preserves_prompt_with_boundary_whitespace() -> No
 
     assert changed is True
     assert migrated["system_prompt"] == f"\n{LEGACY_TIMESTAMP_PROMPT}\n"
-
-
-def test_load_settings_preserves_prompt_with_boundary_whitespace(tmp_path) -> None:
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy["settings_version"] = SETTINGS_SCHEMA_VERSION
-    legacy["system_prompt"] = f"  {LEGACY_TIMESTAMP_PROMPT}  "
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    persisted = legacy_projected_settings_file(path)
-
-    assert loaded.system_prompt == f"  {LEGACY_TIMESTAMP_PROMPT}  "
-    assert persisted["system_prompt"] == f"  {LEGACY_TIMESTAMP_PROMPT}  "
 
 
 def test_from_dict_initializes_empty_prompt_fields_to_shared_default() -> None:
@@ -3131,22 +2532,6 @@ def test_load_settings_migrates_legacy_soniox_model_and_persists(tmp_path):
     persisted = legacy_projected_settings_file(path)
     assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
     assert persisted["soniox_stt"]["model"] == "stt-rt-v5"
-
-
-def test_load_settings_migration_preserves_custom_soniox_model(tmp_path):
-    path = tmp_path / "settings.json"
-    legacy = to_dict(AppSettings())
-    legacy["settings_version"] = 2
-    legacy["soniox_stt"]["model"] = "stt-rt-experimental"
-    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    loaded = load_settings(path)
-    assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
-    assert loaded.soniox_stt.model == "stt-rt-experimental"
-
-    persisted = legacy_projected_settings_file(path)
-    assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
-    assert persisted["soniox_stt"]["model"] == "stt-rt-experimental"
 
 
 def test_mask_secret():

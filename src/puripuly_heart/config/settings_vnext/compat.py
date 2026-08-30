@@ -8,11 +8,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from puripuly_heart.config.settings_vnext import migration, serialization
-from puripuly_heart.config.settings_vnext.schema import (
-    AppSettingsVNext,
-    ensure_telemetry_default_allow,
-)
+from puripuly_heart.config.settings_vnext import defaults, migration, serialization
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +63,9 @@ def load_vnext_settings(
 ) -> VNextSettingsLoadResult:
     try:
         original_bytes = path.read_bytes()
-        raw = json.loads(original_bytes.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        source_text = original_bytes.decode("utf-8")
+        raw = json.loads(source_text)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         _log_migration_failure("unknown", SettingsPersistenceStatus.PARSE_FAILED)
         return VNextSettingsLoadResult(
             status=SettingsPersistenceStatus.PARSE_FAILED,
@@ -83,9 +81,26 @@ def load_vnext_settings(
             ),
         )
 
-    source_shape = "canonical" if migration.is_vnext_settings_dict(raw) else "legacy"
+    source_shape = "canonical" if migration.is_vnext_settings_dict(raw) else "pre_vnext"
+    if source_shape == "canonical":
+        try:
+            raw = json.loads(
+                source_text,
+                parse_constant=_reject_nonstandard_json_constant,
+            )
+        except (json.JSONDecodeError, ValueError) as exc:
+            _log_migration_failure(source_shape, SettingsPersistenceStatus.PARSE_FAILED)
+            return VNextSettingsLoadResult(
+                status=SettingsPersistenceStatus.PARSE_FAILED,
+                error=_error(SettingsPersistenceStatus.PARSE_FAILED, exc),
+            )
+
     try:
-        settings = migration.from_dict(raw)
+        settings = (
+            migration.from_dict(raw)
+            if source_shape == "canonical"
+            else defaults.new_settings_for_first_run()
+        )
     except Exception as exc:
         _log_migration_failure(source_shape, SettingsPersistenceStatus.MIGRATION_FAILED)
         return VNextSettingsLoadResult(
@@ -118,22 +133,28 @@ def load_vnext_settings(
 
     save_result = save_vnext_settings(path, settings)
     if not save_result.ok:
+        restore_error = _restore_original_bytes(path, original_bytes)
+        error = save_result.error or SettingsPersistenceError(
+            SettingsPersistenceStatus.SAVE_FAILED,
+            "save_failed:unknown",
+        )
+        if restore_error is not None:
+            error = _combined_restore_error(error, restore_error)
         _log_migration_failure(source_shape, SettingsPersistenceStatus.SAVE_FAILED)
         return VNextSettingsLoadResult(
             status=SettingsPersistenceStatus.SAVE_FAILED,
             backup_path=backup_path,
-            error=save_result.error,
+            error=error,
         )
 
     try:
         _validate_persisted_settings(path, settings)
     except Exception as exc:
-        try:
-            _atomic_write_bytes(path, original_bytes)
-        except Exception as restore_exc:
+        restore_error = _restore_original_bytes(path, original_bytes)
+        if restore_error is not None:
             exc = RuntimeError(
                 f"{type(exc).__name__}: persisted validation failed; "
-                f"{type(restore_exc).__name__}: source restoration failed"
+                f"{type(restore_error).__name__}: source restoration failed"
             )
         _log_migration_failure(source_shape, SettingsPersistenceStatus.SAVE_FAILED)
         return VNextSettingsLoadResult(
@@ -167,22 +188,15 @@ def save_vnext_settings(path: Path, settings: AppSettingsVNext) -> VNextSettings
 
 def _save_vnext_settings_or_raise(path: Path, settings: AppSettingsVNext) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    normalized = ensure_telemetry_default_allow(settings)
-    content = serialization.to_json_text(normalized)
-    _validate_canonical_text(content, normalized)
+    content = serialization.to_json_text(settings)
+    _validate_canonical_text(content, settings)
     _atomic_write_text(path, content, encoding="utf-8")
 
 
 def _requires_canonical_save(raw: dict[str, Any], settings: AppSettingsVNext) -> bool:
     canonical = json.loads(serialization.to_json_text(settings))
     normalized_raw = serialization.normalize_persisted_dict(raw)
-    return _without_settings_version(normalized_raw) != _without_settings_version(canonical)
-
-
-def _without_settings_version(data: dict[str, Any]) -> dict[str, Any]:
-    comparable = dict(data)
-    comparable.pop("settings_version", None)
-    return comparable
+    return normalized_raw != canonical
 
 
 def create_pre_migration_backup(
@@ -282,8 +296,29 @@ def _atomic_write_bytes(path: Path, content: bytes) -> None:
         raise
 
 
+def _restore_original_bytes(path: Path, original_bytes: bytes) -> Exception | None:
+    try:
+        _atomic_write_bytes(path, original_bytes)
+    except Exception as exc:
+        return exc
+    return None
+
+
+def _combined_restore_error(
+    save_error: SettingsPersistenceError | None,
+    restore_error: Exception,
+) -> SettingsPersistenceError:
+    save_error_type = "unknown"
+    if save_error is not None and ":" in save_error.message:
+        save_error_type = save_error.message.rsplit(":", maxsplit=1)[-1]
+    return SettingsPersistenceError(
+        SettingsPersistenceStatus.SAVE_FAILED,
+        f"save_failed:{save_error_type}; source restoration failed:{type(restore_error).__name__}",
+    )
+
+
 def _validate_canonical_text(content: str, expected: AppSettingsVNext | None) -> None:
-    raw = json.loads(content)
+    raw = json.loads(content, parse_constant=_reject_nonstandard_json_constant)
     if not isinstance(raw, dict) or not migration.is_vnext_settings_dict(raw):
         raise ValueError("persisted canonical settings must contain intent and state")
     restored = migration.from_dict(raw)
@@ -293,6 +328,10 @@ def _validate_canonical_text(content: str, expected: AppSettingsVNext | None) ->
 
 def _validate_persisted_settings(path: Path, expected: AppSettingsVNext) -> None:
     _validate_canonical_text(path.read_text(encoding="utf-8"), expected)
+
+
+def _reject_nonstandard_json_constant(value: str) -> object:
+    raise ValueError(f"non-standard JSON constant: {value}")
 
 
 def _log_migration_failure(

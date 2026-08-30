@@ -55,7 +55,7 @@ export interface StoredAbuseControls {
     maxRequests: number;
     windowMinutes: number;
   };
-  telemetryTranslationSuccessDayIp: {
+  qqAuthStatusIp: {
     endpoint: string;
     scope: 'ip';
     maxRequests: number;
@@ -73,23 +73,11 @@ export interface StoredAbuseControls {
     windowDays: number;
   };
   immediateAlerts: {
-    warn1: number;
-    warn2: number;
-    warn3: number;
-    critical: number;
+    warning: number;
+    brake: number;
   };
-  asnFastPath: {
-    enabled: boolean;
-    minIssueSuccess1h: number;
-    minTopAsnSharePct: number;
-  };
-  asnClassifications: Array<{
-    asn: number;
-    kind: 'cloud_or_vps';
-    displayName?: string;
-  }>;
   retention: {
-    requestEventsDays: number;
+    requestEventSafetyMarginDays: number;
     issueSuccessDays: number;
     runtimeAuditDays: number;
     referralSkippedDays: number;
@@ -119,7 +107,6 @@ export interface StoredAbuseControls {
     enabled: boolean;
     hourUtc: number;
     minuteUtc: number;
-    includeZeroActivity: boolean;
   };
 }
 
@@ -131,10 +118,8 @@ export interface StoredAbuseRuntimeState {
     changedBy: 'system' | 'operator' | null;
   };
   alertLatches: {
-    warn1: boolean;
-    warn2: boolean;
-    warn3: boolean;
-    critical: boolean;
+    warning: boolean;
+    warningObservedAt: string | null;
   };
   dailyReport: {
     lastDeliveredAt: string | null;
@@ -197,10 +182,10 @@ export const TEST_DEFAULT_ABUSE_CONTROLS: StoredAbuseControls = {
     maxRequests: 20,
     windowMinutes: 15,
   },
-  telemetryTranslationSuccessDayIp: {
-    endpoint: 'POST /v1/telemetry/translation-success-day',
+  qqAuthStatusIp: {
+    endpoint: 'POST /v1/auth/qq/status',
     scope: 'ip',
-    maxRequests: 60,
+    maxRequests: 30,
     windowMinutes: 15,
   },
   pendingDiscordOAuthSessions: {
@@ -215,19 +200,11 @@ export const TEST_DEFAULT_ABUSE_CONTROLS: StoredAbuseControls = {
     windowDays: 1,
   },
   immediateAlerts: {
-    warn1: 10,
-    warn2: 25,
-    warn3: 50,
-    critical: 70,
+    warning: 10,
+    brake: 70,
   },
-  asnFastPath: {
-    enabled: true,
-    minIssueSuccess1h: 20,
-    minTopAsnSharePct: 70,
-  },
-  asnClassifications: [],
   retention: {
-    requestEventsDays: 30,
+    requestEventSafetyMarginDays: 1,
     issueSuccessDays: 30,
     runtimeAuditDays: 90,
     referralSkippedDays: 7,
@@ -255,9 +232,8 @@ export const TEST_DEFAULT_ABUSE_CONTROLS: StoredAbuseControls = {
   },
   dailyReport: {
     enabled: true,
-    hourUtc: 13,
-    minuteUtc: 0,
-    includeZeroActivity: false,
+    hourUtc: 0,
+    minuteUtc: 5,
   },
 };
 
@@ -269,10 +245,8 @@ export const TEST_DEFAULT_ABUSE_RUNTIME_STATE: StoredAbuseRuntimeState = {
     changedBy: null,
   },
   alertLatches: {
-    warn1: false,
-    warn2: false,
-    warn3: false,
-    critical: false,
+    warning: false,
+    warningObservedAt: null,
   },
   dailyReport: {
     lastDeliveredAt: null,
@@ -439,10 +413,14 @@ function normalizeAbuseControls(value: unknown): StoredAbuseControls {
     value.discordOpenrouterIssueInstallation,
   );
   assignRecord(normalized.qqAuthAssertIp, value.qqAuthAssertIp);
+  assignRecord(normalized.qqAuthStatusIp, value.qqAuthStatusIp);
   assignRecord(normalized.pendingDiscordOAuthSessions, value.pendingDiscordOAuthSessions);
   assignRecord(normalized.newActiveEntitlementsPerDay, value.newActiveEntitlementsPerDay);
   assignRecord(normalized.immediateAlerts, value.immediateAlerts);
-  assignRecord(normalized.asnFastPath, value.asnFastPath);
+  normalized.immediateAlerts = {
+    warning: normalized.immediateAlerts.warning,
+    brake: normalized.immediateAlerts.brake,
+  };
   assignRecord(normalized.retention, value.retention);
   assignRecord(normalized.referralAttempts, value.referralAttempts);
   if (isRecord(value.referralAttempts)) {
@@ -459,20 +437,6 @@ function normalizeAbuseControls(value: unknown): StoredAbuseControls {
   }
   assignRecord(normalized.dailyReport, value.dailyReport);
 
-  if (Array.isArray(value.asnClassifications)) {
-    normalized.asnClassifications = value.asnClassifications
-      .map(normalizeAsnClassification)
-      .filter(
-        (
-          entry,
-        ): entry is {
-          asn: number;
-          kind: 'cloud_or_vps';
-          displayName?: string;
-        } => entry !== null,
-      );
-  }
-
   return normalized;
 }
 
@@ -485,27 +449,12 @@ function normalizeAbuseRuntimeState(value: unknown): StoredAbuseRuntimeState {
   assignRecord(normalized, value);
   assignRecord(normalized.brake, value.brake);
   assignRecord(normalized.alertLatches, value.alertLatches);
+  normalized.alertLatches = {
+    warning: normalized.alertLatches.warning,
+    warningObservedAt: normalized.alertLatches.warningObservedAt,
+  };
   assignRecord(normalized.dailyReport, value.dailyReport);
   return normalized;
-}
-
-function normalizeAsnClassification(
-  value: unknown,
-): { asn: number; kind: 'cloud_or_vps'; displayName?: string } | null {
-  if (!isRecord(value) || !Number.isInteger(value.asn) || value.kind !== 'cloud_or_vps') {
-    return null;
-  }
-
-  return typeof value.displayName === 'string'
-    ? {
-        asn: Number(value.asn),
-        kind: 'cloud_or_vps',
-        displayName: value.displayName,
-      }
-    : {
-        asn: Number(value.asn),
-        kind: 'cloud_or_vps',
-      };
 }
 
 function assignRecord<T extends object>(target: T, source: unknown): void {

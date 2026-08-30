@@ -1,22 +1,33 @@
 <p align="center">
+
   <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — VRChat 실시간 양방향 음성 번역기" width="128" />
+
 </p>
 
-<h1 align="center">PuriPuly — VRChat 실시간 양방향 음성 번역기</h1>
+<h1 align="center">PuriPuly<br>
+  <sub>VRChat 실시간 양방향 음성 번역기</sub>
+</h1>
 
 <p align="center">
+
   <img src="https://img.shields.io/badge/version-2.5.0-blue" alt="Version" />
+
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
+
   <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
+
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
+
 </p>
 
 <h2 align="center">
+
   <a href="README.md">🇺🇸 English</a> ·
   🇰🇷 한국어 ·
   <a href="README.ja.md">🇯🇵 日本語</a> ·
   <a href="README.zh-CN.md">🇨🇳 简体中文</a> ·
   <a href="README.ru.md">🇷🇺 Русский</a>
+
 </h2>
 
 ---
@@ -27,9 +38,12 @@
 
 ---
 
-<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%">
+
+</video>
 
 PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습을 더 보고 싶다면:
+
 - [데모 1](https://www.youtube.com/watch?v=3p0CamYui0o)
 - [데모 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
 - [데모 3](https://www.youtube.com/watch?v=D0npvp68xNY)
@@ -63,19 +77,14 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 
 - **번역 품질은 어느정도인가요?**
 → 사람과 사람이 나눌 수 있는 가장 깊은 대화까지 무리 없이 나눌 수 있어요. 또한 전통적인 상용 번역 서비스들을 큰 차이로 앞서요. 자세한 내용은 아래의 '번역 품질 비교' 항목을 봐주세요.
-
 - **말하고 번역이 되기까지 시간이 얼마나 걸리나요?**
 → 최적의 상황이라면 지연시간은 1초 부근이에요. 상대방의 발화가 끝났을 때가 기준이에요.
-
 - **사용하는데 돈이 드나요?**
 → 네, 하지만 나중에요. 신규 사용자에게는 무료 사용량이 주어져요. 그 이후에도 가격은 매우 저렴해요. 1달러에 수천번을 번역할 수 있어요. 또한 로컬 모델을 활용하면 무료로 사용할 수 있어요.
-
 - **API 키를 발급 받아야 하나요?**
 → 네, 하지만 이것도 나중에요. 처음에는 그냥 설치하고 디스코드로 인증만하면 쓸 수 있어요.
-
 - **음성 인식이 느려요**
 → 로컬 ASR을 사용할 때 컴퓨팅이 부족한 상황이라면 처리 시간이 늦어 질 수 있어요. 이때는 클라우드 STT 서비스로 바꾸는 걸 추천해요.
-
 - **개인 데이터는 어떻게 처리되나요?**
 → Puripuly 서버에는 음성과 대화 내용이 전송되지 않아요. 또한 모든 코드가 현재 레포에 공개되어 있어 네트워크 동작을 직접 검증할 수 있어요.
 
@@ -84,8 +93,10 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 ---
 
 ## 번역 품질 비교
-![번역 품질 벤치마크 차트. 문장당 평균 에러 페널티(낮을수록 좋음)를 모델별로 나열한 순위표이다. 1위 Gemma 4 31B (0.353), 2위 Gemma 4 26B A4B (0.387), 3위 DeepSeek V4 Flash 0731 (0.571), 4위 Gemma 4 E4B QAT Q4 (1.577), 5위 Papago (2.699), 6위 Gemini 3.5 Live Translate (2.991), 7위 MiLMMT 46-4B (3.087), 8위 DeepL (3.914), 9위 Google Cloud Translation Basic (5.731) 이다.](docs/images/performance/1.png)
 
+![한국어 → 영어/일본어/중국어(간체) 번역에 대한 문장당 평균 에러 페널티 차트. 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 PuriPuly에서 사용할 수 있는 모델: 1위 Gemma 4 31B (0.353), 2위 Gemma 4 26B A4B (0.387), 3위 DeepSeek-V4 Flash 0731 (0.571), 4위 Gemma 4 12B QAT Q4 (0.855), 5위 Gemma 4 E4B QAT Q4 (1.577). 주황색 막대는 외부 베이스라인: Hy-MT-7B (1.863), Papago (2.699), Gemini 3.5 Live Translate (2.991), MiLMMT 46-4B (3.087), DeepL (3.914), Google Cloud Translation Basic (5.731).](docs/images/performance/2.png)
+
+- 파란색 막대 그래프들이 PuriPuly에서 사용할 수 있는 모델이에요.
 - 마이크로소프트의 Gemba MQM 프레임워크를 사용해서 실험했어요.
 - 실제 대화 환경과 가깝게 맥락을 포함한 멀티턴 환경으로 구성했어요.
 - 전체 실험 결과는 [여기](https://github.com/kapitalismho/korean-llm-context-translation-benchmark)를 참조해주세요.
@@ -96,61 +107,71 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 
 #### 권장 모델
 
-| LLM \ ASR | Local ASR | Soniox | Qwen3 ASR (Cloud) | Deepgram |
-|---|---|---|---|---|
-| **Gemma 4 E4B (Local)** | 무제한 | 5,000회 | 3,660회 | 1,290회 |
-| **Gemma 4 26B A4B + 31B** | 13,940회 | 3,680회 | 2,900회 | 1,180회 |
-| **DeepSeek V4 Flash** | 11,620회 | 3,500회 | 2,780회 | 1,160회 |
+
+| LLM \ ASR                 | Local ASR | Soniox | Qwen3 ASR (Cloud) | Deepgram |
+| ------------------------- | --------- | ------ | ----------------- | -------- |
+| **Gemma 4 E4B (Local)**   | 무제한       | 5,000회 | 3,660회            | 1,290회   |
+| **Gemma 4 26B A4B + 31B** | 13,940회   | 3,680회 | 2,900회            | 1,180회   |
+| **DeepSeek V4 Flash**     | 11,620회   | 3,500회 | 2,780회            | 1,160회   |
+
 
 #### 기타 모델
 
-| LLM \ ASR | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
-|---|---|---|---|---|
-| **Gemma 4 12B (Local)** | 무제한 | 5,000회 | 3,660회 | 1,290회 |
-| **Gemma 4 26B A4B** | 14,380회 | 3,710회 | 2,920회 | 1,180회 |
-| **Gemma 4 31B (OpenRouter)** | 10,940회 | 3,430회 | 2,740회 | 1,150회 |
-| **Gemma 4 31B (Cerebras)** | 920회 | 770회 | 730회 | 540회 |
-| **Gemini 3.7 Flash** | 1,160회 | 940회 | 880회 | 610회 |
-| **Gemini 3.1 Flash-Lite** | 3,430회 | 2,030회 | 1,770회 | 940회 |
-| **Qwen 3.5 Plus** | 7,460회 | — | 2,460회 | — |
+
+| LLM \ ASR                    | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
+| ---------------------------- | --------- | ------ | ---------------- | -------- |
+| **Gemma 4 12B (Local)**      | 무제한       | 5,000회 | 3,660회           | 1,290회   |
+| **Gemma 4 26B A4B**          | 14,380회   | 3,710회 | 2,920회           | 1,180회   |
+| **Gemma 4 31B (OpenRouter)** | 10,940회   | 3,430회 | 2,740회           | 1,150회   |
+| **Gemma 4 31B (Cerebras)**   | 920회      | 770회   | 730회             | 540회     |
+| **Gemini 3.7 Flash**         | 1,160회    | 940회   | 880회             | 610회     |
+| **Gemini 3.1 Flash-Lite**    | 3,430회    | 2,030회 | 1,770회           | 940회     |
+| **Qwen 3.5 Plus**            | 7,460회    | —      | 2,460회           | —        |
+
 
 ### 발화당 비용
 
 #### 권장 모델
 
-| LLM \ ASR | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
-|---|---|---|---|---|
-| **Gemma 4 E4B (Local)** | 0원 | ~0.3원 | ~0.4원 | ~1.1원 |
-| **Gemma 4 26B A4B + 31B** | ~0.1원 | ~0.4원 | ~0.5원 | ~1.2원 |
-| **DeepSeek V4 Flash** | ~0.12원 | ~0.4원 | ~0.5원 | ~1.2원 |
+
+| LLM \ ASR                 | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
+| ------------------------- | --------- | ------ | ---------------- | -------- |
+| **Gemma 4 E4B (Local)**   | 0원        | ~0.3원  | ~0.4원            | ~1.1원    |
+| **Gemma 4 26B A4B + 31B** | ~0.1원     | ~0.4원  | ~0.5원            | ~1.2원    |
+| **DeepSeek V4 Flash**     | ~0.12원    | ~0.4원  | ~0.5원            | ~1.2원    |
+
 
 #### 기타 모델
 
-| LLM \ ASR | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
-|---|---|---|---|---|
-| **Gemma 4 12B (Local)** | 0원 | ~0.3원 | ~0.4원 | ~1.1원 |
-| **Gemma 4 26B A4B** | ~0.1원 | ~0.4원 | ~0.5원 | ~1.2원 |
-| **Gemma 4 31B (OpenRouter)** | ~0.13원 | ~0.4원 | ~0.5원 | ~1.2원 |
-| **Gemma 4 31B (Cerebras)** | ~1.5원 | ~1.8원 | ~1.9원 | ~2.6원 |
-| **Gemini 3.7 Flash** | ~1.2원 | ~1.5원 | ~1.6원 | ~2.3원 |
-| **Gemini 3.1 Flash-Lite** | ~0.4원 | ~0.7원 | ~0.8원 | ~1.5원 |
-| **Qwen 3.5 Plus** | ~0.2원 | — | ~0.6원 | — |
 
-*   *(입력 900 토큰 + 출력 12토큰) x 발화 1회당 평균 LLM 호출 횟수 1.2회 가정*
-*   *1달러 당 사용 가능 횟수는 발화당 비용 테이블의 반올림 전 계산값 기준*
-*   *모든 비용과 사용 가능 횟수는 근사치 계산*
-*   *DeepSeek의 경우 캐시 히트율 70% 가정 / 피크 타임은 고려하지 않음*
-*   *Qwen API 비용은 베이징 리전 기준*
-*   *요금표 기준: 2026년 8월 21일*
-*   *1 달러 = 1400원*
+| LLM \ ASR                    | Local ASR | Soniox | Qwen ASR (Cloud) | Deepgram |
+| ---------------------------- | --------- | ------ | ---------------- | -------- |
+| **Gemma 4 12B (Local)**      | 0원        | ~0.3원  | ~0.4원            | ~1.1원    |
+| **Gemma 4 26B A4B**          | ~0.1원     | ~0.4원  | ~0.5원            | ~1.2원    |
+| **Gemma 4 31B (OpenRouter)** | ~0.13원    | ~0.4원  | ~0.5원            | ~1.2원    |
+| **Gemma 4 31B (Cerebras)**   | ~1.5원     | ~1.8원  | ~1.9원            | ~2.6원    |
+| **Gemini 3.7 Flash**         | ~1.2원     | ~1.5원  | ~1.6원            | ~2.3원    |
+| **Gemini 3.1 Flash-Lite**    | ~0.4원     | ~0.7원  | ~0.8원            | ~1.5원    |
+| **Qwen 3.5 Plus**            | ~0.2원     | —      | ~0.6원            | —        |
+
+
+- *(입력 900 토큰 + 출력 12토큰) x 발화 1회당 평균 LLM 호출 횟수 1.2회 가정*
+- *1달러 당 사용 가능 횟수는 발화당 비용 테이블의 반올림 전 계산값 기준*
+- *모든 비용과 사용 가능 횟수는 근사치 계산*
+- *DeepSeek의 경우 캐시 히트율 70% 가정 / 피크 타임은 고려하지 않음*
+- *Qwen API 비용은 베이징 리전 기준*
+- *요금표 기준: 2026년 8월 21일*
+- *1 달러 = 1400원*
 
 ### 무료 크레딧
 
-| 서비스 | 무료 크레딧 | 기한 | 비고 |
-|--------|------------|------|------|
-| **Deepgram** | $200 | 없음 | - |
-| **Alibaba Cloud** | 모델당 100만 토큰 | 90일 | 싱가포르 리전 기준|
-| **Alibaba Cloud** | ¥300 | 1년 | 중국 내 학생 대상 |
+
+| 서비스               | 무료 크레딧      | 기한  | 비고         |
+| ----------------- | ----------- | --- | ---------- |
+| **Deepgram**      | $200        | 없음  | -          |
+| **Alibaba Cloud** | 모델당 100만 토큰 | 90일 | 싱가포르 리전 기준 |
+| **Alibaba Cloud** | ¥300        | 1년  | 중국 내 학생 대상 |
+
 
 ---
 
@@ -161,41 +182,44 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 
 **ASR**
 
-| 모델 | 실행 환경 | 양자화 |
-|---|---|---|
-| Parakeet TDT 0.6B v3 | CPU | INT8 |
-| Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
-| Qwen3-ASR 0.6B | CPU | INT8 |
-| Qwen3-ASR 1.7B | GPU | Q6_K |
-| OpenAI 호환 API | — | — |
+
+| 모델                         | 실행 환경 | 양자화  |
+| -------------------------- | ----- | ---- |
+| Parakeet TDT 0.6B v3       | CPU   | INT8 |
+| Parakeet TDT-CTC 0.6B (ja) | CPU   | INT8 |
+| Qwen3-ASR 0.6B             | CPU   | INT8 |
+| Qwen3-ASR 1.7B             | GPU   | Q6_K |
+| OpenAI 호환 API              | —     | —    |
+
 
 **LLM**
 
-| 모델 | 실행 환경 | 양자화 |
-|---|---|---|
+
+| 모델                 | 실행 환경     | 양자화        |
+| ------------------ | --------- | ---------- |
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
-| Gemma 4 12B IT QAT | GPU | UD Q4_K_XL |
-| OpenAI 호환 API | — | — |
+| Gemma 4 12B IT QAT | GPU       | UD Q4_K_XL |
+| OpenAI 호환 API      | —         | —          |
+
 
 ---
 
-# 문제가 생기거나 애매모한 게 있다면 [트위터](https://x.com/kapitalismho)로 DM을 보내주세요.
+# 문제가 생기면 [트위터](https://x.com/kapitalismho)로 DM을 보내주세요.
 
 ## 사용법
 
 1. [다운로드 페이지](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)에서 최신 버전 다운로드
 2. PuriPuly 설치
 3. **TALK** 버튼 클릭
-4. **TRANS** 버튼 클릭 후 디스코드 인증 
-5. **CAPTIONS** 버튼을 눌러 VR 자막 켜기 
+4. **TRANS** 버튼 클릭 후 디스코드 인증
+5. **CAPTIONS** 버튼을 눌러 VR 자막 켜기
 6. (선택) **LISTEN** 버튼을 눌러 상대 음성 번역 켜기
-
-   > 상대 음성 번역 기능이 제대로 작동하기 위해서는 시끄럽지 않은 공간이 필요해요. VRChat에서 사용할 경우 Earmuff 기능을 사용해서 환경을 통제해주세요.
-
+  > 상대 음성 번역 기능이 제대로 작동하기 위해서는 시끄럽지 않은 공간이 필요해요. VRChat에서 사용할 경우 Earmuff 기능을 사용해서 환경을 통제해주세요.
 7. VRChat에서 OSC 활성화: Action menu → Settings → OSC → Enable
 
 ### 오디오 캡쳐가 되지 않는다면
-오디오 캡쳐가 되지 않는다면 **설정 > 일반**에서 다음 절차를 따라주세요.
+
+오디오 캡쳐가 되지 않는다면 **설정 &gt; 일반**에서 다음 절차를 따라주세요.
 
 1. **오디오 호스트 API**를 **자동선택** 혹은 **MME**로 변경
 2. 알맞은 마이크 선택
@@ -209,12 +233,11 @@ Soniox/Gemini/Deepgram이 차단된 지역이라면 아래와 같은 조합으�
 
 - STT: **Qwen ASR**
 - LLM: **DeepSeek V4 Flash**
-
-   > 디스코드 대신 QQ를 통해 인증할 수 있어요.
+  > 디스코드 대신 QQ를 통해 인증할 수 있어요.
 
 ---
 
-### 자신의 API 키 사용하기 
+### 자신의 API 키 사용하기
 
 사용하려는 서비스에 따라 알맞은 가이드를 보고 따라해주세요.
 
@@ -435,6 +458,8 @@ Authorize 버튼을 눌렀는데도 인증이 안되어 있다면 재시도 하�
 
 ## 아키텍처
 
+![PuriPuly Heart 헥사고널 아키텍처 다이어그램](docs/architecture-light.png)
+
 [`ARCHITECTURE.md`](ARCHITECTURE.md)를 참고하세요.
 
 ## 로드맵
@@ -447,11 +472,13 @@ Authorize 버튼을 눌렀는데도 인증이 안되어 있다면 재시도 하�
 
 ### 환경
 
-| 영역 | 권장 환경 | 문서 |
-|---|---|---|
-| Python 데스크톱 앱 | Windows | 지금 섹션 |
-| Broker 서비스 | Linux | [`broker/README.md`](broker/README.md) |
-| 네이티브 VR 오버레이 | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
+
+| 영역            | 권장 환경   | 문서                                                     |
+| ------------- | ------- | ------------------------------------------------------ |
+| Python 데스크톱 앱 | Windows | 지금 섹션                                                  |
+| Broker 서비스    | Linux   | [`broker/README.md`](broker/README.md)                 |
+| 네이티브 VR 오버레이  | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
+
 
 ### Python 환경
 
@@ -574,7 +601,7 @@ VRChat OSC 컨트롤은 [`docs/vrchat-osc.md`](docs/vrchat-osc.md)를 참조하�
 
 ## Special Thanks
 
-SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
+SUI32C, Nagikokoro, motoka96, Ykol魚, kascr, Just Monika V, FLUVIA, Han โชเล่ย์, EAPE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
 
 ---
 

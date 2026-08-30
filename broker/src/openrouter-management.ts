@@ -96,6 +96,25 @@ export class OpenRouterManagementError extends Error {
   }
 }
 
+export function isDefinitiveManagedChildKeyCreateRejection(
+  error: unknown,
+): boolean {
+  if (
+    !(error instanceof OpenRouterManagementError) ||
+    error.operation !== 'create_key' ||
+    error.code !== 'upstream_http_error' ||
+    error.status === null
+  ) {
+    return false;
+  }
+
+  return (
+    error.status >= 400 &&
+    error.status < 500 &&
+    ![408, 425, 429].includes(error.status)
+  );
+}
+
 export async function createManagedChildKey(
   input: CreateManagedChildKeyInput,
 ): Promise<{ rawKey: string; hash: string }> {
@@ -348,6 +367,9 @@ async function tryCleanupStep(input: {
     });
     return { ok: true };
   } catch (error) {
+    if (error instanceof OpenRouterManagementError && error.status === 404) {
+      return { ok: true };
+    }
     return {
       ok: false,
       error: normalizeManagementError(error, input.operation),

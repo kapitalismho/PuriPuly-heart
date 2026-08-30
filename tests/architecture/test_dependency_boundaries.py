@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -78,6 +79,7 @@ LAYER_RULES = (
     LayerRule(
         layer=SCHEMA_VALUES,
         prefixes=(
+            "puripuly_heart.config.desktop_overlay_values",
             "puripuly_heart.config.overlay_calibration",
             "puripuly_heart.config.settings_vnext.schema",
             "puripuly_heart.config.audio_host_api",
@@ -247,6 +249,7 @@ LAYER_RULES = (
             "puripuly_heart.core.osc.control_schema",
             "puripuly_heart.core.osc.control_codec",
             "puripuly_heart.core.osc.oscquery_contract",
+            "puripuly_heart.core.osc.receiver_contract",
         ),
         forbidden_layers=frozenset(
             {
@@ -347,165 +350,7 @@ EXTERNAL_MODULE_LAYERS = {
     "keyring": ADAPTERS,
 }
 
-KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
-    {
-        ImportViolation(
-            rule_id="adapters-avoid-ui-and-migration-internals",
-            importer="src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="adapters",
-            imported_layer="migration/serialization",
-            reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
-        ),
-        ImportViolation(
-            rule_id="runtime-owners-use-ports",
-            importer="src/puripuly_heart/core/runtime/logging.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="runtime owners",
-            imported_layer="adapters",
-            reason="runtime owners must coordinate through domain events, resolved DTOs, lifecycle/message/observability protocols, not app wiring, Flet UI, provider config parsing, or concrete adapters",
-        ),
-        ImportViolation(
-            rule_id="runtime-owners-use-ports",
-            importer="src/puripuly_heart/core/runtime/receiver.py",
-            imported="puripuly_heart.core.osc.receiver",
-            importer_layer="runtime owners",
-            imported_layer="adapters",
-            reason="runtime owners must coordinate through domain events, resolved DTOs, lifecycle/message/observability protocols, not app wiring, Flet UI, provider config parsing, or concrete adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/deepseek.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="providers",
-            imported_layer="adapters",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/gemini.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="providers",
-            imported_layer="adapters",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/local_openai.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="providers",
-            imported_layer="adapters",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/openrouter.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="providers",
-            imported_layer="migration/serialization",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/openrouter.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="providers",
-            imported_layer="adapters",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/qwen.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="providers",
-            imported_layer="adapters",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="providers-avoid-ui-settings-and-runtime-log-concretes",
-            importer="src/puripuly_heart/providers/llm/qwen_async.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="providers",
-            imported_layer="adapters",
-            reason="providers may use provider ports, SDKs, and message/observability protocols, but not Flet UI, settings migration internals, app services, or concrete SessionRuntimeLoggingService-style adapters",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/desktop_overlay.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="UI adapters/renderers",
-            imported_layer="migration/serialization",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/desktop_overlay_surface/contract.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="UI adapters/renderers",
-            imported_layer="migration/serialization",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/desktop_overlay_surface/renderer.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="UI adapters/renderers",
-            imported_layer="migration/serialization",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/views/settings.py",
-            imported="puripuly_heart.app.wiring",
-            importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/views/settings.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="UI adapters/renderers",
-            imported_layer="migration/serialization",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        *(
-            ImportViolation(
-                rule_id="adapters-avoid-ui-and-migration-internals",
-                importer=f"src/puripuly_heart/app/wiring/{importer_name}",
-                imported="puripuly_heart.config.settings",
-                importer_layer="adapters",
-                imported_layer="migration/serialization",
-                reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
-            )
-            for importer_name in (
-                "wiring_capture_runtime.py",
-                "wiring_composition.py",
-                "wiring_llm_factory.py",
-                "wiring_local_asr_application.py",
-                "wiring_local_asr_provider_runtime.py",
-                "wiring_managed_account.py",
-                "wiring_managed_auth_factory.py",
-                "wiring_microphone_test.py",
-                "wiring_overlay_factory.py",
-                "wiring_peer_application.py",
-                "wiring_provider_runtime.py",
-                "wiring_provider_runtime_policy.py",
-                "wiring_runtime_pipeline.py",
-                "wiring_secrets_factory.py",
-                "wiring_stt_factory.py",
-            )
-        ),
-        ImportViolation(
-            rule_id="adapters-avoid-ui-and-migration-internals",
-            importer="src/puripuly_heart/app/wiring/wiring_stt_factory.py",
-            imported="puripuly_heart.config.settings_vnext.migration",
-            importer_layer="adapters",
-            imported_layer="migration/serialization",
-            reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
-        ),
-    }
-)
+KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset()
 
 SETTINGS_COMPATIBILITY_SOURCE_PATHS = frozenset(
     {
@@ -528,7 +373,6 @@ SETTINGS_PERSISTENCE_COMPOSITION_PATHS = frozenset(
     {
         "src/puripuly_heart/app/adapters/settings_vnext_canonical_persistence.py",
         "src/puripuly_heart/app/services/canonical_settings_persistence.py",
-        "src/puripuly_heart/app/services/capture/capture_target_settings.py",
     }
 )
 
@@ -538,22 +382,10 @@ SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS = frozenset(
         "src/puripuly_heart/app/services/github_star_prompt_settings.py",
         "src/puripuly_heart/app/services/manual_local_asr_fallback.py",
         "src/puripuly_heart/app/services/openrouter_pkce_flow.py",
-        "src/puripuly_heart/app/services/capture/peer_capture_target_application.py",
-        "src/puripuly_heart/app/services/provider/provider_settings.py",
         "src/puripuly_heart/app/services/settings/settings_application.py",
         "src/puripuly_heart/app/services/settings/settings_runtime_effects.py",
-        "src/puripuly_heart/app/wiring/wiring_llm_factory.py",
-        "src/puripuly_heart/app/wiring/wiring_capture_runtime.py",
-        "src/puripuly_heart/app/wiring/wiring_local_asr_application.py",
         "src/puripuly_heart/app/wiring/wiring_managed_auth_factory.py",
         "src/puripuly_heart/app/wiring/wiring_managed_account.py",
-        "src/puripuly_heart/app/wiring/wiring_microphone_test.py",
-        "src/puripuly_heart/app/wiring/wiring_overlay_factory.py",
-        "src/puripuly_heart/app/wiring/wiring_peer_application.py",
-        "src/puripuly_heart/app/wiring/wiring_provider_runtime.py",
-        "src/puripuly_heart/app/wiring/wiring_provider_runtime_policy.py",
-        "src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py",
-        "src/puripuly_heart/app/wiring/wiring_stt_factory.py",
     }
 )
 
@@ -608,27 +440,8 @@ LEGACY_SETTINGS_VALUE_PAYLOAD_PREFIXES = (
 
 UNKNOWN_SETTINGS_RUNTIME_CONFINEMENT_RATIONALE = "unclassified order-11 settings runtime debt"
 
-KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT: frozenset[SettingsRuntimeConfinementViolation] = frozenset(
-    {
-        SettingsRuntimeConfinementViolation(
-            "legacy-settings-api-import",
-            "src/puripuly_heart/composition/application_runtime.py",
-            "AppSettings",
-            "The production composition root uses the AppSettings compatibility DTO only to connect focused owners while SettingsOwner exclusively owns load, normalization, migration, backup, and persistence.",
-        ),
-        SettingsRuntimeConfinementViolation(
-            "legacy-settings-api-import",
-            "src/puripuly_heart/ui/views/settings.py",
-            "AppSettings",
-            "SettingsView remains a UI editor for the public AppSettings compatibility model while controller/app services own persistence; replacing the view draft model is deferred UI-rendering work, not active runtime resolution.",
-        ),
-        SettingsRuntimeConfinementViolation(
-            "legacy-settings-api-import",
-            "src/puripuly_heart/core/telemetry.py",
-            "AppSettings",
-            "Translation-success telemetry service mutates and persists consent/anonymous identity through the public AppSettings compatibility model until a dedicated telemetry state port is extracted.",
-        ),
-    }
+KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT: frozenset[SettingsRuntimeConfinementViolation] = (
+    frozenset()
 )
 
 
@@ -1176,6 +989,10 @@ def test_concrete_osc_modules_classify_as_adapters() -> None:
     assert _layer_for_module("puripuly_heart.core.osc.udp_sender") == ADAPTERS
 
 
+def test_osc_receiver_contract_classifies_as_service_port() -> None:
+    assert _layer_for_module("puripuly_heart.core.osc.receiver_contract") == SERVICE_PORTS
+
+
 def test_overlay_calibration_value_object_has_config_schema_ownership() -> None:
     assert _layer_for_module("puripuly_heart.config.overlay_calibration") == SCHEMA_VALUES
     assert _layer_for_module("puripuly_heart.ui.overlay_calibration") == UI_ADAPTERS_RENDERERS
@@ -1275,9 +1092,9 @@ def test_canonical_settings_persistence_composition_uses_only_public_settings_ty
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
-    assert imports["puripuly_heart.config.settings"] == {
-        "AppSettings",
-        "new_settings_for_first_run",
+    assert imports["puripuly_heart.config.settings"] == {"AppSettings"}
+    assert imports["puripuly_heart.config.settings_vnext.defaults"] == {
+        "new_settings_for_first_run"
     }
     assert imports["puripuly_heart.config.settings_vnext.schema"] == {
         "AppSettingsVNext",
@@ -1316,7 +1133,6 @@ def test_capture_target_compatibility_service_delegates_to_settings_owner() -> N
 def test_settings_persistence_calls_are_confined_to_owner_mechanics() -> None:
     allowed_paths = {
         "app/adapters/settings_vnext_canonical_persistence.py",
-        "config/profile_bootstrap.py",
         "config/settings_vnext/compat.py",
         "config/settings_vnext/facade.py",
     }
@@ -1352,18 +1168,7 @@ def test_settings_persistence_calls_are_confined_to_owner_mechanics() -> None:
         for node in ast.walk(main_tree)
     )
 
-    owner_path = SOURCE_PACKAGE_ROOT / "app" / "services" / "canonical_settings_persistence.py"
-    owner_tree = ast.parse(owner_path.read_text(encoding="utf-8"))
-    assert (
-        sum(
-            1
-            for node in ast.walk(owner_tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "import_stable_settings_if_missing"
-        )
-        == 1
-    )
+    assert not (SOURCE_PACKAGE_ROOT / "config" / "profile_bootstrap.py").exists()
 
 
 def test_internal_source_imports_canonical_overlay_calibration_not_ui_facade() -> None:
@@ -1455,7 +1260,7 @@ def test_application_composition_has_no_concrete_osc_import_violations() -> None
     )
 
 
-def test_current_runtime_owner_imports_are_allowlist_synchronization_only() -> None:
+def test_a03_runtime_owner_adapter_imports_are_retired() -> None:
     runtime_owner_rule = _rule_for_layer(RUNTIME_OWNERS)
     inherited_runtime_owner_violations = {
         ImportViolation(
@@ -1476,8 +1281,8 @@ def test_current_runtime_owner_imports_are_allowlist_synchronization_only() -> N
         ),
     }
 
-    assert inherited_runtime_owner_violations <= _dependency_violations()
-    assert inherited_runtime_owner_violations <= KNOWN_ALLOWED_VIOLATIONS
+    assert inherited_runtime_owner_violations.isdisjoint(_dependency_violations())
+    assert inherited_runtime_owner_violations.isdisjoint(KNOWN_ALLOWED_VIOLATIONS)
 
 
 def test_gate1_existing_replacement_private_shims_are_removed() -> None:
@@ -1755,6 +1560,327 @@ def test_dependency_boundary_allowlist_matches_current_violations() -> None:
         "Stale allowlist entries:\n"
         f"{_format_violations(stale)}"
     )
+
+
+def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -> None:
+    census_path = REPO_ROOT / "tests" / "architecture" / "settings_legacy_reachability_r00.json"
+    census = json.loads(census_path.read_text(encoding="utf-8"))
+    entries = census["entries"]
+    assert census["baseline_sha"] == "a4aeacccf17194bbf607266f037d16e680234eef"
+    assert len(entries) == 39
+    assert len({entry["path"] for entry in entries}) == 39
+    assert all(
+        entry["symbols"] and entry["classifications"] and entry["owners"] for entry in entries
+    )
+    assert {classification for entry in entries for classification in entry["classifications"]} <= {
+        "flat persistence ingress",
+        "runtime AppSettings projection/mutation",
+        "pure enum/constant/value misplaced in settings.py",
+        "first-run/default policy",
+        "test-only compatibility",
+        "proven external compatibility",
+    }
+    assert {owner for entry in entries for owner in entry["owners"]} <= {
+        "R00",
+        "A02",
+        "A04",
+        "A06",
+        "A07",
+        "A08",
+        "A09",
+        "A10",
+    }
+
+    expected_current = {entry["path"]: set(entry["symbols"]) for entry in entries}
+    expected_current.pop("src/puripuly_heart/main.py")
+    expected_current.pop("src/puripuly_heart/providers/llm/openrouter.py")
+    expected_current.pop("src/puripuly_heart/ui/desktop_overlay.py")
+    expected_current.pop("src/puripuly_heart/ui/desktop_overlay_surface/contract.py")
+    expected_current.pop("src/puripuly_heart/ui/desktop_overlay_surface/renderer.py")
+    expected_current.pop("src/puripuly_heart/ui/views/settings.py")
+    expected_current.pop("src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_llm_factory.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_local_asr_provider_runtime.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_provider_runtime.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_provider_runtime_policy.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_stt_factory.py")
+    expected_current.pop("src/puripuly_heart/app/services/provider/provider_settings.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_capture_runtime.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_local_asr_application.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_microphone_test.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_overlay_factory.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_peer_application.py")
+    expected_current.pop("src/puripuly_heart/app/services/capture/capture_target_settings.py")
+    expected_current.pop(
+        "src/puripuly_heart/app/services/capture/peer_capture_target_application.py"
+    )
+    expected_current.pop("src/puripuly_heart/composition/application_runtime.py")
+    expected_current.pop("src/puripuly_heart/core/telemetry.py")
+    expected_current.pop("src/puripuly_heart/core/openrouter/managed_openrouter_release.py")
+    expected_current.pop("src/puripuly_heart/core/openrouter/openrouter_credentials.py")
+    expected_current.pop("src/puripuly_heart/core/stt/controller.py")
+    expected_current.pop("src/puripuly_heart/core/stt/custom_vocab.py")
+    expected_current.pop("src/puripuly_heart/app/services/github_star_prompt_settings.py")
+    expected_current.pop("src/puripuly_heart/app/services/manual_local_asr_fallback.py")
+    expected_current.pop("src/puripuly_heart/app/services/openrouter_pkce_flow.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_composition.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_managed_account.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_managed_auth_factory.py")
+    expected_current.pop("src/puripuly_heart/app/wiring/wiring_secrets_factory.py")
+    expected_current.pop("src/puripuly_heart/app/services/settings/settings_application.py")
+    expected_current.pop("src/puripuly_heart/app/services/settings/settings_runtime_effects.py")
+    expected_current["src/puripuly_heart/app/services/canonical_settings_persistence.py"] = {
+        "AppSettings"
+    }
+    actual_current: dict[str, set[str]] = {}
+    for source_path in SOURCE_PACKAGE_ROOT.rglob("*.py"):
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        symbols = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module == "puripuly_heart.config.settings"
+            for alias in node.names
+        }
+        if symbols:
+            actual_current[_relative_repo_path(source_path)] = symbols
+
+    assert actual_current == expected_current
+
+
+def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
+    forbidden = {
+        "_extract_unknown_legacy_values",
+        "_fallback_intent_from_legacy_raw_dict",
+        "_migrate_legacy_local_qwen_providers",
+        "_telemetry_consent_from_legacy_raw_dict",
+        "_telemetry_state_from_legacy_raw_dict",
+        "allow_stable_settings_import",
+        "copy_stable_secrets_to_vnext_namespace",
+        "import_stable_settings_if_missing",
+        "is_legacy_shape_dict",
+    }
+    occurrences = {
+        (path.relative_to(REPO_ROOT).as_posix(), symbol)
+        for path in SOURCE_PACKAGE_ROOT.rglob("*.py")
+        for symbol in forbidden
+        if symbol in path.read_text(encoding="utf-8")
+    }
+
+    assert occurrences == set()
+
+
+def test_a07_managed_broker_boundary_reduces_dependency_debt_to_16() -> None:
+    assert not any(
+        violation.importer.endswith("managed_openrouter_broker_client.py")
+        for violation in KNOWN_ALLOWED_VIOLATIONS
+    )
+    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 0
+    assert len(_settings_runtime_confinement_violations()) == 0
+
+
+def test_a08_provider_runtime_wiring_reduces_dependency_debt_to_9() -> None:
+    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 0
+    assert len(_settings_runtime_confinement_violations()) == 0
+    a08_paths = (
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_llm_factory.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_local_asr_provider_runtime.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_provider_runtime.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_provider_runtime_policy.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_stt_factory.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "provider" / "provider_settings.py",
+    )
+    for path in a08_paths:
+        imported_modules = set(
+            _imported_modules(
+                _module_name_for_path(path),
+                path,
+                _internal_module_names(),
+            )
+        )
+        assert "puripuly_heart.config.settings" not in imported_modules
+        assert "puripuly_heart.config.settings_vnext.migration" not in imported_modules
+    assert {violation.importer for violation in KNOWN_ALLOWED_VIOLATIONS}.isdisjoint(
+        {_relative_repo_path(path) for path in a08_paths}
+    )
+
+
+def test_a09_capture_overlay_application_wiring_reduces_dependency_debt_to_4() -> None:
+    assert len(KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT) == 0
+    assert len(_settings_runtime_confinement_violations()) == 0
+    a09_paths = (
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_capture_runtime.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_local_asr_application.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_microphone_test.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_overlay_factory.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_peer_application.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "capture" / "capture_target_settings.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "capture" / "peer_capture_target_application.py",
+    )
+    for path in a09_paths:
+        imported_modules = set(
+            _imported_modules(
+                _module_name_for_path(path),
+                path,
+                _internal_module_names(),
+            )
+        )
+        assert "puripuly_heart.config.settings" not in imported_modules
+    assert {violation.importer for violation in KNOWN_ALLOWED_VIOLATIONS}.isdisjoint(
+        {_relative_repo_path(path) for path in a09_paths}
+    )
+
+
+def test_a10_composition_managed_secrets_wiring_reduces_dependency_debt_to_0() -> None:
+    assert KNOWN_ALLOWED_VIOLATIONS == frozenset()
+    assert _dependency_violations() == frozenset()
+    assert KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT == frozenset()
+    assert _settings_runtime_confinement_violations() == frozenset()
+    a10_paths = (
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_composition.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_managed_account.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_managed_auth_factory.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_secrets_factory.py",
+        SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py",
+        SOURCE_PACKAGE_ROOT / "core" / "telemetry.py",
+        SOURCE_PACKAGE_ROOT / "core" / "openrouter" / "managed_openrouter_release.py",
+        SOURCE_PACKAGE_ROOT / "core" / "openrouter" / "openrouter_credentials.py",
+        SOURCE_PACKAGE_ROOT / "core" / "stt" / "controller.py",
+        SOURCE_PACKAGE_ROOT / "core" / "stt" / "custom_vocab.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "github_star_prompt_settings.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "manual_local_asr_fallback.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "openrouter_pkce_flow.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "settings" / "settings_application.py",
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py",
+    )
+    for path in a10_paths:
+        imported_modules = set(
+            _imported_modules(
+                _module_name_for_path(path),
+                path,
+                _internal_module_names(),
+            )
+        )
+        assert "puripuly_heart.config.settings" not in imported_modules
+
+
+def test_a07_managed_broker_uses_the_pure_provider_value_owner() -> None:
+    broker_path = (
+        SOURCE_PACKAGE_ROOT / "core" / "openrouter" / "managed_openrouter_broker_client.py"
+    )
+    imported_modules = set(
+        _imported_modules(
+            _module_name_for_path(broker_path),
+            broker_path,
+            _internal_module_names(),
+        )
+    )
+
+    assert "puripuly_heart.config.settings" not in imported_modules
+    assert "puripuly_heart.config.provider_values" in imported_modules
+
+
+def test_a04_overlay_ui_uses_the_pure_canonical_value_owner() -> None:
+    owned_paths = (
+        SOURCE_PACKAGE_ROOT / "ui" / "desktop_overlay.py",
+        SOURCE_PACKAGE_ROOT / "ui" / "desktop_overlay_surface" / "contract.py",
+        SOURCE_PACKAGE_ROOT / "ui" / "desktop_overlay_surface" / "renderer.py",
+    )
+    for path in owned_paths:
+        imported_modules = set(
+            _imported_modules(
+                _module_name_for_path(path),
+                path,
+                _internal_module_names(),
+            )
+        )
+        assert "puripuly_heart.config.settings" not in imported_modules
+        assert "puripuly_heart.config.desktop_overlay_values" in imported_modules
+
+    settings_view_path = SOURCE_PACKAGE_ROOT / "ui" / "views" / "settings.py"
+    settings_view_tree = ast.parse(settings_view_path.read_text(encoding="utf-8"))
+    imports_by_module = {
+        node.module: {alias.name for alias in node.names}
+        for node in ast.walk(settings_view_tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+    a04_symbols = {
+        "DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA",
+        "DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER",
+        "DESKTOP_FLET_SIZE_PRESET_ORDER",
+    }
+    assert a04_symbols <= imports_by_module["puripuly_heart.config.desktop_overlay_values"]
+    assert a04_symbols.isdisjoint(imports_by_module.get("puripuly_heart.config.settings", set()))
+    assert _layer_for_module("puripuly_heart.config.desktop_overlay_values") == SCHEMA_VALUES
+
+
+def test_a05_settings_view_uses_composed_typed_secret_ports() -> None:
+    settings_view_path = SOURCE_PACKAGE_ROOT / "ui" / "views" / "settings.py"
+    settings_view_source = settings_view_path.read_text(encoding="utf-8")
+    settings_view_tree = ast.parse(settings_view_source)
+    imported_modules = set(
+        _imported_modules(
+            _module_name_for_path(settings_view_path),
+            settings_view_path,
+            _internal_module_names(),
+        )
+    )
+    imported_secret_port_symbols = {
+        alias.name
+        for node in ast.walk(settings_view_tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "puripuly_heart.app.ports.settings_secrets"
+        for alias in node.names
+    }
+
+    assert "puripuly_heart.app.wiring" not in imported_modules
+    assert "create_secret_store" not in settings_view_source
+    assert "SecretStore" not in settings_view_source
+    assert {
+        "SettingsSecretKey",
+        "SettingsSecretMutation",
+        "SettingsSecretSnapshot",
+        "SettingsSecretsPort",
+    } <= imported_secret_port_symbols
+
+    composition_source = (SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py").read_text(
+        encoding="utf-8"
+    )
+    assert "settings_secrets=SettingsSecretsOwner(" in composition_source
+    assert "secret_store_factory=create_settings_secret_store" in composition_source
+
+
+def test_r00_canonical_migration_loader_has_no_flat_ingress() -> None:
+    migration_path = SOURCE_PACKAGE_ROOT / "config" / "settings_vnext" / "migration.py"
+    tree = ast.parse(migration_path.read_text(encoding="utf-8"))
+    loader = next(
+        node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "from_dict"
+    )
+    referenced_names = {node.id for node in ast.walk(loader) if isinstance(node, ast.Name)} | {
+        node.attr for node in ast.walk(loader) if isinstance(node, ast.Attribute)
+    }
+    imported_modules = {
+        node.module
+        for node in ast.walk(loader)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    } | {
+        alias.name
+        for node in ast.walk(loader)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+
+    assert "is_vnext_settings_dict" in referenced_names
+    assert referenced_names.isdisjoint(
+        {
+            "_extract_unknown_legacy_values",
+            "_migrate_settings_dict",
+            "from_legacy_app_settings",
+            "is_legacy_shape_dict",
+        }
+    )
+    assert "puripuly_heart.config.settings" not in imported_modules
 
 
 def test_dependency_boundary_allowlist_entries_have_gate6_rationale() -> None:

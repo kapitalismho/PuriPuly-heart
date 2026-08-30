@@ -243,6 +243,7 @@ class LogsView(ft.Column):
             size=16,
             font_family="Consolas",
             color=COLOR_ON_BACKGROUND,
+            style=ft.TextStyle(letter_spacing=0),
             selectable=True,
         )
 

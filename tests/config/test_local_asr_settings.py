@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 
 from puripuly_heart.config.settings import (
-    SETTINGS_SCHEMA_VERSION,
     AppSettings,
     STTProviderName,
 )
@@ -22,7 +21,7 @@ from puripuly_heart.config.settings_vnext import compat, serialization
 from puripuly_heart.config.settings_vnext.schema import (
     VNEXT_SETTINGS_SCHEMA_VERSION,
     AppSettingsVNext,
-    with_telemetry_consent,
+    with_telemetry_enabled,
 )
 
 LOCAL_PROVIDER_VALUES = (
@@ -74,7 +73,7 @@ def test_target_schema_29_local_qwen_migration_is_backed_up_and_idempotent(
 ) -> None:
     path = tmp_path / "settings.json"
     raw = serialization.to_dict(AppSettingsVNext())
-    assert VNEXT_SETTINGS_SCHEMA_VERSION == 36
+    assert VNEXT_SETTINGS_SCHEMA_VERSION == 37
     raw["settings_version"] = 29
     raw["intent"]["stt"]["provider"] = self_provider
     raw["intent"]["stt"].pop("gpu_device_id")
@@ -111,48 +110,13 @@ def test_target_schema_29_local_qwen_migration_is_backed_up_and_idempotent(
     assert len(list(tmp_path.glob("*.bak"))) == 1
 
 
-def test_legacy_local_qwen_migration_preserves_unrelated_settings_after_backup(
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "settings.json"
-    raw = legacy_to_dict(AppSettings())
-    raw["settings_version"] = SETTINGS_SCHEMA_VERSION
-    raw["provider"]["stt"] = STTProviderName.LOCAL_QWEN.value
-    raw["provider"]["peer_stt"] = STTProviderName.LOCAL_QWEN.value
-    raw["stt"].pop("gpu_device_id")
-    raw["languages"]["source_language"] = "fr"
-    raw["languages"]["peer_target_language"] = "ja"
-    raw["ui"]["locale"] = "ko"
-    original_bytes = json.dumps(raw, ensure_ascii=False, indent=2).encode("utf-8")
-    path.write_bytes(original_bytes)
-
-    result = compat.load_vnext_settings(path)
-
-    assert result.ok
-    assert result.migrated is True
-    assert result.backup_path is not None
-    assert result.backup_path.read_bytes() == original_bytes
-    assert result.settings is not None
-    assert result.settings.intent.stt.provider == STTProviderName.LOCAL_CPU_AUTO.value
-    assert result.settings.intent.peer_stt.provider == STTProviderName.LOCAL_CPU_AUTO.value
-    assert result.settings.intent.stt.gpu_device_id == "auto"
-    assert result.settings.intent.languages.source_language == "fr"
-    assert result.settings.intent.languages.peer_target_language == "ja"
-    assert result.settings.intent.ui.locale == "ko"
-
-
-@pytest.mark.parametrize(
-    "source_version",
-    [VNEXT_SETTINGS_SCHEMA_VERSION, VNEXT_SETTINGS_SCHEMA_VERSION + 100],
-)
 def test_current_manual_qwen_selection_and_shared_gpu_device_remain_stable(
-    source_version: int,
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "settings.json"
-    default = with_telemetry_consent(
+    default = with_telemetry_enabled(
         AppSettingsVNext(),
-        "allow",
+        True,
         identifier_factory=lambda: "manual-qwen-test-id",
     )
     manual_qwen = replace(
@@ -172,7 +136,7 @@ def test_current_manual_qwen_selection_and_shared_gpu_device_remain_stable(
     )
 
     raw = serialization.to_dict(manual_qwen)
-    raw["settings_version"] = source_version
+    raw["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION
     path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
     loaded = compat.load_vnext_settings(path)
 

@@ -17,6 +17,15 @@ import {
 } from './test-support/migrations';
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
 
+const DAILY_SUMMARY_V2_FINALIZER = new URL(
+  '../deploy/finalize-daily-summary-v2.sql',
+  import.meta.url,
+);
+const APP_ACTIVE_DAY_FINALIZER = new URL(
+  '../deploy/finalize-app-active-day.sql',
+  import.meta.url,
+);
+
 describe('broker persistent state model', () => {
   it('defines the D1 table contract, runtime config keys, and minimal release-session state', async () => {
     const contract = await import('../src/contract');
@@ -25,11 +34,18 @@ describe('broker persistent state model', () => {
       fingerprintSalt: 'fingerprint_salt',
       abuseControls: 'abuse_controls',
       abuseRuntimeState: 'abuse_runtime_state',
+      qqTalkTogetherPass: 'qq_talk_together_pass',
     });
     expect(contract).toHaveProperty('BROKER_RUNTIME_CONFIG_SCHEMA', {
       fingerprint_salt: ['current', 'previous', 'rotated_at'],
       abuse_controls: TEST_DEFAULT_ABUSE_CONTROLS,
       abuse_runtime_state: TEST_DEFAULT_ABUSE_RUNTIME_STATE,
+      qq_talk_together_pass: {
+        enabled: false,
+        rewards_enabled: false,
+        daily_warning_count: 30,
+        daily_max_count: 50,
+      },
     });
     expect(contract).toHaveProperty('BROKER_PUBLIC_INPUT_BOUNDS', {
       installation_id: {
@@ -67,12 +83,18 @@ describe('broker persistent state model', () => {
             'fingerprint_salt',
             'abuse_controls',
             'abuse_runtime_state',
+            'qq_talk_together_pass',
           ],
           constraints: {
             key: 'supported-keys-only',
             value: 'valid-json',
           },
-          seedRows: ['fingerprint_salt', 'abuse_controls', 'abuse_runtime_state'],
+          seedRows: [
+            'fingerprint_salt',
+            'abuse_controls',
+            'abuse_runtime_state',
+            'qq_talk_together_pass',
+          ],
         },
         installations: {
           name: 'installations',
@@ -241,11 +263,12 @@ describe('broker persistent state model', () => {
         },
         referralCodes: {
           name: 'referral_codes',
-          purpose: 'stable owned Referral ID per Discord identity',
+          purpose: 'stable owned global Referral ID per managed source subject',
           primaryKey: 'referral_id',
           columns: [
             'referral_id',
-            'owner_discord_user_ref',
+            'owner_source',
+            'owner_subject_ref',
             'owner_installation_id',
             'status',
             'created_at',
@@ -257,9 +280,10 @@ describe('broker persistent state model', () => {
           referralIdFormat:
             'six uppercase approved-alphabet characters excluding 0/O/1/I/L',
           storedStatuses: ['active', 'disabled'],
-          unique: ['owner_discord_user_ref'],
+          ownerSources: ['discord', 'qq'],
+          unique: ['owner_source + owner_subject_ref'],
           indexed: [
-            'owner_discord_user_ref',
+            'owner_source + owner_subject_ref',
             'owner_installation_id',
             'status + referral_id',
           ],
@@ -268,14 +292,16 @@ describe('broker persistent state model', () => {
         },
         referralRewards: {
           name: 'referral_rewards',
-          purpose: 'append-only referral attempt and reward ledger',
+          purpose: 'global append-only source-aware referral attempt and reward ledger',
           primaryKey: 'id',
           columns: [
             'id',
             'referral_id',
-            'referrer_discord_user_ref',
+            'referrer_source',
+            'referrer_subject_ref',
             'referrer_installation_id',
-            'referred_discord_user_ref',
+            'referred_source',
+            'referred_subject_ref',
             'referred_installation_id',
             'referred_hardware_hash',
             'referred_hardware_hash_salt_version',
@@ -292,6 +318,7 @@ describe('broker persistent state model', () => {
           ],
           referralIdFormat:
             'six uppercase approved-alphabet characters excluding 0/O/1/I/L',
+          subjectSources: ['discord', 'qq'],
           referredBonusStatuses: ['reserved', 'credited', 'skipped', 'failed'],
           referrerBonusStatuses: ['pending', 'applying', 'credited', 'skipped', 'failed'],
           reasonBounds: {
@@ -300,24 +327,28 @@ describe('broker persistent state model', () => {
           },
           indexed: [
             'referral_id',
-            'referrer_discord_user_ref + referred_bonus_status',
+            'referrer_source + referrer_subject_ref + referred_bonus_status',
+            'referred_source + referred_subject_ref + created_at',
             'referred_installation_id + created_at',
             'attempt_ip_hash + created_at',
             'referral_id + created_at',
-            'referrer_discord_user_ref + created_at',
+            'referrer_source + referrer_subject_ref + created_at',
           ],
           partialUniqueIndexes: [
             {
-              name: 'idx_referral_rewards_counted_referred_discord_user',
-              columns: ['referred_discord_user_ref'],
+              name: 'idx_referral_rewards_counted_referred_subject',
+              columns: ['referred_source', 'referred_subject_ref'],
               predicate: "referred_bonus_status IN ('reserved', 'credited')",
             },
             {
               name: 'idx_referral_rewards_counted_referred_installation',
               columns: ['referred_installation_id'],
-              predicate: "referred_bonus_status IN ('reserved', 'credited')",
+              predicate:
+                "referred_installation_id IS NOT NULL AND referred_bonus_status IN ('reserved', 'credited')",
             },
           ],
+          sourceShape:
+            'Discord referred rows require installation and hardware evidence; QQ referred rows prohibit Discord hardware fields',
           deletionBehavior:
             'installation aging must not cascade-delete referral reward ledger history',
         },
@@ -374,6 +405,7 @@ describe('broker persistent state model', () => {
             'delivered_at',
             'created_at',
             'updated_at',
+            'child_key_creation_started_at',
           ],
           unique: ['issue_ref'],
           partialUniqueIndexes: [
@@ -391,13 +423,13 @@ describe('broker persistent state model', () => {
               'requires managed_credential_ref, issued_at, and expires_at; delivered_at remains null until ACK succeeds',
             cleanup_required: 'requires managed_credential_ref',
             issuing:
-              'may be stale-reclaimed only when managed_credential_ref is NULL; issuing with a credential ref requires cleanup/remediation',
+              'may be stale-reclaimed only when managed_credential_ref and child_key_creation_started_at are NULL; any started child-key creation requires manual remediation or cleanup',
             revoked: 'blocks automatic reissue',
           },
           staleIssuingPolicy: {
             ttlMinutes: 15,
             withoutManagedCredentialRef:
-              'eligible for same-subject release/reclaim by a later valid request after TTL',
+              'eligible for same-subject release/reclaim by a later valid request after TTL only when child-key creation never started',
             withManagedCredentialRef:
               'cleanup/remediation candidate; must not be silently overwritten',
           },
@@ -440,7 +472,39 @@ describe('broker persistent state model', () => {
           rawAckTokenStorage: false,
           rawOpenRouterKeyStorage: false,
           stalePendingCleanup:
-            'pending rows remain pending after expired ACK attempts until cleanup owner marks expired or cleanup_required',
+            'expired rows are claimed exclusively; abandoned claims recover only after the scheduled invocation limit, and terminal owner/ledger transitions are atomic',
+        },
+        qqPassSettlementJobs: {
+          name: 'qq_pass_settlement_jobs',
+          purpose:
+            'durable fenced QQ invitee/referrer reward settlement work keyed by referral reward and acknowledged delivery',
+          primaryKey: 'id',
+          columns: [
+            'id',
+            'referral_reward_id',
+            'delivery_id',
+            'phase',
+            'attempt_count',
+            'last_attempt_at',
+            'next_attempt_at',
+            'fencing_token',
+            'lease_expires_at',
+            'last_error_code',
+            'created_at',
+            'updated_at',
+            'completed_at',
+          ],
+          phases: ['invitee_pending', 'referrer_pending', 'completed'],
+          unique: [
+            'referral_reward_id',
+            'delivery_id',
+            'fencing_token when claimed',
+          ],
+          indexed: ['phase + next_attempt_at + lease_expires_at'],
+          noRetention: true,
+          noCascade: true,
+          fencing:
+            'every claim, transition, release, and completion mutation requires the exact fencing_token',
         },
         brokerRequestEvents: {
           name: 'broker_request_events',
@@ -456,7 +520,7 @@ describe('broker persistent state model', () => {
         },
         brokerIssueSuccessEvents: {
           name: 'broker_issue_success_events',
-          purpose: ['issue success alerting', 'daily reporting', 'asn-based heuristics'],
+          purpose: ['issuance spike detection', 'daily reporting'],
           issueSources: ['discord', 'qq'],
           sourceAwareSubjectModel: {
             discord: {
@@ -497,6 +561,54 @@ describe('broker persistent state model', () => {
             'asn + observed_at',
             'observed_at',
           ],
+        },
+        telemetrySubjects: {
+          name: 'telemetry_subjects',
+          purpose:
+            'legacy translation-success subject bounds preserved but unused by app usage aggregation',
+          primaryKey: 'subject_ref',
+          columns: ['subject_ref', 'first_active_date_utc', 'last_active_date_utc'],
+          indexed: ['last_active_date_utc'],
+          rawTelemetryIdentifierStorage: false,
+          joinedToManagedIdentity: false,
+        },
+        telemetryActiveDays: {
+          name: 'telemetry_active_days',
+          purpose:
+            'legacy translation-success dates preserved but unused by app usage aggregation',
+          primaryKey: ['subject_ref', 'active_date_utc'],
+          columns: [
+            'subject_ref',
+            'active_date_utc',
+            'first_received_at',
+            'last_received_at',
+          ],
+          indexed: ['active_date_utc', 'last_received_at'],
+          rawTelemetryIdentifierStorage: false,
+          joinedToManagedIdentity: false,
+        },
+        appActiveDays: {
+          name: 'app_active_days',
+          purpose: 'retained anonymous app-launch dates for completed-day usage aggregation',
+          primaryKey: ['subject_ref', 'active_date_utc'],
+          columns: ['subject_ref', 'active_date_utc'],
+          indexed: ['active_date_utc'],
+          rawTelemetryIdentifierStorage: false,
+          joinedToManagedIdentity: false,
+        },
+        brokerDailySummaryDeliveries: {
+          name: 'broker_daily_summary_deliveries',
+          purpose: 'v2 completed-day delivery leases and durable delivery outcomes',
+          primaryKey: 'report_date_utc',
+          columns: [
+            'report_date_utc',
+            'status',
+            'lease_token',
+            'lease_expires_at',
+            'attempted_at',
+            'delivered_at',
+          ],
+          indexed: ['status + report_date_utc + lease_expires_at'],
         },
         brokerAbuseRuntimeAudit: {
           name: 'broker_abuse_runtime_audit',
@@ -600,6 +712,11 @@ describe('broker persistent state model', () => {
       '0010_source_aware_issue_success_events.sql',
       '0011_add_telemetry_active_days.sql',
       '0012_add_managed_key_delivery_ack.sql',
+      '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
+      '0014_simplify_abuse_incidents.sql',
+      '0015_add_app_active_days.sql',
+      '0016_make_referrals_source_aware.sql',
+      '0017_add_qq_pass_settlement_jobs.sql',
     ]);
     expect(existsSync(FIRST_BROKER_MIGRATION)).toBe(true);
     expect(existsSync(LATEST_BROKER_MIGRATION)).toBe(true);
@@ -647,6 +764,20 @@ describe('broker persistent state model', () => {
     const managedKeyDeliveryAckMigration = readBrokerMigrationSql(
       '0012_add_managed_key_delivery_ack.sql',
     );
+    const dailySummaryV2Migration = readBrokerMigrationSql(
+      '0013_add_telemetry_subjects_and_daily_summary_v2.sql',
+    );
+    const simplifiedAbuseIncidentsMigration = readBrokerMigrationSql(
+      '0014_simplify_abuse_incidents.sql',
+    );
+    const appActiveDaysMigration = readBrokerMigrationSql(
+      '0015_add_app_active_days.sql',
+    );
+    const dailySummaryV2Finalizer = readFileSync(
+      DAILY_SUMMARY_V2_FINALIZER,
+      'utf8',
+    );
+    const appActiveDayFinalizer = readFileSync(APP_ACTIVE_DAY_FINALIZER, 'utf8');
 
     expect(migration).toContain('CREATE TABLE broker_config');
     expect(migration).toContain('CREATE TABLE installations');
@@ -831,6 +962,44 @@ describe('broker persistent state model', () => {
     expect(telemetryActiveDaysMigration).toContain('POST /v1/telemetry/translation-success-day');
     expect(telemetryActiveDaysMigration).not.toContain('telemetry_identifier');
     expect(telemetryActiveDaysMigration).not.toContain('translation_text');
+    expect(appActiveDaysMigration).toContain('CREATE TABLE app_active_days');
+    expect(appActiveDaysMigration).toContain('subject_ref TEXT NOT NULL');
+    expect(appActiveDaysMigration).toContain('active_date_utc TEXT NOT NULL');
+    expect(appActiveDaysMigration).toContain('PRIMARY KEY (subject_ref, active_date_utc)');
+    expect(appActiveDaysMigration).toContain("'ph-app-subject-v1_'");
+    expect(appActiveDaysMigration).not.toContain('telemetryTranslationSuccessDayIp');
+    expect(appActiveDayFinalizer).toContain(
+      "json_remove(value, '$.telemetryTranslationSuccessDayIp')",
+    );
+    expect(appActiveDaysMigration).not.toContain('anonymous_id');
+    expect(appActiveDaysMigration).not.toContain('received_at');
+    expect(appActiveDaysMigration).not.toContain('ip TEXT');
+    expect(appActiveDaysMigration).not.toContain('metadata');
+    expect(dailySummaryV2Migration).toContain('CREATE TABLE telemetry_subjects');
+    expect(dailySummaryV2Migration).toContain('MIN(active_date_utc)');
+    expect(dailySummaryV2Migration).toContain('MAX(active_date_utc)');
+    expect(dailySummaryV2Migration).toContain(
+      'CREATE TRIGGER telemetry_active_days_sync_subject_after_insert',
+    );
+    expect(dailySummaryV2Migration).toContain(
+      'CREATE TABLE broker_daily_summary_deliveries',
+    );
+    expect(dailySummaryV2Migration).toContain("'$.dailyReport.hourUtc'");
+    expect(dailySummaryV2Migration).toContain("'$.dailyReport.minuteUtc'");
+    expect(dailySummaryV2Migration).not.toContain(
+      "'$.dailyReport.includeZeroActivity'",
+    );
+    expect(dailySummaryV2Finalizer).toContain(
+      "'$.dailyReport.includeZeroActivity'",
+    );
+    expect(dailySummaryV2Migration).toContain("'$.retention.issueSuccessDays'");
+    expect(dailySummaryV2Migration).not.toContain('telemetry_identifier');
+    expect(simplifiedAbuseIncidentsMigration).toContain(
+      "'$.immediateAlerts.warning'",
+    );
+    expect(simplifiedAbuseIncidentsMigration).toContain(
+      "'$.retention.requestEventSafetyMarginDays'",
+    );
     expect(managedKeyDeliveryAckMigration).toContain('CREATE TABLE managed_key_deliveries');
     expect(managedKeyDeliveryAckMigration).toContain(
       "discord_issue_status TEXT CHECK(discord_issue_status IS NULL OR discord_issue_status IN ('issuing', 'delivery_pending', 'active', 'failed', 'cleanup_required'))",

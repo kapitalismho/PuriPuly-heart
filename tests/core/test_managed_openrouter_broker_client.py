@@ -471,7 +471,7 @@ async def test_issue_discord_managed_key_parses_talk_together_pass_status() -> N
                 "talk_together_pass": {
                     "pass_id": "7KQ9M2",
                     "invite_count": 1,
-                    "invite_limit": 5,
+                    "invite_limit": 3,
                     "bonus_translations_per_friend": 200,
                 },
             },
@@ -485,7 +485,7 @@ async def test_issue_discord_managed_key_parses_talk_together_pass_status() -> N
     assert result.pass_status == TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=1,
-        invite_limit=5,
+        invite_limit=3,
         bonus_translations_per_friend=200,
     )
     await client.close()
@@ -601,7 +601,7 @@ async def test_acknowledge_managed_key_delivery_posts_token_and_maps_success() -
                 "talk_together_pass": {
                     "pass_id": "7KQ9M2",
                     "invite_count": 2,
-                    "invite_limit": 5,
+                    "invite_limit": 3,
                     "bonus_translations_per_friend": 200,
                 },
             },
@@ -625,7 +625,7 @@ async def test_acknowledge_managed_key_delivery_posts_token_and_maps_success() -
     assert result.pass_status == TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=2,
-        invite_limit=5,
+        invite_limit=3,
         bonus_translations_per_friend=200,
     )
     await client.close()
@@ -663,29 +663,6 @@ async def test_acknowledge_managed_key_delivery_maps_broker_error() -> None:
     assert result.diagnostics is not None
     assert result.diagnostics.code == "managed_key_delivery_ack_error"
     assert result.diagnostics.fields["broker_subcode"] == "delivery_ack_invalid"
-    await client.close()
-
-
-@pytest.mark.asyncio
-async def test_record_translation_success_day_posts_telemetry_payload() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        assert request.method == "POST"
-        assert request.url.path == "/v1/telemetry/translation-success-day"
-        assert json.loads(request.content) == {
-            "signal": "translation_success_day",
-            "telemetry_identifier": "anon-telemetry-id-123456",
-            "active_date_utc": "2026-07-03",
-        }
-        return httpx.Response(200, json={"ok": True})
-
-    client, _transport = _build_client(handler)
-
-    result = await client.record_translation_success_day(
-        "anon-telemetry-id-123456",
-        "2026-07-03",
-    )
-
-    assert result is True
     await client.close()
 
 
@@ -913,7 +890,7 @@ async def test_get_trial_status_parses_talk_together_pass_status() -> None:
                 "talk_together_pass": {
                     "pass_id": "7KQ9M2",
                     "invite_count": 2,
-                    "invite_limit": 5,
+                    "invite_limit": 3,
                     "bonus_translations_per_friend": 200,
                 },
             },
@@ -931,7 +908,7 @@ async def test_get_trial_status_parses_talk_together_pass_status() -> None:
     assert result.pass_status == TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=2,
-        invite_limit=5,
+        invite_limit=3,
         bonus_translations_per_friend=200,
     )
     await client.close()
@@ -943,15 +920,15 @@ async def test_get_trial_status_parses_talk_together_pass_status() -> None:
     [
         None,
         {},
-        {"pass_id": "ABC120", "invite_count": 1, "invite_limit": 5},
-        {"pass_id": "8H3J4N", "invite_count": 1, "invite_limit": 5},
-        {"pass_id": "7KQ9M2", "invite_count": True, "invite_limit": 5},
-        {"pass_id": "7KQ9M2", "invite_count": 1.5, "invite_limit": 5},
-        {"pass_id": "7KQ9M2", "invite_count": "1", "invite_limit": 5},
-        {"pass_id": "7KQ9M2", "invite_count": None, "invite_limit": 5},
-        {"pass_id": "7KQ9M2", "invite_count": -1, "invite_limit": 5},
+        {"pass_id": "ABC120", "invite_count": 1, "invite_limit": 3},
+        {"pass_id": "8H3J4N", "invite_count": 1, "invite_limit": 3},
+        {"pass_id": "7KQ9M2", "invite_count": True, "invite_limit": 3},
+        {"pass_id": "7KQ9M2", "invite_count": 1.5, "invite_limit": 3},
+        {"pass_id": "7KQ9M2", "invite_count": "1", "invite_limit": 3},
+        {"pass_id": "7KQ9M2", "invite_count": None, "invite_limit": 3},
+        {"pass_id": "7KQ9M2", "invite_count": -1, "invite_limit": 3},
         {"pass_id": "7KQ9M2", "invite_count": 1, "invite_limit": 0},
-        {"pass_id": "7KQ9M2", "invite_count": 2**63, "invite_limit": 5},
+        {"pass_id": "7KQ9M2", "invite_count": 2**63, "invite_limit": 3},
     ],
 )
 async def test_talk_together_pass_malformed_required_fields_are_absent(
@@ -986,7 +963,7 @@ async def test_talk_together_pass_defaults_malformed_bonus_only() -> None:
                 "talk_together_pass": {
                     "pass_id": "7KQ9M2",
                     "invite_count": 1,
-                    "invite_limit": 5,
+                    "invite_limit": 3,
                     "bonus_translations_per_friend": "200",
                 },
             },
@@ -999,7 +976,7 @@ async def test_talk_together_pass_defaults_malformed_bonus_only() -> None:
     assert result.pass_status == TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=1,
-        invite_limit=5,
+        invite_limit=3,
         bonus_translations_per_friend=200,
     )
     await client.close()
@@ -1016,7 +993,7 @@ async def test_talk_together_pass_defaults_missing_bonus_only() -> None:
                 "talk_together_pass": {
                     "pass_id": "7KQ9M2",
                     "invite_count": 1,
-                    "invite_limit": 5,
+                    "invite_limit": 3,
                 },
             },
         )
@@ -1028,7 +1005,7 @@ async def test_talk_together_pass_defaults_missing_bonus_only() -> None:
     assert result.pass_status == TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=1,
-        invite_limit=5,
+        invite_limit=3,
         bonus_translations_per_friend=200,
     )
     await client.close()

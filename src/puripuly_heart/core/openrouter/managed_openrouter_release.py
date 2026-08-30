@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import inspect
+import json
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import InitVar, dataclass, field, replace
@@ -11,13 +12,17 @@ from enum import Enum
 from typing import Protocol
 from uuid import UUID
 
-from puripuly_heart.app.ports.broker_client import ManagedKeyDeliveryAckRequest
+from puripuly_heart.app.ports.broker_client import (
+    ManagedKeyDeliveryAckRequest,
+    QqManagedStatusRequest,
+    QqManagedStatusResult,
+)
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
 from puripuly_heart.config.llm_profiles import (
     get_openrouter_llm_profile,
     openrouter_alias_for_fields,
 )
-from puripuly_heart.config.settings import (
+from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
@@ -43,6 +48,7 @@ from puripuly_heart.domain.models import Translation
 
 from .openrouter_credentials import (
     OPENROUTER_MANAGED_API_KEY_SECRET,
+    OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET,
     OpenRouterCredentialRuntimeConfig,
     best_effort_store_managed_openrouter_user_identifier,
     clear_temporary_managed_release_state,
@@ -301,6 +307,11 @@ class ManagedOpenRouterReleaseClient(Protocol):
         signature: str,
     ) -> ManagedOpenRouterTrialStatusSuccess: ...
 
+    async def get_qq_managed_status(
+        self,
+        request: QqManagedStatusRequest,
+    ) -> QqManagedStatusResult: ...
+
     async def acknowledge_managed_key_delivery(
         self,
         request: ManagedKeyDeliveryAckRequest,
@@ -355,6 +366,17 @@ class UnavailableManagedOpenRouterReleaseClient:
         self,
         request: dict[str, object],
     ) -> ManagedOpenRouterIssueSuccess:
+        _ = request
+        raise ManagedOpenRouterReleaseError(
+            code="trial_unavailable",
+            error_class="retryable",
+            message="managed OpenRouter release is unavailable",
+        )
+
+    async def get_qq_managed_status(
+        self,
+        request: QqManagedStatusRequest,
+    ) -> QqManagedStatusResult:
         _ = request
         raise ManagedOpenRouterReleaseError(
             code="trial_unavailable",
@@ -559,9 +581,16 @@ class ManagedOpenRouterReleaseService:
         return await self._await_or_start_issue_flow()
 
     async def refresh_managed_status(self) -> ManagedOpenRouterStatusRefreshResult:
-        """Best-effort signed-request status refresh for owned Pass ID and live pass status."""
+        """Best-effort status refresh for owned Pass ID and live pass status."""
 
         observed_referral_id = normalize_owned_referral_id(self.managed_state.referral_id)
+        observed_source = _managed_referral_source(
+            getattr(self.managed_state, "referral_source", None),
+            observed_referral_id,
+        )
+        observed_credential_ref = _normalize_optional_text(
+            self.managed_state.active_managed_credential_ref
+        )
         if self._closed:
             return ManagedOpenRouterStatusRefreshResult(
                 referral_id=observed_referral_id,
@@ -577,26 +606,51 @@ class ManagedOpenRouterReleaseService:
         if current_task is not None:
             self._status_refresh_tasks.add(current_task)
         try:
+            status_source = "qq" if observed_source == "qq" else "discord"
             try:
-                bundle = load_existing_managed_identity_bundle(self.managed_state, self.secrets)
-            except Exception:
-                return ManagedOpenRouterStatusRefreshResult(
-                    referral_id=observed_referral_id,
-                    succeeded=False,
-                )
-            if bundle is None:
-                return ManagedOpenRouterStatusRefreshResult(
-                    referral_id=observed_referral_id,
-                    succeeded=False,
-                )
-
-            try:
-                signed_request = bundle.sign_status_request(timestamp=self.signed_at_provider())
-                status_response = await self.client.get_trial_status(
-                    installation_id=signed_request["installation_id"],
-                    timestamp=signed_request["timestamp"],
-                    signature=signed_request["signature"],
-                )
+                if status_source == "qq":
+                    auth = _parse_qq_status_auth_secret(
+                        self.secrets.get(OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET)
+                    )
+                    if auth is None:
+                        return ManagedOpenRouterStatusRefreshResult(
+                            referral_id=observed_referral_id,
+                            succeeded=False,
+                        )
+                    qq_identity, credential, auth_credential_ref = auth
+                    if (
+                        auth_credential_ref is None
+                        or auth_credential_ref != observed_credential_ref
+                    ):
+                        return ManagedOpenRouterStatusRefreshResult(
+                            referral_id=observed_referral_id,
+                            succeeded=False,
+                        )
+                    status_response = await self.client.get_qq_managed_status(
+                        QqManagedStatusRequest(
+                            qq_identity=qq_identity,
+                            credential=credential,
+                            installation_id=_normalize_optional_text(
+                                self.managed_state.installation_id
+                            ),
+                        )
+                    )
+                else:
+                    bundle = load_existing_managed_identity_bundle(
+                        self.managed_state,
+                        self.secrets,
+                    )
+                    if bundle is None:
+                        return ManagedOpenRouterStatusRefreshResult(
+                            referral_id=observed_referral_id,
+                            succeeded=False,
+                        )
+                    signed_request = bundle.sign_status_request(timestamp=self.signed_at_provider())
+                    status_response = await self.client.get_trial_status(
+                        installation_id=signed_request["installation_id"],
+                        timestamp=signed_request["timestamp"],
+                        signature=signed_request["signature"],
+                    )
             except Exception:
                 return ManagedOpenRouterStatusRefreshResult(
                     referral_id=normalize_owned_referral_id(self.managed_state.referral_id),
@@ -612,14 +666,21 @@ class ManagedOpenRouterReleaseService:
                 getattr(status_response, "referral_id", None)
             )
             latest_referral_id = normalize_owned_referral_id(self.managed_state.referral_id)
+            latest_source = _managed_referral_source(
+                getattr(self.managed_state, "referral_source", None),
+                latest_referral_id,
+            )
+            latest_credential_ref = _normalize_optional_text(
+                self.managed_state.active_managed_credential_ref
+            )
             pass_status = getattr(status_response, "pass_status", None)
-            if returned_referral_id is None:
-                return ManagedOpenRouterStatusRefreshResult(
-                    referral_id=latest_referral_id,
-                    pass_status=None,
-                    succeeded=True,
-                )
-            if latest_referral_id != observed_referral_id:
+            if not isinstance(pass_status, TalkTogetherPassStatus):
+                pass_status = None
+            if (
+                latest_referral_id != observed_referral_id
+                or latest_source != observed_source
+                or latest_credential_ref != observed_credential_ref
+            ):
                 if pass_status is not None and pass_status.pass_id != latest_referral_id:
                     pass_status = None
                 return ManagedOpenRouterStatusRefreshResult(
@@ -627,13 +688,21 @@ class ManagedOpenRouterReleaseService:
                     pass_status=pass_status,
                     succeeded=True,
                 )
-            if returned_referral_id != latest_referral_id:
-                previous_referral_id = self.managed_state.referral_id
-                self.managed_state.referral_id = returned_referral_id
+
+            final_referral_id = returned_referral_id or latest_referral_id
+            previous_referral_id = self.managed_state.referral_id
+            previous_source = getattr(self.managed_state, "referral_source", None)
+            self.managed_state.referral_id = final_referral_id
+            self.managed_state.referral_source = status_source
+            if (
+                previous_referral_id != self.managed_state.referral_id
+                or previous_source != self.managed_state.referral_source
+            ):
                 try:
                     self.managed_state.persist()
                 except Exception:
                     self.managed_state.referral_id = previous_referral_id
+                    self.managed_state.referral_source = previous_source
                     return ManagedOpenRouterStatusRefreshResult(
                         referral_id=latest_referral_id,
                         succeeded=False,
@@ -701,6 +770,24 @@ class ManagedOpenRouterReleaseService:
             self.secrets.delete(token_key)
         except Exception:
             return self._delivery_ack_retry_result("pending_delivery_ack_token_clear_failed")
+        previous_referral_id = self.managed_state.referral_id
+        previous_referral_source = getattr(self.managed_state, "referral_source", None)
+        previous_normalized_referral_id = normalize_owned_referral_id(previous_referral_id)
+        if source in {"discord", "qq"}:
+            if (
+                _managed_referral_source(
+                    previous_referral_source,
+                    previous_normalized_referral_id,
+                )
+                != source
+            ):
+                self.managed_state.referral_id = None
+            self.managed_state.referral_source = source
+            acknowledged_referral_id = normalize_owned_referral_id(
+                getattr(ack_result, "referral_id", None)
+            )
+            if acknowledged_referral_id is not None:
+                self.managed_state.referral_id = acknowledged_referral_id
         self.managed_state.pending_delivery_ack_source = None
         self.managed_state.pending_delivery_ack_delivery_id = None
         self.managed_state.pending_delivery_ack_managed_credential_ref = None
@@ -708,6 +795,8 @@ class ManagedOpenRouterReleaseService:
         try:
             self.managed_state.persist()
         except Exception:
+            self.managed_state.referral_id = previous_referral_id
+            self.managed_state.referral_source = previous_referral_source
             self.managed_state.pending_delivery_ack_source = source
             self.managed_state.pending_delivery_ack_delivery_id = delivery_id
             self.managed_state.pending_delivery_ack_managed_credential_ref = managed_credential_ref
@@ -978,10 +1067,10 @@ class ManagedOpenRouterReleaseService:
                 managed_credential_ref=issue_response.managed_credential_ref,
                 expires_at=issue_response.expires_at,
             )
-            returned_referral_id = normalize_owned_referral_id(issue_response.referral_id)
-            if returned_referral_id is not None:
-                self.managed_state.referral_id = returned_referral_id
-            final_referral_id = normalize_owned_referral_id(self.managed_state.referral_id)
+            final_referral_id = _apply_discord_owned_referral_result(
+                self.managed_state,
+                issue_response.referral_id,
+            )
             pass_status = issue_response.pass_status
             if pass_status is not None and pass_status.pass_id != final_referral_id:
                 pass_status = None
@@ -1095,10 +1184,10 @@ class ManagedOpenRouterReleaseService:
             managed_credential_ref=issue_response.managed_credential_ref,
             expires_at=issue_response.expires_at,
         )
-        returned_referral_id = normalize_owned_referral_id(issue_response.referral_id)
-        if returned_referral_id is not None:
-            self.managed_state.referral_id = returned_referral_id
-        final_referral_id = normalize_owned_referral_id(self.managed_state.referral_id)
+        final_referral_id = _apply_discord_owned_referral_result(
+            self.managed_state,
+            issue_response.referral_id,
+        )
         pass_status = issue_response.pass_status
         if pass_status is not None and pass_status.pass_id != final_referral_id:
             pass_status = None
@@ -1518,11 +1607,55 @@ class ManagedOpenRouterLLMProvider(LLMProvider):
             self._delegate = None
 
 
-def _normalize_optional_text(value: str | None) -> str | None:
+def _normalize_optional_text(value: object) -> str | None:
     if not isinstance(value, str):
         return None
     normalized = value.strip()
     return normalized or None
+
+
+def _managed_referral_source(value: object, referral_id: str | None) -> str | None:
+    normalized = _normalize_optional_text(value)
+    if normalized is not None:
+        normalized = normalized.lower()
+    if normalized in {"discord", "qq"}:
+        return normalized
+    return "discord" if referral_id is not None else None
+
+
+def _apply_discord_owned_referral_result(
+    managed_state: ManagedIdentityStatePort,
+    referral_id: object,
+) -> str | None:
+    returned_referral_id = normalize_owned_referral_id(referral_id)
+    current_referral_id = normalize_owned_referral_id(managed_state.referral_id)
+    current_source = _managed_referral_source(
+        getattr(managed_state, "referral_source", None),
+        current_referral_id,
+    )
+    if current_source != "discord":
+        managed_state.referral_id = None
+    managed_state.referral_source = "discord"
+    if returned_referral_id is not None:
+        managed_state.referral_id = returned_referral_id
+    return normalize_owned_referral_id(managed_state.referral_id)
+
+
+def _parse_qq_status_auth_secret(value: object) -> tuple[str, str, str | None] | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        payload = json.loads(value)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    qq_identity = _normalize_optional_text(payload.get("qq_identity"))
+    credential = _normalize_optional_text(payload.get("credential"))
+    managed_credential_ref = _normalize_optional_text(payload.get("managed_credential_ref"))
+    if qq_identity is None or credential is None:
+        return None
+    return qq_identity, credential, managed_credential_ref
 
 
 def _delivery_ack_token_secret_key(source: str) -> str:

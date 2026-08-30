@@ -3,6 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Protocol
 
+from puripuly_heart.app.ports.settings_view import (
+    GeneralSettingsSnapshot,
+    OverlaySettingsSnapshot,
+    PromptSettingsSnapshot,
+    ProviderSettingsSnapshot,
+)
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
     OscControlPresentationState,
@@ -103,22 +109,28 @@ class UiPresentationPort(Protocol):
 
     def render_settings(
         self,
-        settings: object,
         *,
+        provider: ProviderSettingsSnapshot,
+        general: GeneralSettingsSnapshot,
+        prompt: PromptSettingsSnapshot,
+        overlay: OverlaySettingsSnapshot,
         config_path: Path,
         preserve_custom_vocab_draft: bool = False,
     ) -> bool: ...
 
     def refresh_settings_after_openrouter_pkce_success(
         self,
-        settings: object,
         *,
+        provider: ProviderSettingsSnapshot,
+        prompt: PromptSettingsSnapshot,
         config_path: Path,
     ) -> bool: ...
 
     def set_settings_overlay_calibration(self, calibration: object) -> None: ...
 
-    def refresh_settings_loopback_capture_target(self, settings: object) -> None: ...
+    def refresh_settings_loopback_capture_target(
+        self, general: GeneralSettingsSnapshot
+    ) -> None: ...
 
     def set_settings_local_cpu_auto_available(self, available: bool) -> None: ...
 
@@ -144,8 +156,6 @@ class UiPresentationPort(Protocol):
     def show_snackbar(self, *args: Any, **kwargs: Any) -> None: ...
 
     def on_github_star_translation_success(self) -> None: ...
-
-    def on_telemetry_translation_success(self) -> None: ...
 
     def on_overlay_state_changed(self, **kwargs: Any) -> None: ...
 

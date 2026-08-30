@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,6 +12,7 @@ pytest.importorskip("flet")
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
+from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -75,13 +77,14 @@ def _view(
     monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
-    monkeypatch.setattr(settings_view, "create_secret_store", lambda *_args, **_kwargs: store)
-    return settings_view.SettingsView(
+    view = settings_view.SettingsView(
         http_extension_registry=HttpExtensionRegistryService(
             registry,
             directory_opener,
         )
     )
+    view._settings_secrets = SettingsSecretsOwner(secret_store_factory=lambda: store)
+    return view
 
 
 def _custom_settings() -> AppSettings:
@@ -142,8 +145,8 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     assert pending is not None
     assert pending.translation.http_extension_id == "demo"
     assert set(view._http_extension_secret_fields) == {"api_key"}
-    assert view._http_extension_secret_fields["api_key"].value == ""
-    assert "saved-secret" not in repr(view._http_extension_secret_fields["api_key"])
+    assert view._http_extension_secret_fields["api_key"].value == "saved-secret"
+    assert view._http_extension_secret_fields["api_key"].password is True
     assert not hasattr(view, "_http_extension_request_editor")
 
     view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
@@ -172,15 +175,36 @@ def test_custom_http_credentials_use_namespaced_secret_callback_and_reload_isola
     settings.translation.http_extension_id = "demo"
     callbacks: list[tuple[str, str]] = []
     notices: list[str] = []
-    view.on_provider_secret_change = lambda key, value: (callbacks.append((key, value)) or True)
+
+    def save_secret(key: str, value: str) -> bool:
+        callbacks.append((key, value))
+        if value:
+            store.set(key, value)
+        else:
+            store.delete(key)
+        return True
+
+    view.on_provider_secret_change = save_secret
     view.show_snackbar = lambda message, _color: notices.append(message)
     view.load_from_settings(settings, config_path=tmp_path / "settings.json")
 
     field = view._http_extension_secret_fields["api_key"]
+    assert field.value == "saved-secret"
     view._on_http_extension_secret_blur("api_key")
     assert callbacks == []
     field.value = "new-secret"
+    field.on_change(None)
     view._on_http_extension_secret_blur("api_key")
+
+    (tmp_path / "broken.json").write_text("{", encoding="utf-8")
+    changed: list[bool] = []
+    view.on_providers_changed = lambda: changed.append(True)
+    view._on_http_extension_reload(None)
+
+    field = view._http_extension_secret_fields["api_key"]
+    assert field.value == "new-secret"
+    view._on_http_extension_secret_blur("api_key")
+    assert callbacks == [("http_extension.demo.api_key", "new-secret")]
     field.value = ""
     field.on_change(None)
     view._on_http_extension_secret_blur("api_key")
@@ -190,12 +214,6 @@ def test_custom_http_credentials_use_namespaced_secret_callback_and_reload_isola
         ("http_extension.demo.api_key", ""),
     ]
     assert "new-secret" not in repr(settings)
-
-    (tmp_path / "broken.json").write_text("{", encoding="utf-8")
-    changed: list[bool] = []
-    view.on_providers_changed = lambda: changed.append(True)
-    view._on_http_extension_reload(None)
-
     assert [loaded.definition.id for loaded in view._http_extension_snapshot.extensions] == ["demo"]
     assert len(view._http_extension_snapshot.errors) == 1
     assert changed == []
@@ -217,7 +235,10 @@ def test_custom_http_reload_uses_active_engine_with_unsaved_llm_draft(
     view.load_from_settings(settings, config_path=tmp_path / "settings.json")
 
     draft = view._ensure_provider_settings_draft()
-    draft.translation.model = TranslationModel.QWEN_35_PLUS
+    view._provider_draft = replace(
+        draft,
+        translation=replace(draft.translation, model=TranslationModel.QWEN_35_PLUS),
+    )
     changed: list[bool] = []
     view.on_providers_changed = lambda: changed.append(True)
 
@@ -230,8 +251,8 @@ def test_custom_http_reload_uses_active_engine_with_unsaved_llm_draft(
 
     assert changed == [True]
     assert view.consume_http_extension_runtime_reload() is True
-    assert view._settings.translation.model is TranslationModel.CUSTOM_HTTP
-    assert view._provider_settings_draft.translation.model is TranslationModel.QWEN_35_PLUS
+    assert view._provider_snapshot.translation.model is TranslationModel.CUSTOM_HTTP
+    assert view._provider_draft.translation.model is TranslationModel.QWEN_35_PLUS
 
 
 def test_custom_http_card_surfaces_missing_selected_extension_without_fallback(

@@ -9,7 +9,7 @@ from uuid import UUID
 import httpx
 
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
-from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.error_details import extract_provider_error_detail
 from puripuly_heart.providers.llm.messages import build_translation_user_message
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def _log_basic_request(
     *,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     text: str,
     source_language: str,
@@ -40,7 +40,7 @@ def _log_basic_request(
 
 
 def _log_basic_response(
-    *, runtime_logging: SessionRuntimeLoggingService | None, operation: str, text: str
+    *, runtime_logging: ProviderObservationPort | None, operation: str, text: str
 ) -> None:
     message = "[Basic][LLM] DeepSeek response [%s]: %r" % (operation, text)
     if runtime_logging is not None:
@@ -51,7 +51,7 @@ def _log_basic_response(
 
 def _log_basic_request_failure(
     *,
-    runtime_logging: SessionRuntimeLoggingService | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     status: int,
     message: str,
@@ -146,7 +146,7 @@ class DeepSeekLLMProvider:
     base_url: str = "https://api.deepseek.com"
     model: str = "deepseek-v4-flash"
     timeout: float = 30.0
-    runtime_logging: SessionRuntimeLoggingService | None = None
+    runtime_logging: ProviderObservationPort | None = None
     client: DeepSeekClient | None = None
     _internal_client: DeepSeekClient | None = field(init=False, default=None, repr=False)
 
@@ -221,7 +221,7 @@ class HttpxDeepSeekClient:
     model: str
     base_url: str = "https://api.deepseek.com"
     timeout: float = 30.0
-    runtime_logging: SessionRuntimeLoggingService | None = None
+    runtime_logging: ProviderObservationPort | None = None
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _client_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
 
@@ -257,6 +257,7 @@ class HttpxDeepSeekClient:
                 {"role": "user", "content": user_message},
             ],
             "thinking": {"type": "disabled"},
+            "temperature": 0.6,
         }
         return request_body
 

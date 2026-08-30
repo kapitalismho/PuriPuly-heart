@@ -7,6 +7,15 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.ports.settings_secrets import SettingsSecretsPort
+from puripuly_heart.app.ports.settings_view import (
+    GeneralSettingsSnapshot,
+    ImmediateSettingsIntent,
+    OpenRouterPkceTarget,
+    OverlaySettingsSnapshot,
+    PromptApplyIntent,
+    ProviderApplyIntent,
+)
 from puripuly_heart.app.ports.ui_models import (
     GpuNoticeAction,
     ManagedGemmaNoticeAction,
@@ -42,7 +51,6 @@ class UiApplicationFactoryPort(Protocol):
         *,
         presentation: UiPresentationPort,
         config_path: Path,
-        allow_stable_settings_import: bool = False,
         runtime_logging_sinks: object | None = None,
         vrchat_osc_presence: VrchatOscPresencePort | None = None,
     ) -> UiApplicationPort: ...
@@ -54,6 +62,8 @@ class UiApplicationPort(Protocol):
     def effective_osc_ports(self) -> tuple[int | None, int | None]: ...
 
     def http_extension_registry(self) -> object | None: ...
+
+    def settings_secrets(self) -> SettingsSecretsPort: ...
 
     def compatibility_settings(self) -> Any | None: ...
 
@@ -170,7 +180,17 @@ class UiApplicationPort(Protocol):
 
     def dashboard_managed_auth_prompt_kind(self) -> str: ...
 
-    async def apply_telemetry_consent(self, consent: str) -> Any | None: ...
+    async def apply_telemetry_enabled(self, enabled: bool) -> Any | None: ...
+
+    async def apply_settings_intent(self, intent: ImmediateSettingsIntent) -> object: ...
+
+    async def apply_prompt_intent(self, intent: PromptApplyIntent) -> object: ...
+
+    async def apply_provider_intent(self, intent: ProviderApplyIntent) -> object: ...
+
+    def settings_overlay_snapshot(self) -> OverlaySettingsSnapshot | None: ...
+
+    def settings_general_snapshot(self) -> GeneralSettingsSnapshot | None: ...
 
     async def accept_peer_translation_eula_and_enable(self) -> object: ...
 
@@ -179,13 +199,13 @@ class UiApplicationPort(Protocol):
     async def connect_openrouter_via_pkce(
         self,
         *,
-        target_settings: Any,
+        target: OpenRouterPkceTarget,
         launch_source: str,
     ) -> bool: ...
 
     def reopen_openrouter_pkce_authorization_url(self) -> None: ...
 
-    def build_managed_openrouter_byok_target_settings(self) -> Any | None: ...
+    def build_managed_openrouter_byok_target(self) -> OpenRouterPkceTarget | None: ...
 
     async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]: ...
 
@@ -218,7 +238,7 @@ class UiApplicationPort(Protocol):
 
     def schedule_github_star_prompt_translation_success_observed(self) -> None: ...
 
-    async def record_telemetry_translation_success_day(self) -> None: ...
+    async def record_app_active_day(self, active_date_utc: str) -> object: ...
 
     def should_show_github_star_prompt(self) -> bool: ...
 

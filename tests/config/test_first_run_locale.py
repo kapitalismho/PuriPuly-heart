@@ -17,6 +17,7 @@ from puripuly_heart.config.settings import (
     save_settings,
     to_dict,
 )
+from puripuly_heart.config.settings_vnext import defaults as canonical_defaults
 from puripuly_heart.main import _load_settings_or_default
 from tests.config.settings_vnext_test_helpers import legacy_projected_settings_file
 
@@ -180,7 +181,7 @@ def test_settings_owner_first_run_uses_detected_system_locale(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings_module, "detect_system_locale", lambda: "ko_KR", raising=False)
+    monkeypatch.setattr(canonical_defaults, "detect_system_locale", lambda: "ko_KR")
     path = tmp_path / "settings.json"
 
     loaded = compose_settings_owner(path).start().settings
@@ -189,11 +190,27 @@ def test_settings_owner_first_run_uses_detected_system_locale(
     assert legacy_projected_settings_file(path)["ui"]["locale"] == "ko"
 
 
+@pytest.mark.parametrize("system_locale", ["en_US", "ko_KR", "ja_JP", "zh_CN", "ru_RU"])
+def test_canonical_first_run_factory_preserves_legacy_first_run_defaults(
+    system_locale: str,
+) -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    expected = serialization.to_dict(
+        migration.from_legacy_app_settings(_new_first_run_settings(system_locale))
+    )
+    actual = serialization.to_dict(canonical_defaults.new_settings_for_first_run(system_locale))
+    expected["state"]["telemetry"]["anonymous_id"] = "generated"
+    actual["state"]["telemetry"]["anonymous_id"] = "generated"
+
+    assert actual == expected
+
+
 def test_main_first_run_uses_detected_system_locale(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings_module, "detect_system_locale", lambda: "zh_CN", raising=False)
+    monkeypatch.setattr(canonical_defaults, "detect_system_locale", lambda: "zh_CN")
     path = tmp_path / "settings.json"
 
     loaded = _load_settings_or_default(path)
@@ -211,7 +228,7 @@ def test_main_first_run_non_china_uses_openrouter_unified_gemma_fallback_default
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings_module, "detect_system_locale", lambda: "ko_KR", raising=False)
+    monkeypatch.setattr(canonical_defaults, "detect_system_locale", lambda: "ko_KR")
     path = tmp_path / "settings.json"
 
     loaded = _load_settings_or_default(path)
@@ -227,7 +244,7 @@ def test_main_first_run_populates_default_system_prompt(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings_module, "detect_system_locale", lambda: None, raising=False)
+    monkeypatch.setattr(canonical_defaults, "detect_system_locale", lambda: None)
     path = tmp_path / "settings.json"
 
     loaded = _load_settings_or_default(path)

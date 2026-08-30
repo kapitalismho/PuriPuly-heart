@@ -6,6 +6,7 @@ import base64
 import importlib
 import inspect
 import json
+import os
 import re
 import shutil
 import textwrap
@@ -17,7 +18,6 @@ from typing import Any
 import pytest
 
 from puripuly_heart.app import wiring
-from puripuly_heart.app.wiring import root as wiring_root
 from puripuly_heart.config import llm_profiles, runtime_resolution
 from puripuly_heart.config import prompts as prompts_module
 from puripuly_heart.config import resolved as resolved_config
@@ -26,6 +26,7 @@ from puripuly_heart.config.prompts import (
     load_prompt,
     load_prompt_for_provider,
 )
+from puripuly_heart.config.provider_values import QwenRegion
 from puripuly_heart.config.settings import (
     AppSettings,
     OpenRouterCredentialSource,
@@ -60,6 +61,7 @@ from puripuly_heart.core.storage.secrets import (
     InMemorySecretStore,
     KeyringSecretStore,
 )
+from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
 from tests.config.settings_migration_fixtures import (
     maximal_v24_settings_fixture,
     serialized_field_paths,
@@ -159,16 +161,6 @@ REQUIRED_SECRET_KEYS = (
     "managed_device_private_key",
     "managed_device_public_key",
     "managed_identity_binding",
-)
-WIRING_SECRET_KEYS = (
-    "google_api_key",
-    "deepseek_api_key",
-    "deepgram_api_key",
-    "soniox_api_key",
-    "alibaba_api_key_beijing",
-    "alibaba_api_key_singapore",
-    "alibaba_api_key",
-    "local_llm_api_key",
 )
 EXPECTED_SECRET_ENV_LOOKUP_PATHS = (
     {
@@ -696,45 +688,86 @@ def _assert_openrouter_byok_env_lookup(
     assert store_resolution.api_key == "fake-store-openrouter"
 
 
-def _assert_local_llm_optional_secret_store_only(entry: dict[str, Any]) -> None:
-    llm_factory = importlib.import_module("puripuly_heart.app.wiring.wiring_llm_factory")
-    source = "\n".join(
-        (
-            inspect.getsource(wiring.create_llm_provider),
-            inspect.getsource(wiring._base_llm_provider_from_resolved_config),
-            inspect.getsource(llm_factory._provider_from_resolved_target),
-        )
+def _local_llm_runtime_input() -> runtime_resolution.RuntimeResolutionInput:
+    return runtime_resolution.RuntimeResolutionInput(
+        translation=runtime_resolution.normalize_translation_runtime_intent(
+            model="local_llm",
+            connection="ollama",
+            concurrency_limit=1,
+        ),
+        translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
+            enabled=False,
+            model="local_llm",
+            connection="ollama",
+        ),
+        openrouter=runtime_resolution.normalize_openrouter_runtime_intent(
+            model="google/gemma-4-26b-a4b-it",
+            selected_source=OpenRouterCredentialSource.NONE,
+            selection_alias=None,
+            routing_mode=None,
+            provider_routing=None,
+            managed_credential_kind="standard",
+            broker_base_url=None,
+        ),
+        direct=runtime_resolution.DirectProviderRuntimeIntent(
+            gemini_37_flash_model="gemini-3.7-flash",
+            gemini_31_flash_lite_model="gemini-3.1-flash-lite",
+            deepseek_v4_flash_model="deepseek-v4-flash",
+            qwen_35_plus_model="qwen3.5-plus",
+            qwen_region=QwenRegion.BEIJING,
+            local_llm_backend="openai",
+            local_llm_base_url="http://127.0.0.1:11434/v1",
+            local_llm_model="llama3.1:8b",
+            local_llm_extra_body={},
+            cerebras_model="gemma-4-31b",
+        ),
     )
+
+
+def _assert_local_llm_optional_secret_store_only(entry: dict[str, Any]) -> None:
+    runtime_input = _local_llm_runtime_input()
 
     assert entry["env_vars"] == []
     assert entry["ignored_env_vars"] == ["LOCAL_LLM_API_KEY"]
-    assert 'secrets.get("local_llm_api_key")' in source
-    assert "LOCAL_LLM_API_KEY" not in source
+
+    previous_env = os.environ.pop("LOCAL_LLM_API_KEY", None)
+    os.environ["LOCAL_LLM_API_KEY"] = "fake-env-local-key"
+    try:
+        empty_store_provider = wiring.create_llm_provider(
+            runtime_input,
+            secrets=InMemorySecretStore(),
+        )
+        assert isinstance(empty_store_provider.inner, LocalOpenAICompatibleLLMProvider)
+        assert empty_store_provider.inner.api_key == ""
+
+        populated_store = InMemorySecretStore()
+        populated_store.set("local_llm_api_key", "fake-store-local-key")
+        store_provider = wiring.create_llm_provider(
+            runtime_input,
+            secrets=populated_store,
+        )
+        assert isinstance(store_provider.inner, LocalOpenAICompatibleLLMProvider)
+        assert store_provider.inner.api_key == "fake-store-local-key"
+    finally:
+        os.environ.pop("LOCAL_LLM_API_KEY", None)
+        if previous_env is not None:
+            os.environ["LOCAL_LLM_API_KEY"] = previous_env
 
 
 def _assert_qwen_resolved_credential_helper_preserves_legacy_fallbacks() -> None:
-    llm_factory = importlib.import_module("puripuly_heart.app.wiring.wiring_llm_factory")
-    helper_source = inspect.getsource(wiring._qwen_api_key_for_resolved_credential)
-    base_llm_source = inspect.getsource(wiring._base_llm_provider_from_resolved_config)
-    provider_target_source = inspect.getsource(llm_factory._provider_from_resolved_target)
-    stt_source = inspect.getsource(wiring.create_stt_backend_from_resolved_config)
-    self_stt_source = inspect.getsource(wiring.create_stt_backend)
-    peer_stt_source = inspect.getsource(wiring.create_peer_stt_backend)
-    peer_resolved_source = inspect.getsource(wiring.create_peer_stt_backend_from_resolved_config)
+    helper = wiring.require_secret_any
 
-    assert 'key="alibaba_api_key_beijing"' in helper_source
-    assert 'key="alibaba_api_key_singapore"' in helper_source
-    assert '"ALIBABA_API_KEY_BEIJING"' in helper_source
-    assert '"ALIBABA_API_KEY_SINGAPORE"' in helper_source
-    assert '"ALIBABA_API_KEY"' in helper_source
-    assert '"DASHSCOPE_API_KEY"' in helper_source
-    assert helper_source.count('legacy_keys=("alibaba_api_key",)') == 2
-    assert "_provider_from_resolved_target(" in base_llm_source
-    assert "_qwen_api_key_for_resolved_credential(target.credential" in provider_target_source
-    assert "_qwen_api_key_for_resolved_credential(config.credential" in stt_source
-    assert "create_stt_backend_from_resolved_config(" in self_stt_source
-    assert "create_peer_stt_backend_from_resolved_config(" in peer_stt_source
-    assert "create_stt_backend_from_resolved_config(" in peer_resolved_source
+    store = InMemorySecretStore()
+    store.set("alibaba_api_key_beijing", "fake-beijing")
+    assert (
+        helper(
+            store,
+            key="alibaba_api_key_beijing",
+            env_vars=("ALIBABA_API_KEY_BEIJING", "ALIBABA_API_KEY", "DASHSCOPE_API_KEY"),
+            legacy_keys=("alibaba_api_key",),
+        )
+        == "fake-beijing"
+    )
 
 
 def test_public_compatibility_snapshot_declares_all_required_surfaces() -> None:
@@ -920,9 +953,6 @@ def test_secret_store_key_registry_snapshot_matches_current_public_keys() -> Non
     assert managed_identity.MANAGED_DEVICE_PUBLIC_KEY_SECRET == "managed_device_public_key"
     assert managed_identity.MANAGED_IDENTITY_BINDING_SECRET == "managed_identity_binding"
 
-    wiring_source = inspect.getsource(wiring_root)
-    for key in WIRING_SECRET_KEYS:
-        assert f'"{key}"' in wiring_source
     _assert_qwen_resolved_credential_helper_preserves_legacy_fallbacks()
 
 
@@ -1100,12 +1130,13 @@ def test_broker_v1_snapshot_freezes_request_success_and_error_envelopes() -> Non
         "challenge",
         "discord_start",
         "qq_auth_assert",
+        "qq_auth_status",
         "verify",
         "issue",
         "discord_issue",
         "trial_status",
         "managed_key_delivery_ack",
-        "telemetry_translation_success_day",
+        "app_active_day",
     )
 
     assert tuple(operations) == expected_operation_names
@@ -1143,6 +1174,14 @@ def test_broker_v1_snapshot_freezes_request_success_and_error_envelopes() -> Non
     qq_auth_source = _broker_source("qq-auth.ts")
     assert tuple(operations["qq_auth_assert"]["request_body_fields"]) == (
         _typescript_interface_fields(qq_auth_source, "QqAuthAssertRequestBody")
+    )
+    assert tuple(operations["qq_auth_status"]["request_body_fields"]) == (
+        _typescript_interface_fields(qq_auth_source, "QqAuthStatusRequestBody")
+    )
+
+    telemetry_source = _broker_source("telemetry.ts")
+    assert tuple(operations["app_active_day"]["request_body_fields"]) == (
+        _typescript_interface_fields(telemetry_source, "AppActiveDayRequestBody")
     )
 
     assert tuple(operations["verify"]["request_body_fields"]) == _return_dict_keys(
@@ -1353,24 +1392,7 @@ async def test_overlay_startup_contract_snapshot_matches_python_runners_and_mani
     finally:
         written_manifest_path.unlink(missing_ok=True)
 
-    manager_handler_source = inspect.getsource(
-        overlay_process_module.OverlayProcessManager._handle_lifecycle_event
-    )
-    for key in (
-        "ready_event_type",
-        "startup_failure_event_type",
-        "runtime_failure_event_type",
-        "renderer_event_type",
-    ):
-        assert f'"{startup[key]}"' in manager_handler_source
-
-    default_spawn_source = inspect.getsource(
-        overlay_process_module.DefaultOverlayProcessRunner.spawn
-    )
-    desktop_spawn_source = inspect.getsource(overlay_process_module.DesktopFletOverlayRunner.spawn)
     assert startup["explicit_env_overrides"] == [overlay_process_module.QUIET_TAIL_PROFILE_ENV]
-    assert "env=child_env" in default_spawn_source
-    assert "env=" not in desktop_spawn_source
 
 
 def test_rust_overlay_startup_contract_snapshot_matches_native_sources() -> None:

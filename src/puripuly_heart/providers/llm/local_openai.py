@@ -12,7 +12,6 @@ from uuid import UUID
 
 import httpx
 
-from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
@@ -381,10 +380,11 @@ class HttpxLocalOpenAIClient:
     base_url: str = _DEFAULT_BASE_URL
     model: str = "llama3.1:8b"
     api_key: str = ""
-    extra_body: Mapping[str, object] = field(default_factory=lambda: {"reasoning_effort": "none"})
+    extra_body: Mapping[str, object] = field(
+        default_factory=lambda: {"reasoning_effort": "none", "temperature": 0.6}
+    )
     max_tokens: int | None = None
     timeout: httpx.Timeout | float = field(default_factory=_default_timeout)
-    runtime_logging: SessionRuntimeLoggingService | None = None
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _client_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
 
@@ -529,10 +529,11 @@ class LocalOpenAICompatibleLLMProvider:
     base_url: str = _DEFAULT_BASE_URL
     model: str = "llama3.1:8b"
     api_key: str = ""
-    extra_body: Mapping[str, object] = field(default_factory=lambda: {"reasoning_effort": "none"})
+    extra_body: Mapping[str, object] = field(
+        default_factory=lambda: {"reasoning_effort": "none", "temperature": 0.6}
+    )
     max_tokens: int | None = None
     timeout: httpx.Timeout | float = field(default_factory=_default_timeout)
-    runtime_logging: SessionRuntimeLoggingService | None = None
     client: LocalOpenAIClient | None = None
     _internal_client: HttpxLocalOpenAIClient | None = field(init=False, default=None, repr=False)
     _external_client_closed: bool = field(init=False, default=False, repr=False)
@@ -548,7 +549,6 @@ class LocalOpenAICompatibleLLMProvider:
                 extra_body=self.extra_body,
                 max_tokens=self.max_tokens,
                 timeout=self.timeout,
-                runtime_logging=self.runtime_logging,
             )
         return self._internal_client
 
@@ -600,7 +600,11 @@ class LocalOpenAICompatibleLLMProvider:
                 base_url=base_url,
                 model=model,
                 api_key=api_key,
-                extra_body=extra_body if extra_body is not None else {"reasoning_effort": "none"},
+                extra_body=(
+                    extra_body
+                    if extra_body is not None
+                    else {"reasoning_effort": "none", "temperature": 0.6}
+                ),
                 max_tokens=1,
                 timeout=httpx.Timeout(connect=3.0, read=10.0, write=5.0, pool=3.0),
             )

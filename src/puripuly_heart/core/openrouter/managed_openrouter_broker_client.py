@@ -15,8 +15,10 @@ from puripuly_heart.app.ports.broker_client import (
     QqManagedAssertionRequest,
     QqManagedAssertionResult,
     QqManagedEntitlementSnapshot,
+    QqManagedStatusRequest,
+    QqManagedStatusResult,
 )
-from puripuly_heart.config.settings import normalize_owned_referral_id
+from puripuly_heart.config.provider_values import normalize_owned_referral_id
 from puripuly_heart.core import messages
 
 from .managed_openrouter_release import (
@@ -193,15 +195,21 @@ class HttpManagedOpenRouterBrokerClient:
         self,
         request: QqManagedAssertionRequest,
     ) -> QqManagedAssertionResult:
+        request_body: dict[str, object] = {
+            "qq_identity": request.qq_identity,
+            "credential": request.credential,
+            "asserted_at": request.asserted_at,
+            "delivery_ack_supported": True,
+        }
+        normalized_referral_id = _normalize_friend_referral_id(request.referral_id)
+        if normalized_referral_id is not None:
+            request_body["referral_id"] = normalized_referral_id
+        if request.installation_id:
+            request_body["installation_id"] = request.installation_id
         try:
             payload = await self._post_json(
                 path="/v1/auth/qq/assert",
-                request_body={
-                    "qq_identity": request.qq_identity,
-                    "credential": request.credential,
-                    "asserted_at": request.asserted_at,
-                    "delivery_ack_supported": True,
-                },
+                request_body=request_body,
                 operation="qq_assert",
             )
         except ManagedOpenRouterReleaseError as exc:
@@ -237,6 +245,9 @@ class HttpManagedOpenRouterBrokerClient:
                 retry_after_ms=None,
                 message=None,
                 diagnostics=None,
+                referral_bonus_applied=_parse_referral_bonus_applied(payload),
+                referral_id=_parse_owned_referral_id(payload),
+                pass_status=_parse_talk_together_pass_status(payload),
                 delivery_ack=_parse_delivery_ack_metadata(payload, source="qq"),
             )
         except ValueError as exc:
@@ -249,21 +260,27 @@ class HttpManagedOpenRouterBrokerClient:
                 fields={"payload_valid": False, "reason": _safe_field_label(str(exc))},
             )
 
-    async def record_translation_success_day(
+    async def get_qq_managed_status(
         self,
-        identifier: str,
-        active_date_utc: str,
-    ) -> bool:
+        request: QqManagedStatusRequest,
+    ) -> QqManagedStatusResult:
+        request_body: dict[str, object] = {
+            "qq_identity": request.qq_identity,
+            "credential": request.credential,
+        }
+        if request.installation_id:
+            request_body["installation_id"] = request.installation_id
         payload = await self._post_json(
-            path="/v1/telemetry/translation-success-day",
-            request_body={
-                "signal": "translation_success_day",
-                "telemetry_identifier": identifier,
-                "active_date_utc": active_date_utc,
-            },
-            operation="telemetry_translation_success_day",
+            path="/v1/auth/qq/status",
+            request_body=request_body,
+            operation="qq_status",
         )
-        return payload.get("ok") is True
+        if payload.get("ok") is not True or payload.get("status") != "active":
+            raise _retryable_error("qq_status", "broker returned inactive QQ status")
+        return QqManagedStatusResult(
+            referral_id=_parse_owned_referral_id(payload),
+            pass_status=_parse_talk_together_pass_status(payload),
+        )
 
     async def acknowledge_managed_key_delivery(
         self,

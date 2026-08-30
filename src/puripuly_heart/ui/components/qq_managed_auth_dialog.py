@@ -51,6 +51,7 @@ class QqManagedAuthDialog:
         self._cancel_button: ft.TextButton | None = None
         self._qq_identity_field: ft.TextField | None = None
         self._credential_field: ft.TextField | None = None
+        self._referral_id_field: ft.TextField | None = None
         self._error_text: ft.Text | None = None
 
     @property
@@ -69,6 +70,10 @@ class QqManagedAuthDialog:
     def credential(self) -> str:
         return self._field_value(self._credential_field)
 
+    @property
+    def referral_id(self) -> str:
+        return self._field_value(self._referral_id_field).strip().upper()
+
     def open(self) -> None:
         if self._dialog is not None and self._is_open:
             return
@@ -83,6 +88,10 @@ class QqManagedAuthDialog:
             helper_key="qq_auth.credential.helper",
             password=True,
         )
+        self._referral_id_field = self._build_text_field(
+            "discord_auth.referral_id.label",
+            helper_key="discord_auth.referral_id.helper",
+        )
         self._error_text = ft.Text(
             "",
             size=18,
@@ -96,6 +105,7 @@ class QqManagedAuthDialog:
             extra_body_controls=[
                 self._qq_identity_field,
                 self._credential_field,
+                self._referral_id_field,
                 self._error_text,
             ],
             body_spacing=44,
@@ -228,7 +238,11 @@ class QqManagedAuthDialog:
         action()
 
     def _set_fields_disabled(self, disabled: bool) -> None:
-        for field in (self._qq_identity_field, self._credential_field):
+        for field in (
+            self._qq_identity_field,
+            self._credential_field,
+            self._referral_id_field,
+        ):
             if field is not None:
                 field.disabled = disabled
 

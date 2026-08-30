@@ -3,18 +3,27 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, TypeAlias
+from typing import Protocol
 
 import flet as ft
 
+from puripuly_heart.app.ports.settings_secrets import SettingsSecretsPort
+from puripuly_heart.app.ports.settings_view import (
+    GeneralSettingsSnapshot,
+    ImmediateSettingsIntent,
+    OpenRouterPkceTarget,
+    OverlaySettingsSnapshot,
+    PromptApplyIntent,
+    PromptSettingsSnapshot,
+    ProviderApplyIntent,
+    ProviderSettingsSnapshot,
+)
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
-
-SettingsSnapshot: TypeAlias = object
 
 
 @dataclass(frozen=True, slots=True)
 class SettingsSurfaceIntents:
-    settings_changed: Callable[[SettingsSnapshot], None]
+    settings_changed: Callable[[ImmediateSettingsIntent], None]
     show_snackbar: Callable[[str, str], None]
     runtime_log_basic: Callable[..., None] | None = None
     runtime_log_detailed: Callable[..., None] | None = None
@@ -23,19 +32,20 @@ class SettingsSurfaceIntents:
 @dataclass(frozen=True, slots=True)
 class SettingsProviderIntents:
     providers_changed: Callable[[], None]
-    request_openrouter_pkce: Callable[[SettingsSnapshot], None]
+    request_openrouter_pkce: Callable[[OpenRouterPkceTarget], None]
     verify_api_key: Callable[[str, str], object]
     provider_secret_change: Callable[[str, str], object]
     secret_cleared: Callable[[str], None]
     local_llm_secret_changed: Callable[[], None]
     gpu_discovery_requested: Callable[[], object]
+    settings_secrets: SettingsSecretsPort
     custom_stt_secret_changed: Callable[[], None] | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class SettingsGeneralIntents:
     start_microphone_test: Callable[[], None]
-    telemetry_consent_change: Callable[[str], None]
+    telemetry_enabled_change: Callable[[bool], None]
     list_loopback_capture_options: Callable[[], object]
     list_loopback_process_options: Callable[[], object]
     list_loopback_device_options: Callable[[], object]
@@ -47,7 +57,7 @@ class SettingsGeneralIntents:
 
 @dataclass(frozen=True, slots=True)
 class SettingsPromptIntents:
-    prompt_apply_settings: Callable[[SettingsSnapshot], None]
+    prompt_apply_settings: Callable[[PromptApplyIntent], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,16 +90,20 @@ class SettingsProviderStateSink(Protocol):
 
     def load_from_settings(
         self,
-        settings: SettingsSnapshot,
         *,
+        provider: ProviderSettingsSnapshot,
+        general: GeneralSettingsSnapshot,
+        prompt: PromptSettingsSnapshot,
+        overlay: OverlaySettingsSnapshot,
         config_path: Path,
         preserve_custom_vocab_draft: bool = False,
     ) -> None: ...
 
     def refresh_after_openrouter_pkce_success(
         self,
-        settings: SettingsSnapshot,
         *,
+        provider: ProviderSettingsSnapshot,
+        prompt: PromptSettingsSnapshot,
         config_path: Path,
     ) -> None: ...
 
@@ -119,7 +133,7 @@ class SettingsProviderStateSink(Protocol):
         llm_devices: tuple[GpuDeviceOption, ...] | None = None,
     ) -> None: ...
 
-    def consume_provider_apply_settings(self) -> SettingsSnapshot | None: ...
+    def consume_provider_apply_settings(self) -> ProviderApplyIntent | None: ...
 
     def apply_locale(self) -> None: ...
 
@@ -216,7 +230,7 @@ class SettingsGeneralSurfaceSlots:
     peer_vad: ft.Control
     clipboard_auto_translate: ft.Control
     vrchat_mic_intercept: ft.Control
-    telemetry_consent: ft.Control
+    telemetry_enabled: ft.Control
 
 
 @dataclass(frozen=True, slots=True)
@@ -288,6 +302,5 @@ __all__ = [
     "SettingsPromptSurfaceSlots",
     "SettingsProviderIntents",
     "SettingsProviderStateSink",
-    "SettingsSnapshot",
     "SettingsSurfaceIntents",
 ]

@@ -153,6 +153,12 @@ def test_canonical_runtime_intent_contracts_are_frozen_and_slotted() -> None:
     with pytest.raises(FrozenInstanceError):
         intent.model = runtime_resolution.TRANSLATION_MODEL_LOCAL_LLM
 
+    direct = runtime_resolution.DirectProviderRuntimeIntent()
+    assert direct.local_llm_extra_body == {
+        "reasoning_effort": "none",
+        "temperature": 0.6,
+    }
+
 
 def test_stt_runtime_resolution_produces_channel_specific_resolved_dto() -> None:
     runtime_resolution = _runtime_resolution_module()

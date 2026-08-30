@@ -26,6 +26,7 @@ class ManagedIdentitySnapshot:
     founder_letter_seen_credential_ref: str | None
     referral_id: str | None
     local_managed_claim_sources: tuple[str, ...]
+    referral_source: str | None = None
     pending_delivery_ack_source: str | None = None
     pending_delivery_ack_delivery_id: str | None = None
     pending_delivery_ack_managed_credential_ref: str | None = None
@@ -50,6 +51,7 @@ class ManagedIdentityStatePort(Protocol):
     active_managed_expires_at: str | None
     founder_letter_seen_credential_ref: str | None
     referral_id: str | None
+    referral_source: str | None
     local_managed_claim_sources: tuple[str, ...]
     pending_delivery_ack_source: str | None
     pending_delivery_ack_delivery_id: str | None

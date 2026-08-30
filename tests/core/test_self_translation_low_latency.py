@@ -573,13 +573,17 @@ async def test_replaced_llm_provider_late_spec_completion_cannot_update_low_late
         low_latency_awaiting_vad_timeout_s=0,
     )
 
-    await harness.self_owner._handle_low_latency_final(
-        Transcript(
-            utterance_id=uuid4(),
-            text="hello live",
-            is_final=True,
-            created_at=0.0,
-        )
+    utterance_id = uuid4()
+    await harness.dispatch_stt_event(
+        STTFinalEvent(
+            utterance_id=utterance_id,
+            transcript=Transcript(
+                utterance_id=utterance_id,
+                text="hello live",
+                is_final=True,
+                created_at=0.0,
+            ),
+        ),
     )
     buffer = harness.self_owner.merge_buffer
     assert buffer is not None
@@ -629,13 +633,16 @@ async def test_replaced_llm_provider_late_spec_completion_falls_back_without_han
     utterance_id = uuid4()
     await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
 
-    await harness.self_owner._handle_low_latency_final(
-        Transcript(
+    await harness.dispatch_stt_event(
+        STTFinalEvent(
             utterance_id=utterance_id,
-            text="hello live",
-            is_final=True,
-            created_at=clock.now(),
-        )
+            transcript=Transcript(
+                utterance_id=utterance_id,
+                text="hello live",
+                is_final=True,
+                created_at=clock.now(),
+            ),
+        ),
     )
     buffer = harness.self_owner.merge_buffer
     assert buffer is not None
@@ -691,8 +698,11 @@ async def test_ready_spec_result_is_invalidated_by_provider_replacement_during_g
     )
     utterance_id = uuid4()
     await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
-    await harness.self_owner._handle_low_latency_final(
-        Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+    await harness.dispatch_stt_event(
+        STTFinalEvent(
+            utterance_id=utterance_id,
+            transcript=Transcript(utterance_id=utterance_id, text="hello", is_final=True),
+        ),
     )
     buffer = harness.self_owner.merge_buffer
     assert buffer is not None
@@ -762,7 +772,9 @@ class TestSpeechEndedTracking:
             is_final=True,
             created_at=clock.now(),
         )
-        await harness.self_owner._handle_low_latency_final(transcript)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
+        )
 
         assert harness.self_runtime.merge_buffer is harness.self_owner.merge_buffer
         assert harness.peer_runtime.merge_buffer is None
@@ -811,7 +823,9 @@ class TestRuntimeLatencyLogging:
                 is_final=True,
                 created_at=0.0,
             )
-            await harness.self_owner._handle_low_latency_final(transcript)
+            await harness.dispatch_stt_event(
+                STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
+            )
 
             current_buffer = harness.self_owner.merge_buffer
             spec_task = (
@@ -851,13 +865,16 @@ class TestRuntimeLatencyLogging:
             await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
             clock.advance(0.25)
 
-            await harness.self_owner._handle_low_latency_final(
-                Transcript(
+            await harness.dispatch_stt_event(
+                STTFinalEvent(
                     utterance_id=utterance_id,
-                    text="official latency",
-                    is_final=True,
-                    created_at=clock.now(),
-                )
+                    transcript=Transcript(
+                        utterance_id=utterance_id,
+                        text="official latency",
+                        is_final=True,
+                        created_at=clock.now(),
+                    ),
+                ),
             )
 
             messages = _runtime_log_messages(log_stream)
@@ -904,25 +921,31 @@ class TestRuntimeLatencyLogging:
             basic_utterance_id = uuid4()
             await basic_harness.self_owner.handle_vad_event(SpeechEnd(basic_utterance_id))
             basic_clock.advance(0.05)
-            await basic_harness.self_owner._handle_low_latency_final(
-                Transcript(
+            await basic_harness.dispatch_stt_event(
+                STTFinalEvent(
                     utterance_id=basic_utterance_id,
-                    text="basic only",
-                    is_final=True,
-                    created_at=basic_clock.now(),
-                )
+                    transcript=Transcript(
+                        utterance_id=basic_utterance_id,
+                        text="basic only",
+                        is_final=True,
+                        created_at=basic_clock.now(),
+                    ),
+                ),
             )
 
             detailed_utterance_id = uuid4()
             await detailed_harness.self_owner.handle_vad_event(SpeechEnd(detailed_utterance_id))
             detailed_clock.advance(0.05)
-            await detailed_harness.self_owner._handle_low_latency_final(
-                Transcript(
+            await detailed_harness.dispatch_stt_event(
+                STTFinalEvent(
                     utterance_id=detailed_utterance_id,
-                    text="detailed trace",
-                    is_final=True,
-                    created_at=detailed_clock.now(),
-                )
+                    transcript=Transcript(
+                        utterance_id=detailed_utterance_id,
+                        text="detailed trace",
+                        is_final=True,
+                        created_at=detailed_clock.now(),
+                    ),
+                ),
             )
 
             basic_messages = _runtime_log_messages(basic_stream)
@@ -988,25 +1011,31 @@ class TestRuntimeLatencyLogging:
             basic_utterance_id = uuid4()
             await basic_harness.self_owner.handle_vad_event(SpeechEnd(basic_utterance_id))
             basic_clock.advance(0.25)
-            await basic_harness.self_owner._handle_low_latency_final(
-                Transcript(
+            await basic_harness.dispatch_stt_event(
+                STTFinalEvent(
                     utterance_id=basic_utterance_id,
-                    text="basic raw transcript secret-token",
-                    is_final=True,
-                    created_at=basic_clock.now(),
-                )
+                    transcript=Transcript(
+                        utterance_id=basic_utterance_id,
+                        text="basic raw transcript secret-token",
+                        is_final=True,
+                        created_at=basic_clock.now(),
+                    ),
+                ),
             )
 
             detailed_utterance_id = uuid4()
             await detailed_harness.self_owner.handle_vad_event(SpeechEnd(detailed_utterance_id))
             detailed_clock.advance(0.25)
-            await detailed_harness.self_owner._handle_low_latency_final(
-                Transcript(
+            await detailed_harness.dispatch_stt_event(
+                STTFinalEvent(
                     utterance_id=detailed_utterance_id,
-                    text="detailed raw transcript secret-token",
-                    is_final=True,
-                    created_at=detailed_clock.now(),
-                )
+                    transcript=Transcript(
+                        utterance_id=detailed_utterance_id,
+                        text="detailed raw transcript secret-token",
+                        is_final=True,
+                        created_at=detailed_clock.now(),
+                    ),
+                ),
             )
 
             basic_messages = _runtime_log_messages(basic_stream)
@@ -1050,13 +1079,16 @@ class TestRuntimeLatencyLogging:
         try:
             await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
             clock.advance(0.05)
-            await harness.self_owner._handle_low_latency_final(
-                Transcript(
+            await harness.dispatch_stt_event(
+                STTFinalEvent(
                     utterance_id=utterance_id,
-                    text="source secret-token",
-                    is_final=True,
-                    created_at=clock.now(),
-                )
+                    transcript=Transcript(
+                        utterance_id=utterance_id,
+                        text="source secret-token",
+                        is_final=True,
+                        created_at=clock.now(),
+                    ),
+                ),
             )
             current_buffer = harness.self_owner.merge_buffer
             spec_task = (
@@ -1102,13 +1134,16 @@ class TestRuntimeLatencyLogging:
             runtime_logging.set_mode(SessionLoggingMode.DETAILED)
             clock.advance(0.05)
 
-            await harness.self_owner._handle_low_latency_final(
-                Transcript(
+            await harness.dispatch_stt_event(
+                STTFinalEvent(
                     utterance_id=utterance_id,
-                    text="mode switch",
-                    is_final=True,
-                    created_at=clock.now(),
-                )
+                    transcript=Transcript(
+                        utterance_id=utterance_id,
+                        text="mode switch",
+                        is_final=True,
+                        created_at=clock.now(),
+                    ),
+                ),
             )
 
             messages = _runtime_log_messages(log_stream)
@@ -1219,13 +1254,16 @@ class TestRuntimeLatencyLogging:
         try:
             await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
             clock.advance(0.05)
-            await harness.self_owner._handle_low_latency_final(
-                Transcript(
+            await harness.dispatch_stt_event(
+                STTFinalEvent(
                     utterance_id=utterance_id,
-                    text="hello live",
-                    is_final=True,
-                    created_at=clock.now(),
-                )
+                    transcript=Transcript(
+                        utterance_id=utterance_id,
+                        text="hello live",
+                        is_final=True,
+                        created_at=clock.now(),
+                    ),
+                ),
             )
 
             current_buffer = harness.self_owner.merge_buffer
@@ -1278,13 +1316,16 @@ class TestRuntimeLatencyLogging:
         try:
             await harness.self_owner.handle_vad_event(SpeechEnd(source_utterance_id))
             clock.advance(0.05)
-            await harness.self_owner._handle_low_latency_final(
-                Transcript(
+            await harness.dispatch_stt_event(
+                STTFinalEvent(
                     utterance_id=source_utterance_id,
-                    text="merge path",
-                    is_final=True,
-                    created_at=clock.now(),
-                )
+                    transcript=Transcript(
+                        utterance_id=source_utterance_id,
+                        text="merge path",
+                        is_final=True,
+                        created_at=clock.now(),
+                    ),
+                ),
             )
 
             output_utterance_id = osc.messages[0].utterance_id
@@ -1506,7 +1547,9 @@ class TestRuntimeLatencyLogging:
         transcript = Transcript(
             utterance_id=uid, text="테스트", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
+        )
 
         # 6. awaiting_vad_end=False 확인 (post_end로 처리됨)
         buffer = harness.self_owner.merge_buffer
@@ -1534,7 +1577,9 @@ class TestRuntimeLatencyLogging:
         transcript = Transcript(
             utterance_id=uid, text="테스트", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
+        )
 
         # awaiting_vad_end=True 확인
         buffer = harness.self_owner.merge_buffer
@@ -1573,7 +1618,9 @@ class TestRuntimeLatencyLogging:
         transcript = Transcript(
             utterance_id=uid, text="테스트", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
+        )
 
         # 커밋 후 정리됨
         assert uid not in harness.self_runtime.speech_ended_ids
@@ -1603,7 +1650,9 @@ class TestAwaitingVadEndTimeout:
         transcript = Transcript(
             utterance_id=uid, text="테스트", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
+        )
 
         # awaiting_vad_end=True 확인
         buffer = harness.self_owner.merge_buffer
@@ -1637,7 +1686,9 @@ class TestAwaitingVadEndTimeout:
         transcript = Transcript(
             utterance_id=uid, text="테스트", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
+        )
 
         buffer = harness.self_owner.merge_buffer
         assert buffer is not None
@@ -1683,7 +1734,9 @@ class TestLowLatencyCommitBlocking:
         transcript = Transcript(
             utterance_id=uid, text="정상 발화", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
+        )
 
         # grace period 대기
         await asyncio.sleep(0.02)
@@ -1722,7 +1775,9 @@ class TestLowLatencyCommitBlocking:
         transcript1 = Transcript(
             utterance_id=uid1, text="첫 번째", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript1)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript1.utterance_id, transcript=transcript1)
+        )
 
         # uid1이 _utterance_start_times에서 pop됨
         assert uid1 not in harness.self_runtime.utterance_start_times
@@ -1735,7 +1790,9 @@ class TestLowLatencyCommitBlocking:
         transcript2 = Transcript(
             utterance_id=uid2, text="두 번째", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript2)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript2.utterance_id, transcript=transcript2)
+        )
 
         # 정상적으로 커밋됨 (블록 없음)
         assert harness.self_owner.merge_buffer is None
@@ -1786,7 +1843,9 @@ class TestResumeEndTimeout:
         transcript1 = Transcript(
             utterance_id=uid1, text="첫 번째 발화", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript1)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript1.utterance_id, transcript=transcript1)
+        )
 
         # 버퍼에 텍스트가 있음 (grace period가 길어서 아직 커밋 안 됨)
         buffer = harness.self_owner.merge_buffer
@@ -1844,7 +1903,9 @@ class TestResumeEndTimeout:
         transcript1 = Transcript(
             utterance_id=uid1, text="첫 번째", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript1)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript1.utterance_id, transcript=transcript1)
+        )
 
         buffer = harness.self_owner.merge_buffer
         assert buffer is not None
@@ -1865,7 +1926,9 @@ class TestResumeEndTimeout:
         transcript2 = Transcript(
             utterance_id=uid2, text="두 번째", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript2)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript2.utterance_id, transcript=transcript2)
+        )
 
         # resume 상태 클리어됨 → 타임아웃도 취소됨
         assert buffer.resume_end_timeout_task is None
@@ -1899,7 +1962,9 @@ class TestResumeEndTimeout:
         transcript1 = Transcript(
             utterance_id=uid1, text="첫 번째", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript1)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript1.utterance_id, transcript=transcript1)
+        )
 
         buffer = harness.self_owner.merge_buffer
         assert buffer is not None
@@ -1955,7 +2020,9 @@ class TestResumeEndTimeout:
         transcript1 = Transcript(
             utterance_id=uid1, text="첫 번째", is_final=True, created_at=clock.now()
         )
-        await harness.self_owner._handle_low_latency_final(transcript1)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(utterance_id=transcript1.utterance_id, transcript=transcript1)
+        )
 
         buffer = harness.self_owner.merge_buffer
         assert buffer is not None
@@ -2042,8 +2109,11 @@ class TestSpecFinalReconciliation:
         )
         utterance_id = uuid4()
 
-        await harness.self_owner._handle_low_latency_final(
-            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(utterance_id=utterance_id, text="hello", is_final=True),
+            ),
         )
         await asyncio.wait_for(llm.started.wait(), timeout=1.0)
         buffer = harness.self_owner.merge_buffer
@@ -2051,8 +2121,11 @@ class TestSpecFinalReconciliation:
         attempt = buffer.speculative_attempt
         assert attempt is not None
 
-        await harness.self_owner._handle_low_latency_final(
-            Transcript(utterance_id=utterance_id, text=revised_text, is_final=True)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(utterance_id=utterance_id, text=revised_text, is_final=True),
+            ),
         )
 
         assert buffer.speculative_attempt is attempt
@@ -2075,8 +2148,11 @@ class TestSpecFinalReconciliation:
         )
         utterance_id = uuid4()
 
-        await harness.self_owner._handle_low_latency_final(
-            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(utterance_id=utterance_id, text="hello", is_final=True),
+            ),
         )
         await asyncio.wait_for(llm.started.wait(), timeout=1.0)
         buffer = harness.self_owner.merge_buffer
@@ -2084,8 +2160,11 @@ class TestSpecFinalReconciliation:
         retired_attempt = buffer.speculative_attempt
         assert retired_attempt is not None
 
-        await harness.self_owner._handle_low_latency_final(
-            Transcript(utterance_id=utterance_id, text="goodbye", is_final=True)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(utterance_id=utterance_id, text="goodbye", is_final=True),
+            ),
         )
         await asyncio.sleep(0)
 
@@ -2120,8 +2199,11 @@ class TestSpecFinalReconciliation:
         )
         utterance_id = uuid4()
 
-        await harness.self_owner._handle_low_latency_final(
-            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(utterance_id=utterance_id, text="hello", is_final=True),
+            ),
         )
         await asyncio.wait_for(llm.started.wait(), timeout=1.0)
         buffer = harness.self_owner.merge_buffer
@@ -2130,8 +2212,11 @@ class TestSpecFinalReconciliation:
         assert retired_attempt is not None
 
         harness.replace_configuration(system_prompt="new prompt")
-        await harness.self_owner._handle_low_latency_final(
-            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(utterance_id=utterance_id, text="hello", is_final=True),
+            ),
         )
         await asyncio.sleep(0)
 
@@ -2158,8 +2243,11 @@ class TestSpecFinalReconciliation:
         )
         utterance_id = uuid4()
 
-        await harness.self_owner._handle_low_latency_final(
-            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(utterance_id=utterance_id, text="hello", is_final=True),
+            ),
         )
         await asyncio.wait_for(llm.started.wait(), timeout=1.0)
         buffer = harness.self_owner.merge_buffer
@@ -2168,8 +2256,11 @@ class TestSpecFinalReconciliation:
         assert attempt is not None
 
         harness.replace_configuration(chatbox_include_source=False)
-        await harness.self_owner._handle_low_latency_final(
-            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(utterance_id=utterance_id, text="hello", is_final=True),
+            ),
         )
 
         assert buffer.speculative_attempt is attempt
@@ -2194,8 +2285,11 @@ class TestSpecFinalReconciliation:
         )
         utterance_id = uuid4()
 
-        await harness.self_owner._handle_low_latency_final(
-            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(utterance_id=utterance_id, text="hello", is_final=True),
+            ),
         )
         buffer = harness.self_owner.merge_buffer
         assert buffer is not None
@@ -2205,8 +2299,11 @@ class TestSpecFinalReconciliation:
         await asyncio.gather(attempt.task, return_exceptions=True)
         assert attempt.status is _SpeculativeAttemptStatus.READY
 
-        await harness.self_owner._handle_low_latency_final(
-            Transcript(utterance_id=utterance_id, text="hello...", is_final=True)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(utterance_id=utterance_id, text="hello...", is_final=True),
+            ),
         )
         assert buffer.speculative_attempt is attempt
 
@@ -2232,8 +2329,11 @@ class TestSpecFinalReconciliation:
         utterance_id = uuid4()
         await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
 
-        await harness.self_owner._handle_low_latency_final(
-            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(utterance_id=utterance_id, text="hello", is_final=True),
+            ),
         )
         await asyncio.sleep(0.05)
 

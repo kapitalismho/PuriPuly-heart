@@ -16,8 +16,8 @@ import {
   handleDiscordAuthStart,
   handleDiscordOpenRouterIssue,
 } from './discord-managed-issue';
-import { handleQqAuthAssert } from './qq-auth';
-import { handleTelemetryTranslationSuccessDay } from './telemetry';
+import { handleQqAuthAssert, handleQqAuthStatus } from './qq-auth';
+import { handleAppActiveDay } from './telemetry';
 import { handleManagedKeyDeliveryAck } from './managed-key-delivery';
 
 export const app = new Hono<BrokerEnv>();
@@ -42,7 +42,8 @@ app.post('/v1/trial/challenge/verify', handleTrialChallengeVerify);
 app.get('/v1/trial/status', handleTrialStatus);
 app.post('/v1/auth/discord/start', handleDiscordAuthStart);
 app.post('/v1/auth/qq/assert', handleQqAuthAssert);
-app.post('/v1/telemetry/translation-success-day', handleTelemetryTranslationSuccessDay);
+app.post('/v1/auth/qq/status', handleQqAuthStatus);
+app.post('/v1/telemetry/app-active-day', handleAppActiveDay);
 app.post('/v1/providers/openrouter/issue', handleOpenRouterIssue);
 app.post('/v1/providers/openrouter/discord/issue', handleDiscordOpenRouterIssue);
 app.post('/v1/providers/openrouter/managed-key-delivery/ack', handleManagedKeyDeliveryAck);

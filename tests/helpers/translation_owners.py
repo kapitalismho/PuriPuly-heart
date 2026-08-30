@@ -261,6 +261,19 @@ class TranslationOwnersTestHarness:
             return
         await self._peer_owner._ensure_translation(*args, **kwargs)
 
+    async def commit_self_merge(self, buffer: object, *, reason: str) -> None:
+        """Commit the current self merge buffer through the owner's commit path."""
+        await self._self_owner._commit_merge(buffer, reason=reason)
+
+    async def run_self_spec_translation(
+        self,
+        merge_id: object,
+        text: str,
+        sequence: int,
+    ) -> None:
+        """Run the owner's speculative translation path for the merge buffer."""
+        await self._self_owner._run_spec_translation(merge_id, text, sequence)
+
     async def process_translation(
         self,
         utterance_id: object,

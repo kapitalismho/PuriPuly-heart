@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping
-from dataclasses import replace
+from datetime import date
 from typing import Any
 
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
@@ -42,25 +42,21 @@ from puripuly_heart.config.settings_vnext.schema import (
     SecretsIntent,
     SonioxSTTIntent,
     STTIntent,
-    TelemetryConsentIntent,
+    TelemetryIntent,
     TelemetryOperationalState,
     TranslationFallbackIntent,
     TranslationIntent,
     UiIntent,
     UserIntentSettings,
-    is_safe_compatibility_extension_key,
+    new_anonymous_telemetry_identifier,
     normalize_managed_claim_sources,
-    with_telemetry_consent,
+    with_telemetry_enabled,
     with_translation_runtime_policy,
 )
 
 
 def is_vnext_shape_dict(data: Mapping[str, Any]) -> bool:
     return isinstance(data, Mapping) and ("intent" in data or "state" in data)
-
-
-def is_legacy_shape_dict(data: Mapping[str, Any]) -> bool:
-    return isinstance(data, Mapping) and not is_vnext_shape_dict(data)
 
 
 def is_vnext_settings_dict(data: Mapping[str, Any]) -> bool:
@@ -96,6 +92,7 @@ _PEER_SOURCE_AUTO_MIGRATION_VERSION = 31
 _MULTI_MODEL_GEMMA_MIGRATION_VERSION = 32
 _CEREBRAS_CONNECTION_MIGRATION_VERSION = 35
 _DEEPSEEK_V4_PRO_RETIREMENT_MIGRATION_VERSION = 36
+_TELEMETRY_BOOLEAN_MIGRATION_VERSION = 37
 _EXPLICIT_LEGACY_GEMMA_FALLBACK_ALIASES = frozenset({"openrouter_gemma4_26b_a4b"})
 
 _TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
@@ -162,25 +159,10 @@ _FALLBACK_FIELDS_ALIAS: dict[tuple[bool, str, str], str] = {
     (True, "gemma4_31b_cerebras", "official_byok"): "cerebras_gemma4_31b",
     (True, "deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
 }
-_LEGACY_OPEN_MAPPING_PATHS = frozenset(
-    {
-        ("translation", "connection_history"),
-        ("stt", "custom_terms"),
-        ("local_llm", "extra_body"),
-        ("custom_stt", "extra"),
-        ("system_prompts",),
-    }
-)
-_LEGACY_RETIRED_COMPATIBILITY_PATHS = frozenset(
-    {
-        ("peer_qwen_asr_stt",),
-        ("peer_soniox_stt",),
-        ("provider", "peer_soniox_stt"),
-    }
-)
 
 
 def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
+    migrate_telemetry = _requires_telemetry_boolean_migration(data)
     migrate_local_qwen = _requires_local_qwen_cpu_auto_migration(data.get("settings_version"))
     migrate_peer_source_auto = _requires_peer_source_auto_migration(data.get("settings_version"))
     migrate_multi_model_gemma = _requires_multi_model_gemma_migration(data.get("settings_version"))
@@ -248,7 +230,89 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
             _migrate_legacy_timestamp_prompt(prompts)
             intent["prompts"] = prompts
         prepared["intent"] = intent
+    if migrate_telemetry:
+        _migrate_telemetry_boolean_model(prepared)
     return prepared
+
+
+def _requires_telemetry_boolean_migration(data: Mapping[str, Any]) -> bool:
+    settings_version = data.get("settings_version")
+    if isinstance(settings_version, bool):
+        return True
+    if isinstance(settings_version, int):
+        version_requires_migration = settings_version < _TELEMETRY_BOOLEAN_MIGRATION_VERSION
+    elif isinstance(settings_version, str) and settings_version.strip().isdigit():
+        version_requires_migration = (
+            int(settings_version.strip()) < _TELEMETRY_BOOLEAN_MIGRATION_VERSION
+        )
+    else:
+        return True
+    intent = data.get("intent")
+    telemetry_intent = intent.get("telemetry") if isinstance(intent, Mapping) else None
+    state = data.get("state")
+    telemetry_state = state.get("telemetry") if isinstance(state, Mapping) else None
+    return (
+        version_requires_migration
+        or isinstance(telemetry_intent, Mapping)
+        and "consent" in telemetry_intent
+        or isinstance(telemetry_state, Mapping)
+        and "sent_translation_success_dates_utc" in telemetry_state
+    )
+
+
+def _legacy_telemetry_enabled(value: object, *, missing: bool = False) -> bool:
+    if missing or value in {"allow", "unknown"}:
+        return True
+    return False
+
+
+def _latest_telemetry_sent_date(value: object) -> str | None:
+    candidates = (
+        (value,) if isinstance(value, str) else value if isinstance(value, list | tuple) else ()
+    )
+    normalized: set[str] = set()
+    for candidate in candidates:
+        if not isinstance(candidate, str):
+            continue
+        try:
+            normalized.add(date.fromisoformat(candidate.strip()).isoformat())
+        except ValueError:
+            continue
+    return max(normalized, default=None)
+
+
+def _migrate_telemetry_boolean_model(data: dict[str, Any]) -> None:
+    intent = data.setdefault("intent", {})
+    telemetry_present = "telemetry" in intent
+    raw_intent_value = intent.get("telemetry")
+    raw_intent = raw_intent_value if isinstance(raw_intent_value, Mapping) else {}
+    if telemetry_present and not isinstance(raw_intent_value, Mapping):
+        enabled = False
+    elif isinstance(raw_intent.get("enabled"), bool):
+        enabled = bool(raw_intent["enabled"])
+        if raw_intent.get("consent") == "decline":
+            enabled = False
+    elif "enabled" in raw_intent:
+        enabled = False
+    else:
+        missing = "consent" not in raw_intent
+        enabled = _legacy_telemetry_enabled(raw_intent.get("consent"), missing=missing)
+    intent["telemetry"] = {"enabled": enabled}
+
+    state = data.setdefault("state", {})
+    raw_state = state.get("telemetry") if isinstance(state.get("telemetry"), Mapping) else {}
+    anonymous_id = raw_state.get("anonymous_id")
+    if not isinstance(anonymous_id, str) or not anonymous_id.strip():
+        anonymous_id = None
+    else:
+        anonymous_id = anonymous_id.strip()
+    last_sent = _latest_telemetry_sent_date(
+        raw_state.get("sent_translation_success_dates_utc", raw_state.get("last_sent_date_utc"))
+    )
+    state["telemetry"] = {
+        "anonymous_id": anonymous_id or new_anonymous_telemetry_identifier() if enabled else None,
+        "last_sent_date_utc": last_sent if enabled else None,
+    }
 
 
 def _migrate_legacy_timestamp_prompt(prompts: dict[str, Any]) -> None:
@@ -443,15 +507,6 @@ def _migrate_canonical_local_qwen_provider(intent: dict[str, Any], key: str) -> 
         intent[key] = block
 
 
-def _migrate_legacy_local_qwen_providers(data: dict[str, Any]) -> None:
-    provider = data.get("provider")
-    if not isinstance(provider, dict):
-        return
-    for key in ("stt", "peer_stt"):
-        if provider.get(key) == _LOCAL_QWEN_PROVIDER:
-            provider[key] = _LOCAL_CPU_AUTO_PROVIDER
-
-
 def _capture_target_from_legacy_output_device(value: object) -> CaptureTargetIntent:
     if isinstance(value, str) and value.strip():
         return CaptureTargetIntent.named_output_device(value)
@@ -591,116 +646,17 @@ def _fallback_intent_from_legacy_translation_data(
     )
 
 
-def _fallback_intent_from_legacy_raw_dict(data: Mapping[str, Any]) -> TranslationFallbackIntent:
-    translation_data = data.get("translation")
-    openrouter_data = data.get("openrouter")
-    return _fallback_intent_from_legacy_translation_data(
-        translation_data,
-        openrouter_data=openrouter_data,
-    )
-
-
-def _telemetry_consent_from_legacy_raw_dict(data: Mapping[str, Any]) -> str:
-    telemetry = data.get("telemetry") if isinstance(data.get("telemetry"), Mapping) else {}
-    return TelemetryConsentIntent(telemetry.get("consent", "unknown")).consent
-
-
-def _telemetry_state_from_legacy_raw_dict(data: Mapping[str, Any]) -> TelemetryOperationalState:
-    telemetry_state = (
-        data.get("telemetry_state") if isinstance(data.get("telemetry_state"), Mapping) else {}
-    )
-    if not telemetry_state:
-        telemetry = data.get("telemetry") if isinstance(data.get("telemetry"), Mapping) else {}
-        telemetry_state = {
-            "anonymous_id": telemetry.get("identifier"),
-            "sent_translation_success_dates_utc": telemetry.get("sent_utc_dates", ()),
-        }
-    return TelemetryOperationalState(
-        anonymous_id=telemetry_state.get("anonymous_id"),
-        sent_translation_success_dates_utc=telemetry_state.get(
-            "sent_translation_success_dates_utc", ()
-        ),
-    )
-
-
 def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
-    """Read either canonical vNext settings or an accepted legacy settings dict."""
-
     if not isinstance(data, Mapping):
         raise ValueError("settings must be a JSON object")
-    if is_vnext_settings_dict(data):
-        _validate_vnext_top_level_shape(data)
-        return with_translation_runtime_policy(
-            serialization.from_dict(_prepare_vnext_migration_dict(data))
-        )
-
-    # Legacy compatibility belongs here: use the public legacy migration chain first, then
-    # project the normalized AppSettings values into canonical vNext intent/state values.
-    from puripuly_heart.config import settings as legacy_settings
-
-    fallback_intent = _fallback_intent_from_legacy_raw_dict(data)
-    telemetry_consent = _telemetry_consent_from_legacy_raw_dict(data)
-    telemetry_state = _telemetry_state_from_legacy_raw_dict(data)
-    prepared_legacy = dict(copy.deepcopy(data))
-    _migrate_legacy_local_qwen_providers(prepared_legacy)
-    managed_identity = prepared_legacy.get("managed_identity")
-    if isinstance(managed_identity, dict):
-        pending_delivery_ack_id = managed_identity.get("pending_delivery_ack_id")
-        if (
-            pending_delivery_ack_id is not None
-            and "pending_delivery_ack_delivery_id" not in managed_identity
-        ):
-            managed_identity["pending_delivery_ack_delivery_id"] = pending_delivery_ack_id
-    migrated, _changed = legacy_settings._migrate_settings_dict(prepared_legacy)
-    settings = from_legacy_app_settings(
-        legacy_settings.from_dict(migrated),
-        fallback_intent=fallback_intent,
-        preserve_provider_verification=True,
+    if not is_vnext_settings_dict(data):
+        raise ValueError("canonical settings must contain intent and state")
+    _validate_vnext_top_level_shape(data)
+    _validate_supported_vnext_version(data)
+    serialization._validate_persisted_types(data)
+    return with_translation_runtime_policy(
+        serialization.from_dict(_prepare_vnext_migration_dict(data))
     )
-    settings = replace(settings, state=replace(settings.state, telemetry=telemetry_state))
-    legacy_template = legacy_settings.to_dict(legacy_settings.AppSettings())
-    legacy_extensions = _extract_unknown_legacy_values(migrated, legacy_template, path=())
-    if legacy_extensions:
-        settings = replace(
-            settings,
-            compatibility_extensions={"legacy_compatibility": legacy_extensions},
-        )
-    from puripuly_heart.config.settings_vnext.schema import ensure_telemetry_default_allow
-
-    prepared = serialization.to_dict(settings)
-    prepared["settings_version"] = _MULTI_MODEL_GEMMA_MIGRATION_VERSION - 1
-    migrated_settings = serialization.from_dict(_prepare_vnext_migration_dict(prepared))
-    return ensure_telemetry_default_allow(
-        with_telemetry_consent(migrated_settings, telemetry_consent)
-    )
-
-
-def _extract_unknown_legacy_values(
-    raw: Mapping[str, Any],
-    template: Mapping[str, Any],
-    *,
-    path: tuple[str, ...],
-) -> dict[str, Any]:
-    extensions: dict[str, Any] = {}
-    for key, value in raw.items():
-        child_path = (*path, key)
-        if key == "settings_version":
-            continue
-        if child_path in _LEGACY_RETIRED_COMPATIBILITY_PATHS:
-            continue
-        if not is_safe_compatibility_extension_key(key):
-            continue
-        if key not in template:
-            extensions[key] = copy.deepcopy(value)
-            continue
-        template_value = template[key]
-        if isinstance(value, Mapping) and isinstance(template_value, Mapping):
-            if child_path in _LEGACY_OPEN_MAPPING_PATHS:
-                continue
-            nested = _extract_unknown_legacy_values(value, template_value, path=child_path)
-            if nested:
-                extensions[key] = nested
-    return extensions
 
 
 def from_legacy_app_settings(
@@ -719,7 +675,7 @@ def from_legacy_app_settings(
         data.get("translation"),
         openrouter_data=data.get("openrouter"),
     )
-    return with_translation_runtime_policy(
+    converted = with_translation_runtime_policy(
         AppSettingsVNext(
             settings_version=VNEXT_SETTINGS_SCHEMA_VERSION,
             intent=UserIntentSettings(
@@ -870,9 +826,7 @@ def from_legacy_app_settings(
                 integrated_context=IntegratedContextIntent(
                     enabled=bool(data["ui"]["integrated_context_enabled"]),
                 ),
-                telemetry=TelemetryConsentIntent(
-                    data.get("telemetry", {}).get("consent", "unknown")
-                ),
+                telemetry=TelemetryIntent(bool(data.get("telemetry", {}).get("enabled", True))),
                 prompts=PromptIntent(system_prompt=data["system_prompt"]),
             ),
             state=PersistedOperationalState(
@@ -896,6 +850,7 @@ def from_legacy_app_settings(
                         "founder_letter_seen_credential_ref"
                     ],
                     referral_id=data["managed_identity"]["referral_id"],
+                    referral_source=data["managed_identity"].get("referral_source"),
                     local_managed_claim_sources=normalize_managed_claim_sources(
                         data["managed_identity"].get("local_managed_claim_sources")
                     ),
@@ -931,13 +886,12 @@ def from_legacy_app_settings(
                 ),
                 telemetry=TelemetryOperationalState(
                     anonymous_id=data.get("telemetry_state", {}).get("anonymous_id"),
-                    sent_translation_success_dates_utc=data.get("telemetry_state", {}).get(
-                        "sent_translation_success_dates_utc"
-                    ),
+                    last_sent_date_utc=data.get("telemetry_state", {}).get("last_sent_date_utc"),
                 ),
             ),
         )
     )
+    return with_telemetry_enabled(converted, converted.intent.telemetry.enabled)
 
 
 def _apply_changed_mapping_values(
@@ -1028,6 +982,14 @@ def _validate_vnext_top_level_shape(data: Mapping[str, Any]) -> None:
             raise ValueError(f"vNext settings missing required top-level {section!r} object")
         if not isinstance(data[section], Mapping):
             raise ValueError(f"vNext settings top-level {section!r} must be a JSON object")
+
+
+def _validate_supported_vnext_version(data: Mapping[str, Any]) -> None:
+    version = data.get("settings_version")
+    if type(version) is not int or version < 1:
+        raise ValueError("canonical settings_version must be a positive integer")
+    if version > VNEXT_SETTINGS_SCHEMA_VERSION:
+        raise ValueError(f"unsupported canonical settings_version: {version}")
 
 
 def _provider_verification_state(
@@ -1229,12 +1191,10 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
             state.github_star_prompt.eligible_launch_count
         ),
     }
-    data["telemetry"] = {"consent": intent.telemetry.consent}
+    data["telemetry"] = {"enabled": intent.telemetry.enabled}
     data["telemetry_state"] = {
         "anonymous_id": state.telemetry.anonymous_id,
-        "sent_translation_success_dates_utc": list(
-            state.telemetry.sent_translation_success_dates_utc
-        ),
+        "last_sent_date_utc": state.telemetry.last_sent_date_utc,
     }
     data["api_key_verified"] = {
         "deepgram": _is_evidence_bound_verified_entry(
@@ -1284,6 +1244,7 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
             state.managed_connection.founder_letter_seen_credential_ref
         ),
         "referral_id": state.managed_connection.referral_id,
+        "referral_source": state.managed_connection.referral_source,
         "local_managed_claim_sources": list(
             normalize_managed_claim_sources(state.managed_connection.local_managed_claim_sources)
         ),
@@ -1337,7 +1298,6 @@ def _is_evidence_bound_verified_entry(
 __all__ = [
     "from_dict",
     "from_legacy_app_settings",
-    "is_legacy_shape_dict",
     "is_vnext_shape_dict",
     "is_vnext_settings_dict",
     "to_legacy_dict",

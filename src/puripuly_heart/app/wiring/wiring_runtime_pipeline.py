@@ -16,10 +16,16 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineCloseCallbacks,
     RuntimePipelineStartCallbacks,
 )
+from puripuly_heart.app.ports.translation_runtime_configuration import (
+    TranslationRuntimeSettingsValues,
+)
 from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTranslationOwner
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.config.paths import default_http_extensions_dir
-from puripuly_heart.config.settings import AppSettings, STTProviderName, TranslationModel
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.runtime_resolution import RuntimeResolutionInput
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import TranslationModel
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
@@ -37,6 +43,7 @@ from puripuly_heart.core.orchestrator.context import ContextResolver
 from puripuly_heart.core.orchestrator.peer_translation_channel import (
     PeerTranslationChannelOwner,
 )
+from puripuly_heart.core.orchestrator.ports import TranslationRuntimeLoggingPort
 from puripuly_heart.core.orchestrator.self_translation_channel import (
     SelfTranslationChannelOwner,
 )
@@ -55,30 +62,99 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnLifecycleOwner,
 )
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
-from puripuly_heart.core.osc.receiver import VrcMicState
+from puripuly_heart.core.osc.receiver_contract import VrcMicState
 from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
 from puripuly_heart.core.runtime.output import OutputRuntime
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
+from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
+from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.domain.events import UIEvent
 
+from .wiring_llm_factory import (
+    LlmFactoryResolvedExtras,
+    llm_factory_extras_from_vnext,
+    runtime_resolution_input_from_vnext,
+)
 from .wiring_local_asr_provider_runtime import LocalASRProviderRuntimeFactory
 from .wiring_managed_account import ManagedOpenRouterReleaseRuntime
 from .wiring_managed_gemma import noop_managed_gemma_release
 from .wiring_provider_runtime import (
-    project_translation_runtime_settings,
+    project_translation_runtime_settings_from_vnext,
 )
-from .wiring_secrets_factory import create_secret_store
 from .wiring_stt_factory import (
-    build_self_capture_session_config,
-    build_self_stt_provider_request,
+    build_self_capture_session_config_from_vnext,
+    build_self_stt_provider_request_from_vnext,
 )
 from .wiring_translation_backend import create_translation_backend
 from .wiring_translation_runtime_configuration import (
     build_translation_runtime_config,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimePipelineOscInputs:
+    host: str
+    port: int
+    chatbox_address: str
+    chatbox_send: bool
+    chatbox_clear: bool
+    chatbox_max_chars: int
+    vrc_mic_intercept: bool
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimePipelineResolvedInputs:
+    translation_model: str
+    http_extension_id: str | None
+    concurrency_limit: int
+    stt_provider: str
+    peer_translation_enabled: bool
+    osc: RuntimePipelineOscInputs
+    translation_runtime: TranslationRuntimeSettingsValues
+    llm_runtime_input: RuntimeResolutionInput
+    llm_extras: LlmFactoryResolvedExtras
+    self_capture_session: SelfCaptureSessionConfig
+    prepare_self_provider: bool
+
+
+def runtime_pipeline_inputs_from_vnext(
+    settings: AppSettingsVNext,
+    *,
+    peer_translation_enabled: bool,
+) -> RuntimePipelineResolvedInputs:
+    translation = settings.intent.translation
+    osc = settings.intent.osc
+    stt_provider = settings.intent.stt.provider
+    prepare_self_provider = stt_provider != STTProviderName.LOCAL_QWEN_GPU.value
+    if prepare_self_provider:
+        try:
+            build_self_stt_provider_request_from_vnext(settings)
+        except Exception:
+            prepare_self_provider = False
+    return RuntimePipelineResolvedInputs(
+        translation_model=translation.model,
+        http_extension_id=translation.http_extension_id,
+        concurrency_limit=translation.concurrency_limit,
+        stt_provider=stt_provider,
+        peer_translation_enabled=peer_translation_enabled,
+        osc=RuntimePipelineOscInputs(
+            host=osc.host,
+            port=osc.port,
+            chatbox_address=osc.chatbox_address,
+            chatbox_send=osc.chatbox_send,
+            chatbox_clear=osc.chatbox_clear,
+            chatbox_max_chars=osc.chatbox_max_chars,
+            vrc_mic_intercept=osc.vrc_mic_intercept,
+        ),
+        translation_runtime=project_translation_runtime_settings_from_vnext(settings),
+        llm_runtime_input=runtime_resolution_input_from_vnext(settings),
+        llm_extras=llm_factory_extras_from_vnext(settings),
+        self_capture_session=build_self_capture_session_config_from_vnext(settings),
+        prepare_self_provider=prepare_self_provider,
+    )
 
 
 @dataclass(slots=True)
@@ -481,7 +557,7 @@ class RuntimePipelineHandle:
 class RuntimePipelineLauncher:
     config_path: Path
     clock: Clock
-    runtime_logging: object
+    runtime_logging: TranslationRuntimeLoggingPort
     managed_release: ManagedOpenRouterReleaseRuntime
     managed_delegate_ready: Callable[[], None]
     local_asr_factory: Callable[
@@ -539,8 +615,9 @@ class RuntimePipelineLauncher:
 
     async def launch(
         self,
-        settings: AppSettings,
+        inputs: RuntimePipelineResolvedInputs,
         *,
+        secrets: SecretStore,
         vrc_mic_state: VrcMicState | None,
         vrc_mic_audio_gate: VrcMicAudioGate | None,
         receiver_active: bool,
@@ -549,7 +626,8 @@ class RuntimePipelineLauncher:
         resources = RuntimePipelineResourceOwner()
         try:
             pipeline = await compose_runtime_pipeline(
-                settings=settings,
+                inputs=inputs,
+                secrets=secrets,
                 config_path=self.config_path,
                 clock=self.clock,
                 runtime_logging=self.runtime_logging,
@@ -567,9 +645,7 @@ class RuntimePipelineLauncher:
                 resources=resources,
             )
             if pipeline.prepare_self_provider:
-                snapshot = await pipeline.self_capture.prepare_provider(
-                    build_self_capture_session_config(settings)
-                )
+                snapshot = await pipeline.self_capture.prepare_provider(inputs.self_capture_session)
                 if snapshot.provider_status.value != "ready":
                     self.stt_failure_sink("STT backend not available")
             previous = self.previous_self_capture()
@@ -578,8 +654,8 @@ class RuntimePipelineLauncher:
             self.component_sink(pipeline)
             peer = self.peer_application()
             await peer.replace_runtime(pipeline.peer_capture)
-            peer.last_intent_enabled = settings.ui.peer_translation_enabled
-            await self.configure_vrc_mic(enabled=settings.osc.vrc_mic_intercept)
+            peer.last_intent_enabled = inputs.peer_translation_enabled
+            await self.configure_vrc_mic(enabled=inputs.osc.vrc_mic_intercept)
             return pipeline
         except BaseException as exc:
             try:
@@ -600,10 +676,11 @@ class RuntimePipelineLauncher:
 
 async def compose_runtime_pipeline(
     *,
-    settings: AppSettings,
+    inputs: RuntimePipelineResolvedInputs,
+    secrets: SecretStore,
     config_path: Path,
     clock: Clock,
-    runtime_logging: object,
+    runtime_logging: TranslationRuntimeLoggingPort,
     managed_release: ManagedOpenRouterReleaseRuntime,
     managed_delegate_ready: Callable[[], None],
     local_asr_factory: Callable[
@@ -639,7 +716,8 @@ async def compose_runtime_pipeline(
     pipeline_resources = resources or RuntimePipelineResourceOwner()
     try:
         return await _compose_runtime_pipeline(
-            settings=settings,
+            inputs=inputs,
+            secrets=secrets,
             config_path=config_path,
             clock=clock,
             runtime_logging=runtime_logging,
@@ -671,10 +749,11 @@ async def compose_runtime_pipeline(
 
 async def _compose_runtime_pipeline(
     *,
-    settings: AppSettings,
+    inputs: RuntimePipelineResolvedInputs,
+    secrets: SecretStore,
     config_path: Path,
     clock: Clock,
-    runtime_logging: object,
+    runtime_logging: TranslationRuntimeLoggingPort,
     managed_release: ManagedOpenRouterReleaseRuntime,
     managed_delegate_ready: Callable[[], None],
     managed_gemma: ManagedGemmaTranslationOwner | None,
@@ -703,20 +782,20 @@ async def _compose_runtime_pipeline(
     http_extensions: HttpExtensionRegistry | None,
     resources: RuntimePipelineResourceOwner,
 ) -> RuntimePipelineComponents:
-    secrets = create_secret_store(settings.secrets, config_path=config_path)
-    if http_extensions is None and settings.translation.model == TranslationModel.CUSTOM_HTTP:
+    _ = config_path
+    if http_extensions is None and inputs.translation_model == TranslationModel.CUSTOM_HTTP.value:
         http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
         http_extensions.reload()
     if (
-        settings.translation.model
-        not in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
+        inputs.translation_model
+        not in {TranslationModel.MANAGED_GEMMA.value, TranslationModel.MANAGED_GEMMA_12B.value}
         and managed_gemma is not None
     ):
         await managed_gemma.deactivate()
-    if settings.translation.model not in {
-        TranslationModel.CUSTOM_HTTP,
-        TranslationModel.MANAGED_GEMMA,
-        TranslationModel.MANAGED_GEMMA_12B,
+    if inputs.translation_model not in {
+        TranslationModel.CUSTOM_HTTP.value,
+        TranslationModel.MANAGED_GEMMA.value,
+        TranslationModel.MANAGED_GEMMA_12B.value,
     }:
         await managed_release.rebuild(secrets=secrets)
 
@@ -724,20 +803,24 @@ async def _compose_runtime_pipeline(
     with contextlib.suppress(Exception):
         gemma_runtime = None
         gemma_release = None
-        if settings.translation.model in (
-            TranslationModel.MANAGED_GEMMA,
-            TranslationModel.MANAGED_GEMMA_12B,
+        if inputs.translation_model in (
+            TranslationModel.MANAGED_GEMMA.value,
+            TranslationModel.MANAGED_GEMMA_12B.value,
         ):
             if managed_gemma is None:
                 raise RuntimeError("managed Gemma translation runtime is unavailable")
             gemma_runtime = managed_gemma.runtime
             gemma_release = noop_managed_gemma_release
         llm = create_translation_backend(
-            settings,
+            translation_model=inputs.translation_model,
             secrets=secrets,
             http_extensions=(
                 http_extensions or HttpExtensionRegistry(default_http_extensions_dir())
             ),
+            runtime_input=inputs.llm_runtime_input,
+            extras=inputs.llm_extras,
+            http_extension_id=inputs.http_extension_id,
+            concurrency_limit=inputs.concurrency_limit,
             managed_release_service=managed_release.service,
             managed_delegate_ready=managed_delegate_ready,
             runtime_logging=runtime_logging,
@@ -746,31 +829,27 @@ async def _compose_runtime_pipeline(
         )
         resources.pending_llm = llm
 
-    prepare_self_provider = settings.provider.stt != STTProviderName.LOCAL_QWEN_GPU
-    if prepare_self_provider:
-        try:
-            build_self_stt_provider_request(settings)
-        except Exception:
-            prepare_self_provider = False
-            stt_failure_sink("STT backend not available")
+    prepare_self_provider = inputs.prepare_self_provider
+    if not prepare_self_provider and inputs.stt_provider != STTProviderName.LOCAL_QWEN_GPU.value:
+        stt_failure_sink("STT backend not available")
 
     sender = VrchatOscUdpSender(
-        host=settings.osc.host,
-        port=settings.osc.port,
-        chatbox_address=settings.osc.chatbox_address,
-        chatbox_send=settings.osc.chatbox_send,
-        chatbox_clear=settings.osc.chatbox_clear,
+        host=inputs.osc.host,
+        port=inputs.osc.port,
+        chatbox_address=inputs.osc.chatbox_address,
+        chatbox_send=inputs.osc.chatbox_send,
+        chatbox_clear=inputs.osc.chatbox_clear,
     )
     resources.sender = sender
     osc = ChatboxPaginator(
         sender=sender,
         clock=clock,
-        max_chars=settings.osc.chatbox_max_chars,
+        max_chars=inputs.osc.chatbox_max_chars,
         runtime_logging=runtime_logging,
     )
     translation_runtime_configuration = TranslationRuntimeConfigurationOwner(
         build_translation_runtime_config(
-            project_translation_runtime_settings(settings),
+            inputs.translation_runtime,
             fallback_transcript_only=True,
             translation_enabled=True,
             peer_translation_enabled=False,
@@ -885,11 +964,11 @@ async def _compose_runtime_pipeline(
     if gate is None:
         gate = VrcMicAudioGate(
             state=state,
-            enabled=settings.osc.vrc_mic_intercept,
+            enabled=inputs.osc.vrc_mic_intercept,
         )
     else:
         gate.state = state
-        gate.set_enabled(settings.osc.vrc_mic_intercept)
+        gate.set_enabled(inputs.osc.vrc_mic_intercept)
     gate.set_receiver_active(receiver_active)
     gate.reset()
 
@@ -941,6 +1020,9 @@ __all__ = [
     "RuntimePipelineChannelResetRouter",
     "RuntimePipelineHandle",
     "RuntimePipelineLauncher",
+    "RuntimePipelineOscInputs",
+    "RuntimePipelineResolvedInputs",
     "RuntimePipelineResourceOwner",
     "compose_runtime_pipeline",
+    "runtime_pipeline_inputs_from_vnext",
 ]

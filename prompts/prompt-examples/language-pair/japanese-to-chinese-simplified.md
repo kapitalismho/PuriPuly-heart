@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self] ミラーどこに出そうか。
+[${inputChannel}] ミラーどこに出そうか。
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Your response:
 
 ### Context Ignore Example
 <context>
-[self] このワールド、結構重いね。
+[${inputChannel}] このワールド、結構重いね。
 </context>
 
 <input>

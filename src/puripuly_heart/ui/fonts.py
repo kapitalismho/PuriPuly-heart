@@ -94,6 +94,17 @@ def noto_cjk_family_for_ui_locale(locale: str | None) -> str:
     return FONT_FAMILY_NOTO_SANS_CJK_JP
 
 
+_LOCALE_LETTER_SPACING_PX = {
+    "ja": 0.5,
+    "zh": 0.4,
+}
+
+
+def locale_body_letter_spacing(locale: str | None) -> float | None:
+    base = (locale or "").split("-")[0].lower()
+    return _LOCALE_LETTER_SPACING_PX.get(base)
+
+
 def font_for_language(code: str | None) -> str | None:
     if not code:
         return default_font_family()

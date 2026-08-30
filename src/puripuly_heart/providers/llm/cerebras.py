@@ -9,6 +9,7 @@ from uuid import UUID
 import httpx
 
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.error_details import extract_provider_error_detail
 from puripuly_heart.providers.llm.messages import build_translation_user_message
@@ -21,7 +22,7 @@ CEREBRAS_DEFAULT_MODEL = "gemma-4-31b"
 
 def _log_basic_request(
     *,
-    runtime_logging: object | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     text: str,
     source_language: str,
@@ -41,7 +42,9 @@ def _log_basic_request(
     logger.info(message)
 
 
-def _log_basic_response(*, runtime_logging: object | None, operation: str, text: str) -> None:
+def _log_basic_response(
+    *, runtime_logging: ProviderObservationPort | None, operation: str, text: str
+) -> None:
     message = "[Basic][LLM] Cerebras response [%s]: %r" % (operation, text)
     if runtime_logging is not None:
         runtime_logging.emit_basic(message)
@@ -51,7 +54,7 @@ def _log_basic_response(*, runtime_logging: object | None, operation: str, text:
 
 def _log_basic_request_failure(
     *,
-    runtime_logging: object | None,
+    runtime_logging: ProviderObservationPort | None,
     operation: str,
     status: int,
     message: str,
@@ -147,7 +150,7 @@ class CerebrasLLMProvider:
     model: str = CEREBRAS_DEFAULT_MODEL
     max_completion_tokens: int = 100
     timeout: float = 30.0
-    runtime_logging: object | None = None
+    runtime_logging: ProviderObservationPort | None = None
     client: CerebrasClient | None = None
     _internal_client: CerebrasClient | None = field(init=False, default=None, repr=False)
 
@@ -225,7 +228,7 @@ class HttpxCerebrasClient:
     base_url: str = CEREBRAS_DEFAULT_BASE_URL
     max_completion_tokens: int = 100
     timeout: float = 30.0
-    runtime_logging: object | None = None
+    runtime_logging: ProviderObservationPort | None = None
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _client_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
 
@@ -262,6 +265,7 @@ class HttpxCerebrasClient:
             ],
             "stream": False,
             "reasoning_effort": "none",
+            "temperature": 0.6,
             "max_completion_tokens": self.max_completion_tokens,
         }
 

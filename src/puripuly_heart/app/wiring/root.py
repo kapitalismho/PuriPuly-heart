@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from puripuly_heart.app import wiring_llm_factory as _llm_factory
@@ -12,11 +12,14 @@ from puripuly_heart.app.adapters.sync_secret_store import (
 )
 from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
 from puripuly_heart.app.ports.secret_store import SecretStorePort
-from puripuly_heart.config.runtime_resolution import resolve_llm_config
+from puripuly_heart.config.resolved import ResolvedLLMConfig
+from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
     HuggingFaceXetDownloadAdapter,
 )
+from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter_credentials import load_managed_openrouter_user_identifier
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
@@ -38,7 +41,7 @@ from puripuly_heart.core.runtime.self_capture import (
     SelfCaptureVadFactory,
 )
 from puripuly_heart.core.self_capture import SelfCaptureAdmissionPort
-from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
+from puripuly_heart.core.storage.secrets import SecretStore
 
 from .wiring_composition import (
     create_microphone_test_capture_adapter,
@@ -57,7 +60,9 @@ from .wiring_composition import (
 )
 from .wiring_llm_factory import (
     MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR,
+    LlmFactoryResolvedExtras,
     _LazyFactoryLLMProvider,
+    create_llm_provider,
 )
 from .wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
@@ -71,12 +76,18 @@ from .wiring_managed_auth_factory import (
     apply_discord_issue_result_to_managed_state,
     build_managed_identity_state_port,
     build_openrouter_credential_runtime_config,
+    build_openrouter_credential_runtime_config_from_vnext,
     build_openrouter_release_runtime_config,
+    build_openrouter_release_runtime_config_from_vnext,
+    managed_openrouter_selected_from_vnext,
 )
-from .wiring_overlay_factory import resolve_overlay_config
+from .wiring_overlay_factory import (
+    overlay_runtime_intent_from_vnext,
+    resolve_overlay_config,
+    resolve_overlay_config_from_vnext,
+)
 from .wiring_secrets_factory import (
     SECRETS_PASSPHRASE_ENV,
-    copy_stable_secrets_to_vnext_namespace,
     create_secret_store,
     require_secret,
     require_secret_any,
@@ -91,15 +102,17 @@ from .wiring_stt_factory import (
     build_peer_stt_provider_signature,
     build_peer_stt_provider_signature_from_vnext,
     build_peer_stt_runtime_signature,
+    build_peer_stt_runtime_signature_from_vnext,
     build_self_capture_session_config,
+    build_self_capture_session_config_from_vnext,
     build_self_capture_vad_signature,
     build_self_local_asr_transition_request,
     build_self_stt_provider_request,
+    build_self_stt_provider_request_from_vnext,
     build_self_stt_provider_signature,
     build_self_stt_runtime_signature,
-    create_peer_stt_backend,
+    build_self_stt_runtime_signature_from_vnext,
     create_peer_stt_backend_from_resolved_config,
-    create_stt_backend,
     create_stt_backend_from_resolved_config,
     resolve_peer_stt_config,
     resolve_peer_stt_runtime_config,
@@ -188,19 +201,29 @@ _cerebras_api_key_for_resolved_credential = _llm_factory._cerebras_api_key_for_r
 _qwen_api_key_for_resolved_credential = _llm_factory._qwen_api_key_for_resolved_credential
 
 
-def create_llm_provider_from_resolved_config(*args, **kwargs):
+def create_llm_provider_from_resolved_config(
+    config: ResolvedLLMConfig,
+    *,
+    secrets: SecretStore,
+    managed_release_service: object | None = None,
+    managed_delegate_ready: Callable[[], object] | None = None,
+    runtime_logging: ProviderObservationPort | None = None,
+    extras: LlmFactoryResolvedExtras | None = None,
+    managed_gemma_runtime: ManagedGemmaRuntimeOwner | None = None,
+    managed_gemma_release: Callable[[], Awaitable[None]] | None = None,
+    qwen_low_latency_mode: bool = True,
+) -> LLMProvider:
     _llm_factory.load_managed_openrouter_user_identifier = load_managed_openrouter_user_identifier
-    return _llm_factory.create_llm_provider_from_resolved_config(*args, **kwargs)
-
-
-def create_llm_provider(settings, **kwargs):
-    runtime_input = _llm_factory._runtime_resolution_input_from_compatibility_settings(settings)
-    resolved = resolve_llm_config(runtime_input)
-    return create_llm_provider_from_resolved_config(
-        resolved,
-        compatibility_settings=settings,
-        qwen_low_latency_mode=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
-        **kwargs,
+    return _llm_factory.create_llm_provider_from_resolved_config(
+        config,
+        secrets=secrets,
+        managed_release_service=managed_release_service,
+        managed_delegate_ready=managed_delegate_ready,
+        runtime_logging=runtime_logging,
+        extras=extras,
+        managed_gemma_runtime=managed_gemma_runtime,
+        managed_gemma_release=managed_gemma_release,
+        qwen_low_latency_mode=qwen_low_latency_mode,
     )
 
 
@@ -235,12 +258,16 @@ __all__ = (
     "build_peer_stt_provider_signature_from_vnext",
     "build_peer_stt_provider_request",
     "build_peer_stt_runtime_signature",
+    "build_peer_stt_runtime_signature_from_vnext",
     "build_self_capture_session_config",
+    "build_self_capture_session_config_from_vnext",
     "build_self_capture_vad_signature",
     "build_self_local_asr_transition_request",
     "build_self_stt_provider_request",
+    "build_self_stt_provider_request_from_vnext",
     "build_self_stt_provider_signature",
     "build_self_stt_runtime_signature",
+    "build_self_stt_runtime_signature_from_vnext",
     "create_llm_provider",
     "create_llm_provider_from_resolved_config",
     "create_local_asr_provisioning_owner",
@@ -251,7 +278,6 @@ __all__ = (
     "create_peer_capture_target_resolver_adapter",
     "create_peer_capture_vad_adapter",
     "create_peer_capture_vad_sink_adapter",
-    "create_peer_stt_backend",
     "create_peer_stt_backend_from_resolved_config",
     "create_provider_verifier",
     "create_secret_store",
@@ -261,12 +287,12 @@ __all__ = (
     "create_self_capture_vad_adapter",
     "create_self_capture_vad_sink_adapter",
     "create_sync_secret_store_adapter",
-    "copy_stable_secrets_to_vnext_namespace",
-    "create_stt_backend",
     "create_stt_backend_from_resolved_config",
     "require_secret",
     "require_secret_any",
+    "overlay_runtime_intent_from_vnext",
     "resolve_overlay_config",
+    "resolve_overlay_config_from_vnext",
     "resolve_peer_stt_config",
     "resolve_peer_stt_runtime_config",
     "resolve_peer_stt_runtime_config_from_vnext",
@@ -278,7 +304,10 @@ __all__ = (
     "apply_discord_issue_result_to_managed_state",
     "build_managed_identity_state_port",
     "build_openrouter_credential_runtime_config",
+    "build_openrouter_credential_runtime_config_from_vnext",
     "build_openrouter_release_runtime_config",
+    "build_openrouter_release_runtime_config_from_vnext",
+    "managed_openrouter_selected_from_vnext",
     "build_custom_vocabulary_runtime_config",
     "_LazyFactoryLLMProvider",
 )

@@ -8,6 +8,7 @@ from enum import Enum
 from pathlib import Path
 from typing import cast
 
+import puripuly_heart.config.settings as legacy_settings
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
@@ -26,8 +27,8 @@ from puripuly_heart.app.services.provider_runtime_apply import (
 from puripuly_heart.app.services.settings_mutation_legacy import (
     _apply_settings_path_patch,
 )
-from puripuly_heart.config.profile_bootstrap import import_stable_settings_if_missing
-from puripuly_heart.config.settings import AppSettings, new_settings_for_first_run
+from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.defaults import new_settings_for_first_run
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     CaptureTargetIntent,
@@ -211,14 +212,28 @@ def compose_canonical_settings_persistence() -> (
     return SettingsVNextCanonicalPersistenceAdapter()
 
 
+def materialize_compatibility_translation_settings(settings: AppSettings) -> AppSettings:
+    return legacy_settings.materialize_translation_settings(settings)
+
+
+def compatibility_telemetry_enabled_settings(
+    settings: AppSettings,
+    enabled: bool,
+) -> AppSettings:
+    return legacy_settings.with_telemetry_enabled(settings, enabled)
+
+
+def compatibility_managed_openrouter_byok_target_settings(
+    current_settings: AppSettings | None,
+) -> AppSettings | None:
+    return legacy_settings.build_managed_openrouter_byok_target_settings(current_settings)
+
+
 @dataclass(frozen=True, slots=True)
 class SettingsOwnerStartResult:
     settings: AppSettings
     migrated: bool
     backup_path: Path | None
-    stable_source_path: Path | None = None
-    stable_source_settings: AppSettingsVNext | None = None
-    imported_settings: AppSettingsVNext | None = None
 
 
 @dataclass(slots=True)
@@ -237,30 +252,49 @@ class SettingsOwner:
     _rollback_pending: bool = False
     _mutation_depth: int = 0
 
-    def start(self, *, allow_stable_settings_import: bool = False) -> SettingsOwnerStartResult:
-        stable_source_path: Path | None = None
-        stable_source_settings: AppSettingsVNext | None = None
-        imported_settings: AppSettingsVNext | None = None
-        if not self.path.exists() and allow_stable_settings_import:
-            imported = import_stable_settings_if_missing(self.path)
-            if imported.error is not None:
-                raise RuntimeError(
-                    "failed to import stable settings into vNext profile: "
-                    f"{imported.error.message}"
-                )
-            if imported.imported and imported.settings is not None:
-                stable_source_path = imported.source_path
-                stable_source_settings = imported.source_settings
-                imported_settings = imported.settings
+    def materialize_translation(self, settings: AppSettings) -> AppSettings:
+        return materialize_compatibility_translation_settings(settings)
+
+    def with_telemetry_enabled(self, settings: AppSettings, enabled: bool) -> AppSettings:
+        return compatibility_telemetry_enabled_settings(settings, enabled)
+
+    def build_managed_openrouter_byok_target(
+        self,
+        current_settings: AppSettings | None,
+    ) -> AppSettings | None:
+        return compatibility_managed_openrouter_byok_target_settings(current_settings)
+
+    def overlay_enabled(self) -> bool:
+        current = self.current
+        return False if current is None else bool(current.ui.overlay_enabled)
+
+    def set_overlay_enabled(self, enabled: bool) -> None:
+        current = self.current
+        if current is None:
+            return
+        current.ui.overlay_enabled = bool(enabled)
+
+    def overlay_desktop_locked(self) -> bool:
+        current = self.current
+        return False if current is None else bool(current.overlay.desktop_flet.locked)
+
+    def peer_translation_enabled(self) -> bool:
+        current = self.current
+        return False if current is None else bool(current.ui.peer_translation_enabled)
+
+    def set_peer_translation_enabled(self, enabled: bool) -> None:
+        current = self.current
+        if current is None:
+            return
+        current.ui.peer_translation_enabled = bool(enabled)
+
+    def start(self) -> SettingsOwnerStartResult:
         if not self.path.exists():
-            settings = new_settings_for_first_run()
-            self.canonical = self.persistence.project(
-                settings,
-                canonical=None,
-                authoritative=False,
-            )
+            self.canonical = new_settings_for_first_run()
             self.persistence.persist(self.path, self.canonical)
-            self.current = self.persistence.compatibility_projection(self.canonical)
+            loaded = self.persistence.load_active(self.path)
+            self.canonical = loaded.canonical_settings
+            self.current = loaded.compatibility_settings
             return SettingsOwnerStartResult(
                 settings=self.current,
                 migrated=False,
@@ -273,9 +307,6 @@ class SettingsOwner:
             settings=self.current,
             migrated=loaded.migrated,
             backup_path=loaded.backup_path,
-            stable_source_path=stable_source_path,
-            stable_source_settings=stable_source_settings,
-            imported_settings=imported_settings,
         )
 
     def persist(self) -> None:
@@ -370,6 +401,12 @@ class SettingsOwner:
         if not authoritative:
             self.canonical = projected
         return projected
+
+    def projected_canonical(self) -> AppSettingsVNext | None:
+        current = self.current
+        if current is not None:
+            return self.project(current, authoritative=True)
+        return self.canonical
 
     def apply_legacy_delta(
         self,
@@ -467,6 +504,19 @@ class SettingsOwner:
             provider_verification_binding=provider_verification_binding,
             save_failure_sink=save_failure_sink,
         )
+
+    def apply_capture_target(self, capture_target: CaptureTargetIntent) -> AppSettings:
+        if self.canonical is None:
+            self.canonical = new_settings_for_first_run()
+        snapshot = self.persistence.snapshot(self.canonical)
+        self.canonical = with_capture_target(self.canonical, capture_target)
+        try:
+            projected = self.compatibility_projection()
+            self.persist()
+        except Exception:
+            self.canonical = self.persistence.rollback(snapshot)
+            raise
+        return projected
 
     def update_capture_target(
         self,

@@ -5,10 +5,9 @@ import logging
 import queue
 from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
-from enum import Enum
 from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Callable
 from uuid import uuid4
 
 from puripuly_heart.config.paths import user_config_dir
@@ -51,8 +50,10 @@ from puripuly_heart.core.observability import (
     ProviderObservationEvent,
     ProviderObservationOutcome,
     ProviderObservationSink,
+    RealtimeLogSink,
     RuntimeLogEvent,
     RuntimeLogSink,
+    SessionLoggingMode,
 )
 from puripuly_heart.core.output.models import OutputRoutingDecision
 
@@ -235,10 +236,6 @@ def format_translation_ready_for_output(
     return " ".join(parts)
 
 
-class RealtimeLogSink(Protocol):
-    def append_log(self, line: str) -> None: ...
-
-
 class RealtimeLogHandler(logging.Handler):
     def __init__(self, sink: RealtimeLogSink):
         super().__init__()
@@ -260,11 +257,6 @@ class RealtimeLogHandler(logging.Handler):
 
 
 ObservabilityRunner = Callable[[Awaitable[None]], None]
-
-
-class SessionLoggingMode(str, Enum):
-    BASIC = "basic"
-    DETAILED = "detailed"
 
 
 class _DiagnosticRedactionFilter(logging.Filter):

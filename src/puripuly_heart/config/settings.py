@@ -4,15 +4,42 @@ import copy
 import json
 import locale
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
 
 from puripuly_heart.config.audio_host_api import (
     WINDOWS_DIRECTSOUND_HOST_API,
     WINDOWS_WASAPI_COMPATIBILITY_HOST_API,
+)
+from puripuly_heart.config.desktop_overlay_values import (
+    DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
+    DESKTOP_FLET_DEFAULT_HEIGHT,
+    DESKTOP_FLET_DEFAULT_SIZE_PRESET,
+    DESKTOP_FLET_DEFAULT_WIDTH,
+    DESKTOP_FLET_MAX_BACKGROUND_ALPHA,
+    DESKTOP_FLET_MAX_OUTLINE_WIDTH,
+    DESKTOP_FLET_MIN_BACKGROUND_ALPHA,
+    DESKTOP_FLET_MIN_HEIGHT,
+    DESKTOP_FLET_MIN_OUTLINE_WIDTH,
+    DESKTOP_FLET_MIN_WIDTH,
+    DESKTOP_FLET_SIZE_PRESET_ORDER,
+    DESKTOP_FLET_SIZE_PRESETS,
+    DesktopFletOverlayVisualSettings,
+)
+from puripuly_heart.config.desktop_overlay_values import (
+    DESKTOP_FLET_DEFAULT_TEXT_SCALE as DESKTOP_FLET_DEFAULT_TEXT_SCALE,
+)
+from puripuly_heart.config.desktop_overlay_values import (
+    DESKTOP_FLET_MAX_TEXT_SCALE as DESKTOP_FLET_MAX_TEXT_SCALE,
+)
+from puripuly_heart.config.desktop_overlay_values import (
+    DESKTOP_FLET_MIN_TEXT_SCALE as DESKTOP_FLET_MIN_TEXT_SCALE,
+)
+from puripuly_heart.config.desktop_overlay_values import (
+    DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER as DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER,
 )
 from puripuly_heart.config.llm_profiles import (
     LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
@@ -23,30 +50,57 @@ from puripuly_heart.config.llm_profiles import (
     OPENROUTER_FALLBACK_SELECTION_ALIAS_NONE,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_QWEN35_FLASH,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
-    OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
     OPENROUTER_MODEL_GEMINI_37_FLASH,
-    OPENROUTER_MODEL_GEMMA_4_31B_IT,
-    OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK,
-    OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED,
-    OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
-    OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED,
-    OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK,
-    OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED,
-    OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK,
-    OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_MANAGED,
     get_openrouter_llm_profile,
     get_openrouter_selection_alias_for_model_and_source,
     normalize_openrouter_fallback_selection_alias,
     openrouter_alias_for_fields,
 )
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
+from puripuly_heart.config.provider_values import (
+    LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
+    LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS,
+    MAX_CUSTOM_VOCAB_TERMS,
+    LLMProviderName,
+    OpenRouterCredentialSource,
+    OpenRouterLLMModel,
+    OpenRouterSelectionAlias,
+    QwenLLMModel,
+    QwenRegion,
+    SecretsBackend,
+    STTProviderName,
+    normalize_local_llm_base_url,
+    normalize_owned_referral_id,
+)
+from puripuly_heart.config.provider_values import (
+    STT_INTERNAL_SAMPLE_RATE_HZ as STT_INTERNAL_SAMPLE_RATE_HZ,
+)
+from puripuly_heart.config.provider_values import (
+    custom_stt_selection_for_provider as custom_stt_selection_for_provider,
+)
+from puripuly_heart.config.provider_values import (
+    display_stt_provider as display_stt_provider,
+)
+from puripuly_heart.config.provider_values import (
+    is_custom_stt_provider as is_custom_stt_provider,
+)
 from puripuly_heart.config.settings_vnext.schema import (  # noqa: F401
     AppSettingsVNext,
     new_anonymous_telemetry_identifier,
+)
+from puripuly_heart.config.translation_values import (
+    TranslationConnection,
+    TranslationModel,
+    default_translation_connection,
+    supported_translation_connections,
+)
+from puripuly_heart.core.openrouter_routing import (
+    OpenRouterProviderRouting,
+    OpenRouterRoutingMode,
 )
 
 SETTINGS_SCHEMA_VERSION = 25
@@ -56,83 +110,27 @@ MANAGED_AUTH_CLAIM_SOURCES = (
     MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
     MANAGED_AUTH_CLAIM_SOURCE_QQ,
 )
-STT_INTERNAL_SAMPLE_RATE_HZ = 16000
 DEFAULT_DESKTOP_AUDIO_VAD_HANGOVER_MS = 500
 LEGACY_LOW_LATENCY_VAD_HANGOVER_MS = 600
 DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS = 500
-MAX_CUSTOM_VOCAB_TERMS = 100
 DEFAULT_OPENROUTER_BROKER_BASE_URL = "https://puripuly-heart-broker.kapitalismho.workers.dev"
-TELEMETRY_CONSENT_VALUES = frozenset({"unknown", "allow", "decline"})
-REFERRAL_ID_LENGTH = 6
-REFERRAL_ID_ALPHABET = frozenset("23456789ABCDEFGHJKMNPQRSTUVWXYZ")
 OVERLAY_TARGET_STEAMVR = "steamvr"
 OVERLAY_TARGET_DESKTOP = "desktop"
 OVERLAY_TARGET_VALUES = frozenset({OVERLAY_TARGET_STEAMVR, OVERLAY_TARGET_DESKTOP})
-DESKTOP_FLET_MIN_WIDTH = 480
-DESKTOP_FLET_MIN_HEIGHT = 160
-DESKTOP_FLET_DEFAULT_TEXT_SCALE = 1.0
-DESKTOP_FLET_MIN_TEXT_SCALE = 0.75
-DESKTOP_FLET_MAX_TEXT_SCALE = 1.5
-DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA = 0.6
-DESKTOP_FLET_MIN_BACKGROUND_ALPHA = 0.0
-DESKTOP_FLET_MAX_BACKGROUND_ALPHA = 1.0
-DESKTOP_FLET_MIN_OUTLINE_WIDTH = 0.5
-DESKTOP_FLET_MAX_OUTLINE_WIDTH = 8.0
-DESKTOP_FLET_SIZE_PRESET_ORDER = ("tiny", "xsmall", "small", "medium", "large", "xlarge")
-DESKTOP_FLET_SIZE_PRESET_DISPLAY_ORDER = tuple(reversed(DESKTOP_FLET_SIZE_PRESET_ORDER))
-DESKTOP_FLET_DEFAULT_SIZE_PRESET = "medium"
-DESKTOP_FLET_SIZE_PRESETS: dict[str, tuple[int, int]] = {
-    "tiny": (640, 160),
-    "xsmall": (960, 240),
-    "small": (1152, 288),
-    "medium": (1344, 336),
-    "large": (1600, 400),
-    "xlarge": (1792, 448),
-}
-DESKTOP_FLET_DEFAULT_WIDTH = DESKTOP_FLET_SIZE_PRESETS[DESKTOP_FLET_DEFAULT_SIZE_PRESET][0]
-DESKTOP_FLET_DEFAULT_HEIGHT = DESKTOP_FLET_SIZE_PRESETS[DESKTOP_FLET_DEFAULT_SIZE_PRESET][1]
 DEFAULT_CUSTOM_VOCAB_TERMS: dict[str, tuple[str, ...]] = {}
 LEGACY_QWEN_DEFAULT_PROMPT = (
     "VRChat social voice chat interpretation. Use spoken, conversational language and mirror "
     "the speaker's tone and formality. Fix voice recognition errors like missing punctuation "
     "and typos."
 )
-LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS = frozenset(
-    {
-        "model",
-        "messages",
-        "stream",
-        "tools",
-        "tool_choice",
-        "functions",
-        "function_call",
-        "max_tokens",
-    }
-)
-LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS = frozenset(
-    {"api_key", "authorization", "headers", "token", "secret", "password"}
-)
 
 
 def _default_local_llm_extra_body() -> dict[str, object]:
-    return {"reasoning_effort": "none"}
+    return {"reasoning_effort": "none", "temperature": 0.6}
 
 
 def _default_custom_terms() -> dict[str, list[str]]:
     return {language: list(terms) for language, terms in DEFAULT_CUSTOM_VOCAB_TERMS.items()}
-
-
-def normalize_owned_referral_id(value: object) -> str | None:
-    """Normalize an owned Referral ID for app persistence/display, or return None."""
-
-    if not isinstance(value, str):
-        return None
-    normalized = value.strip().upper()
-    if len(normalized) != REFERRAL_ID_LENGTH:
-        return None
-    if any(char not in REFERRAL_ID_ALPHABET for char in normalized):
-        return None
-    return normalized
 
 
 def normalize_managed_claim_sources(value: object) -> tuple[str, ...]:
@@ -151,90 +149,9 @@ def normalize_managed_claim_sources(value: object) -> tuple[str, ...]:
     return tuple(source for source in MANAGED_AUTH_CLAIM_SOURCES if source in normalized)
 
 
-class STTProviderName(str, Enum):
-    LOCAL_CPU_AUTO = "local_cpu_auto"
-    LOCAL_PARAKEET_V3 = "local_parakeet_v3"
-    LOCAL_PARAKEET_JAPANESE = "local_parakeet_ja"
-    LOCAL_QWEN = "local_qwen"
-    LOCAL_QWEN_GPU = "local_qwen_gpu"
-    DEEPGRAM = "deepgram"
-    QWEN_ASR = "qwen_asr"
-    SONIOX = "soniox"
-    CUSTOM = "custom"
-    CUSTOM_OFFLINE = "custom_offline"
-    CUSTOM_REALTIME = "custom_realtime"
-
-
-_CUSTOM_STT_PROVIDER_VALUES = frozenset(
-    {
-        STTProviderName.CUSTOM.value,
-        STTProviderName.CUSTOM_OFFLINE.value,
-        STTProviderName.CUSTOM_REALTIME.value,
-    }
-)
-
-
-def is_custom_stt_provider(provider: STTProviderName | str | None) -> bool:
-    if provider is None:
-        return False
-    value = provider.value if isinstance(provider, STTProviderName) else str(provider)
-    return value in _CUSTOM_STT_PROVIDER_VALUES
-
-
-def display_stt_provider(
-    provider: STTProviderName,
-    *,
-    custom_mode: str = "offline",
-) -> STTProviderName:
-    if provider is not STTProviderName.CUSTOM:
-        return provider
-    if custom_mode == "realtime":
-        return STTProviderName.CUSTOM_REALTIME
-    return STTProviderName.CUSTOM_OFFLINE
-
-
-def custom_stt_selection_for_provider(
-    provider: STTProviderName | str,
-    *,
-    stored_mode: str,
-    stored_compatibility: str,
-) -> tuple[str, str]:
-    value = provider.value if isinstance(provider, STTProviderName) else str(provider)
-    if value == STTProviderName.CUSTOM_REALTIME.value:
-        return "realtime", "openai_realtime"
-    if value == STTProviderName.CUSTOM_OFFLINE.value:
-        return "offline", "openai_transcription"
-    return stored_mode, stored_compatibility
-
-
-class LLMProviderName(str, Enum):
-    GEMINI = "gemini"
-    OPENROUTER = "openrouter"
-    QWEN = "qwen"
-    DEEPSEEK = "deepseek"
-    CEREBRAS = "cerebras"
-    MANAGED_GEMMA = "managed_gemma"
-    LOCAL_LLM = "local_llm"
-
-
-class SecretsBackend(str, Enum):
-    KEYRING = "keyring"
-    ENCRYPTED_FILE = "encrypted_file"
-
-
-class QwenRegion(str, Enum):
-    BEIJING = "beijing"
-    SINGAPORE = "singapore"
-
-
 class GeminiLLMModel(str, Enum):
     GEMINI_37_FLASH = "gemini-3.7-flash"
     GEMINI_31_FLASH_LITE = "gemini-3.1-flash-lite"
-
-
-class QwenLLMModel(str, Enum):
-    QWEN_35_FLASH = "qwen3.5-flash"
-    QWEN_35_PLUS = "qwen3.5-plus"
 
 
 class DeepSeekLLMModel(str, Enum):
@@ -249,51 +166,6 @@ class LocalLLMBackend(str, Enum):
     OLLAMA = "ollama"
 
 
-class OpenRouterLLMModel(str, Enum):
-    GEMMA_4_26B_A4B_IT = "google/gemma-4-26b-a4b-it"
-    GEMMA_4_31B_IT = OPENROUTER_MODEL_GEMMA_4_31B_IT
-    QWEN_35_FLASH_02_23 = "qwen/qwen3.5-flash-02-23"
-    DEEPSEEK_V4_FLASH = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
-    GEMINI_37_FLASH = OPENROUTER_MODEL_GEMINI_37_FLASH
-    GEMINI_31_FLASH_LITE = OPENROUTER_MODEL_GEMINI_31_FLASH_LITE
-
-
-class OpenRouterRoutingMode(str, Enum):
-    LATENCY = "latency"
-
-
-class OpenRouterProviderRouting(str, Enum):
-    DEFAULT = "default"
-    DEEPSEEK_ONLY = "deepseek_only"
-    GOOGLE_GEMINI_LATENCY = "google_gemini_latency"
-    GEMMA4_26B_31B_LATENCY = "gemma4_26b_31b_latency"
-    GEMMA4_31B_LATENCY = "gemma4_31b_latency"
-    GEMMA4_26B_LATENCY = "gemma4_26b_latency"
-    DEEPSEEK_V4_FLASH_LATENCY = "deepseek_v4_flash_latency"
-    GEMMA4_31B_CEREBRAS_ONLY = "gemma4_31b_cerebras_only"
-
-
-class OpenRouterCredentialSource(str, Enum):
-    NONE = "none"
-    MANAGED = "managed"
-    BYOK = "byok"
-
-
-class OpenRouterSelectionAlias(str, Enum):
-    GEMMA4_26B_31B_MANAGED = OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED
-    GEMMA4_26B_31B_BYOK = OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK
-    GEMMA4_31B_MANAGED = OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED
-    GEMMA4_31B_BYOK = OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK
-    GEMMA4_MANAGED = OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED
-    GEMMA4_BYOK = OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK
-    QWEN35_FLASH_MANAGED = OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_MANAGED
-    QWEN35_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK
-    DEEPSEEK_V4_FLASH_MANAGED = OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED
-    DEEPSEEK_V4_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK
-    GEMINI37_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK
-    GEMINI31_FLASH_LITE_BYOK = OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK
-
-
 class OpenRouterFallbackSelectionAlias(str, Enum):
     NONE = OPENROUTER_FALLBACK_SELECTION_ALIAS_NONE
     QWEN35_FLASH = OPENROUTER_FALLBACK_SELECTION_ALIAS_QWEN35_FLASH
@@ -301,32 +173,6 @@ class OpenRouterFallbackSelectionAlias(str, Enum):
     DEEPSEEK_V4_FLASH_CHINA = OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_CHINA
     GEMMA4_26B_31B = OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_26B_31B
     GEMMA4_31B = OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_31B
-
-
-class TranslationModel(str, Enum):
-    GEMMA4_26B_31B = "gemma4_26b_31b"
-    GEMMA4_31B = "gemma4_31b"
-    GEMMA4 = "gemma4"
-    DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
-    GEMINI_37_FLASH = "gemini37_flash"
-    GEMINI_31_FLASH_LITE = "gemini31_flash_lite"
-    QWEN_35_PLUS = "qwen35_plus"
-    MANAGED_GEMMA = "managed_gemma"
-    MANAGED_GEMMA_12B = "managed_gemma_12b"
-    LOCAL_LLM = "local_llm"
-    CUSTOM_HTTP = "custom_http"
-
-
-class TranslationConnection(str, Enum):
-    MANAGED = "managed"
-    MANAGED_CHINA = "managed_china"
-    OPENROUTER = "openrouter"
-    CEREBRAS = "cerebras"
-    OFFICIAL_BYOK = "official_byok"
-    OLLAMA = "ollama"
-    CPU = "cpu"
-    GPU = "gpu"
-    CUSTOM_HTTP = "custom_http"
 
 
 @dataclass(slots=True)
@@ -402,68 +248,6 @@ class TranslationSettings:
         elif self.previous_llm_model is not None:
             raise ValueError("previous LLM translation model is only valid for custom HTTP")
         self.fallback.validate()
-
-
-TRANSLATION_CONNECTIONS_BY_MODEL: dict[TranslationModel, tuple[TranslationConnection, ...]] = {
-    TranslationModel.GEMMA4_26B_31B: (
-        TranslationConnection.MANAGED,
-        TranslationConnection.OPENROUTER,
-    ),
-    TranslationModel.GEMMA4_31B: (
-        TranslationConnection.MANAGED,
-        TranslationConnection.OPENROUTER,
-        TranslationConnection.CEREBRAS,
-    ),
-    TranslationModel.GEMMA4: (
-        TranslationConnection.MANAGED,
-        TranslationConnection.OPENROUTER,
-    ),
-    TranslationModel.DEEPSEEK_V4_FLASH: (
-        TranslationConnection.MANAGED,
-        TranslationConnection.MANAGED_CHINA,
-        TranslationConnection.OPENROUTER,
-        TranslationConnection.OFFICIAL_BYOK,
-    ),
-    TranslationModel.GEMINI_37_FLASH: (
-        TranslationConnection.OFFICIAL_BYOK,
-        TranslationConnection.OPENROUTER,
-    ),
-    TranslationModel.GEMINI_31_FLASH_LITE: (
-        TranslationConnection.OFFICIAL_BYOK,
-        TranslationConnection.OPENROUTER,
-    ),
-    TranslationModel.QWEN_35_PLUS: (TranslationConnection.OFFICIAL_BYOK,),
-    TranslationModel.MANAGED_GEMMA: (
-        TranslationConnection.CPU,
-        TranslationConnection.GPU,
-    ),
-    TranslationModel.MANAGED_GEMMA_12B: (TranslationConnection.GPU,),
-    TranslationModel.LOCAL_LLM: (TranslationConnection.OLLAMA,),
-    TranslationModel.CUSTOM_HTTP: (TranslationConnection.CUSTOM_HTTP,),
-}
-TRANSLATION_CONNECTION_PRIORITY: tuple[TranslationConnection, ...] = (
-    TranslationConnection.MANAGED,
-    TranslationConnection.OPENROUTER,
-    TranslationConnection.OFFICIAL_BYOK,
-)
-
-
-def supported_translation_connections(
-    model: TranslationModel,
-) -> tuple[TranslationConnection, ...]:
-    return TRANSLATION_CONNECTIONS_BY_MODEL[model]
-
-
-def default_translation_connection(model: TranslationModel) -> TranslationConnection:
-    if model == TranslationModel.CUSTOM_HTTP:
-        return TranslationConnection.CUSTOM_HTTP
-    if model in (TranslationModel.GEMINI_37_FLASH, TranslationModel.GEMINI_31_FLASH_LITE):
-        return TranslationConnection.OFFICIAL_BYOK
-    supported_connections = supported_translation_connections(model)
-    for connection in TRANSLATION_CONNECTION_PRIORITY:
-        if connection in supported_connections:
-            return connection
-    return supported_connections[0]
 
 
 def _supported_translation_connections(
@@ -1174,44 +958,6 @@ class DesktopFletOverlayPosition:
         self.x, self.y = _normalize_desktop_flet_position(self.x, self.y)
 
 
-@dataclass(slots=True, init=False)
-class DesktopFletOverlayVisualSettings:
-    background_alpha: float = DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA
-
-    def __init__(
-        self,
-        text_scale: object = None,
-        background_alpha: object = DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
-        outline_width: object = None,
-    ) -> None:
-        _ = (text_scale, outline_width)
-        self.background_alpha = background_alpha
-
-    def validate(self) -> None:
-        self.background_alpha = _normalize_desktop_flet_range(
-            self.background_alpha,
-            default=DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
-            minimum=DESKTOP_FLET_MIN_BACKGROUND_ALPHA,
-            maximum=DESKTOP_FLET_MAX_BACKGROUND_ALPHA,
-        )
-
-    @property
-    def text_scale(self) -> float:
-        return DESKTOP_FLET_DEFAULT_TEXT_SCALE
-
-    @text_scale.setter
-    def text_scale(self, _value: object) -> None:
-        return
-
-    @property
-    def outline_width(self) -> None:
-        return None
-
-    @outline_width.setter
-    def outline_width(self, _value: object) -> None:
-        return
-
-
 @dataclass(slots=True)
 class DesktopFletOverlaySettings:
     size_preset: str = DESKTOP_FLET_DEFAULT_SIZE_PRESET
@@ -1300,6 +1046,7 @@ class ManagedIdentitySettings:
     active_managed_expires_at: str | None = None
     founder_letter_seen_credential_ref: str | None = None
     referral_id: str | None = None
+    referral_source: str | None = None
     local_managed_claim_sources: tuple[str, ...] = field(default_factory=tuple)
     pending_delivery_ack_source: str | None = None
     pending_delivery_ack_delivery_id: str | None = None
@@ -1337,6 +1084,12 @@ class ManagedIdentitySettings:
         ):
             raise ValueError("managed founder_letter_seen_credential_ref must be a string or None")
         self.referral_id = normalize_owned_referral_id(self.referral_id)
+        referral_source = (
+            self.referral_source.strip().lower() if isinstance(self.referral_source, str) else None
+        )
+        if referral_source not in {"discord", "qq"}:
+            referral_source = "discord" if self.referral_id is not None else None
+        self.referral_source = referral_source
         self.local_managed_claim_sources = normalize_managed_claim_sources(
             self.local_managed_claim_sources
         )
@@ -1351,12 +1104,10 @@ class ManagedIdentitySettings:
                 raise ValueError(f"managed {key} must be a string or None")
 
 
-def _parse_telemetry_consent(value: object) -> str:
-    if isinstance(value, str):
-        normalized = value.strip()
-        if normalized in TELEMETRY_CONSENT_VALUES:
-            return normalized
-    return "unknown"
+def _parse_telemetry_enabled(value: object) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError("telemetry enabled must be a boolean")
+    return value
 
 
 def _normalize_telemetry_identifier(value: object) -> str | None:
@@ -1366,7 +1117,7 @@ def _normalize_telemetry_identifier(value: object) -> str | None:
     return normalized or None
 
 
-def _normalize_telemetry_sent_dates(value: object) -> list[str]:
+def _normalize_telemetry_sent_date(value: object) -> str | None:
     if isinstance(value, str):
         candidates: tuple[object, ...] = (value,)
     elif isinstance(value, (list, tuple, set, frozenset)):
@@ -1385,27 +1136,43 @@ def _normalize_telemetry_sent_dates(value: object) -> list[str]:
         date_text = parsed.strftime("%Y-%m-%d")
         if date_text not in normalized:
             normalized.append(date_text)
-    return normalized
+    return max(normalized, default=None)
+
+
+def _telemetry_enabled_from_dict(data: Mapping[str, object]) -> bool:
+    telemetry_value = data.get("telemetry")
+    if "telemetry" not in data:
+        return True
+    if not isinstance(telemetry_value, Mapping):
+        return False
+    if telemetry_value.get("consent") == "decline":
+        return False
+    enabled = telemetry_value.get("enabled")
+    if isinstance(enabled, bool):
+        return enabled
+    if "enabled" in telemetry_value:
+        return False
+    if "consent" not in telemetry_value:
+        return True
+    return telemetry_value.get("consent") in {"allow", "unknown"}
 
 
 @dataclass(slots=True)
 class TelemetrySettings:
-    consent: str = "unknown"
+    enabled: bool = True
 
     def validate(self) -> None:
-        self.consent = _parse_telemetry_consent(self.consent)
+        self.enabled = _parse_telemetry_enabled(self.enabled)
 
 
 @dataclass(slots=True)
 class TelemetryStateSettings:
-    anonymous_id: str | None = None
-    sent_translation_success_dates_utc: list[str] = field(default_factory=list)
+    anonymous_id: str | None = field(default_factory=new_anonymous_telemetry_identifier)
+    last_sent_date_utc: str | None = None
 
     def validate(self) -> None:
         self.anonymous_id = _normalize_telemetry_identifier(self.anonymous_id)
-        self.sent_translation_success_dates_utc = _normalize_telemetry_sent_dates(
-            self.sent_translation_success_dates_utc
-        )
+        self.last_sent_date_utc = _normalize_telemetry_sent_date(self.last_sent_date_utc)
 
 
 @dataclass(slots=True)
@@ -1945,11 +1712,11 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
                 settings.ui.github_star_prompt_eligible_launch_count
             ),
         },
-        "telemetry": {"consent": _parse_telemetry_consent(settings.telemetry.consent)},
+        "telemetry": {"enabled": _parse_telemetry_enabled(settings.telemetry.enabled)},
         "telemetry_state": {
             "anonymous_id": _normalize_telemetry_identifier(settings.telemetry_state.anonymous_id),
-            "sent_translation_success_dates_utc": _normalize_telemetry_sent_dates(
-                settings.telemetry_state.sent_translation_success_dates_utc
+            "last_sent_date_utc": _normalize_telemetry_sent_date(
+                settings.telemetry_state.last_sent_date_utc
             ),
         },
         "api_key_verified": {
@@ -1978,6 +1745,7 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
                 settings.managed_identity.founder_letter_seen_credential_ref
             ),
             "referral_id": normalize_owned_referral_id(settings.managed_identity.referral_id),
+            "referral_source": settings.managed_identity.referral_source,
             "local_managed_claim_sources": list(
                 normalize_managed_claim_sources(
                     settings.managed_identity.local_managed_claim_sources
@@ -2006,19 +1774,18 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
     return _enum_to_value(data)  # type: ignore[return-value]
 
 
-def with_telemetry_consent(
+def with_telemetry_enabled(
     settings: AppSettings,
-    consent: str,
+    enabled: bool,
     *,
     identifier_factory: object = new_anonymous_telemetry_identifier,
 ) -> AppSettings:
     updated = copy.deepcopy(settings)
-    normalized_consent = _parse_telemetry_consent(consent)
-    updated.telemetry.consent = normalized_consent
-    if normalized_consent == "decline":
+    updated.telemetry.enabled = _parse_telemetry_enabled(enabled)
+    if not enabled:
         updated.telemetry_state.anonymous_id = None
-        updated.telemetry_state.sent_translation_success_dates_utc = []
-    elif normalized_consent == "allow":
+        updated.telemetry_state.last_sent_date_utc = None
+    else:
         factory = (
             identifier_factory
             if callable(identifier_factory)
@@ -2027,29 +1794,11 @@ def with_telemetry_consent(
         updated.telemetry_state.anonymous_id = _normalize_telemetry_identifier(
             updated.telemetry_state.anonymous_id
         ) or str(factory())
-        updated.telemetry_state.sent_translation_success_dates_utc = (
-            _normalize_telemetry_sent_dates(
-                updated.telemetry_state.sent_translation_success_dates_utc
-            )
+        updated.telemetry_state.last_sent_date_utc = _normalize_telemetry_sent_date(
+            updated.telemetry_state.last_sent_date_utc
         )
     updated.validate()
     return updated
-
-
-def ensure_telemetry_default_allow(
-    settings: AppSettings,
-    *,
-    identifier_factory: object = new_anonymous_telemetry_identifier,
-) -> AppSettings:
-    """Map unknown consent to allow and mint an anonymous id when needed."""
-    consent = _parse_telemetry_consent(settings.telemetry.consent)
-    if consent == "decline":
-        return settings
-    if consent == "allow" and _normalize_telemetry_identifier(
-        settings.telemetry_state.anonymous_id
-    ):
-        return settings
-    return with_telemetry_consent(settings, "allow", identifier_factory=identifier_factory)
 
 
 def _parse_custom_stt_settings(value: object) -> CustomSTTSettings:
@@ -2334,27 +2083,7 @@ def _parse_local_llm_backend(value: object) -> LocalLLMBackend:
     return LocalLLMBackend.OLLAMA
 
 
-def _normalize_local_llm_base_url(value: str) -> str:
-    if not isinstance(value, str):
-        raise ValueError("invalid local llm base url")
-    try:
-        parsed = urlsplit(value.strip())
-        _ = parsed.port
-    except ValueError as exc:
-        raise ValueError("invalid local llm base url") from exc
-    if parsed.scheme not in {"http", "https"}:
-        raise ValueError("invalid local llm base url")
-    if not parsed.hostname:
-        raise ValueError("invalid local llm base url")
-    if (
-        "@" in parsed.netloc
-        or parsed.username
-        or parsed.password
-        or parsed.query
-        or parsed.fragment
-    ):
-        raise ValueError("invalid local llm base url")
-    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", ""))
+_normalize_local_llm_base_url = normalize_local_llm_base_url
 
 
 def _parse_local_llm_base_url(value: object) -> str:
@@ -3152,7 +2881,41 @@ LEGACY_TIMESTAMP_PROMPT = (
 
 
 def _prompt_matches_legacy_timestamp_default(prompt: str) -> bool:
-    return prompt == LEGACY_TIMESTAMP_PROMPT
+    context_line = "* `<context>` is a multilingual history of prior utterances.\n"
+    chronological_line = "* Context entries are ordered chronologically from older to newer.\n"
+    timestamp_line = (
+        "* Treat timestamps and speaker hints as metadata for tracking conversation flow.\n"
+    )
+    input_channel_line = "* For this request, `<input>` is a `[${inputChannel}]` utterance.\n"
+    output_metadata_line = (
+        "* Translate only the text inside `<input>`; `<context>` and channel labels are "
+        "background metadata.\n"
+    )
+    previous_output_lines = (
+        "* Text inside `<input>` is the translation target.\n"
+        "* Text inside `<context>` is background information.\n"
+    )
+    previous_default = LEGACY_TIMESTAMP_PROMPT.replace(
+        context_line,
+        context_line + chronological_line,
+        1,
+    ).replace(timestamp_line, "", 1)
+    p0_default = previous_default.replace(
+        chronological_line,
+        chronological_line + input_channel_line,
+        1,
+    )
+    previous_output_default = _shared_default_prompt().replace(
+        output_metadata_line,
+        previous_output_lines,
+        1,
+    )
+    return prompt in {
+        LEGACY_TIMESTAMP_PROMPT,
+        previous_default,
+        p0_default,
+        previous_output_default,
+    }
 
 
 def ensure_prompt_defaults(settings: AppSettings) -> AppSettings:
@@ -3239,7 +3002,7 @@ def new_settings_for_first_run(system_locale: str | None = None) -> AppSettings:
             connection=TranslationConnection.OPENROUTER,
         )
     ensure_prompt_defaults(settings)
-    settings = with_telemetry_consent(settings, "allow")
+    settings = with_telemetry_enabled(settings, True)
     settings.validate()
     return settings
 
@@ -4230,6 +3993,19 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         managed_identity_data["referral_id"] = normalized_referral_id
         changed = True
 
+    raw_referral_source = managed_identity_data.get("referral_source")
+    normalized_referral_source = (
+        raw_referral_source.strip().lower() if isinstance(raw_referral_source, str) else None
+    )
+    if normalized_referral_source not in {"discord", "qq"}:
+        normalized_referral_source = "discord" if normalized_referral_id is not None else None
+    if (
+        "referral_source" not in managed_identity_data
+        or raw_referral_source != normalized_referral_source
+    ):
+        managed_identity_data["referral_source"] = normalized_referral_source
+        changed = True
+
     raw_local_managed_claim_sources = managed_identity_data.get("local_managed_claim_sources")
     normalized_local_managed_claim_sources = list(
         normalize_managed_claim_sources(raw_local_managed_claim_sources)
@@ -4319,7 +4095,6 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
     local_llm_raw = data.get("local_llm") if isinstance(data.get("local_llm"), dict) else {}
     qwen_asr_raw = data.get("qwen_asr_stt") if isinstance(data.get("qwen_asr_stt"), dict) else {}
     openrouter_raw = data.get("openrouter") if isinstance(data.get("openrouter"), dict) else {}
-    telemetry_raw = data.get("telemetry") if isinstance(data.get("telemetry"), dict) else {}
     telemetry_state_raw = (
         data.get("telemetry_state") if isinstance(data.get("telemetry_state"), dict) else {}
     )
@@ -4652,13 +4427,14 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
                 managed_identity_data.get("pending_delivery_ack_expires_at")
             ),
         ),
-        telemetry=TelemetrySettings(
-            consent=_parse_telemetry_consent(telemetry_raw.get("consent")),
-        ),
+        telemetry=TelemetrySettings(enabled=_telemetry_enabled_from_dict(data)),
         telemetry_state=TelemetryStateSettings(
             anonymous_id=_normalize_telemetry_identifier(telemetry_state_raw.get("anonymous_id")),
-            sent_translation_success_dates_utc=_normalize_telemetry_sent_dates(
-                telemetry_state_raw.get("sent_translation_success_dates_utc")
+            last_sent_date_utc=_normalize_telemetry_sent_date(
+                telemetry_state_raw.get(
+                    "last_sent_date_utc",
+                    telemetry_state_raw.get("sent_translation_success_dates_utc"),
+                )
             ),
         ),
         system_prompt=legacy_system_prompt,
@@ -4693,7 +4469,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
     materialize_translation_settings(settings)
 
     ensure_prompt_defaults(settings)
-    settings = ensure_telemetry_default_allow(settings)
+    settings = with_telemetry_enabled(settings, settings.telemetry.enabled)
     settings.validate()
     return settings
 

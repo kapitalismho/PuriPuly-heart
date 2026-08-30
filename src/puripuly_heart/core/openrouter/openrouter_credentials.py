@@ -5,12 +5,13 @@ from dataclasses import dataclass
 from enum import Enum
 
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
-from puripuly_heart.config.settings import OpenRouterCredentialSource
+from puripuly_heart.config.provider_values import OpenRouterCredentialSource
 from puripuly_heart.core.storage.secrets import SecretStore
 
 OPENROUTER_BYOK_API_KEY_SECRET = "openrouter_api_key"
 OPENROUTER_MANAGED_API_KEY_SECRET = "openrouter_managed_api_key"
 OPENROUTER_MANAGED_QQ_API_KEY_SECRET = "openrouter_managed_qq_api_key"
+OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET = "openrouter_managed_qq_status_auth"
 OPENROUTER_MANAGED_USER_ID_SECRET = "openrouter_managed_user_id"
 OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET = "openrouter_managed_user_installation_id"
 OPENROUTER_MANAGED_USER_ID_MAX_LENGTH = 256

@@ -1,0 +1,105 @@
+from __future__ import annotations
+
+from enum import Enum
+
+
+class TranslationModel(str, Enum):
+    GEMMA4_26B_31B = "gemma4_26b_31b"
+    GEMMA4_31B = "gemma4_31b"
+    GEMMA4 = "gemma4"
+    DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
+    GEMINI_37_FLASH = "gemini37_flash"
+    GEMINI_31_FLASH_LITE = "gemini31_flash_lite"
+    QWEN_35_PLUS = "qwen35_plus"
+    MANAGED_GEMMA = "managed_gemma"
+    MANAGED_GEMMA_12B = "managed_gemma_12b"
+    LOCAL_LLM = "local_llm"
+    CUSTOM_HTTP = "custom_http"
+
+
+class TranslationConnection(str, Enum):
+    MANAGED = "managed"
+    MANAGED_CHINA = "managed_china"
+    OPENROUTER = "openrouter"
+    CEREBRAS = "cerebras"
+    OFFICIAL_BYOK = "official_byok"
+    OLLAMA = "ollama"
+    CPU = "cpu"
+    GPU = "gpu"
+    CUSTOM_HTTP = "custom_http"
+
+
+TRANSLATION_CONNECTIONS_BY_MODEL: dict[
+    TranslationModel,
+    tuple[TranslationConnection, ...],
+] = {
+    TranslationModel.GEMMA4_26B_31B: (
+        TranslationConnection.MANAGED,
+        TranslationConnection.OPENROUTER,
+    ),
+    TranslationModel.GEMMA4_31B: (
+        TranslationConnection.MANAGED,
+        TranslationConnection.OPENROUTER,
+        TranslationConnection.CEREBRAS,
+    ),
+    TranslationModel.GEMMA4: (
+        TranslationConnection.MANAGED,
+        TranslationConnection.OPENROUTER,
+    ),
+    TranslationModel.DEEPSEEK_V4_FLASH: (
+        TranslationConnection.MANAGED,
+        TranslationConnection.MANAGED_CHINA,
+        TranslationConnection.OPENROUTER,
+        TranslationConnection.OFFICIAL_BYOK,
+    ),
+    TranslationModel.GEMINI_37_FLASH: (
+        TranslationConnection.OFFICIAL_BYOK,
+        TranslationConnection.OPENROUTER,
+    ),
+    TranslationModel.GEMINI_31_FLASH_LITE: (
+        TranslationConnection.OFFICIAL_BYOK,
+        TranslationConnection.OPENROUTER,
+    ),
+    TranslationModel.QWEN_35_PLUS: (TranslationConnection.OFFICIAL_BYOK,),
+    TranslationModel.MANAGED_GEMMA: (
+        TranslationConnection.CPU,
+        TranslationConnection.GPU,
+    ),
+    TranslationModel.MANAGED_GEMMA_12B: (TranslationConnection.GPU,),
+    TranslationModel.LOCAL_LLM: (TranslationConnection.OLLAMA,),
+    TranslationModel.CUSTOM_HTTP: (TranslationConnection.CUSTOM_HTTP,),
+}
+
+TRANSLATION_CONNECTION_PRIORITY: tuple[TranslationConnection, ...] = (
+    TranslationConnection.MANAGED,
+    TranslationConnection.OPENROUTER,
+    TranslationConnection.OFFICIAL_BYOK,
+)
+
+
+def supported_translation_connections(
+    model: TranslationModel,
+) -> tuple[TranslationConnection, ...]:
+    return TRANSLATION_CONNECTIONS_BY_MODEL[model]
+
+
+def default_translation_connection(model: TranslationModel) -> TranslationConnection:
+    if model == TranslationModel.CUSTOM_HTTP:
+        return TranslationConnection.CUSTOM_HTTP
+    if model in (TranslationModel.GEMINI_37_FLASH, TranslationModel.GEMINI_31_FLASH_LITE):
+        return TranslationConnection.OFFICIAL_BYOK
+    supported_connections = supported_translation_connections(model)
+    for connection in TRANSLATION_CONNECTION_PRIORITY:
+        if connection in supported_connections:
+            return connection
+    return supported_connections[0]
+
+
+__all__ = [
+    "TRANSLATION_CONNECTIONS_BY_MODEL",
+    "TRANSLATION_CONNECTION_PRIORITY",
+    "TranslationConnection",
+    "TranslationModel",
+    "default_translation_connection",
+    "supported_translation_connections",
+]

@@ -53,11 +53,13 @@ def render_translation_system_prompt(
     source_language: str,
     target_language: str,
     source_name: str | None = None,
+    input_channel: ChannelId = "self",
 ) -> str:
     return render_translation_prompt_template(
         template,
         source_name=source_name or get_llm_language_name(source_language),
         target_name=get_llm_language_name(target_language),
+        input_channel=input_channel,
     )
 
 
@@ -290,7 +292,7 @@ class TranslationRequestOwner:
 
     def get_valid_context(self) -> list[ContextEntry]:
         configuration = self.config_snapshot().value
-        return self.context_resolver.get_local_entries(
+        return self.context_resolver.get_entries(
             runtime=self.self_runtime,
             source_language=self.source_language_for("self", configuration),
             target_language=self.target_language_for("self", configuration),
@@ -298,7 +300,7 @@ class TranslationRequestOwner:
         )
 
     def format_context(self, context: list[ContextEntry]) -> str:
-        return self.context_resolver.format_local(context)
+        return self.context_resolver.format_entries(context)
 
     def remember_context(
         self,
@@ -355,8 +357,6 @@ class TranslationRequestOwner:
         context, applied_mode = self.context_resolver.resolve_for_request(
             runtime=runtime,
             other_runtime=other_runtime,
-            requested_mode="integrated",
-            peer_translation_enabled=configuration.peer_translation_enabled,
             source_language=source_language,
             target_language=target_language,
             other_source_language=self.source_language_for(other_channel, configuration),
@@ -389,6 +389,7 @@ class TranslationRequestOwner:
                 source_language=source_language,
                 target_language=target_language,
                 source_name=source_name,
+                input_channel=channel,
             ),
             context=context,
             requested_at=self.clock.now(),

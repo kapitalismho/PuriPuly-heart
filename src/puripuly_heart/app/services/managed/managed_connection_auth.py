@@ -49,6 +49,8 @@ from .managed_auth_claims import (
     ManagedAuthClaimGuard,
 )
 from .managed_key_delivery_ack import (
+    ACK_SOURCE_DISCORD,
+    ManagedKeyDeliveryAckService,
     ManagedKeyDeliveryAckTokenStoreError,
     clear_pending_ack_in_settings_values,
     secret_key_for_ack_source,
@@ -101,10 +103,15 @@ class ManagedConnectionAuthService:
     secret_store: SecretStorePort
     settings_repository: SettingsRepositoryPort
     claim_guard: ManagedAuthClaimGuard | None = None
+    delivery_ack_service: ManagedKeyDeliveryAckService | None = None
 
     async def authorize(self, request: ManagedConnectionAuthRequest) -> TransactionResult:
         if _caller_settings_values_are_unsafe(request.settings_values):
             return _unsafe_settings_values_result(request)
+
+        recovery_result = await self._recover_pending_delivery_ack(request)
+        if recovery_result is not None:
+            return recovery_result
 
         claim_result = await self._preflight_claim_source()
         if claim_result is not None:
@@ -149,12 +156,15 @@ class ManagedConnectionAuthService:
                 message=broker_result.message,
             )
 
-        settings_values = request.settings_values
+        settings_values = _settings_values_with_broker_issue(
+            request.settings_values,
+            broker_result,
+        )
         commit_result: TransactionResult | None = None
         if broker_result.delivery_ack is not None:
             try:
                 settings_values = await store_pending_ack_in_settings_values(
-                    settings_values=request.settings_values,
+                    settings_values=settings_values,
                     secret_store=self.secret_store,
                     metadata=broker_result.delivery_ack,
                 )
@@ -281,6 +291,65 @@ class ManagedConnectionAuthService:
         if claim_persist_result is not None:
             return claim_persist_result
         return commit_result
+
+    async def _recover_pending_delivery_ack(
+        self,
+        request: ManagedConnectionAuthRequest,
+    ) -> TransactionResult | None:
+        service = self.delivery_ack_service
+        if (
+            service is None
+            or service.managed_state.pending_delivery_ack_source != ACK_SOURCE_DISCORD
+        ):
+            return None
+        result = await service.recover_pending(
+            source=ACK_SOURCE_DISCORD,
+            managed_secret_key=request.local_secret_key,
+        )
+        message = result.ack_result.message if result.ack_result is not None else None
+        if not result.succeeded:
+            return _delivery_ack_recovery_pending_result(
+                request=request,
+                ack_status=result.status,
+                diagnostics_present=result.diagnostics is not None,
+                message=message,
+            )
+        if result.status == "none":
+            return None
+        if self.claim_guard is not None:
+            self.claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
+            try:
+                self.claim_guard.managed_state.persist()
+            except Exception:
+                return TransactionResult(
+                    status=TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING,
+                    message=message,
+                    diagnostics=_metadata_diagnostics(
+                        operation="persist_recovered_managed_claim_source",
+                        code="recovered_delivery_ack_claim_persist_failed",
+                        fields={
+                            "phase": "remote_delivery_ack_recovery",
+                            "local_secret_key": request.local_secret_key,
+                            "secret_write_succeeded": True,
+                            "settings_commit_succeeded": False,
+                        },
+                    ),
+                )
+        return TransactionResult(
+            status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+            message=message,
+            diagnostics=_metadata_diagnostics(
+                operation="recover_managed_key_delivery",
+                code="delivery_ack_recovered",
+                fields={
+                    "phase": "remote_delivery_ack_recovery",
+                    "local_secret_key": request.local_secret_key,
+                    "delivery_ack_status": result.status,
+                    "secret_write_succeeded": True,
+                    "settings_commit_succeeded": True,
+                },
+            ),
+        )
 
     async def _preflight_claim_source(self) -> TransactionResult | None:
         if self.claim_guard is None:
@@ -782,6 +851,64 @@ def _delivery_ack_pending_result(
             fields=fields,
         ),
     )
+
+
+def _delivery_ack_recovery_pending_result(
+    *,
+    request: ManagedConnectionAuthRequest,
+    ack_status: str,
+    diagnostics_present: bool,
+    message: UserMessageRef | None,
+) -> TransactionResult:
+    return TransactionResult(
+        status=TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
+        message=message,
+        diagnostics=_metadata_diagnostics(
+            operation="recover_managed_key_delivery",
+            code="delivery_ack_recovery_pending",
+            fields={
+                "phase": "remote_delivery_ack_recovery",
+                "local_secret_key": request.local_secret_key,
+                "delivery_ack_status": ack_status,
+                "diagnostics_present": diagnostics_present,
+            },
+        ),
+    )
+
+
+def _settings_values_with_broker_issue(
+    settings_values: Mapping[str, object],
+    broker_result: BrokerIssueResult,
+) -> dict[str, object]:
+    values = _copy_settings_values(settings_values)
+    state = values.setdefault("state", {})
+    if not isinstance(state, dict):
+        state = {}
+        values["state"] = state
+    managed = state.setdefault("managed_connection", {})
+    if not isinstance(managed, dict):
+        managed = {}
+        state["managed_connection"] = managed
+    managed_credential_ref = broker_result.managed_credential_ref
+    if managed_credential_ref:
+        managed["active_managed_credential_ref"] = managed_credential_ref
+    if broker_result.expires_at:
+        managed["active_managed_expires_at"] = broker_result.expires_at
+    if broker_result.referral_id:
+        managed["referral_id"] = broker_result.referral_id
+    return values
+
+
+def _copy_settings_values(values: Mapping[str, object]) -> dict[str, object]:
+    return {key: _copy_settings_value(value) for key, value in values.items()}
+
+
+def _copy_settings_value(value: object) -> object:
+    if isinstance(value, Mapping):
+        return _copy_settings_values(value)
+    if isinstance(value, tuple | list):
+        return [_copy_settings_value(item) for item in value]
+    return value
 
 
 def _metadata_diagnostics(

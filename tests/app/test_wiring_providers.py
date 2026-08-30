@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import uuid
 from dataclasses import replace
 from pathlib import Path
 
@@ -13,17 +15,26 @@ from puripuly_heart.app.wiring import (
     build_openrouter_release_runtime_config,
     build_peer_stt_provider_signature,
     build_peer_stt_provider_signature_from_vnext,
-    create_llm_provider,
+    build_self_stt_runtime_signature,
+    build_self_stt_runtime_signature_from_vnext,
     create_llm_provider_from_resolved_config,
-    create_peer_stt_backend,
-    create_stt_backend,
     resolve_peer_stt_config,
     resolve_peer_stt_runtime_config_from_vnext,
 )
-from puripuly_heart.app.wiring import root as wiring_root
+from puripuly_heart.app.wiring import wiring_llm_factory as wiring_llm_factory_module
+from puripuly_heart.app.wiring.wiring_llm_factory import (
+    create_llm_provider as create_llm_provider_from_runtime_input,
+)
+from puripuly_heart.app.wiring.wiring_llm_factory import (
+    llm_factory_extras_from_vnext,
+    runtime_resolution_input_from_vnext,
+)
 from puripuly_heart.app.wiring.wiring_stt_factory import (
-    _self_stt_runtime_intent_from_compatibility_settings,
+    create_peer_stt_backend_from_resolved_config,
+    create_stt_backend_from_resolved_config,
     resolve_peer_stt_runtime_config,
+    resolve_self_stt_runtime_config_from_vnext,
+    self_stt_runtime_intent_from_vnext,
 )
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_NONE,
@@ -34,7 +45,11 @@ from puripuly_heart.config.resolved import (
     ResolvedLLMTarget,
     ResolvedSTTConfig,
 )
-from puripuly_heart.config.runtime_resolution import resolve_stt_config
+from puripuly_heart.config.runtime_resolution import (
+    TranslationFallbackRuntimeIntent,
+    derive_translation_runtime_intent_from_compatibility,
+    resolve_stt_config,
+)
 from puripuly_heart.config.settings import (
     AppSettings,
     CerebrasLLMModel,
@@ -66,20 +81,66 @@ from puripuly_heart.config.settings import (
     TranslationModel,
     TranslationSettings,
 )
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.settings_vnext.schema import (
+    AppSettingsVNext,
+    TranslationFallbackIntent,
+)
 from puripuly_heart.core.language import (
     get_deepgram_language,
     get_qwen_asr_language,
 )
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
-from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
+from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
+
+
+class _ConcurrencyProbeProvider(LLMProvider):
+    def __init__(self) -> None:
+        self.active = 0
+        self.max_active = 0
+
+    async def translate(self, **_kwargs: object) -> object:
+        self.active += 1
+        self.max_active = max(self.max_active, self.active)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        self.active -= 1
+        return object()
+
+    async def close(self) -> None:
+        return None
+
+
+def assert_bounded_concurrency(provider: SemaphoreLLMProvider, limit: int) -> None:
+    probe = _ConcurrencyProbeProvider()
+
+    async def run() -> None:
+        wrapped = SemaphoreLLMProvider(inner=probe, semaphore=provider.semaphore)
+        await asyncio.gather(
+            *(
+                wrapped.translate(
+                    utterance_id=uuid.uuid4(),
+                    text="t",
+                    system_prompt="s",
+                    source_language="en",
+                    target_language="ko",
+                )
+                for _ in range(limit * 2 + 1)
+            ),
+        )
+
+    asyncio.run(run())
+    assert probe.max_active == limit
+
+
 from puripuly_heart.core.local_asr.local_stt_assets import default_local_stt_model_dir
 from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterLLMProvider,
     ManagedOpenRouterReleaseService,
     _resolve_managed_issue_model,
 )
-from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.core.storage.secrets import InMemorySecretStore, SecretStore
+from puripuly_heart.core.stt.backend import STTBackend
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
 from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
@@ -109,6 +170,117 @@ def _translation_with_fallback(
             model=model,
             connection=connection,
         )
+    )
+
+
+def _canonical_settings(settings: AppSettings) -> AppSettingsVNext:
+    if (
+        settings.provider.llm == LLMProviderName.OPENROUTER
+        and settings.openrouter.selected_source == OpenRouterCredentialSource.NONE
+    ):
+        raise ValueError("OpenRouter selected source must not be `none` for execution")
+    intent = derive_translation_runtime_intent_from_compatibility(
+        provider_llm=settings.provider.llm,
+        openrouter_model=settings.openrouter.llm_model,
+        openrouter_selected_source=settings.openrouter.selected_source,
+        openrouter_provider_routing=settings.openrouter.provider_routing,
+        gemini_model=settings.gemini.llm_model,
+        qwen_model=settings.qwen.llm_model,
+        cerebras_model=settings.cerebras.llm_model,
+        concurrency_limit=settings.llm.concurrency_limit,
+    )
+    model = intent.model
+    connection = intent.connection
+    if settings.translation.model == TranslationModel.CUSTOM_HTTP:
+        model = "custom_http"
+        connection = "custom_http"
+    elif settings.translation.model == TranslationModel.MANAGED_GEMMA:
+        model = "managed_gemma"
+        connection = settings.translation.connection.value
+    elif settings.translation.model == TranslationModel.MANAGED_GEMMA_12B:
+        model = "managed_gemma_12b"
+        connection = settings.translation.connection.value
+    elif settings.provider.llm == LLMProviderName.QWEN:
+        model = "qwen35_plus"
+        connection = "official_byok"
+    canonical = from_legacy_app_settings(settings)
+    translation = canonical.intent.translation
+    fallback = translation.fallback
+    if not settings.translation.fallback.enabled:
+        fallback = TranslationFallbackIntent(selection_alias="none")
+    return replace(
+        canonical,
+        intent=replace(
+            canonical.intent,
+            translation=replace(
+                translation,
+                model=model,
+                connection=connection,
+                concurrency_limit=intent.concurrency_limit,
+                fallback=fallback,
+                openrouter_model=settings.openrouter.llm_model.value,
+                openrouter_selected_source=settings.openrouter.selected_source.value,
+                openrouter_selection_alias=settings.openrouter.selection_alias.value,
+                openrouter_provider_routing=settings.openrouter.provider_routing.value,
+                openrouter_routing_mode=settings.openrouter.routing_mode.value,
+            ),
+        ),
+    )
+
+
+def create_llm_provider(
+    settings: AppSettings,
+    *,
+    secrets: SecretStore,
+    **kwargs: object,
+) -> LLMProvider:
+    canonical = _canonical_settings(settings)
+    extras = kwargs.pop("extras", None)
+    runtime_input = runtime_resolution_input_from_vnext(canonical)
+    if settings.translation.fallback.enabled:
+        runtime_input = replace(
+            runtime_input,
+            translation_fallback=TranslationFallbackRuntimeIntent(
+                enabled=True,
+                model=settings.translation.fallback.model.value,
+                connection=settings.translation.fallback.connection.value,
+            ),
+        )
+    return create_llm_provider_from_runtime_input(
+        runtime_input,
+        secrets=secrets,
+        extras=extras if extras is not None else llm_factory_extras_from_vnext(canonical),
+        **kwargs,
+    )
+
+
+def create_stt_backend(
+    settings: AppSettings,
+    *,
+    secrets: SecretStore,
+    **kwargs: object,
+) -> STTBackend:
+    canonical = from_legacy_app_settings(settings)
+    return create_stt_backend_from_resolved_config(
+        resolve_self_stt_runtime_config_from_vnext(canonical),
+        secrets=secrets,
+        gpu_device_id=canonical.intent.stt.gpu_device_id,
+        **kwargs,
+    )
+
+
+def create_peer_stt_backend(
+    settings: AppSettings,
+    *,
+    secrets: SecretStore,
+    **kwargs: object,
+) -> STTBackend:
+    canonical = from_legacy_app_settings(settings)
+    return create_peer_stt_backend_from_resolved_config(
+        resolve_peer_stt_runtime_config_from_vnext(canonical),
+        secrets=secrets,
+        gpu_device_id=canonical.intent.stt.gpu_device_id,
+        **kwargs,
     )
 
 
@@ -219,7 +391,7 @@ def test_create_llm_provider_gemini_uses_secret_and_concurrency_limit() -> None:
     assert isinstance(provider.inner, GeminiLLMProvider)
     assert provider.inner.api_key == "k"
     assert provider.inner.model == "gemini-3.1-flash-lite"
-    assert provider.semaphore._value == 3  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 3)
 
 
 def test_create_llm_provider_gemini_uses_selected_model() -> None:
@@ -261,7 +433,7 @@ def test_create_llm_provider_qwen_uses_secret() -> None:
     assert provider.inner.api_key == "k2"
     assert provider.inner.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
     assert provider.inner.model == "qwen3.5-plus"
-    assert provider.semaphore._value == 5  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 5)
 
 
 def test_create_llm_provider_qwen_low_latency_passes_runtime_logging() -> None:
@@ -371,7 +543,7 @@ def test_create_llm_provider_deepseek_uses_secret_and_model() -> None:
     assert provider.inner.api_key == "ds-key"
     assert provider.inner.model == "deepseek-v4-flash"
     assert provider.inner.base_url == "https://api.deepseek.com"
-    assert provider.semaphore._value == 4  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 4)
 
 
 def test_create_llm_provider_deepseek_uses_v4_flash_model() -> None:
@@ -417,7 +589,7 @@ def test_create_llm_provider_cerebras_uses_secret_and_model() -> None:
     assert isinstance(provider.inner, CerebrasLLMProvider)
     assert provider.inner.api_key == "cerebras-key"
     assert provider.inner.model == "gemma-4-31b"
-    assert provider.semaphore._value == 6  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 6)
 
 
 def test_create_llm_provider_cerebras_from_resolved_config_uses_dto_and_secret_store() -> None:
@@ -442,7 +614,7 @@ def test_create_llm_provider_cerebras_from_resolved_config_uses_dto_and_secret_s
     assert isinstance(provider.inner, CerebrasLLMProvider)
     assert provider.inner.api_key == "dto-cerebras-key"
     assert provider.inner.model == "gemma-4-31b"
-    assert provider.semaphore._value == 2  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 2)
 
 
 def test_create_llm_provider_local_llm_uses_settings_without_secret(
@@ -464,7 +636,7 @@ def test_create_llm_provider_local_llm_uses_settings_without_secret(
     assert provider.inner.model == "llama3.1:8b"
     assert provider.inner.api_key == ""
     assert provider.inner.extra_body == {"think": False}
-    assert provider.semaphore._value == 2  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 2)
 
 
 def test_create_llm_provider_local_llm_ignores_optional_env_key(
@@ -522,7 +694,7 @@ def test_create_llm_provider_from_resolved_local_llm_uses_dto_values_and_optiona
     provider = create_llm_provider_from_resolved_config(
         resolved,
         secrets=secrets,
-        compatibility_settings=legacy_settings,
+        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(legacy_settings)),
     )
 
     assert isinstance(provider, SemaphoreLLMProvider)
@@ -531,64 +703,7 @@ def test_create_llm_provider_from_resolved_local_llm_uses_dto_values_and_optiona
     assert provider.inner.model == "dto-model"
     assert provider.inner.api_key == "dto-local-secret"
     assert provider.inner.extra_body == {"think": False}
-    assert provider.semaphore._value == 7  # type: ignore[attr-defined]
-
-
-def test_create_llm_provider_legacy_facade_uses_runtime_resolution(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings(
-        provider=ProviderSettings(llm=LLMProviderName.GEMINI),
-        gemini=GeminiSettings(llm_model=GeminiLLMModel.GEMINI_37_FLASH),
-        llm=LLMSettings(concurrency_limit=2),
-    )
-    settings.local_llm.base_url = "http://legacy.local/v1"
-    settings.local_llm.model = "legacy-local-model"
-    settings.local_llm.extra_body = {"legacy": True}
-    resolved = ResolvedLLMConfig(
-        primary=ResolvedLLMTarget(
-            provider="local_llm",
-            model="resolved-local-model",
-            credential=ResolvedCredentialRequirement(
-                source=CREDENTIAL_SOURCE_NONE,
-                required=False,
-                reference=None,
-            ),
-            base_url="http://resolved.local/v1",
-            provider_options={"extra_body": {"resolved": True}},
-        ),
-        concurrency_limit=9,
-    )
-    captured_inputs: list[object] = []
-
-    def fake_resolve_llm_config(runtime_input: object) -> ResolvedLLMConfig:
-        captured_inputs.append(runtime_input)
-        return resolved
-
-    monkeypatch.setattr(
-        wiring_root,
-        "resolve_llm_config",
-        fake_resolve_llm_config,
-        raising=False,
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("google_api_key", "raw-gemini-key")
-    secrets.set("local_llm_api_key", "resolved-local-key")
-
-    provider = create_llm_provider(settings, secrets=secrets)
-
-    assert captured_inputs, "legacy facade must call runtime resolution"
-    runtime_input = captured_inputs[0]
-    assert runtime_input.direct.local_llm_base_url == "http://legacy.local/v1"  # type: ignore[attr-defined]
-    assert runtime_input.direct.local_llm_model == "legacy-local-model"  # type: ignore[attr-defined]
-    assert runtime_input.translation.concurrency_limit == 2  # type: ignore[attr-defined]
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, LocalOpenAICompatibleLLMProvider)
-    assert provider.inner.base_url == "http://resolved.local/v1"
-    assert provider.inner.model == "resolved-local-model"
-    assert provider.inner.api_key == "resolved-local-key"
-    assert provider.inner.extra_body == {"resolved": True}
-    assert provider.semaphore._value == 9  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 7)
 
 
 def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
@@ -613,7 +728,7 @@ def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
     assert provider.inner.model == "google/gemma-4-26b-a4b-it"
     assert provider.inner.base_url == "https://openrouter.ai/api/v1"
     assert provider.inner.routing_mode == OpenRouterRoutingMode.LATENCY
-    assert provider.semaphore._value == 4  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 4)
 
 
 def test_create_llm_provider_from_resolved_openrouter_gemini_byok_uses_google_latency_routing() -> (
@@ -644,7 +759,7 @@ def test_create_llm_provider_from_resolved_openrouter_gemini_byok_uses_google_la
     assert provider.inner.model == OpenRouterLLMModel.GEMINI_31_FLASH_LITE.value
     assert provider.inner.routing_mode == OpenRouterRoutingMode.LATENCY
     assert provider.inner.provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
-    assert provider.semaphore._value == 3  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 3)
 
 
 def test_create_llm_provider_openrouter_byok_still_uses_user_owned_secret_after_pkce_storage() -> (
@@ -947,7 +1062,7 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert fallback_provider.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
     assert fallback_provider.routing_mode == OpenRouterRoutingMode.LATENCY
     assert fallback_provider.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
-    assert provider.semaphore._value == 3  # type: ignore[attr-defined]
+    assert_bounded_concurrency(provider, 3)
 
 
 def test_create_llm_provider_from_resolved_cerebras_fallback_uses_resolved_secret() -> None:
@@ -1010,7 +1125,7 @@ def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_use
         return "managed-user-123"
 
     monkeypatch.setattr(
-        wiring_root,
+        wiring_llm_factory_module,
         "load_managed_openrouter_user_identifier",
         fake_load_managed_openrouter_user_identifier,
         raising=False,
@@ -1099,7 +1214,7 @@ def test_create_llm_provider_openrouter_managed_delegate_factory_loads_user_iden
         return current_user_identifier
 
     monkeypatch.setattr(
-        wiring_root,
+        wiring_llm_factory_module,
         "load_managed_openrouter_user_identifier",
         fake_load_managed_openrouter_user_identifier,
         raising=False,
@@ -1158,7 +1273,6 @@ def test_create_llm_provider_openrouter_wraps_primary_with_source_locked_openrou
     assert provider.inner.primary.routing_mode == OpenRouterRoutingMode.LATENCY
     assert provider.inner.primary.runtime_logging is runtime_logging
     assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
-    assert provider.inner.fallback._delegate is None
 
     fallback_delegate = provider.inner.fallback.factory()
 
@@ -1198,7 +1312,7 @@ def test_create_llm_provider_openrouter_byok_paths_omit_managed_user_identifier(
         raise AssertionError("managed user identifier should not be loaded for BYOK paths")
 
     monkeypatch.setattr(
-        wiring_root,
+        wiring_llm_factory_module,
         "load_managed_openrouter_user_identifier",
         unexpected_load_managed_openrouter_user_identifier,
         raising=False,
@@ -1303,7 +1417,6 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_uses_fallback_
     fallback_release_service = _unwrap_release_service(fallback_delegate.release_service)
     assert isinstance(fallback_release_service, ManagedOpenRouterReleaseService)
     assert fallback_release_service is not managed_release_service
-    assert fallback_release_service.managed_state is not managed_release_service.managed_state
     assert fallback_release_service.openrouter_config.selection_alias is None
     assert fallback_release_service.openrouter_config.llm_model == deepseek_model
     assert (
@@ -1349,7 +1462,7 @@ def test_create_llm_provider_openrouter_managed_fallback_delegate_factory_loads_
         return current_user_identifier
 
     monkeypatch.setattr(
-        wiring_root,
+        wiring_llm_factory_module,
         "load_managed_openrouter_user_identifier",
         fake_load_managed_openrouter_user_identifier,
         raising=False,
@@ -1717,7 +1830,11 @@ def test_resolve_overlay_config_maps_desktop_flet_to_resolved_desktop_options() 
     settings.overlay.desktop_flet.locked = True
     settings.overlay.desktop_flet.visual.background_alpha = 0.44
 
-    resolved = wiring_module.resolve_overlay_config(settings)
+    resolved = wiring_module.resolve_overlay_config_from_vnext(
+        from_legacy_app_settings(settings),
+        enabled=settings.ui.overlay_enabled,
+        locked=settings.overlay.desktop_flet.locked,
+    )
 
     assert resolved.enabled is True
     assert resolved.target == "desktop"
@@ -1823,11 +1940,17 @@ def test_create_stt_backend_local_qwen_passes_language_hint_without_hotwords() -
 
 
 def test_create_stt_backend_rejects_invalid_compatibility_provider() -> None:
-    settings = AppSettings()
-    settings.provider.stt = "corrupt-self-stt-provider"  # type: ignore[assignment]
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            stt=replace(settings.intent.stt, provider="corrupt-self-stt-provider"),
+        ),
+    )
 
     with pytest.raises(ValueError, match="Unsupported STT provider"):
-        create_stt_backend(settings, secrets=InMemorySecretStore())
+        resolve_self_stt_runtime_config_from_vnext(settings)
 
 
 def test_create_peer_stt_backend_uses_dedicated_deepgram_configuration_without_hint_terms() -> None:
@@ -1941,14 +2064,6 @@ def test_resolve_peer_stt_config_rejects_invalid_compatibility_provider() -> Non
         resolve_peer_stt_config(settings)
 
 
-def test_create_peer_stt_backend_rejects_invalid_compatibility_provider() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = "corrupt-peer-stt-provider"  # type: ignore[assignment]
-
-    with pytest.raises(ValueError, match="Unsupported peer STT provider"):
-        create_peer_stt_backend(settings, secrets=InMemorySecretStore())
-
-
 def test_create_peer_stt_backend_uses_peer_selected_soniox_provider() -> None:
     settings = AppSettings()
     settings.provider.peer_stt = STTProviderName.SONIOX
@@ -1978,6 +2093,54 @@ def test_create_peer_stt_backend_uses_shared_qwen_region_for_endpoint_and_secret
     assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
 
 
+def test_self_stt_runtime_signature_from_vnext_matches_bag_restart_fields() -> None:
+    cases = (
+        AppSettings(
+            provider=ProviderSettings(stt=STTProviderName.DEEPGRAM),
+            stt=STTSettings(
+                custom_vocabulary_enabled=True,
+                custom_terms={"ko": [" Puripuly ", "a,b", "VRChat"]},
+            ),
+        ),
+        AppSettings(
+            provider=ProviderSettings(stt=STTProviderName.LOCAL_QWEN),
+            stt=STTSettings(
+                custom_vocabulary_enabled=True,
+                custom_terms={"ko": [f"term{i}, extra" for i in range(20)]},
+            ),
+        ),
+        AppSettings(
+            provider=ProviderSettings(stt=STTProviderName.LOCAL_QWEN_GPU),
+            stt=STTSettings(
+                custom_vocabulary_enabled=True,
+                custom_terms={"ko": ["gpu-term"]},
+            ),
+        ),
+        AppSettings(
+            provider=ProviderSettings(stt=STTProviderName.SONIOX),
+            stt=STTSettings(
+                custom_vocabulary_enabled=True,
+                custom_terms={"ko": ["soniox-term"]},
+            ),
+        ),
+        AppSettings(
+            provider=ProviderSettings(stt=STTProviderName.QWEN_ASR),
+            qwen=QwenSettings(region=QwenRegion.BEIJING),
+        ),
+        AppSettings(
+            provider=ProviderSettings(stt=STTProviderName.QWEN_ASR),
+            qwen=QwenSettings(region=QwenRegion.SINGAPORE),
+        ),
+        AppSettings(provider=ProviderSettings(stt=STTProviderName.CUSTOM)),
+    )
+    for settings in cases:
+        settings.qwen_asr_stt.endpoint = settings.qwen.get_asr_endpoint()
+        canonical = from_legacy_app_settings(settings)
+        assert build_self_stt_runtime_signature_from_vnext(
+            canonical
+        ) == build_self_stt_runtime_signature(settings)
+
+
 def test_build_peer_stt_provider_signature_includes_backend_affecting_values() -> None:
     settings = AppSettings()
     settings.provider.peer_stt = STTProviderName.SONIOX
@@ -2001,7 +2164,9 @@ def test_peer_auto_detection_keeps_self_language_restriction_separate() -> None:
     settings.languages.peer_expected_languages = ["ja", "zh-TW"]
 
     peer = resolve_peer_stt_runtime_config(settings)
-    self_config = resolve_stt_config(_self_stt_runtime_intent_from_compatibility_settings(settings))
+    self_config = resolve_stt_config(
+        self_stt_runtime_intent_from_vnext(from_legacy_app_settings(settings))
+    )
 
     assert peer.provider_options["enable_language_identification"] is True
     assert peer.provider_options["language_hints"] == ("ja", "zh")
@@ -2098,9 +2263,7 @@ def test_vnext_peer_runtime_keeps_self_and_non_soniox_paths_manual() -> None:
     )
 
     peer = resolve_peer_stt_runtime_config_from_vnext(settings)
-    self_config = resolve_stt_config(
-        _self_stt_runtime_intent_from_compatibility_settings(AppSettings())
-    )
+    self_config = resolve_stt_config(self_stt_runtime_intent_from_vnext(AppSettingsVNext()))
 
     assert peer.provider == "deepgram"
     assert peer.provider_options == {}

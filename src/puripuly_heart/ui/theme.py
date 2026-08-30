@@ -40,8 +40,16 @@ def _clickable_button_style() -> ft.ButtonStyle:
     )
 
 
-def get_app_theme(font_family: str | None = None) -> ft.Theme:
+def get_app_theme(
+    font_family: str | None = None,
+    body_letter_spacing: float | None = None,
+) -> ft.Theme:
     clickable = _clickable_button_style()
+    text_theme = (
+        ft.TextTheme(body_medium=ft.TextStyle(letter_spacing=body_letter_spacing))
+        if body_letter_spacing is not None
+        else None
+    )
     return ft.Theme(
         color_scheme=ft.ColorScheme(
             surface=COLOR_SURFACE,
@@ -54,6 +62,7 @@ def get_app_theme(font_family: str | None = None) -> ft.Theme:
             tertiary=COLOR_TERTIARY,
         ),
         font_family=font_family,
+        text_theme=text_theme,
         visual_density=ft.VisualDensity.COMPACT,
         button_theme=ft.ButtonTheme(style=clickable),
         text_button_theme=ft.TextButtonTheme(style=clickable),

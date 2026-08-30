@@ -271,6 +271,21 @@ describe('OpenRouter management client', () => {
     );
   });
 
+  it('treats an already-missing child key as an idempotent cleanup success', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }));
+
+    await expect(
+      cleanupManagedChildKey({
+        managementApiKey: 'mgmt-key',
+        keyHash: 'hash_missing',
+        fetchImpl: fetchMock,
+      }),
+    ).resolves.toEqual({ ok: true });
+  });
+
   it('surfaces malformed disable success responses instead of reporting cleanup success', async () => {
     const fetchMock = vi
       .fn()
