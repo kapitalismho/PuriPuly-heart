@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -1336,77 +1335,7 @@ def test_dependency_violations_are_empty() -> None:
     assert _dependency_violations() == frozenset()
 
 
-def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -> None:
-    census_path = REPO_ROOT / "tests" / "architecture" / "settings_legacy_reachability_r00.json"
-    census = json.loads(census_path.read_text(encoding="utf-8"))
-    entries = census["entries"]
-    assert census["baseline_sha"] == "a4aeacccf17194bbf607266f037d16e680234eef"
-    assert len(entries) == 39
-    assert len({entry["path"] for entry in entries}) == 39
-    assert all(
-        entry["symbols"] and entry["classifications"] and entry["owners"] for entry in entries
-    )
-    assert {classification for entry in entries for classification in entry["classifications"]} <= {
-        "flat persistence ingress",
-        "runtime AppSettings projection/mutation",
-        "pure enum/constant/value misplaced in settings.py",
-        "first-run/default policy",
-        "test-only compatibility",
-        "proven external compatibility",
-    }
-    assert {owner for entry in entries for owner in entry["owners"]} <= {
-        "R00",
-        "A02",
-        "A04",
-        "A06",
-        "A07",
-        "A08",
-        "A09",
-        "A10",
-    }
-
-    expected_current = {entry["path"]: set(entry["symbols"]) for entry in entries}
-    expected_current.pop("src/puripuly_heart/main.py")
-    expected_current.pop("src/puripuly_heart/providers/llm/openrouter.py")
-    expected_current.pop("src/puripuly_heart/ui/desktop_overlay.py")
-    expected_current.pop("src/puripuly_heart/ui/desktop_overlay_surface/contract.py")
-    expected_current.pop("src/puripuly_heart/ui/desktop_overlay_surface/renderer.py")
-    expected_current.pop("src/puripuly_heart/ui/views/settings.py")
-    expected_current.pop("src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_llm_factory.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_local_asr_provider_runtime.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_provider_runtime.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_provider_runtime_policy.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_stt_factory.py")
-    expected_current.pop("src/puripuly_heart/app/services/provider/provider_settings.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_capture_runtime.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_local_asr_application.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_microphone_test.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_overlay_factory.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_peer_application.py")
-    expected_current.pop("src/puripuly_heart/app/services/capture/capture_target_settings.py")
-    expected_current.pop(
-        "src/puripuly_heart/app/services/capture/peer_capture_target_application.py"
-    )
-    expected_current.pop("src/puripuly_heart/composition/application_runtime.py")
-    expected_current.pop("src/puripuly_heart/core/telemetry.py")
-    expected_current.pop("src/puripuly_heart/core/openrouter/managed_openrouter_release.py")
-    expected_current.pop("src/puripuly_heart/core/openrouter/openrouter_credentials.py")
-    expected_current.pop("src/puripuly_heart/core/stt/controller.py")
-    expected_current.pop("src/puripuly_heart/core/stt/custom_vocab.py")
-    expected_current.pop("src/puripuly_heart/app/services/github_star_prompt_settings.py")
-    expected_current.pop("src/puripuly_heart/app/services/manual_local_asr_fallback.py")
-    expected_current.pop("src/puripuly_heart/app/services/openrouter_pkce_flow.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_composition.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_managed_account.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_managed_auth_factory.py")
-    expected_current.pop("src/puripuly_heart/app/wiring/wiring_secrets_factory.py")
-    expected_current.pop("src/puripuly_heart/app/services/settings/settings_application.py")
-    expected_current.pop("src/puripuly_heart/app/services/settings/settings_runtime_effects.py")
-    expected_current.pop("src/puripuly_heart/app/services/canonical_settings_persistence.py")
-    expected_current.pop("src/puripuly_heart/config/settings_vnext/facade.py")
-    expected_current.pop("src/puripuly_heart/config/settings_vnext/migration.py")
+def test_production_does_not_import_legacy_settings_module() -> None:
     actual_current: dict[str, set[str]] = {}
     for source_path in SOURCE_PACKAGE_ROOT.rglob("*.py"):
         tree = ast.parse(source_path.read_text(encoding="utf-8"))
@@ -1419,7 +1348,7 @@ def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -
         if symbols:
             actual_current[_relative_repo_path(source_path)] = symbols
 
-    assert actual_current == expected_current
+    assert actual_current == {}
 
 
 def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
