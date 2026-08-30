@@ -1579,7 +1579,7 @@ def test_set_managed_key_state_shows_talk_together_pass_invite_progress(
         pass_status=TalkTogetherPassStatus(
             pass_id="7KQ9M2",
             invite_count=1,
-            invite_limit=5,
+            invite_limit=3,
             bonus_translations_per_friend=200,
         ),
     )
@@ -1588,7 +1588,7 @@ def test_set_managed_key_state_shows_talk_together_pass_invite_progress(
     assert view._managed_key_invite_progress_label.value == t(
         "settings.managed_key.invite_progress.label"
     )
-    assert view._managed_key_invite_progress_value.value == "1 / 5"
+    assert view._managed_key_invite_progress_value.value == "1 / 3"
 
 
 def test_set_managed_key_state_repaints_mounted_pass_id_usage_and_invite_controls(
@@ -1625,7 +1625,7 @@ def test_set_managed_key_state_repaints_mounted_pass_id_usage_and_invite_control
         pass_status=TalkTogetherPassStatus(
             pass_id="7KQ9M2",
             invite_count=1,
-            invite_limit=5,
+            invite_limit=3,
             bonus_translations_per_friend=200,
         ),
     )
@@ -1633,7 +1633,7 @@ def test_set_managed_key_state_repaints_mounted_pass_id_usage_and_invite_control
     assert view._managed_trial_usage_bar.percent == 64
     assert view._managed_key_referral_id_value.value == "7KQ9M2"
     assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 5"
+    assert view._managed_key_invite_progress_value.value == "1 / 3"
     assert {
         "usage_bar",
         "usage_remaining_text",
@@ -1667,7 +1667,7 @@ def test_managed_key_invite_progress_survives_managed_china_round_trip_before_se
         pass_status=TalkTogetherPassStatus(
             pass_id="7KQ9M2",
             invite_count=1,
-            invite_limit=5,
+            invite_limit=3,
             bonus_translations_per_friend=200,
         ),
     )
@@ -1675,17 +1675,17 @@ def test_managed_key_invite_progress_survives_managed_china_round_trip_before_se
     view._on_translation_connection_selected(TranslationConnection.MANAGED_CHINA.value)
     assert view._managed_key_referral_id == "7KQ9M2"
     assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 5"
+    assert view._managed_key_invite_progress_value.value == "1 / 3"
 
     view._on_translation_connection_selected(TranslationConnection.MANAGED.value)
     assert view._managed_key_referral_id == "7KQ9M2"
     assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 5"
+    assert view._managed_key_invite_progress_value.value == "1 / 3"
 
     view._on_llm_selected(TranslationModel.GEMMA4.value)
     assert view._managed_key_referral_id == "7KQ9M2"
     assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 5"
+    assert view._managed_key_invite_progress_value.value == "1 / 3"
 
 
 def test_set_managed_key_state_can_display_preview_referral_without_remembering(
@@ -1701,7 +1701,7 @@ def test_set_managed_key_state_can_display_preview_referral_without_remembering(
         pass_status=TalkTogetherPassStatus(
             pass_id="7KQ9M2",
             invite_count=1,
-            invite_limit=5,
+            invite_limit=3,
             bonus_translations_per_friend=200,
         ),
         remember_referral_id=False,
@@ -1741,12 +1741,12 @@ def test_set_managed_key_state_shows_invite_progress_placeholder_when_absent(
         pass_status=TalkTogetherPassStatus(
             pass_id="7KQ9M2",
             invite_count=1,
-            invite_limit=5,
+            invite_limit=3,
             bonus_translations_per_friend=200,
         ),
     )
     assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 5"
+    assert view._managed_key_invite_progress_value.value == "1 / 3"
 
     view.set_managed_key_state(
         visible=True,
@@ -1772,12 +1772,12 @@ def test_set_managed_key_state_clamps_over_limit_invite_progress(
         pass_status=TalkTogetherPassStatus(
             pass_id="7KQ9M2",
             invite_count=7,
-            invite_limit=5,
+            invite_limit=3,
             bonus_translations_per_friend=200,
         ),
     )
 
-    assert view._managed_key_invite_progress_value.value == "5 / 5"
+    assert view._managed_key_invite_progress_value.value == "3 / 3"
 
 
 def test_update_api_visibility_treats_peer_local_qwen_as_local_provider(

@@ -15,6 +15,8 @@ from puripuly_heart.app.ports.broker_client import (
     BrokerIssueResult,
     ManagedKeyDeliveryAckMetadata,
     ManagedKeyDeliveryAckRequest,
+    ManagedKeyDeliveryAckResult,
+    QqManagedAssertionResult,
 )
 from puripuly_heart.app.ports.discord_auth import DiscordAuthRequest, DiscordAuthResult
 from puripuly_heart.app.ports.managed_identity import (
@@ -86,6 +88,7 @@ from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterReleaseBehavior,
     ManagedOpenRouterReleaseError,
     OpenRouterReleaseRuntimeConfig,
+    TalkTogetherPassStatus,
     format_managed_openrouter_diagnostics,
 )
 from puripuly_heart.core.messages import (
@@ -130,6 +133,7 @@ class ManagedIdentityRecord(Protocol):
     active_managed_expires_at: str | None
     founder_letter_seen_credential_ref: str | None
     referral_id: str | None
+    referral_source: str | None
     local_managed_claim_sources: tuple[str, ...]
     pending_delivery_ack_source: str | None
     pending_delivery_ack_delivery_id: str | None
@@ -226,6 +230,14 @@ class ManagedIdentityStateAdapter:
         self._identity.referral_id = value
 
     @property
+    def referral_source(self) -> str | None:
+        return getattr(self._identity, "referral_source", None)
+
+    @referral_source.setter
+    def referral_source(self, value: str | None) -> None:
+        self._identity.referral_source = value
+
+    @property
     def local_managed_claim_sources(self) -> tuple[str, ...]:
         return self._identity.local_managed_claim_sources
 
@@ -290,6 +302,7 @@ class ManagedIdentityStateAdapter:
             active_managed_expires_at=managed.active_managed_expires_at,
             founder_letter_seen_credential_ref=managed.founder_letter_seen_credential_ref,
             referral_id=managed.referral_id,
+            referral_source=getattr(managed, "referral_source", None),
             local_managed_claim_sources=managed.local_managed_claim_sources,
             pending_delivery_ack_source=getattr(managed, "pending_delivery_ack_source", None),
             pending_delivery_ack_delivery_id=getattr(
@@ -318,6 +331,7 @@ class ManagedIdentityStateAdapter:
         managed.active_managed_expires_at = snapshot.active_managed_expires_at
         managed.founder_letter_seen_credential_ref = snapshot.founder_letter_seen_credential_ref
         managed.referral_id = snapshot.referral_id
+        managed.referral_source = snapshot.referral_source
         managed.local_managed_claim_sources = snapshot.local_managed_claim_sources
         managed.pending_delivery_ack_source = snapshot.pending_delivery_ack_source
         managed.pending_delivery_ack_delivery_id = snapshot.pending_delivery_ack_delivery_id
@@ -387,6 +401,7 @@ def _vnext_with_managed_identity(
                 active_managed_expires_at=snapshot.active_managed_expires_at,
                 founder_letter_seen_credential_ref=snapshot.founder_letter_seen_credential_ref,
                 referral_id=snapshot.referral_id,
+                referral_source=snapshot.referral_source,
                 local_managed_claim_sources=snapshot.local_managed_claim_sources,
                 pending_delivery_ack_source=snapshot.pending_delivery_ack_source,
                 pending_delivery_ack_delivery_id=snapshot.pending_delivery_ack_delivery_id,
@@ -619,6 +634,15 @@ def apply_discord_issue_result_to_managed_state(
     managed_state.active_managed_credential_ref = next_ref
     managed_state.active_managed_expires_at = _normalize_optional_text(issue.expires_at)
     referral_id = _normalize_owned_referral_id(issue.referral_id)
+    current_referral_id = _normalize_owned_referral_id(managed_state.referral_id)
+    current_referral_source = _normalize_optional_text(managed_state.referral_source)
+    if current_referral_source is not None:
+        current_referral_source = current_referral_source.lower()
+    if current_referral_source not in {"discord", "qq"}:
+        current_referral_source = "discord" if current_referral_id is not None else None
+    if current_referral_source != "discord":
+        managed_state.referral_id = None
+    managed_state.referral_source = "discord"
     if referral_id is not None:
         managed_state.referral_id = referral_id
     managed_state.release_token = None
@@ -974,6 +998,7 @@ class ManagedAuthRuntimeAdapter:
         self,
         qq_identity: str,
         credential: str,
+        referral_id: str | None,
     ) -> ManagedAuthExecutionResult:
         current = self.settings.canonical
         canonical = self.settings.canonical
@@ -990,6 +1015,8 @@ class ManagedAuthRuntimeAdapter:
         )
         secret_store_port = SyncSecretStoreAdapter(secret_store)
         managed_state = managed_identity_state_port_from_vnext(self.settings, current)
+        assertion_results: list[QqManagedAssertionResult] = []
+        ack_results: list[ManagedKeyDeliveryAckResult] = []
         result = await QqManagedAuthService(
             broker_client=broker_client,
             secret_store=secret_store_port,
@@ -998,19 +1025,46 @@ class ManagedAuthRuntimeAdapter:
                 managed_state=managed_state,
                 secret_store=secret_store_port,
             ),
+            assertion_result_sink=assertion_results.append,
+            ack_result_sink=ack_results.append,
         ).authenticate(
             QqManagedAuthRequest(
                 qq_identity=qq_identity,
                 credential=credential,
                 asserted_at=github_star_prompt_utc_timestamp(),
+                referral_id=referral_id,
                 metadata={"flow": "qq_managed_auth_dialog"},
             )
         )
+        delivery_ack_pending = result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
+        assertion_result = assertion_results[-1] if assertion_results else None
+        ack_result = ack_results[-1] if ack_results else None
+        projected_referral_id = (
+            normalize_owned_referral_id(getattr(ack_result, "referral_id", None))
+            or normalize_owned_referral_id(getattr(assertion_result, "referral_id", None))
+            or normalize_owned_referral_id(managed_state.referral_id)
+        )
+        projected_pass_status = getattr(ack_result, "pass_status", None)
+        if not isinstance(projected_pass_status, TalkTogetherPassStatus):
+            projected_pass_status = getattr(assertion_result, "pass_status", None)
+        if not isinstance(projected_pass_status, TalkTogetherPassStatus):
+            projected_pass_status = None
+        if (
+            projected_pass_status is not None
+            and projected_pass_status.pass_id != projected_referral_id
+        ):
+            projected_pass_status = None
         if _settings_mutation_committed(result):
             runtime_owner_available, runtime_available = self.runtime_presence_provider()
             return ManagedAuthExecutionResult(
                 succeeded=True,
                 transaction_result=result,
+                referral_bonus_applied=(
+                    getattr(ack_result, "referral_bonus_applied", False) is True
+                    or getattr(assertion_result, "referral_bonus_applied", False) is True
+                ),
+                referral_id=projected_referral_id,
+                pass_status=projected_pass_status,
                 runtime_rebuild=(
                     "if_missing" if runtime_owner_available and not runtime_available else "never"
                 ),
@@ -1019,6 +1073,9 @@ class ManagedAuthRuntimeAdapter:
         return ManagedAuthExecutionResult(
             succeeded=False,
             transaction_result=result,
+            delivery_ack_pending=delivery_ack_pending,
+            referral_id=projected_referral_id if delivery_ack_pending else None,
+            pass_status=projected_pass_status if delivery_ack_pending else None,
             message_key=(message.key if message is not None else "qq_managed_auth.error.retry"),
             message_kwargs=dict(message.params) if message is not None else {},
         )
@@ -1295,6 +1352,7 @@ def _managed_connection_auth_settings_values(
                 "active_managed_expires_at": managed.active_managed_expires_at,
                 "founder_letter_seen_credential_ref": (managed.founder_letter_seen_credential_ref),
                 "referral_id": managed.referral_id,
+                "referral_source": managed.referral_source,
                 "local_managed_claim_sources": list(managed.local_managed_claim_sources),
             }
         },

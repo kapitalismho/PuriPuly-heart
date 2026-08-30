@@ -17,6 +17,7 @@ import type {
   BrokerAbuseControlsConfigValue,
   ManagedKeyDeliveryRecord,
 } from './persistence';
+import { processQqPassSettlementJobs } from './qq-pass-settlement';
 import {
   applyReferralRewardRetention,
   reconcileStaleReferralRewards,
@@ -76,6 +77,9 @@ export async function handleScheduled(
 
   await runScheduledPhase(failures, () =>
     reconcileStaleManagedKeyDeliveries(env, now),
+  );
+  await runScheduledPhase(failures, () =>
+    processQqPassSettlementJobs(env, { now }),
   );
   await runScheduledPhase(failures, () =>
     reconcileStaleReferralRewards(env.BROKER_DB, { nowIso: now.toISOString() }),
@@ -337,6 +341,31 @@ async function completeDeliveryCleanup(
         nowIso,
       ),
       db.prepare(
+        `UPDATE referral_rewards
+            SET referred_bonus_status = 'failed',
+                referrer_bonus_status = 'failed',
+                failure_reason = 'issue_delivery_failed',
+                updated_at = ?
+          WHERE referred_source = 'qq'
+            AND referred_subject_ref = ?
+            AND referred_installation_id IS ?
+            AND referred_bonus_status = 'reserved'
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
+      ).bind(
+        nowIso,
+        delivery.subject_ref ?? '',
+        delivery.installation_id,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
+      ),
+      db.prepare(
         `UPDATE managed_key_deliveries
             SET failed_at = ?, failure_reason = 'ack_expired_child_key_cleaned'
           WHERE delivery_id = ?
@@ -449,6 +478,21 @@ async function markDeliveryCleanupRequired(
         nowIso,
       ),
       db.prepare(
+        `UPDATE referral_rewards
+            SET referred_bonus_status = 'failed',
+                referrer_bonus_status = 'failed',
+                failure_reason = 'issue_delivery_failed',
+                updated_at = ?
+          WHERE referred_source = 'qq'
+            AND referred_subject_ref = ?
+            AND referred_installation_id IS ?
+            AND referred_bonus_status = 'reserved'`,
+      ).bind(
+        nowIso,
+        delivery.subject_ref ?? '',
+        delivery.installation_id,
+      ),
+      db.prepare(
         `UPDATE managed_key_deliveries
             SET status = 'cleanup_required',
                 failed_at = ?,
@@ -465,7 +509,7 @@ async function markDeliveryCleanupRequired(
       ),
     ]);
     return {
-      incidentRecorded: Number(results[1]?.meta.changes ?? 0) === 1,
+      incidentRecorded: Number(results[2]?.meta.changes ?? 0) === 1,
       ownerRecorded: Number(results[0]?.meta.changes ?? 0) === 1,
     };
   }

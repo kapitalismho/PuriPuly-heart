@@ -262,6 +262,7 @@ class ManagedUsageRuntimeAdapter:
                 installation_id=None,
                 entitlement_ref=None,
                 referral_id=None,
+                referral_source=None,
                 ingress_frozen=self.ingress_provider(),
             )
         identity = canonical.state.managed_connection
@@ -274,6 +275,7 @@ class ManagedUsageRuntimeAdapter:
             installation_id=identity.installation_id.strip() or None,
             entitlement_ref=entitlement_ref or None,
             referral_id=normalize_owned_referral_id(identity.referral_id),
+            referral_source=identity.referral_source,
             ingress_frozen=self.ingress_provider(),
         )
 

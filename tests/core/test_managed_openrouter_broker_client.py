@@ -471,7 +471,7 @@ async def test_issue_discord_managed_key_parses_talk_together_pass_status() -> N
                 "talk_together_pass": {
                     "pass_id": "7KQ9M2",
                     "invite_count": 1,
-                    "invite_limit": 5,
+                    "invite_limit": 3,
                     "bonus_translations_per_friend": 200,
                 },
             },
@@ -485,7 +485,7 @@ async def test_issue_discord_managed_key_parses_talk_together_pass_status() -> N
     assert result.pass_status == TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=1,
-        invite_limit=5,
+        invite_limit=3,
         bonus_translations_per_friend=200,
     )
     await client.close()
@@ -601,7 +601,7 @@ async def test_acknowledge_managed_key_delivery_posts_token_and_maps_success() -
                 "talk_together_pass": {
                     "pass_id": "7KQ9M2",
                     "invite_count": 2,
-                    "invite_limit": 5,
+                    "invite_limit": 3,
                     "bonus_translations_per_friend": 200,
                 },
             },
@@ -625,7 +625,7 @@ async def test_acknowledge_managed_key_delivery_posts_token_and_maps_success() -
     assert result.pass_status == TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=2,
-        invite_limit=5,
+        invite_limit=3,
         bonus_translations_per_friend=200,
     )
     await client.close()
@@ -890,7 +890,7 @@ async def test_get_trial_status_parses_talk_together_pass_status() -> None:
                 "talk_together_pass": {
                     "pass_id": "7KQ9M2",
                     "invite_count": 2,
-                    "invite_limit": 5,
+                    "invite_limit": 3,
                     "bonus_translations_per_friend": 200,
                 },
             },
@@ -908,7 +908,7 @@ async def test_get_trial_status_parses_talk_together_pass_status() -> None:
     assert result.pass_status == TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=2,
-        invite_limit=5,
+        invite_limit=3,
         bonus_translations_per_friend=200,
     )
     await client.close()
@@ -920,15 +920,15 @@ async def test_get_trial_status_parses_talk_together_pass_status() -> None:
     [
         None,
         {},
-        {"pass_id": "ABC120", "invite_count": 1, "invite_limit": 5},
-        {"pass_id": "8H3J4N", "invite_count": 1, "invite_limit": 5},
-        {"pass_id": "7KQ9M2", "invite_count": True, "invite_limit": 5},
-        {"pass_id": "7KQ9M2", "invite_count": 1.5, "invite_limit": 5},
-        {"pass_id": "7KQ9M2", "invite_count": "1", "invite_limit": 5},
-        {"pass_id": "7KQ9M2", "invite_count": None, "invite_limit": 5},
-        {"pass_id": "7KQ9M2", "invite_count": -1, "invite_limit": 5},
+        {"pass_id": "ABC120", "invite_count": 1, "invite_limit": 3},
+        {"pass_id": "8H3J4N", "invite_count": 1, "invite_limit": 3},
+        {"pass_id": "7KQ9M2", "invite_count": True, "invite_limit": 3},
+        {"pass_id": "7KQ9M2", "invite_count": 1.5, "invite_limit": 3},
+        {"pass_id": "7KQ9M2", "invite_count": "1", "invite_limit": 3},
+        {"pass_id": "7KQ9M2", "invite_count": None, "invite_limit": 3},
+        {"pass_id": "7KQ9M2", "invite_count": -1, "invite_limit": 3},
         {"pass_id": "7KQ9M2", "invite_count": 1, "invite_limit": 0},
-        {"pass_id": "7KQ9M2", "invite_count": 2**63, "invite_limit": 5},
+        {"pass_id": "7KQ9M2", "invite_count": 2**63, "invite_limit": 3},
     ],
 )
 async def test_talk_together_pass_malformed_required_fields_are_absent(
@@ -963,7 +963,7 @@ async def test_talk_together_pass_defaults_malformed_bonus_only() -> None:
                 "talk_together_pass": {
                     "pass_id": "7KQ9M2",
                     "invite_count": 1,
-                    "invite_limit": 5,
+                    "invite_limit": 3,
                     "bonus_translations_per_friend": "200",
                 },
             },
@@ -976,7 +976,7 @@ async def test_talk_together_pass_defaults_malformed_bonus_only() -> None:
     assert result.pass_status == TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=1,
-        invite_limit=5,
+        invite_limit=3,
         bonus_translations_per_friend=200,
     )
     await client.close()
@@ -993,7 +993,7 @@ async def test_talk_together_pass_defaults_missing_bonus_only() -> None:
                 "talk_together_pass": {
                     "pass_id": "7KQ9M2",
                     "invite_count": 1,
-                    "invite_limit": 5,
+                    "invite_limit": 3,
                 },
             },
         )
@@ -1005,7 +1005,7 @@ async def test_talk_together_pass_defaults_missing_bonus_only() -> None:
     assert result.pass_status == TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=1,
-        invite_limit=5,
+        invite_limit=3,
         bonus_translations_per_friend=200,
     )
     await client.close()

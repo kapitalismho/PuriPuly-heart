@@ -5,6 +5,7 @@ PROMPT_PATH = Path("prompts/translation_prompt.md")
 REQUIRED_PLACEHOLDERS = (
     "${sourceName}",
     "${targetName}",
+    "${inputChannel}",
     "${targetLanguageRules}",
     "${translationExamples}",
 )
@@ -41,15 +42,23 @@ def test_translation_prompt_states_context_ordering_relation() -> None:
 def test_translation_prompt_states_self_and_peer_speaker_semantics() -> None:
     lines = _prompt_lines()
 
-    self_lines = [line for line in lines if "[self]" in line]
-    assert self_lines, "prompt must define the [self] legend"
-    assert "local user" in self_lines[0]
-    assert "earlier" in self_lines[0]
+    channel_lines = [
+        line
+        for line in lines
+        if "[self]" in line and "[peer]" in line and "channel labels are fixed" in line
+    ]
+    assert channel_lines, "prompt must define fixed [self] and [peer] channel labels"
+    channels = channel_lines[0]
+    assert "local-user" in channels
+    assert "peer-audio" in channels
+    assert "different people" in channels
 
-    peer_lines = [line for line in lines if "[peer]" in line]
-    assert peer_lines, "prompt must define the [peer] legend"
-    assert "peer audio channel" in peer_lines[0]
-    assert "more than one person" in peer_lines[0]
+    input_lines = [
+        line
+        for line in lines
+        if "<input>" in line and "${inputchannel}" in line and "same labels" in line
+    ]
+    assert input_lines, "prompt must map current input to the fixed channel labels"
 
 
 def test_translation_prompt_excludes_timestamp_and_competing_legend_semantics() -> None:

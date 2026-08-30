@@ -20,7 +20,7 @@ Use `pnpm --filter @puripuly-heart/broker run verify:config` to exercise the pin
 
 - `broker/scripts/render-production-wrangler-config.mjs` renders a temporary deploy-time Wrangler config from `broker/wrangler.jsonc`, injects the production D1 `database_id`, and fails if the checked-in worker name stops being the canonical `puripuly-heart-broker`.
 - `broker/deploy/fingerprint-bootstrap.template.sql` plus `broker/scripts/render-fingerprint-bootstrap-sql.mjs` render guarded bootstrap SQL for `wrangler d1 execute --file ... --yes`. The rendered SQL only replaces the migration placeholder and fails before mutating `broker_config` if the placeholder is already gone.
-- `.github/workflows/deploy-broker-direct.yml` is the manual `workflow_dispatch` path for the first canonical deploy. It exports the remote production D1 database to a restricted seven-day workflow artifact before applying migrations, bootstraps the fingerprint salt, reconciles the production OpenRouter guardrail through `PATCH /api/v1/guardrails/{id}`, syncs the OpenRouter, Discord, and QQ worker secrets needed for managed child-key issuance and QQ production issuance, deploys the canonical worker, verifies health, removes transitional runtime fields with `broker/deploy/finalize-daily-summary-v2.sql` and `broker/deploy/finalize-app-active-day.sql`, and runs `broker/tests/deploy-smoke/canonical-production.spec.ts` against the canonical `workers.dev` URL.
+- `.github/workflows/deploy-broker-direct.yml` is the manual `workflow_dispatch` path for the first canonical deploy. It exports the remote production D1 database to a restricted seven-day workflow artifact before applying migrations, bootstraps the fingerprint salt, reconciles the production OpenRouter guardrail through `PATCH /api/v1/guardrails/{id}`, syncs the OpenRouter, Discord, and QQ worker secrets needed for managed child-key issuance and QQ production issuance, deploys the canonical worker, verifies health, removes transitional runtime fields with `broker/deploy/finalize-daily-summary-v2.sql` and `broker/deploy/finalize-app-active-day.sql`, and runs `broker/tests/deploy-smoke/canonical-production.spec.ts` against the canonical `workers.dev` URL. Because migrations run before Worker deployment, `0016_make_referrals_source_aware.sql` retains the previous Worker's Discord referral columns and synchronizes Discord inserts into both legacy and source-aware identities; QQ rows keep those compatibility columns `NULL`.
 - `OPENROUTER_MANAGED_API_KEY_PRODUCTION` remains transitional runtime compatibility only; `OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION` drives managed child-key creation / cleanup, `OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION` assigns the production guardrail to each issued key, and `OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION` is copied into the runtime secret `OPENROUTER_MANAGED_USER_HMAC_SECRET` so the worker can derive a deterministic versioned managed OpenRouter user id per installation or QQ subject.
 - `QQ_AUTH_HMAC_PSK_PRODUCTION` is copied into the runtime secret `QQ_AUTH_HMAC_PSK` for `POST /v1/auth/qq/assert`. The endpoint is production issuance-capable when runtime issuance configuration is present (`QQ_AUTH_HMAC_PSK`, `OPENROUTER_MANAGEMENT_API_KEY`, and `OPENROUTER_MANAGED_GUARDRAIL_ID` are all non-blank). The issuance-disabled verification-only behavior preserves `verified` / `already_verified` compatibility without touching `qq_managed_entitlements`; when issuance is enabled, OpenRouter, guardrail, cleanup, or D1 failures return a bounded retryable/internal error envelope instead of falling back to verification-only success. The PSK value, raw QQ identity, raw credential, and raw key-bearing payloads must stay out of source, docs, logs, and test output.
 - `TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION` is copied into the runtime secret `TELEMETRY_SUBJECT_HMAC_SECRET` for `POST /v1/telemetry/app-active-day`. Production migration rollout must take a D1 backup before applying `0015_add_app_active_days.sql`; that forward-only migration creates the isolated minimal app active-day table while preserving the previous Worker's required abuse-control shape and the previous translation telemetry tables and rows. After the new Worker passes health verification, `broker/deploy/finalize-app-active-day.sql` removes the obsolete telemetry endpoint rate-limit setting.
@@ -105,14 +105,22 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
   - live remaining budget and usage stay upstream in OpenRouter metadata and are not mirrored into the issue response
   - manual broker revocation is only a broker-local stop for future onboarding; because the app calls OpenRouter directly after issue succeeds, operators must also disable or delete the upstream OpenRouter child key when they need a revocation to stop existing direct use
 - `POST /v1/auth/qq/assert`
-  - request body remains `qq_identity`, `credential`, and `asserted_at`; no installation ID, device key, hardware hash, or app-side endpoint sequence is required for QQ production issuance
-  - `credential` remains `HMAC-SHA256-HEX(QQ_AUTH_HMAC_PSK, qq_identity)`; `asserted_at` is validated as bounded timestamp text but is not part of the HMAC payload
+  - required request fields are `qq_identity`, `credential`, and `asserted_at`; optional fields are `delivery_ack_supported`, normalized `referral_id`, and bounded `installation_id`; no device key or hardware hash is used
+  - `credential` remains `HMAC-SHA256-HEX(QQ_AUTH_HMAC_PSK, qq_identity)`; referral and installation metadata are not added to the HMAC payload, and `asserted_at` is validated as bounded timestamp text but is not part of that payload
   - `QQ_AUTH_HMAC_PSK` is mandatory for all QQ assertion handling; `OPENROUTER_MANAGEMENT_API_KEY` and `OPENROUTER_MANAGED_GUARDRAIL_ID` are the runtime gate for production issuance
   - with the OpenRouter issuance gate disabled, valid assertions preserve verification-only compatibility and return `verified` / `already_verified` without creating or mutating `qq_managed_entitlements`
-  - with the gate enabled, an eligible first assertion returns `issued`, `qq_subject_ref`, one-time top-level `openrouter_api_key`, `managed_credential_ref`, `expires_at`, and optional `openrouter_user_id`; the Broker never stores the raw key
+  - with the gate enabled, an eligible first assertion returns `issued`, `qq_subject_ref`, one-time top-level `openrouter_api_key`, `managed_credential_ref`, `expires_at`, optional `openrouter_user_id`, and delivery-ACK metadata when the client advertises ACK support; the Broker never stores the raw key
   - duplicate active, cleanup-required, or revoked QQ entitlements return `qq_lifetime_used`; concurrent current issuance returns `qq_already_issuing`; invalid credentials return `qq_credential_invalid`
-  - QQ uses the base Managed trial budget, expiry, allowed-model policy, OpenRouter child-key creation, and configured guardrail; it does not run Discord referral reservation/rewards, owned Referral ID, Talk Together Pass, or referral bonus budget paths
-  - QQ lifetime, monitoring, and cleanup use `qq_subject_ref` / `issue_ref` metadata and must not create fake installation rows or pass raw QQ identity to OpenRouter child-key names
+  - `qq_talk_together_pass.enabled` controls QQ owned Pass/status creation and referral input; `rewards_enabled` independently controls reward reservation while leaving base QQ issuance available; both default to `false`
+  - a QQ referral reservation is best-effort and cannot block the base `0.07` USD key; a counted invitee remains `reserved` until durable delivery ACK, then the broker raises the invitee key to at least `0.09` USD, persists the verified limit, credits the ledger, and applies the referrer reward
+  - counted QQ rewards enforce the configured UTC-day warning/default cap of `30`/`50`; reserved and credited rows both count toward global and per-Pass limits, and one source-aware Pass rewards at most three invitees across Discord and QQ
+  - QQ lifetime, monitoring, cleanup, Pass ownership, and reward accounting use derived `qq_subject_ref` / `issue_ref` metadata and must not create fake installation rows or persist/log raw QQ identity or credential
+- `POST /v1/auth/qq/status`
+  - request: `qq_identity`, `credential`, and optional bounded `installation_id`; the credential uses the unchanged QQ HMAC contract
+  - requires an active delivered, unexpired QQ entitlement and returns `status: "active"`; inactive lifecycle returns `qq_entitlement_inactive`
+  - when `qq_talk_together_pass.enabled` is true, status lazily creates or resolves the QQ subject's owned global Referral ID and returns `referral_id` plus `talk_together_pass`; when disabled, it does not create an ID
+  - rate limited per IP by `qqAuthStatusIp` at `30` requests / `15` minutes
+  - the desktop stores status authentication only in the local secret store and binds it to the active managed credential reference; raw QQ identity and credential do not enter D1 or logs
 - `POST /v1/telemetry/app-active-day`
   - request: `anonymous_id` and `active_date_utc` as `YYYY-MM-DD`
   - accepts only those two fields and only the current or immediately previous UTC date; malformed JSON, invalid values, stale dates, and additional metadata return the existing public `invalid_request` envelope
@@ -156,10 +164,12 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
 - `0013_add_telemetry_subjects_and_daily_summary_v2.sql` creates and backfills `telemetry_subjects`, keeps it synchronized for the previous Worker during rollout, creates the v2 delivery ledger, preserves existing active-day rows, sets the daily report schedule to 00:05 UTC, and raises issue-event retention to the report-safe two-day minimum without replacing unrelated operator-tuned controls. It intentionally retains `includeZeroActivity` while the previous Worker may still run; the deploy workflow removes that dead field only after the new Worker passes its health check.
 - `0014_simplify_abuse_incidents.sql` additively derives the `warning` and `brake` thresholds, the ordered warning observation state, and the request-event safety margin from existing persisted controls. It also adds a QQ child-key-creation-start marker so ambiguous post-provider failures cannot be stale-reclaimed into a second key. Legacy alert/ASN JSON fields remain during the migration-before-deploy compatibility window; unused physical columns and indexes require a separate forward migration after stabilization.
 - `0015_add_app_active_days.sql` creates `app_active_days` with only HMAC-derived subject and UTC-date columns while retaining the previous Worker's required abuse-control shape and preserving the legacy translation telemetry tables and rows without mixing them into app usage metrics. The deploy workflow removes `telemetryTranslationSuccessDayIp` with `broker/deploy/finalize-app-active-day.sql` only after the new Worker passes its health check.
+- `0016_make_referrals_source_aware.sql` migrates Referral IDs and reward rows to the shared `discord`/`qq` subject namespace, adds the disabled-by-default `qq_talk_together_pass` config and QQ status rate limit, and preserves migration-before-deploy compatibility. Existing and previous-Worker Discord writes retain `owner_discord_user_ref`, `referrer_discord_user_ref`, and `referred_discord_user_ref`; insert triggers synchronize those values with the source-aware columns. New source-aware Discord writes synchronize back to the compatibility columns, while QQ rows leave them `NULL` so they cannot be mistaken for Discord identities. Removing these compatibility columns requires a separate post-stabilization migration.
 
 - `broker_config`
   - columns: `key`, `value`, `updated_at`
-  - bootstrap rows: `fingerprint_salt`, `abuse_controls`, `abuse_runtime_state`
+  - bootstrap rows: `fingerprint_salt`, `abuse_controls`, `abuse_runtime_state`, `qq_talk_together_pass`
+  - `qq_talk_together_pass` defaults to `{ enabled: false, rewards_enabled: false, daily_warning_count: 30, daily_max_count: 50 }`; malformed values fall back to those disabled defaults
   - runtime-tunable non-secret operational controls live in `abuse_controls` so operators do not need code changes for threshold updates
   - persisted mutable runtime state lives separately in `abuse_runtime_state` so brake status, alert latches, and legacy v1 daily-heartbeat delivery metadata do not get mixed into the editable threshold policy blob
   - malformed `abuse_controls` payloads fall back to the built-in default layout/thresholds instead of disabling enforcement or surfacing 500s
@@ -170,6 +180,7 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
     - `POST /v1/providers/openrouter/issue`: per `installation_id`, `3` requests / `15` minutes
     - `GET /v1/trial/status`: per `installation_id`, `30` requests / `15` minutes
     - `POST /v1/auth/qq/assert`: per IP via `qqAuthAssertIp`, `20` requests / `15` minutes
+    - `POST /v1/auth/qq/status`: per IP via `qqAuthStatusIp`, `30` requests / `15` minutes
     - global UTC-day cap on new active entitlements, counted by `issued_at` semantics even if an entitlement is later revoked, stored as a runtime-configurable broker value
 - `broker_issue_success_events`
   - append-only successful issue observations recorded only after child-key creation and entitlement persistence both succeed
@@ -236,21 +247,23 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
   - columns: `qq_subject_ref`, `status`, `issue_ref`, nullable `managed_credential_ref`, `budget_usd`, `reserved_at`, `issued_at`, `expires_at`, `delivered_at`, `created_at`, `updated_at`, and nullable `child_key_creation_started_at`
   - stored statuses are `issuing`, `delivery_pending`, `active`, `cleanup_required`, and `revoked`; `delivery_pending`, `active`, `cleanup_required`, and `revoked` block automatic reissue
   - `active` requires `managed_credential_ref`, `issued_at`, `expires_at`, and `delivered_at`; `cleanup_required` requires `managed_credential_ref`; stale `issuing` rows can be reclaimed only when neither a child-key hash nor a child-key-creation-start marker was recorded
+  - a referred delivery remains at base budget `0.07` through `delivery_pending`; successful ACK settlement raises and verifies at least `0.09` before the entitlement budget and reward ledger are credited
   - existing `qq_auth_assertions` rows without a `qq_managed_entitlements` row remain eligible for their first production issuance
   - stores derived and operational metadata only; raw QQ identities, raw credentials, and raw OpenRouter API keys do not belong in this table
 - `referral_codes`
-  - stable owned Referral ID rows keyed by `referral_id`
-  - columns: `referral_id`, `owner_discord_user_ref`, `owner_installation_id`, `status`, `created_at`, `updated_at`
+  - stable global Referral ID rows keyed by `referral_id`, owned by `(owner_source, owner_subject_ref)` for `discord` or `qq`
+  - source-aware columns are `referral_id`, `owner_source`, `owner_subject_ref`, nullable `owner_installation_id`, status/audit timestamps, and disable metadata
+  - `owner_discord_user_ref` is a migration-before-deploy compatibility column for Discord rows; insert synchronization keeps it aligned with `owner_subject_ref`, and it stays `NULL` for QQ rows
   - Referral IDs are exactly six characters from the approved uppercase alphabet excluding `0`, `O`, `1`, `I`, and `L`; statuses are `active` or `disabled`
-  - `owner_discord_user_ref` is unique and raw Discord IDs or email addresses do not belong in this table
+  - `(owner_source, owner_subject_ref)` is unique across each source and the `referral_id` primary key provides the shared cross-source namespace; raw Discord/QQ identities do not belong in this table
   - no `ON DELETE CASCADE` dependency on `installations`, preserving code history when installation rows age out
 - `referral_rewards`
-  - append-only referral attempt/reward ledger rows keyed by `id`
-  - columns: `id`, `referral_id`, referrer/referred identity and installation references, referred hardware hash/salt version, referred/referrer bonus statuses, bounded reason codes, managed credential refs, and lifecycle timestamps
+  - append-only source-aware referral attempt/reward ledger rows keyed by `id`
+  - source-aware identity is stored as referrer/referred source and derived subject references, with nullable installation evidence, Discord-only referred hardware evidence, bonus statuses, bounded reason codes, managed credential refs, and lifecycle timestamps
+  - `referrer_discord_user_ref` and `referred_discord_user_ref` remain synchronized compatibility columns for Discord rows during rollout and stay `NULL` for QQ identities
   - Referral IDs use the same approved six-character constraint; referred-side statuses are `reserved`, `credited`, `skipped`, and `failed`; referrer-side statuses are `pending`, `applying`, `credited`, `skipped`, and `failed`
-  - cap queries are indexed by `referrer_discord_user_ref` plus referred-side status, and referral lookup is indexed by `referral_id`
-  - partial unique indexes enforce one counted (`reserved`/`credited`) reward per referred Discord identity and per referred installation
-  - ledger rows do not cascade-delete with `installations`, preserving cap/accounting history when installation rows age out
+  - reserved and credited rows both count toward the three-invitee Pass cap, one lifetime reward per source-aware referred subject, installation duplicate prevention, and the QQ UTC-day cap
+  - source-aware and compatibility indexes support both Workers during migration-before-deploy; ledger rows do not cascade-delete with `installations`, preserving cap/accounting history when installation rows age out
 
 ## Retention and salt rotation
 

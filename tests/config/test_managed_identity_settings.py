@@ -55,15 +55,26 @@ def test_managed_identity_referral_id_defaults_to_none_and_round_trips() -> None
     settings = AppSettingsVNext()
 
     assert settings.state.managed_connection.referral_id is None
+    assert settings.state.managed_connection.referral_source is None
 
     default_payload = serialization.to_dict(settings)
     assert default_payload["state"]["managed_connection"]["referral_id"] is None
+    assert default_payload["state"]["managed_connection"]["referral_source"] is None
 
-    settings = _with_managed_connection(settings, referral_id="7KQ9M2")
+    settings = _with_managed_connection(settings, referral_id="7KQ9M2", referral_source="qq")
     restored = serialization.from_dict(serialization.to_dict(settings))
 
     assert restored.state.managed_connection.referral_id == "7KQ9M2"
-    assert serialization.to_dict(restored)["state"]["managed_connection"]["referral_id"] == "7KQ9M2"
+    assert restored.state.managed_connection.referral_source == "qq"
+    payload = serialization.to_dict(restored)["state"]["managed_connection"]
+    assert payload["referral_id"] == "7KQ9M2"
+    assert payload["referral_source"] == "qq"
+
+
+def test_managed_identity_referral_source_defaults_to_discord_when_referral_id_is_set() -> None:
+    settings = _with_managed_connection(AppSettingsVNext(), referral_id="7KQ9M2")
+
+    assert settings.state.managed_connection.referral_source == "discord"
 
 
 def test_managed_identity_settings_do_not_persist_talk_together_pass_status() -> None:
@@ -86,7 +97,7 @@ def test_managed_identity_settings_do_not_persist_talk_together_pass_status() ->
                     **managed_identity,
                     "talk_together_pass": {"pass_id": "7KQ9M2", "invite_count": 1},
                     "invite_count": 1,
-                    "invite_limit": 5,
+                    "invite_limit": 3,
                 },
             },
         }

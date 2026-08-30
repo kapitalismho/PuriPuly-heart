@@ -98,7 +98,8 @@ describe('Referral ID lifecycle primitives', () => {
       created: true,
       referralCode: {
         referral_id: SECOND_VALID_REFERRAL_ID,
-        owner_discord_user_ref: SAFE_DISCORD_USER_REF,
+        owner_source: 'discord',
+        owner_subject_ref: SAFE_DISCORD_USER_REF,
         owner_installation_id: 'install-owned-collision',
         status: 'active',
       },
@@ -108,7 +109,8 @@ describe('Referral ID lifecycle primitives', () => {
       created: false,
       referralCode: {
         referral_id: SECOND_VALID_REFERRAL_ID,
-        owner_discord_user_ref: SAFE_DISCORD_USER_REF,
+        owner_source: 'discord',
+        owner_subject_ref: SAFE_DISCORD_USER_REF,
         status: 'active',
       },
     });
@@ -161,7 +163,8 @@ describe('Referral ID lifecycle primitives', () => {
       created: true,
       referralCode: {
         referral_id: VALID_REFERRAL_ID,
-        owner_discord_user_ref: SAFE_DISCORD_USER_REF,
+        owner_source: 'discord',
+        owner_subject_ref: SAFE_DISCORD_USER_REF,
         owner_installation_id: 'install-owned-active',
         status: 'active',
       },
@@ -341,7 +344,7 @@ describe('Referral ID lifecycle primitives', () => {
         nowIso: NOW_ISO,
         generateReferralId: () => SECOND_VALID_REFERRAL_ID,
       }),
-    ).resolves.toEqual({ ok: false, reason: 'unsafe_discord_user_ref' });
+    ).resolves.toEqual({ ok: false, reason: 'unsafe_subject_ref' });
 
     expect(countActiveReferralCodes(env, SAFE_DISCORD_USER_REF)).toBe(0);
     expect(countAllReferralCodes(env)).toBe(1);
@@ -364,7 +367,8 @@ describe('Referral ID lifecycle primitives', () => {
             `UPDATE referral_codes
                 SET status = 'disabled',
                     updated_at = ?
-              WHERE owner_discord_user_ref = ?`,
+              WHERE owner_source = 'discord'
+                AND owner_subject_ref = ?`,
           )
           .run(NOW_ISO, SAFE_DISCORD_USER_REF);
       },
@@ -541,12 +545,13 @@ function insertReferralCode(
     .prepare(
       `INSERT INTO referral_codes (
           referral_id,
-          owner_discord_user_ref,
+          owner_source,
+          owner_subject_ref,
           owner_installation_id,
           status,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, 'discord', ?, ?, ?, ?, ?)`,
     )
     .run(
       input.referralId,
@@ -563,7 +568,8 @@ function countReferralCodes(env: TestBrokerEnv, discordUserRef: string): number 
     .prepare(
       `SELECT COUNT(*) AS count
          FROM referral_codes
-        WHERE owner_discord_user_ref = ?`,
+        WHERE owner_source = 'discord'
+          AND owner_subject_ref = ?`,
     )
     .get(discordUserRef) as { count: number };
   return Number(row.count);
@@ -574,7 +580,8 @@ function countActiveReferralCodes(env: TestBrokerEnv, discordUserRef: string): n
     .prepare(
       `SELECT COUNT(*) AS count
          FROM referral_codes
-        WHERE owner_discord_user_ref = ?
+        WHERE owner_source = 'discord'
+          AND owner_subject_ref = ?
           AND status = 'active'`,
     )
     .get(discordUserRef) as { count: number };

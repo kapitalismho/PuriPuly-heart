@@ -106,6 +106,7 @@ def test_ensure_managed_identity_bundle_generates_uuid7_and_keeps_secret_boundar
         "pending_delivery_ack_managed_credential_ref": None,
         "pending_delivery_ack_source": None,
         "referral_id": None,
+        "referral_source": None,
         "release_token": None,
         "release_token_expires_at": None,
         "verified_hardware_hash": None,

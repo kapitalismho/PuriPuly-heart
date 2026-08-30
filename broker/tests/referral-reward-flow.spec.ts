@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  applyReferrerRewardLimitUpdates,
-  reserveIssueReferralReward,
+  applyReferrerRewardLimitUpdates as applySourceAwareReferrerRewardLimitUpdates,
+  reserveIssueReferralReward as reserveSourceAwareIssueReferralReward,
   type IssueReferralReservationResult,
 } from '../src/referral';
 import {
@@ -45,6 +45,32 @@ const REFERRED_DISCORD_REF = `ph-discord-user-v1_${'B'.repeat(43)}`;
 const REFERRED_INSTALLATION_ID = 'install-referred-reward-flow';
 const REFERRED_HARDWARE_HASH = 'hardware-hash-referred-reward-flow';
 
+function reserveIssueReferralReward(
+  db: D1Database,
+  input: Omit<
+    Parameters<typeof reserveSourceAwareIssueReferralReward>[1],
+    'referredSource'
+  >,
+) {
+  return reserveSourceAwareIssueReferralReward(db, {
+    ...input,
+    referredSource: 'discord',
+  });
+}
+
+function applyReferrerRewardLimitUpdates(
+  db: D1Database,
+  input: Omit<
+    Parameters<typeof applySourceAwareReferrerRewardLimitUpdates>[1],
+    'referrerSource'
+  >,
+) {
+  return applySourceAwareReferrerRewardLimitUpdates(db, {
+    ...input,
+    referrerSource: 'discord',
+  });
+}
+
 interface StartedDiscordSession {
   env: TestBrokerEnv;
   keyPair: DeviceKeyPair;
@@ -58,9 +84,9 @@ interface StartedDiscordSession {
 
 interface ReferralRewardRow {
   referral_id: string;
-  referrer_discord_user_ref: string | null;
+  referrer_subject_ref: string | null;
   referrer_installation_id: string | null;
-  referred_discord_user_ref: string;
+  referred_subject_ref: string;
   referred_installation_id: string;
   referred_hardware_hash: string;
   referred_hardware_hash_salt_version: number;
@@ -88,7 +114,7 @@ describe('issue-time referral reservation primitive', () => {
 
     const result = await reserveIssueReferralReward(env.BROKER_DB, {
       referralId: REFERRAL_ID,
-      referredDiscordUserRef: REFERRED_DISCORD_REF,
+      referredSubjectRef: REFERRED_DISCORD_REF,
       referredInstallationId: REFERRED_INSTALLATION_ID,
       referredHardwareHash: REFERRED_HARDWARE_HASH,
       referredHardwareHashSaltVersion: 7,
@@ -99,9 +125,9 @@ describe('issue-time referral reservation primitive', () => {
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referral_id: REFERRAL_ID,
-        referrer_discord_user_ref: REFERRER_DISCORD_REF,
+        referrer_subject_ref: REFERRER_DISCORD_REF,
         referrer_installation_id: REFERRER_INSTALLATION_ID,
-        referred_discord_user_ref: REFERRED_DISCORD_REF,
+        referred_subject_ref: REFERRED_DISCORD_REF,
         referred_installation_id: REFERRED_INSTALLATION_ID,
         referred_hardware_hash: REFERRED_HARDWARE_HASH,
         referred_hardware_hash_salt_version: 7,
@@ -118,7 +144,7 @@ describe('issue-time referral reservation primitive', () => {
 
     const result = await reserveIssueReferralReward(env.BROKER_DB, {
       referralId: UNKNOWN_REFERRAL_ID,
-      referredDiscordUserRef: REFERRED_DISCORD_REF,
+      referredSubjectRef: REFERRED_DISCORD_REF,
       referredInstallationId: REFERRED_INSTALLATION_ID,
       referredHardwareHash: REFERRED_HARDWARE_HASH,
       referredHardwareHashSaltVersion: 7,
@@ -129,7 +155,7 @@ describe('issue-time referral reservation primitive', () => {
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referral_id: UNKNOWN_REFERRAL_ID,
-        referrer_discord_user_ref: null,
+        referrer_subject_ref: null,
         referrer_installation_id: null,
         referred_bonus_status: 'skipped',
         referrer_bonus_status: 'skipped',
@@ -144,7 +170,7 @@ describe('issue-time referral reservation primitive', () => {
       arrange: (env: TestBrokerEnv) => {
         insertReferralCode(env, {
           referralId: REFERRAL_ID,
-          ownerDiscordUserRef: REFERRER_DISCORD_REF,
+          ownerSubjectRef: REFERRER_DISCORD_REF,
           ownerInstallationId: REFERRER_INSTALLATION_ID,
           status: 'disabled',
         });
@@ -156,7 +182,7 @@ describe('issue-time referral reservation primitive', () => {
       arrange: (env: TestBrokerEnv) => {
         insertReferralCode(env, {
           referralId: REFERRAL_ID,
-          ownerDiscordUserRef: REFERRED_DISCORD_REF,
+          ownerSubjectRef: REFERRED_DISCORD_REF,
           ownerInstallationId: REFERRER_INSTALLATION_ID,
         });
       },
@@ -178,9 +204,9 @@ describe('issue-time referral reservation primitive', () => {
         insertActiveReferrer(env);
         insertReferralReward(env, {
           referralId: 'BCDEFG',
-          referrerDiscordUserRef: `ph-discord-user-v1_${'C'.repeat(43)}`,
+          referrerSubjectRef: `ph-discord-user-v1_${'C'.repeat(43)}`,
           referrerInstallationId: 'install-other-referrer',
-          referredDiscordUserRef: REFERRED_DISCORD_REF,
+          referredSubjectRef: REFERRED_DISCORD_REF,
           referredInstallationId: 'install-other-referred',
           referredHardwareHash: 'hardware-hash-other-referred',
           referredBonusStatus: 'credited',
@@ -195,9 +221,9 @@ describe('issue-time referral reservation primitive', () => {
         insertActiveReferrer(env);
         insertReferralReward(env, {
           referralId: 'CDEFGH',
-          referrerDiscordUserRef: `ph-discord-user-v1_${'D'.repeat(43)}`,
+          referrerSubjectRef: `ph-discord-user-v1_${'D'.repeat(43)}`,
           referrerInstallationId: 'install-installation-dupe-referrer',
-          referredDiscordUserRef: `ph-discord-user-v1_${'E'.repeat(43)}`,
+          referredSubjectRef: `ph-discord-user-v1_${'E'.repeat(43)}`,
           referredInstallationId: REFERRED_INSTALLATION_ID,
           referredHardwareHash: 'hardware-hash-installation-dupe',
           referredBonusStatus: 'reserved',
@@ -212,7 +238,7 @@ describe('issue-time referral reservation primitive', () => {
 
     const result = await reserveIssueReferralReward(env.BROKER_DB, {
       referralId: REFERRAL_ID,
-      referredDiscordUserRef: REFERRED_DISCORD_REF,
+      referredSubjectRef: REFERRED_DISCORD_REF,
       referredInstallationId: REFERRED_INSTALLATION_ID,
       referredHardwareHash: REFERRED_HARDWARE_HASH,
       referredHardwareHashSaltVersion: 7,
@@ -230,14 +256,14 @@ describe('issue-time referral reservation primitive', () => {
     );
   });
 
-  it('skips the sixth counted referral using ledger-derived cap accounting', async () => {
+  it('skips the fourth counted referral using ledger-derived cap accounting', async () => {
     const env = createTestBrokerEnv();
     insertActiveReferrer(env);
-    seedCountedReferralRewards(env, 5);
+    seedCountedReferralRewards(env, 3);
 
     const result = await reserveIssueReferralReward(env.BROKER_DB, {
       referralId: REFERRAL_ID,
-      referredDiscordUserRef: REFERRED_DISCORD_REF,
+      referredSubjectRef: REFERRED_DISCORD_REF,
       referredInstallationId: REFERRED_INSTALLATION_ID,
       referredHardwareHash: REFERRED_HARDWARE_HASH,
       referredHardwareHashSaltVersion: 7,
@@ -245,7 +271,7 @@ describe('issue-time referral reservation primitive', () => {
     });
 
     expect(result).toEqual({ outcome: 'skipped', reason: 'referrer_cap_reached' });
-    expect(countCountedRewards(env, REFERRER_DISCORD_REF)).toBe(5);
+    expect(countCountedRewards(env, REFERRER_DISCORD_REF)).toBe(3);
     expect(readReferralRewards(env).at(-1)).toEqual(
       expect.objectContaining({
         referred_bonus_status: 'skipped',
@@ -255,7 +281,7 @@ describe('issue-time referral reservation primitive', () => {
     );
   });
 
-  it('admits only one reservation when two referred users race for the fifth referrer slot', async () => {
+  it('admits only one reservation when two referred users race for the third referrer slot', async () => {
     let gateEnabled = false;
     let waitingInserts = 0;
     let releaseInserts: (() => void) | null = null;
@@ -279,13 +305,13 @@ describe('issue-time referral reservation primitive', () => {
       },
     });
     insertActiveReferrer(env);
-    seedCountedReferralRewards(env, 4);
+    seedCountedReferralRewards(env, 2);
     gateEnabled = true;
 
     const results = await Promise.all([
       reserveIssueReferralReward(env.BROKER_DB, {
         referralId: REFERRAL_ID,
-        referredDiscordUserRef: `ph-discord-user-v1_${'X'.repeat(43)}`,
+        referredSubjectRef: `ph-discord-user-v1_${'X'.repeat(43)}`,
         referredInstallationId: 'install-race-referred-a',
         referredHardwareHash: 'hardware-hash-race-a',
         referredHardwareHashSaltVersion: 7,
@@ -293,7 +319,7 @@ describe('issue-time referral reservation primitive', () => {
       }),
       reserveIssueReferralReward(env.BROKER_DB, {
         referralId: REFERRAL_ID,
-        referredDiscordUserRef: `ph-discord-user-v1_${'Y'.repeat(43)}`,
+        referredSubjectRef: `ph-discord-user-v1_${'Y'.repeat(43)}`,
         referredInstallationId: 'install-race-referred-b',
         referredHardwareHash: 'hardware-hash-race-b',
         referredHardwareHashSaltVersion: 7,
@@ -310,7 +336,7 @@ describe('issue-time referral reservation primitive', () => {
         result.outcome === 'skipped',
     );
     expect(skipped?.reason).toBe('referrer_cap_reached');
-    expect(countCountedRewards(env, REFERRER_DISCORD_REF)).toBe(5);
+    expect(countCountedRewards(env, REFERRER_DISCORD_REF)).toBe(3);
   });
 
   it('drops missing or malformed referral input without storing raw attempts', async () => {
@@ -319,7 +345,7 @@ describe('issue-time referral reservation primitive', () => {
     await expect(
       reserveIssueReferralReward(env.BROKER_DB, {
         referralId: null,
-        referredDiscordUserRef: REFERRED_DISCORD_REF,
+        referredSubjectRef: REFERRED_DISCORD_REF,
         referredInstallationId: REFERRED_INSTALLATION_ID,
         referredHardwareHash: REFERRED_HARDWARE_HASH,
         referredHardwareHashSaltVersion: 7,
@@ -329,7 +355,7 @@ describe('issue-time referral reservation primitive', () => {
     await expect(
       reserveIssueReferralReward(env.BROKER_DB, {
         referralId: 'bad raw referral',
-        referredDiscordUserRef: REFERRED_DISCORD_REF,
+        referredSubjectRef: REFERRED_DISCORD_REF,
         referredInstallationId: REFERRED_INSTALLATION_ID,
         referredHardwareHash: REFERRED_HARDWARE_HASH,
         referredHardwareHashSaltVersion: 7,
@@ -343,13 +369,13 @@ describe('issue-time referral reservation primitive', () => {
     const env = createTestBrokerEnv();
     insertReferralCode(env, {
       referralId: REFERRAL_ID,
-      ownerDiscordUserRef: REFERRER_DISCORD_REF,
+      ownerSubjectRef: REFERRER_DISCORD_REF,
       ownerInstallationId: REFERRER_INSTALLATION_ID,
     });
 
     const result = await reserveIssueReferralReward(env.BROKER_DB, {
       referralId: REFERRAL_ID,
-      referredDiscordUserRef: REFERRED_DISCORD_REF,
+      referredSubjectRef: REFERRED_DISCORD_REF,
       referredInstallationId: REFERRED_INSTALLATION_ID,
       referredHardwareHash: REFERRED_HARDWARE_HASH,
       referredHardwareHashSaltVersion: 7,
@@ -360,7 +386,7 @@ describe('issue-time referral reservation primitive', () => {
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referral_id: REFERRAL_ID,
-        referrer_discord_user_ref: REFERRER_DISCORD_REF,
+        referrer_subject_ref: REFERRER_DISCORD_REF,
         referrer_installation_id: REFERRER_INSTALLATION_ID,
         referred_bonus_status: 'skipped',
         referrer_bonus_status: 'skipped',
@@ -422,7 +448,7 @@ describe('Discord managed issue referral reservation', () => {
     expect(payload.talk_together_pass).toMatchObject({
       pass_id: payload.referral_id,
       invite_count: 0,
-      invite_limit: 5,
+      invite_limit: 3,
       bonus_translations_per_friend: 200,
     });
     expectNoReferralRewardEstimateFields(payload);
@@ -456,8 +482,8 @@ describe('Discord managed issue referral reservation', () => {
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referral_id: REFERRAL_ID,
-        referrer_discord_user_ref: REFERRER_DISCORD_REF,
-        referred_discord_user_ref: referredDiscordRef,
+        referrer_subject_ref: REFERRER_DISCORD_REF,
+        referred_subject_ref: referredDiscordRef,
         referred_installation_id: started.installationId,
         referred_hardware_hash: 'hardware-hash-issue-referral-reserved',
         referred_bonus_status: 'credited',
@@ -469,6 +495,106 @@ describe('Discord managed issue referral reservation', () => {
         credited_at: NOW_ISO,
       }),
     ]);
+  });
+
+  it('credits a Discord referred user and QQ Pass owner across sources', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW_ISO));
+
+    const env = createTestBrokerEnv();
+    const qqReferrerSubjectRef = `ph-qq-subject-v1_${'Q'.repeat(43)}`;
+    env.__db
+      .prepare(
+        `INSERT INTO qq_managed_entitlements (
+            qq_subject_ref, status, issue_ref, managed_credential_ref, budget_usd,
+            reserved_at, issued_at, expires_at, delivered_at, created_at, updated_at
+          ) VALUES (?, 'active', ?, ?, 0.07, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        qqReferrerSubjectRef,
+        'qq-issue-v1_cross-source-discord-referrer',
+        REFERRER_MANAGED_CREDENTIAL_REF,
+        NOW_ISO,
+        NOW_ISO,
+        EXPIRES_AT_ISO,
+        NOW_ISO,
+        NOW_ISO,
+        NOW_ISO,
+      );
+    env.__db
+      .prepare(
+        `INSERT INTO referral_codes (
+            referral_id, owner_source, owner_subject_ref, owner_installation_id,
+            status, created_at, updated_at
+          ) VALUES (?, 'qq', ?, NULL, 'active', ?, ?)`,
+      )
+      .run(REFERRAL_ID, qqReferrerSubjectRef, NOW_ISO, NOW_ISO);
+    const referredDiscordId = discordSnowflakeForAgeDays(31);
+    const referredDiscordRef = await deriveExpectedDiscordUserRef(
+      env.DISCORD_USER_REF_SECRET,
+      referredDiscordId,
+    );
+    const started = await startDiscordSession({
+      env,
+      installationId: 'install-discord-referred-by-qq',
+      referralId: REFERRAL_ID,
+    });
+    const discordApi = mockDiscordApi({
+      user: {
+        id: referredDiscordId,
+        verified: true,
+      },
+    });
+
+    const response = await postDiscordIssue(
+      env,
+      await signedIssueRequest(started, {
+        code: 'discord-oauth-code-referred-by-qq',
+        hardware_hash: 'hardware-hash-discord-referred-by-qq',
+      }),
+    );
+    const payload = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual(
+      expect.objectContaining({
+        budget_usd: 0.09,
+        referral_bonus_applied: true,
+      }),
+    );
+    expect(discordApi.openRouterReferrerReadCalls).toHaveLength(1);
+    expect(discordApi.openRouterReferrerPatchCalls).toHaveLength(1);
+    expect(
+      env.__db
+        .prepare(
+          `SELECT budget_usd, managed_credential_ref
+             FROM qq_managed_entitlements
+            WHERE qq_subject_ref = ?`,
+        )
+        .get(qqReferrerSubjectRef),
+    ).toEqual({
+      budget_usd: 0.09,
+      managed_credential_ref: REFERRER_MANAGED_CREDENTIAL_REF,
+    });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT referrer_source, referrer_subject_ref, referrer_discord_user_ref,
+                  referred_source, referred_subject_ref,
+                  referred_bonus_status, referrer_bonus_status
+             FROM referral_rewards
+            WHERE referred_subject_ref = ?`,
+        )
+        .get(referredDiscordRef),
+    ).toEqual({
+      referrer_source: 'qq',
+      referrer_subject_ref: qqReferrerSubjectRef,
+      referrer_discord_user_ref: null,
+      referred_source: 'discord',
+      referred_subject_ref: referredDiscordRef,
+      referred_bonus_status: 'credited',
+      referrer_bonus_status: 'credited',
+    });
   });
 
   it('skips referrer credit without failing issue when the referrer has no active managed key', async () => {
@@ -511,8 +637,8 @@ describe('Discord managed issue referral reservation', () => {
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referral_id: REFERRAL_ID,
-        referrer_discord_user_ref: REFERRER_DISCORD_REF,
-        referred_discord_user_ref: referredDiscordRef,
+        referrer_subject_ref: REFERRER_DISCORD_REF,
+        referred_subject_ref: referredDiscordRef,
         referred_bonus_status: 'credited',
         referrer_bonus_status: 'skipped',
         skip_reason: 'referrer_managed_key_missing',
@@ -657,8 +783,8 @@ describe('Discord managed issue referral reservation', () => {
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referral_id: REFERRAL_ID,
-        referrer_discord_user_ref: REFERRER_DISCORD_REF,
-        referred_discord_user_ref: referredDiscordRef,
+        referrer_subject_ref: REFERRER_DISCORD_REF,
+        referred_subject_ref: referredDiscordRef,
         referred_installation_id: started.installationId,
         referred_bonus_status: 'failed',
         referrer_bonus_status: 'failed',
@@ -709,7 +835,7 @@ describe('Discord managed issue referral reservation', () => {
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referral_id: REFERRAL_ID,
-        referred_discord_user_ref: referredDiscordRef,
+        referred_subject_ref: referredDiscordRef,
         referred_installation_id: started.installationId,
         referred_bonus_status: 'failed',
         referrer_bonus_status: 'failed',
@@ -752,7 +878,7 @@ describe('Discord managed issue referral reservation', () => {
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referral_id: UNKNOWN_REFERRAL_ID,
-        referrer_discord_user_ref: null,
+        referrer_subject_ref: null,
         referrer_installation_id: null,
         referred_installation_id: started.installationId,
         referred_bonus_status: 'skipped',
@@ -945,7 +1071,7 @@ describe('Discord managed issue referral reservation', () => {
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referral_id: REFERRAL_ID,
-        referrer_discord_user_ref: REFERRER_DISCORD_REF,
+        referrer_subject_ref: REFERRER_DISCORD_REF,
         referred_installation_id: second.installationId,
         referred_bonus_status: 'skipped',
         referrer_bonus_status: 'skipped',
@@ -1007,7 +1133,7 @@ describe('Discord managed issue referral reservation', () => {
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referral_id: REFERRAL_ID,
-        referrer_discord_user_ref: REFERRER_DISCORD_REF,
+        referrer_subject_ref: REFERRER_DISCORD_REF,
         referred_installation_id: started.installationId,
         referred_bonus_status: 'skipped',
         referrer_bonus_status: 'skipped',
@@ -1080,7 +1206,7 @@ describe('Discord managed issue referral reservation', () => {
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referral_id: REFERRAL_ID,
-        referrer_discord_user_ref: REFERRER_DISCORD_REF,
+        referrer_subject_ref: REFERRER_DISCORD_REF,
         referred_installation_id: started.installationId,
         referred_bonus_status: 'skipped',
         referrer_bonus_status: 'skipped',
@@ -1122,9 +1248,9 @@ describe('referrer reward limit update primitive', () => {
     insertActiveReferrer(env);
     insertReferralReward(env, {
       referralId: REFERRAL_ID,
-      referrerDiscordUserRef: REFERRER_DISCORD_REF,
+      referrerSubjectRef: REFERRER_DISCORD_REF,
       referrerInstallationId: REFERRER_INSTALLATION_ID,
-      referredDiscordUserRef: `ph-discord-user-v1_${'M'.repeat(43)}`,
+      referredSubjectRef: `ph-discord-user-v1_${'M'.repeat(43)}`,
       referredInstallationId: 'install-concurrent-referrer-reward-a',
       referredHardwareHash: 'hardware-hash-concurrent-referrer-reward-a',
       referredBonusStatus: 'credited',
@@ -1132,9 +1258,9 @@ describe('referrer reward limit update primitive', () => {
     });
     insertReferralReward(env, {
       referralId: REFERRAL_ID,
-      referrerDiscordUserRef: REFERRER_DISCORD_REF,
+      referrerSubjectRef: REFERRER_DISCORD_REF,
       referrerInstallationId: REFERRER_INSTALLATION_ID,
-      referredDiscordUserRef: `ph-discord-user-v1_${'N'.repeat(43)}`,
+      referredSubjectRef: `ph-discord-user-v1_${'N'.repeat(43)}`,
       referredInstallationId: 'install-concurrent-referrer-reward-b',
       referredHardwareHash: 'hardware-hash-concurrent-referrer-reward-b',
       referredBonusStatus: 'credited',
@@ -1145,12 +1271,12 @@ describe('referrer reward limit update primitive', () => {
 
     const results = await Promise.all([
       applyReferrerRewardLimitUpdates(env.BROKER_DB, {
-        referrerDiscordUserRef: REFERRER_DISCORD_REF,
+        referrerSubjectRef: REFERRER_DISCORD_REF,
         managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY,
         nowIso: NOW_ISO,
       }),
       applyReferrerRewardLimitUpdates(env.BROKER_DB, {
-        referrerDiscordUserRef: REFERRER_DISCORD_REF,
+        referrerSubjectRef: REFERRER_DISCORD_REF,
         managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY,
         nowIso: NOW_ISO,
       }),
@@ -1187,9 +1313,9 @@ describe('referrer reward limit update primitive', () => {
     insertActiveReferrer(env);
     insertReferralReward(env, {
       referralId: REFERRAL_ID,
-      referrerDiscordUserRef: REFERRER_DISCORD_REF,
+      referrerSubjectRef: REFERRER_DISCORD_REF,
       referrerInstallationId: REFERRER_INSTALLATION_ID,
-      referredDiscordUserRef: `ph-discord-user-v1_${'Q'.repeat(43)}`,
+      referredSubjectRef: `ph-discord-user-v1_${'Q'.repeat(43)}`,
       referredInstallationId: 'install-drain-referrer-reward-a',
       referredHardwareHash: 'hardware-hash-drain-referrer-reward-a',
       referredBonusStatus: 'credited',
@@ -1207,16 +1333,16 @@ describe('referrer reward limit update primitive', () => {
         insertedConcurrentReward = true;
         insertReferralReward(env, {
           referralId: REFERRAL_ID,
-          referrerDiscordUserRef: REFERRER_DISCORD_REF,
+          referrerSubjectRef: REFERRER_DISCORD_REF,
           referrerInstallationId: REFERRER_INSTALLATION_ID,
-          referredDiscordUserRef: `ph-discord-user-v1_${'R'.repeat(43)}`,
+          referredSubjectRef: `ph-discord-user-v1_${'R'.repeat(43)}`,
           referredInstallationId: 'install-drain-referrer-reward-b',
           referredHardwareHash: 'hardware-hash-drain-referrer-reward-b',
           referredBonusStatus: 'credited',
           referrerBonusStatus: 'pending',
         });
         concurrentApplyResult = await applyReferrerRewardLimitUpdates(env.BROKER_DB, {
-          referrerDiscordUserRef: REFERRER_DISCORD_REF,
+          referrerSubjectRef: REFERRER_DISCORD_REF,
           managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY,
           nowIso: NOW_ISO,
         });
@@ -1225,7 +1351,7 @@ describe('referrer reward limit update primitive', () => {
 
     await expect(
       applyReferrerRewardLimitUpdates(env.BROKER_DB, {
-        referrerDiscordUserRef: REFERRER_DISCORD_REF,
+        referrerSubjectRef: REFERRER_DISCORD_REF,
         managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY,
         nowIso: NOW_ISO,
       }),
@@ -1268,9 +1394,9 @@ describe('referrer reward limit update primitive', () => {
     insertActiveReferrer(env);
     insertReferralReward(env, {
       referralId: REFERRAL_ID,
-      referrerDiscordUserRef: REFERRER_DISCORD_REF,
+      referrerSubjectRef: REFERRER_DISCORD_REF,
       referrerInstallationId: REFERRER_INSTALLATION_ID,
-      referredDiscordUserRef: `ph-discord-user-v1_${'P'.repeat(43)}`,
+      referredSubjectRef: `ph-discord-user-v1_${'P'.repeat(43)}`,
       referredInstallationId: 'install-stale-applying-referrer-reward',
       referredHardwareHash: 'hardware-hash-stale-applying-referrer-reward',
       referredBonusStatus: 'credited',
@@ -1282,7 +1408,7 @@ describe('referrer reward limit update primitive', () => {
 
     await expect(
       applyReferrerRewardLimitUpdates(env.BROKER_DB, {
-        referrerDiscordUserRef: REFERRER_DISCORD_REF,
+        referrerSubjectRef: REFERRER_DISCORD_REF,
         managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY,
         nowIso: NOW_ISO,
       }),
@@ -1405,7 +1531,7 @@ function insertActiveReferrer(
   });
   insertReferralCode(env, {
     referralId: REFERRAL_ID,
-    ownerDiscordUserRef: REFERRER_DISCORD_REF,
+    ownerSubjectRef: REFERRER_DISCORD_REF,
     ownerInstallationId: REFERRER_INSTALLATION_ID,
   });
 }
@@ -1424,7 +1550,7 @@ function insertReferrerWithoutManagedKey(env: TestBrokerEnv): void {
   });
   insertReferralCode(env, {
     referralId: REFERRAL_ID,
-    ownerDiscordUserRef: REFERRER_DISCORD_REF,
+    ownerSubjectRef: REFERRER_DISCORD_REF,
     ownerInstallationId: REFERRER_INSTALLATION_ID,
   });
 }
@@ -1433,7 +1559,7 @@ function insertReferralCode(
   env: TestBrokerEnv,
   input: {
     referralId: string;
-    ownerDiscordUserRef: string;
+    ownerSubjectRef: string;
     ownerInstallationId: string | null;
     status?: 'active' | 'disabled';
   },
@@ -1442,16 +1568,17 @@ function insertReferralCode(
     .prepare(
       `INSERT INTO referral_codes (
           referral_id,
-          owner_discord_user_ref,
+          owner_source,
+          owner_subject_ref,
           owner_installation_id,
           status,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, 'discord', ?, ?, ?, ?, ?)`,
     )
     .run(
       input.referralId,
-      input.ownerDiscordUserRef,
+      input.ownerSubjectRef,
       input.ownerInstallationId,
       input.status ?? 'active',
       NOW_ISO,
@@ -1463,9 +1590,9 @@ function insertReferralReward(
   env: TestBrokerEnv,
   input: {
     referralId: string;
-    referrerDiscordUserRef: string | null;
+    referrerSubjectRef: string | null;
     referrerInstallationId: string | null;
-    referredDiscordUserRef: string;
+    referredSubjectRef: string;
     referredInstallationId: string;
     referredHardwareHash: string;
     referredBonusStatus: 'reserved' | 'credited' | 'skipped' | 'failed';
@@ -1481,9 +1608,11 @@ function insertReferralReward(
     .prepare(
       `INSERT INTO referral_rewards (
           referral_id,
-          referrer_discord_user_ref,
+          referrer_source,
+          referrer_subject_ref,
           referrer_installation_id,
-          referred_discord_user_ref,
+          referred_source,
+          referred_subject_ref,
           referred_installation_id,
           referred_hardware_hash,
           referred_hardware_hash_salt_version,
@@ -1495,13 +1624,14 @@ function insertReferralReward(
           referrer_managed_credential_ref,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 7, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, 'discord', ?, ?, ?, 7, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.referralId,
-      input.referrerDiscordUserRef,
+      input.referrerSubjectRef ? 'discord' : null,
+      input.referrerSubjectRef,
       input.referrerInstallationId,
-      input.referredDiscordUserRef,
+      input.referredSubjectRef,
       input.referredInstallationId,
       input.referredHardwareHash,
       input.referredBonusStatus,
@@ -1519,9 +1649,9 @@ function seedCountedReferralRewards(env: TestBrokerEnv, count: number): void {
   for (let index = 0; index < count; index += 1) {
     insertReferralReward(env, {
       referralId: REFERRAL_ID,
-      referrerDiscordUserRef: REFERRER_DISCORD_REF,
+      referrerSubjectRef: REFERRER_DISCORD_REF,
       referrerInstallationId: REFERRER_INSTALLATION_ID,
-      referredDiscordUserRef: `ph-discord-user-v1_seeded-referred-${index}`,
+      referredSubjectRef: `ph-discord-user-v1_seeded-referred-${index}`,
       referredInstallationId: `install-seeded-referred-${index}`,
       referredHardwareHash: `hardware-hash-seeded-referred-${index}`,
       referredBonusStatus: index % 2 === 0 ? 'reserved' : 'credited',
@@ -1534,9 +1664,9 @@ function readReferralRewards(env: TestBrokerEnv): ReferralRewardRow[] {
   return env.__db
     .prepare(
       `SELECT referral_id,
-              referrer_discord_user_ref,
+              referrer_subject_ref,
               referrer_installation_id,
-              referred_discord_user_ref,
+              referred_subject_ref,
               referred_installation_id,
               referred_hardware_hash,
               referred_hardware_hash_salt_version,
@@ -1572,15 +1702,15 @@ async function readEntitlementBudget(
   );
 }
 
-function countCountedRewards(env: TestBrokerEnv, referrerDiscordUserRef: string): number {
+function countCountedRewards(env: TestBrokerEnv, referrerSubjectRef: string): number {
   const row = env.__db
     .prepare(
       `SELECT COUNT(*) AS count
          FROM referral_rewards
-        WHERE referrer_discord_user_ref = ?
+        WHERE referrer_subject_ref = ?
           AND referred_bonus_status IN ('reserved', 'credited')`,
     )
-    .get(referrerDiscordUserRef) as { count: number };
+    .get(referrerSubjectRef) as { count: number };
   return Number(row.count);
 }
 

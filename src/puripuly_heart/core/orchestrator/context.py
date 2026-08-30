@@ -11,7 +11,7 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
 )
 
-ContextMode = Literal["local", "integrated"]
+ContextMode = Literal["integrated"]
 
 
 def _default_config_snapshot_port() -> TranslationRuntimeConfigSnapshotPort:
@@ -34,7 +34,7 @@ class ContextResolver:
             return configuration
         return self.config_snapshot().value
 
-    def get_local_entries(
+    def get_entries(
         self,
         *,
         runtime: ChannelRuntime,
@@ -51,32 +51,14 @@ class ContextResolver:
             max_entries=configuration.context_max_entries,
         )
 
-    def format_local(self, entries: list[ContextEntry]) -> str:
+    def format_entries(self, entries: list[ContextEntry]) -> str:
         return self._format_entries(entries)
-
-    def resolve_local(
-        self,
-        *,
-        runtime: ChannelRuntime,
-        source_language: str,
-        target_language: str,
-        configuration: TranslationRuntimeConfig | None = None,
-    ) -> tuple[str, ContextMode]:
-        entries = self.get_local_entries(
-            runtime=runtime,
-            source_language=source_language,
-            target_language=target_language,
-            configuration=configuration,
-        )
-        return self.format_local(entries), "local"
 
     def resolve_for_request(
         self,
         *,
         runtime: ChannelRuntime,
         other_runtime: ChannelRuntime,
-        requested_mode: ContextMode,
-        peer_translation_enabled: bool,
         source_language: str,
         target_language: str,
         other_source_language: str | None = None,
@@ -84,13 +66,6 @@ class ContextResolver:
         configuration: TranslationRuntimeConfig | None = None,
     ) -> tuple[str, ContextMode]:
         configuration = self._configuration(configuration)
-        if requested_mode != "integrated" or not peer_translation_enabled:
-            return self.resolve_local(
-                runtime=runtime,
-                source_language=source_language,
-                target_language=target_language,
-                configuration=configuration,
-            )
         integrated_entries = self._get_integrated_entries(
             runtime=runtime,
             other_runtime=other_runtime,
@@ -100,13 +75,6 @@ class ContextResolver:
             other_target_language=other_target_language,
             configuration=configuration,
         )
-        if not any(channel_runtime.channel == "peer" for channel_runtime, _ in integrated_entries):
-            return self.resolve_local(
-                runtime=runtime,
-                source_language=source_language,
-                target_language=target_language,
-                configuration=configuration,
-            )
         return self.format_integrated(integrated_entries), "integrated"
 
     def _format_entries(self, entries: list[ContextEntry]) -> str:

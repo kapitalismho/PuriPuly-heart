@@ -211,6 +211,9 @@ class UiManagedRuntimeAdapter:
         return await self.managed.auth.start_qq(
             qq_identity=str(kwargs.get("qq_identity", "")),
             credential=str(kwargs.get("credential", "")),
+            referral_id=(
+                str(kwargs["referral_id"]) if kwargs.get("referral_id") is not None else None
+            ),
         )
 
     async def start_discord_managed_auth_from_dialog(self, **kwargs: object) -> object:

@@ -1127,6 +1127,7 @@ def test_broker_v1_snapshot_freezes_request_success_and_error_envelopes() -> Non
         "challenge",
         "discord_start",
         "qq_auth_assert",
+        "qq_auth_status",
         "verify",
         "issue",
         "discord_issue",
@@ -1170,6 +1171,9 @@ def test_broker_v1_snapshot_freezes_request_success_and_error_envelopes() -> Non
     qq_auth_source = _broker_source("qq-auth.ts")
     assert tuple(operations["qq_auth_assert"]["request_body_fields"]) == (
         _typescript_interface_fields(qq_auth_source, "QqAuthAssertRequestBody")
+    )
+    assert tuple(operations["qq_auth_status"]["request_body_fields"]) == (
+        _typescript_interface_fields(qq_auth_source, "QqAuthStatusRequestBody")
     )
 
     telemetry_source = _broker_source("telemetry.ts")

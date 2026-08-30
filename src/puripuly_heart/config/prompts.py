@@ -265,26 +265,48 @@ def _select_translation_examples(
     return ""
 
 
-def build_translation_prompt_variables(source_name: str, target_name: str) -> dict[str, str]:
+def build_translation_prompt_variables(
+    source_name: str,
+    target_name: str,
+    *,
+    input_channel: str = "self",
+) -> dict[str, str]:
     """Build dynamic variables for rendering the shared translation prompt."""
+    if input_channel not in {"self", "peer"}:
+        raise ValueError(f"unsupported input channel: {input_channel!r}")
     cache = _get_prompt_cache()
     target_rules_key = _resolve_target_language_rules_key(target_name)
     target_language_rules = (
         cache.target_language_rules.get(target_rules_key, "") if target_rules_key else ""
     )
 
+    translation_examples = _select_translation_examples(cache, source_name, target_name)
+    translation_examples = translation_examples.replace("${inputChannel}", input_channel)
+
     return {
         "sourceName": source_name,
         "targetName": target_name,
+        "inputChannel": input_channel,
         "targetLanguageRules": target_language_rules,
-        "translationExamples": _select_translation_examples(cache, source_name, target_name),
+        "translationExamples": translation_examples,
     }
 
 
-def render_translation_prompt_template(template: str, *, source_name: str, target_name: str) -> str:
+def render_translation_prompt_template(
+    template: str,
+    *,
+    source_name: str,
+    target_name: str,
+    input_channel: str = "self",
+) -> str:
     """Render the shared translation prompt template with dynamic variables."""
     rendered = template
-    for key, value in build_translation_prompt_variables(source_name, target_name).items():
+    variables = build_translation_prompt_variables(
+        source_name,
+        target_name,
+        input_channel=input_channel,
+    )
+    for key, value in variables.items():
         rendered = rendered.replace(f"${{{key}}}", value)
     return rendered
 

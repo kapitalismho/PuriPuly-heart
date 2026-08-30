@@ -60,6 +60,7 @@ def _owner(
     async def execute_qq(
         _qq_identity: str,
         _credential: str,
+        _referral_id: str | None,
     ) -> ManagedAuthExecutionResult:
         return qq_result or ManagedAuthExecutionResult(succeeded=True)
 
@@ -166,7 +167,7 @@ async def test_discord_success_sequences_pending_result_runtime_view_and_refresh
     pass_status = TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=2,
-        invite_limit=5,
+        invite_limit=3,
     )
     transaction = TransactionResult(
         status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
@@ -244,7 +245,7 @@ async def test_discord_delivery_ack_pending_keeps_issued_pass_visible_and_refres
     pass_status = TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=0,
-        invite_limit=5,
+        invite_limit=3,
     )
     owner = _owner(
         [_state()],

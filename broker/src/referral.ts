@@ -10,12 +10,13 @@ import type {
   OpenRouterEntitlementRecord,
   ReferralCodeRecord,
   ReferralRewardRecord,
+  ReferralSource,
 } from './persistence';
 import { MANAGED_TRIAL_BUDGET_POLICY } from './trial-policy';
 
 export const REFERRAL_ID_LENGTH = 6;
 export const REFERRAL_ID_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-export const TALK_TOGETHER_PASS_INVITE_LIMIT = 5;
+export const TALK_TOGETHER_PASS_INVITE_LIMIT = 3;
 export const TALK_TOGETHER_PASS_BONUS_TRANSLATIONS_PER_FRIEND = 200;
 
 const REFERRAL_ID_PATTERN = new RegExp(
@@ -26,6 +27,7 @@ const REFERRAL_RANDOM_REJECTION_THRESHOLD =
   Math.floor(256 / REFERRAL_ID_ALPHABET.length) * REFERRAL_ID_ALPHABET.length;
 const REFERRAL_ID_MAX_RANDOM_DRAWS = 64;
 const OWNED_DISCORD_USER_REF_PATTERN = /^ph-discord-user-v\d+_[A-Za-z0-9_-]{32,128}$/u;
+const OWNED_QQ_SUBJECT_REF_PATTERN = /^ph-qq-subject-v1_[A-Za-z0-9_-]{32,128}$/u;
 const DEFAULT_REFERRAL_ID_COLLISION_ATTEMPTS = 12;
 const USD_CENTS = 100;
 const REFERRER_REFERRAL_REWARD_CENTS = 2;
@@ -39,7 +41,11 @@ const ISSUE_REFERRAL_SKIP_REASONS = [
   'unknown_referral_id',
   'disabled_referral_id',
   'self_referral',
+  'self_or_cross_source_installation',
   'duplicate_hardware',
+  'invalid_installation',
+  'rewards_disabled',
+  'global_reward_cap_reached',
   'referred_already_rewarded',
   'referrer_cap_reached',
   'referrer_not_eligible',
@@ -98,7 +104,11 @@ export type IssueReferralSkipReason =
   | 'unknown_referral_id'
   | 'disabled_referral_id'
   | 'self_referral'
+  | 'self_or_cross_source_installation'
   | 'duplicate_hardware'
+  | 'invalid_installation'
+  | 'rewards_disabled'
+  | 'global_reward_cap_reached'
   | 'referred_already_rewarded'
   | 'referrer_cap_reached'
   | 'referrer_not_eligible'
@@ -155,7 +165,7 @@ export type IssueReferralReservationResult =
 
 export type OwnedReferralIdEnsureFailureReason =
   | 'not_eligible'
-  | 'unsafe_discord_user_ref'
+  | 'unsafe_subject_ref'
   | 'disabled'
   | 'collision_exhausted';
 
@@ -170,13 +180,22 @@ export type OwnedReferralIdEnsureResult =
       reason: OwnedReferralIdEnsureFailureReason;
     };
 
-interface ActiveDiscordManagedReferralOwner extends OpenRouterEntitlementRecord {
-  installation_id: string;
-  discord_user_ref: string;
-  managed_credential_ref: string;
-  expires_at: string;
-  discord_issue_status: 'active';
-  discord_issue_delivered_at: string;
+export interface ReferralSubject {
+  source: ReferralSource;
+  subjectRef: string;
+  installationId: string | null;
+}
+
+export interface ReferralRewardSubject extends ReferralSubject {
+  hardwareHash: string | null;
+  hardwareHashSaltVersion: number | null;
+}
+
+interface ActiveManagedReferralOwner extends ReferralSubject {
+  entitlementRef: string;
+  managedCredentialRef: string;
+  budgetUsd: number;
+  expiresAt: string;
 }
 
 export function normalizeReferralId(value: unknown): string | null {
@@ -196,11 +215,14 @@ export async function reserveIssueReferralReward(
   db: D1Database,
   input: {
     referralId: string | null;
-    referredDiscordUserRef: string;
-    referredInstallationId: string;
-    referredHardwareHash: string;
-    referredHardwareHashSaltVersion: number;
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
+    referredHardwareHash: string | null;
+    referredHardwareHashSaltVersion: number | null;
     clientIp?: string | null;
+    globalCountLimit?: number | null;
+    globalCountWindowStartIso?: string | null;
     nowIso: string;
   },
 ): Promise<IssueReferralReservationResult> {
@@ -219,6 +241,8 @@ export async function reserveIssueReferralReward(
 
   if (
     await isValidShapedReferralAttemptRateLimited(db, {
+      referredSource: input.referredSource,
+      referredSubjectRef: input.referredSubjectRef,
       referredInstallationId: input.referredInstallationId,
       attemptIpHash,
       nowIso: input.nowIso,
@@ -227,11 +251,12 @@ export async function reserveIssueReferralReward(
   ) {
     const referrerFields = existingCode
       ? referralRewardReferrerFields(existingCode)
-      : { referrerDiscordUserRef: null, referrerInstallationId: null };
+      : { referrerSource: null, referrerSubjectRef: null, referrerInstallationId: null };
     await insertSkippedIssueReferralReward(db, {
       referralId,
       ...referrerFields,
-      referredDiscordUserRef: input.referredDiscordUserRef,
+      referredSource: input.referredSource,
+      referredSubjectRef: input.referredSubjectRef,
       referredInstallationId: input.referredInstallationId,
       referredHardwareHash: input.referredHardwareHash,
       referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
@@ -246,6 +271,8 @@ export async function reserveIssueReferralReward(
     const reason: IssueReferralSkipReason = (await isUnknownReferralAttemptRateLimited(
       db,
       {
+        referredSource: input.referredSource,
+        referredSubjectRef: input.referredSubjectRef,
         referredInstallationId: input.referredInstallationId,
         attemptIpHash,
         nowIso: input.nowIso,
@@ -256,9 +283,11 @@ export async function reserveIssueReferralReward(
       : 'unknown_referral_id';
     await insertSkippedIssueReferralReward(db, {
       referralId,
-      referrerDiscordUserRef: null,
+      referrerSource: null,
+      referrerSubjectRef: null,
       referrerInstallationId: null,
-      referredDiscordUserRef: input.referredDiscordUserRef,
+      referredSource: input.referredSource,
+      referredSubjectRef: input.referredSubjectRef,
       referredInstallationId: input.referredInstallationId,
       referredHardwareHash: input.referredHardwareHash,
       referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
@@ -274,7 +303,8 @@ export async function reserveIssueReferralReward(
     await insertSkippedIssueReferralReward(db, {
       referralId,
       ...referrerFields,
-      referredDiscordUserRef: input.referredDiscordUserRef,
+      referredSource: input.referredSource,
+      referredSubjectRef: input.referredSubjectRef,
       referredInstallationId: input.referredInstallationId,
       referredHardwareHash: input.referredHardwareHash,
       referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
@@ -296,7 +326,8 @@ export async function reserveIssueReferralReward(
     await insertSkippedIssueReferralReward(db, {
       referralId,
       ...referrerFields,
-      referredDiscordUserRef: input.referredDiscordUserRef,
+      referredSource: input.referredSource,
+      referredSubjectRef: input.referredSubjectRef,
       referredInstallationId: input.referredInstallationId,
       referredHardwareHash: input.referredHardwareHash,
       referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
@@ -309,12 +340,15 @@ export async function reserveIssueReferralReward(
 
   const reserved = await insertReservedIssueReferralReward(db, {
     referralId,
-    referredDiscordUserRef: input.referredDiscordUserRef,
+    referredSource: input.referredSource,
+    referredSubjectRef: input.referredSubjectRef,
     referredInstallationId: input.referredInstallationId,
     referredHardwareHash: input.referredHardwareHash,
     referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
     attemptIpHash,
     controls,
+    globalCountLimit: input.globalCountLimit ?? null,
+    globalCountWindowStartIso: input.globalCountWindowStartIso ?? null,
     nowIso: input.nowIso,
   });
   if (reserved) {
@@ -322,25 +356,31 @@ export async function reserveIssueReferralReward(
       outcome: 'reserved',
       referralId,
       referredInstallationId: input.referredInstallationId,
-      referrerDiscordUserRef: existingCode.owner_discord_user_ref,
+      referrerSource: existingCode.owner_source,
+      referrerSubjectRef: existingCode.owner_subject_ref,
     });
     return { outcome: 'reserved', referralId };
   }
 
   const skip = await resolveIssueReferralSkip(db, {
     referralId,
-    referredDiscordUserRef: input.referredDiscordUserRef,
+    referredSource: input.referredSource,
+    referredSubjectRef: input.referredSubjectRef,
     referredInstallationId: input.referredInstallationId,
     referredHardwareHash: input.referredHardwareHash,
     referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
     controls,
+    globalCountLimit: input.globalCountLimit ?? null,
+    globalCountWindowStartIso: input.globalCountWindowStartIso ?? null,
     nowIso: input.nowIso,
   });
   await insertSkippedIssueReferralReward(db, {
     referralId,
-    referrerDiscordUserRef: skip.referrerDiscordUserRef,
+    referrerSource: skip.referrerSource,
+    referrerSubjectRef: skip.referrerSubjectRef,
     referrerInstallationId: skip.referrerInstallationId,
-    referredDiscordUserRef: input.referredDiscordUserRef,
+    referredSource: input.referredSource,
+    referredSubjectRef: input.referredSubjectRef,
     referredInstallationId: input.referredInstallationId,
     referredHardwareHash: input.referredHardwareHash,
     referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
@@ -356,8 +396,9 @@ export async function markReservedIssueReferralFailed(
   db: D1Database,
   input: {
     referralId: string;
-    referredDiscordUserRef: string;
-    referredInstallationId: string;
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
     failureReason: 'issue_delivery_failed';
     nowIso: string;
   },
@@ -371,15 +412,17 @@ export async function markReservedIssueReferralFailed(
               failure_reason = ?,
               updated_at = ?
         WHERE referral_id = ?
-          AND referred_discord_user_ref = ?
-          AND referred_installation_id = ?
+          AND referred_source = ?
+          AND referred_subject_ref = ?
+          AND referred_installation_id IS ?
           AND referred_bonus_status = 'reserved'`,
     )
     .bind(
       input.failureReason,
       input.nowIso,
       input.referralId,
-      input.referredDiscordUserRef,
+      input.referredSource,
+      input.referredSubjectRef,
       input.referredInstallationId,
     )
     .run();
@@ -395,8 +438,9 @@ export async function markReservedIssueReferralCredited(
   db: D1Database,
   input: {
     referralId: string;
-    referredDiscordUserRef: string;
-    referredInstallationId: string;
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
     referredManagedCredentialRef: string;
     nowIso: string;
   },
@@ -406,11 +450,13 @@ export async function markReservedIssueReferralCredited(
       `UPDATE referral_rewards
           SET referred_bonus_status = 'credited',
               referred_managed_credential_ref = ?,
+              failure_reason = NULL,
               updated_at = ?,
               credited_at = ?
         WHERE referral_id = ?
-          AND referred_discord_user_ref = ?
-          AND referred_installation_id = ?
+          AND referred_source = ?
+          AND referred_subject_ref = ?
+          AND referred_installation_id IS ?
           AND referred_bonus_status = 'reserved'`,
     )
     .bind(
@@ -418,7 +464,8 @@ export async function markReservedIssueReferralCredited(
       input.nowIso,
       input.nowIso,
       input.referralId,
-      input.referredDiscordUserRef,
+      input.referredSource,
+      input.referredSubjectRef,
       input.referredInstallationId,
     )
     .run();
@@ -438,24 +485,27 @@ export async function applyCreditedIssueReferrerRewardLimitUpdate(
   db: D1Database,
   input: {
     referralId: string;
-    referredDiscordUserRef: string;
-    referredInstallationId: string;
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
     managementApiKey: string;
     nowIso: string;
     fetchImpl?: typeof fetch;
   },
 ): Promise<ReferrerRewardLimitUpdateResult> {
-  const referrerDiscordUserRef = await getCreditedIssueReferralReferrer(db, {
+  const referrer = await getCreditedIssueReferralReferrer(db, {
     referralId: input.referralId,
-    referredDiscordUserRef: input.referredDiscordUserRef,
+    referredSource: input.referredSource,
+    referredSubjectRef: input.referredSubjectRef,
     referredInstallationId: input.referredInstallationId,
   });
-  if (!referrerDiscordUserRef) {
+  if (!referrer) {
     return { outcome: 'not_applicable', reason: 'no_referrer_reward_rows' };
   }
 
   return applyReferrerRewardLimitUpdates(db, {
-    referrerDiscordUserRef,
+    referrerSource: referrer.source,
+    referrerSubjectRef: referrer.subjectRef,
     managementApiKey: input.managementApiKey,
     nowIso: input.nowIso,
     fetchImpl: input.fetchImpl,
@@ -465,7 +515,8 @@ export async function applyCreditedIssueReferrerRewardLimitUpdate(
 export async function applyReferrerRewardLimitUpdates(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
     managementApiKey: string;
     nowIso: string;
     fetchImpl?: typeof fetch;
@@ -485,7 +536,8 @@ export async function applyReferrerRewardLimitUpdates(
     lastCreditedResult = result;
     if (
       !(await hasPendingReferrerRewardRows(db, {
-        referrerDiscordUserRef: input.referrerDiscordUserRef,
+        referrerSource: input.referrerSource,
+        referrerSubjectRef: input.referrerSubjectRef,
       }))
     ) {
       return result;
@@ -503,7 +555,8 @@ export async function applyReferrerRewardLimitUpdates(
 async function applyReferrerRewardLimitUpdateAttempt(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
     managementApiKey: string;
     nowIso: string;
     fetchImpl?: typeof fetch;
@@ -515,12 +568,14 @@ async function applyReferrerRewardLimitUpdateAttempt(
   }
 
   const activeEntitlement = await getActiveReferrerRewardEntitlement(db, {
-    referrerDiscordUserRef: input.referrerDiscordUserRef,
+    referrerSource: input.referrerSource,
+    referrerSubjectRef: input.referrerSubjectRef,
     nowIso: input.nowIso,
   });
-  if (!activeEntitlement?.managed_credential_ref) {
+  if (!activeEntitlement) {
     const skippedRows = await markReferrerRewardRowsSkipped(db, {
-      referrerDiscordUserRef: input.referrerDiscordUserRef,
+      referrerSource: input.referrerSource,
+      referrerSubjectRef: input.referrerSubjectRef,
       nowIso: input.nowIso,
       skipReason: 'referrer_managed_key_missing',
     });
@@ -535,12 +590,13 @@ async function applyReferrerRewardLimitUpdateAttempt(
     };
   }
 
-  const managedCredentialRef = activeEntitlement.managed_credential_ref;
+  const managedCredentialRef = activeEntitlement.managedCredentialRef;
   const leaseCutoffIso = new Date(
     now.getTime() - REFERRER_APPLYING_LEASE_MS,
   ).toISOString();
   const claimedRows = await claimReferrerRewardApplicationLease(db, {
-    referrerDiscordUserRef: input.referrerDiscordUserRef,
+    referrerSource: input.referrerSource,
+    referrerSubjectRef: input.referrerSubjectRef,
     managedCredentialRef,
     nowIso: input.nowIso,
     leaseCutoffIso,
@@ -548,14 +604,16 @@ async function applyReferrerRewardLimitUpdateAttempt(
   if (claimedRows === 0) {
     if (
       await hasActiveReferrerRewardApplicationLease(db, {
-        referrerDiscordUserRef: input.referrerDiscordUserRef,
+        referrerSource: input.referrerSource,
+        referrerSubjectRef: input.referrerSubjectRef,
         managedCredentialRef,
         leaseCutoffIso,
       })
     ) {
       logReferralRewardOutcome({
         outcome: 'applying',
-        referrerDiscordUserRef: input.referrerDiscordUserRef,
+        referrerSource: input.referrerSource,
+        referrerSubjectRef: input.referrerSubjectRef,
         referrerManagedCredentialRef: managedCredentialRef,
         reason: 'active_lease',
       });
@@ -567,7 +625,8 @@ async function applyReferrerRewardLimitUpdateAttempt(
 
   try {
     const reflectedRewardCount = await countReferrerRewardsForTargetLimit(db, {
-      referrerDiscordUserRef: input.referrerDiscordUserRef,
+      referrerSource: input.referrerSource,
+      referrerSubjectRef: input.referrerSubjectRef,
       managedCredentialRef,
     });
     const ledgerTargetLimitUsd = referrerRewardTargetLimitUsd(reflectedRewardCount);
@@ -579,7 +638,7 @@ async function applyReferrerRewardLimitUpdateAttempt(
     const targetLimitUsd = maxUsd(
       ledgerTargetLimitUsd,
       providerLimitUsd,
-      activeEntitlement.budget_usd,
+      activeEntitlement.budgetUsd,
     );
     let verifiedLimitUsd = providerLimitUsd;
 
@@ -594,8 +653,7 @@ async function applyReferrerRewardLimitUpdateAttempt(
 
     const consistentLimitUsd = maxUsd(targetLimitUsd, verifiedLimitUsd);
     const budgetUpdated = await updateReferrerEntitlementBudget(db, {
-      referrerDiscordUserRef: input.referrerDiscordUserRef,
-      installationId: activeEntitlement.installation_id,
+      owner: activeEntitlement,
       managedCredentialRef,
       budgetUsd: consistentLimitUsd,
     });
@@ -604,14 +662,16 @@ async function applyReferrerRewardLimitUpdateAttempt(
     }
 
     const creditedRows = await markReferrerRewardRowsCredited(db, {
-      referrerDiscordUserRef: input.referrerDiscordUserRef,
+      referrerSource: input.referrerSource,
+      referrerSubjectRef: input.referrerSubjectRef,
       managedCredentialRef,
       nowIso: input.nowIso,
     });
     if (creditedRows > 0) {
       logReferralRewardOutcome({
         outcome: 'credited',
-        referrerDiscordUserRef: input.referrerDiscordUserRef,
+        referrerSource: input.referrerSource,
+        referrerSubjectRef: input.referrerSubjectRef,
         referrerManagedCredentialRef: managedCredentialRef,
         affectedRows: creditedRows,
       });
@@ -623,7 +683,8 @@ async function applyReferrerRewardLimitUpdateAttempt(
     };
   } catch {
     const failedRows = await markReferrerRewardRowsFailed(db, {
-      referrerDiscordUserRef: input.referrerDiscordUserRef,
+      referrerSource: input.referrerSource,
+      referrerSubjectRef: input.referrerSubjectRef,
       managedCredentialRef,
       nowIso: input.nowIso,
       failureReason: 'referrer_patch_failed',
@@ -640,10 +701,11 @@ export async function recordSkippedIssueReferralReward(
   db: D1Database,
   input: {
     referralId: string | null;
-    referredDiscordUserRef: string;
-    referredInstallationId: string;
-    referredHardwareHash: string;
-    referredHardwareHashSaltVersion: number;
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
+    referredHardwareHash: string | null;
+    referredHardwareHashSaltVersion: number | null;
     skipReason: IssueReferralSkipReason;
     clientIp?: string | null;
     nowIso: string;
@@ -665,9 +727,11 @@ export async function recordSkippedIssueReferralReward(
   const attemptIpHash = await hashReferralAttemptIp(input.clientIp ?? null);
   await insertSkippedIssueReferralReward(db, {
     referralId,
-    referrerDiscordUserRef: skip.referrerDiscordUserRef,
+    referrerSource: skip.referrerSource,
+    referrerSubjectRef: skip.referrerSubjectRef,
     referrerInstallationId: skip.referrerInstallationId,
-    referredDiscordUserRef: input.referredDiscordUserRef,
+    referredSource: input.referredSource,
+    referredSubjectRef: input.referredSubjectRef,
     referredInstallationId: input.referredInstallationId,
     referredHardwareHash: input.referredHardwareHash,
     referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
@@ -704,10 +768,12 @@ export async function reconcileStaleReferralRewards(
         ? DEFAULT_STALE_APPLYING_RECONCILE_MS
         : input.staleApplyingAfterMinutes * 60_000),
   ).toISOString();
-
   let staleReservedCredited = 0;
   let staleReservedFailed = 0;
-  const staleReservedRows = await listStaleReservedReferralRewards(db, reservedCutoffIso);
+  const staleReservedRows = await listStaleReservedReferralRewards(
+    db,
+    reservedCutoffIso,
+  );
   for (const row of staleReservedRows) {
     const deliveredEntitlement = await getDeliveredReferredEntitlement(db, row);
     if (deliveredEntitlement?.managed_credential_ref) {
@@ -715,8 +781,11 @@ export async function reconcileStaleReferralRewards(
         rewardId: row.id,
         referralId: row.referral_id,
         referredInstallationId: row.referred_installation_id,
-        referrerDiscordUserRef: row.referrer_discord_user_ref,
+        referrerSource: row.referrer_source,
+        referrerSubjectRef: row.referrer_subject_ref,
         managedCredentialRef: deliveredEntitlement.managed_credential_ref,
+        expectedUpdatedAt: row.updated_at,
+        expectedFailureReason: row.failure_reason,
         nowIso: input.nowIso,
       });
       staleReservedCredited += credited;
@@ -727,7 +796,10 @@ export async function reconcileStaleReferralRewards(
       rewardId: row.id,
       referralId: row.referral_id,
       referredInstallationId: row.referred_installation_id,
-      referrerDiscordUserRef: row.referrer_discord_user_ref,
+      referrerSource: row.referrer_source,
+      referrerSubjectRef: row.referrer_subject_ref,
+      expectedUpdatedAt: row.updated_at,
+      expectedFailureReason: row.failure_reason,
       nowIso: input.nowIso,
     });
     staleReservedFailed += failed;
@@ -873,7 +945,9 @@ export function generateReferralId(
 async function isValidShapedReferralAttemptRateLimited(
   db: D1Database,
   input: {
-    referredInstallationId: string;
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
     attemptIpHash: string | null;
     nowIso: string;
     controls: BrokerAbuseControlsConfigValue;
@@ -882,6 +956,8 @@ async function isValidShapedReferralAttemptRateLimited(
   const config = input.controls.referralAttempts.validShaped;
   const windowStart = windowStartIso(input.nowIso, config.windowMinutes);
   const installationCount = await countReferralAttemptsByInstallation(db, {
+    referredSource: input.referredSource,
+    referredSubjectRef: input.referredSubjectRef,
     referredInstallationId: input.referredInstallationId,
     windowStartIso: windowStart,
   });
@@ -903,7 +979,9 @@ async function isValidShapedReferralAttemptRateLimited(
 async function isUnknownReferralAttemptRateLimited(
   db: D1Database,
   input: {
-    referredInstallationId: string;
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
     attemptIpHash: string | null;
     nowIso: string;
     controls: BrokerAbuseControlsConfigValue;
@@ -912,6 +990,8 @@ async function isUnknownReferralAttemptRateLimited(
   const config = input.controls.referralAttempts.unknown;
   const windowStart = windowStartIso(input.nowIso, config.windowMinutes);
   const installationCount = await countUnknownReferralAttemptsByInstallation(db, {
+    referredSource: input.referredSource,
+    referredSubjectRef: input.referredSubjectRef,
     referredInstallationId: input.referredInstallationId,
     windowStartIso: windowStart,
   });
@@ -949,14 +1029,16 @@ async function isReferralIdVelocityLimited(
 async function isReferrerRewardVelocityLimited(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
     nowIso: string;
     controls: BrokerAbuseControlsConfigValue;
   },
 ): Promise<boolean> {
   const config = input.controls.referralAttempts.perReferrerRewardVelocity;
   const count = await countRecentCountedRewardsForReferrer(db, {
-    referrerDiscordUserRef: input.referrerDiscordUserRef,
+    referrerSource: input.referrerSource,
+    referrerSubjectRef: input.referrerSubjectRef,
     windowStartIso: windowStartIso(input.nowIso, config.windowMinutes),
   });
   return count >= config.maxRewards;
@@ -964,16 +1046,30 @@ async function isReferrerRewardVelocityLimited(
 
 async function countReferralAttemptsByInstallation(
   db: D1Database,
-  input: { referredInstallationId: string; windowStartIso: string },
+  input: {
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
+    windowStartIso: string;
+  },
 ): Promise<number> {
   const row = await db
     .prepare(
       `SELECT COUNT(*) AS count
          FROM referral_rewards
-        WHERE referred_installation_id = ?
-          AND created_at >= ?`,
+        WHERE created_at >= ?
+          AND (
+            (referred_source = ? AND referred_subject_ref = ?)
+            OR (? IS NOT NULL AND referred_installation_id = ?)
+          )`,
     )
-    .bind(input.referredInstallationId, input.windowStartIso)
+    .bind(
+      input.windowStartIso,
+      input.referredSource,
+      input.referredSubjectRef,
+      input.referredInstallationId,
+      input.referredInstallationId,
+    )
     .first<{ count: number }>();
   return Number(row?.count ?? 0);
 }
@@ -996,17 +1092,31 @@ async function countReferralAttemptsByIpHash(
 
 async function countUnknownReferralAttemptsByInstallation(
   db: D1Database,
-  input: { referredInstallationId: string; windowStartIso: string },
+  input: {
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
+    windowStartIso: string;
+  },
 ): Promise<number> {
   const row = await db
     .prepare(
       `SELECT COUNT(*) AS count
          FROM referral_rewards
-        WHERE referred_installation_id = ?
-          AND skip_reason IN ('unknown_referral_id', 'unknown_referral_id_rate_limited')
-          AND created_at >= ?`,
+        WHERE skip_reason IN ('unknown_referral_id', 'unknown_referral_id_rate_limited')
+          AND created_at >= ?
+          AND (
+            (referred_source = ? AND referred_subject_ref = ?)
+            OR (? IS NOT NULL AND referred_installation_id = ?)
+          )`,
     )
-    .bind(input.referredInstallationId, input.windowStartIso)
+    .bind(
+      input.windowStartIso,
+      input.referredSource,
+      input.referredSubjectRef,
+      input.referredInstallationId,
+      input.referredInstallationId,
+    )
     .first<{ count: number }>();
   return Number(row?.count ?? 0);
 }
@@ -1046,17 +1156,22 @@ async function countReferralAttemptsForReferralId(
 
 async function countRecentCountedRewardsForReferrer(
   db: D1Database,
-  input: { referrerDiscordUserRef: string; windowStartIso: string },
+  input: {
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
+    windowStartIso: string;
+  },
 ): Promise<number> {
   const row = await db
     .prepare(
       `SELECT COUNT(*) AS count
          FROM referral_rewards
-        WHERE referrer_discord_user_ref = ?
+        WHERE referrer_source = ?
+          AND referrer_subject_ref = ?
           AND referred_bonus_status IN ('reserved', 'credited')
           AND created_at >= ?`,
     )
-    .bind(input.referrerDiscordUserRef, input.windowStartIso)
+    .bind(input.referrerSource, input.referrerSubjectRef, input.windowStartIso)
     .first<{ count: number }>();
   return Number(row?.count ?? 0);
 }
@@ -1089,12 +1204,15 @@ async function insertReservedIssueReferralReward(
   db: D1Database,
   input: {
     referralId: string;
-    referredDiscordUserRef: string;
-    referredInstallationId: string;
-    referredHardwareHash: string;
-    referredHardwareHashSaltVersion: number;
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
+    referredHardwareHash: string | null;
+    referredHardwareHashSaltVersion: number | null;
     attemptIpHash: string | null;
     controls: BrokerAbuseControlsConfigValue;
+    globalCountLimit: number | null;
+    globalCountWindowStartIso: string | null;
     nowIso: string;
   },
 ): Promise<boolean> {
@@ -1110,9 +1228,11 @@ async function insertReservedIssueReferralReward(
     .prepare(
       `INSERT OR IGNORE INTO referral_rewards (
           referral_id,
-          referrer_discord_user_ref,
+          referrer_source,
+          referrer_subject_ref,
           referrer_installation_id,
-          referred_discord_user_ref,
+          referred_source,
+          referred_subject_ref,
           referred_installation_id,
           referred_hardware_hash,
           referred_hardware_hash_salt_version,
@@ -1127,8 +1247,10 @@ async function insertReservedIssueReferralReward(
           updated_at
         )
         SELECT code.referral_id,
-               code.owner_discord_user_ref,
+               code.owner_source,
+               code.owner_subject_ref,
                code.owner_installation_id,
+               ?,
                ?,
                ?,
                ?,
@@ -1136,37 +1258,69 @@ async function insertReservedIssueReferralReward(
                'reserved',
                'pending',
                NULL,
-                NULL,
-                NULL,
-                NULL,
-                ?,
-                ?,
-                ?
-           FROM referral_codes code
+               NULL,
+               NULL,
+               NULL,
+               ?,
+               ?,
+               ?
+          FROM referral_codes code
          WHERE code.referral_id = ?
            AND code.status = 'active'
-           AND code.owner_installation_id IS NOT NULL
-           AND EXISTS (
-             SELECT 1
-               FROM discord_identities identity
-              WHERE identity.discord_user_ref = code.owner_discord_user_ref
-                AND identity.entitlement_installation_id = code.owner_installation_id
-                AND identity.status = 'active'
+           AND (
+             (
+               code.owner_source = 'discord'
+               AND code.owner_installation_id IS NOT NULL
+               AND EXISTS (
+                 SELECT 1
+                   FROM discord_identities identity
+                  WHERE identity.discord_user_ref = code.owner_subject_ref
+                    AND identity.entitlement_installation_id = code.owner_installation_id
+                    AND identity.status = 'active'
+               )
+             )
+             OR (
+               code.owner_source = 'qq'
+               AND EXISTS (
+                 SELECT 1
+                   FROM qq_managed_entitlements entitlement
+                  WHERE entitlement.qq_subject_ref = code.owner_subject_ref
+                    AND entitlement.status = 'active'
+                    AND entitlement.managed_credential_ref IS NOT NULL
+                    AND length(trim(entitlement.managed_credential_ref)) > 0
+                    AND entitlement.delivered_at IS NOT NULL
+                    AND entitlement.expires_at IS NOT NULL
+                    AND datetime(entitlement.expires_at) >= datetime(?)
+               )
+             )
            )
-           AND code.owner_discord_user_ref <> ?
-           AND NOT EXISTS (
-             SELECT 1
-               FROM openrouter_entitlements referrer_entitlement
-              WHERE referrer_entitlement.discord_user_ref = code.owner_discord_user_ref
-                AND referrer_entitlement.status = 'active'
-                AND referrer_entitlement.discord_issue_status = 'active'
-                AND referrer_entitlement.verified_hardware_hash = ?
-                AND referrer_entitlement.verified_hardware_hash_salt_version = ?
+           AND NOT (
+             code.owner_source = ?
+             AND code.owner_subject_ref = ?
+           )
+           AND NOT (
+             ? IS NOT NULL
+             AND code.owner_installation_id IS NOT NULL
+             AND code.owner_installation_id = ?
+           )
+           AND (
+             code.owner_source <> 'discord'
+             OR ? <> 'discord'
+             OR NOT EXISTS (
+               SELECT 1
+                 FROM openrouter_entitlements referrer_entitlement
+                WHERE referrer_entitlement.discord_user_ref = code.owner_subject_ref
+                  AND referrer_entitlement.status = 'active'
+                  AND referrer_entitlement.discord_issue_status = 'active'
+                  AND referrer_entitlement.verified_hardware_hash = ?
+                  AND referrer_entitlement.verified_hardware_hash_salt_version = ?
+             )
            )
            AND (
              SELECT COUNT(*)
                FROM referral_rewards counted
-              WHERE counted.referrer_discord_user_ref = code.owner_discord_user_ref
+              WHERE counted.referrer_source = code.owner_source
+                AND counted.referrer_subject_ref = code.owner_subject_ref
                 AND counted.referred_bonus_status IN ('reserved', 'credited')
            ) < ?
            AND NOT EXISTS (
@@ -1174,26 +1328,46 @@ async function insertReservedIssueReferralReward(
                FROM referral_rewards counted_referred
               WHERE counted_referred.referred_bonus_status IN ('reserved', 'credited')
                 AND (
-                 counted_referred.referred_discord_user_ref = ?
-                 OR counted_referred.referred_installation_id = ?
-               )
-            )
-            AND (
-              SELECT COUNT(*)
-                FROM referral_rewards referral_velocity
-               WHERE referral_velocity.referral_id = code.referral_id
-                 AND referral_velocity.created_at >= ?
-            ) < ?
-            AND (
-              SELECT COUNT(*)
-                FROM referral_rewards referrer_velocity
-               WHERE referrer_velocity.referrer_discord_user_ref = code.owner_discord_user_ref
-                 AND referrer_velocity.referred_bonus_status IN ('reserved', 'credited')
-                 AND referrer_velocity.created_at >= ?
-            ) < ?`,
+                  (
+                    counted_referred.referred_source = ?
+                    AND counted_referred.referred_subject_ref = ?
+                  )
+                  OR (
+                    ? IS NOT NULL
+                    AND counted_referred.referred_installation_id = ?
+                  )
+                )
+           )
+           AND (
+             ? IS NULL
+             OR ? IS NULL
+             OR ? <> 'qq'
+             OR (
+               SELECT COUNT(*)
+                 FROM referral_rewards qq_daily
+                WHERE qq_daily.referred_source = 'qq'
+                  AND qq_daily.referred_bonus_status IN ('reserved', 'credited')
+                  AND qq_daily.created_at >= ?
+             ) < ?
+           )
+           AND (
+             SELECT COUNT(*)
+               FROM referral_rewards referral_velocity
+              WHERE referral_velocity.referral_id = code.referral_id
+                AND referral_velocity.created_at >= ?
+           ) < ?
+           AND (
+             SELECT COUNT(*)
+               FROM referral_rewards referrer_velocity
+              WHERE referrer_velocity.referrer_source = code.owner_source
+                AND referrer_velocity.referrer_subject_ref = code.owner_subject_ref
+                AND referrer_velocity.referred_bonus_status IN ('reserved', 'credited')
+                AND referrer_velocity.created_at >= ?
+           ) < ?`,
     )
     .bind(
-      input.referredDiscordUserRef,
+      input.referredSource,
+      input.referredSubjectRef,
       input.referredInstallationId,
       input.referredHardwareHash,
       input.referredHardwareHashSaltVersion,
@@ -1201,12 +1375,24 @@ async function insertReservedIssueReferralReward(
       input.nowIso,
       input.nowIso,
       input.referralId,
-      input.referredDiscordUserRef,
+      input.nowIso,
+      input.referredSource,
+      input.referredSubjectRef,
+      input.referredInstallationId,
+      input.referredInstallationId,
+      input.referredSource,
       input.referredHardwareHash,
       input.referredHardwareHashSaltVersion,
       TALK_TOGETHER_PASS_INVITE_LIMIT,
-      input.referredDiscordUserRef,
+      input.referredSource,
+      input.referredSubjectRef,
       input.referredInstallationId,
+      input.referredInstallationId,
+      input.globalCountLimit,
+      input.globalCountWindowStartIso,
+      input.referredSource,
+      input.globalCountWindowStartIso,
+      input.globalCountLimit,
       referralVelocityWindowStartIso,
       input.controls.referralAttempts.perReferralIdVelocity.maxAttempts,
       referrerVelocityWindowStartIso,
@@ -1221,23 +1407,28 @@ async function resolveIssueReferralSkip(
   db: D1Database,
   input: {
     referralId: string;
-    referredDiscordUserRef: string;
-    referredInstallationId: string;
-    referredHardwareHash: string;
-    referredHardwareHashSaltVersion: number;
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
+    referredHardwareHash: string | null;
+    referredHardwareHashSaltVersion: number | null;
     controls: BrokerAbuseControlsConfigValue;
+    globalCountLimit: number | null;
+    globalCountWindowStartIso: string | null;
     nowIso: string;
   },
 ): Promise<{
   reason: IssueReferralSkipReason;
-  referrerDiscordUserRef: string | null;
+  referrerSource: ReferralSource | null;
+  referrerSubjectRef: string | null;
   referrerInstallationId: string | null;
 }> {
   const code = await getReferralCodeByReferralId(db, input.referralId);
   if (!code) {
     return {
       reason: 'unknown_referral_id',
-      referrerDiscordUserRef: null,
+      referrerSource: null,
+      referrerSubjectRef: null,
       referrerInstallationId: null,
     };
   }
@@ -1247,24 +1438,36 @@ async function resolveIssueReferralSkip(
     return { reason: 'disabled_referral_id', ...referrerFields };
   }
 
-  if (code.owner_discord_user_ref === input.referredDiscordUserRef) {
+  if (
+    code.owner_source === input.referredSource &&
+    code.owner_subject_ref === input.referredSubjectRef
+  ) {
     return { reason: 'self_referral', ...referrerFields };
   }
 
-  if (!code.owner_installation_id) {
-    return { reason: 'referrer_not_eligible', ...referrerFields };
+  if (
+    input.referredInstallationId !== null &&
+    code.owner_installation_id === input.referredInstallationId
+  ) {
+    return { reason: 'self_or_cross_source_installation', ...referrerFields };
   }
 
   if (
     !(await hasActiveReferralOwnerIdentity(db, {
-      referrerDiscordUserRef: code.owner_discord_user_ref,
+      referrerSource: code.owner_source,
+      referrerSubjectRef: code.owner_subject_ref,
       referrerInstallationId: code.owner_installation_id,
+      nowIso: input.nowIso,
     }))
   ) {
     return { reason: 'referrer_not_eligible', ...referrerFields };
   }
 
-  if (await hasIssueReferralDuplicateHardware(db, input, code.owner_discord_user_ref)) {
+  if (
+    code.owner_source === 'discord' &&
+    input.referredSource === 'discord' &&
+    (await hasIssueReferralDuplicateHardware(db, input, code.owner_subject_ref))
+  ) {
     return { reason: 'duplicate_hardware', ...referrerFields };
   }
 
@@ -1272,8 +1475,22 @@ async function resolveIssueReferralSkip(
     return { reason: 'referred_already_rewarded', ...referrerFields };
   }
 
-  if (await hasReachedIssueReferralCap(db, code.owner_discord_user_ref)) {
+  if (
+    await hasReachedIssueReferralCap(db, code.owner_source, code.owner_subject_ref)
+  ) {
     return { reason: 'referrer_cap_reached', ...referrerFields };
+  }
+
+  if (
+    input.referredSource === 'qq' &&
+    input.globalCountLimit !== null &&
+    input.globalCountWindowStartIso !== null &&
+    (await countCountedQqReferralRewardsSince(
+      db,
+      input.globalCountWindowStartIso,
+    )) >= input.globalCountLimit
+  ) {
+    return { reason: 'global_reward_cap_reached', ...referrerFields };
   }
 
   if (
@@ -1288,7 +1505,8 @@ async function resolveIssueReferralSkip(
 
   if (
     await isReferrerRewardVelocityLimited(db, {
-      referrerDiscordUserRef: code.owner_discord_user_ref,
+      referrerSource: code.owner_source,
+      referrerSubjectRef: code.owner_subject_ref,
       nowIso: input.nowIso,
       controls: input.controls,
     })
@@ -1307,14 +1525,16 @@ async function resolveForcedIssueReferralSkip(
   },
 ): Promise<{
   reason: IssueReferralSkipReason;
-  referrerDiscordUserRef: string | null;
+  referrerSource: ReferralSource | null;
+  referrerSubjectRef: string | null;
   referrerInstallationId: string | null;
 }> {
   const code = await getReferralCodeByReferralId(db, input.referralId);
   if (!code) {
     return {
       reason: 'unknown_referral_id',
-      referrerDiscordUserRef: null,
+      referrerSource: null,
+      referrerSubjectRef: null,
       referrerInstallationId: null,
     };
   }
@@ -1328,18 +1548,13 @@ async function resolveForcedIssueReferralSkip(
 }
 
 function referralRewardReferrerFields(code: ReferralCodeRecord): {
-  referrerDiscordUserRef: string | null;
+  referrerSource: ReferralSource;
+  referrerSubjectRef: string;
   referrerInstallationId: string | null;
 } {
-  if (!code.owner_installation_id) {
-    return {
-      referrerDiscordUserRef: null,
-      referrerInstallationId: null,
-    };
-  }
-
   return {
-    referrerDiscordUserRef: code.owner_discord_user_ref,
+    referrerSource: code.owner_source,
+    referrerSubjectRef: code.owner_subject_ref,
     referrerInstallationId: code.owner_installation_id,
   };
 }
@@ -1351,7 +1566,8 @@ async function getReferralCodeByReferralId(
   return db
     .prepare(
       `SELECT referral_id,
-              owner_discord_user_ref,
+              owner_source,
+              owner_subject_ref,
               owner_installation_id,
               status,
               created_at,
@@ -1366,10 +1582,10 @@ async function getReferralCodeByReferralId(
 async function hasIssueReferralDuplicateHardware(
   db: D1Database,
   input: {
-    referredHardwareHash: string;
-    referredHardwareHashSaltVersion: number;
+    referredHardwareHash: string | null;
+    referredHardwareHashSaltVersion: number | null;
   },
-  referrerDiscordUserRef: string,
+  referrerSubjectRef: string,
 ): Promise<boolean> {
   const row = await db
     .prepare(
@@ -1384,7 +1600,7 @@ async function hasIssueReferralDuplicateHardware(
         ) AS duplicate_found`,
     )
     .bind(
-      referrerDiscordUserRef,
+      referrerSubjectRef,
       input.referredHardwareHash,
       input.referredHardwareHashSaltVersion,
     )
@@ -1396,31 +1612,56 @@ async function hasIssueReferralDuplicateHardware(
 async function hasActiveReferralOwnerIdentity(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
-    referrerInstallationId: string;
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
+    referrerInstallationId: string | null;
+    nowIso: string;
   },
 ): Promise<boolean> {
+  if (input.referrerSource === 'discord') {
+    if (!input.referrerInstallationId) {
+      return false;
+    }
+    const row = await db
+      .prepare(
+        `SELECT EXISTS(
+            SELECT 1
+              FROM discord_identities identity
+             WHERE identity.discord_user_ref = ?
+               AND identity.entitlement_installation_id = ?
+               AND identity.status = 'active'
+          ) AS active_found`,
+      )
+      .bind(input.referrerSubjectRef, input.referrerInstallationId)
+      .first<{ active_found: number }>();
+    return Number(row?.active_found ?? 0) === 1;
+  }
+
   const row = await db
     .prepare(
       `SELECT EXISTS(
           SELECT 1
-            FROM discord_identities identity
-           WHERE identity.discord_user_ref = ?
-             AND identity.entitlement_installation_id = ?
-             AND identity.status = 'active'
+            FROM qq_managed_entitlements entitlement
+           WHERE entitlement.qq_subject_ref = ?
+             AND entitlement.status = 'active'
+             AND entitlement.managed_credential_ref IS NOT NULL
+             AND length(trim(entitlement.managed_credential_ref)) > 0
+             AND entitlement.delivered_at IS NOT NULL
+             AND entitlement.expires_at IS NOT NULL
+             AND datetime(entitlement.expires_at) >= datetime(?)
         ) AS active_found`,
     )
-    .bind(input.referrerDiscordUserRef, input.referrerInstallationId)
+    .bind(input.referrerSubjectRef, input.nowIso)
     .first<{ active_found: number }>();
-
   return Number(row?.active_found ?? 0) === 1;
 }
 
 async function hasCountedIssueReferralForReferred(
   db: D1Database,
   input: {
-    referredDiscordUserRef: string;
-    referredInstallationId: string;
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
   },
 ): Promise<boolean> {
   const row = await db
@@ -1430,12 +1671,23 @@ async function hasCountedIssueReferralForReferred(
             FROM referral_rewards counted
            WHERE counted.referred_bonus_status IN ('reserved', 'credited')
              AND (
-               counted.referred_discord_user_ref = ?
-               OR counted.referred_installation_id = ?
+               (
+                 counted.referred_source = ?
+                 AND counted.referred_subject_ref = ?
+               )
+               OR (
+                 ? IS NOT NULL
+                 AND counted.referred_installation_id = ?
+               )
              )
         ) AS counted_found`,
     )
-    .bind(input.referredDiscordUserRef, input.referredInstallationId)
+    .bind(
+      input.referredSource,
+      input.referredSubjectRef,
+      input.referredInstallationId,
+      input.referredInstallationId,
+    )
     .first<{ counted_found: number }>();
 
   return Number(row?.counted_found ?? 0) === 1;
@@ -1443,11 +1695,15 @@ async function hasCountedIssueReferralForReferred(
 
 export async function resolveTalkTogetherPassStatusForOwnedReferralCode(
   db: D1Database,
-  referralCode: Pick<ReferralCodeRecord, 'referral_id' | 'owner_discord_user_ref'>,
+  referralCode: Pick<
+    ReferralCodeRecord,
+    'referral_id' | 'owner_source' | 'owner_subject_ref'
+  >,
 ): Promise<TalkTogetherPassStatusResponse> {
   const inviteCount = await countCountedIssueReferralRewardsForReferrer(
     db,
-    referralCode.owner_discord_user_ref,
+    referralCode.owner_source,
+    referralCode.owner_subject_ref,
   );
   return {
     pass_id: referralCode.referral_id,
@@ -1459,28 +1715,51 @@ export async function resolveTalkTogetherPassStatusForOwnedReferralCode(
 
 async function countCountedIssueReferralRewardsForReferrer(
   db: D1Database,
-  referrerDiscordUserRef: string,
+  referrerSource: ReferralSource,
+  referrerSubjectRef: string,
 ): Promise<number> {
   const row = await db
     .prepare(
       `SELECT COUNT(*) AS count
          FROM referral_rewards counted
-        WHERE counted.referrer_discord_user_ref = ?
+        WHERE counted.referrer_source = ?
+          AND counted.referrer_subject_ref = ?
           AND counted.referred_bonus_status IN ('reserved', 'credited')`,
     )
-    .bind(referrerDiscordUserRef)
+    .bind(referrerSource, referrerSubjectRef)
     .first<{ count: number }>();
 
   return Math.max(0, Number(row?.count ?? 0));
 }
 
+export async function countCountedQqReferralRewardsSince(
+  db: D1Database,
+  windowStartIso: string,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count
+         FROM referral_rewards
+        WHERE referred_source = 'qq'
+          AND referred_bonus_status IN ('reserved', 'credited')
+          AND created_at >= ?`,
+    )
+    .bind(windowStartIso)
+    .first<{ count: number }>();
+  return Math.max(0, Number(row?.count ?? 0));
+}
+
 async function hasReachedIssueReferralCap(
   db: D1Database,
-  referrerDiscordUserRef: string,
+  referrerSource: ReferralSource,
+  referrerSubjectRef: string,
 ): Promise<boolean> {
   return (
-    (await countCountedIssueReferralRewardsForReferrer(db, referrerDiscordUserRef)) >=
-    TALK_TOGETHER_PASS_INVITE_LIMIT
+    (await countCountedIssueReferralRewardsForReferrer(
+      db,
+      referrerSource,
+      referrerSubjectRef,
+    )) >= TALK_TOGETHER_PASS_INVITE_LIMIT
   );
 }
 
@@ -1488,12 +1767,14 @@ async function insertSkippedIssueReferralReward(
   db: D1Database,
   input: {
     referralId: string;
-    referrerDiscordUserRef: string | null;
+    referrerSource: ReferralSource | null;
+    referrerSubjectRef: string | null;
     referrerInstallationId: string | null;
-    referredDiscordUserRef: string;
-    referredInstallationId: string;
-    referredHardwareHash: string;
-    referredHardwareHashSaltVersion: number;
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
+    referredHardwareHash: string | null;
+    referredHardwareHashSaltVersion: number | null;
     skipReason: IssueReferralSkipReason;
     attemptIpHash?: string | null;
     nowIso: string;
@@ -1504,9 +1785,11 @@ async function insertSkippedIssueReferralReward(
     .prepare(
       `INSERT INTO referral_rewards (
           referral_id,
-          referrer_discord_user_ref,
+          referrer_source,
+          referrer_subject_ref,
           referrer_installation_id,
-          referred_discord_user_ref,
+          referred_source,
+          referred_subject_ref,
           referred_installation_id,
           referred_hardware_hash,
           referred_hardware_hash_salt_version,
@@ -1519,13 +1802,15 @@ async function insertSkippedIssueReferralReward(
           attempt_ip_hash,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'skipped', 'skipped', ?, NULL, NULL, NULL, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'skipped', 'skipped', ?, NULL, NULL, NULL, ?, ?, ?)`,
     )
     .bind(
       input.referralId,
-      input.referrerDiscordUserRef,
+      input.referrerSource,
+      input.referrerSubjectRef,
       input.referrerInstallationId,
-      input.referredDiscordUserRef,
+      input.referredSource,
+      input.referredSubjectRef,
       input.referredInstallationId,
       input.referredHardwareHash,
       input.referredHardwareHashSaltVersion,
@@ -1539,7 +1824,8 @@ async function insertSkippedIssueReferralReward(
     outcome: 'skipped',
     referralId: input.referralId,
     referredInstallationId: input.referredInstallationId,
-    referrerDiscordUserRef: input.referrerDiscordUserRef,
+    referrerSource: input.referrerSource,
+    referrerSubjectRef: input.referrerSubjectRef,
     reason: input.skipReason,
   });
 }
@@ -1548,76 +1834,149 @@ async function getCreditedIssueReferralReferrer(
   db: D1Database,
   input: {
     referralId: string;
-    referredDiscordUserRef: string;
-    referredInstallationId: string;
+    referredSource: ReferralSource;
+    referredSubjectRef: string;
+    referredInstallationId: string | null;
   },
-): Promise<string | null> {
+): Promise<ReferralSubject | null> {
   const row = await db
     .prepare(
-      `SELECT referrer_discord_user_ref
+      `SELECT referrer_source,
+              referrer_subject_ref,
+              referrer_installation_id
          FROM referral_rewards
         WHERE referral_id = ?
-          AND referred_discord_user_ref = ?
-          AND referred_installation_id = ?
+          AND referred_source = ?
+          AND referred_subject_ref = ?
+          AND referred_installation_id IS ?
           AND referred_bonus_status = 'credited'
           AND referrer_bonus_status IN ('pending', 'applying', 'credited')`,
     )
-    .bind(input.referralId, input.referredDiscordUserRef, input.referredInstallationId)
-    .first<{ referrer_discord_user_ref: string | null }>();
+    .bind(
+      input.referralId,
+      input.referredSource,
+      input.referredSubjectRef,
+      input.referredInstallationId,
+    )
+    .first<{
+      referrer_source: ReferralSource | null;
+      referrer_subject_ref: string | null;
+      referrer_installation_id: string | null;
+    }>();
 
-  return row?.referrer_discord_user_ref ?? null;
+  if (!row?.referrer_source || !row.referrer_subject_ref) {
+    return null;
+  }
+  return {
+    source: row.referrer_source,
+    subjectRef: row.referrer_subject_ref,
+    installationId: row.referrer_installation_id,
+  };
 }
 
 async function getActiveReferrerRewardEntitlement(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
     nowIso: string;
   },
-): Promise<OpenRouterEntitlementRecord | null> {
-  const row = await db
-    .prepare(
-      `SELECT installation_id,
-              status,
-              budget_usd,
-              managed_credential_ref,
-              issued_at,
-              expires_at,
-              release_session_ref,
-              release_token_hash,
-              release_token_expires_at,
-              verified_hardware_hash,
-              verified_hardware_hash_salt_version,
-              discord_user_ref,
-              discord_issue_status,
-              discord_issue_reserved_at,
-              discord_issue_delivered_at
-         FROM openrouter_entitlements
-        WHERE discord_user_ref = ?
-          AND status = 'active'
-          AND discord_issue_status = 'active'
-          AND managed_credential_ref IS NOT NULL
-          AND length(trim(managed_credential_ref)) > 0`,
-    )
-    .bind(input.referrerDiscordUserRef)
-    .first<OpenRouterEntitlementRecord>();
-
-  if (!row) {
-    return null;
-  }
-
+): Promise<ActiveManagedReferralOwner | null> {
   const now = new Date(input.nowIso);
   if (Number.isNaN(now.getTime())) {
     return null;
   }
 
-  return resolveEffectiveEntitlementLifecycle(row, now) === 'active' ? row : null;
+  if (input.referrerSource === 'discord') {
+    const row = await db
+      .prepare(
+        `SELECT installation_id,
+                status,
+                budget_usd,
+                managed_credential_ref,
+                issued_at,
+                expires_at,
+                release_session_ref,
+                release_token_hash,
+                release_token_expires_at,
+                verified_hardware_hash,
+                verified_hardware_hash_salt_version,
+                discord_user_ref,
+                discord_issue_status,
+                discord_issue_reserved_at,
+                discord_issue_delivered_at
+           FROM openrouter_entitlements
+          WHERE discord_user_ref = ?
+            AND status = 'active'
+            AND discord_issue_status = 'active'
+            AND managed_credential_ref IS NOT NULL
+            AND length(trim(managed_credential_ref)) > 0`,
+      )
+      .bind(input.referrerSubjectRef)
+      .first<OpenRouterEntitlementRecord>();
+
+    if (
+      !row?.managed_credential_ref ||
+      !row.expires_at ||
+      !row.discord_user_ref ||
+      resolveEffectiveEntitlementLifecycle(row, now) !== 'active'
+    ) {
+      return null;
+    }
+    return {
+      source: 'discord',
+      subjectRef: row.discord_user_ref,
+      installationId: row.installation_id,
+      entitlementRef: row.installation_id,
+      managedCredentialRef: row.managed_credential_ref,
+      budgetUsd: row.budget_usd,
+      expiresAt: row.expires_at,
+    };
+  }
+
+  const row = await db
+    .prepare(
+      `SELECT qq_subject_ref,
+              issue_ref,
+              managed_credential_ref,
+              budget_usd,
+              expires_at
+         FROM qq_managed_entitlements
+        WHERE qq_subject_ref = ?
+          AND status = 'active'
+          AND managed_credential_ref IS NOT NULL
+          AND length(trim(managed_credential_ref)) > 0
+          AND delivered_at IS NOT NULL
+          AND expires_at IS NOT NULL`,
+    )
+    .bind(input.referrerSubjectRef)
+    .first<{
+      qq_subject_ref: string;
+      issue_ref: string;
+      managed_credential_ref: string;
+      budget_usd: number;
+      expires_at: string;
+    }>();
+
+  if (!row || new Date(row.expires_at).getTime() < now.getTime()) {
+    return null;
+  }
+  return {
+    source: 'qq',
+    subjectRef: row.qq_subject_ref,
+    installationId: null,
+    entitlementRef: row.issue_ref,
+    managedCredentialRef: row.managed_credential_ref,
+    budgetUsd: row.budget_usd,
+    expiresAt: row.expires_at,
+  };
 }
 
 async function claimReferrerRewardApplicationLease(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
     managedCredentialRef: string;
     nowIso: string;
     leaseCutoffIso: string;
@@ -1630,7 +1989,8 @@ async function claimReferrerRewardApplicationLease(
               referrer_managed_credential_ref = ?,
               failure_reason = NULL,
               updated_at = ?
-        WHERE referrer_discord_user_ref = ?
+        WHERE referrer_source = ?
+          AND referrer_subject_ref = ?
           AND referred_bonus_status = 'credited'
           AND (
             referrer_bonus_status = 'pending'
@@ -1646,7 +2006,8 @@ async function claimReferrerRewardApplicationLease(
           AND NOT EXISTS (
             SELECT 1
               FROM referral_rewards active_lease
-             WHERE active_lease.referrer_discord_user_ref = ?
+             WHERE active_lease.referrer_source = ?
+               AND active_lease.referrer_subject_ref = ?
                AND active_lease.referred_bonus_status = 'credited'
                AND active_lease.referrer_bonus_status = 'applying'
                AND active_lease.updated_at >= ?
@@ -1659,10 +2020,12 @@ async function claimReferrerRewardApplicationLease(
     .bind(
       input.managedCredentialRef,
       input.nowIso,
-      input.referrerDiscordUserRef,
+      input.referrerSource,
+      input.referrerSubjectRef,
       input.leaseCutoffIso,
       input.managedCredentialRef,
-      input.referrerDiscordUserRef,
+      input.referrerSource,
+      input.referrerSubjectRef,
       input.leaseCutoffIso,
       input.managedCredentialRef,
     )
@@ -1674,7 +2037,8 @@ async function claimReferrerRewardApplicationLease(
 async function hasActiveReferrerRewardApplicationLease(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
     managedCredentialRef: string;
     leaseCutoffIso: string;
   },
@@ -1684,7 +2048,8 @@ async function hasActiveReferrerRewardApplicationLease(
       `SELECT EXISTS(
           SELECT 1
             FROM referral_rewards active_lease
-           WHERE active_lease.referrer_discord_user_ref = ?
+           WHERE active_lease.referrer_source = ?
+             AND active_lease.referrer_subject_ref = ?
              AND active_lease.referred_bonus_status = 'credited'
              AND active_lease.referrer_bonus_status = 'applying'
              AND active_lease.updated_at >= ?
@@ -1694,7 +2059,12 @@ async function hasActiveReferrerRewardApplicationLease(
              )
         ) AS active_found`,
     )
-    .bind(input.referrerDiscordUserRef, input.leaseCutoffIso, input.managedCredentialRef)
+    .bind(
+      input.referrerSource,
+      input.referrerSubjectRef,
+      input.leaseCutoffIso,
+      input.managedCredentialRef,
+    )
     .first<{ active_found: number }>();
 
   return Number(row?.active_found ?? 0) === 1;
@@ -1703,7 +2073,8 @@ async function hasActiveReferrerRewardApplicationLease(
 async function hasPendingReferrerRewardRows(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
   },
 ): Promise<boolean> {
   const row = await db
@@ -1711,12 +2082,13 @@ async function hasPendingReferrerRewardRows(
       `SELECT EXISTS(
           SELECT 1
             FROM referral_rewards pending_reward
-           WHERE pending_reward.referrer_discord_user_ref = ?
+           WHERE pending_reward.referrer_source = ?
+             AND pending_reward.referrer_subject_ref = ?
              AND pending_reward.referred_bonus_status = 'credited'
              AND pending_reward.referrer_bonus_status = 'pending'
         ) AS pending_found`,
     )
-    .bind(input.referrerDiscordUserRef)
+    .bind(input.referrerSource, input.referrerSubjectRef)
     .first<{ pending_found: number }>();
 
   return Number(row?.pending_found ?? 0) === 1;
@@ -1725,7 +2097,8 @@ async function hasPendingReferrerRewardRows(
 async function countReferrerRewardsForTargetLimit(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
     managedCredentialRef: string;
   },
 ): Promise<number> {
@@ -1733,7 +2106,8 @@ async function countReferrerRewardsForTargetLimit(
     .prepare(
       `SELECT COUNT(*) AS count
          FROM referral_rewards
-        WHERE referrer_discord_user_ref = ?
+        WHERE referrer_source = ?
+          AND referrer_subject_ref = ?
           AND referred_bonus_status = 'credited'
           AND referrer_bonus_status IN ('pending', 'applying', 'credited')
           AND (
@@ -1741,7 +2115,7 @@ async function countReferrerRewardsForTargetLimit(
             OR referrer_managed_credential_ref = ?
           )`,
     )
-    .bind(input.referrerDiscordUserRef, input.managedCredentialRef)
+    .bind(input.referrerSource, input.referrerSubjectRef, input.managedCredentialRef)
     .first<{ count: number }>();
 
   return Number(row?.count ?? 0);
@@ -1750,37 +2124,59 @@ async function countReferrerRewardsForTargetLimit(
 async function updateReferrerEntitlementBudget(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
-    installationId: string;
+    owner: ActiveManagedReferralOwner;
     managedCredentialRef: string;
     budgetUsd: number;
   },
 ): Promise<boolean> {
+  if (input.owner.source === 'discord') {
+    if (!input.owner.installationId) {
+      return false;
+    }
+    const result = await db
+      .prepare(
+        `UPDATE openrouter_entitlements
+            SET budget_usd = ?
+          WHERE installation_id = ?
+            AND discord_user_ref = ?
+            AND status = 'active'
+            AND discord_issue_status = 'active'
+            AND managed_credential_ref = ?`,
+      )
+      .bind(
+        input.budgetUsd,
+        input.owner.installationId,
+        input.owner.subjectRef,
+        input.managedCredentialRef,
+      )
+      .run();
+    return Number(result.meta.changes ?? 0) === 1;
+  }
+
   const result = await db
     .prepare(
-      `UPDATE openrouter_entitlements
+      `UPDATE qq_managed_entitlements
           SET budget_usd = ?
-        WHERE installation_id = ?
-          AND discord_user_ref = ?
+        WHERE qq_subject_ref = ?
+          AND issue_ref = ?
           AND status = 'active'
-          AND discord_issue_status = 'active'
           AND managed_credential_ref = ?`,
     )
     .bind(
       input.budgetUsd,
-      input.installationId,
-      input.referrerDiscordUserRef,
+      input.owner.subjectRef,
+      input.owner.entitlementRef,
       input.managedCredentialRef,
     )
     .run();
-
   return Number(result.meta.changes ?? 0) === 1;
 }
 
 async function markReferrerRewardRowsCredited(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
     managedCredentialRef: string;
     nowIso: string;
   },
@@ -1792,7 +2188,8 @@ async function markReferrerRewardRowsCredited(
               referrer_managed_credential_ref = ?,
               failure_reason = NULL,
               updated_at = ?
-        WHERE referrer_discord_user_ref = ?
+        WHERE referrer_source = ?
+          AND referrer_subject_ref = ?
           AND referred_bonus_status = 'credited'
           AND referrer_bonus_status = 'applying'
           AND (
@@ -1803,7 +2200,8 @@ async function markReferrerRewardRowsCredited(
     .bind(
       input.managedCredentialRef,
       input.nowIso,
-      input.referrerDiscordUserRef,
+      input.referrerSource,
+      input.referrerSubjectRef,
       input.managedCredentialRef,
     )
     .run();
@@ -1814,7 +2212,8 @@ async function markReferrerRewardRowsCredited(
 async function markReferrerRewardRowsFailed(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
     managedCredentialRef: string;
     nowIso: string;
     failureReason: 'referrer_patch_failed';
@@ -1828,7 +2227,8 @@ async function markReferrerRewardRowsFailed(
               referrer_managed_credential_ref = ?,
               failure_reason = ?,
               updated_at = ?
-        WHERE referrer_discord_user_ref = ?
+        WHERE referrer_source = ?
+          AND referrer_subject_ref = ?
           AND referred_bonus_status = 'credited'
           AND referrer_bonus_status = 'applying'
           AND (
@@ -1840,7 +2240,8 @@ async function markReferrerRewardRowsFailed(
       input.managedCredentialRef,
       input.failureReason,
       input.nowIso,
-      input.referrerDiscordUserRef,
+      input.referrerSource,
+      input.referrerSubjectRef,
       input.managedCredentialRef,
     )
     .run();
@@ -1849,7 +2250,8 @@ async function markReferrerRewardRowsFailed(
   if (failedRows > 0) {
     logReferralRewardOutcome({
       outcome: 'failed',
-      referrerDiscordUserRef: input.referrerDiscordUserRef,
+      referrerSource: input.referrerSource,
+      referrerSubjectRef: input.referrerSubjectRef,
       referrerManagedCredentialRef: input.managedCredentialRef,
       reason: input.failureReason,
       affectedRows: failedRows,
@@ -1861,7 +2263,8 @@ async function markReferrerRewardRowsFailed(
 async function markReferrerRewardRowsSkipped(
   db: D1Database,
   input: {
-    referrerDiscordUserRef: string;
+    referrerSource: ReferralSource;
+    referrerSubjectRef: string;
     nowIso: string;
     skipReason: 'referrer_managed_key_missing';
   },
@@ -1872,18 +2275,20 @@ async function markReferrerRewardRowsSkipped(
           SET referrer_bonus_status = 'skipped',
               skip_reason = ?,
               updated_at = ?
-        WHERE referrer_discord_user_ref = ?
+        WHERE referrer_source = ?
+          AND referrer_subject_ref = ?
           AND referred_bonus_status = 'credited'
           AND referrer_bonus_status IN ('pending', 'applying')`,
     )
-    .bind(input.skipReason, input.nowIso, input.referrerDiscordUserRef)
+    .bind(input.skipReason, input.nowIso, input.referrerSource, input.referrerSubjectRef)
     .run();
 
   const skippedRows = Number(result.meta.changes ?? 0);
   if (skippedRows > 0) {
     logReferralRewardOutcome({
       outcome: 'skipped',
-      referrerDiscordUserRef: input.referrerDiscordUserRef,
+      referrerSource: input.referrerSource,
+      referrerSubjectRef: input.referrerSubjectRef,
       reason: input.skipReason,
       affectedRows: skippedRows,
     });
@@ -1899,9 +2304,11 @@ async function listStaleReservedReferralRewards(
     .prepare(
       `SELECT id,
               referral_id,
-              referrer_discord_user_ref,
+              referrer_source,
+              referrer_subject_ref,
               referrer_installation_id,
-              referred_discord_user_ref,
+              referred_source,
+              referred_subject_ref,
               referred_installation_id,
               referred_hardware_hash,
               referred_hardware_hash_salt_version,
@@ -1917,6 +2324,7 @@ async function listStaleReservedReferralRewards(
               credited_at
          FROM referral_rewards
         WHERE referred_bonus_status = 'reserved'
+          AND referred_source <> 'qq'
           AND updated_at < ?
         ORDER BY id ASC`,
     )
@@ -1928,46 +2336,43 @@ async function listStaleReservedReferralRewards(
 async function getDeliveredReferredEntitlement(
   db: D1Database,
   reward: ReferralRewardRecord,
-): Promise<OpenRouterEntitlementRecord | null> {
-  const row = await db
-    .prepare(
-      `SELECT installation_id,
-              status,
-              budget_usd,
-              managed_credential_ref,
-              issued_at,
-              expires_at,
-              release_session_ref,
-              release_token_hash,
-              release_token_expires_at,
-              verified_hardware_hash,
-              verified_hardware_hash_salt_version,
-              discord_user_ref,
-              discord_issue_status,
-              discord_issue_reserved_at,
-              discord_issue_delivered_at
-         FROM openrouter_entitlements
-        WHERE installation_id = ?
-          AND discord_user_ref = ?
-          AND status = 'active'
-          AND discord_issue_status = 'active'
-          AND managed_credential_ref IS NOT NULL
-          AND length(trim(managed_credential_ref)) > 0`,
-    )
-    .bind(reward.referred_installation_id, reward.referred_discord_user_ref)
-    .first<OpenRouterEntitlementRecord>();
-
-  if (!row) {
-    return null;
-  }
+): Promise<{ managed_credential_ref: string } | null> {
+  const row =
+    reward.referred_source === 'discord'
+      ? await db
+          .prepare(
+            `SELECT managed_credential_ref
+               FROM openrouter_entitlements
+              WHERE installation_id = ?
+                AND discord_user_ref = ?
+                AND status = 'active'
+                AND discord_issue_status = 'active'
+                AND managed_credential_ref IS NOT NULL
+                AND length(trim(managed_credential_ref)) > 0`,
+          )
+          .bind(reward.referred_installation_id, reward.referred_subject_ref)
+          .first<{ managed_credential_ref: string }>()
+      : await db
+          .prepare(
+            `SELECT managed_credential_ref
+               FROM qq_managed_entitlements
+              WHERE qq_subject_ref = ?
+                AND status = 'active'
+                AND delivered_at IS NOT NULL
+                AND managed_credential_ref IS NOT NULL
+                AND length(trim(managed_credential_ref)) > 0
+                AND budget_usd >= ?`,
+          )
+          .bind(reward.referred_subject_ref, referrerRewardTargetLimitUsd(1))
+          .first<{ managed_credential_ref: string }>();
 
   if (
-    reward.referred_managed_credential_ref &&
-    reward.referred_managed_credential_ref !== row.managed_credential_ref
+    !row ||
+    (reward.referred_managed_credential_ref &&
+      reward.referred_managed_credential_ref !== row.managed_credential_ref)
   ) {
     return null;
   }
-
   return row;
 }
 
@@ -1976,9 +2381,12 @@ async function reconcileStaleReservedReferralToCredited(
   input: {
     rewardId: number;
     referralId: string;
-    referredInstallationId: string;
-    referrerDiscordUserRef: string | null;
+    referredInstallationId: string | null;
+    referrerSource: ReferralSource | null;
+    referrerSubjectRef: string | null;
     managedCredentialRef: string;
+    expectedUpdatedAt: string;
+    expectedFailureReason: string | null;
     nowIso: string;
   },
 ): Promise<number> {
@@ -1991,9 +2399,18 @@ async function reconcileStaleReservedReferralToCredited(
               updated_at = ?,
               credited_at = COALESCE(credited_at, ?)
         WHERE id = ?
-          AND referred_bonus_status = 'reserved'`,
+          AND referred_bonus_status = 'reserved'
+          AND updated_at = ?
+          AND failure_reason IS ?`,
     )
-    .bind(input.managedCredentialRef, input.nowIso, input.nowIso, input.rewardId)
+    .bind(
+      input.managedCredentialRef,
+      input.nowIso,
+      input.nowIso,
+      input.rewardId,
+      input.expectedUpdatedAt,
+      input.expectedFailureReason,
+    )
     .run();
   const changed = Number(result.meta.changes ?? 0);
   if (changed > 0) {
@@ -2001,7 +2418,8 @@ async function reconcileStaleReservedReferralToCredited(
       outcome: 'credited',
       referralId: input.referralId,
       referredInstallationId: input.referredInstallationId,
-      referrerDiscordUserRef: input.referrerDiscordUserRef,
+      referrerSource: input.referrerSource,
+      referrerSubjectRef: input.referrerSubjectRef,
       reason: 'stale_reserved_reconciled',
     });
   }
@@ -2013,8 +2431,11 @@ async function reconcileStaleReservedReferralToFailed(
   input: {
     rewardId: number;
     referralId: string;
-    referredInstallationId: string;
-    referrerDiscordUserRef: string | null;
+    referredInstallationId: string | null;
+    referrerSource: ReferralSource | null;
+    referrerSubjectRef: string | null;
+    expectedUpdatedAt: string;
+    expectedFailureReason: string | null;
     nowIso: string;
   },
 ): Promise<number> {
@@ -2028,9 +2449,17 @@ async function reconcileStaleReservedReferralToFailed(
               failure_reason = ?,
               updated_at = ?
         WHERE id = ?
-          AND referred_bonus_status = 'reserved'`,
+          AND referred_bonus_status = 'reserved'
+          AND updated_at = ?
+          AND failure_reason IS ?`,
     )
-    .bind(failureReason, input.nowIso, input.rewardId)
+    .bind(
+      failureReason,
+      input.nowIso,
+      input.rewardId,
+      input.expectedUpdatedAt,
+      input.expectedFailureReason,
+    )
     .run();
   const changed = Number(result.meta.changes ?? 0);
   if (changed > 0) {
@@ -2038,7 +2467,8 @@ async function reconcileStaleReservedReferralToFailed(
       outcome: 'failed',
       referralId: input.referralId,
       referredInstallationId: input.referredInstallationId,
-      referrerDiscordUserRef: input.referrerDiscordUserRef,
+      referrerSource: input.referrerSource,
+      referrerSubjectRef: input.referrerSubjectRef,
       reason: failureReason,
     });
   }
@@ -2057,6 +2487,7 @@ async function requeueStaleApplyingReferralRewards(
               failure_reason = NULL,
               updated_at = ?
         WHERE referred_bonus_status = 'credited'
+          AND referred_source <> 'qq'
           AND referrer_bonus_status = 'applying'
           AND updated_at < ?`,
     )
@@ -2184,7 +2615,8 @@ function logReferralRewardOutcome(input: {
     | 'disabled';
   referralId?: string | null;
   referredInstallationId?: string | null;
-  referrerDiscordUserRef?: string | null;
+  referrerSource?: ReferralSource | null;
+  referrerSubjectRef?: string | null;
   referrerManagedCredentialRef?: string | null;
   reason?: string | null;
   affectedRows?: number;
@@ -2200,8 +2632,11 @@ function logReferralRewardOutcome(input: {
   if (input.referredInstallationId) {
     payload.referred_installation_id = input.referredInstallationId;
   }
-  if (input.referrerDiscordUserRef) {
-    payload.referrer_discord_user_ref = input.referrerDiscordUserRef;
+  if (input.referrerSource) {
+    payload.referrer_source = input.referrerSource;
+  }
+  if (input.referrerSubjectRef) {
+    payload.referrer_subject_ref = input.referrerSubjectRef;
   }
   if (input.referrerManagedCredentialRef) {
     payload.referrer_managed_credential_ref = input.referrerManagedCredentialRef;
@@ -2225,6 +2660,10 @@ function boundLogReason(reason: string): string {
   return 'unclassified';
 }
 
+export type ActiveManagedReferralOwnerLookup =
+  | { source: 'discord'; installationId: string }
+  | { source: 'qq'; subjectRef: string };
+
 export async function ensureOwnedReferralIdForActiveDiscordManagedUser(
   db: D1Database,
   input: {
@@ -2234,21 +2673,85 @@ export async function ensureOwnedReferralIdForActiveDiscordManagedUser(
     maxCollisionAttempts?: number;
   },
 ): Promise<OwnedReferralIdEnsureResult> {
-  const owner = await getActiveDiscordManagedReferralOwner(
+  return ensureOwnedReferralIdForActiveManagedSubject(db, {
+    owner: { source: 'discord', installationId: input.installationId },
+    nowIso: input.nowIso,
+    generateReferralId: input.generateReferralId,
+    maxCollisionAttempts: input.maxCollisionAttempts,
+  });
+}
+
+export async function ensureOwnedReferralIdForActiveQqManagedUser(
+  db: D1Database,
+  input: {
+    qqSubjectRef: string;
+    ownerInstallationId?: string | null;
+    nowIso: string;
+    generateReferralId?: ReferralIdGenerator;
+    maxCollisionAttempts?: number;
+  },
+): Promise<OwnedReferralIdEnsureResult> {
+  return ensureOwnedReferralIdForActiveManagedSubject(db, {
+    owner: { source: 'qq', subjectRef: input.qqSubjectRef },
+    ownerInstallationId: input.ownerInstallationId ?? null,
+    nowIso: input.nowIso,
+    generateReferralId: input.generateReferralId,
+    maxCollisionAttempts: input.maxCollisionAttempts,
+  });
+}
+
+export async function resolveOwnedReferralStatusForManagedSubject(
+  db: D1Database,
+  input: { source: ReferralSource; subjectRef: string },
+): Promise<{
+  referralCode: ReferralCodeRecord;
+  talkTogetherPass: TalkTogetherPassStatusResponse;
+} | null> {
+  const referralCode = await getActiveReferralCodeForOwner(
     db,
-    input.nowIso,
-    input.installationId,
+    input.source,
+    input.subjectRef,
   );
-  if (!owner) {
+  if (!referralCode) {
+    return null;
+  }
+  return {
+    referralCode,
+    talkTogetherPass: await resolveTalkTogetherPassStatusForOwnedReferralCode(
+      db,
+      referralCode,
+    ),
+  };
+}
+
+export async function ensureOwnedReferralIdForActiveManagedSubject(
+  db: D1Database,
+  input: {
+    owner: ActiveManagedReferralOwnerLookup;
+    ownerInstallationId?: string | null;
+    nowIso: string;
+    generateReferralId?: ReferralIdGenerator;
+    maxCollisionAttempts?: number;
+  },
+): Promise<OwnedReferralIdEnsureResult> {
+  const activeOwner = await getActiveManagedReferralOwner(db, input.owner, input.nowIso);
+  if (!activeOwner) {
     return { ok: false, reason: 'not_eligible' };
   }
+  const owner: ActiveManagedReferralOwner = {
+    ...activeOwner,
+    installationId:
+      input.owner.source === 'qq'
+        ? (input.ownerInstallationId ?? activeOwner.installationId)
+        : activeOwner.installationId,
+  };
 
-  const discordUserRef = owner.discord_user_ref.trim();
-  if (!isPersistableOwnedDiscordUserRef(discordUserRef)) {
-    return { ok: false, reason: 'unsafe_discord_user_ref' };
+  const subjectRef = owner.subjectRef.trim();
+  if (!isPersistableOwnedSubjectRef(owner.source, subjectRef)) {
+    return { ok: false, reason: 'unsafe_subject_ref' };
   }
 
-  const existing = await getReferralCodeForDiscordUserRef(db, discordUserRef);
+  const existing = await getReferralCodeForOwner(db, owner.source, subjectRef);
   if (existing) {
     if (existing.status === 'disabled') {
       return { ok: false, reason: 'disabled' };
@@ -2256,24 +2759,20 @@ export async function ensureOwnedReferralIdForActiveDiscordManagedUser(
 
     const refreshed = await refreshActiveReferralCodeOwnerInstallation(db, {
       referralId: existing.referral_id,
-      discordUserRef,
-      installationId: owner.installation_id,
+      source: owner.source,
+      subjectRef,
+      installationId: owner.installationId,
       nowIso: input.nowIso,
     });
     if (!refreshed) {
-      const latest = await getReferralCodeForDiscordUserRef(db, discordUserRef);
+      const latest = await getReferralCodeForOwner(db, owner.source, subjectRef);
       if (latest?.status === 'disabled') {
         return { ok: false, reason: 'disabled' };
       }
-
       return { ok: false, reason: 'not_eligible' };
     }
 
-    return {
-      ok: true,
-      referralCode: refreshed,
-      created: false,
-    };
+    return { ok: true, referralCode: refreshed, created: false };
   }
 
   const createReferralId = input.generateReferralId ?? generateReferralId;
@@ -2288,36 +2787,37 @@ export async function ensureOwnedReferralIdForActiveDiscordManagedUser(
 
     const inserted = await insertActiveOwnedReferralCode(db, {
       referralId,
-      discordUserRef,
-      installationId: owner.installation_id,
+      source: owner.source,
+      subjectRef,
+      installationId: owner.installationId,
       nowIso: input.nowIso,
     });
     if (inserted) {
-      const created = await getActiveReferralCodeForDiscordUserRef(db, discordUserRef);
+      const created = await getActiveReferralCodeForOwner(
+        db,
+        owner.source,
+        subjectRef,
+      );
       if (!created) {
-        const latest = await getReferralCodeForDiscordUserRef(db, discordUserRef);
+        const latest = await getReferralCodeForOwner(db, owner.source, subjectRef);
         if (latest?.status === 'disabled') {
           return { ok: false, reason: 'disabled' };
         }
-
         throw new Error('created Referral ID could not be read back as active');
       }
       return { ok: true, referralCode: created, created: true };
     }
 
-    const concurrentlyCreated = await getReferralCodeForDiscordUserRef(
+    const concurrentlyCreated = await getReferralCodeForOwner(
       db,
-      discordUserRef,
+      owner.source,
+      subjectRef,
     );
     if (concurrentlyCreated) {
       if (concurrentlyCreated.status === 'disabled') {
         return { ok: false, reason: 'disabled' };
       }
-      return {
-        ok: true,
-        referralCode: concurrentlyCreated,
-        created: false,
-      };
+      return { ok: true, referralCode: concurrentlyCreated, created: false };
     }
   }
 
@@ -2330,11 +2830,21 @@ function cryptoReferralRandomBytes(byteLength: number): Uint8Array {
   return bytes;
 }
 
+async function getActiveManagedReferralOwner(
+  db: D1Database,
+  lookup: ActiveManagedReferralOwnerLookup,
+  nowIso: string,
+): Promise<ActiveManagedReferralOwner | null> {
+  return lookup.source === 'discord'
+    ? getActiveDiscordManagedReferralOwner(db, nowIso, lookup.installationId)
+    : getActiveQqManagedReferralOwner(db, nowIso, lookup.subjectRef);
+}
+
 async function getActiveDiscordManagedReferralOwner(
   db: D1Database,
   nowIso: string,
   installationId: string,
-): Promise<ActiveDiscordManagedReferralOwner | null> {
+): Promise<ActiveManagedReferralOwner | null> {
   const row = await db
     .prepare(
       `SELECT entitlement.installation_id,
@@ -2370,60 +2880,129 @@ async function getActiveDiscordManagedReferralOwner(
           AND identity.entitlement_installation_id = entitlement.installation_id`,
     )
     .bind(installationId)
-    .first<ActiveDiscordManagedReferralOwner>();
-
-  if (!row) {
-    return null;
-  }
+    .first<OpenRouterEntitlementRecord>();
 
   const now = new Date(nowIso);
-  if (Number.isNaN(now.getTime())) {
+  if (
+    !row?.discord_user_ref ||
+    !row.managed_credential_ref ||
+    !row.expires_at ||
+    Number.isNaN(now.getTime()) ||
+    resolveEffectiveEntitlementLifecycle(row, now) !== 'active'
+  ) {
     return null;
   }
 
-  return resolveEffectiveEntitlementLifecycle(row, now) === 'active' ? row : null;
+  return {
+    source: 'discord',
+    subjectRef: row.discord_user_ref,
+    installationId: row.installation_id,
+    entitlementRef: row.installation_id,
+    managedCredentialRef: row.managed_credential_ref,
+    budgetUsd: row.budget_usd,
+    expiresAt: row.expires_at,
+  };
 }
 
-function isPersistableOwnedDiscordUserRef(value: string): boolean {
-  return OWNED_DISCORD_USER_REF_PATTERN.test(value);
-}
-
-async function getReferralCodeForDiscordUserRef(
+async function getActiveQqManagedReferralOwner(
   db: D1Database,
-  discordUserRef: string,
+  nowIso: string,
+  subjectRef: string,
+): Promise<ActiveManagedReferralOwner | null> {
+  const row = await db
+    .prepare(
+      `SELECT qq_subject_ref,
+              issue_ref,
+              managed_credential_ref,
+              budget_usd,
+              expires_at
+         FROM qq_managed_entitlements
+        WHERE qq_subject_ref = ?
+          AND status = 'active'
+          AND managed_credential_ref IS NOT NULL
+          AND length(trim(managed_credential_ref)) > 0
+          AND delivered_at IS NOT NULL
+          AND expires_at IS NOT NULL`,
+    )
+    .bind(subjectRef)
+    .first<{
+      qq_subject_ref: string;
+      issue_ref: string;
+      managed_credential_ref: string;
+      budget_usd: number;
+      expires_at: string;
+    }>();
+  const now = new Date(nowIso);
+  if (
+    !row ||
+    Number.isNaN(now.getTime()) ||
+    new Date(row.expires_at).getTime() < now.getTime()
+  ) {
+    return null;
+  }
+
+  return {
+    source: 'qq',
+    subjectRef: row.qq_subject_ref,
+    installationId: null,
+    entitlementRef: row.issue_ref,
+    managedCredentialRef: row.managed_credential_ref,
+    budgetUsd: row.budget_usd,
+    expiresAt: row.expires_at,
+  };
+}
+
+function isPersistableOwnedSubjectRef(
+  source: ReferralSource,
+  value: string,
+): boolean {
+  return source === 'discord'
+    ? OWNED_DISCORD_USER_REF_PATTERN.test(value)
+    : OWNED_QQ_SUBJECT_REF_PATTERN.test(value);
+}
+
+async function getReferralCodeForOwner(
+  db: D1Database,
+  source: ReferralSource,
+  subjectRef: string,
 ): Promise<ReferralCodeRecord | null> {
   return db
     .prepare(
       `SELECT referral_id,
-              owner_discord_user_ref,
+              owner_source,
+              owner_subject_ref,
               owner_installation_id,
               status,
               created_at,
               updated_at
          FROM referral_codes
-        WHERE owner_discord_user_ref = ?`,
+        WHERE owner_source = ?
+          AND owner_subject_ref = ?`,
     )
-    .bind(discordUserRef)
+    .bind(source, subjectRef)
     .first<ReferralCodeRecord>();
 }
 
-async function getActiveReferralCodeForDiscordUserRef(
+async function getActiveReferralCodeForOwner(
   db: D1Database,
-  discordUserRef: string,
+  source: ReferralSource,
+  subjectRef: string,
 ): Promise<ReferralCodeRecord | null> {
   return db
     .prepare(
       `SELECT referral_id,
-              owner_discord_user_ref,
+              owner_source,
+              owner_subject_ref,
               owner_installation_id,
               status,
               created_at,
               updated_at
          FROM referral_codes
-        WHERE owner_discord_user_ref = ?
+        WHERE owner_source = ?
+          AND owner_subject_ref = ?
           AND status = 'active'`,
     )
-    .bind(discordUserRef)
+    .bind(source, subjectRef)
     .first<ReferralCodeRecord>();
 }
 
@@ -2431,8 +3010,9 @@ async function refreshActiveReferralCodeOwnerInstallation(
   db: D1Database,
   input: {
     referralId: string;
-    discordUserRef: string;
-    installationId: string;
+    source: ReferralSource;
+    subjectRef: string;
+    installationId: string | null;
     nowIso: string;
   },
 ): Promise<ReferralCodeRecord | null> {
@@ -2442,28 +3022,31 @@ async function refreshActiveReferralCodeOwnerInstallation(
           SET owner_installation_id = ?,
               updated_at = ?
         WHERE referral_id = ?
-          AND owner_discord_user_ref = ?
+          AND owner_source = ?
+          AND owner_subject_ref = ?
           AND status = 'active'
-          AND (owner_installation_id IS NULL OR owner_installation_id <> ?)`,
+          AND owner_installation_id IS NOT ?`,
     )
     .bind(
       input.installationId,
       input.nowIso,
       input.referralId,
-      input.discordUserRef,
+      input.source,
+      input.subjectRef,
       input.installationId,
     )
     .run();
 
-  return getActiveReferralCodeForDiscordUserRef(db, input.discordUserRef);
+  return getActiveReferralCodeForOwner(db, input.source, input.subjectRef);
 }
 
 async function insertActiveOwnedReferralCode(
   db: D1Database,
   input: {
     referralId: string;
-    discordUserRef: string;
-    installationId: string;
+    source: ReferralSource;
+    subjectRef: string;
+    installationId: string | null;
     nowIso: string;
   },
 ): Promise<boolean> {
@@ -2471,16 +3054,18 @@ async function insertActiveOwnedReferralCode(
     .prepare(
       `INSERT OR IGNORE INTO referral_codes (
           referral_id,
-          owner_discord_user_ref,
+          owner_source,
+          owner_subject_ref,
           owner_installation_id,
           status,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, 'active', ?, ?)`,
+        ) VALUES (?, ?, ?, ?, 'active', ?, ?)`,
     )
     .bind(
       input.referralId,
-      input.discordUserRef,
+      input.source,
+      input.subjectRef,
       input.installationId,
       input.nowIso,
       input.nowIso,

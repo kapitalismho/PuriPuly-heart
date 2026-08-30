@@ -101,7 +101,7 @@ class TranslationOutputSubmission:
     outcome: TranslationTurnOutcome
     config_snapshot: TranslationRuntimeConfigSnapshot
     translation: Translation | None = None
-    applied_context_mode: Literal["local", "integrated"] | None = None
+    applied_context_mode: Literal["integrated"] | None = None
     failure_code: str | None = None
 
     def __post_init__(self) -> None:

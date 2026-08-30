@@ -866,6 +866,7 @@ class ManagedConnectionState:
     active_managed_expires_at: str | None = None
     founder_letter_seen_credential_ref: str | None = None
     referral_id: str | None = None
+    referral_source: str | None = None
     local_managed_claim_sources: tuple[str, ...] = ()
     pending_delivery_ack_source: str | None = None
     pending_delivery_ack_delivery_id: str | None = None
@@ -873,6 +874,12 @@ class ManagedConnectionState:
     pending_delivery_ack_expires_at: str | None = None
 
     def __post_init__(self) -> None:
+        referral_source = _normalize_optional_state_text(self.referral_source)
+        if referral_source not in {"discord", "qq"}:
+            referral_source = (
+                "discord" if _normalize_optional_state_text(self.referral_id) is not None else None
+            )
+        object.__setattr__(self, "referral_source", referral_source)
         source = _normalize_optional_state_text(self.pending_delivery_ack_source)
         if source not in MANAGED_KEY_DELIVERY_ACK_SOURCES:
             source = None

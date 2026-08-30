@@ -312,7 +312,7 @@
   "debug_preview.discord_auth": "Discord auth",
   "debug_preview.qq_auth": "QQ auth",
   "debug_preview.discord_callback_page": "Discord callback page",
-  "debug_preview.talk_together_pass_invite_progress": "Invite 1/5",
+  "debug_preview.talk_together_pass_invite_progress": "Invite 1/3",
   "debug_preview.capture_fault_cycle": "Cycle capture fault",
   "debug_preview.stt_fault_cycle": "Cycle STT fault",
   "debug_preview.stt_loading_button_cycle": "Cycle STT loading button",

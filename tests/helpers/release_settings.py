@@ -34,6 +34,7 @@ class ManagedIdentityBag:
     active_managed_expires_at: str | None = None
     founder_letter_seen_credential_ref: str | None = None
     referral_id: str | None = None
+    referral_source: str | None = None
     local_managed_claim_sources: tuple[str, ...] = ()
     pending_delivery_ack_source: str | None = None
     pending_delivery_ack_delivery_id: str | None = None

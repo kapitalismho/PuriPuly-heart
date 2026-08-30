@@ -22,6 +22,7 @@ import {
   buildManagedCleanupRequiredAuditPayload,
   getManagedIssuanceSourcePolicy,
 } from './managed-issuance';
+import type { TalkTogetherPassStatusResponse } from './managed-state';
 import { createManagedKeyDelivery } from './managed-key-delivery';
 import {
   assignManagedGuardrail,
@@ -34,8 +35,23 @@ import {
 import { deriveManagedOpenRouterUserId } from './openrouter-user-id';
 import {
   QQ_MANAGED_ENTITLEMENT_STALE_ISSUING_POLICY,
+  type BrokerQqTalkTogetherPassConfigValue,
   type QqManagedEntitlementRecord,
 } from './persistence';
+import {
+  countCountedQqReferralRewardsSince,
+  ensureOwnedReferralIdForActiveQqManagedUser,
+  markReservedIssueReferralFailed,
+  recordSkippedIssueReferralReward,
+  reserveIssueReferralReward,
+  resolveOwnedReferralStatusForManagedSubject,
+  resolveTalkTogetherPassStatusForOwnedReferralCode,
+  type IssueReferralReservationResult,
+} from './referral';
+import {
+  getQqTalkTogetherPassConfig,
+  qqReferralUtcDayStartIso,
+} from './qq-talk-together-pass';
 import { nonEmptyString } from './public-input';
 import { MANAGED_TRIAL_POLICY } from './trial-policy';
 
@@ -47,6 +63,10 @@ interface QqManagedIssueInput {
   qqSubjectRef: string;
   now: Date;
   deliveryAckSupported?: boolean;
+  referralId: string | null;
+  referredInstallationId: string | null;
+  clientIp: string | null;
+  passConfig: BrokerQqTalkTogetherPassConfigValue;
 }
 
 type QqReservationResult =
@@ -70,6 +90,8 @@ export async function issueQqManagedEntitlement(
   let childKey: { rawKey: string; hash: string } | null = null;
   let childKeyAttached = false;
   let childKeyCreationStarted = false;
+  let referralReservation: IssueReferralReservationResult | null = null;
+  const issueBudgetUsd = sourcePolicy.budget_usd;
 
   try {
     const currentEntitlement = await getQqManagedEntitlement(
@@ -119,6 +141,27 @@ export async function issueQqManagedEntitlement(
       });
     }
 
+    if (input.referralId && input.deliveryAckSupported === true) {
+      referralReservation = await bestEffortReserveQqIssueReferralReward(
+        c.env.BROKER_DB,
+        {
+          referralId: input.referralId,
+          qqSubjectRef: input.qqSubjectRef,
+          referredInstallationId: input.referredInstallationId,
+          clientIp: input.clientIp,
+          passConfig: input.passConfig,
+          now: input.now,
+          nowIso,
+        },
+      );
+      if (referralReservation?.outcome === 'reserved') {
+        await bestEffortWarnQqReferralDailyThreshold(c.env.BROKER_DB, {
+          passConfig: input.passConfig,
+          now: input.now,
+        });
+      }
+    }
+
     const issuedAt = nowIso;
     const deliveredAt = nowIso;
     const expiresAt = addMonthsUtc(
@@ -131,6 +174,7 @@ export async function issueQqManagedEntitlement(
       {
         qqSubjectRef: input.qqSubjectRef,
         issueRef: issueMetadata.issueRef,
+        budgetUsd: issueBudgetUsd,
         nowIso,
       },
     );
@@ -144,7 +188,7 @@ export async function issueQqManagedEntitlement(
       subjectRef: input.qqSubjectRef,
       issueRef: issueMetadata.issueRef,
       expiresAt,
-      limitUsd: sourcePolicy.budget_usd,
+      limitUsd: issueBudgetUsd,
     });
 
     const attached = await attachManagedCredentialToQqReservation(c.env.BROKER_DB, {
@@ -169,7 +213,7 @@ export async function issueQqManagedEntitlement(
         qqSubjectRef: input.qqSubjectRef,
         issueRef: issueMetadata.issueRef,
         managedCredentialRef: childKey.hash,
-        budgetUsd: sourcePolicy.budget_usd,
+        budgetUsd: issueBudgetUsd,
         issuedAt,
         expiresAt,
         nowIso,
@@ -183,6 +227,7 @@ export async function issueQqManagedEntitlement(
       const delivery = await createManagedKeyDelivery(c.env.BROKER_DB, {
         issueSource: ISSUE_SOURCE,
         subjectRef: input.qqSubjectRef,
+        installationId: input.referredInstallationId,
         managedCredentialRef: childKey.hash,
         createdAt: input.now,
         expiresAt: deliveryAckExpiresAt,
@@ -210,7 +255,7 @@ export async function issueQqManagedEntitlement(
       qqSubjectRef: input.qqSubjectRef,
       issueRef: issueMetadata.issueRef,
       managedCredentialRef: childKey.hash,
-      budgetUsd: sourcePolicy.budget_usd,
+      budgetUsd: issueBudgetUsd,
       issuedAt,
       expiresAt,
       deliveredAt,
@@ -226,6 +271,15 @@ export async function issueQqManagedEntitlement(
       now: input.now,
     });
 
+    const ownedStatus = await bestEffortResolveQqOwnedReferralStatus(
+      c.env.BROKER_DB,
+      {
+        qqSubjectRef: input.qqSubjectRef,
+        ownerInstallationId: input.referredInstallationId,
+        passEnabled: input.passConfig.enabled,
+        nowIso,
+      },
+    );
     const openRouterUserId = await deriveOptionalOpenRouterUserId({
       subjectRef: input.qqSubjectRef,
       secret: c.env.OPENROUTER_MANAGED_USER_HMAC_SECRET,
@@ -239,6 +293,12 @@ export async function issueQqManagedEntitlement(
       managed_credential_ref: childKey.hash,
       expires_at: expiresAt,
       ...(openRouterUserId ? { openrouter_user_id: openRouterUserId } : {}),
+      ...(ownedStatus
+        ? {
+            referral_id: ownedStatus.referralCode.referral_id,
+            talk_together_pass: ownedStatus.talkTogetherPass,
+          }
+        : {}),
     });
   } catch (error) {
     if (
@@ -248,6 +308,13 @@ export async function issueQqManagedEntitlement(
     ) {
       childKey = error.createdChildKey;
     }
+
+    await bestEffortMarkQqIssueReferralFailed(c.env.BROKER_DB, {
+      referralReservation,
+      qqSubjectRef: input.qqSubjectRef,
+      referredInstallationId: input.referredInstallationId,
+      nowIso,
+    });
 
     if (reservationCreated) {
       if (!childKey) {
@@ -286,6 +353,149 @@ export async function issueQqManagedEntitlement(
     }
 
     return internalErrorResponse(c);
+  }
+}
+
+async function bestEffortReserveQqIssueReferralReward(
+  db: D1Database,
+  input: {
+    referralId: string;
+    qqSubjectRef: string;
+    referredInstallationId: string | null;
+    clientIp: string | null;
+    passConfig: BrokerQqTalkTogetherPassConfigValue;
+    now: Date;
+    nowIso: string;
+  },
+): Promise<IssueReferralReservationResult | null> {
+  try {
+    if (!input.passConfig.enabled) {
+      return null;
+    }
+    if (!input.passConfig.rewards_enabled) {
+      return await recordSkippedIssueReferralReward(db, {
+        referralId: input.referralId,
+        referredSource: 'qq',
+        referredSubjectRef: input.qqSubjectRef,
+        referredInstallationId: input.referredInstallationId,
+        referredHardwareHash: null,
+        referredHardwareHashSaltVersion: null,
+        skipReason: 'rewards_disabled',
+        clientIp: input.clientIp,
+        nowIso: input.nowIso,
+      });
+    }
+    if (!input.referredInstallationId) {
+      return await recordSkippedIssueReferralReward(db, {
+        referralId: input.referralId,
+        referredSource: 'qq',
+        referredSubjectRef: input.qqSubjectRef,
+        referredInstallationId: null,
+        referredHardwareHash: null,
+        referredHardwareHashSaltVersion: null,
+        skipReason: 'invalid_installation',
+        clientIp: input.clientIp,
+        nowIso: input.nowIso,
+      });
+    }
+    return await reserveIssueReferralReward(db, {
+      referralId: input.referralId,
+      referredSource: 'qq',
+      referredSubjectRef: input.qqSubjectRef,
+      referredInstallationId: input.referredInstallationId,
+      referredHardwareHash: null,
+      referredHardwareHashSaltVersion: null,
+      clientIp: input.clientIp,
+      globalCountLimit: input.passConfig.daily_max_count,
+      globalCountWindowStartIso: qqReferralUtcDayStartIso(input.now),
+      nowIso: input.nowIso,
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function bestEffortWarnQqReferralDailyThreshold(
+  db: D1Database,
+  input: { passConfig: BrokerQqTalkTogetherPassConfigValue; now: Date },
+): Promise<void> {
+  try {
+    const count = await countCountedQqReferralRewardsSince(
+      db,
+      qqReferralUtcDayStartIso(input.now),
+    );
+    if (count >= input.passConfig.daily_warning_count) {
+      console.warn('qq_referral_daily_warning_threshold_reached', {
+        counted_rewards: count,
+        warning_threshold: input.passConfig.daily_warning_count,
+        daily_max_count: input.passConfig.daily_max_count,
+        broker_timestamp: input.now.toISOString(),
+      });
+    }
+  } catch {
+    return;
+  }
+}
+
+async function bestEffortMarkQqIssueReferralFailed(
+  db: D1Database,
+  input: {
+    referralReservation: IssueReferralReservationResult | null;
+    qqSubjectRef: string;
+    referredInstallationId: string | null;
+    nowIso: string;
+  },
+): Promise<void> {
+  if (input.referralReservation?.outcome !== 'reserved') {
+    return;
+  }
+  try {
+    await markReservedIssueReferralFailed(db, {
+      referralId: input.referralReservation.referralId,
+      referredSource: 'qq',
+      referredSubjectRef: input.qqSubjectRef,
+      referredInstallationId: input.referredInstallationId,
+      failureReason: 'issue_delivery_failed',
+      nowIso: input.nowIso,
+    });
+  } catch {
+    return;
+  }
+}
+
+async function bestEffortResolveQqOwnedReferralStatus(
+  db: D1Database,
+  input: {
+    qqSubjectRef: string;
+    ownerInstallationId: string | null;
+    passEnabled: boolean;
+    nowIso: string;
+  },
+) {
+  try {
+    let status = await resolveOwnedReferralStatusForManagedSubject(db, {
+      source: 'qq',
+      subjectRef: input.qqSubjectRef,
+    });
+    if (!status && input.passEnabled) {
+      const ensured = await ensureOwnedReferralIdForActiveQqManagedUser(db, {
+        qqSubjectRef: input.qqSubjectRef,
+        ownerInstallationId: input.ownerInstallationId,
+        nowIso: input.nowIso,
+      });
+      if (ensured.ok) {
+        status = {
+          referralCode: ensured.referralCode,
+          talkTogetherPass: await resolveTalkTogetherPassStatusForOwnedReferralCode(
+            db,
+            ensured.referralCode,
+          ),
+        };
+      }
+    }
+    return status;
+  } catch {
+    return null;
   }
 }
 
@@ -431,12 +641,17 @@ async function getQqManagedEntitlement(
 
 async function markQqChildKeyCreationStarted(
   db: D1Database,
-  input: { qqSubjectRef: string; issueRef: string; nowIso: string },
+  input: {
+    qqSubjectRef: string;
+    issueRef: string;
+    budgetUsd: number;
+    nowIso: string;
+  },
 ): Promise<boolean> {
   const result = await db
     .prepare(
       `UPDATE qq_managed_entitlements
-          SET child_key_creation_started_at = ?, updated_at = ?
+          SET child_key_creation_started_at = ?, budget_usd = ?, updated_at = ?
         WHERE qq_subject_ref = ?
           AND issue_ref = ?
           AND status = 'issuing'
@@ -445,6 +660,7 @@ async function markQqChildKeyCreationStarted(
     )
     .bind(
       input.nowIso,
+      input.budgetUsd,
       input.nowIso,
       input.qqSubjectRef,
       input.issueRef,
@@ -615,9 +831,13 @@ export async function finalizeQqManagedKeyDeliveryAck(
     managedCredentialRef: string;
     acknowledgedAt: Date;
   },
-): Promise<'acknowledged' | 'already_acknowledged'> {
+): Promise<{
+  acknowledgementStatus: 'acknowledged' | 'already_acknowledged';
+  referralId?: string;
+  talkTogetherPass?: TalkTogetherPassStatusResponse;
+}> {
   const entitlement = await c.env.BROKER_DB.prepare(
-      `SELECT qq_subject_ref, status, issue_ref, managed_credential_ref,
+    `SELECT qq_subject_ref, status, issue_ref, managed_credential_ref,
             budget_usd, reserved_at, issued_at, expires_at, delivered_at,
             child_key_creation_started_at, created_at, updated_at
        FROM qq_managed_entitlements
@@ -628,6 +848,18 @@ export async function finalizeQqManagedKeyDeliveryAck(
   if (!entitlement) {
     throw new Error('QQ delivery ACK target is missing');
   }
+  const delivery = await c.env.BROKER_DB.prepare(
+    `SELECT installation_id
+       FROM managed_key_deliveries
+      WHERE delivery_id = ?
+        AND issue_source = 'qq'
+        AND managed_credential_ref = ?`,
+  )
+    .bind(input.deliveryId, input.managedCredentialRef)
+    .first<{ installation_id: string | null }>();
+  if (!delivery) {
+    throw new Error('QQ delivery ACK metadata is missing');
+  }
   const alreadyActive = entitlement.status === 'active';
   if (!alreadyActive && entitlement.status !== 'delivery_pending') {
     throw new Error('QQ delivery ACK target is not pending');
@@ -635,7 +867,9 @@ export async function finalizeQqManagedKeyDeliveryAck(
   if (!entitlement.issued_at || !entitlement.expires_at) {
     throw new Error('QQ delivery ACK target is missing entitlement metadata');
   }
-  const deliveredAt = entitlement.delivered_at ?? input.acknowledgedAt.toISOString();
+
+  const acknowledgedAtIso = input.acknowledgedAt.toISOString();
+  const deliveredAt = entitlement.delivered_at ?? acknowledgedAtIso;
   const network = await extractRequestNetworkMetadata(c, c.env.BROKER_DB);
   const results = await c.env.BROKER_DB.batch([
     c.env.BROKER_DB.prepare(
@@ -690,13 +924,68 @@ export async function finalizeQqManagedKeyDeliveryAck(
                AND managed_credential_ref = ?
           )`,
     ).bind(
-      input.acknowledgedAt.toISOString(),
+      acknowledgedAtIso,
       input.deliveryId,
       input.managedCredentialRef,
       entitlement.qq_subject_ref,
       entitlement.issue_ref,
       input.managedCredentialRef,
       input.managedCredentialRef,
+    ),
+    c.env.BROKER_DB.prepare(
+      `INSERT INTO qq_pass_settlement_jobs (
+          referral_reward_id,
+          delivery_id,
+          phase,
+          attempt_count,
+          last_attempt_at,
+          next_attempt_at,
+          fencing_token,
+          lease_expires_at,
+          last_error_code,
+          created_at,
+          updated_at,
+          completed_at
+        )
+        SELECT reward.id,
+               delivery.delivery_id,
+               'invitee_pending',
+               0,
+               NULL,
+               ?,
+               NULL,
+               NULL,
+               NULL,
+               ?,
+               ?,
+               NULL
+          FROM referral_rewards reward
+          JOIN managed_key_deliveries delivery
+            ON delivery.delivery_id = ?
+           AND delivery.issue_source = 'qq'
+           AND delivery.subject_ref = reward.referred_subject_ref
+           AND delivery.installation_id IS reward.referred_installation_id
+           AND delivery.managed_credential_ref = ?
+           AND delivery.status = 'acknowledged'
+         WHERE reward.id = (
+           SELECT candidate.id
+             FROM referral_rewards candidate
+            WHERE candidate.referred_source = 'qq'
+              AND candidate.referred_subject_ref = ?
+              AND candidate.referred_installation_id IS ?
+              AND candidate.referred_bonus_status = 'reserved'
+            ORDER BY candidate.created_at DESC, candidate.id DESC
+            LIMIT 1
+         )
+        ON CONFLICT(referral_reward_id) DO NOTHING`,
+    ).bind(
+      acknowledgedAtIso,
+      acknowledgedAtIso,
+      acknowledgedAtIso,
+      input.deliveryId,
+      input.managedCredentialRef,
+      entitlement.qq_subject_ref,
+      delivery.installation_id,
     ),
   ]);
   const finalized = await c.env.BROKER_DB.prepare(
@@ -712,6 +1001,20 @@ export async function finalizeQqManagedKeyDeliveryAck(
           SELECT 1 FROM broker_issue_success_events
            WHERE issue_source = 'qq'
              AND managed_credential_ref = delivery.managed_credential_ref
+        )
+        AND NOT EXISTS (
+          SELECT 1
+            FROM referral_rewards reward
+           WHERE reward.referred_source = 'qq'
+             AND reward.referred_subject_ref = entitlement.qq_subject_ref
+             AND reward.referred_installation_id IS delivery.installation_id
+             AND reward.referred_bonus_status = 'reserved'
+             AND NOT EXISTS (
+               SELECT 1
+                 FROM qq_pass_settlement_jobs job
+                WHERE job.referral_reward_id = reward.id
+                  AND job.delivery_id = delivery.delivery_id
+             )
         )`,
   )
     .bind(input.deliveryId)
@@ -719,15 +1022,64 @@ export async function finalizeQqManagedKeyDeliveryAck(
   if (Number(finalized?.finalized ?? 0) !== 1) {
     throw new Error('QQ delivery ACK finalization failed');
   }
-  await runQqIssueSuccessMonitoring(c, {
+
+  try {
+    await runQqIssueSuccessMonitoring(c, {
+      qqSubjectRef: entitlement.qq_subject_ref,
+      managedCredentialRef: input.managedCredentialRef,
+      observedAt: deliveredAt,
+      now: input.acknowledgedAt,
+    });
+  } catch {
+  }
+
+  return buildQqDeliveryAckResult(c, {
+    acknowledgementStatus:
+      Number(results[2]?.meta.changes ?? 0) === 1
+        ? 'acknowledged'
+        : 'already_acknowledged',
     qqSubjectRef: entitlement.qq_subject_ref,
-    managedCredentialRef: input.managedCredentialRef,
-    observedAt: deliveredAt,
-    now: input.acknowledgedAt,
+    ownerInstallationId: delivery.installation_id,
+    nowIso: deliveredAt,
   });
-  return Number(results[2]?.meta.changes ?? 0) === 1
-    ? 'acknowledged'
-    : 'already_acknowledged';
+}
+
+async function buildQqDeliveryAckResult(
+  c: Context<BrokerEnv>,
+  input: {
+    acknowledgementStatus: 'acknowledged' | 'already_acknowledged';
+    qqSubjectRef: string;
+    ownerInstallationId: string | null;
+    nowIso: string;
+  },
+): Promise<{
+  acknowledgementStatus: 'acknowledged' | 'already_acknowledged';
+  referralId?: string;
+  talkTogetherPass?: TalkTogetherPassStatusResponse;
+}> {
+  try {
+    const passConfig = await getQqTalkTogetherPassConfig(c.env.BROKER_DB);
+    const ownedStatus = await bestEffortResolveQqOwnedReferralStatus(
+      c.env.BROKER_DB,
+      {
+        qqSubjectRef: input.qqSubjectRef,
+        ownerInstallationId: input.ownerInstallationId,
+        passEnabled: passConfig.enabled,
+        nowIso: input.nowIso,
+      },
+    );
+    return {
+      acknowledgementStatus: input.acknowledgementStatus,
+      ...(ownedStatus
+        ? {
+            referralId: ownedStatus.referralCode.referral_id,
+            talkTogetherPass: ownedStatus.talkTogetherPass,
+          }
+        : {}),
+    };
+  } catch {
+    return { acknowledgementStatus: input.acknowledgementStatus };
+  }
 }
 
 async function releaseQqReservationBeforeChildKey(

@@ -50,7 +50,7 @@ class ManagedAuthExecutionResult:
 
 ManagedAuthStateProvider = Callable[[], ManagedAuthState]
 ManagedAuthPendingSink = Callable[[bool], None]
-ManagedAuthQqExecutor = Callable[[str, str], Awaitable[ManagedAuthExecutionResult]]
+ManagedAuthQqExecutor = Callable[[str, str, str | None], Awaitable[ManagedAuthExecutionResult]]
 ManagedAuthDiscordExecutor = Callable[
     [str | None, Callable[[], None] | None],
     Awaitable[ManagedAuthExecutionResult],
@@ -113,7 +113,9 @@ class ManagedAuthOwner:
         *,
         qq_identity: str,
         credential: str,
+        referral_id: str | None = None,
     ) -> bool | tuple[str, dict[str, object]]:
+        self.last_referral_bonus_applied = False
         state = self.state_provider()
         if (
             self._ingress_stopped
@@ -123,14 +125,20 @@ class ManagedAuthOwner:
             or not state.release_service_available
         ):
             return "qq_auth.error.retry", {}
-        result = await self.qq_executor(qq_identity, credential)
+        result = await self.qq_executor(qq_identity, credential, referral_id)
+        if result.transaction_result is not None:
+            self.result_sink(result.transaction_result)
         if result.succeeded:
             self.clear_pending()
+            self.last_referral_bonus_applied = result.referral_bonus_applied
             if result.runtime_rebuild != "never":
                 await self.runtime_ensurer(result.runtime_rebuild)
-            else:
-                self.usage_refresh_sink()
+            self.usage_view_sink(result.referral_id, result.pass_status)
+            self.usage_refresh_sink()
             return True
+        if result.delivery_ack_pending and result.referral_id is not None:
+            self.usage_view_sink(result.referral_id, result.pass_status)
+            self.usage_refresh_sink()
         message_key = QQ_AUTH_DIALOG_MESSAGE_KEY_BY_SERVICE_KEY.get(
             result.message_key,
             result.message_key,

@@ -3,6 +3,8 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 vi.mock('../src/openrouter-management', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/openrouter-management')>()),
   cleanupManagedChildKey: vi.fn(),
+  readManagedChildKeyEffectiveLimit: vi.fn(),
+  updateManagedChildKeyLimit: vi.fn(),
 }));
 
 import app from '../src/index';
@@ -13,7 +15,12 @@ import {
   hashDeliveryAckToken,
   listStalePendingManagedKeyDeliveries,
 } from '../src/managed-key-delivery';
-import { cleanupManagedChildKey } from '../src/openrouter-management';
+import {
+  cleanupManagedChildKey,
+  readManagedChildKeyEffectiveLimit,
+  updateManagedChildKeyLimit,
+} from '../src/openrouter-management';
+import { processQqPassSettlementJobs } from '../src/qq-pass-settlement';
 import { handleScheduled, reconcileStaleManagedKeyDeliveries } from '../src/scheduled';
 import { normalizedErrorEnvelope } from './test-support/errors';
 import { BROKER_MIGRATION_FILENAMES } from './test-support/migrations';
@@ -505,14 +512,23 @@ describe('managed key delivery ACK foundation', () => {
     });
   });
 
-  it('finalizes QQ delivery only after a valid ACK and keeps duplicate ACK idempotent', async () => {
+  it('atomically enqueues QQ reward settlement after a valid ACK and keeps duplicate ACK idempotent', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
     const env = createTestBrokerEnv();
+    vi.mocked(readManagedChildKeyEffectiveLimit)
+      .mockResolvedValueOnce(0.07)
+      .mockResolvedValue(0.09);
+    vi.mocked(updateManagedChildKeyLimit).mockResolvedValue(0.09);
     insertQqDeliveryPendingOwner(env, {
       qqSubjectRef: 'ph-qq-subject-v1_ack',
       issueRef: 'qq-issue-ack',
       managedCredentialRef: 'hash_qq_ack',
+      budgetUsd: 0.07,
+    });
+    insertQqReservedReferralReward(env, {
+      qqSubjectRef: 'ph-qq-subject-v1_ack',
+      referrerSubjectRef: 'ph-discord-user-v1_ack-referrer',
     });
     const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
       issueSource: 'qq',
@@ -530,8 +546,11 @@ describe('managed key delivery ACK foundation', () => {
     expect(invalid.status).toBe(404);
     expect(selectQqEntitlement(env, 'hash_qq_ack')).toMatchObject({
       status: 'delivery_pending',
+      budget_usd: 0.07,
       delivered_at: null,
     });
+    expect(readManagedChildKeyEffectiveLimit).not.toHaveBeenCalled();
+    expect(updateManagedChildKeyLimit).not.toHaveBeenCalled();
 
     const valid = await postAck(env, {
       delivery_id: delivery.deliveryId,
@@ -539,11 +558,83 @@ describe('managed key delivery ACK foundation', () => {
       delivery_ack_token: delivery.deliveryAckToken,
     });
     expect(valid.status).toBe(200);
+    await expect(valid.json()).resolves.toEqual({
+      ok: true,
+      status: 'acknowledged',
+    });
+    expect(readManagedChildKeyEffectiveLimit).not.toHaveBeenCalled();
+    expect(updateManagedChildKeyLimit).not.toHaveBeenCalled();
     expect(selectQqEntitlement(env, 'hash_qq_ack')).toMatchObject({
       status: 'active',
+      budget_usd: 0.07,
       delivered_at: '2026-07-05T00:01:00.000Z',
     });
-    expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_qq_ack'")).toBe(1);
+    expect(
+      env.__db
+        .prepare(
+          `SELECT phase, attempt_count, fencing_token, lease_expires_at
+             FROM qq_pass_settlement_jobs
+            WHERE delivery_id = ?`,
+        )
+        .get(delivery.deliveryId),
+    ).toEqual({
+      phase: 'invitee_pending',
+      attempt_count: 0,
+      fencing_token: null,
+      lease_expires_at: null,
+    });
+    expect(selectScalar(env, 'SELECT COUNT(*) FROM qq_pass_settlement_jobs')).toBe(1);
+
+    await expect(
+      processQqPassSettlementJobs(env, {
+        now: new Date('2026-07-05T00:01:00.000Z'),
+      }),
+    ).resolves.toMatchObject({ completed: 1, retried: 0 });
+    expect(readManagedChildKeyEffectiveLimit).toHaveBeenCalledTimes(2);
+    expect(updateManagedChildKeyLimit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY,
+        keyHash: 'hash_qq_ack',
+        limitUsd: 0.09,
+      }),
+    );
+    expect(selectQqEntitlement(env, 'hash_qq_ack')).toMatchObject({
+      status: 'active',
+      budget_usd: 0.09,
+      delivered_at: '2026-07-05T00:01:00.000Z',
+    });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT referred_bonus_status, referred_managed_credential_ref
+             FROM referral_rewards
+            WHERE referred_subject_ref = 'ph-qq-subject-v1_ack'`,
+        )
+        .get(),
+    ).toEqual({
+      referred_bonus_status: 'credited',
+      referred_managed_credential_ref: 'hash_qq_ack',
+    });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT phase, fencing_token, lease_expires_at, completed_at
+             FROM qq_pass_settlement_jobs
+            WHERE delivery_id = ?`,
+        )
+        .get(delivery.deliveryId),
+    ).toEqual({
+      phase: 'completed',
+      fencing_token: null,
+      lease_expires_at: null,
+      completed_at: '2026-07-05T00:01:00.000Z',
+    });
+    expect(
+      selectScalar(
+        env,
+        "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_qq_ack'",
+      ),
+    ).toBe(1);
 
     const duplicate = await postAck(env, {
       delivery_id: delivery.deliveryId,
@@ -551,18 +642,126 @@ describe('managed key delivery ACK foundation', () => {
       delivery_ack_token: delivery.deliveryAckToken,
     });
     expect(duplicate.status).toBe(200);
-    await expect(duplicate.json()).resolves.toEqual({ ok: true, status: 'already_acknowledged' });
-    expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_qq_ack'")).toBe(1);
+    await expect(duplicate.json()).resolves.toEqual({
+      ok: true,
+      status: 'already_acknowledged',
+    });
+    expect(readManagedChildKeyEffectiveLimit).toHaveBeenCalledTimes(2);
+    expect(updateManagedChildKeyLimit).toHaveBeenCalledTimes(1);
+    expect(selectScalar(env, 'SELECT COUNT(*) FROM qq_pass_settlement_jobs')).toBe(1);
   });
 
-  it('serializes concurrent QQ ACK finalization into one delivery event', async () => {
+  it('reclaims an expired fenced QQ reward settlement job from scheduled processing', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
     const env = createTestBrokerEnv();
     insertQqDeliveryPendingOwner(env, {
+      qqSubjectRef: 'ph-qq-subject-v1_reclaim_ack',
+      issueRef: 'qq-issue-reclaim-ack',
+      managedCredentialRef: 'hash_qq_reclaim_ack',
+      budgetUsd: 0.07,
+    });
+    const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'qq',
+      subjectRef: 'ph-qq-subject-v1_reclaim_ack',
+      managedCredentialRef: 'hash_qq_reclaim_ack',
+      createdAt: new Date('2026-07-05T00:00:00.000Z'),
+      expiresAt: new Date('2026-07-05T01:00:00.000Z'),
+    });
+    const payload = {
+      delivery_id: delivery.deliveryId,
+      managed_credential_ref: 'hash_qq_reclaim_ack',
+      delivery_ack_token: delivery.deliveryAckToken,
+    };
+
+    const acknowledged = await postAck(env, payload);
+    expect(acknowledged.status).toBe(200);
+    insertQqReservedReferralReward(env, {
+      qqSubjectRef: 'ph-qq-subject-v1_reclaim_ack',
+      referrerSubjectRef: 'ph-discord-user-v1_reclaim-ack-referrer',
+    });
+    await expect(
+      processQqPassSettlementJobs(env, {
+        now: new Date('2026-07-05T00:01:00.000Z'),
+        limit: 0,
+      }),
+    ).resolves.toMatchObject({ repaired: 1, claimed: 0 });
+    env.__db
+      .prepare(
+        `UPDATE qq_pass_settlement_jobs
+            SET fencing_token = ?,
+                lease_expires_at = ?,
+                next_attempt_at = ?
+          WHERE delivery_id = ?`,
+      )
+      .run(
+        'expired-fence-token',
+        '2026-07-05T00:06:00.000Z',
+        '2026-07-05T00:01:00.000Z',
+        delivery.deliveryId,
+      );
+    vi.mocked(readManagedChildKeyEffectiveLimit).mockResolvedValue(0.09);
+    vi.setSystemTime(new Date('2026-07-05T00:18:00.000Z'));
+
+    await expect(
+      processQqPassSettlementJobs(env, {
+        now: new Date('2026-07-05T00:18:00.000Z'),
+      }),
+    ).resolves.toMatchObject({ completed: 1, retried: 0 });
+
+    expect(readManagedChildKeyEffectiveLimit).toHaveBeenCalledTimes(2);
+    expect(updateManagedChildKeyLimit).not.toHaveBeenCalled();
+    expect(selectQqEntitlement(env, 'hash_qq_reclaim_ack')).toMatchObject({
+      status: 'active',
+      budget_usd: 0.09,
+      delivered_at: '2026-07-05T00:01:00.000Z',
+    });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT referred_bonus_status, failure_reason, updated_at
+             FROM referral_rewards
+            WHERE referred_subject_ref = 'ph-qq-subject-v1_reclaim_ack'`,
+        )
+        .get(),
+    ).toEqual({
+      referred_bonus_status: 'credited',
+      failure_reason: null,
+      updated_at: '2026-07-05T00:18:00.000Z',
+    });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT phase, attempt_count, fencing_token, lease_expires_at
+             FROM qq_pass_settlement_jobs
+            WHERE delivery_id = ?`,
+        )
+        .get(delivery.deliveryId),
+    ).toEqual({
+      phase: 'completed',
+      attempt_count: 2,
+      fencing_token: null,
+      lease_expires_at: null,
+    });
+  });
+
+  it('serializes concurrent rewarded QQ ACK finalization into one durable job', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
+    const env = createTestBrokerEnv();
+    vi.mocked(readManagedChildKeyEffectiveLimit)
+      .mockResolvedValueOnce(0.07)
+      .mockResolvedValue(0.09);
+    vi.mocked(updateManagedChildKeyLimit).mockResolvedValue(0.09);
+    insertQqDeliveryPendingOwner(env, {
       qqSubjectRef: 'ph-qq-subject-v1_concurrent_ack',
       issueRef: 'qq-issue-concurrent-ack',
       managedCredentialRef: 'hash_qq_concurrent_ack',
+      budgetUsd: 0.07,
+    });
+    insertQqReservedReferralReward(env, {
+      qqSubjectRef: 'ph-qq-subject-v1_concurrent_ack',
+      referrerSubjectRef: 'ph-discord-user-v1_concurrent-ack-referrer',
     });
     const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
       issueSource: 'qq',
@@ -584,9 +783,76 @@ describe('managed key delivery ACK foundation', () => {
       'acknowledged',
       'already_acknowledged',
     ]);
+    expect(
+      bodies.every(
+        (body) =>
+          !Object.hasOwn(body as Record<string, unknown>, 'referral_bonus_applied'),
+      ),
+    ).toBe(true);
+    expect(readManagedChildKeyEffectiveLimit).not.toHaveBeenCalled();
+    expect(updateManagedChildKeyLimit).not.toHaveBeenCalled();
     expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_qq_concurrent_ack'")).toBe(1);
+    expect(selectScalar(env, 'SELECT COUNT(*) FROM qq_pass_settlement_jobs')).toBe(1);
     expect(selectQqEntitlement(env, 'hash_qq_concurrent_ack')).toMatchObject({
       status: 'active',
+      budget_usd: 0.07,
+    });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT referred_bonus_status, failure_reason
+             FROM referral_rewards
+            WHERE referred_subject_ref = 'ph-qq-subject-v1_concurrent_ack'`,
+        )
+        .get(),
+    ).toEqual({
+      referred_bonus_status: 'reserved',
+      failure_reason: null,
+    });
+
+    await expect(
+      processQqPassSettlementJobs(env, {
+        now: new Date('2026-07-05T00:01:00.000Z'),
+      }),
+    ).resolves.toMatchObject({ completed: 1, retried: 0 });
+
+    expect(readManagedChildKeyEffectiveLimit).toHaveBeenCalledTimes(2);
+    expect(updateManagedChildKeyLimit).toHaveBeenCalledTimes(1);
+    expect(updateManagedChildKeyLimit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY,
+        keyHash: 'hash_qq_concurrent_ack',
+        limitUsd: 0.09,
+      }),
+    );
+    expect(selectQqEntitlement(env, 'hash_qq_concurrent_ack')).toMatchObject({
+      status: 'active',
+      budget_usd: 0.09,
+    });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT referred_bonus_status, failure_reason
+             FROM referral_rewards
+            WHERE referred_subject_ref = 'ph-qq-subject-v1_concurrent_ack'`,
+        )
+        .get(),
+    ).toEqual({
+      referred_bonus_status: 'credited',
+      failure_reason: null,
+    });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT phase, fencing_token, lease_expires_at
+             FROM qq_pass_settlement_jobs
+            WHERE delivery_id = ?`,
+        )
+        .get(delivery.deliveryId),
+    ).toEqual({
+      phase: 'completed',
+      fencing_token: null,
+      lease_expires_at: null,
     });
   });
 
@@ -1182,22 +1448,55 @@ function insertDiscordDeliveryPendingOwner(
 
 function insertQqDeliveryPendingOwner(
   env: ReturnType<typeof createTestBrokerEnv>,
-  input: { qqSubjectRef: string; issueRef: string; managedCredentialRef: string },
+  input: {
+    qqSubjectRef: string;
+    issueRef: string;
+    managedCredentialRef: string;
+    budgetUsd?: number;
+  },
 ): void {
   env.__db
     .prepare(
       `INSERT INTO qq_managed_entitlements (
           qq_subject_ref, status, issue_ref, managed_credential_ref, budget_usd,
           reserved_at, issued_at, expires_at, delivered_at, created_at, updated_at
-        ) VALUES (?, 'delivery_pending', ?, ?, 0.5, ?, ?, ?, NULL, ?, ?)`,
+        ) VALUES (?, 'delivery_pending', ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
     )
     .run(
       input.qqSubjectRef,
       input.issueRef,
       input.managedCredentialRef,
+      input.budgetUsd ?? 0.5,
       '2026-07-05T00:00:00.000Z',
       '2026-07-05T00:00:00.000Z',
       '2026-08-05T00:00:00.000Z',
+      '2026-07-05T00:00:00.000Z',
+      '2026-07-05T00:00:00.000Z',
+    );
+}
+
+function insertQqReservedReferralReward(
+  env: ReturnType<typeof createTestBrokerEnv>,
+  input: { qqSubjectRef: string; referrerSubjectRef: string },
+): void {
+  env.__db
+    .prepare(
+      `INSERT INTO referral_rewards (
+          referral_id,
+          referrer_source,
+          referrer_subject_ref,
+          referred_source,
+          referred_subject_ref,
+          referred_bonus_status,
+          referrer_bonus_status,
+          created_at,
+          updated_at
+        ) VALUES (?, 'discord', ?, 'qq', ?, 'reserved', 'pending', ?, ?)`,
+    )
+    .run(
+      '7KQ9M2',
+      input.referrerSubjectRef,
+      input.qqSubjectRef,
       '2026-07-05T00:00:00.000Z',
       '2026-07-05T00:00:00.000Z',
     );
@@ -1222,7 +1521,7 @@ function selectQqEntitlement(
 ): Record<string, unknown> | null {
   return (env.__db
     .prepare(
-      `SELECT status, delivered_at
+      `SELECT status, budget_usd, delivered_at
          FROM qq_managed_entitlements
         WHERE managed_credential_ref = ?`,
     )

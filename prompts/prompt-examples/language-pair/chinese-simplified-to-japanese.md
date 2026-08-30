@@ -1,6 +1,6 @@
 ### Context Use Example
 <context>
-[self] 刚才发给你的那个链接。
+[${inputChannel}] 刚才发给你的那个链接。
 </context>
 
 <input>
@@ -12,7 +12,7 @@ Your response:
 
 ### Context Ignore Example
 <context>
-[self] 我这边有点卡。
+[${inputChannel}] 我这边有点卡。
 </context>
 
 <input>
