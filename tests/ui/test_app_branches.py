@@ -1439,7 +1439,7 @@ def test_debug_preview_talk_together_pass_invite_progress_sets_settings_state_on
             "pass_status": TalkTogetherPassStatus(
                 pass_id="7KQ9M2",
                 invite_count=1,
-                invite_limit=5,
+                invite_limit=3,
                 bonus_translations_per_friend=200,
             ),
         }

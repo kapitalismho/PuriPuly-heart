@@ -315,7 +315,7 @@
   "debug_preview.discord_auth": "Discord авторизация",
   "debug_preview.qq_auth": "QQ авторизация",
   "debug_preview.discord_callback_page": "Страница callback Discord",
-  "debug_preview.talk_together_pass_invite_progress": "Приглашение 1/5",
+  "debug_preview.talk_together_pass_invite_progress": "Приглашение 1/3",
   "debug_preview.capture_fault_cycle": "Цикл ошибки захвата",
   "debug_preview.stt_fault_cycle": "Цикл ошибки STT",
   "debug_preview.stt_loading_button_cycle": "Переключить загрузку STT",

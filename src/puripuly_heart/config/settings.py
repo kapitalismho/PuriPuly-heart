@@ -1035,6 +1035,7 @@ class ManagedIdentitySettings:
     active_managed_expires_at: str | None = None
     founder_letter_seen_credential_ref: str | None = None
     referral_id: str | None = None
+    referral_source: str | None = None
     local_managed_claim_sources: tuple[str, ...] = field(default_factory=tuple)
     pending_delivery_ack_source: str | None = None
     pending_delivery_ack_delivery_id: str | None = None
@@ -1072,6 +1073,12 @@ class ManagedIdentitySettings:
         ):
             raise ValueError("managed founder_letter_seen_credential_ref must be a string or None")
         self.referral_id = normalize_owned_referral_id(self.referral_id)
+        referral_source = (
+            self.referral_source.strip().lower() if isinstance(self.referral_source, str) else None
+        )
+        if referral_source not in {"discord", "qq"}:
+            referral_source = "discord" if self.referral_id is not None else None
+        self.referral_source = referral_source
         self.local_managed_claim_sources = normalize_managed_claim_sources(
             self.local_managed_claim_sources
         )
@@ -1726,6 +1733,7 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
                 settings.managed_identity.founder_letter_seen_credential_ref
             ),
             "referral_id": normalize_owned_referral_id(settings.managed_identity.referral_id),
+            "referral_source": settings.managed_identity.referral_source,
             "local_managed_claim_sources": list(
                 normalize_managed_claim_sources(
                     settings.managed_identity.local_managed_claim_sources
@@ -3971,6 +3979,19 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     normalized_referral_id = normalize_owned_referral_id(raw_referral_id)
     if "referral_id" not in managed_identity_data or raw_referral_id != normalized_referral_id:
         managed_identity_data["referral_id"] = normalized_referral_id
+        changed = True
+
+    raw_referral_source = managed_identity_data.get("referral_source")
+    normalized_referral_source = (
+        raw_referral_source.strip().lower() if isinstance(raw_referral_source, str) else None
+    )
+    if normalized_referral_source not in {"discord", "qq"}:
+        normalized_referral_source = "discord" if normalized_referral_id is not None else None
+    if (
+        "referral_source" not in managed_identity_data
+        or raw_referral_source != normalized_referral_source
+    ):
+        managed_identity_data["referral_source"] = normalized_referral_source
         changed = True
 
     raw_local_managed_claim_sources = managed_identity_data.get("local_managed_claim_sources")

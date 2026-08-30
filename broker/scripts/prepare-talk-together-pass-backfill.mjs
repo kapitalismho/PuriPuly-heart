@@ -33,7 +33,8 @@ const REAL_REF_CANDIDATE_QUERY = `SELECT e.installation_id,
    AND identity.status = 'active'
    AND identity.entitlement_installation_id = e.installation_id
   LEFT JOIN referral_codes rc
-    ON rc.owner_discord_user_ref = e.discord_user_ref
+    ON rc.owner_source = 'discord'
+   AND rc.owner_subject_ref = e.discord_user_ref
  WHERE e.status = 'active'
    AND e.managed_credential_ref IS NOT NULL
    AND length(trim(e.managed_credential_ref)) > 0
@@ -97,7 +98,8 @@ const REFERRAL_CODE_INSERT_GUARDRAILS = [
   'e.discord_issue_delivered_at IS NOT NULL',
   'length(trim(e.discord_issue_delivered_at)) > 0',
   'NOT EXISTS',
-  'existing.owner_discord_user_ref = e.discord_user_ref',
+  "existing.owner_source = 'discord'",
+  'existing.owner_subject_ref = e.discord_user_ref',
   'existing.referral_id =',
 ];
 
@@ -157,7 +159,7 @@ const SYNTHETIC_ENTITLEMENT_UPDATE_GUARDRAILS = [
   "existing_active_identity.status = 'active'",
   'existing_active_identity.discord_user_ref <>',
   'existing_referral_id.referral_id =',
-  'existing_code.owner_discord_user_ref =',
+  'existing_code.owner_subject_ref =',
 ];
 
 export function allocateReferralId(existingCodes, randomBytesFn = randomBytes) {
@@ -346,7 +348,7 @@ function validateReferralCodeInsertStatement(statement, maskedStatement) {
   assertStatementGuardrails(statement, REFERRAL_CODE_INSERT_GUARDRAILS);
 
   const referralIdMatch = statement.match(
-    /SELECT\s+'((?:[^']|'')*)'\s*,\s*e\.discord_user_ref\s*,\s*e\.installation_id\s*,\s*'active'/iu,
+    /SELECT\s+'((?:[^']|'')*)'\s*,\s*'discord'\s*,\s*e\.discord_user_ref\s*,\s*e\.installation_id\s*,\s*'active'/iu,
   );
 
   if (!referralIdMatch) {
@@ -503,9 +505,9 @@ function buildRealRefReferralCodeInsert(input) {
   const discordUserRef = sqlString(input.discordUserRef);
 
   return `INSERT INTO referral_codes (
-  referral_id, owner_discord_user_ref, owner_installation_id, status, created_at, updated_at
+  referral_id, owner_source, owner_subject_ref, owner_installation_id, status, created_at, updated_at
 )
-SELECT ${referralId}, e.discord_user_ref, e.installation_id, 'active', ${nowIso}, ${nowIso}
+SELECT ${referralId}, 'discord', e.discord_user_ref, e.installation_id, 'active', ${nowIso}, ${nowIso}
   FROM openrouter_entitlements e
   JOIN discord_identities identity
     ON identity.discord_user_ref = e.discord_user_ref
@@ -526,8 +528,11 @@ SELECT ${referralId}, e.discord_user_ref, e.installation_id, 'active', ${nowIso}
    AND length(trim(e.discord_issue_delivered_at)) > 0
    AND NOT EXISTS (
      SELECT 1 FROM referral_codes existing
-      WHERE existing.owner_discord_user_ref = e.discord_user_ref
-         OR existing.referral_id = ${referralId}
+      WHERE existing.owner_source = 'discord'
+        AND (
+          existing.owner_subject_ref = e.discord_user_ref
+          OR existing.referral_id = ${referralId}
+        )
    )`;
 }
 
@@ -614,7 +619,7 @@ function buildSyntheticEntitlementUpdate(input) {
    )
    AND NOT EXISTS (
      SELECT 1 FROM referral_codes existing_code
-      WHERE existing_code.owner_discord_user_ref = ${syntheticRef}
+      WHERE existing_code.owner_subject_ref = ${syntheticRef}
    )`;
 }
 
@@ -625,9 +630,9 @@ function buildSyntheticReferralCodeInsert(input) {
   const syntheticRef = sqlString(input.syntheticRef);
 
   return `INSERT INTO referral_codes (
-  referral_id, owner_discord_user_ref, owner_installation_id, status, created_at, updated_at
+  referral_id, owner_source, owner_subject_ref, owner_installation_id, status, created_at, updated_at
 )
-SELECT ${referralId}, e.discord_user_ref, e.installation_id, 'active', ${nowIso}, ${nowIso}
+SELECT ${referralId}, 'discord', e.discord_user_ref, e.installation_id, 'active', ${nowIso}, ${nowIso}
   FROM openrouter_entitlements e
   JOIN discord_identities identity
     ON identity.discord_user_ref = e.discord_user_ref
@@ -654,8 +659,11 @@ SELECT ${referralId}, e.discord_user_ref, e.installation_id, 'active', ${nowIso}
    )
    AND NOT EXISTS (
      SELECT 1 FROM referral_codes existing
-      WHERE existing.owner_discord_user_ref = e.discord_user_ref
-         OR existing.referral_id = ${referralId}
+      WHERE existing.owner_source = 'discord'
+        AND (
+          existing.owner_subject_ref = e.discord_user_ref
+          OR existing.referral_id = ${referralId}
+        )
    )`;
 }
 

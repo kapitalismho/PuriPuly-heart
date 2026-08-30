@@ -123,6 +123,7 @@
     "paths": [
       "/v1/auth/discord/start",
       "/v1/auth/qq/assert",
+      "/v1/auth/qq/status",
       "/v1/providers/openrouter/discord/issue",
       "/v1/providers/openrouter/issue",
       "/v1/providers/openrouter/managed-key-delivery/ack",
@@ -154,6 +155,10 @@
       {
         "method": "POST",
         "path": "/v1/auth/qq/assert"
+      },
+      {
+        "method": "POST",
+        "path": "/v1/auth/qq/status"
       },
       {
         "method": "POST",
@@ -261,7 +266,9 @@
           "qq_identity",
           "credential",
           "asserted_at",
-          "delivery_ack_supported"
+          "delivery_ack_supported",
+          "referral_id",
+          "installation_id"
         ],
         "success_response_fields": [
           "ok",
@@ -271,6 +278,24 @@
         "success_response_source": {
           "file": "qq-auth.ts",
           "function": "legacyVerificationResponse",
+          "kind": "c_json_object"
+        }
+      },
+      "qq_auth_status": {
+        "method": "POST",
+        "path": "/v1/auth/qq/status",
+        "request_body_fields": [
+          "qq_identity",
+          "credential",
+          "installation_id"
+        ],
+        "success_response_fields": [
+          "ok",
+          "status"
+        ],
+        "success_response_source": {
+          "file": "qq-auth.ts",
+          "function": "handleQqAuthStatus",
           "kind": "c_json_object"
         }
       },

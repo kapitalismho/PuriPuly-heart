@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+import json
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
 
 from puripuly_heart.app.ports.broker_client import (
     BrokerClientPort,
+    ManagedKeyDeliveryAckResult,
     QqManagedAssertionFailureSubcode,
     QqManagedAssertionRequest,
     QqManagedAssertionResult,
@@ -25,6 +27,7 @@ from puripuly_heart.app.services.managed_key_delivery_ack import (
     ManagedKeyDeliveryAckService,
     ManagedKeyDeliveryAckTokenStoreError,
 )
+from puripuly_heart.config.provider_values import normalize_owned_referral_id
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_AUTH,
@@ -50,8 +53,11 @@ from puripuly_heart.core.messages import (
     TransactionResult,
     UserMessageRef,
 )
+from puripuly_heart.core.openrouter.openrouter_credentials import (
+    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+    OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET,
+)
 
-OPENROUTER_MANAGED_QQ_API_KEY_SECRET = "openrouter_managed_qq_api_key"
 QQ_MANAGED_AUTH_FAILURE_MESSAGE_KEYS = (
     "qq_managed_auth.invalid_credential",
     "qq_managed_auth.mismatch",
@@ -74,6 +80,7 @@ class QqManagedAuthRequest:
     credential: str = field(repr=False)
     asserted_at: str
     correlation_id: str | None = None
+    referral_id: str | None = None
     metadata: Mapping[str, DiagnosticFieldValue] = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
@@ -87,6 +94,14 @@ class QqManagedAuthService:
     managed_state: ManagedIdentityStatePort
     claim_guard: ManagedAuthClaimGuard | None = None
     delivery_ack_service: ManagedKeyDeliveryAckService | None = None
+    assertion_result_sink: Callable[[QqManagedAssertionResult], None] | None = field(
+        default=None,
+        repr=False,
+    )
+    ack_result_sink: Callable[[ManagedKeyDeliveryAckResult], None] | None = field(
+        default=None,
+        repr=False,
+    )
 
     async def authenticate(self, request: QqManagedAuthRequest) -> TransactionResult:
         recovery_result = await self._recover_pending_delivery_ack()
@@ -114,6 +129,7 @@ class QqManagedAuthService:
                 retry_after_ms=broker_result.retry_after_ms,
             )
 
+        self._emit_assertion_result(broker_result)
         secret_snapshot = await self._snapshot_secret()
         if isinstance(secret_snapshot, TransactionResult):
             return secret_snapshot
@@ -135,11 +151,23 @@ class QqManagedAuthService:
                     retry_after_ms=None,
                 )
             self._apply_entitlement_snapshot(broker_result.entitlement)
+            self._apply_qq_referral_result(
+                broker_result.referral_id,
+                account_changed=(
+                    _normalize_optional_text(state_snapshot.active_managed_credential_ref)
+                    != _normalize_optional_text(self.managed_state.active_managed_credential_ref)
+                ),
+            )
             if self.claim_guard is not None:
                 self.claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_QQ)
             try:
                 self.managed_state.persist()
             except Exception:
+                try:
+                    await self._delivery_ack_service().clear_pending(ACK_SOURCE_QQ)
+                except Exception:
+                    pass
+                self._restore_state_snapshot(state_snapshot)
                 return _remote_active_local_missing_result(
                     operation="persist_qq_pending_delivery_ack",
                     code="qq_pending_delivery_ack_persist_failed_before_local_key_write",
@@ -154,7 +182,9 @@ class QqManagedAuthService:
             secret_write = await self._write_managed_secret(broker_result.managed_secret_key)
             if isinstance(secret_write, TransactionResult):
                 return secret_write
+            await self._write_status_auth_secret_best_effort(request)
             ack_result = await self._delivery_ack_service().retry_pending()
+            self._consume_ack_result(ack_result.ack_result)
             if not ack_result.succeeded:
                 return _delivery_ack_pending_result(
                     ack_status=ack_result.status,
@@ -187,6 +217,13 @@ class QqManagedAuthService:
             return secret_write
 
         self._apply_entitlement_snapshot(broker_result.entitlement)
+        self._apply_qq_referral_result(
+            broker_result.referral_id,
+            account_changed=(
+                _normalize_optional_text(state_snapshot.active_managed_credential_ref)
+                != _normalize_optional_text(self.managed_state.active_managed_credential_ref)
+            ),
+        )
         if self.claim_guard is not None:
             self.claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_QQ)
         try:
@@ -196,6 +233,7 @@ class QqManagedAuthService:
                 secret_snapshot=secret_snapshot,
                 state_snapshot=state_snapshot,
             )
+        await self._write_status_auth_secret_best_effort(request)
 
         return TransactionResult(
             status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -238,6 +276,7 @@ class QqManagedAuthService:
             source=ACK_SOURCE_QQ,
             managed_secret_key=OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
         )
+        self._consume_ack_result(result.ack_result)
         if not result.succeeded:
             return _delivery_ack_pending_result(
                 ack_status=result.status,
@@ -272,6 +311,8 @@ class QqManagedAuthService:
                     credential=request.credential,
                     asserted_at=request.asserted_at,
                     metadata=request.metadata,
+                    referral_id=request.referral_id,
+                    installation_id=_normalize_optional_text(self.managed_state.installation_id),
                 )
             )
         except Exception:
@@ -323,6 +364,77 @@ class QqManagedAuthService:
                 message=result.message,
             )
         return None
+
+    async def _write_status_auth_secret_best_effort(
+        self,
+        request: QqManagedAuthRequest,
+    ) -> None:
+        value = json.dumps(
+            {
+                "qq_identity": request.qq_identity,
+                "credential": request.credential,
+                "managed_credential_ref": self.managed_state.active_managed_credential_ref,
+            },
+            separators=(",", ":"),
+        )
+        try:
+            result = await self.secret_store.set_secret(
+                OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET,
+                value,
+            )
+            if result.succeeded:
+                return
+        except Exception:
+            pass
+        try:
+            await self.secret_store.clear_secret(
+                OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET,
+            )
+        except Exception:
+            return
+
+    def _emit_assertion_result(self, result: QqManagedAssertionResult) -> None:
+        if self.assertion_result_sink is None:
+            return
+        try:
+            self.assertion_result_sink(result)
+        except Exception:
+            return
+
+    def _consume_ack_result(self, result: ManagedKeyDeliveryAckResult | None) -> None:
+        if result is None:
+            return
+        if result.succeeded:
+            changed = self._apply_qq_referral_result(result.referral_id)
+            if changed:
+                try:
+                    self.managed_state.persist()
+                except Exception:
+                    pass
+        if self.ack_result_sink is not None:
+            try:
+                self.ack_result_sink(result)
+            except Exception:
+                return
+
+    def _apply_qq_referral_result(
+        self,
+        referral_id: object,
+        *,
+        account_changed: bool = False,
+    ) -> bool:
+        previous_source = getattr(self.managed_state, "referral_source", None)
+        previous_referral_id = self.managed_state.referral_id
+        if previous_source != "qq" or account_changed:
+            self.managed_state.referral_id = None
+        self.managed_state.referral_source = "qq"
+        normalized_referral_id = normalize_owned_referral_id(referral_id)
+        if normalized_referral_id is not None:
+            self.managed_state.referral_id = normalized_referral_id
+        return (
+            previous_source != self.managed_state.referral_source
+            or previous_referral_id != self.managed_state.referral_id
+        )
 
     def _apply_entitlement_snapshot(self, entitlement: QqManagedEntitlementSnapshot) -> None:
         current_ref = self.managed_state.active_managed_credential_ref

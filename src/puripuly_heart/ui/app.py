@@ -861,7 +861,7 @@ class TranslatorApp:
             pass_status=TalkTogetherPassStatus(
                 pass_id=DEBUG_PREVIEW_TALK_TOGETHER_PASS_ID,
                 invite_count=1,
-                invite_limit=5,
+                invite_limit=3,
                 bonus_translations_per_friend=200,
             ),
         )
@@ -1632,6 +1632,10 @@ class TranslatorApp:
         dialog = getattr(self, "_qq_managed_auth_dialog", None)
         qq_identity = getattr(dialog, "qq_identity", "")
         credential = getattr(dialog, "credential", "")
+        raw_referral_id = getattr(dialog, "referral_id", "")
+        referral_id = (
+            raw_referral_id if isinstance(raw_referral_id, str) and raw_referral_id else None
+        )
         set_waiting = getattr(dialog, "set_waiting", None)
         if callable(set_waiting):
             set_waiting()
@@ -1645,6 +1649,7 @@ class TranslatorApp:
                 result = await application.start_qq_managed_auth_from_dialog(
                     qq_identity=qq_identity,
                     credential=credential,
+                    referral_id=referral_id,
                 )
             except asyncio.CancelledError:
                 return

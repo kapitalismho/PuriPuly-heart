@@ -4,6 +4,7 @@ import asyncio
 import base64
 import contextlib
 import hashlib
+import json
 import sys
 import threading
 import types
@@ -33,6 +34,7 @@ from puripuly_heart.core.managed_openrouter_release import (
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_MANAGED_API_KEY_SECRET,
     OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+    OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET,
     OPENROUTER_MANAGED_USER_ID_SECRET,
     OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
     load_managed_openrouter_user_identifier,
@@ -67,6 +69,7 @@ class FakeManagedReleaseClient:
     discord_issue_result: object | None = None
     delivery_ack_result: object | None = None
     trial_status_result: object | None = None
+    qq_status_result: object | None = None
     challenge_gate: asyncio.Event | None = None
     discord_start_gate: asyncio.Event | None = None
     issue_gate: asyncio.Event | None = None
@@ -180,6 +183,13 @@ class FakeManagedReleaseClient:
         if self.trial_status_gate is not None:
             await self.trial_status_gate.wait()
         result = self.trial_status_result
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    async def get_qq_managed_status(self, request: object):
+        self.calls.append(("qq_status", {"request": request}))
+        result = self.qq_status_result
         if isinstance(result, Exception):
             raise result
         return result
@@ -974,7 +984,7 @@ async def test_discord_issue_success_exposes_talk_together_pass_status() -> None
     pass_status = TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=1,
-        invite_limit=5,
+        invite_limit=3,
         bonus_translations_per_friend=200,
     )
     client = FakeManagedReleaseClient(
@@ -1015,6 +1025,28 @@ async def test_discord_issue_success_defaults_referral_bonus_and_preserves_known
     assert result.referral_bonus_applied is False
     assert result.referral_id == "8H3J4N"
     assert settings.managed_identity.referral_id == "8H3J4N"
+
+
+@pytest.mark.asyncio
+async def test_discord_issue_without_owned_id_clears_previous_qq_pass_state() -> None:
+    settings = AppSettings()
+    settings.managed_identity.referral_id = "8H3J4N"
+    settings.managed_identity.referral_source = "qq"
+    client = FakeManagedReleaseClient(
+        discord_start_result=_make_discord_start_success(),
+        discord_issue_result=ManagedOpenRouterIssueSuccess(openrouter_api_key="managed-key"),
+    )
+    service, settings, _secrets, _client, _harness = _make_discord_service(
+        client=client,
+        settings=settings,
+    )
+
+    result = await service.prepare_for_translation()
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.READY
+    assert result.referral_id is None
+    assert settings.managed_identity.referral_id is None
+    assert settings.managed_identity.referral_source == "discord"
 
 
 @pytest.mark.asyncio
@@ -1087,6 +1119,78 @@ async def test_status_refresh_signs_existing_identity_request_and_persists_owned
 
 
 @pytest.mark.asyncio
+async def test_qq_status_refresh_uses_only_auth_bound_to_active_managed_credential() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.managed_identity.referral_source = "qq"
+    settings.managed_identity.active_managed_credential_ref = "managed-ref-qq"
+    secrets = InMemorySecretStore()
+    secrets.set(
+        OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET,
+        json.dumps(
+            {
+                "qq_identity": "qq-account-current",
+                "credential": "a" * 64,
+                "managed_credential_ref": "managed-ref-qq",
+            },
+            separators=(",", ":"),
+        ),
+    )
+    client = FakeManagedReleaseClient(
+        qq_status_result=ManagedOpenRouterTrialStatusSuccess(referral_id="7KQ9M2"),
+    )
+    service, settings, _secrets = _make_service(
+        client=client,
+        settings=settings,
+        secrets=secrets,
+    )
+
+    result = await service.refresh_managed_status()
+
+    assert result.succeeded is True
+    assert result.referral_id == "7KQ9M2"
+    assert settings.managed_identity.referral_id == "7KQ9M2"
+    assert settings.managed_identity.referral_source == "qq"
+    assert [name for name, _payload in client.calls] == ["qq_status"]
+
+
+@pytest.mark.asyncio
+async def test_qq_status_refresh_rejects_stale_auth_from_previous_managed_credential() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.managed_identity.referral_id = "8H3J4N"
+    settings.managed_identity.referral_source = "qq"
+    settings.managed_identity.active_managed_credential_ref = "managed-ref-current"
+    secrets = InMemorySecretStore()
+    stale_status_auth = json.dumps(
+        {
+            "qq_identity": "qq-account-previous",
+            "credential": "b" * 64,
+            "managed_credential_ref": "managed-ref-previous",
+        },
+        separators=(",", ":"),
+    )
+    secrets.set(OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET, stale_status_auth)
+    client = FakeManagedReleaseClient(
+        qq_status_result=ManagedOpenRouterTrialStatusSuccess(referral_id="7KQ9M2"),
+    )
+    service, settings, _secrets = _make_service(
+        client=client,
+        settings=settings,
+        secrets=secrets,
+    )
+
+    result = await service.refresh_managed_status()
+
+    assert result.succeeded is False
+    assert result.referral_id == "8H3J4N"
+    assert settings.managed_identity.referral_id == "8H3J4N"
+    assert settings.managed_identity.referral_source == "qq"
+    assert client.calls == []
+    assert secrets.get(OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET) == stale_status_auth
+
+
+@pytest.mark.asyncio
 async def test_managed_status_refresh_returns_pass_status_without_persisting_it() -> None:
     from puripuly_heart.config.settings import to_dict
 
@@ -1100,7 +1204,7 @@ async def test_managed_status_refresh_returns_pass_status_without_persisting_it(
     pass_status = TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=2,
-        invite_limit=5,
+        invite_limit=3,
         bonus_translations_per_friend=200,
     )
     client = FakeManagedReleaseClient(
@@ -1175,7 +1279,8 @@ async def test_status_refresh_preserves_known_owned_referral_id_when_old_broker_
     assert [name for name, _payload in client.calls] == ["trial_status"]
     assert result == "8H3J4N"
     assert settings.managed_identity.referral_id == "8H3J4N"
-    assert persist_calls == []
+    assert settings.managed_identity.referral_source == "discord"
+    assert persist_calls == [(settings.managed_identity.installation_id, None)]
 
 
 @pytest.mark.asyncio

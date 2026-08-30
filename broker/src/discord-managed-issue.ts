@@ -2538,7 +2538,16 @@ async function bestEffortReserveIssueReferralReward(
   },
 ): Promise<IssueReferralReservationResult | null> {
   try {
-    return await reserveIssueReferralReward(db, input);
+    return await reserveIssueReferralReward(db, {
+      referralId: input.referralId,
+      referredSource: 'discord',
+      referredSubjectRef: input.referredDiscordUserRef,
+      referredInstallationId: input.referredInstallationId,
+      referredHardwareHash: input.referredHardwareHash,
+      referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
+      clientIp: input.clientIp,
+      nowIso: input.nowIso,
+    });
   } catch {
     return null;
   }
@@ -2585,7 +2594,8 @@ async function creditReservedIssueReferralReward(
 
   const credited = await markReservedIssueReferralCredited(db, {
     referralId: input.referralReservation.referralId,
-    referredDiscordUserRef: input.referredDiscordUserRef,
+    referredSource: 'discord',
+    referredSubjectRef: input.referredDiscordUserRef,
     referredInstallationId: input.referredInstallationId,
     referredManagedCredentialRef: input.referredManagedCredentialRef,
     nowIso: input.nowIso,
@@ -2596,7 +2606,8 @@ async function creditReservedIssueReferralReward(
         `SELECT 1 AS credited
            FROM referral_rewards
           WHERE referral_id = ?
-            AND referred_discord_user_ref = ?
+            AND referred_source = 'discord'
+            AND referred_subject_ref = ?
             AND referred_installation_id = ?
             AND referred_bonus_status = 'credited'
             AND referred_managed_credential_ref = ?`,
@@ -2625,7 +2636,8 @@ async function resolveReservedIssueReferralForAck(
     .prepare(
       `SELECT referral_id
          FROM referral_rewards
-        WHERE referred_discord_user_ref = ?
+        WHERE referred_source = 'discord'
+          AND referred_subject_ref = ?
           AND referred_installation_id = ?
           AND referred_bonus_status = 'reserved'
         ORDER BY created_at DESC
@@ -2653,7 +2665,8 @@ async function bestEffortApplyReferrerRewardLimitUpdate(
   try {
     await applyCreditedIssueReferrerRewardLimitUpdate(db, {
       referralId: input.referralReservation.referralId,
-      referredDiscordUserRef: input.referredDiscordUserRef,
+      referredSource: 'discord',
+      referredSubjectRef: input.referredDiscordUserRef,
       referredInstallationId: input.referredInstallationId,
       managementApiKey: input.managementApiKey,
       nowIso: input.nowIso,
@@ -2684,7 +2697,8 @@ async function bestEffortRecordIneligibleIssueReferralSkip(
   try {
     await recordSkippedIssueReferralReward(db, {
       referralId: input.referralId,
-      referredDiscordUserRef: input.referredDiscordUserRef,
+      referredSource: 'discord',
+      referredSubjectRef: input.referredDiscordUserRef,
       referredInstallationId: input.referredInstallationId,
       referredHardwareHash: input.referredHardwareHash,
       referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
@@ -2735,7 +2749,8 @@ async function bestEffortMarkIssueReferralReservationFailed(
   try {
     await markReservedIssueReferralFailed(db, {
       referralId: input.referralReservation.referralId,
-      referredDiscordUserRef: input.referredDiscordUserRef,
+      referredSource: 'discord',
+      referredSubjectRef: input.referredDiscordUserRef,
       referredInstallationId: input.referredInstallationId,
       failureReason: 'issue_delivery_failed',
       nowIso: input.nowIso,

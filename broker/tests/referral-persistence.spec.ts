@@ -135,6 +135,8 @@ describe('broker referral persistence foundation', () => {
       const referralCodeColumns = columnNames(db, 'referral_codes');
       expect(referralCodeColumns).toEqual([
         'referral_id',
+        'owner_source',
+        'owner_subject_ref',
         'owner_discord_user_ref',
         'owner_installation_id',
         'status',
@@ -149,8 +151,12 @@ describe('broker referral persistence foundation', () => {
       expect(referralRewardColumns).toEqual([
         'id',
         'referral_id',
+        'referrer_source',
+        'referrer_subject_ref',
         'referrer_discord_user_ref',
         'referrer_installation_id',
+        'referred_source',
+        'referred_subject_ref',
         'referred_discord_user_ref',
         'referred_installation_id',
         'referred_hardware_hash',
@@ -181,27 +187,254 @@ describe('broker referral persistence foundation', () => {
 
       expect(indexes.map((index) => index.name)).toEqual(
         expect.arrayContaining([
+          'idx_referral_codes_owner_subject',
           'idx_referral_codes_owner_discord_user_ref',
           'idx_referral_codes_owner_installation_id',
           'idx_referral_codes_status',
           'idx_referral_rewards_referral_id',
           'idx_referral_rewards_referrer_cap',
+          'idx_referral_rewards_referrer_cap_legacy',
+          'idx_referral_rewards_counted_referred_subject',
           'idx_referral_rewards_counted_referred_discord_user',
           'idx_referral_rewards_counted_referred_installation',
+          'idx_referral_rewards_attempt_subject_time',
           'idx_referral_rewards_attempt_installation_time',
           'idx_referral_rewards_attempt_ip_hash_time',
           'idx_referral_rewards_referral_velocity',
           'idx_referral_rewards_referrer_velocity',
+          'idx_referral_rewards_referrer_velocity_legacy',
           'idx_discord_oauth_sessions_referral_id',
         ]),
       );
-      expect(indexSql(indexes, 'idx_referral_rewards_counted_referred_discord_user')).toContain(
-        "WHERE referred_bonus_status IN ('reserved', 'credited')",
+      expect(indexSql(indexes, 'idx_referral_rewards_counted_referred_subject')).toContain(
+        "AND referred_bonus_status IN ('reserved', 'credited')",
       );
       expect(indexSql(indexes, 'idx_referral_rewards_counted_referred_installation')).toContain(
-        "WHERE referred_bonus_status IN ('reserved', 'credited')",
+        "AND referred_bonus_status IN ('reserved', 'credited')",
       );
     });
+  });
+
+  it('keeps previous and source-aware Worker referral SQL compatible across migration-before-deploy', () => {
+    const db = new DatabaseSync(':memory:');
+    try {
+      applyBrokerMigrations(db, {
+        through: '0015_add_app_active_days.sql',
+      });
+      db.prepare(
+        `INSERT INTO referral_codes (
+          referral_id, owner_discord_user_ref, owner_installation_id, status
+        ) VALUES (?, ?, ?, 'active')`,
+      ).run(
+        VALID_REFERRAL_ID,
+        'ph-discord-user-v1_legacy-before-migration',
+        'install-legacy-before-migration',
+      );
+      db.prepare(
+        `INSERT INTO referral_rewards (
+          referral_id, referrer_discord_user_ref, referrer_installation_id,
+          referred_discord_user_ref, referred_installation_id, referred_hardware_hash,
+          referred_hardware_hash_salt_version, referred_bonus_status,
+          referrer_bonus_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', 'pending')`,
+      ).run(
+        VALID_REFERRAL_ID,
+        'ph-discord-user-v1_legacy-before-migration',
+        'install-legacy-before-migration',
+        'ph-discord-user-v1_referred-before-migration',
+        'install-referred-before-migration',
+        'hardware-before-migration',
+        7,
+      );
+
+      applyBrokerMigrations(db, {
+        after: '0015_add_app_active_days.sql',
+        through: '0016_make_referrals_source_aware.sql',
+      });
+
+      expect(
+        db
+          .prepare(
+            `SELECT owner_source, owner_subject_ref, owner_discord_user_ref
+               FROM referral_codes
+              WHERE referral_id = ?`,
+          )
+          .get(VALID_REFERRAL_ID),
+      ).toEqual({
+        owner_source: 'discord',
+        owner_subject_ref: 'ph-discord-user-v1_legacy-before-migration',
+        owner_discord_user_ref: 'ph-discord-user-v1_legacy-before-migration',
+      });
+      expect(
+        db
+          .prepare(
+            `SELECT referrer_source, referrer_subject_ref, referrer_discord_user_ref,
+                    referred_source, referred_subject_ref, referred_discord_user_ref
+               FROM referral_rewards
+              WHERE referral_id = ?`,
+          )
+          .get(VALID_REFERRAL_ID),
+      ).toEqual({
+        referrer_source: 'discord',
+        referrer_subject_ref: 'ph-discord-user-v1_legacy-before-migration',
+        referrer_discord_user_ref: 'ph-discord-user-v1_legacy-before-migration',
+        referred_source: 'discord',
+        referred_subject_ref: 'ph-discord-user-v1_referred-before-migration',
+        referred_discord_user_ref: 'ph-discord-user-v1_referred-before-migration',
+      });
+
+      db.prepare(
+        `INSERT INTO referral_codes (
+          referral_id, owner_discord_user_ref, owner_installation_id, status
+        ) VALUES (?, ?, ?, 'active')`,
+      ).run(
+        SECOND_VALID_REFERRAL_ID,
+        'ph-discord-user-v1_legacy-during-rollout',
+        'install-legacy-during-rollout',
+      );
+      db.prepare(
+        `INSERT INTO referral_rewards (
+          referral_id, referrer_discord_user_ref, referrer_installation_id,
+          referred_discord_user_ref, referred_installation_id, referred_hardware_hash,
+          referred_hardware_hash_salt_version, referred_bonus_status,
+          referrer_bonus_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', 'pending')`,
+      ).run(
+        SECOND_VALID_REFERRAL_ID,
+        'ph-discord-user-v1_legacy-during-rollout',
+        'install-legacy-during-rollout',
+        'ph-discord-user-v1_referred-during-rollout',
+        'install-referred-during-rollout',
+        'hardware-during-rollout',
+        7,
+      );
+
+      expect(
+        db
+          .prepare(
+            `SELECT owner_source, owner_subject_ref
+               FROM referral_codes
+              WHERE owner_discord_user_ref = ?`,
+          )
+          .get('ph-discord-user-v1_legacy-during-rollout'),
+      ).toEqual({
+        owner_source: 'discord',
+        owner_subject_ref: 'ph-discord-user-v1_legacy-during-rollout',
+      });
+      expect(
+        db
+          .prepare(
+            `SELECT referrer_source, referrer_subject_ref,
+                    referred_source, referred_subject_ref
+               FROM referral_rewards
+              WHERE referred_discord_user_ref = ?`,
+          )
+          .get('ph-discord-user-v1_referred-during-rollout'),
+      ).toEqual({
+        referrer_source: 'discord',
+        referrer_subject_ref: 'ph-discord-user-v1_legacy-during-rollout',
+        referred_source: 'discord',
+        referred_subject_ref: 'ph-discord-user-v1_referred-during-rollout',
+      });
+
+      db.prepare(
+        `UPDATE referral_codes
+            SET owner_installation_id = ?
+          WHERE owner_discord_user_ref = ?`,
+      ).run(
+        'install-legacy-during-rollout-refreshed',
+        'ph-discord-user-v1_legacy-during-rollout',
+      );
+      db.prepare(
+        `UPDATE referral_rewards
+            SET referred_bonus_status = 'credited', updated_at = ?
+          WHERE referred_discord_user_ref = ?`,
+      ).run(
+        '2026-08-30T00:00:00.000Z',
+        'ph-discord-user-v1_referred-during-rollout',
+      );
+      expect(
+        db
+          .prepare(
+            `SELECT owner_installation_id
+               FROM referral_codes
+              WHERE owner_source = 'discord' AND owner_subject_ref = ?`,
+          )
+          .get('ph-discord-user-v1_legacy-during-rollout'),
+      ).toEqual({ owner_installation_id: 'install-legacy-during-rollout-refreshed' });
+      expect(
+        db
+          .prepare(
+            `SELECT referred_bonus_status
+               FROM referral_rewards
+              WHERE referred_source = 'discord' AND referred_subject_ref = ?`,
+          )
+          .get('ph-discord-user-v1_referred-during-rollout'),
+      ).toEqual({ referred_bonus_status: 'credited' });
+
+      db.prepare(
+        `INSERT INTO referral_codes (
+          referral_id, owner_source, owner_subject_ref, owner_installation_id, status
+        ) VALUES (?, 'discord', ?, ?, 'active')`,
+      ).run(
+        'BCDEFG',
+        'ph-discord-user-v1_source-aware-discord',
+        'install-source-aware-discord',
+      );
+      expect(
+        db
+          .prepare(
+            `SELECT owner_discord_user_ref
+               FROM referral_codes
+              WHERE owner_source = 'discord' AND owner_subject_ref = ?`,
+          )
+          .get('ph-discord-user-v1_source-aware-discord'),
+      ).toEqual({ owner_discord_user_ref: 'ph-discord-user-v1_source-aware-discord' });
+
+      db.prepare(
+        `INSERT INTO referral_codes (
+          referral_id, owner_source, owner_subject_ref, owner_installation_id, status
+        ) VALUES (?, 'qq', ?, ?, 'active')`,
+      ).run('CDEFGH', 'ph-qq-subject-v1_source-aware-qq', 'install-source-aware-qq');
+      db.prepare(
+        `INSERT INTO referral_rewards (
+          referral_id, referrer_source, referrer_subject_ref,
+          referrer_installation_id, referred_source, referred_subject_ref,
+          referred_installation_id, referred_hardware_hash,
+          referred_hardware_hash_salt_version, referred_bonus_status,
+          referrer_bonus_status
+        ) VALUES (?, 'discord', ?, ?, 'qq', ?, ?, NULL, NULL, 'reserved', 'pending')`,
+      ).run(
+        'BCDEFG',
+        'ph-discord-user-v1_source-aware-discord',
+        'install-source-aware-discord',
+        'ph-qq-subject-v1_source-aware-referred',
+        'install-source-aware-referred',
+      );
+      expect(
+        db
+          .prepare(
+            `SELECT owner_discord_user_ref
+               FROM referral_codes
+              WHERE owner_source = 'qq' AND owner_subject_ref = ?`,
+          )
+          .get('ph-qq-subject-v1_source-aware-qq'),
+      ).toEqual({ owner_discord_user_ref: null });
+      expect(
+        db
+          .prepare(
+            `SELECT referrer_discord_user_ref, referred_discord_user_ref
+               FROM referral_rewards
+              WHERE referred_source = 'qq' AND referred_subject_ref = ?`,
+          )
+          .get('ph-qq-subject-v1_source-aware-referred'),
+      ).toEqual({
+        referrer_discord_user_ref: 'ph-discord-user-v1_source-aware-discord',
+        referred_discord_user_ref: null,
+      });
+    } finally {
+      db.close();
+    }
   });
 
   it('uses D1-safe Referral ID checks in all referral-bearing tables', () => {
@@ -462,10 +695,11 @@ describe('broker referral persistence foundation', () => {
       const insertReferralCode = db.prepare(
         `INSERT INTO referral_codes (
           referral_id,
-          owner_discord_user_ref,
+          owner_source,
+          owner_subject_ref,
           owner_installation_id,
           status
-        ) VALUES (?, ?, ?, ?)`,
+        ) VALUES (?, 'discord', ?, ?, ?)`,
       );
 
       expect(() =>
@@ -575,9 +809,11 @@ describe('broker referral persistence foundation', () => {
       const insertReward = db.prepare(
         `INSERT INTO referral_rewards (
           referral_id,
-          referrer_discord_user_ref,
+          referrer_source,
+          referrer_subject_ref,
           referrer_installation_id,
-          referred_discord_user_ref,
+          referred_source,
+          referred_subject_ref,
           referred_installation_id,
           referred_hardware_hash,
           referred_hardware_hash_salt_version,
@@ -587,7 +823,7 @@ describe('broker referral persistence foundation', () => {
           failure_reason,
           referred_managed_credential_ref,
           referrer_managed_credential_ref
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?1, CASE WHEN ?2 IS NULL THEN NULL ELSE 'discord' END, ?2, ?3, 'discord', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
       );
 
       expect(() =>
@@ -724,24 +960,27 @@ describe('broker referral persistence foundation', () => {
       db.prepare(
         `INSERT INTO referral_codes (
           referral_id,
-          owner_discord_user_ref,
+          owner_source,
+          owner_subject_ref,
           owner_installation_id,
           status
-        ) VALUES (?, ?, ?, 'active')`,
+        ) VALUES (?, 'discord', ?, ?, 'active')`,
       ).run(VALID_REFERRAL_ID, 'ph-discord-user-v1_owner-aging-out', 'install-owner-aging-out');
 
       db.prepare(
         `INSERT INTO referral_rewards (
           referral_id,
-          referrer_discord_user_ref,
+          referrer_source,
+          referrer_subject_ref,
           referrer_installation_id,
-          referred_discord_user_ref,
+          referred_source,
+          referred_subject_ref,
           referred_installation_id,
           referred_hardware_hash,
           referred_hardware_hash_salt_version,
           referred_bonus_status,
           referrer_bonus_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'credited', 'credited')`,
+        ) VALUES (?, 'discord', ?, ?, 'discord', ?, ?, ?, ?, 'credited', 'credited')`,
       ).run(
         VALID_REFERRAL_ID,
         'ph-discord-user-v1_owner-aging-out',

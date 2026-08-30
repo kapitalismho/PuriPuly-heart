@@ -36,6 +36,7 @@ class ManagedUsageState:
     entitlement_ref: str | None
     referral_id: str | None
     ingress_frozen: bool
+    referral_source: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,7 +67,7 @@ class ManagedUsageOwner:
     usage_metadata: OpenRouterKeyMetadata | None = None
     usage_metadata_entitlement_ref: str | None = None
     pass_status: TalkTogetherPassStatus | None = None
-    pass_status_key: tuple[str | None, str | None, str | None] | None = None
+    pass_status_key: tuple[str | None, str | None, str | None, str | None] | None = None
     refresh_owner: ManagedStatusRefreshOwner = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -102,13 +103,21 @@ class ManagedUsageOwner:
         referral_id: str | None,
         *,
         state: ManagedUsageState | None = None,
-    ) -> tuple[str | None, str | None, str | None] | None:
+    ) -> tuple[str | None, str | None, str | None, str | None] | None:
         current = state or self.state_provider()
         if not current.settings_available:
             return None
+        referral_source = (
+            current.referral_source.strip().lower()
+            if isinstance(current.referral_source, str)
+            else None
+        )
+        if referral_source not in {"discord", "qq"}:
+            referral_source = None
         return (
             current.installation_id,
             current.entitlement_ref,
+            referral_source,
             self.normalize_referral_id(referral_id),
         )
 
@@ -201,7 +210,7 @@ class ManagedUsageOwner:
         if not callable(refresh_status) and not callable(legacy_refresh):
             return False
         scheduled_scope = self.identity_scope(current_referral_id, state=state)
-        scheduled_base = scheduled_scope[:2] if scheduled_scope is not None else None
+        scheduled_base = scheduled_scope[:3] if scheduled_scope is not None else None
 
         async def run() -> None:
             try:

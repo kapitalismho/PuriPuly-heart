@@ -60,7 +60,8 @@ function readReferralCode(input: {
               owner_installation_id,
               status
          FROM referral_codes
-        WHERE owner_discord_user_ref = ?`,
+        WHERE owner_source = 'discord'
+          AND owner_subject_ref = ?`,
     )
     .get(input.discordUserRef) as
     | { referral_id: string; owner_installation_id: string | null; status: string }
@@ -87,9 +88,11 @@ function insertStatusReferralReward(input: {
     .prepare(
       `INSERT INTO referral_rewards (
           referral_id,
-          referrer_discord_user_ref,
+          referrer_source,
+          referrer_subject_ref,
           referrer_installation_id,
-          referred_discord_user_ref,
+          referred_source,
+          referred_subject_ref,
           referred_installation_id,
           referred_hardware_hash,
           referred_hardware_hash_salt_version,
@@ -101,7 +104,7 @@ function insertStatusReferralReward(input: {
           referrer_managed_credential_ref,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 7, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
+        ) VALUES (?, 'discord', ?, ?, 'discord', ?, ?, ?, 7, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
     )
     .run(
       input.referralId,
@@ -304,7 +307,7 @@ describe('GET /v1/trial/status response contract', () => {
     expect(payload.talk_together_pass).toEqual({
       pass_id: payload.referral_id,
       invite_count: 0,
-      invite_limit: 5,
+      invite_limit: 3,
       bonus_translations_per_friend: 200,
     });
     const serialized = JSON.stringify(payload.talk_together_pass);
@@ -391,7 +394,7 @@ describe('GET /v1/trial/status response contract', () => {
     expect(payload.talk_together_pass).toMatchObject({
       pass_id: payload.referral_id,
       invite_count: 2,
-      invite_limit: 5,
+      invite_limit: 3,
       bonus_translations_per_friend: 200,
     });
   });
@@ -406,7 +409,8 @@ describe('GET /v1/trial/status response contract', () => {
       beforeFirst({ sql }) {
         if (
           sql.includes('FROM referral_rewards counted') &&
-          sql.includes('counted.referrer_discord_user_ref = ?')
+          sql.includes('counted.referrer_source = ?') &&
+          sql.includes('counted.referrer_subject_ref = ?')
         ) {
           throw new Error('forced Talk Together Pass count failure');
         }
@@ -541,8 +545,8 @@ describe('GET /v1/trial/status response contract', () => {
       const payload = (await response.json()) as Record<string, unknown>;
       expect(payload.talk_together_pass).toMatchObject({
         pass_id: referralId,
-        invite_count: Math.min(countedRows, 5),
-        invite_limit: 5,
+        invite_count: Math.min(countedRows, 3),
+        invite_limit: 3,
         bonus_translations_per_friend: 200,
       });
     },

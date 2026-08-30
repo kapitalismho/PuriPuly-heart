@@ -315,7 +315,7 @@
   "debug_preview.discord_auth": "Discord 认证",
   "debug_preview.qq_auth": "QQ 认证",
   "debug_preview.discord_callback_page": "Discord 回调页面",
-  "debug_preview.talk_together_pass_invite_progress": "邀请朋友 1/5",
+  "debug_preview.talk_together_pass_invite_progress": "邀请朋友 1/3",
   "debug_preview.capture_fault_cycle": "切换采集故障",
   "debug_preview.stt_fault_cycle": "切换 STT 故障",
   "debug_preview.stt_loading_button_cycle": "切换 STT 加载按钮",

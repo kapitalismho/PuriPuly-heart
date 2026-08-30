@@ -219,6 +219,7 @@ CURRENT_OPERATIONAL_STATE_DESTINATIONS = {
         "state.managed_connection.pending_delivery_ack_source"
     ),
     "managed_identity.referral_id": "state.managed_connection.referral_id",
+    "managed_identity.referral_source": "state.managed_connection.referral_source",
     "managed_identity.release_token": "state.managed_connection.release_token",
     "managed_identity.release_token_expires_at": (
         "state.managed_connection.release_token_expires_at"
@@ -304,6 +305,7 @@ EXPLICIT_MISSING_FIELD_DEFAULT_EXPECTATIONS: dict[str, Any] = {
     "ui.github_star_prompt_show_count": 0,
     # Missing referral identity state remains absent rather than inventing a value.
     "managed_identity.referral_id": None,
+    "managed_identity.referral_source": None,
     "languages.peer_source_mode": "manual",
     "languages.peer_expected_languages": [],
 }
@@ -447,6 +449,7 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     settings.managed_identity.active_managed_expires_at = "2026-07-09T00:00:00Z"
     settings.managed_identity.founder_letter_seen_credential_ref = "fixture-founder-ref"
     settings.managed_identity.referral_id = "7KQ9M2"
+    settings.managed_identity.referral_source = "qq"
     settings.managed_identity.local_managed_claim_sources = ("discord",)
     settings.managed_identity.pending_delivery_ack_source = "discord"
     settings.managed_identity.pending_delivery_ack_delivery_id = "fixture-delivery-id"

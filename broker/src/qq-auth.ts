@@ -11,9 +11,17 @@ import {
 } from './broker-error';
 import type { BrokerEnv } from './contract';
 import { stringValue } from './public-input';
+import {
+  ensureOwnedReferralIdForActiveQqManagedUser,
+  normalizeReferralId,
+  resolveOwnedReferralStatusForManagedSubject,
+  resolveTalkTogetherPassStatusForOwnedReferralCode,
+} from './referral';
 import { issueQqManagedEntitlement } from './qq-managed-issue';
+import { getQqTalkTogetherPassConfig } from './qq-talk-together-pass';
 
 const QQ_AUTH_ASSERT_ENDPOINT = 'POST /v1/auth/qq/assert';
+const QQ_AUTH_STATUS_ENDPOINT = 'POST /v1/auth/qq/status';
 const QQ_SUBJECT_REF_PREFIX = 'ph-qq-subject-v1_';
 const QQ_SUBJECT_REF_PAYLOAD_PREFIX = 'puripuly-heart:qq-subject:v1';
 const CREDENTIAL_HASH_PREFIX = 'sha256-base64url-v1_';
@@ -30,6 +38,14 @@ interface QqAuthAssertRequestBody {
   credential?: unknown;
   asserted_at?: unknown;
   delivery_ack_supported?: unknown;
+  referral_id?: unknown;
+  installation_id?: unknown;
+}
+
+interface QqAuthStatusRequestBody {
+  qq_identity?: unknown;
+  credential?: unknown;
+  installation_id?: unknown;
 }
 
 interface QqAuthAssertInput {
@@ -37,6 +53,8 @@ interface QqAuthAssertInput {
   credential: string;
   assertedAt: string;
   deliveryAckSupported: boolean;
+  referralId: string | null;
+  installationId: string | null;
 }
 
 export async function handleQqAuthAssert(
@@ -117,10 +135,135 @@ export async function handleQqAuthAssert(
     });
   }
 
+  const passConfig = await getQqTalkTogetherPassConfig(c.env.BROKER_DB);
   return issueQqManagedEntitlement(c, {
     qqSubjectRef,
     now,
     deliveryAckSupported: input.value.deliveryAckSupported,
+    referralId: passConfig.enabled ? input.value.referralId : null,
+    referredInstallationId: passConfig.enabled ? input.value.installationId : null,
+    clientIp: requestContext.ip,
+    passConfig,
+  });
+}
+
+export async function handleQqAuthStatus(
+  c: Context<BrokerEnv>,
+): Promise<Response> {
+  const now = new Date();
+  const requestContext = {
+    endpoint: QQ_AUTH_STATUS_ENDPOINT,
+    now,
+    ip: resolveClientIp(c),
+    installationId: null,
+    hardwareHash: null,
+  };
+  await recordRequestEvent(c.env.BROKER_DB, requestContext);
+  const rateLimitDecision = await checkEndpointRateLimit(
+    c.env.BROKER_DB,
+    requestContext,
+  );
+  if (rateLimitDecision) {
+    return publicErrorResponse(c, rateLimitDecision.status, {
+      code: rateLimitDecision.code,
+      class: rateLimitDecision.class,
+      subcode: rateLimitDecision.subcode,
+      retryAfterMs: rateLimitDecision.retryAfterMs,
+      message: rateLimitDecision.message,
+      entitlement: null,
+    });
+  }
+
+  const body = await readJsonBody<QqAuthStatusRequestBody>(c);
+  if (!body.ok) {
+    return invalidRequestBodyResponse(c, body.reason);
+  }
+  const qqIdentity = stringValue(body.value.qq_identity);
+  const credential = stringValue(body.value.credential);
+  if (
+    qqIdentity === null ||
+    credential === null ||
+    validateQqIdentity(qqIdentity) !== null ||
+    !QQ_CREDENTIAL_PATTERN.test(credential)
+  ) {
+    return invalidRequestResponse(c, 'qq_identity and credential are required');
+  }
+  const hmacPsk = stringValue(c.env.QQ_AUTH_HMAC_PSK);
+  if (!hmacPsk || hmacPsk.trim().length === 0) {
+    return internalErrorResponse(c);
+  }
+  const expectedCredential = await hmacSha256Hex(hmacPsk, qqIdentity);
+  if (!constantTimeEqual(credential, expectedCredential)) {
+    return invalidQqCredentialResponse(c);
+  }
+  const qqSubjectRef = `${QQ_SUBJECT_REF_PREFIX}${encodeBase64Url(
+    await hmacSha256Bytes(
+      hmacPsk,
+      `${QQ_SUBJECT_REF_PAYLOAD_PREFIX}\n${qqIdentity}`,
+    ),
+  )}`;
+  const active = await c.env.BROKER_DB.prepare(
+    `SELECT EXISTS(
+        SELECT 1
+          FROM qq_managed_entitlements
+         WHERE qq_subject_ref = ?
+           AND status = 'active'
+           AND delivered_at IS NOT NULL
+           AND expires_at IS NOT NULL
+           AND datetime(expires_at) >= datetime(?)
+      ) AS active_found`,
+  )
+    .bind(qqSubjectRef, now.toISOString())
+    .first<{ active_found: number }>();
+  if (Number(active?.active_found ?? 0) !== 1) {
+    return publicErrorResponse(c, 409, {
+      code: 'invalid_request',
+      class: 'terminal',
+      subcode: 'qq_entitlement_inactive',
+      message: 'QQ managed entitlement is not active',
+      entitlement: null,
+    });
+  }
+
+  let ownedStatus: Awaited<ReturnType<typeof resolveOwnedReferralStatusForManagedSubject>> = null;
+  try {
+    const passConfig = await getQqTalkTogetherPassConfig(c.env.BROKER_DB);
+    ownedStatus = await resolveOwnedReferralStatusForManagedSubject(
+      c.env.BROKER_DB,
+      { source: 'qq', subjectRef: qqSubjectRef },
+    );
+    if (!ownedStatus && passConfig.enabled) {
+      const ensured = await ensureOwnedReferralIdForActiveQqManagedUser(
+        c.env.BROKER_DB,
+        {
+          qqSubjectRef,
+          ownerInstallationId: normalizeInstallationId(body.value.installation_id),
+          nowIso: now.toISOString(),
+        },
+      );
+      if (ensured.ok) {
+        ownedStatus = {
+          referralCode: ensured.referralCode,
+          talkTogetherPass: await resolveTalkTogetherPassStatusForOwnedReferralCode(
+            c.env.BROKER_DB,
+            ensured.referralCode,
+          ),
+        };
+      }
+    }
+  } catch {
+    ownedStatus = null;
+  }
+
+  return c.json({
+    ok: true,
+    status: 'active',
+    ...(ownedStatus
+      ? {
+          referral_id: ownedStatus.referralCode.referral_id,
+          talk_together_pass: ownedStatus.talkTogetherPass,
+        }
+      : {}),
   });
 }
 
@@ -192,8 +335,22 @@ function validateQqAuthAssertInput(
       credential,
       assertedAt: assertedAtDate.toISOString(),
       deliveryAckSupported: body.delivery_ack_supported === true,
+      referralId: normalizeReferralId(body.referral_id),
+      installationId: normalizeInstallationId(body.installation_id),
     },
   };
+}
+
+function normalizeInstallationId(value: unknown): string | null {
+  const installationId = stringValue(value)?.trim() ?? '';
+  if (
+    installationId.length < 1 ||
+    installationId.length > 128 ||
+    CONTROL_OR_NEWLINE_PATTERN.test(installationId)
+  ) {
+    return null;
+  }
+  return installationId;
 }
 
 function validateQqIdentity(value: string): string | null {

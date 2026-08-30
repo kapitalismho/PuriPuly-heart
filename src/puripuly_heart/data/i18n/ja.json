@@ -315,7 +315,7 @@
   "debug_preview.discord_auth": "Discord認証",
   "debug_preview.qq_auth": "QQ認証",
   "debug_preview.discord_callback_page": "Discordコールバックページ",
-  "debug_preview.talk_together_pass_invite_progress": "友だち招待 1/5",
+  "debug_preview.talk_together_pass_invite_progress": "友だち招待 1/3",
   "debug_preview.capture_fault_cycle": "キャプチャ障害を切替",
   "debug_preview.stt_fault_cycle": "STT障害を切替",
   "debug_preview.stt_loading_button_cycle": "STT読み込みボタンを切替",

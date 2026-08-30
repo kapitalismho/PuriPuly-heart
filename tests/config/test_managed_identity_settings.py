@@ -79,7 +79,7 @@ def test_managed_identity_settings_do_not_persist_talk_together_pass_status() ->
                 **managed_identity,
                 "talk_together_pass": {"pass_id": "7KQ9M2", "invite_count": 1},
                 "invite_count": 1,
-                "invite_limit": 5,
+                "invite_limit": 3,
             },
         }
     )
@@ -134,6 +134,7 @@ def test_load_settings_backfills_managed_identity_defaults(tmp_path) -> None:
         "active_managed_expires_at": None,
         "founder_letter_seen_credential_ref": None,
         "referral_id": None,
+        "referral_source": None,
         "local_managed_claim_sources": [],
         "pending_delivery_ack_source": None,
         "pending_delivery_ack_delivery_id": None,

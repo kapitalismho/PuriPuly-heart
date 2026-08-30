@@ -80,7 +80,8 @@ interface IssueSuccessEventRow {
 
 interface ReferralCodeRow {
   referral_id: string;
-  owner_discord_user_ref: string;
+  owner_source: 'discord' | 'qq';
+  owner_subject_ref: string;
   owner_installation_id: string | null;
   status: string;
 }
@@ -135,7 +136,7 @@ describe('Discord issue gate', () => {
     expect(payload.talk_together_pass).toEqual({
       pass_id: payload.referral_id,
       invite_count: 0,
-      invite_limit: 5,
+      invite_limit: 3,
       bonus_translations_per_friend: 200,
     });
     const serializedTalkTogetherPass = JSON.stringify(payload.talk_together_pass);
@@ -187,7 +188,8 @@ describe('Discord issue gate', () => {
     expect(readReferralCodeForOwner(started.env, expectedDiscordUserRef)).toEqual(
       expect.objectContaining({
         referral_id: payload.referral_id,
-        owner_discord_user_ref: expectedDiscordUserRef,
+        owner_source: 'discord',
+        owner_subject_ref: expectedDiscordUserRef,
         owner_installation_id: started.installationId,
         status: 'active',
       }),
@@ -215,7 +217,8 @@ describe('Discord issue gate', () => {
       beforeFirst({ sql }) {
         if (
           sql.includes('FROM referral_rewards counted') &&
-          sql.includes('counted.referrer_discord_user_ref = ?')
+          sql.includes('counted.referrer_source = ?') &&
+          sql.includes('counted.referrer_subject_ref = ?')
         ) {
           throw new Error('forced Talk Together Pass count failure');
         }
@@ -2317,13 +2320,15 @@ function readReferralCodeForOwner(
   const row = env.__db
     .prepare(
       `SELECT referral_id,
-              owner_discord_user_ref,
+              owner_source,
+              owner_subject_ref,
               owner_installation_id,
               status
          FROM referral_codes
-        WHERE owner_discord_user_ref = ?`,
+        WHERE owner_source = ?
+          AND owner_subject_ref = ?`,
     )
-    .get(discordUserRef) as ReferralCodeRow | undefined;
+    .get('discord', discordUserRef) as ReferralCodeRow | undefined;
 
   return row ?? null;
 }

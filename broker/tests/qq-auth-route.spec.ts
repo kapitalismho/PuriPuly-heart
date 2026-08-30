@@ -271,6 +271,526 @@ describe('QQ auth assertion route', () => {
     ]);
   });
 
+  describe('QQ Talk Together Pass runtime behavior', () => {
+    const referralId = '7KQ9M2';
+    const referrerSubjectRef = `ph-discord-user-v1_${'R'.repeat(43)}`;
+    const referrerInstallationId = 'install-qq-pass-discord-owner';
+
+    it('keeps base QQ issuance at 0.07 while the Pass feature is disabled', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_ISO));
+
+      const env = createTestBrokerEnv();
+      updateQqTalkTogetherPassConfig(env, {
+        enabled: false,
+        rewards_enabled: false,
+        daily_warning_count: 30,
+        daily_max_count: 50,
+      });
+      insertActiveDiscordPassOwner(env, {
+        referralId,
+        referrerSubjectRef,
+        referrerInstallationId,
+      });
+      const openRouter = mockOpenRouterManagementApi();
+
+      const pendingIdentity = 'qq-openid-pass-disabled-pending';
+      const pendingCredential = await signQqCredential(
+        env.QQ_AUTH_HMAC_PSK,
+        pendingIdentity,
+      );
+      const pendingResponse = await postQqAssertion(env, {
+        qq_identity: pendingIdentity,
+        credential: pendingCredential,
+        asserted_at: NOW_ISO,
+        delivery_ack_supported: true,
+        referral_id: referralId,
+        installation_id: 'install-qq-pass-disabled-pending',
+      });
+      const pendingPayload = (await pendingResponse.json()) as Record<string, unknown>;
+
+      const activeIdentity = 'qq-openid-pass-disabled-active';
+      const activeCredential = await signQqCredential(
+        env.QQ_AUTH_HMAC_PSK,
+        activeIdentity,
+      );
+      const activeResponse = await postQqAssertion(env, {
+        qq_identity: activeIdentity,
+        credential: activeCredential,
+        asserted_at: NOW_ISO,
+        referral_id: referralId,
+        installation_id: 'install-qq-pass-disabled-active',
+      });
+      const activePayload = (await activeResponse.json()) as Record<string, unknown>;
+
+      expect(pendingResponse.status).toBe(200);
+      expect(pendingPayload.status).toBe('delivery_pending');
+      expect(activeResponse.status).toBe(200);
+      expect(activePayload).toEqual(
+        expect.objectContaining({
+          status: 'issued',
+          qq_subject_ref: expect.any(String),
+        }),
+      );
+      expect(activePayload).not.toHaveProperty('referral_id');
+      expect(activePayload).not.toHaveProperty('talk_together_pass');
+      expect(readQqManagedEntitlement(env, pendingPayload.qq_subject_ref as string)).toEqual(
+        expect.objectContaining({ budget_usd: 0.07, status: 'delivery_pending' }),
+      );
+      expect(readQqManagedEntitlement(env, activePayload.qq_subject_ref as string)).toEqual(
+        expect.objectContaining({ budget_usd: 0.07, status: 'active' }),
+      );
+      expect(readQqReferralRewards(env)).toEqual([]);
+      expect(readQqOwnedReferralCodes(env)).toEqual([]);
+      expect(openRouter.openRouterCreateCalls).toHaveLength(2);
+    });
+
+    it('records rewards_disabled without blocking Discord-to-QQ base issuance', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_ISO));
+
+      const env = createTestBrokerEnv();
+      updateQqTalkTogetherPassConfig(env, {
+        enabled: true,
+        rewards_enabled: false,
+        daily_warning_count: 30,
+        daily_max_count: 50,
+      });
+      insertActiveDiscordPassOwner(env, {
+        referralId,
+        referrerSubjectRef,
+        referrerInstallationId,
+      });
+      const qqIdentity = 'qq-openid-rewards-disabled-cross-source';
+      const credential = await signQqCredential(env.QQ_AUTH_HMAC_PSK, qqIdentity);
+      const openRouter = mockOpenRouterManagementApi();
+
+      const response = await postQqAssertion(env, {
+        qq_identity: qqIdentity,
+        credential,
+        asserted_at: NOW_ISO,
+        delivery_ack_supported: true,
+        referral_id: referralId,
+        installation_id: 'install-qq-rewards-disabled',
+      });
+      const payload = (await response.json()) as Record<string, unknown>;
+
+      expect(response.status).toBe(200);
+      expect(payload.status).toBe('delivery_pending');
+      expect(readQqManagedEntitlement(env, payload.qq_subject_ref as string)).toEqual(
+        expect.objectContaining({ budget_usd: 0.07, status: 'delivery_pending' }),
+      );
+      expect(readQqReferralRewards(env)).toEqual([
+        expect.objectContaining({
+          referral_id: referralId,
+          referrer_source: 'discord',
+          referrer_subject_ref: referrerSubjectRef,
+          referred_source: 'qq',
+          referred_subject_ref: payload.qq_subject_ref,
+          referred_bonus_status: 'skipped',
+          referrer_bonus_status: 'skipped',
+          skip_reason: 'rewards_disabled',
+        }),
+      ]);
+      expect(openRouter.openRouterCreateCalls).toHaveLength(1);
+    });
+
+    it('warns on the 30th counted QQ reward and skips the 51st without blocking issuance', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_ISO));
+
+      const warningEnv = createTestBrokerEnv();
+      updateQqTalkTogetherPassConfig(warningEnv, {
+        enabled: true,
+        rewards_enabled: true,
+        daily_warning_count: 30,
+        daily_max_count: 50,
+      });
+      insertActiveDiscordPassOwner(warningEnv, {
+        referralId,
+        referrerSubjectRef,
+        referrerInstallationId,
+      });
+      seedCountedQqReferralRewards(warningEnv, 29);
+      const warningSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const warningIdentity = 'qq-openid-daily-warning-thirtieth';
+      const warningCredential = await signQqCredential(
+        warningEnv.QQ_AUTH_HMAC_PSK,
+        warningIdentity,
+      );
+      const warningOpenRouter = mockOpenRouterManagementApi();
+
+      const warningResponse = await postQqAssertion(warningEnv, {
+        qq_identity: warningIdentity,
+        credential: warningCredential,
+        asserted_at: NOW_ISO,
+        delivery_ack_supported: true,
+        referral_id: referralId,
+        installation_id: 'install-qq-daily-warning-thirtieth',
+      });
+      const warningPayload = (await warningResponse.json()) as Record<string, unknown>;
+
+      expect(warningResponse.status).toBe(200);
+      expect(warningPayload.status).toBe('delivery_pending');
+      expect(countCountedQqReferralRewards(warningEnv)).toBe(30);
+      expect(readQqReferralRewards(warningEnv).at(-1)).toEqual(
+        expect.objectContaining({
+          referrer_source: 'discord',
+          referred_source: 'qq',
+          referred_subject_ref: warningPayload.qq_subject_ref,
+          referred_bonus_status: 'reserved',
+          referrer_bonus_status: 'pending',
+          skip_reason: null,
+        }),
+      );
+      expect(warningSpy).toHaveBeenCalledWith(
+        'qq_referral_daily_warning_threshold_reached',
+        expect.objectContaining({
+          counted_rewards: 30,
+          warning_threshold: 30,
+          daily_max_count: 50,
+        }),
+      );
+      expect(warningOpenRouter.openRouterCreateCalls).toHaveLength(1);
+
+      const capEnv = createTestBrokerEnv();
+      updateQqTalkTogetherPassConfig(capEnv, {
+        enabled: true,
+        rewards_enabled: true,
+        daily_warning_count: 30,
+        daily_max_count: 50,
+      });
+      insertActiveDiscordPassOwner(capEnv, {
+        referralId,
+        referrerSubjectRef,
+        referrerInstallationId,
+      });
+      seedCountedQqReferralRewards(capEnv, 50);
+      const capIdentity = 'qq-openid-daily-cap-fifty-first';
+      const capCredential = await signQqCredential(capEnv.QQ_AUTH_HMAC_PSK, capIdentity);
+      const capOpenRouter = mockOpenRouterManagementApi();
+
+      const capResponse = await postQqAssertion(capEnv, {
+        qq_identity: capIdentity,
+        credential: capCredential,
+        asserted_at: NOW_ISO,
+        delivery_ack_supported: true,
+        referral_id: referralId,
+        installation_id: 'install-qq-daily-cap-fifty-first',
+      });
+      const capPayload = (await capResponse.json()) as Record<string, unknown>;
+
+      expect(capResponse.status).toBe(200);
+      expect(capPayload.status).toBe('delivery_pending');
+      expect(readQqManagedEntitlement(capEnv, capPayload.qq_subject_ref as string)).toEqual(
+        expect.objectContaining({ budget_usd: 0.07, status: 'delivery_pending' }),
+      );
+      expect(countCountedQqReferralRewards(capEnv)).toBe(50);
+      expect(readQqReferralRewards(capEnv).at(-1)).toEqual(
+        expect.objectContaining({
+          referrer_source: 'discord',
+          referred_source: 'qq',
+          referred_subject_ref: capPayload.qq_subject_ref,
+          referred_bonus_status: 'skipped',
+          referrer_bonus_status: 'skipped',
+          skip_reason: 'global_reward_cap_reached',
+        }),
+      );
+      expect(capOpenRouter.openRouterCreateCalls).toHaveLength(1);
+    });
+
+    it('lazily creates a QQ-owned Pass from status only while the feature is enabled', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_ISO));
+
+      const enabledEnv = createTestBrokerEnv();
+      updateQqTalkTogetherPassConfig(enabledEnv, {
+        enabled: true,
+        rewards_enabled: true,
+        daily_warning_count: 30,
+        daily_max_count: 50,
+      });
+      const enabledIdentity = 'qq-openid-lazy-status-enabled';
+      const enabledCredential = await signQqCredential(
+        enabledEnv.QQ_AUTH_HMAC_PSK,
+        enabledIdentity,
+      );
+      const enabledSubjectRef = await deriveExpectedQqSubjectRef(
+        enabledEnv.QQ_AUTH_HMAC_PSK,
+        enabledIdentity,
+      );
+      insertQqManagedEntitlement(enabledEnv, {
+        qq_subject_ref: enabledSubjectRef,
+        status: 'active',
+        issue_ref: 'qq-issue-v1_lazy-status-enabled',
+        managed_credential_ref: 'hash_qq_lazy_status_enabled',
+        reserved_at: NOW_ISO,
+        issued_at: NOW_ISO,
+        expires_at: EXPECTED_QQ_EXPIRES_AT,
+        delivered_at: NOW_ISO,
+      });
+
+      const enabledResponse = await postQqStatus(enabledEnv, {
+        qq_identity: enabledIdentity,
+        credential: enabledCredential,
+        installation_id: 'install-qq-lazy-status-enabled',
+      });
+      const enabledPayload = (await enabledResponse.json()) as Record<string, unknown>;
+
+      expect(enabledResponse.status).toBe(200);
+      expect(enabledPayload).toEqual({
+        ok: true,
+        status: 'active',
+        referral_id: expect.stringMatching(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{6}$/u),
+        talk_together_pass: {
+          pass_id: enabledPayload.referral_id,
+          invite_count: 0,
+          invite_limit: 3,
+          bonus_translations_per_friend: 200,
+        },
+      });
+      expect(readQqOwnedReferralCodes(enabledEnv)).toEqual([
+        expect.objectContaining({
+          referral_id: enabledPayload.referral_id,
+          owner_source: 'qq',
+          owner_subject_ref: enabledSubjectRef,
+          owner_installation_id: 'install-qq-lazy-status-enabled',
+        }),
+      ]);
+
+      const disabledEnv = createTestBrokerEnv();
+      updateQqTalkTogetherPassConfig(disabledEnv, {
+        enabled: false,
+        rewards_enabled: false,
+        daily_warning_count: 30,
+        daily_max_count: 50,
+      });
+      const disabledIdentity = 'qq-openid-lazy-status-disabled';
+      const disabledCredential = await signQqCredential(
+        disabledEnv.QQ_AUTH_HMAC_PSK,
+        disabledIdentity,
+      );
+      const disabledSubjectRef = await deriveExpectedQqSubjectRef(
+        disabledEnv.QQ_AUTH_HMAC_PSK,
+        disabledIdentity,
+      );
+      insertQqManagedEntitlement(disabledEnv, {
+        qq_subject_ref: disabledSubjectRef,
+        status: 'active',
+        issue_ref: 'qq-issue-v1_lazy-status-disabled',
+        managed_credential_ref: 'hash_qq_lazy_status_disabled',
+        reserved_at: NOW_ISO,
+        issued_at: NOW_ISO,
+        expires_at: EXPECTED_QQ_EXPIRES_AT,
+        delivered_at: NOW_ISO,
+      });
+
+      const disabledResponse = await postQqStatus(disabledEnv, {
+        qq_identity: disabledIdentity,
+        credential: disabledCredential,
+        installation_id: 'install-qq-lazy-status-disabled',
+      });
+
+      expect(disabledResponse.status).toBe(200);
+      await expect(disabledResponse.json()).resolves.toEqual({
+        ok: true,
+        status: 'active',
+      });
+      expect(readQqOwnedReferralCodes(disabledEnv)).toEqual([]);
+    });
+
+    it('isolates referral persistence failure from base QQ key issuance', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_ISO));
+
+      const env = createTestBrokerEnv({
+        beforeRun: ({ sql }) => {
+          if (sql.includes('INSERT OR IGNORE INTO referral_rewards')) {
+            throw new Error('synthetic QQ referral reservation failure');
+          }
+        },
+      });
+      updateQqTalkTogetherPassConfig(env, {
+        enabled: true,
+        rewards_enabled: true,
+        daily_warning_count: 30,
+        daily_max_count: 50,
+      });
+      insertActiveDiscordPassOwner(env, {
+        referralId,
+        referrerSubjectRef,
+        referrerInstallationId,
+      });
+      const qqIdentity = 'qq-openid-referral-persistence-isolated';
+      const credential = await signQqCredential(env.QQ_AUTH_HMAC_PSK, qqIdentity);
+      const openRouter = mockOpenRouterManagementApi();
+
+      const response = await postQqAssertion(env, {
+        qq_identity: qqIdentity,
+        credential,
+        asserted_at: NOW_ISO,
+        delivery_ack_supported: true,
+        referral_id: referralId,
+        installation_id: 'install-qq-referral-persistence-isolated',
+      });
+      const payload = (await response.json()) as Record<string, unknown>;
+
+      expect(response.status).toBe(200);
+      expect(payload.status).toBe('delivery_pending');
+      expect(readQqManagedEntitlement(env, payload.qq_subject_ref as string)).toEqual(
+        expect.objectContaining({ budget_usd: 0.07, status: 'delivery_pending' }),
+      );
+      expect(readQqReferralRewards(env)).toEqual([]);
+      expect(openRouter.openRouterCreateCalls).toHaveLength(1);
+    });
+
+    async function postQqStatus(
+      env: TestBrokerEnv,
+      body: Record<string, unknown>,
+    ): Promise<Response> {
+      return app.request(
+        'http://broker.test/v1/auth/qq/status',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+        env,
+      );
+    }
+
+    function updateQqTalkTogetherPassConfig(
+      env: TestBrokerEnv,
+      value: {
+        enabled: boolean;
+        rewards_enabled: boolean;
+        daily_warning_count: number;
+        daily_max_count: number;
+      },
+    ): void {
+      env.__db
+        .prepare("UPDATE broker_config SET value = ? WHERE key = 'qq_talk_together_pass'")
+        .run(JSON.stringify(value));
+    }
+
+    function insertActiveDiscordPassOwner(
+      env: TestBrokerEnv,
+      input: {
+        referralId: string;
+        referrerSubjectRef: string;
+        referrerInstallationId: string;
+      },
+    ): void {
+      env.__db
+        .prepare(
+          `INSERT INTO installations (
+              installation_id, device_public_key, hardware_hash,
+              hardware_hash_salt_version, app_version, created_at, last_seen_at
+            ) VALUES (?, ?, NULL, NULL, '1.2.3', ?, ?)`,
+        )
+        .run(
+          input.referrerInstallationId,
+          `device-key-${input.referrerInstallationId}`,
+          NOW_ISO,
+          NOW_ISO,
+        );
+      env.__db
+        .prepare(
+          `INSERT INTO discord_identities (
+              discord_user_ref, entitlement_installation_id, status,
+              ref_secret_version, created_at, updated_at
+            ) VALUES (?, ?, 'active', 1, ?, ?)`,
+        )
+        .run(
+          input.referrerSubjectRef,
+          input.referrerInstallationId,
+          NOW_ISO,
+          NOW_ISO,
+        );
+      env.__db
+        .prepare(
+          `INSERT INTO referral_codes (
+              referral_id, owner_source, owner_subject_ref,
+              owner_installation_id, status, created_at, updated_at
+            ) VALUES (?, 'discord', ?, ?, 'active', ?, ?)`,
+        )
+        .run(
+          input.referralId,
+          input.referrerSubjectRef,
+          input.referrerInstallationId,
+          NOW_ISO,
+          NOW_ISO,
+        );
+    }
+
+    function seedCountedQqReferralRewards(env: TestBrokerEnv, count: number): void {
+      const alphabet = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+      for (let index = 0; index < count; index += 1) {
+        let referralSequence = index;
+        let seededReferralId = '';
+        for (let character = 0; character < 6; character += 1) {
+          seededReferralId = `${alphabet[referralSequence % alphabet.length]}${seededReferralId}`;
+          referralSequence = Math.floor(referralSequence / alphabet.length);
+        }
+        const credited = index % 2 === 1;
+        env.__db
+          .prepare(
+            `INSERT INTO referral_rewards (
+                referral_id, referrer_source, referrer_subject_ref,
+                referrer_installation_id, referred_source, referred_subject_ref,
+                referred_installation_id, referred_hardware_hash,
+                referred_hardware_hash_salt_version, referred_bonus_status,
+                referrer_bonus_status, created_at, updated_at
+              ) VALUES (?, 'qq', ?, NULL, 'qq', ?, NULL, NULL, NULL, ?, ?, ?, ?)`,
+          )
+          .run(
+            seededReferralId,
+            `ph-qq-subject-v1_seed-referrer-${index}`,
+            `ph-qq-subject-v1_seed-referred-${index}`,
+            credited ? 'credited' : 'reserved',
+            credited ? 'credited' : 'pending',
+            NOW_ISO,
+            NOW_ISO,
+          );
+      }
+    }
+
+    function readQqReferralRewards(env: TestBrokerEnv): Array<Record<string, unknown>> {
+      return env.__db
+        .prepare(
+          `SELECT referral_id, referrer_source, referrer_subject_ref,
+                  referred_source, referred_subject_ref, referred_bonus_status,
+                  referrer_bonus_status, skip_reason
+             FROM referral_rewards
+            ORDER BY id`,
+        )
+        .all() as unknown as Array<Record<string, unknown>>;
+    }
+
+    function countCountedQqReferralRewards(env: TestBrokerEnv): number {
+      const row = env.__db
+        .prepare(
+          `SELECT COUNT(*) AS count
+             FROM referral_rewards
+            WHERE referred_source = 'qq'
+              AND referred_bonus_status IN ('reserved', 'credited')`,
+        )
+        .get() as { count: number };
+      return Number(row.count);
+    }
+
+    function readQqOwnedReferralCodes(env: TestBrokerEnv): Array<Record<string, unknown>> {
+      return env.__db
+        .prepare(
+          `SELECT referral_id, owner_source, owner_subject_ref, owner_installation_id
+             FROM referral_codes
+            WHERE owner_source = 'qq'
+            ORDER BY referral_id`,
+        )
+        .all() as unknown as Array<Record<string, unknown>>;
+    }
+  });
+
   it('allows an existing assertion-only subject to issue once when production issuance is enabled', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW_ISO));

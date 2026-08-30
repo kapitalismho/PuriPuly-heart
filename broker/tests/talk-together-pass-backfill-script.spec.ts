@@ -37,7 +37,8 @@ describe('Talk Together Pass backfill SQL generator', () => {
     expect(sql).not.toContain("e.expires_at >= datetime('now')");
     expect(sql).toContain('e.discord_issue_delivered_at IS NOT NULL');
     expect(sql).toContain('NOT EXISTS');
-    expect(sql).toContain('existing.owner_discord_user_ref = e.discord_user_ref');
+    expect(sql).toContain("existing.owner_source = 'discord'");
+    expect(sql).toContain('existing.owner_subject_ref = e.discord_user_ref');
     expect(sql).toContain("existing.referral_id = '234567'");
     expect(sql).toContain('install-real-a');
     expect(sql).toContain('ph-discord-user-v1_real-a');

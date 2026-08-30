@@ -847,6 +847,7 @@ def from_legacy_app_settings(
                         "founder_letter_seen_credential_ref"
                     ],
                     referral_id=data["managed_identity"]["referral_id"],
+                    referral_source=data["managed_identity"].get("referral_source"),
                     local_managed_claim_sources=normalize_managed_claim_sources(
                         data["managed_identity"].get("local_managed_claim_sources")
                     ),
@@ -1239,6 +1240,7 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
             state.managed_connection.founder_letter_seen_credential_ref
         ),
         "referral_id": state.managed_connection.referral_id,
+        "referral_source": state.managed_connection.referral_source,
         "local_managed_claim_sources": list(
             normalize_managed_claim_sources(state.managed_connection.local_managed_claim_sources)
         ),

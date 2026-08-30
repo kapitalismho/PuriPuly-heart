@@ -382,14 +382,21 @@ export async function handleManagedKeyDeliveryAck(
         });
         status = result.acknowledgementStatus;
         if (result.referralBonusApplied) {
-          ackDetails = { referralBonusApplied: true };
+          ackDetails = { referral_bonus_applied: true };
         }
       } else {
-        status = await finalizeQqManagedKeyDeliveryAck(c, {
+        const result = await finalizeQqManagedKeyDeliveryAck(c, {
           deliveryId,
           managedCredentialRef,
           acknowledgedAt,
         });
+        status = result.acknowledgementStatus;
+        ackDetails = {
+          ...(result.referralId ? { referral_id: result.referralId } : {}),
+          ...(result.talkTogetherPass
+            ? { talk_together_pass: result.talkTogetherPass }
+            : {}),
+        };
       }
     } catch {
       return ackErrorResponse(c, 409, 'failed', 'delivery acknowledgement cannot be applied');

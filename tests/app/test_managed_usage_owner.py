@@ -96,7 +96,7 @@ def test_pass_status_cache_is_scoped_to_current_identity() -> None:
     pass_status = TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=2,
-        invite_limit=5,
+        invite_limit=3,
     )
 
     owner.set_view_state(
@@ -217,7 +217,7 @@ async def test_status_refresh_preserves_cached_pass_on_failure() -> None:
     pass_status = TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=1,
-        invite_limit=5,
+        invite_limit=3,
     )
     owner.set_view_state(
         visible=True,

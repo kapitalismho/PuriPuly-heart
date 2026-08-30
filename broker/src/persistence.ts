@@ -2,6 +2,7 @@ export const BROKER_RUNTIME_CONFIG_KEYS = {
   fingerprintSalt: 'fingerprint_salt',
   abuseControls: 'abuse_controls',
   abuseRuntimeState: 'abuse_runtime_state',
+  qqTalkTogetherPass: 'qq_talk_together_pass',
 } as const;
 
 export interface BrokerEndpointRateLimitConfig {
@@ -78,6 +79,7 @@ export interface BrokerAbuseControlsConfigValue {
   discordOpenrouterIssueIp: BrokerEndpointRateLimitConfig;
   discordOpenrouterIssueInstallation: BrokerEndpointRateLimitConfig;
   qqAuthAssertIp: BrokerEndpointRateLimitConfig;
+  qqAuthStatusIp: BrokerEndpointRateLimitConfig;
   pendingDiscordOAuthSessions: BrokerPendingDiscordOAuthSessionsConfig;
   newActiveEntitlementsPerDay: BrokerDailyIssuanceCapConfig;
   immediateAlerts: BrokerImmediateAlertsConfig;
@@ -139,6 +141,12 @@ export const DEFAULT_BROKER_ABUSE_CONTROLS: BrokerAbuseControlsConfigValue = {
     endpoint: 'POST /v1/auth/qq/assert',
     scope: 'ip',
     maxRequests: 20,
+    windowMinutes: 15,
+  },
+  qqAuthStatusIp: {
+    endpoint: 'POST /v1/auth/qq/status',
+    scope: 'ip',
+    maxRequests: 30,
     windowMinutes: 15,
   },
   pendingDiscordOAuthSessions: {
@@ -230,10 +238,26 @@ export const DEFAULT_BROKER_ABUSE_RUNTIME_STATE: BrokerAbuseRuntimeStateValue = 
   },
 };
 
+export interface BrokerQqTalkTogetherPassConfigValue {
+  enabled: boolean;
+  rewards_enabled: boolean;
+  daily_warning_count: number;
+  daily_max_count: number;
+}
+
+export const DEFAULT_QQ_TALK_TOGETHER_PASS_CONFIG: BrokerQqTalkTogetherPassConfigValue = {
+  enabled: false,
+  rewards_enabled: false,
+  daily_warning_count: 30,
+  daily_max_count: 50,
+};
+
 export const BROKER_RUNTIME_CONFIG_SCHEMA = {
   [BROKER_RUNTIME_CONFIG_KEYS.fingerprintSalt]: ['current', 'previous', 'rotated_at'],
   [BROKER_RUNTIME_CONFIG_KEYS.abuseControls]: DEFAULT_BROKER_ABUSE_CONTROLS,
   [BROKER_RUNTIME_CONFIG_KEYS.abuseRuntimeState]: DEFAULT_BROKER_ABUSE_RUNTIME_STATE,
+  [BROKER_RUNTIME_CONFIG_KEYS.qqTalkTogetherPass]:
+    DEFAULT_QQ_TALK_TOGETHER_PASS_CONFIG,
 } as const;
 
 export type BrokerRuntimeConfigKey =
@@ -370,6 +394,12 @@ export const REFERRAL_REFERRER_BONUS_STATUS_VALUES = [
   'failed',
 ] as const;
 
+export const QQ_PASS_SETTLEMENT_PHASE_VALUES = [
+  'invitee_pending',
+  'referrer_pending',
+  'completed',
+] as const;
+
 export type OpenRouterEntitlementStatus =
   (typeof OPENROUTER_ENTITLEMENT_STATUS_VALUES)[number];
 
@@ -392,6 +422,9 @@ export type ReferralReferredBonusStatus =
 export type ReferralReferrerBonusStatus =
   (typeof REFERRAL_REFERRER_BONUS_STATUS_VALUES)[number];
 
+export type QqPassSettlementPhase =
+  (typeof QQ_PASS_SETTLEMENT_PHASE_VALUES)[number];
+
 export interface DiscordOAuthSessionRecord {
   state_hash: string;
   installation_id: string;
@@ -412,9 +445,12 @@ export interface DiscordOAuthSessionRecord {
   referral_id: string | null;
 }
 
+export type ReferralSource = BrokerIssueSuccessSource;
+
 export interface ReferralCodeRecord {
   referral_id: string;
-  owner_discord_user_ref: string;
+  owner_source: ReferralSource;
+  owner_subject_ref: string;
   owner_installation_id: string | null;
   status: ReferralCodeStatus;
   disabled_reason?: string | null;
@@ -427,12 +463,14 @@ export interface ReferralCodeRecord {
 export interface ReferralRewardRecord {
   id: number;
   referral_id: string;
-  referrer_discord_user_ref: string | null;
+  referrer_source: ReferralSource | null;
+  referrer_subject_ref: string | null;
   referrer_installation_id: string | null;
-  referred_discord_user_ref: string;
-  referred_installation_id: string;
-  referred_hardware_hash: string;
-  referred_hardware_hash_salt_version: number;
+  referred_source: ReferralSource;
+  referred_subject_ref: string;
+  referred_installation_id: string | null;
+  referred_hardware_hash: string | null;
+  referred_hardware_hash_salt_version: number | null;
   referred_bonus_status: ReferralReferredBonusStatus;
   referrer_bonus_status: ReferralReferrerBonusStatus;
   skip_reason: string | null;
@@ -527,6 +565,22 @@ export interface QqManagedEntitlementRecord {
   updated_at: string;
 }
 
+export interface QqPassSettlementJobRecord {
+  id: number;
+  referral_reward_id: number;
+  delivery_id: string;
+  phase: QqPassSettlementPhase;
+  attempt_count: number;
+  last_attempt_at: string | null;
+  next_attempt_at: string;
+  fencing_token: string | null;
+  lease_expires_at: string | null;
+  last_error_code: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
 export interface ManagedKeyDeliveryRecord {
   delivery_id: string;
   issue_source: BrokerIssueSuccessSource;
@@ -611,12 +665,22 @@ export const BROKER_PERSISTENCE_MODEL = {
       primaryKey: 'key',
         columns: ['key', 'value', 'updated_at'],
         valueEncoding: 'JSON',
-        supportedKeys: ['fingerprint_salt', 'abuse_controls', 'abuse_runtime_state'],
+        supportedKeys: [
+          'fingerprint_salt',
+          'abuse_controls',
+          'abuse_runtime_state',
+          'qq_talk_together_pass',
+        ],
         constraints: {
           key: 'supported-keys-only',
           value: 'valid-json',
         },
-        seedRows: ['fingerprint_salt', 'abuse_controls', 'abuse_runtime_state'],
+        seedRows: [
+          'fingerprint_salt',
+          'abuse_controls',
+          'abuse_runtime_state',
+          'qq_talk_together_pass',
+        ],
       },
     installations: {
       name: 'installations',
@@ -754,11 +818,12 @@ export const BROKER_PERSISTENCE_MODEL = {
     },
     referralCodes: {
       name: 'referral_codes',
-      purpose: 'stable owned Referral ID per Discord identity',
+      purpose: 'stable owned global Referral ID per managed source subject',
       primaryKey: 'referral_id',
       columns: [
         'referral_id',
-        'owner_discord_user_ref',
+        'owner_source',
+        'owner_subject_ref',
         'owner_installation_id',
         'status',
         'created_at',
@@ -769,9 +834,10 @@ export const BROKER_PERSISTENCE_MODEL = {
       ],
       referralIdFormat: REFERRAL_ID_FORMAT_DESCRIPTION,
       storedStatuses: REFERRAL_CODE_STATUS_VALUES,
-      unique: ['owner_discord_user_ref'],
+      ownerSources: ['discord', 'qq'],
+      unique: ['owner_source + owner_subject_ref'],
       indexed: [
-        'owner_discord_user_ref',
+        'owner_source + owner_subject_ref',
         'owner_installation_id',
         'status + referral_id',
       ],
@@ -780,14 +846,16 @@ export const BROKER_PERSISTENCE_MODEL = {
     },
     referralRewards: {
       name: 'referral_rewards',
-      purpose: 'append-only referral attempt and reward ledger',
+      purpose: 'global append-only source-aware referral attempt and reward ledger',
       primaryKey: 'id',
       columns: [
         'id',
         'referral_id',
-        'referrer_discord_user_ref',
+        'referrer_source',
+        'referrer_subject_ref',
         'referrer_installation_id',
-        'referred_discord_user_ref',
+        'referred_source',
+        'referred_subject_ref',
         'referred_installation_id',
         'referred_hardware_hash',
         'referred_hardware_hash_salt_version',
@@ -803,6 +871,7 @@ export const BROKER_PERSISTENCE_MODEL = {
         'attempt_ip_hash',
       ],
       referralIdFormat: REFERRAL_ID_FORMAT_DESCRIPTION,
+      subjectSources: ['discord', 'qq'],
       referredBonusStatuses: REFERRAL_REFERRED_BONUS_STATUS_VALUES,
       referrerBonusStatuses: REFERRAL_REFERRER_BONUS_STATUS_VALUES,
       reasonBounds: {
@@ -811,24 +880,28 @@ export const BROKER_PERSISTENCE_MODEL = {
       },
       indexed: [
         'referral_id',
-        'referrer_discord_user_ref + referred_bonus_status',
+        'referrer_source + referrer_subject_ref + referred_bonus_status',
+        'referred_source + referred_subject_ref + created_at',
         'referred_installation_id + created_at',
         'attempt_ip_hash + created_at',
         'referral_id + created_at',
-        'referrer_discord_user_ref + created_at',
+        'referrer_source + referrer_subject_ref + created_at',
       ],
       partialUniqueIndexes: [
         {
-          name: 'idx_referral_rewards_counted_referred_discord_user',
-          columns: ['referred_discord_user_ref'],
+          name: 'idx_referral_rewards_counted_referred_subject',
+          columns: ['referred_source', 'referred_subject_ref'],
           predicate: "referred_bonus_status IN ('reserved', 'credited')",
         },
         {
           name: 'idx_referral_rewards_counted_referred_installation',
           columns: ['referred_installation_id'],
-          predicate: "referred_bonus_status IN ('reserved', 'credited')",
+          predicate:
+            "referred_installation_id IS NOT NULL AND referred_bonus_status IN ('reserved', 'credited')",
         },
       ],
+      sourceShape:
+        'Discord referred rows require installation and hardware evidence; QQ referred rows prohibit Discord hardware fields',
       deletionBehavior:
         'installation aging must not cascade-delete referral reward ledger history',
     },
@@ -943,6 +1016,33 @@ export const BROKER_PERSISTENCE_MODEL = {
       rawOpenRouterKeyStorage: false,
       stalePendingCleanup:
         'expired rows are claimed exclusively; abandoned claims recover only after the scheduled invocation limit, and terminal owner/ledger transitions are atomic',
+    },
+    qqPassSettlementJobs: {
+      name: 'qq_pass_settlement_jobs',
+      purpose:
+        'durable fenced QQ invitee/referrer reward settlement work keyed by referral reward and acknowledged delivery',
+      primaryKey: 'id',
+      columns: [
+        'id',
+        'referral_reward_id',
+        'delivery_id',
+        'phase',
+        'attempt_count',
+        'last_attempt_at',
+        'next_attempt_at',
+        'fencing_token',
+        'lease_expires_at',
+        'last_error_code',
+        'created_at',
+        'updated_at',
+        'completed_at',
+      ],
+      phases: QQ_PASS_SETTLEMENT_PHASE_VALUES,
+      unique: ['referral_reward_id', 'delivery_id', 'fencing_token when claimed'],
+      indexed: ['phase + next_attempt_at + lease_expires_at'],
+      noRetention: true,
+      noCascade: true,
+      fencing: 'every claim, transition, release, and completion mutation requires the exact fencing_token',
     },
     brokerRequestEvents: {
       name: 'broker_request_events',
