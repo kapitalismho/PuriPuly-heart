@@ -156,7 +156,55 @@ def test_final_reporting_emits_singleton_f0_plus_winner_engineering_artifacts(
     assert decision["significance_claim"] is False
     assert decision["seed_stability_claim"] is False
     assert decision["evidence_level"] == "engineering"
+    assert decision["outcome"] == "B"
+    assert "Outcome: **B**" in markdown
     assert "exactly F0 and the operator-selected seed-7301 candidate" in markdown
+    assert "No student KD was performed or authorized" in markdown
+    assert "does not authorize acoustic/NEST unfreezing" in markdown
+
+
+def test_stop_reporting_emits_outcome_d_without_eval(monkeypatch) -> None:
+    operator_decision = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_operator_dev_decision",
+            "decision": "stop",
+            "selected_arm": None,
+            "rationale": "The trusted operator found no supported adaptation path.",
+            "eval_open_count": 0,
+        }
+    )
+    candidate_freeze = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_candidate_freeze",
+            "candidate_set": [],
+            "operator_dev_decision": operator_decision,
+            "operator_dev_decision_sha256": operator_decision["payload_sha256"],
+            "eval_open_count": 0,
+            "eval_used_for_development": False,
+        }
+    )
+    monkeypatch.setattr(protocol_module, "validate_candidate_freeze", lambda value: value)
+    artifacts, markdown = reporting_module.build_stop_artifacts(candidate_freeze=candidate_freeze)
+    receipt = artifacts["decision_receipt.json"]
+    assert receipt["outcome"] == "D"
+    assert receipt["selected_arm"] is None
+    assert receipt["eval_open_count"] == 0
+    assert receipt["eval_result_sha256s"] == []
+    assert receipt["stop_training"] is True
+    assert "Outcome: **D**" in markdown
+    assert "Selected arm: `none`" in markdown
+    assert "EVAL was not opened or used" in markdown
+    assert "No student KD was performed or authorized" in markdown
+    assert "does not authorize acoustic/NEST unfreezing" in markdown
+
+    substituted_payload = {
+        key: value for key, value in candidate_freeze.items() if key != "payload_sha256"
+    }
+    substituted_payload["candidate_set"] = [{"arm": "F0-FROZEN-FLOAT", "seed": None}]
+    with pytest.raises(Exception, match="exact empty pre-EVAL candidate freeze"):
+        reporting_module.build_stop_artifacts(candidate_freeze=bind_payload(substituted_payload))
 
 
 def test_final_reporting_rejects_more_than_f0_plus_one_winner(monkeypatch) -> None:
@@ -468,6 +516,34 @@ def test_public_freeze_to_final_report_preserves_selected_training_summary(
             operator_decision=decision,
             cost_receipt=cost,
         )
+    stop_decision = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_operator_dev_decision",
+            "decision": "stop",
+            "selected_arm": None,
+            "rationale": "The trusted operator found no supported adaptation path.",
+            "available_dev_result_sha256s": decision["available_dev_result_sha256s"],
+            "eval_open_count": 0,
+        }
+    )
+    stop_freeze = protocol_module.freeze_candidate_set(
+        state,
+        dev_results,
+        {},
+        {},
+        code_identity,
+        operator_decision=stop_decision,
+        cost_receipt=cost,
+    )
+    stop_artifacts, stop_markdown = reporting_module.build_stop_artifacts(
+        candidate_freeze=stop_freeze
+    )
+    assert stop_freeze["candidate_set"] == []
+    assert stop_artifacts["decision_receipt.json"]["outcome"] == "D"
+    assert "EVAL was not opened or used" in stop_markdown
+    assert not (registry / protocol_module.EVAL_REGISTRY_MARKER).exists()
+
     authorization = protocol_module.open_eval_once(candidate_freeze, str(output))
     assert authorization["candidate_set"][1]["training_summary"] == summary
 

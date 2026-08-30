@@ -509,34 +509,58 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
         return 0
     if args.command == "final-report":
-        bundle = _load_json(args.bundle)
-        eval_authorization = _load_json(Path(bundle["eval_authorization"]))
-        if eval_authorization.get("experiment_output_root") != str(args.output_root.resolve()):
-            raise ValueError("final report output root differs from EVAL authorization")
-        validate_current_candidate_identity(
-            {
-                "schema_version": 1,
-                "artifact_role": "psem_sortformer_candidate_code_identity",
-                "git_head": eval_authorization["candidate_git_head"],
-                "worktree_clean": True,
-                "artifact_sha256s": eval_authorization["candidate_artifact_sha256s"],
-                "payload_sha256": eval_authorization["candidate_code_identity_sha256"],
-            }
-        )
-        artifacts, markdown = build_final_artifacts(
-            eval_authorization=eval_authorization,
-            eval_results=[
-                _load_json(path) for path in _load_path_list(bundle["eval_results"], "eval_results")
-            ],
-            eval_prediction_sets=[
-                _load_json(path)
-                for path in _load_path_list(bundle["eval_prediction_sets"], "eval_prediction_sets")
-            ],
-            training_results=[
-                _load_json(path)
-                for path in _load_path_list(bundle["training_results"], "training_results")
-            ],
-        )
+        report_input = _load_json(args.bundle)
+        if report_input.get("artifact_role") == "psem_sortformer_candidate_freeze":
+            candidate_freeze = report_input
+            if candidate_freeze.get("experiment_output_root") != str(args.output_root.resolve()):
+                raise ValueError("STOP report output root differs from candidate freeze")
+            validate_current_candidate_identity(
+                {
+                    "schema_version": 1,
+                    "artifact_role": "psem_sortformer_candidate_code_identity",
+                    "git_head": candidate_freeze["candidate_git_head"],
+                    "worktree_clean": True,
+                    "artifact_sha256s": candidate_freeze["candidate_artifact_sha256s"],
+                    "payload_sha256": candidate_freeze["candidate_code_identity_sha256"],
+                }
+            )
+            from experiments.psem_sortformer_adaptation_depth.reporting import (
+                build_stop_artifacts,
+            )
+
+            artifacts, markdown = build_stop_artifacts(candidate_freeze=candidate_freeze)
+        else:
+            bundle = report_input
+            eval_authorization = _load_json(Path(bundle["eval_authorization"]))
+            if eval_authorization.get("experiment_output_root") != str(args.output_root.resolve()):
+                raise ValueError("final report output root differs from EVAL authorization")
+            validate_current_candidate_identity(
+                {
+                    "schema_version": 1,
+                    "artifact_role": "psem_sortformer_candidate_code_identity",
+                    "git_head": eval_authorization["candidate_git_head"],
+                    "worktree_clean": True,
+                    "artifact_sha256s": eval_authorization["candidate_artifact_sha256s"],
+                    "payload_sha256": eval_authorization["candidate_code_identity_sha256"],
+                }
+            )
+            artifacts, markdown = build_final_artifacts(
+                eval_authorization=eval_authorization,
+                eval_results=[
+                    _load_json(path)
+                    for path in _load_path_list(bundle["eval_results"], "eval_results")
+                ],
+                eval_prediction_sets=[
+                    _load_json(path)
+                    for path in _load_path_list(
+                        bundle["eval_prediction_sets"], "eval_prediction_sets"
+                    )
+                ],
+                training_results=[
+                    _load_json(path)
+                    for path in _load_path_list(bundle["training_results"], "training_results")
+                ],
+            )
         for name, value in artifacts.items():
             path = args.output_root / name
             if name.endswith(".jsonl"):

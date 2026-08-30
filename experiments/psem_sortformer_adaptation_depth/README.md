@@ -121,9 +121,9 @@ identity_and_timing_sanity.json
 short_smoke_metrics.json
 short_training_metrics.json
 dev_primary_metrics.json
-eval_primary_metrics.json
+eval_primary_metrics.json (selection path only)
 cost_receipt.json
-ADAPTATION_DECISION.md
+ADAPTATION_DECISION.md (all terminal outcomes)
 ```
 
 ## Sequential operator flow
@@ -132,8 +132,10 @@ ADAPTATION_DECISION.md
 2. Build lineage evidence, run `canary-arm`, run the 32-step `smoke-arm`, and create a `cost-receipt` for the next material action.
 3. Initialize staged DEV state from F0. For H and then T2, assemble and validate the material bundle, run the exact 256-step `train-arm`, infer DEV predictions, evaluate the singleton cell, and append the result.
 4. Record `dev-decision`. If it is `open_ta`, create `open-ta` authorization and repeat the same canary, smoke, cost, training, and DEV sequence for TA before recording the final selection or stop decision.
-5. Freeze the candidate set with the final operator decision and cost receipt. `stop` ends with an empty freeze and cannot open EVAL; selection freezes exactly F0 plus one winner.
-6. Open EVAL once, infer and evaluate exactly the frozen pair, then emit the engineering final report. No supported command resumes training after EVAL opens.
+5. Freeze the candidate set with the final operator decision and cost receipt. `stop` ends with an empty freeze and cannot open EVAL; pass that freeze directly to `final-report` to emit the Outcome-D `ADAPTATION_DECISION.md` without EVAL. Selection freezes exactly F0 plus one winner.
+6. For selection only, open EVAL once, infer and evaluate exactly the frozen pair, then pass the EVAL report bundle to `final-report`. No supported command resumes training after EVAL opens.
+
+The canonical decision for every outcome explicitly preserves both boundaries: no student KD is performed or authorized, and no NEST/acoustic-encoder parameter is unfrozen or authorized for unfreezing.
 
 The old eight-epoch, 500-step overfit, seed-7302, automatic Pareto/bootstrap escalation, and all-candidate EVAL paths are not part of the supported material CLI.
 

@@ -1128,6 +1128,103 @@ def validate_eval_result(value: Mapping[str, Any]) -> dict[str, Any]:
     return dict(value)
 
 
+_LEAN_OUTCOME_BY_ARM = {
+    "H-HEAD": "A",
+    "T2-TOP": "B",
+    "TA-ALL-TEMPORAL": "C",
+}
+
+
+def _render_lean_decision_markdown(
+    *,
+    outcome: str,
+    selected_arm: str | None,
+    rationale: str,
+    eval_opened: bool,
+) -> str:
+    selected = selected_arm or "none"
+    evidence_lines = (
+        [
+            "Operating point: replacement cell 0.50 / 500 ms.",
+            "Required views: pooled, AMI, AliMeeting.",
+            "EVAL contains exactly F0 and the operator-selected seed-7301 candidate.",
+        ]
+        if eval_opened
+        else [
+            "EVAL was not opened or used; this STOP decision uses frozen DEV evidence only.",
+        ]
+    )
+    return (
+        "\n".join(
+            [
+                "# PSEM Sortformer adaptation engineering decision",
+                "",
+                f"Outcome: **{outcome}**",
+                f"Selected arm: `{selected}`",
+                "",
+                rationale,
+                "",
+                *evidence_lines,
+                "",
+                "This is trusted single-operator engineering evidence. It makes no significance or seed-stability claim.",
+                "",
+                "No student KD was performed or authorized; this outcome does not start KD automatically.",
+                "All NEST/acoustic-encoder parameters remained frozen; this outcome does not authorize acoustic/NEST unfreezing.",
+            ]
+        )
+        + "\n"
+    )
+
+
+def build_stop_artifacts(*, candidate_freeze: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
+    from experiments.psem_sortformer_adaptation_depth.protocol import (
+        validate_candidate_freeze,
+    )
+
+    validate_candidate_freeze(candidate_freeze)
+    frozen = require_bound(candidate_freeze, "psem_sortformer_candidate_freeze")
+    decision = frozen.get("operator_dev_decision")
+    if not isinstance(decision, Mapping):
+        raise ReportingError("STOP report lacks its operator DEV decision")
+    decision_payload = require_bound(decision, "psem_sortformer_operator_dev_decision")
+    if (
+        frozen.get("candidate_set") != []
+        or frozen.get("eval_open_count") != 0
+        or frozen.get("eval_used_for_development") is not False
+        or decision_payload.get("decision") != "stop"
+        or decision_payload.get("selected_arm") is not None
+        or frozen.get("operator_dev_decision_sha256") != decision.get("payload_sha256")
+    ):
+        raise ReportingError("STOP report requires an exact empty pre-EVAL candidate freeze")
+    receipt = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_adaptation_decision",
+            "outcome": "D",
+            "selected_arm": None,
+            "operator_dev_decision_sha256": decision["payload_sha256"],
+            "candidate_freeze_sha256": candidate_freeze["payload_sha256"],
+            "rationale": decision_payload["rationale"],
+            "eval_open_count": 0,
+            "eval_result_sha256s": [],
+            "significance_claim": False,
+            "seed_stability_claim": False,
+            "evidence_level": "engineering",
+            "stop_training": True,
+            "student_kd_performed": False,
+            "student_kd_authorized": False,
+            "acoustic_or_nest_unfreezing_performed": False,
+            "acoustic_or_nest_unfreezing_authorized": False,
+        }
+    )
+    return {"decision_receipt.json": receipt}, _render_lean_decision_markdown(
+        outcome="D",
+        selected_arm=None,
+        rationale=decision_payload["rationale"],
+        eval_opened=False,
+    )
+
+
 def build_final_artifacts(
     *,
     eval_authorization: Mapping[str, Any],
@@ -1174,6 +1271,7 @@ def build_final_artifacts(
     ):
         raise ReportingError("selected training result differs from the frozen candidate")
     require_registered_execution("training-result", training)
+    outcome = _LEAN_OUTCOME_BY_ARM[selected_arm]
     artifacts = {
         "frozen_float_metrics.json": _arm_metrics(results, "F0-FROZEN-FLOAT"),
         "selected_arm_metrics.json": _arm_metrics(results, selected_arm),
@@ -1201,34 +1299,27 @@ def build_final_artifacts(
             {
                 "schema_version": 1,
                 "artifact_role": "psem_sortformer_adaptation_decision",
+                "outcome": outcome,
                 "selected_arm": selected_arm,
                 "operator_dev_decision_sha256": decision["payload_sha256"],
                 "rationale": decision_payload["rationale"],
                 "eval_authorization_sha256": eval_authorization["payload_sha256"],
                 "eval_result_sha256s": [value["payload_sha256"] for value in results],
+                "eval_open_count": 1,
                 "significance_claim": False,
                 "seed_stability_claim": False,
                 "evidence_level": "engineering",
+                "stop_training": False,
+                "student_kd_performed": False,
+                "student_kd_authorized": False,
+                "acoustic_or_nest_unfreezing_performed": False,
+                "acoustic_or_nest_unfreezing_authorized": False,
             }
         ),
     }
-    markdown = (
-        "\n".join(
-            [
-                "# PSEM Sortformer adaptation engineering decision",
-                "",
-                f"Selected arm: `{selected_arm}`",
-                "",
-                decision_payload["rationale"],
-                "",
-                "Operating point: replacement cell 0.50 / 500 ms.",
-                "Required views: pooled, AMI, AliMeeting.",
-                "",
-                "This is trusted single-operator engineering evidence. It makes no significance or seed-stability claim.",
-                "",
-                "EVAL contains exactly F0 and the operator-selected seed-7301 candidate.",
-            ]
-        )
-        + "\n"
+    return artifacts, _render_lean_decision_markdown(
+        outcome=outcome,
+        selected_arm=selected_arm,
+        rationale=decision_payload["rationale"],
+        eval_opened=True,
     )
-    return artifacts, markdown

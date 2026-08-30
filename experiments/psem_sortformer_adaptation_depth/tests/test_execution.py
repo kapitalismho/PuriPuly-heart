@@ -222,3 +222,58 @@ def test_final_report_cli_writes_the_documented_decision_name(tmp_path, monkeypa
     )
     assert (output_root / "ADAPTATION_DECISION.md").read_text(encoding="utf-8") == "decision\n"
     assert not (output_root / "LEAN_ADAPTATION_DECISION.md").exists()
+
+
+def test_final_report_cli_writes_stop_decision_without_opening_eval(tmp_path, monkeypatch) -> None:
+    output_root = (tmp_path / "output").resolve()
+    output_root.mkdir()
+    operator_decision = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_operator_dev_decision",
+            "decision": "stop",
+            "selected_arm": None,
+            "rationale": "The trusted operator found no supported adaptation path.",
+            "eval_open_count": 0,
+        }
+    )
+    candidate_freeze = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_candidate_freeze",
+            "candidate_set": [],
+            "operator_dev_decision": operator_decision,
+            "operator_dev_decision_sha256": operator_decision["payload_sha256"],
+            "eval_open_count": 0,
+            "eval_used_for_development": False,
+            "experiment_output_root": str(output_root),
+            "candidate_git_head": "a" * 40,
+            "candidate_artifact_sha256s": {},
+            "candidate_code_identity_sha256": "b" * 64,
+        }
+    )
+    freeze_path = tmp_path / "candidate-freeze.json"
+    freeze_path.write_text(json.dumps(candidate_freeze), encoding="utf-8")
+    monkeypatch.setattr(run_module, "validate_current_candidate_identity", lambda _value: None)
+    monkeypatch.setattr(
+        "experiments.psem_sortformer_adaptation_depth.protocol.validate_candidate_freeze",
+        lambda value: value,
+    )
+    monkeypatch.setattr(
+        run_module,
+        "open_eval_once",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("EVAL opened")),
+    )
+
+    assert (
+        run_module.main(["final-report", str(freeze_path), "--output-root", str(output_root)]) == 0
+    )
+    markdown = (output_root / "ADAPTATION_DECISION.md").read_text(encoding="utf-8")
+    receipt = json.loads((output_root / "decision_receipt.json").read_text(encoding="utf-8"))
+    assert receipt["outcome"] == "D"
+    assert receipt["eval_open_count"] == 0
+    assert "Outcome: **D**" in markdown
+    assert "EVAL was not opened or used" in markdown
+    assert "No student KD was performed or authorized" in markdown
+    assert "does not authorize acoustic/NEST unfreezing" in markdown
+    assert not (output_root / "LEAN_ADAPTATION_DECISION.md").exists()
