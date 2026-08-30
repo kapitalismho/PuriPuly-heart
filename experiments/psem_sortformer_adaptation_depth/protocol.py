@@ -1313,6 +1313,7 @@ def freeze_candidate_set(
                     checkpoint_payload.get("arm") != key[0]
                     or checkpoint_payload.get("seed") != 7301
                     or checkpoint_payload.get("final_step") != 256
+                    or not isinstance(checkpoint_payload.get("training_summary"), Mapping)
                     or prediction.get("trained_checkpoint_sha256")
                     != checkpoint_payload.get("checkpoint_sha256")
                     or prediction.get("trained_checkpoint_receipt_sha256")
@@ -1324,6 +1325,7 @@ def freeze_candidate_set(
                         "checkpoint_sha256": checkpoint_payload["checkpoint_sha256"],
                         "checkpoint_receipt_sha256": checkpoint["payload_sha256"],
                         "training_result_sha256": checkpoint_payload["training_result_sha256"],
+                        "training_summary": dict(checkpoint_payload["training_summary"]),
                     }
                 )
             candidate_set.append(candidate)

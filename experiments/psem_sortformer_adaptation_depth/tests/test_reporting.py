@@ -5,11 +5,14 @@ import copy
 import pytest
 
 from experiments.psem_sortformer_adaptation_depth import evaluation as evaluation_module
+from experiments.psem_sortformer_adaptation_depth import execution as execution_module
+from experiments.psem_sortformer_adaptation_depth import protocol as protocol_module
 from experiments.psem_sortformer_adaptation_depth import reporting as reporting_module
 from experiments.psem_sortformer_adaptation_depth.evaluation import (
     _aggregate_frame_diagnostics,
     _aggregate_mapping_diagnostics,
 )
+from experiments.psem_sortformer_adaptation_depth.execution import build_cost_receipt
 from experiments.psem_sortformer_adaptation_depth.protocol import bind_payload
 from experiments.psem_sortformer_adaptation_depth.reporting import (
     build_final_artifacts,
@@ -295,3 +298,160 @@ def test_final_reporting_rejects_missing_or_substituted_training_result(monkeypa
             eval_prediction_sets=[],
             training_results=[substituted],
         )
+
+
+def test_public_freeze_to_final_report_preserves_selected_training_summary(
+    tmp_path, monkeypatch
+) -> None:
+    output = (tmp_path / "output").resolve()
+    registry = (tmp_path / "registry").resolve()
+    output.mkdir()
+    registry.mkdir()
+    monkeypatch.setattr(protocol_module, "authority_registry_root", lambda: registry)
+    monkeypatch.setattr(protocol_module, "validate_dev_result", lambda value: dict(value))
+    monkeypatch.setattr(
+        execution_module,
+        "validate_current_candidate_identity",
+        lambda value: value,
+    )
+    code_identity = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_candidate_code_identity",
+            "git_head": "a" * 40,
+            "worktree_clean": True,
+            "artifact_sha256s": {"run.py": "b" * 64},
+        }
+    )
+    summary = {
+        "final_step": 256,
+        "training_wall_clock_seconds": 1.0,
+        "peak_training_memory_bytes": 1,
+        "total_parameters": 10,
+        "trainable_parameters": 2,
+    }
+    training = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_training_result",
+            "arm": "T2-TOP",
+            "seed": 7301,
+            "checkpoint_sha256": "d" * 64,
+            "candidate_code_identity_sha256": code_identity["payload_sha256"],
+            "training_summary": summary,
+        }
+    )
+    checkpoint = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_checkpoint",
+            "arm": "T2-TOP",
+            "seed": 7301,
+            "final_step": 256,
+            "checkpoint_sha256": "d" * 64,
+            "training_result_sha256": training["payload_sha256"],
+            "training_summary": summary,
+        }
+    )
+    frozen_prediction = bind_payload(
+        {
+            "artifact_role": "psem_sortformer_prediction_set",
+            "arm": "F0-FROZEN-FLOAT",
+            "seed": None,
+        }
+    )
+    selected_prediction = bind_payload(
+        {
+            "artifact_role": "psem_sortformer_prediction_set",
+            "arm": "T2-TOP",
+            "seed": 7301,
+            "trained_checkpoint_sha256": checkpoint["checkpoint_sha256"],
+            "trained_checkpoint_receipt_sha256": checkpoint["payload_sha256"],
+        }
+    )
+    frozen_result = bind_payload(
+        {
+            "artifact_role": "psem_sortformer_dev_result",
+            "arm": "F0-FROZEN-FLOAT",
+            "seed": None,
+            "prediction_set": frozen_prediction,
+            "prediction_set_sha256": frozen_prediction["payload_sha256"],
+        }
+    )
+    head_result = bind_payload(
+        {
+            "artifact_role": "psem_sortformer_dev_result",
+            "arm": "H-HEAD",
+            "seed": 7301,
+        }
+    )
+    selected_result = bind_payload(
+        {
+            "artifact_role": "psem_sortformer_dev_result",
+            "arm": "T2-TOP",
+            "seed": 7301,
+            "prediction_set": selected_prediction,
+            "prediction_set_sha256": selected_prediction["payload_sha256"],
+        }
+    )
+    dev_results = [frozen_result, head_result, selected_result]
+    decision = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "psem_sortformer_operator_dev_decision",
+            "decision": "select_candidate",
+            "selected_arm": "T2-TOP",
+            "rationale": "The trusted operator selected T2.",
+            "available_dev_result_sha256s": {
+                f"{result['arm']}:{result.get('seed')}": result["payload_sha256"]
+                for result in dev_results
+            },
+            "eval_open_count": 0,
+        }
+    )
+    state = bind_payload(
+        {
+            "schema_version": 1,
+            "artifact_role": "staged_execution_state",
+            "experiment_output_root": str(output),
+            "protocol_registry_root": str(registry),
+            "eval_open_count": 0,
+            "eval_used_for_development": False,
+        }
+    )
+    cost = build_cost_receipt(
+        hourly_price_usd=1.0,
+        hourly_price_source="operator quote",
+        actual_gpu_seconds=1.0,
+        projected_remaining_gpu_seconds=1.0,
+        command="freeze-candidates",
+    )
+    candidate_freeze = protocol_module.freeze_candidate_set(
+        state,
+        dev_results,
+        {"T2-TOP": checkpoint},
+        {
+            "F0-FROZEN-FLOAT": frozen_prediction,
+            "T2-TOP": selected_prediction,
+        },
+        code_identity,
+        operator_decision=decision,
+        cost_receipt=cost,
+    )
+    authorization = protocol_module.open_eval_once(candidate_freeze, str(output))
+    assert authorization["candidate_set"][1]["training_summary"] == summary
+
+    results = [
+        _singleton_result("F0-FROZEN-FLOAT", None, 10.0),
+        _singleton_result("T2-TOP", 7301, 6.0),
+    ]
+    monkeypatch.setattr(reporting_module, "validate_eval_authorization", lambda value: value)
+    monkeypatch.setattr(reporting_module, "_candidate_results", lambda *_args: results)
+    monkeypatch.setattr(reporting_module, "require_registered_execution", lambda *_args: {})
+    artifacts, _ = build_final_artifacts(
+        eval_authorization=authorization,
+        eval_results=[],
+        eval_prediction_sets=[],
+        training_results=[training],
+    )
+    assert artifacts["timing_and_compute.json"]["training_results"] == [training]
