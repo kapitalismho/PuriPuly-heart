@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from puripuly_heart.app.wiring.wiring_stt_factory import (
     create_stt_backend_from_resolved_config,
     resolve_self_stt_runtime_config,
@@ -12,8 +14,7 @@ from puripuly_heart.config.runtime_resolution import (
     STTRuntimeIntent,
     resolve_stt_config,
 )
-from puripuly_heart.config.settings import AppSettings, STTProviderName
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 class _MemorySecrets:
@@ -45,15 +46,46 @@ def test_custom_stt_runtime_resolution_keeps_mode_and_endpoint() -> None:
     assert config.custom_vocabulary_enabled is False
 
 
-def test_factory_builds_custom_backend_without_requiring_secret() -> None:
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.CUSTOM
-    settings.custom_stt.mode = "offline"
-    settings.custom_stt.compatibility = "openai_transcription"
-    settings.custom_stt.endpoint = "http://127.0.0.1:8000/v1"
-    settings.custom_stt.model = "whisper-1"
+def _custom_stt(
+    *,
+    provider: str,
+    mode: str,
+    compatibility: str,
+    endpoint: str,
+    model: str,
+    extra: dict[str, object] | None = None,
+) -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            stt=replace(
+                settings.intent.stt,
+                provider=provider,
+                custom=replace(
+                    settings.intent.stt.custom,
+                    mode=mode,
+                    compatibility=compatibility,
+                    endpoint=endpoint,
+                    model=model,
+                    extra=extra or {},
+                ),
+            ),
+        ),
+    )
 
-    resolved = resolve_self_stt_runtime_config(from_legacy_app_settings(settings))
+
+def test_factory_builds_custom_backend_without_requiring_secret() -> None:
+    settings = _custom_stt(
+        provider="custom",
+        mode="offline",
+        compatibility="openai_transcription",
+        endpoint="http://127.0.0.1:8000/v1",
+        model="whisper-1",
+    )
+
+    resolved = resolve_self_stt_runtime_config(settings)
     backend = create_stt_backend_from_resolved_config(resolved, secrets=_MemorySecrets())
 
     assert backend.mode == "offline"
@@ -63,14 +95,15 @@ def test_factory_builds_custom_backend_without_requiring_secret() -> None:
 
 
 def test_custom_offline_provider_uses_transcription_even_if_stored_mode_differs() -> None:
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.CUSTOM_OFFLINE
-    settings.custom_stt.mode = "realtime"
-    settings.custom_stt.compatibility = "openai_realtime"
-    settings.custom_stt.endpoint = "http://127.0.0.1:8000/v1"
-    settings.custom_stt.model = "whisper-1"
+    settings = _custom_stt(
+        provider="custom_offline",
+        mode="realtime",
+        compatibility="openai_realtime",
+        endpoint="http://127.0.0.1:8000/v1",
+        model="whisper-1",
+    )
 
-    resolved = resolve_self_stt_runtime_config(from_legacy_app_settings(settings))
+    resolved = resolve_self_stt_runtime_config(settings)
 
     assert resolved.provider == STT_PROVIDER_CUSTOM_OFFLINE
     assert resolved.provider_options["mode"] == "offline"
@@ -94,16 +127,16 @@ def test_custom_realtime_provider_uses_realtime_even_if_stored_mode_differs() ->
 
 
 def test_custom_stt_runtime_extra_flows_to_backend() -> None:
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.CUSTOM
-    settings.custom_stt.mode = "offline"
-    settings.custom_stt.compatibility = "openai_transcription"
-    settings.custom_stt.endpoint = "http://127.0.0.1:8000/v1"
-    settings.custom_stt.model = "whisper-1"
-    settings.custom_stt.extra = {"prompt": "hello", "max_tokens": 16}
-    settings.validate()
+    settings = _custom_stt(
+        provider="custom",
+        mode="offline",
+        compatibility="openai_transcription",
+        endpoint="http://127.0.0.1:8000/v1",
+        model="whisper-1",
+        extra={"prompt": "hello", "max_tokens": 16},
+    )
 
-    resolved = resolve_self_stt_runtime_config(from_legacy_app_settings(settings))
+    resolved = resolve_self_stt_runtime_config(settings)
     assert resolved.provider_options["extra"] == {"prompt": "hello", "max_tokens": 16}
 
     backend = create_stt_backend_from_resolved_config(resolved, secrets=_MemorySecrets())

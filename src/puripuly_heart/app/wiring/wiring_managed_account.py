@@ -363,7 +363,7 @@ def compose_managed_account(
         settings=settings,
         release_service_provider=lambda: release.service,
         settings_repository_factory=lambda base, committed, surface: (
-            settings.create_legacy_patch_repository(
+            settings.create_canonical_patch_repository(
                 base_settings=base,
                 committed_settings=committed,
                 surface=surface,

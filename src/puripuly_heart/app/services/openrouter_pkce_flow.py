@@ -182,7 +182,7 @@ class OpenRouterPkceApplicationOwner:
             updated,
             force_rebuild_llm=True,
         )
-        settings_repository = self.settings.create_legacy_patch_repository(
+        settings_repository = self.settings.create_canonical_patch_repository(
             base_settings=current,
             committed_settings=updated,
             surface="openrouter_pkce",
@@ -205,7 +205,7 @@ class OpenRouterPkceApplicationOwner:
             surface="openrouter_pkce",
             operation="openrouter_pkce_runtime_apply",
         )
-        values = self.settings.legacy_snapshot_values(updated)
+        values = self.settings.snapshot_values(updated)
         scope = LifecycleScope("openrouter-pkce-commit")
 
         async def commit_and_apply() -> bool:

@@ -355,7 +355,6 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset()
 
 SETTINGS_COMPATIBILITY_SOURCE_PATHS = frozenset(
     {
-        "src/puripuly_heart/config/settings.py",
         "src/puripuly_heart/config/settings_vnext/compat.py",
         "src/puripuly_heart/config/settings_vnext/canonical_persistence.py",
         "src/puripuly_heart/config/settings_vnext/facade.py",
@@ -1009,38 +1008,11 @@ def test_overlay_calibration_value_object_has_config_schema_ownership() -> None:
     assert not (forbidden_imports & actual_imports)
 
 
-def test_settings_public_facade_delegates_persistence_helpers_to_vnext_facade() -> None:
+def test_legacy_settings_module_is_absent() -> None:
+    assert not (SOURCE_PACKAGE_ROOT / "config" / "settings.py").exists()
     assert (
         _layer_for_module("puripuly_heart.config.settings_vnext.facade") == MIGRATION_SERIALIZATION
     )
-
-    settings_path = SOURCE_PACKAGE_ROOT / "config" / "settings.py"
-    tree = ast.parse(settings_path.read_text(encoding="utf-8"))
-    delegated_names = {
-        "FacadeSettingsLoadResult",
-        "load_settings",
-        "load_settings_with_result",
-        "save_settings",
-        "save_settings_with_result",
-        "load_vnext_settings",
-        "save_vnext_settings",
-    }
-    helper_definitions = delegated_names | {"_atomic_write_text"}
-    definitions = {
-        node.name
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
-    }
-    facade_imports = {
-        alias.name
-        for node in tree.body
-        if isinstance(node, ast.ImportFrom)
-        and node.module == "puripuly_heart.config.settings_vnext.facade"
-        for alias in node.names
-    }
-
-    assert definitions.isdisjoint(helper_definitions)
-    assert delegated_names <= facade_imports
 
 
 def test_controller_consumes_only_settings_owner_and_public_binding_contract() -> None:
@@ -1635,6 +1607,8 @@ def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -
     expected_current.pop("src/puripuly_heart/app/services/settings/settings_application.py")
     expected_current.pop("src/puripuly_heart/app/services/settings/settings_runtime_effects.py")
     expected_current.pop("src/puripuly_heart/app/services/canonical_settings_persistence.py")
+    expected_current.pop("src/puripuly_heart/config/settings_vnext/facade.py")
+    expected_current.pop("src/puripuly_heart/config/settings_vnext/migration.py")
     actual_current: dict[str, set[str]] = {}
     for source_path in SOURCE_PACKAGE_ROOT.rglob("*.py"):
         tree = ast.parse(source_path.read_text(encoding="utf-8"))

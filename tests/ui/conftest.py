@@ -18,21 +18,12 @@ from puripuly_heart.app.ports.settings_view import (
 from puripuly_heart.app.services.canonical_settings_persistence import (
     materialize_canonical_translation_settings,
 )
-from puripuly_heart.config.settings import AppSettings
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.ui.i18n import get_locale, set_locale
 from puripuly_heart.ui.views.settings import SettingsView
 
 
 def _canonical_settings(settings: object) -> object:
-    if isinstance(settings, AppSettingsVNext):
-        return settings
-    if isinstance(settings, AppSettings):
-        return from_legacy_app_settings(
-            settings,
-            preserve_provider_verification=True,
-        )
     return settings
 
 

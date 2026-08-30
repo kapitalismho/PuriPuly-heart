@@ -4,6 +4,12 @@ from enum import Enum
 from urllib.parse import urlsplit, urlunsplit
 
 from puripuly_heart.config.llm_profiles import (
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH,
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_CHINA,
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_26B_31B,
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_31B,
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_NONE,
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_QWEN35_FLASH,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
     OPENROUTER_MODEL_GEMINI_37_FLASH,
@@ -139,6 +145,32 @@ class OpenRouterCredentialSource(str, Enum):
     BYOK = "byok"
 
 
+class GeminiLLMModel(str, Enum):
+    GEMINI_37_FLASH = "gemini-3.7-flash"
+    GEMINI_31_FLASH_LITE = "gemini-3.1-flash-lite"
+
+
+class DeepSeekLLMModel(str, Enum):
+    DEEPSEEK_V4_FLASH = "deepseek-v4-flash"
+
+
+class CerebrasLLMModel(str, Enum):
+    GEMMA_4_31B = "gemma-4-31b"
+
+
+class LocalLLMBackend(str, Enum):
+    OLLAMA = "ollama"
+
+
+class OpenRouterFallbackSelectionAlias(str, Enum):
+    NONE = OPENROUTER_FALLBACK_SELECTION_ALIAS_NONE
+    QWEN35_FLASH = OPENROUTER_FALLBACK_SELECTION_ALIAS_QWEN35_FLASH
+    DEEPSEEK_V4_FLASH = OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH
+    DEEPSEEK_V4_FLASH_CHINA = OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_CHINA
+    GEMMA4_26B_31B = OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_26B_31B
+    GEMMA4_31B = OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_31B
+
+
 class OpenRouterSelectionAlias(str, Enum):
     GEMMA4_26B_31B_MANAGED = OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED
     GEMMA4_26B_31B_BYOK = OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK
@@ -189,11 +221,16 @@ def normalize_local_llm_base_url(value: str) -> str:
 
 
 __all__ = [
+    "CerebrasLLMModel",
+    "DeepSeekLLMModel",
+    "GeminiLLMModel",
     "LLMProviderName",
     "LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS",
     "LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS",
+    "LocalLLMBackend",
     "MAX_CUSTOM_VOCAB_TERMS",
     "OpenRouterCredentialSource",
+    "OpenRouterFallbackSelectionAlias",
     "OpenRouterLLMModel",
     "OpenRouterSelectionAlias",
     "QwenLLMModel",

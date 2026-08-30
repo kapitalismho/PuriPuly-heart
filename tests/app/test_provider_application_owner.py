@@ -32,17 +32,17 @@ class FakeSettingsOwner:
         self.rollback_pending = False
 
     @staticmethod
-    def legacy_snapshot_values(settings: AppSettingsVNext) -> dict[str, object]:
+    def snapshot_values(settings: AppSettingsVNext) -> dict[str, object]:
         return serialization.to_dict(settings)
 
-    def project_legacy_delta(
+    def project_canonical_delta(
         self,
         _base: AppSettingsVNext,
         _next: AppSettingsVNext,
     ) -> object:
         return object()
 
-    def create_legacy_patch_repository(self, **_kwargs) -> object:
+    def create_canonical_patch_repository(self, **_kwargs) -> object:
         return object()
 
     def begin(self, **_kwargs) -> None:
@@ -50,7 +50,7 @@ class FakeSettingsOwner:
         self.rollback_pending = True
         self.events.append("begin")
 
-    def apply_legacy_delta(self, _base: AppSettingsVNext, _next: AppSettingsVNext) -> None:
+    def apply_canonical_delta(self, _base: AppSettingsVNext, _next: AppSettingsVNext) -> None:
         self.events.append("delta")
 
     def persist(self) -> None:

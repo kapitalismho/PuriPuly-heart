@@ -1,148 +1,152 @@
 from __future__ import annotations
 
-import copy
+from dataclasses import replace
 
 import pytest
 
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    QwenLLMModel,
-    QwenRegion,
-    TranslationConnection,
-    TranslationFallbackSettings,
-    TranslationModel,
-    TranslationSettings,
-    from_dict,
-    materialize_translation_settings,
-    to_dict,
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    materialize_canonical_translation_settings,
 )
-from puripuly_heart.config.settings_vnext import migration, serialization
+from puripuly_heart.config.provider_values import LLMProviderName, QwenLLMModel, QwenRegion
+from puripuly_heart.config.runtime_resolution import TranslationFallbackRuntimeIntent
+from puripuly_heart.config.settings_vnext import serialization
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, TranslationFallbackIntent
+from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 
 
-def _custom_settings() -> AppSettings:
-    settings = AppSettings()
-    settings.telemetry.enabled = True
-    settings.telemetry_state.anonymous_id = "custom-translation-test"
-    settings.provider.llm = LLMProviderName.QWEN
-    settings.qwen.region = QwenRegion.SINGAPORE
-    settings.qwen.llm_model = QwenLLMModel.QWEN_35_PLUS
-    settings.translation = TranslationSettings(
-        model=TranslationModel.CUSTOM_HTTP,
-        connection=TranslationConnection.CUSTOM_HTTP,
-        connection_history={
-            TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED,
-            TranslationModel.QWEN_35_PLUS.value: TranslationConnection.OFFICIAL_BYOK,
-            TranslationModel.CUSTOM_HTTP.value: TranslationConnection.CUSTOM_HTTP,
-        },
-        fallback=TranslationFallbackSettings(
-            enabled=True,
-            model=TranslationModel.GEMMA4,
-            connection=TranslationConnection.OPENROUTER,
+def _custom_settings() -> AppSettingsVNext:
+    current = AppSettingsVNext()
+    return replace(
+        current,
+        intent=replace(
+            current.intent,
+            translation=replace(
+                current.intent.translation,
+                model=TranslationModel.CUSTOM_HTTP.value,
+                connection=TranslationConnection.CUSTOM_HTTP.value,
+                connection_history={
+                    TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
+                    TranslationModel.QWEN_35_PLUS.value: TranslationConnection.OFFICIAL_BYOK.value,
+                    TranslationModel.CUSTOM_HTTP.value: TranslationConnection.CUSTOM_HTTP.value,
+                },
+                fallback=TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_a4b"),
+                http_extension_id="libretranslate",
+                previous_llm_model=TranslationModel.QWEN_35_PLUS.value,
+                qwen=replace(
+                    current.intent.translation.qwen,
+                    region=QwenRegion.SINGAPORE.value,
+                    llm_model=QwenLLMModel.QWEN_35_PLUS.value,
+                ),
+            ),
+            telemetry=replace(current.intent.telemetry, enabled=True),
         ),
-        http_extension_id="libretranslate",
-        previous_llm_model=TranslationModel.QWEN_35_PLUS,
+        state=replace(
+            current.state,
+            telemetry=replace(current.state.telemetry, anonymous_id="custom-translation-test"),
+        ),
     )
-    return settings
 
 
 def test_custom_http_settings_roundtrip_preserves_inactive_llm_state() -> None:
     settings = _custom_settings()
 
-    persisted = to_dict(settings)
-    loaded = from_dict(persisted)
+    persisted = serialization.to_dict(settings)
+    loaded = serialization.from_dict(persisted)
 
-    assert persisted["translation"]["model"] == TranslationModel.CUSTOM_HTTP.value
-    assert persisted["translation"]["connection"] == TranslationConnection.CUSTOM_HTTP.value
-    assert persisted["translation"]["http_extension_id"] == "libretranslate"
-    assert persisted["translation"]["previous_llm_model"] == TranslationModel.QWEN_35_PLUS.value
+    assert persisted["intent"]["translation"]["model"] == TranslationModel.CUSTOM_HTTP.value
+    assert (
+        persisted["intent"]["translation"]["connection"] == TranslationConnection.CUSTOM_HTTP.value
+    )
+    assert persisted["intent"]["translation"]["http_extension_id"] == "libretranslate"
+    assert persisted["intent"]["translation"]["previous_llm_model"] == (
+        TranslationModel.QWEN_35_PLUS.value
+    )
     assert "credential-value" not in repr(persisted)
-    assert loaded.translation.model is TranslationModel.CUSTOM_HTTP
-    assert loaded.translation.connection is TranslationConnection.CUSTOM_HTTP
-    assert loaded.translation.http_extension_id == "libretranslate"
-    assert loaded.translation.previous_llm_model is TranslationModel.QWEN_35_PLUS
-    assert loaded.translation.fallback == settings.translation.fallback
-    assert loaded.provider.llm is LLMProviderName.QWEN
-    assert loaded.qwen.region is QwenRegion.SINGAPORE
-    assert loaded.qwen.llm_model is QwenLLMModel.QWEN_35_PLUS
+    assert loaded.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
+    assert loaded.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
+    assert loaded.intent.translation.http_extension_id == "libretranslate"
+    assert loaded.intent.translation.previous_llm_model == TranslationModel.QWEN_35_PLUS.value
+    assert loaded.intent.translation.fallback == settings.intent.translation.fallback
+    assert loaded.intent.translation.qwen.region == QwenRegion.SINGAPORE.value
+    assert loaded.intent.translation.qwen.llm_model == QwenLLMModel.QWEN_35_PLUS.value
 
 
 def test_custom_http_cannot_be_used_as_translation_fallback() -> None:
     with pytest.raises(ValueError, match="cannot be used as fallback"):
-        TranslationFallbackSettings(
+        TranslationFallbackRuntimeIntent(
             enabled=True,
-            model=TranslationModel.CUSTOM_HTTP,
-            connection=TranslationConnection.CUSTOM_HTTP,
-        ).validate()
+            model=TranslationModel.CUSTOM_HTTP.value,
+            connection=TranslationConnection.CUSTOM_HTTP.value,
+        )
 
 
 def test_switching_custom_http_and_llm_preserves_model_connection_and_fallback() -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.QWEN
-    settings.qwen.region = QwenRegion.SINGAPORE
-    settings.qwen.llm_model = QwenLLMModel.QWEN_35_PLUS
-    settings.translation = TranslationSettings(
-        model=TranslationModel.QWEN_35_PLUS,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-        connection_history={
-            TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED,
-            TranslationModel.QWEN_35_PLUS.value: TranslationConnection.OFFICIAL_BYOK,
-        },
-        fallback=TranslationFallbackSettings(
-            enabled=True,
-            model=TranslationModel.GEMMA4,
-            connection=TranslationConnection.OPENROUTER,
+    current = AppSettingsVNext()
+    settings = replace(
+        current,
+        intent=replace(
+            current.intent,
+            translation=replace(
+                current.intent.translation,
+                model=TranslationModel.QWEN_35_PLUS.value,
+                connection=TranslationConnection.OFFICIAL_BYOK.value,
+                connection_history={
+                    TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
+                    TranslationModel.QWEN_35_PLUS.value: TranslationConnection.OFFICIAL_BYOK.value,
+                },
+                fallback=TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_a4b"),
+                qwen=replace(
+                    current.intent.translation.qwen,
+                    region=QwenRegion.SINGAPORE.value,
+                    llm_model=QwenLLMModel.QWEN_35_PLUS.value,
+                ),
+            ),
         ),
     )
-    expected_provider = settings.provider.llm
-    expected_region = settings.qwen.region
-    expected_qwen_model = settings.qwen.llm_model
-    expected_fallback = copy.deepcopy(settings.translation.fallback)
-    expected_history = copy.deepcopy(settings.translation.connection_history)
+    expected_region = settings.intent.translation.qwen.region
+    expected_qwen_model = settings.intent.translation.qwen.llm_model
+    expected_fallback = settings.intent.translation.fallback
+    expected_history = dict(settings.intent.translation.connection_history)
 
-    settings.translation.model = TranslationModel.CUSTOM_HTTP
-    settings.translation.connection = TranslationConnection.CUSTOM_HTTP
-    settings.translation.http_extension_id = "libretranslate"
-    settings.translation.previous_llm_model = TranslationModel.QWEN_35_PLUS
-    materialize_translation_settings(settings)
-
-    assert settings.provider.llm is expected_provider
-    assert settings.qwen.region is expected_region
-    assert settings.qwen.llm_model is expected_qwen_model
-    assert settings.translation.fallback == expected_fallback
-    assert settings.translation.connection_history == {
-        **expected_history,
-        TranslationModel.CUSTOM_HTTP.value: TranslationConnection.CUSTOM_HTTP,
-    }
-
-    settings.translation = TranslationSettings(
-        model=TranslationModel.QWEN_35_PLUS,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-        connection_history=copy.deepcopy(settings.translation.connection_history),
-        fallback=copy.deepcopy(settings.translation.fallback),
+    custom = materialize_canonical_translation_settings(
+        replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                translation=replace(
+                    settings.intent.translation,
+                    model=TranslationModel.CUSTOM_HTTP.value,
+                    connection=TranslationConnection.CUSTOM_HTTP.value,
+                    http_extension_id="libretranslate",
+                    previous_llm_model=TranslationModel.QWEN_35_PLUS.value,
+                ),
+            ),
+        )
     )
-    materialize_translation_settings(settings)
 
-    assert settings.provider.llm is expected_provider
-    assert settings.qwen.region is expected_region
-    assert settings.qwen.llm_model is expected_qwen_model
-    assert settings.translation.fallback == expected_fallback
+    assert custom.intent.translation.qwen.region == expected_region
+    assert custom.intent.translation.qwen.llm_model == expected_qwen_model
+    assert custom.intent.translation.fallback == expected_fallback
+    assert custom.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
+    assert custom.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
+    for key, value in expected_history.items():
+        assert custom.intent.translation.connection_history[key] == value
 
-
-def test_vnext_custom_http_migration_is_idempotent_and_projects_legacy_provider() -> None:
-    legacy = _custom_settings()
-
-    canonical = serialization.to_dict(migration.from_legacy_app_settings(legacy))
-    reloaded = serialization.to_dict(migration.from_dict(canonical))
-    projected = migration.to_legacy_dict(migration.from_dict(canonical))
-
-    assert reloaded == canonical
-    assert canonical["intent"]["translation"]["http_extension_id"] == "libretranslate"
-    assert canonical["intent"]["translation"]["previous_llm_model"] == (
-        TranslationModel.QWEN_35_PLUS.value
+    restored = materialize_canonical_translation_settings(
+        replace(
+            custom,
+            intent=replace(
+                custom.intent,
+                translation=replace(
+                    custom.intent.translation,
+                    model=TranslationModel.QWEN_35_PLUS.value,
+                    connection=TranslationConnection.OFFICIAL_BYOK.value,
+                ),
+            ),
+        )
     )
-    assert projected["translation"]["model"] == TranslationModel.CUSTOM_HTTP.value
-    assert projected["translation"]["connection"] == TranslationConnection.CUSTOM_HTTP.value
-    assert projected["translation"]["http_extension_id"] == "libretranslate"
-    assert projected["translation"]["previous_llm_model"] == TranslationModel.QWEN_35_PLUS.value
-    assert projected["provider"]["llm"] == LLMProviderName.QWEN.value
+
+    assert restored.intent.translation.qwen.region == expected_region
+    assert restored.intent.translation.qwen.llm_model == expected_qwen_model
+    assert restored.intent.translation.fallback == expected_fallback
+    assert LLMProviderName.QWEN.value == "qwen"

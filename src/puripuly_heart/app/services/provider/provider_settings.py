@@ -214,9 +214,9 @@ class ProviderApplicationOwner:
         committed_before_full_draft = (
             copy.deepcopy(self.settings.canonical) if self.settings.canonical is not None else None
         )
-        if self.settings.canonical is not None and self.settings.legacy_snapshot_values(
+        if self.settings.canonical is not None and self.settings.snapshot_values(
             self.settings.canonical
-        ) != self.settings.legacy_snapshot_values(next_settings):
+        ) != self.settings.snapshot_values(next_settings):
             try:
                 await self._apply_direct(
                     next_settings,
@@ -272,18 +272,18 @@ class ProviderApplicationOwner:
             return False
         committed_settings = copy.deepcopy(base_settings)
         committed_settings = apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = self.settings.legacy_snapshot_values(
+        has_out_of_scope_draft = self.settings.snapshot_values(
             committed_settings
-        ) != self.settings.legacy_snapshot_values(next_settings)
+        ) != self.settings.snapshot_values(next_settings)
         plan = self.runtime.build_plan(
             committed_settings,
             force_rebuild_llm=False,
-            canonical_settings=self.settings.project_legacy_delta(
+            canonical_settings=self.settings.project_canonical_delta(
                 base_settings,
                 committed_settings,
             ),
         )
-        repository = self.settings.create_legacy_patch_repository(
+        repository = self.settings.create_canonical_patch_repository(
             base_settings=base_settings,
             committed_settings=committed_settings,
             save_failure_sink=self.save_failure_sink,
@@ -324,7 +324,7 @@ class ProviderApplicationOwner:
             fallback_plan = self.runtime.build_plan(
                 next_settings,
                 force_rebuild_llm=False,
-                canonical_settings=self.settings.project_legacy_delta(
+                canonical_settings=self.settings.project_canonical_delta(
                     committed_settings,
                     next_settings,
                 ),
@@ -386,18 +386,18 @@ class ProviderApplicationOwner:
             return False
         committed_settings = copy.deepcopy(base_settings)
         committed_settings = apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = self.settings.legacy_snapshot_values(
+        has_out_of_scope_draft = self.settings.snapshot_values(
             committed_settings
-        ) != self.settings.legacy_snapshot_values(next_settings)
+        ) != self.settings.snapshot_values(next_settings)
         plan = self.runtime.build_plan(
             committed_settings,
             force_rebuild_llm=False,
-            canonical_settings=self.settings.project_legacy_delta(
+            canonical_settings=self.settings.project_canonical_delta(
                 base_settings,
                 committed_settings,
             ),
         )
-        repository = self.settings.create_legacy_patch_repository(
+        repository = self.settings.create_canonical_patch_repository(
             base_settings=base_settings,
             committed_settings=committed_settings,
             surface="stt_language_audio",
@@ -464,7 +464,7 @@ class ProviderApplicationOwner:
             fallback_plan = self.runtime.build_plan(
                 next_settings,
                 force_rebuild_llm=False,
-                canonical_settings=self.settings.project_legacy_delta(
+                canonical_settings=self.settings.project_canonical_delta(
                     committed_settings,
                     next_settings,
                 ),
@@ -541,7 +541,7 @@ class ProviderApplicationOwner:
                 plan=plan,
             ).apply_runtime(
                 RuntimeApplyRequest(
-                    settings_values=self.settings.legacy_snapshot_values(next_settings),
+                    settings_values=self.settings.snapshot_values(next_settings),
                     reason="provider_runtime_only",
                     correlation_id=None,
                 )
@@ -550,12 +550,12 @@ class ProviderApplicationOwner:
                 self._set_result(_runtime_apply_result_as_degraded_transaction(runtime_result))
             return runtime_result.status == RUNTIME_APPLY_STATUS_APPLIED
         self.settings.begin(
-            legacy_snapshot=self.settings.projection_snapshot or self.settings.canonical
+            snapshot=self.settings.projection_snapshot or self.settings.canonical
         )
         committed = False
         try:
             self.capture_runtime_signatures()
-            self.settings.apply_legacy_delta(
+            self.settings.apply_canonical_delta(
                 self.settings.projection_snapshot or self.settings.canonical,
                 next_settings,
             )
@@ -589,7 +589,7 @@ class ProviderApplicationOwner:
                 plan=plan,
             ).apply_runtime(
                 RuntimeApplyRequest(
-                    settings_values=self.settings.legacy_snapshot_values(next_settings),
+                    settings_values=self.settings.snapshot_values(next_settings),
                     reason="provider_direct",
                     correlation_id=None,
                 )
@@ -747,7 +747,7 @@ class ProviderSettingsOwner:
                 provider="http_extension",
                 secret_key=secret_key,
                 secret_value=value,
-                settings_values=self.settings.legacy_snapshot_values(current),
+                settings_values=self.settings.snapshot_values(current),
             ),
             result_handler=lambda result, _succeeded: self.results.set(result),
         )
@@ -769,7 +769,7 @@ class ProviderSettingsOwner:
                 ),
             ),
         )
-        repository = self.settings.create_legacy_patch_repository(
+        repository = self.settings.create_canonical_patch_repository(
             base_settings=current,
             committed_settings=updated,
             surface="provider_secret_change",
@@ -785,7 +785,7 @@ class ProviderSettingsOwner:
                 provider=provider,
                 secret_key=secret_key,
                 secret_value=value,
-                settings_values=self.settings.legacy_snapshot_values(updated),
+                settings_values=self.settings.snapshot_values(updated),
             ),
             result_handler=lambda result, succeeded: self._apply_secret_change_result(
                 repository.committed_settings,

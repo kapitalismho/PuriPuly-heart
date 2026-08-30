@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -16,12 +17,7 @@ from puripuly_heart.app.wiring_runtime_pipeline import (
 )
 
 from puripuly_heart.app import wiring_runtime_pipeline as runtime_pipeline_module
-from puripuly_heart.config.settings import (
-    AppSettings,
-    TranslationConnection,
-    TranslationModel,
-    materialize_translation_settings,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import SystemClock
 from puripuly_heart.core.orchestrator.peer_translation_channel import (
@@ -33,7 +29,7 @@ from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
 )
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
-from tests.helpers.runtime_pipeline import pipeline_inputs_from_legacy
+from tests.helpers.runtime_pipeline import pipeline_inputs_from_vnext
 
 
 class ManagedRelease:
@@ -117,7 +113,7 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
         return CaptureOwner("peer")
 
     pipeline = await compose_runtime_pipeline(
-        inputs=pipeline_inputs_from_legacy(AppSettings()),
+        inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
         secrets=object(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
@@ -204,7 +200,7 @@ async def test_pipeline_binds_stt_event_ingress_observer_to_translation_diagnost
     )
 
     pipeline = await compose_runtime_pipeline(
-        inputs=pipeline_inputs_from_legacy(AppSettings()),
+        inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
         secrets=object(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
@@ -264,13 +260,21 @@ async def test_managed_gemma_startup_constructs_provider_without_preparing(
         "ChatboxPaginator",
         lambda *_a, **_k: RecordingChatbox(),
     )
-    settings = AppSettings()
-    settings.translation.model = TranslationModel.MANAGED_GEMMA
-    settings.translation.connection = TranslationConnection.GPU
-    materialize_translation_settings(settings)
+    baseline = AppSettingsVNext()
+    settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            translation=replace(
+                baseline.intent.translation,
+                model="managed_gemma",
+                connection="gpu",
+            ),
+        ),
+    )
 
     pipeline = await compose_runtime_pipeline(
-        inputs=pipeline_inputs_from_legacy(settings),
+        inputs=pipeline_inputs_from_vnext(settings),
         secrets=object(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
@@ -335,16 +339,28 @@ async def test_pipeline_composition_preserves_runtime_configuration_and_gate(
     )
     monkeypatch.setattr(runtime_pipeline_module, "ChatboxPaginator", create_osc)
 
-    settings = AppSettings()
-    settings.osc.chatbox_include_source = False
-    settings.osc.vrc_mic_intercept = True
-    settings.languages.peer_source_language = "ja"
-    settings.languages.peer_target_language = "en"
+    baseline = AppSettingsVNext()
+    settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            osc=replace(
+                baseline.intent.osc,
+                chatbox_include_source=False,
+                vrc_mic_intercept=True,
+            ),
+            languages=replace(
+                baseline.intent.languages,
+                peer_source_language="ja",
+                peer_target_language="en",
+            ),
+        ),
+    )
     original_state = VrcMicState(muted=False)
     gate = VrcMicAudioGate(state=original_state, enabled=False)
 
     pipeline = await compose_runtime_pipeline(
-        inputs=pipeline_inputs_from_legacy(settings),
+        inputs=pipeline_inputs_from_vnext(settings),
         secrets=object(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
@@ -428,11 +444,8 @@ async def test_pipeline_launcher_replaces_owned_runtime_in_order(
         stt_failure_sink=lambda message: events.append(("failure", message)),
         cleanup_failure_sink=lambda _message, _exception: None,
     )
-    settings = AppSettings()
-    settings.ui.peer_translation_enabled = True
-
     result = await launcher.launch(
-        pipeline_inputs_from_legacy(settings),
+        pipeline_inputs_from_vnext(AppSettingsVNext(), peer_translation_enabled=True),
         secrets=object(),
         vrc_mic_state=None,
         vrc_mic_audio_gate=None,
@@ -447,7 +460,7 @@ async def test_pipeline_launcher_replaces_owned_runtime_in_order(
         ("replace_peer", new_peer),
     ]
     assert events[4:] == [
-        ("configure_vrc_mic", settings.osc.vrc_mic_intercept),
+        ("configure_vrc_mic", False),
     ]
     assert peer_application.last_intent_enabled is True
 
@@ -482,7 +495,7 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
     monkeypatch.setattr(runtime_pipeline_module, "ChatboxPaginator", lambda *_a, **_k: chatbox)
 
     pipeline = await compose_runtime_pipeline(
-        inputs=pipeline_inputs_from_legacy(AppSettings()),
+        inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
         secrets=object(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
@@ -823,7 +836,7 @@ async def test_pipeline_composition_closes_pending_llm_on_early_failure(
 
     with pytest.raises(RuntimeError, match=f"{failure_stage} construction failed"):
         await compose_runtime_pipeline(
-            inputs=pipeline_inputs_from_legacy(AppSettings()),
+            inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
             secrets=object(),
             config_path=Path("settings.json"),
             clock=SystemClock(),
@@ -893,7 +906,7 @@ async def test_pipeline_launcher_retains_failed_cleanup_for_retry(
 
     with pytest.raises(BaseExceptionGroup) as raised:
         await launcher.launch(
-            pipeline_inputs_from_legacy(AppSettings()),
+            pipeline_inputs_from_vnext(AppSettingsVNext()),
             secrets=object(),
             vrc_mic_state=None,
             vrc_mic_audio_gate=None,

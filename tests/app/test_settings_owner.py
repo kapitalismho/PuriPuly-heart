@@ -60,7 +60,7 @@ def test_owner_persists_default_gemma_fallback_selected_from_disabled_state(
         ),
     )
 
-    owner.apply_legacy_delta(loaded.settings, changed)
+    owner.apply_canonical_delta(loaded.settings, changed)
     owner.persist()
 
     reloaded = compose_settings_owner(path).start().settings
@@ -81,7 +81,7 @@ def test_owner_unrelated_delta_preserves_disabled_fallback(tmp_path: Path) -> No
     loaded = owner.start()
     changed = _with_locale(loaded.settings, "ja")
 
-    owner.apply_legacy_delta(loaded.settings, changed)
+    owner.apply_canonical_delta(loaded.settings, changed)
     owner.persist()
 
     reloaded = compose_settings_owner(path).start().settings
@@ -143,7 +143,7 @@ def test_owner_failed_save_keeps_last_persisted_state(
     original = path.read_bytes()
     changed = _with_locale(loaded.settings, "ko")
     owner.begin()
-    owner.apply_legacy_delta(loaded.settings, changed)
+    owner.apply_canonical_delta(loaded.settings, changed)
 
     def fail_persist(_path: Path, _settings: AppSettingsVNext) -> None:
         raise OSError("injected owner save failure")
@@ -172,7 +172,7 @@ def test_owner_nested_completion_keeps_outer_rollback_snapshot(
 
     owner.begin()
     changed = _with_locale(before, "ja")
-    owner.apply_legacy_delta(before, changed)
+    owner.apply_canonical_delta(before, changed)
     owner.begin()
     owner.complete()
 
@@ -205,7 +205,7 @@ def test_owner_legacy_delta_projection_is_side_effect_free(tmp_path: Path) -> No
         ),
     )
 
-    projected = owner.project_legacy_delta(loaded.settings, candidate)
+    projected = owner.project_canonical_delta(loaded.settings, candidate)
 
     assert owner.canonical == original_canonical
     assert candidate.intent.stt.low_latency_mode is False

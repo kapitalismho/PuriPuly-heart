@@ -46,7 +46,7 @@ def test_osc_abi_registries_are_explicit_and_cover_current_languages() -> None:
 
 def test_translation_model_publish_ids_cover_every_product_model() -> None:
     from puripuly_heart.app.ports.osc_control import TRANSLATION_MODEL_ID_BY_VALUE
-    from puripuly_heart.config.settings import TranslationModel
+    from puripuly_heart.config.translation_values import TranslationModel
 
     assert {model.value for model in TranslationModel} <= set(TRANSLATION_MODEL_ID_BY_VALUE)
 

@@ -237,7 +237,7 @@ class SettingsOwner:
         owns_mutation = self.mutation_depth == 0
         baseline = self.projection_snapshot or live
         if owns_mutation:
-            self.begin(legacy_snapshot=baseline)
+            self.begin(snapshot=baseline)
         self.apply_canonical_delta(baseline, live)
         try:
             self.persist()
@@ -502,7 +502,7 @@ class SettingsOwner:
             self.canonical = normalized
         return normalized
 
-    def project_legacy_delta(
+    def project_canonical_delta(
         self,
         base_settings: AppSettingsVNext | None,
         next_settings: AppSettingsVNext,
@@ -516,49 +516,21 @@ class SettingsOwner:
             self.normalize(next_settings),
         )
 
-    def apply_legacy_delta(
-        self,
-        base_settings: AppSettingsVNext | None,
-        next_settings: AppSettingsVNext,
-    ) -> AppSettingsVNext:
-        return self.apply_canonical_delta(base_settings, next_settings)
-
-    @staticmethod
-    def legacy_snapshot_values(settings: AppSettingsVNext) -> dict[str, object]:
-        return canonical_snapshot_values(settings)
-
-    def create_legacy_patch_repository(
-        self,
-        *,
-        committed_settings: AppSettingsVNext,
-        base_settings: AppSettingsVNext | None = None,
-        surface: str = "translation_provider",
-        provider_verification_binding: ProviderVerificationBinding | None = None,
-        save_failure_sink: Callable[[str], None] | None = None,
-    ) -> CanonicalSettingsPatchRepository:
-        return self.create_canonical_patch_repository(
-            committed_settings=committed_settings,
-            base_settings=base_settings,
-            surface=surface,
-            provider_verification_binding=provider_verification_binding,
-            save_failure_sink=save_failure_sink,
-        )
-
     def remember_projection(self, settings: AppSettingsVNext) -> None:
         self.projection_snapshot = copy.deepcopy(settings)
 
-    def begin(self, *, legacy_snapshot: AppSettingsVNext | None = None) -> None:
+    def begin(self, *, snapshot: AppSettingsVNext | None = None) -> None:
         if self._mutation_depth == 0:
             self._rollback_snapshot = self.persistence.snapshot(
-                legacy_snapshot if legacy_snapshot is not None else self.canonical
+                snapshot if snapshot is not None else self.canonical
             )
             self._rollback_overlay_enabled = self._overlay_enabled
             self._rollback_peer_translation_enabled = self._peer_translation_enabled
             self._rollback_overlay_desktop_locked = self._overlay_desktop_locked
             self._rollback_authoritative = self.authoritative
             self._rollback_pending = True
-            if legacy_snapshot is not None and self.projection_snapshot is None:
-                self.projection_snapshot = copy.deepcopy(legacy_snapshot)
+            if snapshot is not None and self.projection_snapshot is None:
+                self.projection_snapshot = copy.deepcopy(snapshot)
         self._mutation_depth += 1
 
     def rollback(self) -> None:

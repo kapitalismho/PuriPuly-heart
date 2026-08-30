@@ -124,7 +124,7 @@ async def test_deepseek_provider_close_cleans_up() -> None:
 
 
 def test_deepseek_provider_passes_v4_flash_model_to_internal_httpx_client() -> None:
-    from puripuly_heart.config.settings import DeepSeekLLMModel
+    from puripuly_heart.config.provider_values import DeepSeekLLMModel
 
     deepseek_model = DeepSeekLLMModel.DEEPSEEK_V4_FLASH
 

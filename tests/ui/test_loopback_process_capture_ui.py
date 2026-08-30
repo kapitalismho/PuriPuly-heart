@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 import json
 import threading
 from dataclasses import replace
@@ -22,9 +21,8 @@ from puripuly_heart.config.capture_target_resolution import (
     resolve_desktop_audio_capture_target,
 )
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
-from puripuly_heart.config.settings import AppSettings
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.config.settings_vnext.schema import (
+    AppSettingsVNext,
     CaptureTargetIntent,
     ProcessCaptureTargetIntent,
     with_capture_target,
@@ -83,11 +81,8 @@ def _presentation(
     return FletUiPresentationAdapter(app)
 
 
-def _vnext(settings: AppSettings | None = None):
-    return from_legacy_app_settings(
-        settings or AppSettings(),
-        preserve_provider_verification=True,
-    )
+def _vnext(settings: AppSettingsVNext | None = None) -> AppSettingsVNext:
+    return settings if settings is not None else AppSettingsVNext()
 
 
 def _capture_intent(resolved: ResolvedDesktopAudioCaptureTarget) -> CaptureTargetIntent:
@@ -108,7 +103,7 @@ def _capture_intent(resolved: ResolvedDesktopAudioCaptureTarget) -> CaptureTarge
 
 def _capture_target_owner(
     *,
-    settings: AppSettings | None = None,
+    settings: AppSettingsVNext | None = None,
     candidates: tuple[object, ...] = (),
     devices: tuple[str, ...] = (),
 ) -> PeerCaptureTargetApplicationOwner:
@@ -578,9 +573,8 @@ def test_list_options_preserves_saved_process_when_stopped() -> None:
 
 def test_settings_capture_target_refresh_preserves_unrelated_drafts() -> None:
     view = SettingsView.__new__(SettingsView)
-    baseline_settings = AppSettings()
-    provider_draft = AppSettings()
-    provider_draft.system_prompt = "provider draft"
+    baseline_settings = AppSettingsVNext()
+    provider_draft = AppSettingsVNext()
     view._settings = baseline_settings
     view._provider_settings_draft = provider_draft
     view.has_provider_changes = True
@@ -593,9 +587,11 @@ def test_settings_capture_target_refresh_preserves_unrelated_drafts() -> None:
         update=lambda: None,
     )
     view.on_loopback_capture_summary = lambda: "VRChat"
-    saved = AppSettings()
-    saved.desktop_audio.output_device = "Saved device"
-    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(_vnext(saved))
+    saved = with_capture_target(
+        AppSettingsVNext(),
+        CaptureTargetIntent.named_output_device("Saved device"),
+    )
+    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(saved)
     provider_before = view._provider_snapshot
     provider_draft_before = view._provider_draft
 
@@ -646,7 +642,7 @@ async def test_capture_target_owner_publishes_general_snapshot_after_apply() -> 
     assert projections == [next_settings]
     assert len(presented) == 1
     assert presented[0].output_device == "Headset"
-    assert not isinstance(presented[0], AppSettings)
+    assert not isinstance(presented[0], AppSettingsVNext)
 
 
 @pytest.mark.parametrize(
@@ -678,20 +674,14 @@ def test_settings_capture_target_rebase_updates_all_retained_apply_sources(
     committed_output: str,
 ) -> None:
     view = SettingsView.__new__(SettingsView)
-    retained = AppSettings()
-    retained.desktop_audio.output_device = initial_target.device_name or ""
-    retained.desktop_audio.runtime_capture_target = initial_target
-    retained.stt.vad_speech_threshold = 0.31
-    retained.system_prompt = "retained prompt"
-    draft = copy.deepcopy(retained)
-    draft.stt.vad_speech_threshold = 0.73
-    draft.system_prompt = "draft prompt"
+    retained = with_capture_target(AppSettingsVNext(), _capture_intent(initial_target))
+    draft = retained
     view._settings = retained
     view._provider_settings_draft = draft
     view.has_provider_changes = True
     view.has_pending_prompt_changes = True
     view._audio_settings = SimpleNamespace(
-        desktop_output_device=retained.desktop_audio.output_device
+        desktop_output_device=initial_target.device_name or ""
     )
     view._loopback_audio_text = SimpleNamespace(
         content=SimpleNamespace(value="", size=None),
@@ -699,10 +689,8 @@ def test_settings_capture_target_rebase_updates_all_retained_apply_sources(
         update=lambda: None,
     )
     view.on_loopback_capture_summary = lambda: "Committed target"
-    committed = AppSettings()
-    committed.desktop_audio.output_device = committed_output
-    committed.desktop_audio.runtime_capture_target = committed_target
-    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(_vnext(committed))
+    committed = with_capture_target(AppSettingsVNext(), _capture_intent(committed_target))
+    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(committed)
     provider_before = view._provider_snapshot
     provider_draft_before = view._provider_draft
     prompt_before = view._prompt_snapshot

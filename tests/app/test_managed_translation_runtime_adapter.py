@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,16 +19,7 @@ from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    OpenRouterCredentialSource,
-    QwenRegion,
-    TranslationConnection,
-    TranslationModel,
-    TranslationSettings,
-)
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 class AuthAdapter:
@@ -62,17 +54,54 @@ def _auth_state(
     )
 
 
-def _owner(settings: AppSettings) -> SettingsOwner:
+def _owner(settings: AppSettingsVNext) -> SettingsOwner:
     return SettingsOwner(
         path=Path("settings.json"),
         persistence=SettingsVNextCanonicalPersistenceAdapter(),
-        canonical=from_legacy_app_settings(settings),
+        canonical=settings,
         authoritative=True,
     )
 
 
+def _with_translation(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(settings.intent.translation, **changes),
+        ),
+    )
+
+
+def _qwen_settings() -> AppSettingsVNext:
+    return _with_translation(
+        AppSettingsVNext(),
+        model="qwen35_plus",
+        connection="official_byok",
+        qwen=replace(AppSettingsVNext().intent.translation.qwen, region="beijing"),
+    )
+
+
+def _custom_http_settings() -> AppSettingsVNext:
+    return _with_translation(
+        AppSettingsVNext(),
+        model="custom_http",
+        connection="custom_http",
+        http_extension_id="demo",
+    )
+
+
+def _managed_settings(*, china: bool = False) -> AppSettingsVNext:
+    return _with_translation(
+        AppSettingsVNext(),
+        model="deepseek_v4_flash" if china else AppSettingsVNext().intent.translation.model,
+        connection="managed_china" if china else "managed",
+        openrouter_selected_source="managed",
+    )
+
+
 def _adapter(
-    settings: AppSettings,
+    settings: AppSettingsVNext,
     auth: AuthAdapter,
     *,
     service=None,
@@ -92,9 +121,7 @@ def _adapter(
 
 
 def test_state_projects_runtime_provider_region_and_managed_auth_snapshot() -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.QWEN
-    settings.qwen.region = QwenRegion.BEIJING
+    settings = _qwen_settings()
     adapter = _adapter(
         settings,
         AuthAdapter(
@@ -119,14 +146,7 @@ def test_state_projects_runtime_provider_region_and_managed_auth_snapshot() -> N
 
 
 def test_state_labels_custom_http_without_reusing_inactive_llm_metadata() -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.QWEN
-    settings.qwen.region = QwenRegion.BEIJING
-    settings.translation = TranslationSettings(
-        model=TranslationModel.CUSTOM_HTTP,
-        connection=TranslationConnection.CUSTOM_HTTP,
-        http_extension_id="demo",
-    )
+    settings = _custom_http_settings()
     adapter = _adapter(
         settings,
         AuthAdapter(_auth_state()),
@@ -143,12 +163,7 @@ def test_state_labels_custom_http_without_reusing_inactive_llm_metadata() -> Non
 
 @pytest.mark.asyncio
 async def test_custom_http_prepare_skips_managed_release_service() -> None:
-    settings = AppSettings()
-    settings.translation = TranslationSettings(
-        model=TranslationModel.CUSTOM_HTTP,
-        connection=TranslationConnection.CUSTOM_HTTP,
-        http_extension_id="demo",
-    )
+    settings = _custom_http_settings()
 
     async def unexpected_prepare() -> object:
         raise AssertionError("managed release must not prepare for Custom HTTP")
@@ -166,10 +181,7 @@ async def test_custom_http_prepare_skips_managed_release_service() -> None:
 
 @pytest.mark.asyncio
 async def test_prepare_ready_records_discord_claim_and_persists_identity() -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.translation.connection = TranslationConnection.MANAGED
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings = _managed_settings()
     events: list[str] = []
 
     class ClaimGuard:
@@ -209,10 +221,7 @@ async def test_prepare_ready_records_discord_claim_and_persists_identity() -> No
 
 @pytest.mark.asyncio
 async def test_china_prepare_maps_required_result_to_qq_dialog_and_safe_diagnostics() -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.translation.connection = TranslationConnection.MANAGED_CHINA
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings = _managed_settings(china=True)
 
     async def prepare_for_translation() -> ManagedOpenRouterReleaseResult:
         return ManagedOpenRouterReleaseResult(
@@ -242,8 +251,17 @@ async def test_china_prepare_maps_required_result_to_qq_dialog_and_safe_diagnost
 
 
 def test_founder_letter_marks_active_identity_and_persists_after_dialog() -> None:
-    settings = AppSettings()
-    settings.managed_identity.active_managed_credential_ref = "managed-ref"
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        state=replace(
+            settings.state,
+            managed_connection=replace(
+                settings.state.managed_connection,
+                active_managed_credential_ref="managed-ref",
+            ),
+        ),
+    )
     persisted: list[str] = []
     adapter = _adapter(
         settings,

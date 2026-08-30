@@ -1,112 +1,126 @@
 from __future__ import annotations
 
-import copy
 from dataclasses import replace
 
 from puripuly_heart.app.wiring_provider_runtime_policy import (
     build_llm_provider_signature,
 )
 
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    LocalLLMBackend,
-    LocalLLMSettings,
-    OpenRouterCredentialSource,
-    OpenRouterProviderRouting,
-    OpenRouterSelectionAlias,
-    TranslationConnection,
-    TranslationFallbackSettings,
-    TranslationModel,
+from puripuly_heart.config.provider_values import OpenRouterSelectionAlias
+from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
+from puripuly_heart.config.settings_vnext.schema import (
+    AppSettingsVNext,
+    TranslationFallbackIntent,
 )
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
-def _canonical(settings: AppSettings) -> AppSettingsVNext:
-    return from_legacy_app_settings(settings)
+def _signature(settings: AppSettingsVNext) -> tuple[object, ...]:
+    return build_llm_provider_signature(settings)
 
 
-def _signature(settings: AppSettings | AppSettingsVNext) -> tuple[object, ...]:
-    canonical = settings if isinstance(settings, AppSettingsVNext) else _canonical(settings)
-    return build_llm_provider_signature(canonical)
+def _with_translation(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(settings.intent.translation, **changes),
+        ),
+    )
 
 
 def test_llm_provider_signature_tracks_all_runtime_inputs() -> None:
-    base = AppSettings()
-    base.provider.llm = LLMProviderName.OPENROUTER
-    base.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    base.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_MANAGED
-    base.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.OPENROUTER,
+    baseline = AppSettingsVNext()
+    canonical = _with_translation(
+        baseline,
+        model="gemma4_26b_31b",
+        connection="openrouter",
+        openrouter_selected_source="managed",
+        openrouter_selection_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED.value,
+        fallback=TranslationFallbackIntent(selection_alias="openrouter_deepseek_v4_flash"),
     )
-    canonical = _canonical(base)
-    different_selection = replace(
+    different_selection = _with_translation(
         canonical,
-        intent=replace(
-            canonical.intent,
-            translation=replace(
-                canonical.intent.translation,
-                openrouter_selection_alias=OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED.value,
-            ),
-        ),
+        openrouter_selection_alias=OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED.value,
     )
-    different_fallback = copy.deepcopy(base)
-    different_fallback.translation.fallback = TranslationFallbackSettings(enabled=False)
+    different_fallback = _with_translation(
+        canonical,
+        fallback=TranslationFallbackIntent(selection_alias="none"),
+    )
 
     assert _signature(canonical) != _signature(different_selection)
     assert _signature(canonical) != _signature(different_fallback)
 
-    managed_fallback = AppSettings()
-    managed_fallback.provider.llm = LLMProviderName.GEMINI
-    managed_fallback.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.MANAGED_CHINA,
+    managed_fallback = _with_translation(
+        baseline,
+        model="gemini31_flash_lite",
+        connection="official_byok",
+        fallback=TranslationFallbackIntent(selection_alias="deepseek_v4_flash_china"),
     )
-    different_identity = copy.deepcopy(managed_fallback)
-    different_identity.managed_identity.verified_hardware_hash = "fallback-managed-hash"
+    different_identity = replace(
+        managed_fallback,
+        state=replace(
+            managed_fallback.state,
+            managed_connection=replace(
+                managed_fallback.state.managed_connection,
+                verified_hardware_hash="fallback-managed-hash",
+            ),
+        ),
+    )
     assert _signature(managed_fallback) != _signature(different_identity)
 
-    routed = replace(
+    routed = _with_translation(
         canonical,
-        intent=replace(
-            canonical.intent,
-            translation=replace(
-                canonical.intent.translation,
-                openrouter_selection_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value,
-                openrouter_provider_routing=OpenRouterProviderRouting.DEFAULT.value,
-            ),
-        ),
+        openrouter_selection_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value,
+        openrouter_provider_routing=OpenRouterProviderRouting.DEFAULT.value,
     )
-    deepseek_only = replace(
+    deepseek_only = _with_translation(
         routed,
-        intent=replace(
-            routed.intent,
-            translation=replace(
-                routed.intent.translation,
-                openrouter_provider_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
-            ),
-        ),
+        openrouter_provider_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
     )
     assert _signature(routed) != _signature(deepseek_only)
 
-    local = AppSettings()
-    local.provider.llm = LLMProviderName.LOCAL_LLM
-    local.local_llm = LocalLLMSettings(
-        backend=LocalLLMBackend.OLLAMA,
-        base_url="http://127.0.0.1:11434/v1",
-        model="llama3.1:8b",
-        extra_body={"thinking": {"type": "disabled", "budget": 0}},
+    local = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            translation=replace(
+                baseline.intent.translation,
+                model="local_llm",
+                connection="ollama",
+            ),
+            local_llm=replace(
+                baseline.intent.local_llm,
+                backend="ollama",
+                base_url="http://127.0.0.1:11434/v1",
+                model="llama3.1:8b",
+                extra_body={"thinking": {"type": "disabled", "budget": 0}},
+            ),
+        ),
     )
-    same_json_different_order = copy.deepcopy(local)
-    same_json_different_order.local_llm.extra_body = {"thinking": {"budget": 0, "type": "disabled"}}
-    changed_model = copy.deepcopy(local)
-    changed_model.local_llm.model = "qwen2.5:7b"
-    changed_body = copy.deepcopy(local)
-    changed_body.local_llm.extra_body = {"enable_thinking": False}
+    same_json_different_order = replace(
+        local,
+        intent=replace(
+            local.intent,
+            local_llm=replace(
+                local.intent.local_llm,
+                extra_body={"thinking": {"budget": 0, "type": "disabled"}},
+            ),
+        ),
+    )
+    changed_model = replace(
+        local,
+        intent=replace(
+            local.intent,
+            local_llm=replace(local.intent.local_llm, model="qwen2.5:7b"),
+        ),
+    )
+    changed_body = replace(
+        local,
+        intent=replace(
+            local.intent,
+            local_llm=replace(local.intent.local_llm, extra_body={"enable_thinking": False}),
+        ),
+    )
 
     assert _signature(local) == _signature(same_json_different_order)
     assert _signature(local) != _signature(changed_model)
@@ -114,26 +128,46 @@ def test_llm_provider_signature_tracks_all_runtime_inputs() -> None:
 
 
 def test_managed_gemma_signature_ignores_disabled_provider_fallback_but_tracks_prefix() -> None:
-    base = AppSettings()
-    base.translation.model = TranslationModel.MANAGED_GEMMA
-    base.translation.connection = TranslationConnection.CPU
-    base.provider.llm = LLMProviderName.MANAGED_GEMMA
-    base.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.MANAGED_CHINA,
+    baseline = AppSettingsVNext()
+    base = _with_translation(
+        baseline,
+        model="managed_gemma",
+        connection="cpu",
+        fallback=TranslationFallbackIntent(selection_alias="deepseek_v4_flash_china"),
     )
-
-    changed_fallback = copy.deepcopy(base)
-    changed_fallback.translation.fallback = TranslationFallbackSettings(enabled=False)
-    changed_fallback.openrouter.broker_base_url = "https://different.example"
-    changed_fallback.managed_identity.verified_hardware_hash = "different"
-    changed_language = copy.deepcopy(base)
-    changed_language.languages.target_language = "ja"
-    changed_prompt = copy.deepcopy(base)
-    changed_prompt.system_prompt = "different prompt"
-    changed_backend = copy.deepcopy(base)
-    changed_backend.translation.connection = TranslationConnection.GPU
+    disabled = _with_translation(base, fallback=TranslationFallbackIntent(selection_alias="none"))
+    changed_fallback = replace(
+        disabled,
+        intent=replace(
+            disabled.intent,
+            translation=replace(
+                disabled.intent.translation,
+                openrouter_broker_base_url="https://different.example",
+            ),
+        ),
+        state=replace(
+            disabled.state,
+            managed_connection=replace(
+                disabled.state.managed_connection,
+                verified_hardware_hash="different",
+            ),
+        ),
+    )
+    changed_language = replace(
+        base,
+        intent=replace(
+            base.intent,
+            languages=replace(base.intent.languages, target_language="ja"),
+        ),
+    )
+    changed_prompt = replace(
+        base,
+        intent=replace(
+            base.intent,
+            prompts=replace(base.intent.prompts, system_prompt="different prompt"),
+        ),
+    )
+    changed_backend = _with_translation(base, connection="gpu")
 
     assert _signature(base) == _signature(changed_fallback)
     assert _signature(base) != _signature(changed_language)

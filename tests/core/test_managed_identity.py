@@ -25,12 +25,6 @@ from puripuly_heart.core.openrouter_credentials import (
 )
 
 from puripuly_heart.app.wiring import ManagedIdentityStateAdapter
-from puripuly_heart.config.settings import (
-    AppSettings,
-    load_settings,
-    save_settings,
-    to_dict,
-)
 from puripuly_heart.core.managed_identity import (
     MANAGED_DEVICE_PRIVATE_KEY_SECRET,
     MANAGED_DEVICE_PUBLIC_KEY_SECRET,
@@ -43,27 +37,33 @@ from puripuly_heart.core.managed_identity import (
     regenerate_managed_identity_bundle,
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from tests.helpers.release_settings import (
+    ReleaseSettings,
+    load_release_settings,
+    managed_identity_payload,
+    persist_release_settings,
+)
 
 
 def _persisted_settings_writer(path: Path):
-    def persist(settings: AppSettings) -> None:
-        save_settings(path, settings)
+    def persist(settings: ReleaseSettings) -> None:
+        persist_release_settings(path, settings)
 
     return persist
 
 
-def _raise_persist_failed(_: AppSettings) -> None:
+def _raise_persist_failed(_: ReleaseSettings) -> None:
     raise RuntimeError("persist failed")
 
 
 def _managed_state(
-    settings: AppSettings,
+    settings: ReleaseSettings,
     persist=None,
 ) -> ManagedIdentityStateAdapter:
     return ManagedIdentityStateAdapter(settings, persist if persist is not None else lambda _: None)
 
 
-def _credential_config(settings: AppSettings) -> OpenRouterCredentialRuntimeConfig:
+def _credential_config(settings: ReleaseSettings) -> OpenRouterCredentialRuntimeConfig:
     return OpenRouterCredentialRuntimeConfig(
         selected_source=settings.openrouter.selected_source,
         installation_id=settings.managed_identity.installation_id,
@@ -71,15 +71,15 @@ def _credential_config(settings: AppSettings) -> OpenRouterCredentialRuntimeConf
 
 
 def test_ensure_managed_identity_bundle_generates_uuid7_and_keeps_secret_boundary() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     store = InMemorySecretStore()
     persisted_snapshots: list[dict[str, object]] = []
 
-    def persist(updated: AppSettings) -> None:
-        persisted_snapshots.append(to_dict(updated))
+    def persist(updated: ReleaseSettings) -> None:
+        persisted_snapshots.append(managed_identity_payload(updated))
 
     bundle = ensure_managed_identity_bundle(_managed_state(settings, persist), store)
-    persisted = to_dict(settings)
+    persisted = managed_identity_payload(settings)
 
     assert uuid.UUID(bundle.installation_id).version == 7
     assert settings.managed_identity.installation_id == bundle.installation_id
@@ -95,12 +95,12 @@ def test_ensure_managed_identity_bundle_generates_uuid7_and_keeps_secret_boundar
         )
     ).decode("ascii").rstrip("=")
     assert persisted_snapshots == [persisted]
-    assert persisted["managed_identity"] == {
+    assert persisted == {
         "active_managed_credential_ref": None,
         "active_managed_expires_at": None,
         "founder_letter_seen_credential_ref": None,
         "installation_id": bundle.installation_id,
-        "local_managed_claim_sources": [],
+        "local_managed_claim_sources": (),
         "pending_delivery_ack_delivery_id": None,
         "pending_delivery_ack_expires_at": None,
         "pending_delivery_ack_managed_credential_ref": None,
@@ -114,7 +114,7 @@ def test_ensure_managed_identity_bundle_generates_uuid7_and_keeps_secret_boundar
 
 
 def test_ensure_managed_identity_bundle_reuses_existing_valid_bundle() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     store = InMemorySecretStore()
 
     first = ensure_managed_identity_bundle(_managed_state(settings), store)
@@ -128,9 +128,9 @@ def test_ensure_managed_identity_bundle_reuses_existing_valid_bundle() -> None:
 
 
 def test_ensure_managed_identity_bundle_generates_when_port_persistence_is_available() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     store = InMemorySecretStore()
-    persist_calls: list[AppSettings] = []
+    persist_calls: list[ReleaseSettings] = []
 
     bundle = ensure_managed_identity_bundle(_managed_state(settings, persist_calls.append), store)
 
@@ -141,7 +141,7 @@ def test_ensure_managed_identity_bundle_generates_when_port_persistence_is_avail
 
 
 def test_missing_installation_id_regenerates_bundle_and_clears_release_state() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     store = InMemorySecretStore()
 
     first = ensure_managed_identity_bundle(_managed_state(settings), store)
@@ -166,7 +166,7 @@ def test_missing_installation_id_regenerates_bundle_and_clears_release_state() -
 def test_regenerate_managed_identity_bundle_rotates_bundle_and_clears_managed_release_state() -> (
     None
 ):
-    settings = AppSettings()
+    settings = ReleaseSettings()
     store = InMemorySecretStore()
 
     first = ensure_managed_identity_bundle(_managed_state(settings), store)
@@ -197,7 +197,7 @@ def test_regenerate_managed_identity_bundle_rotates_bundle_and_clears_managed_re
 
 
 def test_corrupted_secret_material_regenerates_bundle_and_clears_release_state() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     store = InMemorySecretStore()
 
     first = ensure_managed_identity_bundle(_managed_state(settings), store)
@@ -221,7 +221,7 @@ def test_corrupted_secret_material_regenerates_bundle_and_clears_release_state()
 
 
 def test_broker_public_key_mismatch_regenerates_bundle_atomically() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     store = InMemorySecretStore()
 
     first = ensure_managed_identity_bundle(_managed_state(settings), store)
@@ -245,7 +245,7 @@ def test_broker_public_key_mismatch_regenerates_bundle_atomically() -> None:
 
 
 def test_broker_installation_id_mismatch_regenerates_bundle_atomically() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     store = InMemorySecretStore()
 
     first = ensure_managed_identity_bundle(_managed_state(settings), store)
@@ -269,7 +269,7 @@ def test_broker_installation_id_mismatch_regenerates_bundle_atomically() -> None
 
 
 def test_mixed_state_secret_overwrite_does_not_reuse_old_installation_id() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     store = InMemorySecretStore()
 
     first = ensure_managed_identity_bundle(_managed_state(settings), store)
@@ -304,7 +304,7 @@ def test_mixed_state_secret_overwrite_does_not_reuse_old_installation_id() -> No
 
 def test_regeneration_rolls_back_secret_and_settings_when_persist_fails(tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
-    settings = AppSettings()
+    settings = ReleaseSettings()
     store = InMemorySecretStore()
 
     first = ensure_managed_identity_bundle(
@@ -317,7 +317,7 @@ def test_regeneration_rolls_back_secret_and_settings_when_persist_fails(tmp_path
     store.set(OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET, first.installation_id)
     settings.managed_identity.release_token = "release-1"
     settings.managed_identity.release_token_expires_at = "2026-04-08T06:00:45.000Z"
-    save_settings(path, settings)
+    persist_release_settings(path, settings)
     persisted_before = json.loads(path.read_text(encoding="utf-8"))
 
     with pytest.raises(RuntimeError, match="persist failed"):
@@ -339,7 +339,7 @@ def test_regeneration_rolls_back_secret_and_settings_when_persist_fails(tmp_path
         == "user-123"
     )
     assert json.loads(path.read_text(encoding="utf-8")) == persisted_before
-    restored = load_settings(path)
+    restored = load_release_settings(path)
     restored_bundle = ensure_managed_identity_bundle(_managed_state(restored), store)
     assert restored_bundle.installation_id == first.installation_id
     assert restored_bundle.device_public_key == first.device_public_key
@@ -452,7 +452,7 @@ def test_discord_issue_payload_matches_landed_broker_field_order_and_hashes_code
 
 
 def test_bundle_signing_matches_canonical_payload_contracts() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     store = InMemorySecretStore()
     bundle = ensure_managed_identity_bundle(_managed_state(settings), store)
     public_key = Ed25519PublicKey.from_public_bytes(decode_base64url(bundle.device_public_key))
@@ -534,7 +534,7 @@ def test_bundle_signing_matches_canonical_payload_contracts() -> None:
 
 
 def test_bundle_signs_discord_issue_request_without_sending_code_hash_field() -> None:
-    settings = AppSettings()
+    settings = ReleaseSettings()
     store = InMemorySecretStore()
     bundle = ensure_managed_identity_bundle(_managed_state(settings), store)
     public_key = Ed25519PublicKey.from_public_bytes(decode_base64url(bundle.device_public_key))

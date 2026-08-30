@@ -44,7 +44,7 @@ class FakeSettingsOwner:
         self.events = events
 
     @staticmethod
-    def legacy_snapshot_values(settings: AppSettingsVNext) -> dict[str, object]:
+    def snapshot_values(settings: AppSettingsVNext) -> dict[str, object]:
         return serialization.to_dict(settings)
 
     @staticmethod
@@ -52,7 +52,7 @@ class FakeSettingsOwner:
         return settings
 
     @staticmethod
-    def create_legacy_patch_repository(**_kwargs: object) -> object:
+    def create_canonical_patch_repository(**_kwargs: object) -> object:
         return object()
 
     def complete(self) -> None:
@@ -64,7 +64,7 @@ class FakeSettingsOwner:
         if self.events is not None:
             self.events.append("begin")
 
-    def apply_legacy_delta(
+    def apply_canonical_delta(
         self,
         _base: AppSettingsVNext,
         next_settings: AppSettingsVNext,

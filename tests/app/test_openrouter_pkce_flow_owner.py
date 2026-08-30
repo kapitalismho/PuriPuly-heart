@@ -39,7 +39,7 @@ from puripuly_heart.app.services.openrouter_pkce_flow import (
     OpenRouterPkceApplicationOwner,
     OpenRouterPkceFlowOwner,
 )
-from puripuly_heart.config.settings import (
+from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,

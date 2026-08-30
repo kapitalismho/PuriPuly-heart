@@ -83,7 +83,7 @@ def compose_github_star_prompt_owner(
         patch_values = build_ui_prompt_clipboard_state_settings_path_patch(base, committed)
         if not patch_values:
             return True
-        repository = settings.create_legacy_patch_repository(
+        repository = settings.create_canonical_patch_repository(
             base_settings=base,
             committed_settings=committed,
             surface="ui_prompt_clipboard_state",

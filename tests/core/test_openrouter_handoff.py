@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import asdict
+from types import SimpleNamespace
+
 from puripuly_heart.core.openrouter_handoff import (
     MANAGED_EFFECTIVE_EXHAUSTION_USD,
     is_effectively_exhausted,
@@ -9,12 +12,17 @@ from puripuly_heart.core.openrouter_handoff import (
 )
 
 from puripuly_heart.app.wiring import ManagedIdentityStateAdapter
-from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.schema import ManagedConnectionState
 from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata
 
 
-def _managed_state(settings: AppSettings) -> ManagedIdentityStateAdapter:
-    return ManagedIdentityStateAdapter(settings, lambda _updated: None)
+def _managed_state(
+    *,
+    founder_letter_seen_credential_ref: str | None = None,
+) -> ManagedIdentityStateAdapter:
+    values = asdict(ManagedConnectionState())
+    values["founder_letter_seen_credential_ref"] = founder_letter_seen_credential_ref
+    return ManagedIdentityStateAdapter(SimpleNamespace(**values), lambda: None)
 
 
 def test_is_effectively_exhausted_uses_raw_remaining_usd_floor() -> None:
@@ -34,38 +42,36 @@ def test_is_effectively_exhausted_uses_raw_remaining_usd_floor() -> None:
 
 
 def test_store_managed_entitlement_snapshot_resets_seen_flag_for_new_ref() -> None:
-    settings = AppSettings()
-    settings.managed_identity.founder_letter_seen_credential_ref = "hash_old"
+    state = _managed_state(founder_letter_seen_credential_ref="hash_old")
 
     store_managed_entitlement_snapshot(
-        _managed_state(settings),
+        state,
         managed_credential_ref="hash_new",
         expires_at="2026-10-17T12:34:56Z",
     )
 
-    assert settings.managed_identity.active_managed_credential_ref == "hash_new"
-    assert settings.managed_identity.active_managed_expires_at == "2026-10-17T12:34:56Z"
-    assert settings.managed_identity.founder_letter_seen_credential_ref is None
+    assert state.active_managed_credential_ref == "hash_new"
+    assert state.active_managed_expires_at == "2026-10-17T12:34:56Z"
+    assert state.founder_letter_seen_credential_ref is None
 
 
 def test_should_auto_show_founder_letter_is_true_once_per_entitlement() -> None:
-    settings = AppSettings()
+    state = _managed_state()
     store_managed_entitlement_snapshot(
-        _managed_state(settings),
+        state,
         managed_credential_ref="hash_123",
         expires_at=None,
     )
 
     metadata = OpenRouterKeyMetadata(limit_usd=0.07, remaining_usd=0.0007, usage_usd=0.0693)
-    assert should_auto_show_founder_letter(_managed_state(settings), metadata) is True
+    assert should_auto_show_founder_letter(state, metadata) is True
 
-    mark_founder_letter_shown(_managed_state(settings))
-    assert should_auto_show_founder_letter(_managed_state(settings), metadata) is False
+    mark_founder_letter_shown(state)
+    assert should_auto_show_founder_letter(state, metadata) is False
 
 
 def test_store_managed_entitlement_snapshot_preserves_existing_ref_on_partial_reissue() -> None:
-    settings = AppSettings()
-    state = _managed_state(settings)
+    state = _managed_state()
     store_managed_entitlement_snapshot(
         state,
         managed_credential_ref="hash_real",
@@ -80,7 +86,7 @@ def test_store_managed_entitlement_snapshot_preserves_existing_ref_on_partial_re
     )
 
     metadata = OpenRouterKeyMetadata(limit_usd=0.07, remaining_usd=0.0007, usage_usd=0.0693)
-    assert settings.managed_identity.active_managed_credential_ref == "hash_real"
-    assert settings.managed_identity.active_managed_expires_at == "2026-11-01T00:00:00Z"
-    assert settings.managed_identity.founder_letter_seen_credential_ref == "hash_real"
-    assert should_auto_show_founder_letter(_managed_state(settings), metadata) is False
+    assert state.active_managed_credential_ref == "hash_real"
+    assert state.active_managed_expires_at == "2026-11-01T00:00:00Z"
+    assert state.founder_letter_seen_credential_ref == "hash_real"
+    assert should_auto_show_founder_letter(state, metadata) is False

@@ -15,18 +15,11 @@ from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
 from puripuly_heart.app.services import canonical_settings_persistence as settings_module
 from puripuly_heart.app.services.canonical_settings_persistence import (
     compose_settings_owner,
+    materialize_canonical_translation_settings,
 )
 from puripuly_heart.app.services.github_star_prompt_settings import (
     compose_github_star_prompt_owner,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    STTProviderName,
-    TranslationConnection,
-    TranslationModel,
-    materialize_translation_settings,
-)
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.settings_vnext.serialization import to_dict as canonical_to_dict
 from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata
@@ -92,31 +85,38 @@ def _payload_star(payload: dict[str, object]) -> dict[str, object]:
     return payload["state"]["github_star_prompt"]
 
 
-def _settings_for_connection(connection: TranslationConnection) -> AppSettings:
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.DEEPGRAM
-    settings.provider.peer_stt = STTProviderName.DEEPGRAM
-    settings.translation.connection = connection
-    if connection == TranslationConnection.MANAGED_CHINA:
-        settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
-    elif connection == TranslationConnection.OFFICIAL_BYOK:
-        settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
-    elif connection == TranslationConnection.OLLAMA:
-        settings.translation.model = TranslationModel.LOCAL_LLM
-    settings.translation.connection_history[settings.translation.model.value] = connection
-    materialize_translation_settings(settings)
-    return settings
+def _settings_for_connection(connection: str) -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    model = settings.intent.translation.model
+    if connection in {"managed_china", "official_byok"}:
+        model = "deepseek_v4_flash"
+    elif connection == "ollama":
+        model = "local_llm"
+    history = dict(settings.intent.translation.connection_history)
+    history[model] = connection
+    return materialize_canonical_translation_settings(
+        replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                stt=replace(settings.intent.stt, provider="deepgram"),
+                peer_stt=replace(settings.intent.peer_stt, provider="deepgram"),
+                translation=replace(
+                    settings.intent.translation,
+                    model=model,
+                    connection=connection,
+                    connection_history=history,
+                ),
+            ),
+        )
+    )
 
 
 class PromptBackend:
-    def __init__(self, settings: AppSettings | AppSettingsVNext) -> None:
+    def __init__(self, settings: AppSettingsVNext) -> None:
         self.config_path = Path("settings.json")
         self.settings_owner = compose_settings_owner(self.config_path)
-        self.settings_owner.canonical = (
-            settings
-            if isinstance(settings, AppSettingsVNext)
-            else from_legacy_app_settings(settings)
-        )
+        self.settings_owner.canonical = settings
         self.usage = SimpleNamespace(usage_metadata=None)
         self.owner = compose_github_star_prompt_owner(
             settings=self.settings_owner,
@@ -153,7 +153,7 @@ class PromptBackend:
 
 
 def _eligible_managed_backend() -> PromptBackend:
-    backend = PromptBackend(_settings_for_connection(TranslationConnection.MANAGED))
+    backend = PromptBackend(_settings_for_connection("managed"))
     backend._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
         limit_usd=100.0,
         remaining_usd=50.0,
@@ -168,12 +168,12 @@ def _utc_z(value: datetime) -> str:
 
 def _eligible_app(
     page: DummyPage | None = None,
-    settings: AppSettings | AppSettingsVNext | None = None,
+    settings: AppSettingsVNext | None = None,
 ) -> tuple[TranslatorApp, DummyPage, PromptBackend]:
     page = page or DummyPage()
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = page
-    backend = PromptBackend(settings or _settings_for_connection(TranslationConnection.MANAGED))
+    backend = PromptBackend(settings or _settings_for_connection("managed"))
     backend._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
         limit_usd=100.0,
         remaining_usd=50.0,
@@ -210,7 +210,7 @@ def test_github_star_prompt_state_blocks_clicked_and_recent_shows() -> None:
 async def test_launch_github_star_snackbar_counts_eligible_launches_before_first_show(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = _settings_for_connection(TranslationConnection.MANAGED)
+    settings = _settings_for_connection("managed")
     saved_payloads: list[dict[str, object]] = []
     sleeps: list[float] = []
 

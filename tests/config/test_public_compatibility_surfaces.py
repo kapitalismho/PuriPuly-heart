@@ -26,14 +26,13 @@ from puripuly_heart.config.prompts import (
     load_prompt,
     load_prompt_for_provider,
 )
-from puripuly_heart.config.provider_values import QwenRegion
-from puripuly_heart.config.settings import (
-    AppSettings,
+from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
+    QwenRegion,
     SecretsBackend,
-    SecretsSettings,
-    to_dict,
 )
+from puripuly_heart.config.settings_vnext import serialization
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, SecretsIntent
 from puripuly_heart.core import (
     managed_identity,
     openrouter_credentials,
@@ -119,7 +118,7 @@ DOCUMENTED_ENTRY_POINT_OR_TEST_IMPORT_MODULES = frozenset(
         "puripuly_heart.app.wiring",
         "puripuly_heart.config.llm_profiles",
         "puripuly_heart.config.prompts",
-        "puripuly_heart.config.settings",
+        "puripuly_heart.config.settings_vnext.schema",
         "puripuly_heart.core.managed_identity",
         "puripuly_heart.core.managed_openrouter_broker_client",
         "puripuly_heart.core.managed_openrouter_release",
@@ -664,15 +663,13 @@ def _assert_openrouter_byok_env_lookup(
     monkeypatch: pytest.MonkeyPatch,
     entry: dict[str, Any],
 ) -> None:
-    settings = AppSettings()
-    settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
     env_var = entry["env_vars"][0]
     _clear_entry_env(monkeypatch, entry)
     monkeypatch.setenv(env_var, "fake-env-openrouter")
 
     credential_config = openrouter_credentials.OpenRouterCredentialRuntimeConfig(
-        selected_source=settings.openrouter.selected_source,
-        installation_id=settings.managed_identity.installation_id,
+        selected_source=OpenRouterCredentialSource.BYOK,
+        installation_id="",
     )
     env_resolution = openrouter_credentials.resolve_openrouter_credentials(
         credential_config,
@@ -1001,7 +998,7 @@ def test_secret_store_accepts_legacy_alibaba_key_and_backfills_current_key(
 def test_settings_serialization_excludes_secret_store_registry_keys() -> None:
     registry_keys = set(_load_snapshot()["secret_store"]["registry_keys"])
     serialized_settings = (
-        to_dict(AppSettings()),
+        serialization.to_dict(AppSettingsVNext()),
         maximal_v24_settings_fixture(),
     )
 
@@ -1071,8 +1068,8 @@ def test_secret_store_encrypted_file_path_resolution_and_env_passphrase(
 ) -> None:
     config_path = tmp_path / "config" / "settings.json"
     config_path.parent.mkdir()
-    settings = SecretsSettings(
-        backend=SecretsBackend.ENCRYPTED_FILE,
+    settings = SecretsIntent(
+        backend=SecretsBackend.ENCRYPTED_FILE.value,
         encrypted_file_path="fixture-secrets.json",
     )
 

@@ -1,45 +1,34 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from puripuly_heart.app.services.canonical_settings_persistence import compose_settings_owner
-from puripuly_heart.config import settings as settings_module
 from puripuly_heart.config.prompts import load_prompt_for_provider
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    OpenRouterCredentialSource,
-    STTProviderName,
-    TranslationConnection,
-    TranslationModel,
-    from_dict,
-    load_settings,
-    save_settings,
-    to_dict,
-)
+from puripuly_heart.config.provider_values import LLMProviderName
 from puripuly_heart.config.settings_vnext import defaults as canonical_defaults
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.main import _load_settings_or_default
-from tests.config.settings_vnext_test_helpers import legacy_projected_settings_file
+from tests.config.settings_vnext_test_helpers import assert_raw_vnext_settings_file
 
 
 def _resolve_first_run_locale(system_locale: str | None) -> str:
-    assert hasattr(settings_module, "resolve_first_run_ui_locale")
-    return settings_module.resolve_first_run_ui_locale(system_locale)
+    return canonical_defaults.resolve_first_run_ui_locale(system_locale)
 
 
-def _new_first_run_settings(system_locale: str | None = None) -> AppSettings:
-    assert hasattr(settings_module, "new_settings_for_first_run")
-    return settings_module.new_settings_for_first_run(system_locale)
+def _new_first_run_settings(system_locale: str | None = None) -> AppSettingsVNext:
+    return canonical_defaults.new_settings_for_first_run(system_locale)
 
 
 def test_detect_system_locale_uses_locale_getlocale(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings_module.locale, "getlocale", lambda: ("Korean_Korea", "949"))
+    monkeypatch.setattr(canonical_defaults.locale, "getlocale", lambda: ("Korean_Korea", "949"))
 
-    assert settings_module.detect_system_locale() == "Korean_Korea"
+    assert canonical_defaults.detect_system_locale() == "Korean_Korea"
 
 
 @pytest.mark.parametrize(
-    "exc", [ValueError("bad locale"), settings_module.locale.Error("bad locale")]
+    "exc", [ValueError("bad locale"), canonical_defaults.locale.Error("bad locale")]
 )
 def test_first_run_settings_falls_back_to_english_when_system_locale_is_invalid(
     exc: Exception,
@@ -48,10 +37,10 @@ def test_first_run_settings_falls_back_to_english_when_system_locale_is_invalid(
     def raise_invalid_locale() -> tuple[str | None, str | None]:
         raise exc
 
-    monkeypatch.setattr(settings_module.locale, "getlocale", raise_invalid_locale)
+    monkeypatch.setattr(canonical_defaults.locale, "getlocale", raise_invalid_locale)
 
-    assert settings_module.detect_system_locale() is None
-    assert _new_first_run_settings().ui.locale == "en"
+    assert canonical_defaults.detect_system_locale() is None
+    assert _new_first_run_settings().intent.ui.locale == "en"
 
 
 @pytest.mark.parametrize(
@@ -108,36 +97,40 @@ def test_load_settings_preserves_existing_saved_locale(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = tmp_path / "settings.json"
-    saved = AppSettings()
-    saved.ui.locale = "ja"
-    save_settings(path, saved)
-    monkeypatch.setattr(settings_module, "detect_system_locale", lambda: "ko_KR", raising=False)
+    saved = AppSettingsVNext()
+    saved = replace(
+        saved,
+        intent=replace(saved.intent, ui=replace(saved.intent.ui, locale="ja")),
+    )
+    owner = compose_settings_owner(path)
+    owner.canonical = saved
+    owner.persist()
+    monkeypatch.setattr(canonical_defaults, "detect_system_locale", lambda: "ko_KR")
 
-    loaded = load_settings(path)
+    loaded = compose_settings_owner(path).start().settings
 
-    assert loaded.ui.locale == "ja"
-    assert legacy_projected_settings_file(path)["ui"]["locale"] == "ja"
+    assert loaded.intent.ui.locale == "ja"
+    assert assert_raw_vnext_settings_file(path)["intent"]["ui"]["locale"] == "ja"
 
 
 def test_first_run_settings_preserve_prompt_defaults() -> None:
     settings = _new_first_run_settings("ko_KR")
     default_prompt = load_prompt_for_provider("gemini")
 
-    assert settings.system_prompt == default_prompt
-    assert settings.system_prompts == {}
+    assert settings.intent.prompts.system_prompt == default_prompt
 
 
 def test_first_run_settings_preserve_provider_defaults() -> None:
     settings = _new_first_run_settings("zh_CN")
 
-    assert settings.provider.stt == STTProviderName.LOCAL_CPU_AUTO
-    assert settings.provider.llm == LLMProviderName.OPENROUTER
-    assert settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert settings.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
-    assert settings.translation.connection == TranslationConnection.MANAGED_CHINA
-    assert settings.translation.fallback.enabled is True
-    assert settings.translation.fallback.model == TranslationModel.GEMMA4_26B_31B
-    assert settings.translation.fallback.connection == TranslationConnection.OPENROUTER
+    translation = settings.intent.translation
+    assert settings.intent.stt.provider == "local_cpu_auto"
+    assert translation.model == "deepseek_v4_flash"
+    assert translation.connection == "managed_china"
+    assert translation.openrouter_selected_source == "managed"
+    assert translation.fallback.enabled is True
+    assert translation.fallback.model == "gemma4_26b_31b"
+    assert translation.fallback.connection == "openrouter"
 
 
 @pytest.mark.parametrize("system_locale", ["en_US", "ko_KR", "ja_JP", None])
@@ -146,35 +139,35 @@ def test_first_run_settings_use_openrouter_unified_gemma_fallback_default(
 ) -> None:
     settings = _new_first_run_settings(system_locale)
 
-    assert settings.provider.llm == LLMProviderName.OPENROUTER
-    assert settings.translation.model == TranslationModel.GEMMA4_26B_31B
-    assert settings.translation.connection == TranslationConnection.MANAGED
-    assert settings.translation.fallback.enabled is True
-    assert settings.translation.fallback.model == TranslationModel.GEMMA4_26B_31B
-    assert settings.translation.fallback.connection == TranslationConnection.OPENROUTER
+    translation = settings.intent.translation
+    assert translation.model == "gemma4_26b_31b"
+    assert translation.connection == "managed"
+    assert translation.fallback.enabled is True
+    assert translation.fallback.model == "gemma4_26b_31b"
+    assert translation.fallback.connection == "openrouter"
 
 
 def test_first_run_settings_roundtrip_through_dict_serialization() -> None:
     settings = _new_first_run_settings("Korean_Korea.949")
 
-    restored = from_dict(to_dict(settings))
+    from puripuly_heart.config.settings_vnext import serialization
 
-    assert restored.ui.locale == "ko"
-    assert restored.provider.stt == STTProviderName.LOCAL_CPU_AUTO
-    assert restored.provider.llm == LLMProviderName.OPENROUTER
-    assert restored.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert restored.system_prompt == settings.system_prompt
-    assert restored.system_prompts == {}
+    restored = serialization.from_dict(serialization.to_dict(settings))
+
+    assert restored.intent.ui.locale == "ko"
+    assert restored.intent.stt.provider == "local_cpu_auto"
+    assert restored.intent.translation.openrouter_selected_source == "managed"
+    assert restored.intent.prompts.system_prompt == settings.intent.prompts.system_prompt
 
 
 def test_first_run_settings_without_explicit_locale_detects_system_locale(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings_module.locale, "getlocale", lambda: ("zh_TW", "UTF-8"))
+    monkeypatch.setattr(canonical_defaults.locale, "getlocale", lambda: ("zh_TW", "UTF-8"))
 
     settings = _new_first_run_settings()
 
-    assert settings.ui.locale == "zh-CN"
+    assert settings.intent.ui.locale == "zh-CN"
 
 
 def test_settings_owner_first_run_uses_detected_system_locale(
@@ -187,23 +180,7 @@ def test_settings_owner_first_run_uses_detected_system_locale(
     loaded = compose_settings_owner(path).start().settings
 
     assert loaded.intent.ui.locale == "ko"
-    assert legacy_projected_settings_file(path)["ui"]["locale"] == "ko"
-
-
-@pytest.mark.parametrize("system_locale", ["en_US", "ko_KR", "ja_JP", "zh_CN", "ru_RU"])
-def test_canonical_first_run_factory_preserves_legacy_first_run_defaults(
-    system_locale: str,
-) -> None:
-    from puripuly_heart.config.settings_vnext import migration, serialization
-
-    expected = serialization.to_dict(
-        migration.from_legacy_app_settings(_new_first_run_settings(system_locale))
-    )
-    actual = serialization.to_dict(canonical_defaults.new_settings_for_first_run(system_locale))
-    expected["state"]["telemetry"]["anonymous_id"] = "generated"
-    actual["state"]["telemetry"]["anonymous_id"] = "generated"
-
-    assert actual == expected
+    assert assert_raw_vnext_settings_file(path)["intent"]["ui"]["locale"] == "ko"
 
 
 def test_main_first_run_uses_detected_system_locale(

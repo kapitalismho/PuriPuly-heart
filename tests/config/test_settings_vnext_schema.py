@@ -8,10 +8,6 @@ from types import ModuleType
 import pytest
 
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
-from puripuly_heart.config.settings import (
-    DEFAULT_DESKTOP_AUDIO_VAD_HANGOVER_MS,
-    DEFAULT_OPENROUTER_BROKER_BASE_URL,
-)
 
 
 def _load_schema_module() -> ModuleType:
@@ -68,9 +64,10 @@ def test_vnext_schema_defaults_match_current_persisted_settings_defaults() -> No
     settings = schema.AppSettingsVNext()
 
     assert settings.intent.audio.input_host_api == WINDOWS_WASAPI_COMPATIBILITY_HOST_API
-    assert settings.intent.desktop_audio.vad_hangover_ms == DEFAULT_DESKTOP_AUDIO_VAD_HANGOVER_MS
+    assert settings.intent.desktop_audio.vad_hangover_ms == 500
     assert (
-        settings.intent.translation.openrouter_broker_base_url == DEFAULT_OPENROUTER_BROKER_BASE_URL
+        settings.intent.translation.openrouter_broker_base_url
+        == schema.DEFAULT_OPENROUTER_BROKER_BASE_URL
     )
 
 

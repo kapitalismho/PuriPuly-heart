@@ -809,9 +809,7 @@
     "provider_aliases": [
       "tests/config/test_public_compatibility_surfaces.py::test_provider_alias_snapshot_matches_current_aliases_and_legacy_acceptance",
       "tests/config/test_config_and_secrets.py::test_openrouter_fallback_aliases_include_curated_openrouter_models",
-      "tests/config/test_config_and_secrets.py::test_from_dict_disables_legacy_openrouter_fallback_aliases",
-      "tests/config/test_config_and_secrets.py::test_openrouter_legacy_gemini25_flash_lite_fallback_is_not_live_alias",
-      "tests/config/test_config_and_secrets.py::test_openrouter_deepseek_v4_flash_aliases_use_stable_slug"
+      "tests/config/test_config_and_secrets.py::test_openrouter_alias_for_fields_does_not_expose_deepseek_v4_pro"
     ],
     "provider_runtime_public_config": [
       "tests/config/test_public_compatibility_surfaces.py::test_provider_runtime_public_config_snapshot_matches_resolved_contracts",

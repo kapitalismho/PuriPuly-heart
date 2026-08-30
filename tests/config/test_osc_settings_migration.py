@@ -1,72 +1,85 @@
 from __future__ import annotations
 
-from puripuly_heart.config.settings import AppSettings, from_dict, to_dict
+from dataclasses import replace
+
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.migration import from_dict as from_vnext_dict
-from puripuly_heart.config.settings_vnext.migration import (
-    from_legacy_app_settings,
-    to_legacy_dict,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
-def test_legacy_osc_settings_round_trip_mode_and_ports() -> None:
-    settings = AppSettings()
-    settings.osc.connection_mode = "manual"
-    settings.osc.send_port = 9100
-    settings.osc.receive_port = 9101
+def _with_osc(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            osc=replace(settings.intent.osc, **changes),
+        ),
+    )
 
-    persisted = to_dict(settings)
-    loaded = from_dict(persisted)
 
-    assert persisted["osc"]["connection_mode"] == "manual"
-    assert persisted["osc"]["send_port"] == 9100
-    assert persisted["osc"]["receive_port"] == 9101
-    assert loaded.osc.connection_mode == "manual"
-    assert loaded.osc.port == 9100
-    assert loaded.osc.send_port == 9100
-    assert loaded.osc.receive_port == 9101
+def test_osc_settings_round_trip_mode_and_ports() -> None:
+    settings = _with_osc(
+        AppSettingsVNext(),
+        connection_mode="manual",
+        send_port=9100,
+        receive_port=9101,
+    )
+
+    persisted = serialization.to_dict(settings)
+    loaded = serialization.from_dict(persisted)
+
+    assert persisted["intent"]["osc"]["connection_mode"] == "manual"
+    assert persisted["intent"]["osc"]["send_port"] == 9100
+    assert persisted["intent"]["osc"]["receive_port"] == 9101
+    assert loaded.intent.osc.connection_mode == "manual"
+    assert loaded.intent.osc.send_port == 9100
+    assert loaded.intent.osc.receive_port == 9101
 
 
 def test_automatic_osc_settings_round_trip_keeps_mode_and_ports() -> None:
-    settings = AppSettings()
-    settings.osc.connection_mode = "automatic"
-    settings.osc.send_port = 9120
-    settings.osc.receive_port = 9121
+    settings = _with_osc(
+        AppSettingsVNext(),
+        connection_mode="automatic",
+        send_port=9120,
+        receive_port=9121,
+    )
 
-    persisted = to_dict(settings)
-    loaded = from_dict(persisted)
+    persisted = serialization.to_dict(settings)
+    loaded = serialization.from_dict(persisted)
 
-    assert persisted["osc"]["connection_mode"] == "automatic"
-    assert persisted["osc"]["send_port"] == 9120
-    assert persisted["osc"]["receive_port"] == 9121
-    assert loaded.osc.connection_mode == "automatic"
-    assert (loaded.osc.send_port, loaded.osc.receive_port) == (9120, 9121)
+    assert persisted["intent"]["osc"]["connection_mode"] == "automatic"
+    assert persisted["intent"]["osc"]["send_port"] == 9120
+    assert persisted["intent"]["osc"]["receive_port"] == 9121
+    assert loaded.intent.osc.connection_mode == "automatic"
+    assert (loaded.intent.osc.send_port, loaded.intent.osc.receive_port) == (9120, 9121)
 
 
-def test_vnext_migration_preserves_osc_mode_and_ports() -> None:
-    settings = AppSettings()
-    settings.osc.connection_mode = "off"
-    settings.osc.send_port = 9200
-    settings.osc.receive_port = 9201
+def test_vnext_osc_mode_and_ports_round_trip() -> None:
+    settings = _with_osc(
+        AppSettingsVNext(),
+        connection_mode="off",
+        send_port=9200,
+        receive_port=9201,
+    )
+    persisted = serialization.to_dict(settings)
+    loaded = serialization.from_dict(persisted)
 
-    canonical = from_legacy_app_settings(settings)
-    legacy = to_legacy_dict(canonical)
-
-    assert canonical.intent.osc.connection_mode == "off"
-    assert canonical.intent.osc.send_port == 9200
-    assert canonical.intent.osc.receive_port == 9201
-    assert legacy["osc"]["connection_mode"] == "off"
-    assert legacy["osc"]["send_port"] == 9200
-    assert legacy["osc"]["receive_port"] == 9201
+    assert loaded.intent.osc.connection_mode == "off"
+    assert loaded.intent.osc.send_port == 9200
+    assert loaded.intent.osc.receive_port == 9201
+    assert persisted["intent"]["osc"]["connection_mode"] == "off"
+    assert persisted["intent"]["osc"]["send_port"] == 9200
+    assert persisted["intent"]["osc"]["receive_port"] == 9201
 
 
 def test_pre_feature_vnext_osc_records_become_automatic_and_round_trip_idempotently() -> None:
-    settings = AppSettings()
-    settings.osc.connection_mode = "manual"
-    settings.osc.port = 9137
-    settings.osc.receive_port = 9001
-    canonical = from_legacy_app_settings(settings)
-    persisted = serialization.to_dict(canonical)
+    settings = _with_osc(
+        AppSettingsVNext(),
+        connection_mode="manual",
+        send_port=9137,
+        receive_port=9001,
+    )
+    persisted = serialization.to_dict(settings)
     persisted["intent"]["osc"].pop("connection_mode", None)
     persisted["intent"]["osc"].pop("send_port", None)
     persisted["intent"]["osc"].pop("receive_port", None)
@@ -84,11 +97,14 @@ def test_pre_feature_vnext_osc_records_become_automatic_and_round_trip_idempoten
 
 
 def test_explicit_vnext_osc_mode_is_preserved_on_reload() -> None:
-    settings = AppSettings()
-    settings.osc.connection_mode = "automatic"
-    settings.osc.send_port = 9138
-    settings.osc.receive_port = 9139
-    persisted = serialization.to_dict(from_legacy_app_settings(settings))
+    persisted = serialization.to_dict(
+        _with_osc(
+            AppSettingsVNext(),
+            connection_mode="automatic",
+            send_port=9138,
+            receive_port=9139,
+        )
+    )
 
     loaded = from_vnext_dict(persisted)
 
@@ -97,27 +113,28 @@ def test_explicit_vnext_osc_mode_is_preserved_on_reload() -> None:
     assert loaded.intent.osc.receive_port == 9139
 
 
-def test_legacy_port_only_osc_settings_become_automatic_and_preserve_ports() -> None:
-    persisted = to_dict(AppSettings())
-    persisted["osc"].pop("connection_mode", None)
-    persisted["osc"].pop("send_port", None)
-    persisted["osc"]["port"] = 9130
+def test_older_vnext_port_only_osc_settings_become_automatic_and_preserve_ports() -> None:
+    persisted = serialization.to_dict(AppSettingsVNext())
+    persisted["intent"]["osc"].pop("connection_mode", None)
+    persisted["intent"]["osc"].pop("send_port", None)
+    persisted["intent"]["osc"]["port"] = 9130
 
-    loaded = from_dict(persisted)
+    loaded = from_vnext_dict(persisted)
 
-    assert loaded.osc.connection_mode == "automatic"
-    assert loaded.osc.port == 9130
-    assert loaded.osc.send_port == 9130
-    assert loaded.osc.receive_port == 9001
+    assert loaded.intent.osc.connection_mode == "automatic"
+    assert loaded.intent.osc.send_port == 9130
+    assert loaded.intent.osc.receive_port == 9001
 
 
-def test_osc_mode_switch_preserves_manual_ports_when_controls_are_off() -> None:
-    settings = AppSettings()
-    settings.osc.connection_mode = "manual"
-    settings.osc.send_port = 9140
-    settings.osc.receive_port = 9141
+def test_osc_mode_replace_preserves_manual_ports() -> None:
+    settings = _with_osc(
+        AppSettingsVNext(),
+        connection_mode="manual",
+        send_port=9140,
+        receive_port=9141,
+    )
 
-    settings.osc.connection_mode = "off"
-    assert (settings.osc.send_port, settings.osc.receive_port) == (9140, 9141)
-    settings.osc.connection_mode = "automatic"
-    assert (settings.osc.send_port, settings.osc.receive_port) == (9140, 9141)
+    off = _with_osc(settings, connection_mode="off")
+    assert (off.intent.osc.send_port, off.intent.osc.receive_port) == (9140, 9141)
+    automatic = _with_osc(off, connection_mode="automatic")
+    assert (automatic.intent.osc.send_port, automatic.intent.osc.receive_port) == (9140, 9141)

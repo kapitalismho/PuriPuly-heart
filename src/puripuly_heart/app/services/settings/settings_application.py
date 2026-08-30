@@ -890,12 +890,12 @@ class SettingsApplicationOwner:
         next_settings = await self.runtime_effects.preserve_before_replace(next_settings)
         if persist:
             baseline = self.settings.projection_snapshot or self.settings.canonical
-            self.settings.begin(legacy_snapshot=baseline)
+            self.settings.begin(snapshot=baseline)
         committed = not persist
         try:
             if persist:
                 self.runtime_effects.capture_runtime_signatures()
-                self.settings.apply_legacy_delta(baseline, next_settings)
+                self.settings.apply_canonical_delta(baseline, next_settings)
             transition = await self.runtime_effects.prepare(
                 self.settings.canonical,
                 next_settings,
@@ -985,10 +985,10 @@ class SettingsApplicationOwner:
         committed_settings: object,
         reload_settings_view: bool = True,
     ) -> None:
-        self.settings.begin(legacy_snapshot=committed_settings)
+        self.settings.begin(snapshot=committed_settings)
         committed = False
         try:
-            self.settings.apply_legacy_delta(
+            self.settings.apply_canonical_delta(
                 committed_settings,
                 base_settings,
             )
@@ -1078,9 +1078,9 @@ class SettingsApplicationOwner:
         committed_before_full_draft = (
             copy.deepcopy(self.settings.canonical) if self.settings.canonical is not None else None
         )
-        if self.settings.canonical is not None and self.settings.legacy_snapshot_values(
+        if self.settings.canonical is not None and self.settings.snapshot_values(
             self.settings.canonical
-        ) != self.settings.legacy_snapshot_values(next_settings):
+        ) != self.settings.snapshot_values(next_settings):
             try:
                 await self.apply_direct(
                     next_settings,
@@ -1138,9 +1138,9 @@ class SettingsApplicationOwner:
         if not patch_values:
             return False
         committed_settings = apply_settings_path_patch(base_settings, patch_values)
-        has_out_of_scope_draft = self.settings.legacy_snapshot_values(
+        has_out_of_scope_draft = self.settings.snapshot_values(
             committed_settings
-        ) != self.settings.legacy_snapshot_values(next_settings)
+        ) != self.settings.snapshot_values(next_settings)
         runtime_apply = (
             NoopRuntimeApply()
             if has_out_of_scope_draft
@@ -1235,9 +1235,9 @@ class SettingsApplicationOwner:
             next_settings,
         )
         committed_settings = apply_settings_path_patch(base_settings, patch_values)
-        has_out_of_scope_draft = self.settings.legacy_snapshot_values(
+        has_out_of_scope_draft = self.settings.snapshot_values(
             committed_settings
-        ) != self.settings.legacy_snapshot_values(next_settings)
+        ) != self.settings.snapshot_values(next_settings)
         runtime_apply = (
             NoopRuntimeApply()
             if has_out_of_scope_draft
@@ -1293,9 +1293,9 @@ class SettingsApplicationOwner:
         if not patch_values:
             return False
         committed_settings = apply_settings_path_patch(base_settings, patch_values)
-        has_out_of_scope_draft = self.settings.legacy_snapshot_values(
+        has_out_of_scope_draft = self.settings.snapshot_values(
             committed_settings
-        ) != self.settings.legacy_snapshot_values(next_settings)
+        ) != self.settings.snapshot_values(next_settings)
         runtime_settings = copy.deepcopy(next_settings)
         runtime_apply = (
             NoopRuntimeApply()
@@ -1352,7 +1352,7 @@ class SettingsApplicationOwner:
         surface: str,
         runtime_apply: RuntimeApplyPort,
     ) -> TransactionResult:
-        repository = self.settings.create_legacy_patch_repository(
+        repository = self.settings.create_canonical_patch_repository(
             base_settings=base_settings,
             committed_settings=committed_settings,
             surface=surface,
