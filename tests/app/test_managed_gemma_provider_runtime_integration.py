@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,16 +11,13 @@ from puripuly_heart.app.ports.managed_gemma_translation import (
     ManagedGemmaTranslationSelection,
 )
 from puripuly_heart.app.wiring import wiring_provider_runtime
+from puripuly_heart.app.wiring.wiring_managed_gemma import managed_gemma_selection
 from puripuly_heart.app.wiring.wiring_provider_runtime import compose_provider_runtime
-from puripuly_heart.config.prompts import render_translation_prompt_template
-from puripuly_heart.config.settings import (
-    AppSettings,
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import (
     TranslationConnection,
     TranslationModel,
-    materialize_translation_settings,
 )
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
-from puripuly_heart.core.language import get_llm_language_name
 
 
 class RecordingLlmRuntime:
@@ -35,11 +33,30 @@ class RecordingLlmRuntime:
         return previous
 
 
-def _managed_settings() -> AppSettings:
-    settings = AppSettings()
-    settings.translation.model = TranslationModel.MANAGED_GEMMA
-    settings.translation.connection = TranslationConnection.GPU
-    return materialize_translation_settings(settings)
+def _managed_settings() -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model=TranslationModel.MANAGED_GEMMA.value,
+                connection=TranslationConnection.GPU.value,
+            ),
+        ),
+    )
+
+
+def _settings_owner(
+    settings: AppSettingsVNext,
+    *,
+    peer_translation_enabled: bool = False,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        canonical=settings,
+        peer_translation_enabled=lambda: peer_translation_enabled,
+    )
 
 
 def _translation_config(*, enabled: bool) -> object:
@@ -50,11 +67,12 @@ def _translation_config(*, enabled: bool) -> object:
 
 def _components(
     *,
-    settings: AppSettings,
+    settings: AppSettingsVNext,
     runtime: RecordingLlmRuntime,
     managed_gemma: object,
     events: list[object],
     translation_enabled: bool | None = None,
+    peer_translation_enabled: bool = False,
 ):
     async def no_op() -> None:
         return None
@@ -64,7 +82,10 @@ def _components(
 
     return compose_provider_runtime(
         config_path=Path("settings.json"),
-        settings=SimpleNamespace(current=settings),
+        settings=_settings_owner(
+            settings,
+            peer_translation_enabled=peer_translation_enabled,
+        ),
         llm_runtime_provider=lambda: runtime,
         http_extensions=SimpleNamespace(),
         local_asr_runtime_provider=lambda: None,
@@ -75,9 +96,9 @@ def _components(
         ),
         self_capture_provider=lambda: None,
         self_capture_owner=lambda: SimpleNamespace(),
-        peer=lambda: SimpleNamespace(),
+        peer=lambda: SimpleNamespace(effective_enabled=lambda: False),
         peer_desired=lambda _settings: False,
-        canonical_settings=from_legacy_app_settings,
+        canonical_settings=lambda current: current,
         clear_local_pending=lambda: None,
         sync_local_notice=lambda: None,
         managed_pending_sink=lambda _value: None,
@@ -157,16 +178,7 @@ async def test_provider_waits_for_readiness_when_translation_is_on(
         runtime = object()
 
         async def prepare(self, selection: ManagedGemmaTranslationSelection) -> object:
-            assert selection == ManagedGemmaTranslationSelection(
-                backend="gpu",
-                source_language="ko",
-                target_language="en",
-                system_prompt=render_translation_prompt_template(
-                    settings.system_prompt,
-                    source_name=get_llm_language_name("ko"),
-                    target_name=get_llm_language_name("en"),
-                ),
-            )
+            assert selection == managed_gemma_selection(settings)
             events.append("prepare")
             entered.set()
             await ready.wait()
@@ -226,13 +238,13 @@ async def test_provider_prepares_when_peer_translation_is_on(
     monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", create_backend)
     runtime = RecordingLlmRuntime(events)
     settings = _managed_settings()
-    settings.ui.peer_translation_enabled = True
     components = _components(
         settings=settings,
         runtime=runtime,
         managed_gemma=ManagedGemma(),
         events=events,
         translation_enabled=False,
+        peer_translation_enabled=True,
     )
 
     await components.llm_rebuild.rebuild()

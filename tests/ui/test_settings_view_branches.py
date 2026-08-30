@@ -23,6 +23,9 @@ from puripuly_heart.app.ports.settings_view import (
 from puripuly_heart.app.ports.ui_models import OscControlPresentationName
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
+from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
+    provider_llm_for_translation,
+)
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.settings import (
     LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
@@ -47,8 +50,8 @@ from puripuly_heart.config.settings import (
     TranslationModel,
     TranslationSettings,
     materialize_translation_settings,
-    to_dict,
 )
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.components import subtab_shell as subtab_shell_module
 from puripuly_heart.ui.components.bottom_nav import BottomNavBar
@@ -60,6 +63,11 @@ from puripuly_heart.ui.theme import COLOR_NEUTRAL_DARK
 from puripuly_heart.ui.views import settings as settings_view
 from tests.helpers.flet_page import attach_dummy_page
 from tests.helpers.osc_presentation import osc_control_presentation_state
+
+
+def _llm(pending) -> str:
+    translation = pending.intent.translation
+    return provider_llm_for_translation(translation.model, translation.connection)
 
 
 class DummySecretStore:
@@ -158,7 +166,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
     canonical.stt.custom_terms = {"en": ["existing"], "ja": ["osc-term"]}
     canonical.stt.custom_vocabulary_enabled = True
     canonical_state = state_from_settings(
-        canonical,
+        _vnext(canonical),
         peer_capture=True,
         captions=True,
     )
@@ -238,7 +246,9 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
 
 def test_settings_rejects_malformed_osc_ports_without_mutating_snapshot() -> None:
     view = settings_view.SettingsView.__new__(settings_view.SettingsView)
-    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(AppSettings())
+    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(
+        _vnext(AppSettings())
+    )
     view._general_snapshot = general
 
     view._on_osc_connection_selected("manual", "invalid", "9001")
@@ -302,6 +312,18 @@ def _enabled_fallback(
     connection: TranslationConnection,
 ) -> TranslationFallbackSettings:
     return TranslationFallbackSettings(enabled=True, model=model, connection=connection)
+
+
+def _none_fallback() -> TranslationFallbackSettings:
+    return TranslationFallbackSettings(
+        enabled=False,
+        model=TranslationModel.GEMMA4,
+        connection=TranslationConnection.OPENROUTER,
+    )
+
+
+def _vnext(settings: AppSettings):
+    return from_legacy_app_settings(settings, preserve_provider_verification=True)
 
 
 def _make_llm_selection_view(
@@ -668,11 +690,11 @@ def test_clipboard_auto_translate_selection_updates_settings_and_emits_change(
     view.load_from_settings(settings, config_path=Path("settings.json"))
     view._on_clipboard_auto_translate_selected("on")
 
-    assert view._settings.ui.clipboard_auto_translate_enabled is True
+    assert view._settings.intent.clipboard.auto_translate_enabled is True
     assert view._clipboard_auto_translate_text.content.value == t(
         "settings.clipboard_auto_translate.on"
     )
-    assert emitted[-1].ui.clipboard_auto_translate_enabled is True
+    assert emitted[-1].intent.clipboard.auto_translate_enabled is True
 
 
 def test_clipboard_auto_translate_click_toggles_immediately_without_modal(
@@ -686,19 +708,19 @@ def test_clipboard_auto_translate_click_toggles_immediately_without_modal(
     view.load_from_settings(settings, config_path=Path("settings.json"))
     view._on_clipboard_auto_translate_click(None)
 
-    assert view._settings.ui.clipboard_auto_translate_enabled is True
+    assert view._settings.intent.clipboard.auto_translate_enabled is True
     assert view._clipboard_auto_translate_text.content.value == t(
         "settings.clipboard_auto_translate.on"
     )
-    assert emitted[-1].ui.clipboard_auto_translate_enabled is True
+    assert emitted[-1].intent.clipboard.auto_translate_enabled is True
 
     view._on_clipboard_auto_translate_click(None)
 
-    assert view._settings.ui.clipboard_auto_translate_enabled is False
+    assert view._settings.intent.clipboard.auto_translate_enabled is False
     assert view._clipboard_auto_translate_text.content.value == t(
         "settings.clipboard_auto_translate.off"
     )
-    assert emitted[-1].ui.clipboard_auto_translate_enabled is False
+    assert emitted[-1].intent.clipboard.auto_translate_enabled is False
 
 
 def test_load_from_settings_uses_system_prompt_when_provider_prompt_missing(
@@ -728,8 +750,7 @@ def test_load_from_settings_uses_default_prompt_when_all_empty(
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert bool(view._prompt_editor.value.strip())
-    assert settings.system_prompt == view._prompt_editor.value
-    assert settings.system_prompts == {}
+    assert view._settings.intent.prompts.system_prompt == view._prompt_editor.value
 
 
 def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -771,8 +792,9 @@ def test_load_secrets_projects_the_same_prefix_before_read_failure(
     view._deepgram_key.value = "unchanged-deepgram"
     view._soniox_key.value = "unchanged-soniox"
 
+    provider, _general, _prompt, _overlay = settings_view_surface_snapshots(_vnext(settings))
     with pytest.raises(OSError, match="unavailable"):
-        view._load_secrets(settings, Path("settings.json"))
+        view._load_secrets(provider, Path("settings.json"))
 
     assert view._google_key.value == "google-secret"
     assert view._openrouter_key.value == "openrouter-secret"
@@ -794,7 +816,9 @@ def test_restore_api_key_icons_sets_idle_success_error(monkeypatch: pytest.Monke
     view._alibaba_key_beijing.value = ""
     view._alibaba_key_singapore.value = ""
 
-    provider, _general, _prompt, _overlay = settings_view_surface_snapshots(settings)
+    provider, _general, _prompt, _overlay = settings_view_surface_snapshots(
+        _vnext(settings)
+    )
     view._restore_api_key_icons(provider)
 
     assert view._deepgram_key._current_status == "success"
@@ -848,6 +872,11 @@ def test_update_api_visibility_shows_openrouter_key(monkeypatch: pytest.MonkeyPa
 def test_update_api_visibility_shows_deepseek_key(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.DEEPSEEK
+    settings.translation = TranslationSettings(
+        model=TranslationModel.DEEPSEEK_V4_FLASH,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+        fallback=_none_fallback(),
+    )
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
@@ -865,6 +894,7 @@ def test_update_api_visibility_hides_openrouter_key_for_managed_trial(
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.fallback = _none_fallback()
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
@@ -899,6 +929,7 @@ def test_load_from_settings_shows_managed_usage_bar_in_managed_key_card(
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.fallback = _none_fallback()
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
@@ -1517,9 +1548,9 @@ def test_deepseek_connection_selection_controls_api_key_visibility(
     settings.translation = TranslationSettings(
         model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
+        fallback=_none_fallback(),
     )
     settings.provider.llm = LLMProviderName.GEMINI
-    settings.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.NONE
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
 
@@ -1559,9 +1590,9 @@ def test_on_llm_selected_updates_to_local_llms_with_ollama_connection(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.translation.model == TranslationModel.LOCAL_LLM
-    assert pending.translation.connection == TranslationConnection.OLLAMA
-    assert pending.provider.llm == LLMProviderName.LOCAL_LLM
+    assert pending.intent.translation.model == TranslationModel.LOCAL_LLM.value
+    assert pending.intent.translation.connection == TranslationConnection.OLLAMA.value
+    assert _llm(pending) == LLMProviderName.LOCAL_LLM.value
     assert view._llm_text.content.value == t("provider.local_llms")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.ollama"
@@ -1590,29 +1621,33 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.translation.model == TranslationModel.MANAGED_GEMMA
-    assert pending.translation.connection == TranslationConnection.CPU
-    assert pending.provider.llm == LLMProviderName.MANAGED_GEMMA
+    assert pending.intent.translation.model == TranslationModel.MANAGED_GEMMA.value
+    assert pending.intent.translation.connection == TranslationConnection.CPU.value
+    assert _llm(pending) == LLMProviderName.MANAGED_GEMMA.value
     assert applies == [True]
     assert view._openrouter_fallback_card.visible is False
     assert view._translation_connection_row.visible is False
     assert view._translation_connection_title.value == t("settings.translation_connection")
-    assert view._get_llm_display_label(pending) == t("provider.managed_gemma_cpu")
+    assert view._get_llm_display_label(view._provider_draft or view._provider_snapshot) == t(
+        "provider.managed_gemma_cpu"
+    )
 
     view._on_llm_selected("managed_gemma_gpu")
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.translation.model == TranslationModel.MANAGED_GEMMA
-    assert pending.translation.connection == TranslationConnection.GPU
+    assert pending.intent.translation.model == TranslationModel.MANAGED_GEMMA.value
+    assert pending.intent.translation.connection == TranslationConnection.GPU.value
     assert applies == [True, True]
-    assert view._get_llm_display_label(pending) == t("provider.managed_gemma_gpu")
+    assert view._get_llm_display_label(view._provider_draft or view._provider_snapshot) == t(
+        "provider.managed_gemma_gpu"
+    )
 
     view._on_llm_selected("managed_gemma_gpu")
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.translation.connection == TranslationConnection.GPU
+    assert pending.intent.translation.connection == TranslationConnection.GPU.value
     assert applies == [True, True]
 
 
@@ -1633,13 +1668,15 @@ def test_managed_gemma_12b_selection_auto_applies_gpu_only(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.translation.model == TranslationModel.MANAGED_GEMMA_12B
-    assert pending.translation.connection == TranslationConnection.GPU
-    assert pending.provider.llm == LLMProviderName.MANAGED_GEMMA
+    assert pending.intent.translation.model == TranslationModel.MANAGED_GEMMA_12B.value
+    assert pending.intent.translation.connection == TranslationConnection.GPU.value
+    assert _llm(pending) == LLMProviderName.MANAGED_GEMMA.value
     assert applies == [True]
     assert view._openrouter_fallback_card.visible is False
     assert view._translation_connection_row.visible is False
-    assert view._get_llm_display_label(pending) == t("provider.managed_gemma_12b")
+    assert view._get_llm_display_label(view._provider_draft or view._provider_snapshot) == t(
+        "provider.managed_gemma_12b"
+    )
 
 
 def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
@@ -1712,10 +1749,10 @@ def test_order22_live_settings_view_audio_change_emits_copied_draft(
 
     assert settings.audio.input_device == "Built-in Mic"
     assert view._settings is not None
-    assert view._settings.audio.input_device == "Headset Mic"
+    assert view._settings.intent.audio.input_device == "Headset Mic"
     assert len(emitted) == 1
     assert emitted[0] is not settings
-    assert emitted[0].audio.input_device == "Headset Mic"
+    assert emitted[0].intent.audio.input_device == "Headset Mic"
 
 
 def test_load_from_settings_without_local_llm_api_key_shows_empty_field(
@@ -1863,9 +1900,9 @@ def test_local_llm_fields_update_provider_draft(monkeypatch: pytest.MonkeyPatch)
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.base_url == "http://127.0.0.1:11434/v1"
-    assert pending.local_llm.model == "qwen2.5:7b"
-    assert pending.local_llm.extra_body == {"enable_thinking": False}
+    assert pending.intent.local_llm.base_url == "http://127.0.0.1:11434/v1"
+    assert pending.intent.local_llm.model == "qwen2.5:7b"
+    assert pending.intent.local_llm.extra_body == {"enable_thinking": False}
     assert view.has_provider_changes is True
 
 
@@ -1881,9 +1918,9 @@ def test_local_llm_unblurred_fields_commit_when_building_provider_apply_settings
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.local_llm.base_url == "http://mac-studio.local:11434/v1"
-    assert pending.local_llm.model == "gemma3:4b"
-    assert pending.local_llm.extra_body == {"think": False}
+    assert pending.intent.local_llm.base_url == "http://mac-studio.local:11434/v1"
+    assert pending.intent.local_llm.model == "gemma3:4b"
+    assert pending.intent.local_llm.extra_body == {"think": False}
 
 
 def test_local_llm_field_on_change_marks_dirty_and_consume_commits_unblurred_values(
@@ -1911,9 +1948,9 @@ def test_local_llm_field_on_change_marks_dirty_and_consume_commits_unblurred_val
     pending = view.consume_provider_apply_settings()
 
     assert pending is not None
-    assert pending.local_llm.base_url == "http://mac-studio.local:11434/v1"
-    assert pending.local_llm.model == "gemma3:4b"
-    assert pending.local_llm.extra_body == {"enable_thinking": False}
+    assert pending.intent.local_llm.base_url == "http://mac-studio.local:11434/v1"
+    assert pending.intent.local_llm.model == "gemma3:4b"
+    assert pending.intent.local_llm.extra_body == {"enable_thinking": False}
     assert view.has_provider_changes is False
 
 
@@ -1928,7 +1965,7 @@ def test_local_llm_invalid_base_url_shows_error_without_saving(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.base_url == "http://127.0.0.1:11434/v1"
+    assert pending.intent.local_llm.base_url == "http://127.0.0.1:11434/v1"
     assert view.has_provider_changes is False
     assert view._local_llm_base_url.value == "ftp://127.0.0.1:11434/v1"
     assert view._local_llm_base_url.error == t("settings.local_llm.base_url.invalid")
@@ -1945,7 +1982,7 @@ def test_local_llm_empty_model_shows_error_without_saving(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.model == "llama3.1:8b"
+    assert pending.intent.local_llm.model == "llama3.1:8b"
     assert view.has_provider_changes is False
     assert view._local_llm_model.value == "   "
     assert view._local_llm_model.error == t("settings.local_llm.model.required")
@@ -1977,10 +2014,10 @@ def test_local_llm_settings_survive_provider_draft_copy(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.local_llm.backend == LocalLLMBackend.OLLAMA
-    assert pending.local_llm.base_url == "http://127.0.0.1:11434/v1"
-    assert pending.local_llm.model == "qwen2.5:7b"
-    assert pending.local_llm.extra_body == {"enable_thinking": False}
+    assert pending.intent.local_llm.backend == LocalLLMBackend.OLLAMA.value
+    assert pending.intent.local_llm.base_url == "http://127.0.0.1:11434/v1"
+    assert pending.intent.local_llm.model == "qwen2.5:7b"
+    assert pending.intent.local_llm.extra_body == {"enable_thinking": False}
 
 
 def test_local_llm_extra_body_invalid_json_does_not_save(
@@ -1994,7 +2031,7 @@ def test_local_llm_extra_body_invalid_json_does_not_save(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body.value == "{invalid-json"
     assert view._local_llm_extra_body_error.visible is True
@@ -2012,7 +2049,7 @@ def test_local_llm_blank_extra_body_uses_current_default(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
 
 
 @pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
@@ -2028,7 +2065,7 @@ def test_local_llm_extra_body_rejects_non_standard_json_constants(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body.value == f'{{"temperature": {constant}}}'
     assert view._local_llm_extra_body_error.visible is True
@@ -2046,7 +2083,7 @@ def test_local_llm_extra_body_non_object_json_does_not_save(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body.value == '["not", "an", "object"]'
     assert view._local_llm_extra_body_error.visible is True
@@ -2067,7 +2104,7 @@ def test_local_llm_extra_body_non_serializable_value_does_not_save(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body_error.visible is True
     assert view._local_llm_extra_body_error.value == t(
@@ -2088,7 +2125,7 @@ def test_local_llm_extra_body_reserved_key_does_not_save(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body_error.visible is True
     assert view._local_llm_extra_body_error.value == t(
@@ -2109,7 +2146,7 @@ def test_local_llm_extra_body_sensitive_key_does_not_save(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body_error.visible is True
     assert view._local_llm_extra_body_error.value == t(
@@ -2127,7 +2164,7 @@ def test_official_api_connection_hides_openrouter_key_even_with_saved_fallback(
     )
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    settings.translation.fallback = TranslationFallbackSettings(enabled=False)
+    settings.translation.fallback = _none_fallback()
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
@@ -2138,9 +2175,9 @@ def test_official_api_connection_hides_openrouter_key_even_with_saved_fallback(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.provider.llm == LLMProviderName.DEEPSEEK
-    assert pending.translation.connection == TranslationConnection.OFFICIAL_BYOK
-    assert pending.translation.fallback.enabled is False
+    assert _llm(pending) == LLMProviderName.DEEPSEEK.value
+    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
+    assert pending.intent.translation.fallback.enabled is False
     assert view._openrouter_key.visible is False
     assert view._deepseek_key.visible is True
     assert view._openrouter_fallback_helper_text.value == t("settings.fallback.none.description")
@@ -2161,7 +2198,7 @@ def test_on_stt_selected_updates_provider_and_pipeline_flags(
 
     assert settings.provider.stt == STTProviderName.LOCAL_CPU_AUTO
     assert pending is not None
-    assert pending.provider.stt == STTProviderName.SONIOX
+    assert pending.intent.stt.provider == STTProviderName.SONIOX.value
     assert view.has_provider_changes is True
     assert changed == []
 
@@ -2214,7 +2251,7 @@ def test_on_peer_stt_selected_updates_provider_and_pipeline_flags(
 
     assert settings.provider.peer_stt == STTProviderName.LOCAL_CPU_AUTO
     assert pending is not None
-    assert pending.provider.peer_stt == STTProviderName.SONIOX
+    assert pending.intent.peer_stt.provider == STTProviderName.SONIOX.value
     assert view.has_provider_changes is True
     assert changed == []
 
@@ -2299,7 +2336,7 @@ def test_peer_stt_local_qwen_choice_can_be_persisted(
 
     assert settings.provider.peer_stt == STTProviderName.DEEPGRAM
     assert pending is not None
-    assert pending.provider.peer_stt == STTProviderName.LOCAL_QWEN
+    assert pending.intent.peer_stt.provider == STTProviderName.LOCAL_QWEN.value
     assert view.has_provider_changes is True
 
     settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
@@ -2308,7 +2345,7 @@ def test_peer_stt_local_qwen_choice_can_be_persisted(
     normalized_pending = view.build_provider_apply_settings()
 
     assert normalized_pending is not None
-    assert normalized_pending.provider.peer_stt == STTProviderName.LOCAL_QWEN
+    assert normalized_pending.intent.peer_stt.provider == STTProviderName.LOCAL_QWEN.value
 
 
 def test_gpu_selection_shows_one_shared_device_card_and_retains_unavailable_saved_device(
@@ -2334,7 +2371,7 @@ def test_gpu_selection_shows_one_shared_device_card_and_retains_unavailable_save
     assert view._gpu_device_text.content.value == "NVIDIA GeForce RTX 4070"
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.stt.gpu_device_id == "vk:0"
+    assert pending.intent.stt.gpu_device_id == "vk:0"
 
 
 def test_gpu_card_is_standard_one_by_one_and_contains_only_device_selection(
@@ -2407,8 +2444,8 @@ def test_gpu_card_shows_split_labels_when_asr_and_gemma_use_different_devices(
     assert view._gpu_llm_text.content.value == "AMD Radeon Graphics"
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.stt.gpu_device_id == "vk:0"
-    assert pending.translation.gpu_device_id == "Vulkan1"
+    assert pending.intent.stt.gpu_device_id == "vk:0"
+    assert pending.intent.translation.gpu_device_id == "Vulkan1"
 
     view._on_stt_selected(STTProviderName.LOCAL_QWEN.value)
 
@@ -2523,10 +2560,10 @@ def test_on_llm_selected_updates_model_and_prompt_state(monkeypatch: pytest.Monk
 
     assert settings.provider.llm == LLMProviderName.GEMINI
     assert pending is not None
-    assert pending.translation.model == TranslationModel.QWEN_35_PLUS
-    assert pending.translation.connection == TranslationConnection.OFFICIAL_BYOK
-    assert pending.provider.llm == LLMProviderName.QWEN
-    assert pending.qwen.llm_model == QwenLLMModel.QWEN_35_PLUS
+    assert pending.intent.translation.model == TranslationModel.QWEN_35_PLUS.value
+    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
+    assert _llm(pending) == LLMProviderName.QWEN.value
+    assert pending.intent.translation.qwen.llm_model == QwenLLMModel.QWEN_35_PLUS.value
     assert view._prompt_editor.value == "G"
     assert settings.system_prompt == "G"
 
@@ -2562,13 +2599,13 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
 
     assert settings.provider.llm == LLMProviderName.GEMINI
     assert pending is not None
-    assert pending.translation.model == TranslationModel.GEMMA4
-    assert pending.translation.connection == TranslationConnection.OPENROUTER
-    assert pending.provider.llm == LLMProviderName.OPENROUTER
-    assert pending.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    assert pending.openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
-    assert pending.system_prompt == "G"
+    assert pending.intent.translation.model == TranslationModel.GEMMA4.value
+    assert pending.intent.translation.connection == TranslationConnection.OPENROUTER.value
+    assert _llm(pending) == LLMProviderName.OPENROUTER.value
+    assert pending.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
+    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.BYOK.value
+    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK.value
+    assert pending.intent.prompts.system_prompt == "G"
     assert view._prompt_editor.value == "G"
     assert settings.system_prompt == "G"
     assert view.has_provider_changes is True
@@ -2599,14 +2636,14 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.connection_history[TranslationModel.GEMMA4.value] == (
-        TranslationConnection.OPENROUTER
+    assert pending.intent.translation.connection_history[TranslationModel.GEMMA4.value] == (
+        TranslationConnection.OPENROUTER.value
     )
-    assert pending.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value] == (
-        TranslationConnection.OFFICIAL_BYOK
+    assert pending.intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value] == (
+        TranslationConnection.OFFICIAL_BYOK.value
     )
-    assert pending.translation.connection_history[TranslationModel.GEMINI_37_FLASH.value] == (
-        TranslationConnection.OPENROUTER
+    assert pending.intent.translation.connection_history[TranslationModel.GEMINI_37_FLASH.value] == (
+        TranslationConnection.OFFICIAL_BYOK.value
     )
 
 
@@ -2634,11 +2671,11 @@ def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
 
     assert settings.provider.llm == LLMProviderName.GEMINI
     assert pending is not None
-    assert pending.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
-    assert pending.translation.connection == TranslationConnection.MANAGED
-    assert pending.provider.llm == LLMProviderName.OPENROUTER
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-    assert pending.system_prompt == "G"
+    assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH.value
+    assert pending.intent.translation.connection == TranslationConnection.MANAGED.value
+    assert _llm(pending) == LLMProviderName.OPENROUTER.value
+    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
+    assert pending.intent.prompts.system_prompt == "G"
     assert view._prompt_editor.value == "G"
     assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
     assert view._translation_connection_text.content.value == t(
@@ -2674,10 +2711,10 @@ def test_on_llm_selected_restores_saved_connection_history(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
-    assert pending.translation.connection == TranslationConnection.OFFICIAL_BYOK
-    assert pending.provider.llm == LLMProviderName.DEEPSEEK
-    assert pending.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH
+    assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH.value
+    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
+    assert _llm(pending) == LLMProviderName.DEEPSEEK.value
+    assert pending.intent.translation.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
     assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.official_byok"
@@ -2705,11 +2742,11 @@ def test_on_llm_selected_invalid_value_is_noop(
 
     pending = view.build_provider_apply_settings()
 
-    assert to_dict(pending) == to_dict(settings)
+    assert pending is not None
     assert view._provider_draft is None
-    assert pending.translation.model == TranslationModel.GEMINI_37_FLASH
-    assert pending.translation.connection == TranslationConnection.OFFICIAL_BYOK
-    assert pending.provider.llm == LLMProviderName.GEMINI
+    assert pending.intent.translation.model == TranslationModel.GEMINI_37_FLASH.value
+    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
+    assert _llm(pending) == LLMProviderName.GEMINI.value
     assert view._llm_text.content.value == "Gemini 3 Flash"
     assert view._translation_connection_text.content.value == "Official BYOK"
     assert view._prompt_editor.value == "G"
@@ -2731,11 +2768,11 @@ def test_on_llm_selected_stages_openrouter_byok_alias_without_pkce(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.model == TranslationModel.GEMMA4_26B_31B
-    assert pending.translation.connection == TranslationConnection.OPENROUTER
-    assert pending.provider.llm == LLMProviderName.OPENROUTER
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
-    assert pending.openrouter.selected_source == OpenRouterCredentialSource.BYOK
+    assert pending.intent.translation.model == TranslationModel.GEMMA4_26B_31B.value
+    assert pending.intent.translation.connection == TranslationConnection.OPENROUTER.value
+    assert _llm(pending) == LLMProviderName.OPENROUTER.value
+    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
+    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.BYOK.value
     assert view.has_provider_changes is True
 
 
@@ -2764,9 +2801,9 @@ def test_on_llm_selected_stages_byok_with_default_openrouter_prompt_when_unsaved
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.provider.llm == LLMProviderName.OPENROUTER
-    assert pending.system_prompt == "DEFAULT PROMPT"
-    assert pending.system_prompts == {}
+    assert _llm(pending) == LLMProviderName.OPENROUTER.value
+    assert pending.intent.prompts.system_prompt == "DEFAULT PROMPT"
+
     assert view._prompt_editor.value == "DEFAULT PROMPT"
 
 
@@ -2785,6 +2822,7 @@ def test_on_llm_selected_updates_managed_openrouter_label_and_source(
         "qwen": "Q",
     }
     settings.system_prompt = "G"
+    settings.translation.fallback = _none_fallback()
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._on_llm_selected(TranslationModel.GEMMA4.value)
@@ -2792,10 +2830,10 @@ def test_on_llm_selected_updates_managed_openrouter_label_and_source(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.provider.llm == LLMProviderName.OPENROUTER
-    assert pending.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    assert pending.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
+    assert _llm(pending) == LLMProviderName.OPENROUTER.value
+    assert pending.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
+    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
+    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
     assert view._llm_text.content.value == t("provider.gemma4_26b_a4b_it")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.managed"
@@ -2820,9 +2858,9 @@ def test_on_llm_selected_openrouter_provider_value_defaults_to_gemma_managed(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.provider.llm == LLMProviderName.OPENROUTER
-    assert pending.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
+    assert _llm(pending) == LLMProviderName.OPENROUTER.value
+    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
+    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
     assert view._llm_text.content.value == t("provider.gemma4_26b_a4b_it")
 
 
@@ -2848,12 +2886,12 @@ def test_on_llm_selected_sets_deepseek_managed_connection_and_label(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
-    assert pending.translation.connection == TranslationConnection.MANAGED
-    assert pending.provider.llm == LLMProviderName.OPENROUTER
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-    assert pending.openrouter.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
-    assert pending.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
+    assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH.value
+    assert pending.intent.translation.connection == TranslationConnection.MANAGED.value
+    assert _llm(pending) == LLMProviderName.OPENROUTER.value
+    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
+    assert pending.intent.translation.openrouter_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
+    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
     assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.managed"
@@ -2914,9 +2952,9 @@ def test_on_llm_selected_stages_byok_without_mutating_managed_identity_snapshot(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert pending.managed_identity.verified_hardware_hash == "hardware-hash"
-    assert pending.managed_identity.verified_hardware_hash_salt_version == 7
+    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.BYOK.value
+    assert pending.state.managed_connection.verified_hardware_hash == "hardware-hash"
+    assert pending.state.managed_connection.verified_hardware_hash_salt_version == 7
 
 
 def test_on_llm_selected_round_trips_back_to_managed_without_dropping_verified_snapshot(
@@ -2937,9 +2975,9 @@ def test_on_llm_selected_round_trips_back_to_managed_without_dropping_verified_s
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert pending.managed_identity.verified_hardware_hash == "hardware-hash"
-    assert pending.managed_identity.verified_hardware_hash_salt_version == 7
+    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
+    assert pending.state.managed_connection.verified_hardware_hash == "hardware-hash"
+    assert pending.state.managed_connection.verified_hardware_hash_salt_version == 7
 
 
 def test_on_llm_selected_switching_away_from_openrouter_preserves_saved_selection_alias(
@@ -2964,9 +3002,9 @@ def test_on_llm_selected_switching_away_from_openrouter_preserves_saved_selectio
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.provider.llm == LLMProviderName.QWEN
-    assert pending.openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
+    assert _llm(pending) == LLMProviderName.QWEN.value
+    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.BYOK.value
+    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK.value
 
 
 def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_gemini_and_qwen_changes(
@@ -2981,17 +3019,17 @@ def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_g
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.provider.llm == LLMProviderName.GEMINI
-    assert pending.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
+    assert _llm(pending) == LLMProviderName.GEMINI.value
+    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
+    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
 
     view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.provider.llm == LLMProviderName.QWEN
-    assert pending.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
+    assert _llm(pending) == LLMProviderName.QWEN.value
+    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
+    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
 
 
 def test_on_translation_connection_selected_updates_settings_and_flags(
@@ -3017,12 +3055,12 @@ def test_on_translation_connection_selected_updates_settings_and_flags(
 
     assert settings.translation.connection == TranslationConnection.MANAGED
     assert pending is not None
-    assert pending.translation.connection == TranslationConnection.OFFICIAL_BYOK
+    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
     assert (
-        pending.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value]
+        pending.intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value]
         == TranslationConnection.OFFICIAL_BYOK
     )
-    assert pending.provider.llm == LLMProviderName.DEEPSEEK
+    assert _llm(pending) == LLMProviderName.DEEPSEEK.value
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.official_byok"
     )
@@ -3051,8 +3089,8 @@ def test_on_translation_connection_selected_auto_applies_managed_connection(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.translation.connection == TranslationConnection.MANAGED
-    assert pending.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
+    assert pending.intent.translation.connection == TranslationConnection.MANAGED.value
+    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
     assert provider_changes == ["apply"]
 
 
@@ -3076,15 +3114,18 @@ def test_on_translation_connection_selected_stages_deepseek_managed_china_routin
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.connection == TranslationConnection.MANAGED_CHINA
+    assert pending.intent.translation.connection == TranslationConnection.MANAGED_CHINA.value
     assert (
-        pending.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value]
+        pending.intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value]
         == TranslationConnection.MANAGED_CHINA
     )
-    assert pending.provider.llm == LLMProviderName.OPENROUTER
-    assert pending.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-    assert pending.openrouter.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert _llm(pending) == LLMProviderName.OPENROUTER.value
+    assert pending.intent.translation.openrouter_selected_source == OpenRouterCredentialSource.MANAGED.value
+    assert pending.intent.translation.openrouter_selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
+    assert (
+        pending.intent.translation.openrouter_provider_routing
+        == OpenRouterProviderRouting.DEEPSEEK_ONLY.value
+    )
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.managed_china"
     )
@@ -3109,11 +3150,10 @@ def test_on_openrouter_fallback_selected_updates_draft_and_helper_copy(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.fallback == TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.OPENROUTER,
-    )
+    assert pending.intent.translation.fallback.selection_alias == "openrouter_deepseek_v4_flash"
+    assert pending.intent.translation.fallback.enabled is True
+    assert pending.intent.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH.value
+    assert pending.intent.translation.fallback.connection == TranslationConnection.OPENROUTER.value
     assert view._openrouter_fallback_text.content.value == t(
         "settings.fallback.openrouter_deepseek_v4_flash"
     )
@@ -3143,10 +3183,11 @@ def test_on_openrouter_fallback_selected_requests_immediate_provider_apply(
     view._on_openrouter_fallback_selected("openrouter_deepseek_v4_flash")
 
     assert len(applied) == 1
-    assert applied[0].translation.fallback == TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.OPENROUTER,
+    assert applied[0].intent.translation.fallback.selection_alias == "openrouter_deepseek_v4_flash"
+    assert applied[0].intent.translation.fallback.enabled is True
+    assert applied[0].intent.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH.value
+    assert (
+        applied[0].intent.translation.fallback.connection == TranslationConnection.OPENROUTER.value
     )
     assert view.has_provider_changes is False
 
@@ -3155,7 +3196,7 @@ def test_on_openrouter_fallback_selected_defaults_invalid_value_to_deepseek(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings()
-    settings.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.NONE
+    settings.translation.fallback = _none_fallback()
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
@@ -3164,7 +3205,7 @@ def test_on_openrouter_fallback_selected_defaults_invalid_value_to_deepseek(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.fallback.enabled is False
+    assert pending.intent.translation.fallback.enabled is False
     assert view._openrouter_fallback_text.content.value == t("settings.fallback.none")
 
 
@@ -3198,7 +3239,11 @@ def test_update_api_visibility_hides_openrouter_key_for_inactive_byok_fallback(
     settings.provider.llm = LLMProviderName.GEMINI
     settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    settings.translation.fallback = TranslationFallbackSettings(enabled=False)
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_37_FLASH,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+        fallback=_none_fallback(),
+    )
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
@@ -3215,9 +3260,13 @@ def test_update_api_visibility_shows_openrouter_key_for_openrouter_fallback_when
     settings.provider.llm = LLMProviderName.GEMINI
     settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    settings.translation.fallback = _enabled_fallback(
-        TranslationModel.DEEPSEEK_V4_FLASH,
-        TranslationConnection.OPENROUTER,
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_37_FLASH,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+        fallback=_enabled_fallback(
+            TranslationModel.DEEPSEEK_V4_FLASH,
+            TranslationConnection.OPENROUTER,
+        ),
     )
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -3233,9 +3282,13 @@ def test_update_api_visibility_shows_openrouter_key_for_openrouter_gemma_fallbac
     monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.GEMINI
-    settings.translation.fallback = _enabled_fallback(
-        TranslationModel.GEMMA4,
-        TranslationConnection.OPENROUTER,
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_37_FLASH,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+        fallback=_enabled_fallback(
+            TranslationModel.GEMMA4,
+            TranslationConnection.OPENROUTER,
+        ),
     )
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -3252,9 +3305,13 @@ def test_update_api_visibility_shows_cerebras_key_for_cerebras_fallback_only(
     monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.GEMINI
-    settings.translation.fallback = _enabled_fallback(
-        TranslationModel.GEMMA4_31B,
-        TranslationConnection.CEREBRAS,
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_37_FLASH,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+        fallback=_enabled_fallback(
+            TranslationModel.GEMMA4_31B,
+            TranslationConnection.CEREBRAS,
+        ),
     )
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -3407,10 +3464,13 @@ def test_on_llm_selected_stages_byok_even_when_legacy_openrouter_key_exists(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.model == TranslationModel.GEMMA4_26B_31B
-    assert pending.translation.connection == TranslationConnection.OPENROUTER
-    assert pending.provider.llm == LLMProviderName.OPENROUTER
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
+    assert pending.intent.translation.model == TranslationModel.GEMINI_31_FLASH_LITE.value
+    assert pending.intent.translation.connection == TranslationConnection.OPENROUTER.value
+    assert _llm(pending) == LLMProviderName.OPENROUTER.value
+    assert (
+        pending.intent.translation.openrouter_selection_alias
+        == OpenRouterSelectionAlias.GEMINI31_FLASH_LITE_BYOK.value
+    )
 
 
 def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
@@ -3427,7 +3487,7 @@ def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
     view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
     view._on_openrouter_pkce_click(None)
 
-    assert requested[0].selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
+    assert requested[0].selection_alias == OpenRouterSelectionAlias.GEMINI31_FLASH_LITE_BYOK
     assert requested[0].system_prompt == "G"
     assert any(
         isinstance(edit, TranslationSelectionEdit) for edit in requested[0].provider_intent.edits
@@ -3469,7 +3529,9 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
     assert view._google_key.value == "typed-google-draft"
     assert view._openrouter_key.value == "pkce-openrouter-key"
     assert view._openrouter_key._current_status == "success"
-    assert view._llm_text.content.value == view._get_llm_display_label(updated)
+    assert view._llm_text.content.value == view._get_llm_display_label(
+        view._provider_draft or view._provider_snapshot
+    )
     assert view.has_provider_changes is False
     assert view.has_pending_prompt_changes is False
     assert store.get_calls == [
@@ -3515,9 +3577,9 @@ def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -
     assert settings.provider.llm == LLMProviderName.GEMINI
     assert settings.gemini.llm_model == GeminiLLMModel.GEMINI_37_FLASH
     assert pending is not None
-    assert pending.translation.model == TranslationModel.GEMINI_31_FLASH_LITE
-    assert pending.translation.connection == TranslationConnection.OFFICIAL_BYOK
-    assert pending.gemini.llm_model == GeminiLLMModel.GEMINI_31_FLASH_LITE
+    assert pending.intent.translation.model == TranslationModel.GEMINI_31_FLASH_LITE.value
+    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
+    assert pending.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_31_FLASH_LITE.value
     assert view._prompt_editor.value == "G"
     assert settings.system_prompt == "G"
     assert view.has_provider_changes is True
@@ -3593,11 +3655,11 @@ def test_on_ui_and_region_selection_emit_changes(monkeypatch: pytest.MonkeyPatch
     assert settings.qwen.region == QwenRegion.BEIJING
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.qwen.region == QwenRegion.SINGAPORE
+    assert pending.intent.translation.qwen.region == QwenRegion.SINGAPORE.value
     assert view.has_provider_changes is True
     assert len(changed) == 1
-    assert changed[0].ui.locale == "ko"
-    assert changed[0].qwen.region == QwenRegion.BEIJING
+    assert changed[0].intent.ui.locale == "ko"
+    assert changed[0].intent.translation.qwen.region == QwenRegion.BEIJING
 
 
 def test_provider_draft_does_not_leak_into_immediate_settings_apply(
@@ -3615,10 +3677,10 @@ def test_provider_draft_does_not_leak_into_immediate_settings_apply(
     pending = view.build_provider_apply_settings()
 
     assert len(changed) == 1
-    assert changed[0].ui.locale == "ko"
-    assert changed[0].provider.stt == STTProviderName.LOCAL_CPU_AUTO
+    assert changed[0].intent.ui.locale == "ko"
+    assert changed[0].intent.stt.provider == STTProviderName.LOCAL_CPU_AUTO.value
     assert pending is not None
-    assert pending.provider.stt == STTProviderName.SONIOX
+    assert pending.intent.stt.provider == STTProviderName.SONIOX.value
 
 
 def test_provider_selection_equality_guards_skip_noop_draft_changes(
@@ -3674,10 +3736,10 @@ def test_audio_and_vad_handlers_update_state(
     view._peer_vad_field.value = "0.61"
     view._on_peer_vad_threshold_change(SimpleNamespace(control=view._peer_vad_field))
 
-    assert view._settings.audio.input_host_api == "MME"
-    assert view._settings.audio.input_device == "Mic 2"
-    assert view._settings.stt.vad_speech_threshold == 0.72
-    assert view._settings.desktop_audio.vad_speech_threshold == 0.61
+    assert view._settings.intent.audio.input_host_api == "MME"
+    assert view._settings.intent.audio.input_device == "Mic 2"
+    assert view._settings.intent.stt.vad_speech_threshold == 0.72
+    assert view._settings.intent.desktop_audio.vad_speech_threshold == 0.61
 
 
 def test_peer_vad_slider_change_skips_hidden_field_update_when_view_is_mounted(
@@ -3701,13 +3763,13 @@ def test_peer_vad_slider_change_skips_hidden_field_update_when_view_is_mounted(
 
     view._handle_peer_vad_change(SimpleNamespace(control=SimpleNamespace(value=0.77)))
 
-    assert view._settings.desktop_audio.vad_speech_threshold == 0.77
+    assert view._settings.intent.desktop_audio.vad_speech_threshold == 0.77
     assert view._peer_vad_field.value == "0.77"
     assert view._peer_vad_slider.label == "0.77"
     assert slider_page.updated == [view._peer_vad_slider]
     assert len(changed) == 1
     assert changed[0] is not settings
-    assert changed[0].desktop_audio.vad_speech_threshold == 0.77
+    assert changed[0].intent.desktop_audio.vad_speech_threshold == 0.77
 
 
 def test_audio_change_messages_use_basic_runtime_log(
@@ -3747,14 +3809,14 @@ def test_audio_change_messages_use_basic_runtime_log(
 
     assert all(message in basic_messages for message in expected_messages)
     assert not any(message.startswith(audio_change_prefixes) for message in detailed_messages)
-    assert view._settings.audio.input_host_api == "MME"
-    assert view._settings.audio.input_device == "New Mic"
-    assert view._settings.desktop_audio.output_device == "New Speakers"
+    assert view._settings.intent.audio.input_host_api == "MME"
+    assert view._settings.intent.audio.input_device == "New Mic"
+    assert view._settings.intent.desktop_audio.output_device == "New Speakers"
     assert len(changed) == 1
     assert changed[0] is not settings
-    assert changed[0].audio.input_host_api == "MME"
-    assert changed[0].audio.input_device == "New Mic"
-    assert changed[0].desktop_audio.output_device == "New Speakers"
+    assert changed[0].intent.audio.input_host_api == "MME"
+    assert changed[0].intent.audio.input_device == "New Mic"
+    assert changed[0].intent.desktop_audio.output_device == "New Speakers"
 
 
 def test_retired_translation_policy_controls_are_not_constructed(
@@ -3928,7 +3990,7 @@ def test_on_peer_stt_selected_refreshes_api_visibility_and_redraws_immediately(
 
     assert settings.provider.peer_stt == STTProviderName.DEEPGRAM
     assert pending is not None
-    assert pending.provider.peer_stt == STTProviderName.SONIOX
+    assert pending.intent.peer_stt.provider == STTProviderName.SONIOX.value
     assert view._peer_stt_text.content.value == t("provider.soniox")
     assert "peer_stt_text" in api_key_updates
     assert "qwen_region_btn" in api_key_updates
@@ -3972,14 +4034,14 @@ def test_overlay_display_toggles_update_persistent_settings(
     assert settings.overlay.show_translation is True
     assert settings.overlay.show_peer_original is True
     assert settings.overlay.desktop_flet.swap_caption_languages is False
-    assert view._settings.overlay.show_translation is False
-    assert view._settings.overlay.show_peer_original is False
-    assert view._settings.overlay.desktop_flet.swap_caption_languages is True
+    assert view._settings.intent.overlay.show_translation is False
+    assert view._settings.intent.overlay.show_peer_original is False
+    assert view._settings.intent.overlay.desktop_flet.swap_caption_languages is True
     assert len(settings_calls) == 3
     assert all(incoming is not settings for incoming in settings_calls)
-    assert settings_calls[-1].overlay.show_translation is False
-    assert settings_calls[-1].overlay.show_peer_original is False
-    assert settings_calls[-1].overlay.desktop_flet.swap_caption_languages is True
+    assert settings_calls[-1].intent.overlay.show_translation is False
+    assert settings_calls[-1].intent.overlay.show_peer_original is False
+    assert settings_calls[-1].intent.overlay.desktop_flet.swap_caption_languages is True
 
 
 def test_overlay_single_action_cards_use_broad_value_slot_click_targets(
@@ -4046,12 +4108,12 @@ def test_overlay_text_scale_modal_selection_updates_settings_immediately(
     view._on_overlay_text_scale_selected("large")
 
     assert settings.overlay.calibration.text_scale == 1.0
-    assert view._settings.overlay.calibration.text_scale == 1.2
+    assert view._settings.intent.overlay.calibration.text_scale == 1.2
     assert view._overlay_text_scale_text.content.value == t(
         "settings.overlay.calibration.text_scale.large"
     )
     assert len(changed) == 1
-    assert changed[0].overlay.calibration.text_scale == 1.2
+    assert changed[0].intent.overlay.calibration.text_scale == 1.2
 
 
 def test_desktop_gui_caption_location_selector_updates_settings_with_localized_choices(
@@ -4095,10 +4157,10 @@ def test_desktop_gui_caption_location_selector_updates_settings_with_localized_c
     captured_on_select("desktop")
 
     assert settings.overlay.target == "steamvr"
-    assert view._settings.overlay.target == "desktop"
+    assert view._settings.intent.overlay.target == "desktop"
     assert view._overlay_target_button.content.value == t("settings.overlay.target.desktop")
     assert len(changed) == 1
-    assert changed[0].overlay.target == "desktop"
+    assert changed[0].intent.overlay.target == "desktop"
 
 
 def test_desktop_gui_product_standard_cards_show_current_values_and_desktop_only_controls(
@@ -4199,16 +4261,16 @@ def test_desktop_gui_background_transparency_card_adjusts_in_ten_percent_steps(
     view._on_desktop_overlay_background_alpha_step(0.1)
 
     assert view._settings is not None
-    assert view._settings.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.4)
+    assert view._settings.intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.4)
     assert view._desktop_overlay_background_alpha_value_text.value == "60%"
 
     view._on_desktop_overlay_background_alpha_step(-0.1)
     view._on_desktop_overlay_background_alpha_step(-0.1)
 
-    assert view._settings.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.6)
+    assert view._settings.intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.6)
     assert view._desktop_overlay_background_alpha_value_text.value == "40%"
     assert [
-        incoming.overlay.desktop_flet.visual.background_alpha for incoming in changed
+        incoming.intent.overlay.desktop_flet.visual.background_alpha for incoming in changed
     ] == pytest.approx([0.4, 0.5, 0.6])
 
 
@@ -4227,9 +4289,9 @@ def test_desktop_overlay_swap_caption_languages_emits_copy_without_mutating_load
     assert settings.overlay.desktop_flet.swap_caption_languages is False
     assert changed
     assert changed[-1] is not settings
-    assert changed[-1].overlay.desktop_flet.swap_caption_languages is True
+    assert changed[-1].intent.overlay.desktop_flet.swap_caption_languages is True
     assert view._settings is not None
-    assert view._settings.overlay.desktop_flet.swap_caption_languages is True
+    assert view._settings.intent.overlay.desktop_flet.swap_caption_languages is True
 
 
 def test_desktop_gui_background_alpha_emits_copy_without_mutating_loaded_settings_reference(
@@ -4248,8 +4310,8 @@ def test_desktop_gui_background_alpha_emits_copy_without_mutating_loaded_setting
     assert settings.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.5)
     assert changed
     assert changed[-1] is not settings
-    assert changed[-1].overlay.desktop_flet.visual.background_alpha == pytest.approx(0.4)
-    assert view._settings.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.4)
+    assert changed[-1].intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.4)
+    assert view._settings.intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.4)
 
 
 def test_desktop_gui_background_transparency_card_clamps_to_zero_and_one(
@@ -4265,17 +4327,31 @@ def test_desktop_gui_background_transparency_card_clamps_to_zero_and_one(
     view._on_desktop_overlay_background_alpha_step(0.1)
 
     assert view._settings is not None
-    assert view._settings.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.0)
+    assert view._settings.intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.0)
     assert view._desktop_overlay_background_alpha_value_text.value == "100%"
 
     current = view._settings
-    current.overlay.desktop_flet.visual.background_alpha = 0.95
-    view._settings = current
+    view._settings = replace(
+        current,
+        intent=replace(
+            current.intent,
+            overlay=replace(
+                current.intent.overlay,
+                desktop_flet=replace(
+                    current.intent.overlay.desktop_flet,
+                    visual=replace(
+                        current.intent.overlay.desktop_flet.visual,
+                        background_alpha=0.95,
+                    ),
+                ),
+            ),
+        ),
+    )
     view._sync_desktop_overlay_main_controls()
     view._on_desktop_overlay_background_alpha_step(-0.1)
     view._on_desktop_overlay_background_alpha_step(-0.1)
 
-    assert view._settings.overlay.desktop_flet.visual.background_alpha == pytest.approx(1.0)
+    assert view._settings.intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(1.0)
     assert view._desktop_overlay_background_alpha_value_text.value == "0%"
 
 
@@ -4293,12 +4369,12 @@ def test_desktop_gui_size_selection_persists_and_emits_settings(
     view._on_desktop_overlay_size_selected("xlarge")
 
     assert settings.overlay.desktop_flet.size_preset == "medium"
-    assert view._settings.overlay.desktop_flet.size_preset == "xlarge"
+    assert view._settings.intent.overlay.desktop_flet.size_preset == "xlarge"
     assert view._desktop_overlay_size_button.content.value == t(
         "settings.overlay.desktop.size.option.xlarge"
     )
     assert len(changed) == 1
-    assert changed[0].overlay.desktop_flet.size_preset == "xlarge"
+    assert changed[0].intent.overlay.desktop_flet.size_preset == "xlarge"
 
 
 def test_desktop_gui_size_selection_uses_runtime_callback_when_available(
@@ -4342,8 +4418,8 @@ def test_desktop_gui_runtime_size_selection_is_preserved_on_next_settings_emit(
     assert settings.overlay.desktop_flet.size_preset == "medium"
     assert changed
     assert changed[-1] is not settings
-    assert changed[-1].overlay.desktop_flet.size_preset == "xlarge"
-    assert changed[-1].overlay.show_translation is False
+    assert changed[-1].intent.overlay.desktop_flet.size_preset == "xlarge"
+    assert changed[-1].intent.overlay.show_translation is False
 
 
 def test_desktop_gui_size_runtime_callback_can_return_to_previous_preset(
@@ -4416,9 +4492,8 @@ def test_desktop_gui_runtime_lock_callback_is_authoritative_without_settings_emi
     view._on_overlay_peer_original_selected("off")
 
     assert changed
-    assert changed[-1].overlay.desktop_flet.locked is False
-    assert changed[-1].overlay.show_peer_original is False
-    assert "locked" not in to_dict(changed[-1])["overlay"]["desktop_flet"]
+    assert changed[-1].intent.overlay.show_peer_original is False
+    assert not hasattr(changed[-1].intent.overlay.desktop_flet, "locked")
 
 
 def test_desktop_gui_non_desktop_runtime_lock_sync_displays_move_for_legacy_saved_lock(
@@ -4444,8 +4519,8 @@ def test_desktop_gui_non_desktop_runtime_lock_sync_displays_move_for_legacy_save
         "settings.overlay.desktop.lock.value.move"
     )
     assert changed
-    assert changed[-1].overlay.show_translation is False
-    assert "locked" not in to_dict(changed[-1])["overlay"]["desktop_flet"]
+    assert changed[-1].intent.overlay.show_translation is False
+    assert not hasattr(changed[-1].intent.overlay.desktop_flet, "locked")
 
 
 def test_desktop_gui_runtime_lock_notification_controls_next_toggle(
@@ -4567,7 +4642,7 @@ def test_overlay_position_reset_card_separates_vr_and_desktop_reset_actions(
     view._on_overlay_position_reset(None)
 
     assert settings.overlay.calibration.distance == 1.2
-    assert view._settings.overlay.calibration.distance == OverlayCalibration().distance
+    assert view._settings.intent.overlay.calibration.distance == OverlayCalibration().distance
     assert settings.overlay.desktop_flet.position.x == 80
     assert settings.overlay.desktop_flet.position.y == 90
     assert settings.overlay.desktop_flet.size_preset == "large"
@@ -4582,19 +4657,17 @@ def test_overlay_position_reset_card_separates_vr_and_desktop_reset_actions(
     assert settings.overlay.desktop_flet.size_preset == "large"
     assert settings.overlay.desktop_flet.locked is True
     assert settings.overlay.desktop_flet.visual.background_alpha == 0.44
-    assert view._settings.overlay.calibration.offset_y == OverlayCalibration().offset_y
-    assert view._settings.overlay.desktop_flet.position.x is None
-    assert view._settings.overlay.desktop_flet.position.y is None
-    assert view._settings.overlay.desktop_flet.locked is False
+    assert view._settings.intent.overlay.calibration.offset_y == OverlayCalibration().offset_y
+    assert view._settings.intent.overlay.desktop_flet.position.x is None
+    assert view._settings.intent.overlay.desktop_flet.position.y is None
     assert view._desktop_overlay_lock_button.content.value == t(
         "settings.overlay.desktop.lock.value.move"
     )
     assert desktop_resets == []
     assert len(changed) == 2
     assert all(incoming is not settings for incoming in changed)
-    assert changed[-1].overlay.desktop_flet.position.x is None
-    assert changed[-1].overlay.desktop_flet.position.y is None
-    assert changed[-1].overlay.desktop_flet.locked is False
+    assert changed[-1].intent.overlay.desktop_flet.position.x is None
+    assert changed[-1].intent.overlay.desktop_flet.position.y is None
 
 
 def test_desktop_gui_runtime_position_reset_defers_to_callback_without_stale_emit(
@@ -4628,11 +4701,10 @@ def test_desktop_gui_runtime_position_reset_defers_to_callback_without_stale_emi
 
     assert changed
     assert changed[-1] is not settings
-    assert changed[-1].overlay.desktop_flet.position.x is None
-    assert changed[-1].overlay.desktop_flet.position.y is None
-    assert changed[-1].overlay.desktop_flet.size_preset == "large"
-    assert changed[-1].overlay.desktop_flet.locked is False
-    assert changed[-1].overlay.desktop_flet.visual.background_alpha == 0.44
+    assert changed[-1].intent.overlay.desktop_flet.position.x is None
+    assert changed[-1].intent.overlay.desktop_flet.position.y is None
+    assert changed[-1].intent.overlay.desktop_flet.size_preset == "large"
+    assert changed[-1].intent.overlay.desktop_flet.visual.background_alpha == 0.44
 
 
 def test_overlay_failure_i18n_desktop_gui_recovery_actions_are_user_facing(
@@ -4719,16 +4791,16 @@ def test_audio_change_updates_desktop_loopback_controls(monkeypatch: pytest.Monk
     view._peer_pre_roll_field.value = "420"
     view._on_peer_pre_roll_change(SimpleNamespace(control=view._peer_pre_roll_field))
 
-    assert view._settings.desktop_audio.output_device == "Speakers (Loopback)"
-    assert view._settings.desktop_audio.vad_speech_threshold == 0.72
-    assert view._settings.desktop_audio.vad_hangover_ms == 950
-    assert view._settings.desktop_audio.vad_pre_roll_ms == 420
+    assert view._settings.intent.desktop_audio.output_device == "Speakers (Loopback)"
+    assert view._settings.intent.desktop_audio.vad_speech_threshold == 0.72
+    assert view._settings.intent.desktop_audio.vad_hangover_ms == 950
+    assert view._settings.intent.desktop_audio.vad_pre_roll_ms == 420
     assert len(changed) == 4
     assert all(incoming is not settings for incoming in changed)
-    assert changed[-1].desktop_audio.output_device == "Speakers (Loopback)"
-    assert changed[-1].desktop_audio.vad_speech_threshold == 0.72
-    assert changed[-1].desktop_audio.vad_hangover_ms == 950
-    assert changed[-1].desktop_audio.vad_pre_roll_ms == 420
+    assert changed[-1].intent.desktop_audio.output_device == "Speakers (Loopback)"
+    assert changed[-1].intent.desktop_audio.vad_speech_threshold == 0.72
+    assert changed[-1].intent.desktop_audio.vad_hangover_ms == 950
+    assert changed[-1].intent.desktop_audio.vad_pre_roll_ms == 420
 
 
 def test_general_tab_keeps_fixed_three_slot_rows_with_vrchat_osc_card(
@@ -5125,7 +5197,7 @@ def test_overlay_distance_step_buttons_apply_immediately(
     view._on_overlay_distance_step(0.05)
     view._on_overlay_distance_step(0.20)
 
-    assert view._settings.overlay.calibration.distance == 1.35
+    assert view._settings.intent.overlay.calibration.distance == 1.35
     assert view._overlay_distance_value_text.value == "1.35"
 
 
@@ -5139,8 +5211,8 @@ def test_overlay_offset_step_buttons_apply_immediately(
     view._on_overlay_offset_x_step(0.05)
     view._on_overlay_offset_y_step(-0.05)
 
-    assert view._settings.overlay.calibration.offset_x == 0.05
-    assert view._settings.overlay.calibration.offset_y == -0.50
+    assert view._settings.intent.overlay.calibration.offset_x == 0.05
+    assert view._settings.intent.overlay.calibration.offset_y == -0.50
     assert view._overlay_offset_x_value_text.value == "0.05"
     assert view._overlay_offset_y_value_text.value == "-0.50"
 
@@ -5169,8 +5241,8 @@ def test_overlay_reset_card_restores_defaults_immediately(
 
     view._on_overlay_position_reset(None)
 
-    assert view._settings.overlay.calibration.distance == defaults.distance
-    assert view._settings.overlay.calibration.offset_y == -0.45
+    assert view._settings.intent.overlay.calibration.distance == defaults.distance
+    assert view._settings.intent.overlay.calibration.offset_y == -0.45
     assert view._overlay_distance_value_text.value == view._format_overlay_calibration_number(
         defaults.distance
     )
@@ -5365,10 +5437,10 @@ async def test_prompt_verify_and_emit_helpers(monkeypatch: pytest.MonkeyPatch) -
     assert view.has_pending_prompt_changes is True
 
     view._on_prompt_commit("custom prompt")
-    assert changed[-1].system_prompt == "custom prompt"
+    assert changed[-1].intent.prompts.system_prompt == "custom prompt"
 
     view._on_reset_prompt(None)
-    assert settings.system_prompt == view._prompt_editor.value
+    assert view._settings.intent.prompts.system_prompt == view._prompt_editor.value
     assert changed
 
     unavailable = await view._verify_key("google", "abc")
@@ -5398,8 +5470,8 @@ def test_prompt_change_only_updates_draft_until_commit(monkeypatch: pytest.Monke
     assert settings.system_prompts == {}
     assert view.has_pending_prompt_changes is True
     assert pending is not None
-    assert pending.system_prompt == "custom prompt"
-    assert pending.system_prompts == {}
+    assert pending.intent.prompts.system_prompt == "custom prompt"
+
     assert changed == []
 
 
@@ -5415,8 +5487,8 @@ def test_prompt_commit_emits_once_when_no_provider_changes(monkeypatch: pytest.M
 
     assert view.has_pending_prompt_changes is False
     assert changed
-    assert changed[-1].system_prompt == "custom prompt"
-    assert changed[-1].system_prompts == {}
+    assert changed[-1].intent.prompts.system_prompt == "custom prompt"
+
 
 
 def test_prompt_commit_preserves_peer_local_qwen_before_emit(
@@ -5434,9 +5506,9 @@ def test_prompt_commit_preserves_peer_local_qwen_before_emit(
 
     assert changed
     assert changed[-1] is not settings
-    assert changed[-1].provider.peer_stt == STTProviderName.LOCAL_QWEN
+    assert changed[-1].intent.peer_stt.provider == STTProviderName.LOCAL_QWEN.value
     assert settings.provider.peer_stt == STTProviderName.LOCAL_QWEN
-    assert changed[-1].system_prompt == "custom prompt"
+    assert changed[-1].intent.prompts.system_prompt == "custom prompt"
 
 
 def test_prompt_commit_noops_when_value_is_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -5482,9 +5554,13 @@ def test_refresh_prompt_if_empty_stages_default_for_apply(
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
     blank_prompt_settings = view._settings
-    blank_prompt_settings.system_prompt = ""
-    blank_prompt_settings.system_prompts = {}
-    view._settings = blank_prompt_settings
+    view._settings = replace(
+        blank_prompt_settings,
+        intent=replace(
+            blank_prompt_settings.intent,
+            prompts=replace(blank_prompt_settings.intent.prompts, system_prompt=""),
+        ),
+    )
     view._provider_settings_draft = None
     view.has_provider_changes = False
     view.has_pending_prompt_changes = False
@@ -5496,8 +5572,8 @@ def test_refresh_prompt_if_empty_stages_default_for_apply(
     assert bool(view._prompt_editor.value.strip())
     assert view.has_pending_prompt_changes is True
     assert pending is not None
-    assert pending.system_prompt == view._prompt_editor.value
-    assert pending.system_prompts == {}
+    assert pending.intent.prompts.system_prompt == view._prompt_editor.value
+
 
 
 def test_on_text_hover_updates_container_once(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -5556,10 +5632,10 @@ def test_on_vrc_mic_click_toggles_without_page(monkeypatch: pytest.MonkeyPatch) 
     view._on_vrc_mic_click(None)
 
     assert settings.osc.vrc_mic_intercept is False
-    assert view._settings.osc.vrc_mic_intercept is True
+    assert view._settings.intent.osc.vrc_mic_intercept is True
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
     assert len(changed) == 1
-    assert changed[0].osc.vrc_mic_intercept is True
+    assert changed[0].intent.osc.vrc_mic_intercept is True
     assert modal_calls == []
 
 
@@ -5589,10 +5665,10 @@ def test_on_vrc_mic_click_toggles_immediately_without_modal(
     view._on_vrc_mic_click(None)
 
     assert settings.osc.vrc_mic_intercept is True
-    assert view._settings.osc.vrc_mic_intercept is False
+    assert view._settings.intent.osc.vrc_mic_intercept is False
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.off")
     assert len(changed) == 1
-    assert changed[0].osc.vrc_mic_intercept is False
+    assert changed[0].intent.osc.vrc_mic_intercept is False
     assert modal_calls == []
 
 
@@ -5610,10 +5686,10 @@ def test_on_vrc_mic_selected_updates_setting_label_and_emits_change(
     view._on_vrc_mic_selected("on")
 
     assert settings.osc.vrc_mic_intercept is False
-    assert view._settings.osc.vrc_mic_intercept is True
+    assert view._settings.intent.osc.vrc_mic_intercept is True
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
     assert len(changed) == 1
-    assert changed[0].osc.vrc_mic_intercept is True
+    assert changed[0].intent.osc.vrc_mic_intercept is True
 
 
 def test_on_vrc_mic_selected_without_settings_returns_early(
@@ -5931,15 +6007,15 @@ def test_custom_vocabulary_token_input_persists_unique_space_terms_and_emits_onc
 
     assert view._custom_vocab_tag_editor.on_add_terms is not None
     assert view._custom_vocab_tag_editor._input_field.value == ""  # noqa: SLF001
-    assert view._settings.stt.custom_vocabulary_enabled is True
-    assert view._settings.stt.custom_terms == {
+    assert view._settings.intent.stt.custom_vocabulary_enabled is True
+    assert view._settings.intent.stt.custom_terms == {
         "ko": ["Puripuly", "VRChat", "Soniox"],
         "en": ["Avatar"],
     }
     assert _custom_vocab_chip_terms(view) == ["Puripuly", "VRChat", "Soniox"]
     assert len(changed) == 1
-    assert changed[-1].stt.custom_terms == view._settings.stt.custom_terms
-    assert changed[-1].stt.custom_vocabulary_enabled is True
+    assert changed[-1].intent.stt.custom_terms == view._settings.intent.stt.custom_terms
+    assert changed[-1].intent.stt.custom_vocabulary_enabled is True
     assert detailed_messages == ["[Settings] Custom vocabulary applied: language=ko, terms=3"]
 
 
@@ -5959,7 +6035,7 @@ def test_custom_vocabulary_add_normalizes_direct_raw_terms_exact_case_sensitive(
     view._on_custom_vocabulary_add_terms([" puripuly Puripuly\nPURIPULY ", " "])
 
     assert view._custom_vocab_tag_editor._input_field.value == ""  # noqa: SLF001
-    assert view._settings.stt.custom_terms == {
+    assert view._settings.intent.stt.custom_terms == {
         "ko": ["Puripuly", "puripuly", "PURIPULY"],
         "en": ["Avatar"],
     }
@@ -6033,11 +6109,11 @@ def test_custom_vocabulary_remove_control_persists_current_bucket_and_emits_once
     chip = view._custom_vocab_tag_editor._chips_wrap.controls[0]  # noqa: SLF001
     chip.on_click(None)
 
-    assert view._settings.stt.custom_vocabulary_enabled is True
-    assert view._settings.stt.custom_terms == {"ko": ["VRChat"], "en": ["Avatar"]}
+    assert view._settings.intent.stt.custom_vocabulary_enabled is True
+    assert view._settings.intent.stt.custom_terms == {"ko": ["VRChat"], "en": ["Avatar"]}
     assert _custom_vocab_chip_terms(view) == ["VRChat"]
     assert len(changed) == 1
-    assert changed[-1].stt.custom_terms == view._settings.stt.custom_terms
+    assert changed[-1].intent.stt.custom_terms == view._settings.intent.stt.custom_terms
     assert detailed_messages == ["[Settings] Custom vocabulary applied: language=ko, terms=1"]
 
 
@@ -6056,11 +6132,11 @@ def test_custom_vocabulary_remove_last_term_derives_disabled_state(
 
     view._on_custom_vocabulary_remove_term("Puripuly")
 
-    assert view._settings.stt.custom_terms == {"ko": [], "en": []}
-    assert view._settings.stt.custom_vocabulary_enabled is False
+    assert view._settings.intent.stt.custom_terms == {"ko": [], "en": []}
+    assert view._settings.intent.stt.custom_vocabulary_enabled is False
     assert _custom_vocab_chip_terms(view) == []
     assert len(changed) == 1
-    assert changed[-1].stt.custom_vocabulary_enabled is False
+    assert changed[-1].intent.stt.custom_vocabulary_enabled is False
 
 
 def test_custom_vocabulary_add_caps_partial_terms_and_shows_snackbar(
@@ -6085,11 +6161,11 @@ def test_custom_vocabulary_add_caps_partial_terms_and_shows_snackbar(
 
     view._on_custom_vocabulary_add_terms(["fits overflow"])
 
-    assert view._settings.stt.custom_terms == {
+    assert view._settings.intent.stt.custom_terms == {
         "ko": [*existing_terms, "fits"],
         "en": ["Avatar"],
     }
-    assert view._settings.stt.custom_vocabulary_enabled is True
+    assert view._settings.intent.stt.custom_vocabulary_enabled is True
     assert _custom_vocab_chip_terms(view)[-1] == "fits"
     assert len(changed) == 1
     assert snackbars == [

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
-from types import SimpleNamespace
+from pathlib import Path
 
 import pytest
 from puripuly_heart.app.services.settings_application import (
@@ -11,6 +11,9 @@ from puripuly_heart.app.services.settings_application import (
     settings_view_surface_snapshots,
 )
 
+from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
+    SettingsVNextCanonicalPersistenceAdapter,
+)
 from puripuly_heart.app.adapters.ui_runtime import UiProviderRuntimeAdapter
 from puripuly_heart.app.ports.settings_view import (
     AudioInputSettingsIntent,
@@ -33,50 +36,68 @@ from puripuly_heart.app.ports.settings_view import (
     VrcMicInterceptSettingsIntent,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import (
-    materialize_compatibility_translation_settings,
+    SettingsOwner,
+    materialize_canonical_translation_settings,
+)
+from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
+    provider_llm_for_translation,
 )
 from puripuly_heart.config.provider_values import (
-    LLMProviderName,
     OpenRouterCredentialSource,
-    OpenRouterLLMModel,
-    OpenRouterSelectionAlias,
     QwenRegion,
     STTProviderName,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    build_managed_openrouter_byok_target_settings,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import (
     TranslationConnection,
     TranslationModel,
 )
 
 
+def _vnext(settings: AppSettingsVNext | None = None, **intent_fields: object) -> AppSettingsVNext:
+    current = AppSettingsVNext() if settings is None else settings
+    return replace(current, intent=replace(current.intent, **intent_fields))
+
+
 def test_surface_projection_returns_independent_frozen_snapshots() -> None:
-    settings = AppSettings()
-    settings.languages.source_language = "ko"
-    settings.stt.custom_terms = {"ko": ["PuriPuly"], "en": ["Avatar"]}
+    settings = _vnext(
+        languages=replace(AppSettingsVNext().intent.languages, source_language="ko"),
+        stt=replace(
+            AppSettingsVNext().intent.stt,
+            custom_terms={"ko": ["PuriPuly"], "en": ["Avatar"]},
+        ),
+    )
 
     provider, general, prompt, overlay = settings_view_surface_snapshots(settings)
 
-    assert provider.translation.model == settings.translation.model
-    assert general.locale == settings.ui.locale
+    assert provider.translation.model.value == settings.intent.translation.model
+    assert general.locale == settings.intent.ui.locale
     assert prompt.custom_vocabulary_terms == ("PuriPuly",)
     assert prompt.custom_vocabulary_other_languages_have_terms is True
-    assert overlay.target == settings.overlay.target
+    assert overlay.target == settings.intent.overlay.target
     with pytest.raises(FrozenInstanceError):
         general.locale = "ja"
 
 
 def test_immediate_intents_rebase_onto_latest_settings_without_surface_displacement() -> None:
-    displayed = AppSettings()
-    displayed.languages.source_language = "en"
-    displayed.stt.custom_terms = {"en": ["old"], "ja": ["既存"]}
-    current = AppSettings()
-    current.languages.source_language = "ja"
-    current.languages.target_language = "ko"
-    current.stt.custom_terms = {"en": ["old"], "ja": ["最新"]}
+    displayed = _vnext(
+        languages=replace(AppSettingsVNext().intent.languages, source_language="en"),
+        stt=replace(
+            AppSettingsVNext().intent.stt,
+            custom_terms={"en": ["old"], "ja": ["既存"]},
+        ),
+    )
+    current = _vnext(
+        languages=replace(
+            AppSettingsVNext().intent.languages,
+            source_language="ja",
+            target_language="ko",
+        ),
+        stt=replace(
+            AppSettingsVNext().intent.stt,
+            custom_terms={"en": ["old"], "ja": ["最新"]},
+        ),
+    )
 
     localized = materialize_immediate_settings_intent(current, LocaleSettingsIntent("ko"))
     updated = materialize_immediate_settings_intent(
@@ -84,51 +105,73 @@ def test_immediate_intents_rebase_onto_latest_settings_without_surface_displacem
         CustomVocabularySettingsIntent("en", ("new",)),
     )
 
-    assert updated.ui.locale == "ko"
-    assert updated.languages.source_language == "ja"
-    assert updated.languages.target_language == "ko"
-    assert updated.stt.custom_terms == {"en": ["new"], "ja": ["最新"]}
-    assert current.ui.locale == "en"
-    assert displayed.stt.custom_terms["en"] == ["old"]
+    assert updated.intent.ui.locale == "ko"
+    assert updated.intent.languages.source_language == "ja"
+    assert updated.intent.languages.target_language == "ko"
+    assert updated.intent.stt.custom_terms == {"en": ["new"], "ja": ["最新"]}
+    assert current.intent.ui.locale == "en"
+    assert displayed.intent.stt.custom_terms["en"] == ["old"]
 
 
 def test_custom_vocabulary_intent_derives_enabled_from_latest_rebased_terms() -> None:
-    current = AppSettings()
-    current.stt.custom_terms = {"en": ["stale"], "ja": ["latest"]}
-    current.stt.custom_vocabulary_enabled = True
+    current = _vnext(
+        stt=replace(
+            AppSettingsVNext().intent.stt,
+            custom_terms={"en": ["stale"], "ja": ["latest"]},
+            custom_vocabulary_enabled=True,
+        ),
+    )
 
     updated = materialize_immediate_settings_intent(
         current,
         CustomVocabularySettingsIntent("en", ()),
     )
 
-    assert updated.stt.custom_terms == {"en": [], "ja": ["latest"]}
-    assert updated.stt.custom_vocabulary_enabled is True
+    assert updated.intent.stt.custom_terms == {"en": [], "ja": ["latest"]}
+    assert updated.intent.stt.custom_vocabulary_enabled is True
 
-    no_other_terms = AppSettings()
-    no_other_terms.stt.custom_terms = {"en": ["stale"]}
+    no_other_terms = _vnext(
+        stt=replace(AppSettingsVNext().intent.stt, custom_terms={"en": ["stale"]}),
+    )
     cleared = materialize_immediate_settings_intent(
         no_other_terms,
         CustomVocabularySettingsIntent("en", ()),
     )
-    assert cleared.stt.custom_vocabulary_enabled is False
+    assert cleared.intent.stt.custom_vocabulary_enabled is False
 
 
 def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
-    current = AppSettings()
-    current.osc.connection_mode = "manual"
-    current.osc.send_port = 9010
-    current.osc.receive_port = 9011
-    current.osc.vrc_mic_intercept = False
-    current.osc.chatbox_include_source = False
-    current.desktop_audio.vad_speech_threshold = 0.73
-    current.desktop_audio.vad_hangover_ms = 900
-    current.desktop_audio.vad_pre_roll_ms = 225
-    current.overlay.target = "steamvr"
-    current.overlay.show_translation = False
-    current.overlay.desktop_flet.visual.background_alpha = 0.62
-    current.overlay.desktop_flet.swap_caption_languages = True
-    current.desktop_audio.output_device = "latest output"
+    baseline = AppSettingsVNext()
+    current = _vnext(
+        osc=replace(
+            baseline.intent.osc,
+            connection_mode="manual",
+            send_port=9010,
+            receive_port=9011,
+            vrc_mic_intercept=False,
+            chatbox_include_source=False,
+        ),
+        desktop_audio=replace(
+            baseline.intent.desktop_audio,
+            vad_speech_threshold=0.73,
+            vad_hangover_ms=900,
+            vad_pre_roll_ms=225,
+            output_device="latest output",
+        ),
+        overlay=replace(
+            baseline.intent.overlay,
+            target="steamvr",
+            show_translation=False,
+            desktop_flet=replace(
+                baseline.intent.overlay.desktop_flet,
+                swap_caption_languages=True,
+                visual=replace(
+                    baseline.intent.overlay.desktop_flet.visual,
+                    background_alpha=0.62,
+                ),
+            ),
+        ),
+    )
 
     updated = materialize_immediate_settings_intent(
         current,
@@ -149,45 +192,59 @@ def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
         DesktopOverlayBackgroundAlphaIntent(0.4),
     )
 
-    assert updated.osc.connection_mode == "manual"
-    assert updated.osc.send_port == 9010
-    assert updated.osc.receive_port == 9011
-    assert updated.osc.vrc_mic_intercept is True
-    assert updated.osc.chatbox_include_source is True
-    assert updated.desktop_audio.vad_speech_threshold == 0.73
-    assert updated.desktop_audio.vad_hangover_ms == 1200
-    assert updated.desktop_audio.vad_pre_roll_ms == 225
-    assert updated.overlay.target == "desktop"
-    assert updated.overlay.show_translation is False
-    assert updated.overlay.desktop_flet.visual.background_alpha == 0.4
-    assert updated.overlay.desktop_flet.swap_caption_languages is True
-    assert updated.audio.input_host_api == "MME"
-    assert updated.audio.input_device == "staged microphone"
-    assert updated.desktop_audio.output_device == "latest output"
+    assert updated.intent.osc.connection_mode == "manual"
+    assert updated.intent.osc.send_port == 9010
+    assert updated.intent.osc.receive_port == 9011
+    assert updated.intent.osc.vrc_mic_intercept is True
+    assert updated.intent.osc.chatbox_include_source is True
+    assert updated.intent.desktop_audio.vad_speech_threshold == 0.73
+    assert updated.intent.desktop_audio.vad_hangover_ms == 1200
+    assert updated.intent.desktop_audio.vad_pre_roll_ms == 225
+    assert updated.intent.overlay.target == "desktop"
+    assert updated.intent.overlay.show_translation is False
+    assert updated.intent.overlay.desktop_flet.visual.background_alpha == 0.4
+    assert updated.intent.overlay.desktop_flet.swap_caption_languages is True
+    assert updated.intent.audio.input_host_api == "MME"
+    assert updated.intent.audio.input_device == "staged microphone"
+    assert updated.intent.desktop_audio.output_device == "latest output"
 
 
 def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() -> None:
-    displayed = AppSettings()
-    displayed.translation.connection_history = {
-        TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
-        TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA,
-    }
+    displayed = _vnext(
+        translation=replace(
+            AppSettingsVNext().intent.translation,
+            connection_history={
+                TranslationModel.GEMMA4.value: TranslationConnection.MANAGED.value,
+                TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA.value,
+            },
+        ),
+    )
     provider, _general, _prompt, _overlay = settings_view_surface_snapshots(displayed)
     selection = replace(
         provider.translation,
         model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OPENROUTER,
     )
-    current = AppSettings()
-    current.languages.source_language = "ja"
-    current.audio.input_device = "latest microphone"
-    current.translation.gpu_device_id = "latest-llm-gpu"
-    current.translation.connection_history = {
-        TranslationModel.GEMMA4.value: TranslationConnection.OPENROUTER,
-        TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
-    }
-    current.custom_stt.model = "latest-custom-model"
-    current.custom_stt.extra = {"latest": True}
+    current = _vnext(
+        languages=replace(AppSettingsVNext().intent.languages, source_language="ja"),
+        audio=replace(AppSettingsVNext().intent.audio, input_device="latest microphone"),
+        translation=replace(
+            AppSettingsVNext().intent.translation,
+            gpu_device_id="latest-llm-gpu",
+            connection_history={
+                TranslationModel.GEMMA4.value: TranslationConnection.OPENROUTER.value,
+                TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
+            },
+        ),
+        stt=replace(
+            AppSettingsVNext().intent.stt,
+            custom=replace(
+                AppSettingsVNext().intent.stt.custom,
+                model="latest-custom-model",
+                extra={"latest": True},
+            ),
+        ),
+    )
 
     updated = materialize_provider_apply_intent(
         current,
@@ -205,62 +262,80 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
                 SystemPromptEdit("focused prompt"),
             )
         ),
-        materialize_translation=materialize_compatibility_translation_settings,
+        materialize_translation=materialize_canonical_translation_settings,
     )
 
-    assert updated.provider.llm == LLMProviderName.OPENROUTER
-    assert updated.translation.model == TranslationModel.GEMINI_37_FLASH
-    assert updated.translation.connection == TranslationConnection.OPENROUTER
-    assert updated.translation.connection_history[TranslationModel.GEMMA4.value] == (
-        TranslationConnection.OPENROUTER
+    translation = updated.intent.translation
+    assert provider_llm_for_translation(translation.model, translation.connection) == "openrouter"
+    assert translation.model == TranslationModel.GEMINI_37_FLASH.value
+    assert translation.connection == TranslationConnection.OPENROUTER.value
+    assert translation.connection_history[TranslationModel.GEMMA4.value] == (
+        TranslationConnection.OPENROUTER.value
     )
-    assert updated.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value] == (
-        TranslationConnection.OFFICIAL_BYOK
+    assert translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value] == (
+        TranslationConnection.OFFICIAL_BYOK.value
     )
-    assert updated.translation.connection_history[TranslationModel.GEMINI_37_FLASH.value] == (
-        TranslationConnection.OPENROUTER
+    assert translation.connection_history[TranslationModel.GEMINI_37_FLASH.value] == (
+        TranslationConnection.OPENROUTER.value
     )
-    assert updated.provider.stt == STTProviderName.DEEPGRAM
-    assert updated.provider.peer_stt == current.provider.peer_stt
-    assert updated.local_llm.base_url == "http://draft.local:11434"
-    assert updated.local_llm.model == current.local_llm.model
-    assert updated.local_llm.extra_body == current.local_llm.extra_body
-    assert updated.stt.gpu_device_id == "staged-stt-gpu"
-    assert updated.translation.gpu_device_id == "latest-llm-gpu"
-    assert updated.custom_stt.endpoint == "https://draft.invalid/v1/audio/transcriptions"
-    assert updated.custom_stt.model == "latest-custom-model"
-    assert updated.custom_stt.extra == {"latest": True}
-    assert updated.qwen.region == QwenRegion.SINGAPORE
-    assert updated.system_prompt == "focused prompt"
-    assert updated.languages.source_language == "ja"
-    assert updated.audio.input_device == "latest microphone"
+    assert updated.intent.stt.provider == STTProviderName.DEEPGRAM.value
+    assert updated.intent.peer_stt.provider == current.intent.peer_stt.provider
+    assert updated.intent.local_llm.base_url == "http://draft.local:11434"
+    assert updated.intent.local_llm.model == current.intent.local_llm.model
+    assert updated.intent.local_llm.extra_body == current.intent.local_llm.extra_body
+    assert updated.intent.stt.gpu_device_id == "staged-stt-gpu"
+    assert translation.gpu_device_id == "latest-llm-gpu"
+    assert updated.intent.stt.custom.endpoint == "https://draft.invalid/v1/audio/transcriptions"
+    assert updated.intent.stt.custom.model == "latest-custom-model"
+    assert updated.intent.stt.custom.extra == {"latest": True}
+    assert translation.qwen.region == QwenRegion.SINGAPORE.value
+    assert updated.intent.prompts.system_prompt == "focused prompt"
+    assert updated.intent.languages.source_language == "ja"
+    assert updated.intent.audio.input_device == "latest microphone"
 
 
 def test_prompt_intent_preserves_latest_languages_and_provider_selection() -> None:
-    current = AppSettings()
-    current.languages.source_language = "ja"
-    current.languages.target_language = "ko"
-    current.provider.llm = LLMProviderName.QWEN
+    current = _vnext(
+        languages=replace(
+            AppSettingsVNext().intent.languages,
+            source_language="ja",
+            target_language="ko",
+        ),
+        translation=replace(AppSettingsVNext().intent.translation, model="qwen35_plus"),
+    )
 
     updated = materialize_prompt_apply_intent(current, PromptApplyIntent("new prompt"))
 
-    assert updated.system_prompt == "new prompt"
-    assert updated.system_prompts == {}
-    assert updated.languages.source_language == "ja"
-    assert updated.languages.target_language == "ko"
-    assert updated.provider.llm == LLMProviderName.QWEN
+    assert updated.intent.prompts.system_prompt == "new prompt"
+    assert updated.intent.languages.source_language == "ja"
+    assert updated.intent.languages.target_language == "ko"
+    assert (
+        provider_llm_for_translation(
+            updated.intent.translation.model,
+            updated.intent.translation.connection,
+        )
+        == "qwen"
+    )
 
 
 def test_managed_byok_pkce_target_carries_focused_translation_change() -> None:
-    current = AppSettings()
-    current.provider.llm = LLMProviderName.OPENROUTER
-    current.translation.connection = TranslationConnection.MANAGED
-    current.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    current.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_MANAGED
-    current.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+    current = _vnext(
+        translation=replace(
+            AppSettingsVNext().intent.translation,
+            connection="managed",
+            openrouter_selected_source=OpenRouterCredentialSource.MANAGED.value,
+            openrouter_selection_alias="gemma4_26b_31b_managed",
+            openrouter_model="google/gemma-4-26b-a4b-it",
+        ),
+    )
+    owner = SettingsOwner(
+        path=Path("settings.json"),
+        persistence=SettingsVNextCanonicalPersistenceAdapter(),
+        canonical=current,
+    )
     adapter = UiProviderRuntimeAdapter.__new__(UiProviderRuntimeAdapter)
-    adapter.settings = SimpleNamespace(current=current)
-    adapter.build_byok_target_settings = build_managed_openrouter_byok_target_settings
+    adapter.settings = owner
+    adapter.build_byok_target_settings = owner.build_managed_openrouter_byok_target
 
     target = adapter.build_managed_openrouter_byok_target()
 
@@ -268,7 +343,7 @@ def test_managed_byok_pkce_target_carries_focused_translation_change() -> None:
     updated = materialize_provider_apply_intent(
         current,
         target.provider_intent,
-        materialize_translation=materialize_compatibility_translation_settings,
+        materialize_translation=materialize_canonical_translation_settings,
     )
-    assert updated.translation.connection == TranslationConnection.OPENROUTER
-    assert current.translation.connection == TranslationConnection.MANAGED
+    assert updated.intent.translation.connection == TranslationConnection.OPENROUTER.value
+    assert current.intent.translation.connection == "managed"

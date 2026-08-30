@@ -399,10 +399,12 @@
       "runtime_all_matches_exports": true,
       "facade_contract": null,
       "exports": [
+        {"name": "apply_canonical_delta", "kind": "attribute"},
         {"name": "from_dict", "kind": "attribute"},
         {"name": "from_legacy_app_settings", "kind": "attribute"},
         {"name": "is_vnext_shape_dict", "kind": "attribute"},
         {"name": "is_vnext_settings_dict", "kind": "attribute"},
+        {"name": "merge_canonical_payload", "kind": "attribute"},
         {"name": "to_legacy_dict", "kind": "attribute"}
       ]
     },

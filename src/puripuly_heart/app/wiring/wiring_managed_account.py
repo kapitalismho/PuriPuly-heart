@@ -53,9 +53,9 @@ from puripuly_heart.core.orchestrator.configuration import (
 from .wiring_managed_auth_factory import (
     ManagedAuthRuntimeAdapter,
     ManagedTranslationRuntimeAdapter,
-    build_managed_identity_state_port,
     build_openrouter_credential_runtime_config_from_vnext,
     build_openrouter_release_runtime_config_from_vnext,
+    managed_identity_state_port_from_vnext,
     managed_openrouter_selected_from_vnext,
 )
 from .wiring_managed_gemma import managed_gemma_selection
@@ -187,7 +187,7 @@ class ManagedOpenRouterReleaseRuntime:
         *,
         secrets: object,
     ) -> ManagedOpenRouterReleaseService | None:
-        current = self.settings.current
+        current = self.settings.canonical
         release_settings = self.release_settings()
         if current is None or release_settings is None:
             return None
@@ -209,10 +209,7 @@ class ManagedOpenRouterReleaseRuntime:
 
         return ManagedOpenRouterReleaseService(
             openrouter_config=build_openrouter_release_runtime_config_from_vnext(release_settings),
-            managed_state=build_managed_identity_state_port(
-                current.managed_identity,
-                lambda: self.settings.managed_identity_persistence_callback(current)(current),
-            ),
+            managed_state=managed_identity_state_port_from_vnext(self.settings, current),
             secrets=secrets,
             client=client,
             raw_hardware_fingerprint_provider=get_raw_hardware_fingerprint,
@@ -281,7 +278,7 @@ class ManagedUsageRuntimeAdapter:
         )
 
     async def fetch_metadata(self) -> ManagedUsageMetadataResult:
-        current = self.settings.current
+        current = self.settings.canonical
         release_settings = self.release.release_settings()
         if current is None or release_settings is None:
             return ManagedUsageMetadataResult(key_available=False, metadata=None)
@@ -302,11 +299,11 @@ class ManagedUsageRuntimeAdapter:
         return ManagedUsageMetadataResult(key_available=True, metadata=metadata)
 
     def should_auto_show_founder_letter(self, metadata: object) -> bool:
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None:
             return False
         return should_auto_show_founder_letter(
-            build_managed_identity_state_port(current.managed_identity, lambda: None),
+            managed_identity_state_port_from_vnext(self.settings, current),
             metadata,
         )
 
@@ -428,11 +425,14 @@ def compose_managed_account(
     translation_owner: TranslationEnableOwner | None = None
 
     async def warmup_translation() -> None:
-        current = settings.current
+        current = settings.canonical
         if (
             current is not None
-            and current.translation.model
-            in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
+            and current.intent.translation.model
+            in {
+                TranslationModel.MANAGED_GEMMA.value,
+                TranslationModel.MANAGED_GEMMA_12B.value,
+            }
             and managed_gemma is not None
         ):
             if sync_local_translation_demand is not None:
@@ -504,7 +504,7 @@ def compose_managed_account(
         provider_settings=provider_settings,
         provider_runtime=provider_runtime,
         secret_store_factory=lambda current: SyncSecretStoreAdapter(
-            create_secret_store(current.secrets, config_path=config_path)
+            create_secret_store(current.intent.secrets, config_path=config_path)
         ),
         failure_message_sink=lambda key: message_sink(key, {}),
         failure_diagnostics_sink=log_error,

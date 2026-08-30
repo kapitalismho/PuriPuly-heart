@@ -3224,8 +3224,8 @@ async def test_prompt_apply_keeps_dashboard_target_for_next_request() -> None:
     current_settings.languages.target_language = "ja"
     applied_targets: list[str] = []
 
-    async def fake_apply_settings(settings: AppSettings) -> None:
-        applied_targets.append(settings.languages.target_language)
+    async def fake_apply_settings(settings) -> None:
+        applied_targets.append(settings.intent.languages.target_language)
 
     controller = SimpleNamespace(
         settings=current_settings,
@@ -4140,10 +4140,7 @@ def test_on_overlay_state_changed_routes_runtime_logs() -> None:
 async def test_on_language_change_updates_settings_and_shows_warning(monkeypatch) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    settings = SimpleNamespace(
-        languages=SimpleNamespace(source_language="ko", target_language="en"),
-        provider=SimpleNamespace(stt=SimpleNamespace(value="deepgram")),
-    )
+    settings = AppSettings()
     seen = []
 
     async def fake_on_dashboard_language_change(change) -> None:
@@ -4184,10 +4181,7 @@ async def test_on_language_change_forwards_automatic_peer_mode(
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    settings = SimpleNamespace(
-        languages=SimpleNamespace(source_language="ko", target_language="en"),
-        provider=SimpleNamespace(stt=SimpleNamespace(value="deepgram")),
-    )
+    settings = AppSettings()
     seen = []
 
     async def callback(change) -> None:

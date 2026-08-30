@@ -479,6 +479,14 @@ class LanguageIntent:
             ),
         )
 
+    @property
+    def effective_peer_source(self) -> str:
+        return self.peer_source_language or self.source_language
+
+    @property
+    def effective_peer_target(self) -> str:
+        return self.peer_target_language or self.target_language
+
 
 @dataclass(frozen=True, slots=True)
 class AudioIntent:

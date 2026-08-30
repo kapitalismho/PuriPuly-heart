@@ -1372,10 +1372,11 @@ class TranslatorApp:
         settings = self.application.compatibility_settings()
         if settings is None:
             return
-        previous_source_code = settings.languages.source_language
-        previous_target_code = settings.languages.target_language
-        previous_peer_source_code = getattr(settings.languages, "peer_source_language", "")
-        previous_peer_target_code = getattr(settings.languages, "peer_target_language", "")
+        languages = settings.intent.languages
+        previous_source_code = languages.source_language
+        previous_target_code = languages.target_language
+        previous_peer_source_code = languages.peer_source_language
+        previous_peer_target_code = languages.peer_target_language
         self._log_basic(
             "[Dashboard] Language change requested: "
             f"source={previous_source_code}->{change.source_code} "
@@ -1390,7 +1391,7 @@ class TranslatorApp:
         # Check STT provider compatibility and show warning if needed
         warning = None
         if change.source_code != previous_source_code:
-            stt_provider = settings.provider.stt.value
+            stt_provider = settings.intent.stt.provider
             warning = get_stt_compatibility_warning(change.source_code, stt_provider)
         if warning:
             snackbar = ft.SnackBar(

@@ -24,25 +24,26 @@ from puripuly_heart.providers.llm.managed_gemma import HttpxManagedGemmaTranspor
 def managed_gemma_selection(
     settings: object,
 ) -> ManagedGemmaTranslationSelection:
-    translation = getattr(settings, "translation")
-    model = getattr(translation, "model")
-    model_value = getattr(model, "value", model)
+    intent = getattr(settings, "intent", None)
+    if intent is None:
+        raise TypeError("managed Gemma selection requires AppSettingsVNext")
+    translation = intent.translation
+    model_value = translation.model
     if model_value == "managed_gemma_12b":
         backend = "gpu"
         model_id = GEMMA_12B_MODEL_ID
     elif model_value == "managed_gemma":
-        connection = getattr(translation, "connection")
-        backend = getattr(connection, "value", connection)
+        backend = translation.connection
         if backend not in {"cpu", "gpu"}:
             raise ValueError("managed Gemma connection must be CPU or GPU")
         model_id = GEMMA_MODEL_ID
     else:
         raise ValueError("managed Gemma selection requires the managed Gemma model")
-    languages = getattr(settings, "languages")
-    source_language = getattr(languages, "source_language")
-    target_language = getattr(languages, "target_language")
+    languages = intent.languages
+    source_language = languages.source_language
+    target_language = languages.target_language
     system_prompt = render_translation_system_prompt(
-        getattr(settings, "system_prompt"),
+        intent.prompts.system_prompt,
         source_language=source_language,
         target_language=target_language,
     )
@@ -52,7 +53,7 @@ def managed_gemma_selection(
         target_language=target_language,
         system_prompt=system_prompt,
         model_id=model_id,
-        vulkan_device=resolve_llama_vulkan_device(getattr(translation, "gpu_device_id", "auto")),
+        vulkan_device=resolve_llama_vulkan_device(translation.gpu_device_id),
     )
 
 
@@ -77,7 +78,7 @@ async def sync_managed_gemma_demand(
         return
     if settings is None:
         return
-    model = getattr(getattr(settings, "translation", None), "model", None)
+    model = getattr(getattr(getattr(settings, "intent", None), "translation", None), "model", None)
     if getattr(model, "value", model) not in {"managed_gemma", "managed_gemma_12b"}:
         return
     await managed_gemma.prepare(managed_gemma_selection(settings))

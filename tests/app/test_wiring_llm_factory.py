@@ -217,7 +217,9 @@ async def test_mixed_managed_fallback_rebuilds_release_service_for_fallback_kind
     settings.translation.connection = TranslationConnection.MANAGED
     secrets = InMemorySecretStore()
     release_service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(
+            from_legacy_app_settings(settings)
+        ),
         managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
         secrets=secrets,
         client=UnavailableManagedOpenRouterReleaseClient(),

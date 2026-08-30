@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import threading
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -27,7 +28,6 @@ from puripuly_heart.app.ports.canonical_settings_persistence import (
     ProviderVerificationBinding,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
@@ -65,24 +65,43 @@ class BlockingByKeySecretStore(MemorySecretStore):
         self.values[key] = value
 
 
+def _with_locale(settings: AppSettingsVNext, locale: str) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(settings.intent, ui=replace(settings.intent.ui, locale=locale)),
+    )
+
+
+def _with_referral(settings: AppSettingsVNext, referral_id: str) -> AppSettingsVNext:
+    return replace(
+        settings,
+        state=replace(
+            settings.state,
+            managed_connection=replace(
+                settings.state.managed_connection,
+                referral_id=referral_id,
+            ),
+        ),
+    )
+
+
 def _provider_settings_owner(
     path: Path,
     store: MemorySecretStore,
 ) -> ProviderSettingsOwner:
-    settings = AppSettings()
+    canonical = AppSettingsVNext()
     owner = SettingsOwner(
         path=path,
         persistence=SettingsVNextCanonicalPersistenceAdapter(),
-        canonical=AppSettingsVNext(),
-        current=settings,
+        canonical=canonical,
         authoritative=True,
-        projection_snapshot=copy.deepcopy(settings),
+        projection_snapshot=copy.deepcopy(canonical),
     )
     return ProviderSettingsOwner(
         settings=owner,
         binding=ProviderVerificationBindingOwner(
             context_provider=lambda provider: provider_verification_context(
-                owner.current,
+                owner.canonical,
                 provider,
                 low_latency=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
             ),
@@ -98,8 +117,7 @@ def _owner_with_verified_openrouter(
 ) -> ProviderSettingsOwner:
     provider_settings = _provider_settings_owner(path, store)
     owner = provider_settings.settings
-    assert owner.current is not None
-    owner.current.api_key_verified.openrouter = True
+    assert owner.canonical is not None
     owner.bind_provider_verification(
         ProviderVerificationBinding(
             provider="openrouter",
@@ -111,15 +129,16 @@ def _owner_with_verified_openrouter(
         )
     )
     owner.persist()
-    owner.remember_projection(owner.current)
+    owner.remember_projection(owner.require_canonical())
     return provider_settings
 
 
-def test_canonical_settings_persistence_port_covers_load_project_delta_save_and_rollback(
+def test_canonical_settings_persistence_port_covers_load_save_and_rollback(
     monkeypatch,
 ) -> None:
+    from puripuly_heart.config.settings_vnext.migration import apply_canonical_delta
+
     adapter = SettingsVNextCanonicalPersistenceAdapter()
-    settings = AppSettings()
     canonical = AppSettingsVNext()
     path = Path("settings.json")
     saved: list[AppSettingsVNext] = []
@@ -137,21 +156,11 @@ def test_canonical_settings_persistence_port_covers_load_project_delta_save_and_
     )
     loaded = adapter.load_active(path)
     assert loaded.canonical_settings is canonical
-    assert loaded.compatibility_settings.stt.low_latency_mode is True
 
-    projected = adapter.project(settings, canonical=None, authoritative=False)
-    assert projected.intent.languages.peer_source_mode == "manual"
-    assert projected.intent.languages.peer_expected_languages == []
-
-    assert adapter.project(settings, canonical=canonical, authoritative=True) is canonical
-    assert adapter.project(settings, canonical=canonical, authoritative=False) == projected
-
-    updated = copy.deepcopy(settings)
-    updated.ui.locale = "ja"
-    updated_canonical = adapter.apply_legacy_delta(
-        canonical=projected,
-        base_settings=settings,
-        next_settings=updated,
+    updated_canonical = apply_canonical_delta(
+        canonical,
+        canonical,
+        _with_locale(canonical, "ja"),
     )
     assert updated_canonical.intent.ui.locale == "ja"
 
@@ -173,16 +182,14 @@ def test_canonical_settings_persistence_port_covers_load_project_delta_save_and_
     owner = SettingsOwner(
         path=path,
         persistence=adapter,
-        canonical=projected,
-        current=copy.deepcopy(settings),
+        canonical=updated_canonical,
         authoritative=True,
-        projection_snapshot=copy.deepcopy(settings),
+        projection_snapshot=copy.deepcopy(updated_canonical),
     )
-    owner.current.ui.locale = "ja"
     assert owner.save_current()
-    assert owner.current.ui.locale == "ja"
+    assert owner.require_canonical().intent.ui.locale == "ja"
     assert owner.projection_snapshot is not None
-    assert owner.projection_snapshot.ui.locale == "ja"
+    assert owner.projection_snapshot.intent.ui.locale == "ja"
     assert owner.mutation_depth == 0
 
     failures: list[BaseException] = []
@@ -191,11 +198,11 @@ def test_canonical_settings_persistence_port_covers_load_project_delta_save_and_
         raise OSError("injected save failure")
 
     monkeypatch.setattr(adapter_module, "save_vnext_settings", fail_save)
-    owner.current.ui.locale = "ko"
+    owner.canonical = _with_locale(owner.require_canonical(), "ko")
     assert not owner.save_current(failure_sink=failures.append)
     assert len(failures) == 1
     assert isinstance(failures[0], OSError)
-    assert owner.current.ui.locale == "ja"
+    assert owner.require_canonical().intent.ui.locale == "ja"
     assert owner.mutation_depth == 0
 
     with pytest.raises(OSError, match="injected save failure"):
@@ -206,42 +213,50 @@ def test_canonical_settings_persistence_port_covers_load_project_delta_save_and_
         "save_vnext_settings",
         lambda _path, value: saved.append(value) or SimpleNamespace(ok=True),
     )
-    stale_settings = copy.deepcopy(owner.current)
+    stale_settings = copy.deepcopy(owner.require_canonical())
     persist_managed_identity = owner.managed_identity_persistence_callback(stale_settings)
-    active_settings = copy.deepcopy(stale_settings)
-    active_settings.ui.locale = "ru"
-    owner.current = active_settings
+    active_settings = _with_locale(stale_settings, "ru")
+    owner.canonical = active_settings
     owner.remember_projection(active_settings)
     owner.persist_current()
 
-    stale_settings.managed_identity.referral_id = "234567"
-    persist_managed_identity(stale_settings)
+    persist_managed_identity(_with_referral(stale_settings, "234567"))
 
-    assert owner.current.ui.locale == "ru"
-    assert owner.current.managed_identity.referral_id == "234567"
-    assert owner.canonical.state.managed_connection.referral_id == "234567"
+    assert owner.require_canonical().intent.ui.locale == "ru"
+    assert owner.require_canonical().state.managed_connection.referral_id == "234567"
 
-    active_before_failure = copy.deepcopy(owner.current)
-    stale_before_failure = copy.deepcopy(stale_settings)
+    active_before_failure = copy.deepcopy(owner.require_canonical())
     monkeypatch.setattr(adapter_module, "save_vnext_settings", fail_save)
-    stale_settings.managed_identity.referral_id = "345678"
     with pytest.raises(OSError, match="injected save failure"):
-        persist_managed_identity(stale_settings)
-    assert owner.current == active_before_failure
-    assert stale_settings == stale_before_failure
+        persist_managed_identity(_with_referral(stale_settings, "345678"))
+    assert owner.canonical == active_before_failure
 
 
 def test_canonical_delta_requires_bound_evidence_and_preserves_invalidation() -> None:
-    adapter = SettingsVNextCanonicalPersistenceAdapter()
-    baseline = AppSettings()
-    verified_settings = copy.deepcopy(baseline)
-    verified_settings.api_key_verified.openrouter = True
+    from puripuly_heart.config.settings_vnext.migration import apply_canonical_delta
+    from puripuly_heart.config.settings_vnext.schema import ProviderVerificationEntry
 
-    unbound = adapter.apply_legacy_delta(
-        canonical=AppSettingsVNext(),
-        base_settings=baseline,
-        next_settings=verified_settings,
+    adapter = SettingsVNextCanonicalPersistenceAdapter()
+    baseline = AppSettingsVNext()
+    claimed_verified = replace(
+        baseline,
+        state=replace(
+            baseline.state,
+            provider_verification=replace(
+                baseline.state.provider_verification,
+                openrouter=ProviderVerificationEntry(
+                    status="verified",
+                    provider="openrouter",
+                    secret_key="openrouter_api_key",
+                    secret_fingerprint="sha256:forged",
+                    verifier_context={"flow": "settings_api_key_verification"},
+                    verifier_evidence={"source": "forged"},
+                ),
+            ),
+        ),
     )
+
+    unbound = apply_canonical_delta(AppSettingsVNext(), baseline, claimed_verified)
 
     assert unbound.state.provider_verification.openrouter.status == "unknown"
 
@@ -259,12 +274,19 @@ def test_canonical_delta_requires_bound_evidence_and_preserves_invalidation() ->
     assert verified.state.provider_verification.openrouter.status == "verified"
     assert verified.state.provider_verification.openrouter.secret_key == "openrouter_api_key"
 
-    invalidated_settings = copy.deepcopy(verified_settings)
-    invalidated_settings.api_key_verified.openrouter = False
-    invalidated = adapter.apply_legacy_delta(
-        canonical=verified,
-        base_settings=verified_settings,
-        next_settings=invalidated_settings,
+    invalidated = apply_canonical_delta(
+        verified,
+        claimed_verified,
+        replace(
+            claimed_verified,
+            state=replace(
+                claimed_verified.state,
+                provider_verification=replace(
+                    claimed_verified.state.provider_verification,
+                    openrouter=ProviderVerificationEntry(status="unknown"),
+                ),
+            ),
+        ),
     )
 
     assert invalidated.state.provider_verification.openrouter.status == "unknown"
@@ -318,8 +340,6 @@ def test_settings_owner_rejects_verification_for_nonmatching_secret_store_value(
         )
 
     owner = provider_settings.settings
-    assert owner.current is not None
-    assert owner.current.api_key_verified.openrouter is False
     assert owner.canonical is not None
     assert owner.canonical.state.provider_verification.openrouter.status == "unknown"
     assert owner.mutation_depth == 0
@@ -341,8 +361,6 @@ async def test_provider_secret_change_invalidates_before_reverification_and_rela
 
     assert store.get("openrouter_api_key") == "new-secret"
     owner = provider_settings.settings
-    assert owner.current is not None
-    assert owner.current.api_key_verified.openrouter is False
     assert owner.canonical is not None
     assert owner.canonical.state.provider_verification.openrouter.status == "unknown"
     reloaded = load_vnext_settings(path)
@@ -357,8 +375,8 @@ async def test_http_extension_secret_change_uses_transaction_without_settings_wr
     path = tmp_path / "settings.json"
     store = MemorySecretStore()
     provider_settings = _provider_settings_owner(path, store)
-    assert provider_settings.settings.current is not None
-    before = copy.deepcopy(provider_settings.settings.current)
+    assert provider_settings.settings.canonical is not None
+    before = copy.deepcopy(provider_settings.settings.canonical)
 
     assert await provider_settings.change_secret(
         "http_extension.demo.api_key",
@@ -366,7 +384,7 @@ async def test_http_extension_secret_change_uses_transaction_without_settings_wr
     )
 
     assert store.get("http_extension.demo.api_key") == "extension-secret"
-    assert provider_settings.settings.current == before
+    assert provider_settings.settings.canonical == before
     assert not path.exists()
 
 
@@ -392,8 +410,6 @@ async def test_provider_secret_change_restores_secret_and_verification_on_commit
 
     assert store.get("openrouter_api_key") == "old-secret"
     owner = provider_settings.settings
-    assert owner.current is not None
-    assert owner.current.api_key_verified.openrouter is True
     assert owner.canonical is not None
     assert owner.canonical.state.provider_verification.openrouter.status == "verified"
     assert path.read_bytes() == persisted_before
@@ -421,8 +437,11 @@ async def test_provider_secret_change_finishes_invalidation_when_caller_is_cance
         await task
 
     assert store.get("openrouter_api_key") == "new-secret"
-    assert provider_settings.settings.current is not None
-    assert provider_settings.settings.current.api_key_verified.openrouter is False
+    assert provider_settings.settings.canonical is not None
+    assert (
+        provider_settings.settings.canonical.state.provider_verification.openrouter.status
+        == "unknown"
+    )
     reloaded = load_vnext_settings(path)
     assert reloaded.settings is not None
     assert reloaded.settings.state.provider_verification.openrouter.status == "unknown"
@@ -452,8 +471,6 @@ async def test_overlapping_provider_secret_changes_preserve_both_invalidations(
     )
     provider_settings = _owner_with_verified_openrouter(path, store)
     owner = provider_settings.settings
-    assert owner.current is not None
-    owner.current.api_key_verified.deepseek = True
     owner.bind_provider_verification(
         ProviderVerificationBinding(
             provider="deepseek",
@@ -465,7 +482,7 @@ async def test_overlapping_provider_secret_changes_preserve_both_invalidations(
         )
     )
     owner.persist()
-    owner.remember_projection(owner.current)
+    owner.remember_projection(owner.require_canonical())
 
     first_task = asyncio.create_task(provider_settings.change_secret(first_key, f"new-{first_key}"))
     assert await asyncio.to_thread(store.started[first_key].wait, 2)
@@ -483,9 +500,6 @@ async def test_overlapping_provider_secret_changes_preserve_both_invalidations(
     assert await second_task
     assert store.get("openrouter_api_key") == "new-openrouter_api_key"
     assert store.get("deepseek_api_key") == "new-deepseek_api_key"
-    assert owner.current is not None
-    assert owner.current.api_key_verified.openrouter is False
-    assert owner.current.api_key_verified.deepseek is False
     assert owner.canonical is not None
     assert owner.canonical.state.provider_verification.openrouter.status == "unknown"
     assert owner.canonical.state.provider_verification.deepseek.status == "unknown"

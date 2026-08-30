@@ -67,7 +67,6 @@ def _owner(settings: AppSettings) -> SettingsOwner:
         path=Path("settings.json"),
         persistence=SettingsVNextCanonicalPersistenceAdapter(),
         canonical=from_legacy_app_settings(settings),
-        current=settings,
         authoritative=True,
     )
 
@@ -255,5 +254,7 @@ def test_founder_letter_marks_active_identity_and_persists_after_dialog() -> Non
 
     adapter.show_founder_letter()
 
-    assert settings.managed_identity.founder_letter_seen_credential_ref == "managed-ref"
+    canonical = adapter.settings.canonical
+    assert canonical is not None
+    assert canonical.state.managed_connection.founder_letter_seen_credential_ref == "managed-ref"
     assert persisted == ["persist"]

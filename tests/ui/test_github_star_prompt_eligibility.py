@@ -23,10 +23,11 @@ from puripuly_heart.config.settings import (
     LLMProviderName,
     TranslationConnection,
     TranslationModel,
-    from_dict,
     materialize_translation_settings,
-    to_dict,
 )
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.settings_vnext.serialization import to_dict as canonical_to_dict
 from puripuly_heart.domain.events import UIEvent, UIEventType
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata
@@ -41,7 +42,7 @@ from puripuly_heart.ui.event_bridge import (
 class PromptBackend:
     def __init__(self, settings: AppSettings) -> None:
         self.settings_owner = compose_settings_owner(Path("settings.json"))
-        self.settings_owner.current = settings
+        self.settings_owner.canonical = from_legacy_app_settings(settings)
         self.usage = SimpleNamespace(usage_metadata=None)
         self.owner = compose_github_star_prompt_owner(
             settings=self.settings_owner,
@@ -55,8 +56,8 @@ class PromptBackend:
         )
 
     @property
-    def settings(self) -> AppSettings:
-        return self.settings_owner.current
+    def settings(self) -> AppSettingsVNext:
+        return self.settings_owner.canonical
 
     def _get_managed_usage_owner(self) -> object:
         return self.usage
@@ -80,7 +81,7 @@ def _prompt_backend_for(settings: AppSettings) -> PromptBackend:
 
 def _patch_settings_save(monkeypatch: pytest.MonkeyPatch, callback) -> None:
     def persist(owner) -> None:
-        callback(owner.path, owner.compatibility_projection())
+        callback(owner.path, owner.canonical)
 
     monkeypatch.setattr(settings_module.SettingsOwner, "persist", persist)
 
@@ -205,17 +206,17 @@ def test_user_owned_cloud_translation_success_observation_persists_through_setti
     controller = _prompt_backend_for(settings)
     saved_payloads: list[dict[str, object]] = []
 
-    def fake_save_settings(_path: Path, updated: AppSettings) -> None:
-        saved_payloads.append(to_dict(updated))
+    def fake_save_settings(_path: Path, updated: AppSettingsVNext) -> None:
+        saved_payloads.append(canonical_to_dict(updated))
 
     _patch_settings_save(monkeypatch, fake_save_settings)
 
     assert controller._get_github_star_prompt_owner().record_translation_success_observed() is True
 
-    assert settings.ui.github_star_prompt_translation_success_observed is True
+    assert controller.settings.state.github_star_prompt.translation_success_observed is True
     assert saved_payloads
-    restored = from_dict(saved_payloads[-1])
-    assert restored.ui.github_star_prompt_translation_success_observed is True
+    restored = saved_payloads[-1]["state"]["github_star_prompt"]
+    assert restored["translation_success_observed"] is True
 
 
 @pytest.mark.parametrize(
@@ -241,7 +242,7 @@ def test_translation_success_observation_ignores_non_user_owned_cloud_connection
 
     assert controller._get_github_star_prompt_owner().record_translation_success_observed() is False
 
-    assert settings.ui.github_star_prompt_translation_success_observed is False
+    assert controller.settings.state.github_star_prompt.translation_success_observed is False
     assert save_calls == []
 
 
@@ -307,8 +308,8 @@ async def test_event_bridge_records_successful_translation_for_user_owned_cloud_
         def set_display_translation_text(self, *_args: object, **_kwargs: object) -> None:
             return None
 
-    def fake_save_settings(_path: Path, updated: AppSettings) -> None:
-        saved_payloads.append(to_dict(updated))
+    def fake_save_settings(_path: Path, updated: AppSettingsVNext) -> None:
+        saved_payloads.append(canonical_to_dict(updated))
 
     _patch_settings_save(monkeypatch, fake_save_settings)
 
@@ -338,5 +339,5 @@ async def test_event_bridge_records_successful_translation_for_user_owned_cloud_
 
     await _wait_until(lambda: bool(saved_payloads))
 
-    assert settings.ui.github_star_prompt_translation_success_observed is True
+    assert controller.settings.state.github_star_prompt.translation_success_observed is True
     assert saved_payloads

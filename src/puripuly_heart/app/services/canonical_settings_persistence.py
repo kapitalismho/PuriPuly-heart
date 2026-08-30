@@ -3,12 +3,9 @@ from __future__ import annotations
 import asyncio
 import copy
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass, fields, replace
-from enum import Enum
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import cast
 
-import puripuly_heart.config.settings as legacy_settings
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
@@ -25,39 +22,35 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     _settings_mutation_diagnostics,
 )
 from puripuly_heart.app.services.settings_mutation_legacy import (
-    _apply_settings_path_patch,
+    apply_settings_path_patch,
 )
-from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.config.settings_vnext.defaults import new_settings_for_first_run
+from puripuly_heart.config.settings_vnext.migration import (
+    apply_canonical_delta,
+    merge_canonical_payload,
+)
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     CaptureTargetIntent,
+    ProviderVerificationEntry,
     with_capture_target,
+    with_telemetry_enabled,
+    with_translation_runtime_policy,
 )
+from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.core.translation_policy import (
     FIXED_TRANSLATION_POLICY,
     TranslationRuntimePolicy,
 )
 
 
-def _legacy_settings_snapshot_value(value: object) -> object:
-    if isinstance(value, Enum):
-        return value.value
-    if isinstance(value, Mapping):
-        return {
-            str(key): _legacy_settings_snapshot_value(nested_value)
-            for key, nested_value in value.items()
-        }
-    if isinstance(value, tuple | list):
-        return [_legacy_settings_snapshot_value(item) for item in value]
-    return copy.deepcopy(value)
+def canonical_snapshot_values(settings: AppSettingsVNext) -> dict[str, object]:
+    return serialization.to_dict(settings)
 
 
-def legacy_settings_snapshot_values(settings: AppSettings) -> dict[str, object]:
-    return cast(dict[str, object], _legacy_settings_snapshot_value(asdict(settings)))
+def _managed_connection_delta(baseline: object, current: object) -> dict[str, object]:
+    from dataclasses import asdict
 
-
-def _managed_identity_delta(baseline: object, current: object) -> dict[str, object]:
     baseline_values = asdict(baseline)
     current_values = asdict(current)
     return {
@@ -67,107 +60,46 @@ def _managed_identity_delta(baseline: object, current: object) -> dict[str, obje
     }
 
 
-def _apply_managed_identity_delta(
-    settings: AppSettings,
-    values: Mapping[str, object],
-) -> None:
-    for field_name, value in values.items():
-        setattr(settings.managed_identity, field_name, copy.deepcopy(value))
-
-
-def _restore_managed_identity(settings: AppSettings, snapshot: object) -> None:
-    for field_name, value in asdict(snapshot).items():
-        setattr(settings.managed_identity, field_name, copy.deepcopy(value))
-
-
-def _apply_managed_pending_delivery_ack_patch(
-    settings: AppSettings,
-    values: Mapping[str, object],
-) -> None:
-    state = values.get("state")
-    if not isinstance(state, Mapping):
-        return
-    managed = state.get("managed_connection")
-    if not isinstance(managed, Mapping):
-        return
-    field_map = {
-        "installation_id": "installation_id",
-        "release_token": "release_token",
-        "release_token_expires_at": "release_token_expires_at",
-        "verified_hardware_hash": "verified_hardware_hash",
-        "verified_hardware_hash_salt_version": "verified_hardware_hash_salt_version",
-        "active_managed_credential_ref": "active_managed_credential_ref",
-        "active_managed_expires_at": "active_managed_expires_at",
-        "founder_letter_seen_credential_ref": "founder_letter_seen_credential_ref",
-        "referral_id": "referral_id",
-        "local_managed_claim_sources": "local_managed_claim_sources",
-        "pending_delivery_ack_source": "pending_delivery_ack_source",
-        "pending_delivery_ack_delivery_id": "pending_delivery_ack_delivery_id",
-        "pending_delivery_ack_managed_credential_ref": (
-            "pending_delivery_ack_managed_credential_ref"
-        ),
-        "pending_delivery_ack_expires_at": "pending_delivery_ack_expires_at",
-    }
-    for source_key, attr_name in field_map.items():
-        if source_key not in managed:
-            continue
-        value = managed[source_key]
-        if attr_name == "local_managed_claim_sources":
-            setattr(
-                settings.managed_identity,
-                attr_name,
-                tuple(value) if isinstance(value, list) else (),
-            )
-        elif attr_name == "verified_hardware_hash_salt_version":
-            setattr(
-                settings.managed_identity,
-                attr_name,
-                value if type(value) is int else None,
-            )
-        else:
-            setattr(
-                settings.managed_identity,
-                attr_name,
-                value if isinstance(value, str) else None,
-            )
-
-
 @dataclass(slots=True)
-class LegacySettingsPatchRepository:
+class CanonicalSettingsPatchRepository:
     owner: SettingsOwner
-    committed_settings: AppSettings
-    base_settings: AppSettings | None = None
+    committed_settings: AppSettingsVNext
+    base_settings: AppSettingsVNext | None = None
     surface: str = "translation_provider"
     provider_verification_binding: ProviderVerificationBinding | None = None
     save_failure_sink: Callable[[str], None] | None = None
     commit_succeeded: bool = False
 
     async def load(self) -> SettingsSnapshot:
-        settings = self.owner.current or self.committed_settings
+        settings = self.owner.canonical or self.committed_settings
         return SettingsSnapshot(
-            values=legacy_settings_snapshot_values(settings),
+            values=canonical_snapshot_values(settings),
             revision=None,
         )
 
     async def save(self, request: SettingsCommitRequest) -> SettingsCommitResult:
         self.commit_succeeded = False
         base_settings = self.base_settings
-        next_settings = copy.deepcopy(base_settings or self.committed_settings)
+        source = base_settings or self.committed_settings
         if (
             base_settings is None
             and "state" not in request.values
             and "intent" not in request.values
         ):
             next_settings = copy.deepcopy(self.committed_settings)
-        elif all(isinstance(path, str) and "." in path for path in request.values):
-            _apply_settings_path_patch(next_settings, request.values)
+        elif request.values and all(
+            isinstance(path, str) and "." in path for path in request.values
+        ):
+            next_settings = apply_settings_path_patch(source, request.values)
         elif "state" in request.values or "intent" in request.values:
-            _apply_managed_pending_delivery_ack_patch(next_settings, request.values)
+            next_settings = merge_canonical_payload(source, request.values)
         else:
             next_settings = copy.deepcopy(self.committed_settings)
+        if not isinstance(next_settings, AppSettingsVNext):
+            raise TypeError("canonical patch repository requires AppSettingsVNext")
         self.owner.begin()
         try:
-            self.owner.apply_legacy_delta(
+            self.owner.apply_canonical_delta(
                 self.owner.projection_snapshot or base_settings or next_settings,
                 next_settings,
             )
@@ -198,7 +130,7 @@ class LegacySettingsPatchRepository:
         return SettingsCommitResult(
             succeeded=True,
             snapshot=SettingsSnapshot(
-                values=legacy_settings_snapshot_values(self.committed_settings),
+                values=canonical_snapshot_values(self.committed_settings),
                 revision=None,
             ),
             message=None,
@@ -206,32 +138,13 @@ class LegacySettingsPatchRepository:
         )
 
 
-def compose_canonical_settings_persistence() -> (
-    CanonicalSettingsPersistencePort[AppSettings, AppSettingsVNext]
-):
+def compose_canonical_settings_persistence() -> CanonicalSettingsPersistencePort:
     return SettingsVNextCanonicalPersistenceAdapter()
-
-
-def materialize_compatibility_translation_settings(settings: AppSettings) -> AppSettings:
-    return legacy_settings.materialize_translation_settings(settings)
-
-
-def compatibility_telemetry_enabled_settings(
-    settings: AppSettings,
-    enabled: bool,
-) -> AppSettings:
-    return legacy_settings.with_telemetry_enabled(settings, enabled)
-
-
-def compatibility_managed_openrouter_byok_target_settings(
-    current_settings: AppSettings | None,
-) -> AppSettings | None:
-    return legacy_settings.build_managed_openrouter_byok_target_settings(current_settings)
 
 
 @dataclass(frozen=True, slots=True)
 class SettingsOwnerStartResult:
-    settings: AppSettings
+    settings: AppSettingsVNext
     migrated: bool
     backup_path: Path | None
 
@@ -239,54 +152,50 @@ class SettingsOwnerStartResult:
 @dataclass(slots=True)
 class SettingsOwner:
     path: Path
-    persistence: CanonicalSettingsPersistencePort[AppSettings, AppSettingsVNext]
+    persistence: CanonicalSettingsPersistencePort
     policy: TranslationRuntimePolicy = FIXED_TRANSLATION_POLICY
     canonical: AppSettingsVNext | None = None
-    current: AppSettings | None = None
     authoritative: bool = False
-    projection_snapshot: AppSettings | None = None
+    projection_snapshot: AppSettingsVNext | None = None
+    _overlay_enabled: bool = False
+    _peer_translation_enabled: bool = False
+    _overlay_desktop_locked: bool = False
     _rollback_snapshot: AppSettingsVNext | None = None
-    _rollback_legacy_snapshot: AppSettings | None = None
-    _rollback_active_settings: AppSettings | None = None
+    _rollback_overlay_enabled: bool = False
+    _rollback_peer_translation_enabled: bool = False
+    _rollback_overlay_desktop_locked: bool = False
     _rollback_authoritative: bool = False
     _rollback_pending: bool = False
     _mutation_depth: int = 0
 
-    def materialize_translation(self, settings: AppSettings) -> AppSettings:
-        return materialize_compatibility_translation_settings(settings)
+    def require_canonical(self) -> AppSettingsVNext:
+        if self.canonical is None:
+            raise RuntimeError("settings owner has no canonical settings")
+        return self.canonical
 
-    def with_telemetry_enabled(self, settings: AppSettings, enabled: bool) -> AppSettings:
-        return compatibility_telemetry_enabled_settings(settings, enabled)
+    def projected_canonical(self) -> AppSettingsVNext | None:
+        return self.canonical
 
-    def build_managed_openrouter_byok_target(
-        self,
-        current_settings: AppSettings | None,
-    ) -> AppSettings | None:
-        return compatibility_managed_openrouter_byok_target_settings(current_settings)
+    def normalize(self, settings: AppSettingsVNext) -> AppSettingsVNext:
+        return with_translation_runtime_policy(settings, self.policy)
 
     def overlay_enabled(self) -> bool:
-        current = self.current
-        return False if current is None else bool(current.ui.overlay_enabled)
+        return self._overlay_enabled
 
     def set_overlay_enabled(self, enabled: bool) -> None:
-        current = self.current
-        if current is None:
-            return
-        current.ui.overlay_enabled = bool(enabled)
+        self._overlay_enabled = bool(enabled)
 
     def overlay_desktop_locked(self) -> bool:
-        current = self.current
-        return False if current is None else bool(current.overlay.desktop_flet.locked)
+        return self._overlay_desktop_locked
+
+    def set_overlay_desktop_locked(self, locked: bool) -> None:
+        self._overlay_desktop_locked = bool(locked)
 
     def peer_translation_enabled(self) -> bool:
-        current = self.current
-        return False if current is None else bool(current.ui.peer_translation_enabled)
+        return self._peer_translation_enabled
 
     def set_peer_translation_enabled(self, enabled: bool) -> None:
-        current = self.current
-        if current is None:
-            return
-        current.ui.peer_translation_enabled = bool(enabled)
+        self._peer_translation_enabled = bool(enabled)
 
     def start(self) -> SettingsOwnerStartResult:
         if not self.path.exists():
@@ -294,25 +203,21 @@ class SettingsOwner:
             self.persistence.persist(self.path, self.canonical)
             loaded = self.persistence.load_active(self.path)
             self.canonical = loaded.canonical_settings
-            self.current = loaded.compatibility_settings
             return SettingsOwnerStartResult(
-                settings=self.current,
+                settings=self.canonical,
                 migrated=False,
                 backup_path=None,
             )
         loaded = self.persistence.load_active(self.path)
         self.canonical = loaded.canonical_settings
-        self.current = loaded.compatibility_settings
         return SettingsOwnerStartResult(
-            settings=self.current,
+            settings=self.canonical,
             migrated=loaded.migrated,
             backup_path=loaded.backup_path,
         )
 
     def persist(self) -> None:
-        if self.canonical is None:
-            raise RuntimeError("settings owner has no canonical settings")
-        self.persistence.persist(self.path, self.canonical)
+        self.persistence.persist(self.path, self.require_canonical())
 
     def save_current(
         self,
@@ -328,123 +233,149 @@ class SettingsOwner:
         return True
 
     def persist_current(self) -> None:
-        if self.current is None:
-            raise RuntimeError("settings owner has no compatibility settings")
+        live = self.require_canonical()
         owns_mutation = self.mutation_depth == 0
-        baseline = self.projection_snapshot or self.current
+        baseline = self.projection_snapshot or live
         if owns_mutation:
             self.begin(legacy_snapshot=baseline)
-        self.apply_legacy_delta(baseline, self.current)
+        self.apply_canonical_delta(baseline, live)
         try:
             self.persist()
         except Exception:
             self.rollback()
             raise
-        self.remember_projection(self.current)
+        self.remember_projection(live)
         if owns_mutation:
             self.complete()
 
+    def with_telemetry_enabled(
+        self,
+        settings: AppSettingsVNext,
+        enabled: bool,
+    ) -> AppSettingsVNext:
+        return with_telemetry_enabled(settings, enabled)
+
+    def build_managed_openrouter_byok_target(
+        self,
+        current_settings: AppSettingsVNext | None = None,
+    ) -> AppSettingsVNext | None:
+        from puripuly_heart.config.translation_values import (
+            provider_llm_for_translation,
+        )
+        from puripuly_heart.config.llm_profiles import (
+            get_openrouter_llm_profile,
+            get_openrouter_selection_alias_for_model_and_source,
+        )
+
+        settings = current_settings if current_settings is not None else self.canonical
+        if settings is None:
+            return None
+        translation = settings.intent.translation
+        if provider_llm_for_translation(translation.model, translation.connection) != "openrouter":
+            return None
+        if translation.openrouter_selected_source != "managed":
+            return None
+        openrouter_model = translation.openrouter_model
+        alias = translation.openrouter_selection_alias
+        if alias is not None:
+            profile = get_openrouter_llm_profile(alias)
+            if profile is not None:
+                openrouter_model = profile.openrouter_model
+        alias_value = get_openrouter_selection_alias_for_model_and_source(
+            openrouter_model,
+            "byok",
+        )
+        if alias_value is None:
+            return None
+        history = dict(translation.connection_history)
+        history[translation.model] = "openrouter"
+        return replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                translation=replace(
+                    translation,
+                    connection="openrouter",
+                    connection_history=history,
+                    openrouter_selection_alias=alias_value,
+                    openrouter_selected_source="byok",
+                    openrouter_model=openrouter_model,
+                    openrouter_provider_routing="default",
+                ),
+            ),
+        )
+
+    def persist_managed_identity(
+        self,
+        settings: AppSettingsVNext,
+        *,
+        bound_managed_snapshot: object | None = None,
+    ) -> None:
+        active_settings = self.canonical or settings
+        baseline = self.projection_snapshot or active_settings
+        managed_baseline = (
+            bound_managed_snapshot
+            if bound_managed_snapshot is not None
+            else baseline.state.managed_connection
+        )
+        managed_delta = _managed_connection_delta(
+            managed_baseline,
+            settings.state.managed_connection,
+        )
+        next_state = replace(
+            active_settings.state,
+            managed_connection=replace(
+                active_settings.state.managed_connection,
+                **managed_delta,
+            ),
+        )
+        next_settings = replace(active_settings, state=next_state)
+        self.begin()
+        self.apply_canonical_delta(baseline, next_settings)
+        try:
+            self.persist()
+        except Exception:
+            self.rollback()
+            raise
+        self.canonical = next_settings
+        self.remember_projection(next_settings)
+        self.complete()
+
     def managed_identity_persistence_callback(
         self,
-        bound_settings: AppSettings,
-    ) -> Callable[[AppSettings], None]:
-        bound_snapshot = copy.deepcopy(bound_settings.managed_identity)
+        bound_settings: AppSettingsVNext,
+    ) -> Callable[[AppSettingsVNext], None]:
+        bound_snapshot = copy.deepcopy(bound_settings.state.managed_connection)
 
-        def persist(settings: AppSettings) -> None:
+        def persist(settings: AppSettingsVNext) -> None:
             nonlocal bound_snapshot
             self.persist_managed_identity(
                 settings,
                 bound_managed_snapshot=bound_snapshot,
             )
-            bound_snapshot = copy.deepcopy(settings.managed_identity)
+            bound_snapshot = copy.deepcopy(settings.state.managed_connection)
 
         return persist
 
-    def persist_managed_identity(
+    def apply_canonical_delta(
         self,
-        settings: AppSettings,
-        *,
-        bound_managed_snapshot: object | None = None,
-    ) -> None:
-        active_settings = self.current or settings
-        baseline = self.projection_snapshot or active_settings
-        managed_baseline = (
-            bound_managed_snapshot
-            if bound_managed_snapshot is not None
-            else baseline.managed_identity
-        )
-        managed_delta = _managed_identity_delta(
-            managed_baseline,
-            settings.managed_identity,
-        )
-        next_settings = copy.deepcopy(active_settings)
-        _apply_managed_identity_delta(next_settings, managed_delta)
-        self.begin(legacy_snapshot=baseline)
-        self.apply_legacy_delta(baseline, next_settings)
-        try:
-            self.persist()
-        except Exception:
-            self.rollback()
-            _restore_managed_identity(settings, managed_baseline)
-            raise
-        self.current = next_settings
-        self.remember_projection(next_settings)
-        self.complete()
-
-    def project(self, settings: AppSettings, *, authoritative: bool) -> AppSettingsVNext:
-        self.normalize_compatibility(settings)
-        projected = self.persistence.project(
-            settings,
-            canonical=self.canonical,
-            authoritative=authoritative,
-        )
-        if not authoritative:
-            self.canonical = projected
-        return projected
-
-    def projected_canonical(self) -> AppSettingsVNext | None:
-        current = self.current
-        if current is not None:
-            return self.project(current, authoritative=True)
-        return self.canonical
-
-    def apply_legacy_delta(
-        self,
-        base_settings: AppSettings | None,
-        next_settings: AppSettings,
+        base_settings: AppSettingsVNext | None,
+        next_settings: AppSettingsVNext,
     ) -> AppSettingsVNext:
-        self.normalize_compatibility(next_settings)
-        self.canonical = self.persistence.apply_legacy_delta(
-            canonical=self.canonical,
-            base_settings=base_settings,
-            next_settings=next_settings,
-        )
+        normalized = self.normalize(next_settings)
+        live = self.canonical
+        if live is None or base_settings is None:
+            self.canonical = normalized
+        else:
+            self.canonical = apply_canonical_delta(live, self.normalize(base_settings), normalized)
         self.authoritative = True
-        return self.canonical
-
-    def project_legacy_delta(
-        self,
-        base_settings: AppSettings | None,
-        next_settings: AppSettings,
-    ) -> AppSettingsVNext:
-        normalized = copy.deepcopy(next_settings)
-        self.normalize_compatibility(normalized)
-        return self.persistence.apply_legacy_delta(
-            canonical=self.canonical,
-            base_settings=base_settings,
-            next_settings=normalized,
-        )
-
-    def normalize_compatibility(self, settings: AppSettings) -> None:
-        settings.stt.low_latency_mode = self.policy.fast_translation_enabled
-        settings.ui.integrated_context_enabled = (
-            self.policy.context_policy == "integrated_preferred"
-        )
+        return self.require_canonical()
 
     def bind_provider_verification(self, binding: ProviderVerificationBinding) -> None:
-        if self.canonical is None:
-            raise RuntimeError("settings owner has no canonical settings")
-        self.canonical = self.persistence.bind_provider_verification(self.canonical, binding)
+        self.canonical = self.persistence.bind_provider_verification(
+            self.require_canonical(),
+            binding,
+        )
 
     def persist_provider_verification(
         self,
@@ -455,14 +386,23 @@ class SettingsOwner:
         binding: ProviderVerificationBinding | None,
         active_secret: str | None,
     ) -> None:
-        if self.current is None:
-            raise RuntimeError("settings owner has no compatibility settings")
-        baseline = copy.deepcopy(self.projection_snapshot or self.current)
-        active_settings = self.current
-        self.begin(legacy_snapshot=baseline)
-        setattr(active_settings.api_key_verified, provider, success)
+        live = self.require_canonical()
+        baseline = copy.deepcopy(self.projection_snapshot or live)
+        self.begin()
+        verification = live.state.provider_verification
+        if success:
+            next_entry = ProviderVerificationEntry(status="unknown")
+        else:
+            next_entry = ProviderVerificationEntry(status="unknown")
+        next_settings = replace(
+            live,
+            state=replace(
+                live.state,
+                provider_verification=replace(verification, **{provider: next_entry}),
+            ),
+        )
         try:
-            self.apply_legacy_delta(baseline, active_settings)
+            self.apply_canonical_delta(baseline, next_settings)
             if success:
                 if binding is None:
                     raise RuntimeError("verified provider requires evidence binding")
@@ -471,32 +411,29 @@ class SettingsOwner:
                         "verified credential does not match the active SecretStore value"
                     )
                 self.bind_provider_verification(binding)
+            else:
+                self.canonical = next_settings
             self.persist()
         except Exception:
             self.rollback()
             raise
-        self.remember_projection(active_settings)
+        self.remember_projection(self.require_canonical())
         self.complete()
 
-    def compatibility_projection(self) -> AppSettings:
-        if self.canonical is None:
-            raise RuntimeError("settings owner has no canonical settings")
-        return self.persistence.compatibility_projection(self.canonical)
-
     @staticmethod
-    def legacy_snapshot_values(settings: AppSettings) -> dict[str, object]:
-        return legacy_settings_snapshot_values(settings)
+    def snapshot_values(settings: AppSettingsVNext) -> dict[str, object]:
+        return canonical_snapshot_values(settings)
 
-    def create_legacy_patch_repository(
+    def create_canonical_patch_repository(
         self,
         *,
-        committed_settings: AppSettings,
-        base_settings: AppSettings | None = None,
+        committed_settings: AppSettingsVNext,
+        base_settings: AppSettingsVNext | None = None,
         surface: str = "translation_provider",
         provider_verification_binding: ProviderVerificationBinding | None = None,
         save_failure_sink: Callable[[str], None] | None = None,
-    ) -> LegacySettingsPatchRepository:
-        return LegacySettingsPatchRepository(
+    ) -> CanonicalSettingsPatchRepository:
+        return CanonicalSettingsPatchRepository(
             owner=self,
             committed_settings=committed_settings,
             base_settings=base_settings,
@@ -505,30 +442,25 @@ class SettingsOwner:
             save_failure_sink=save_failure_sink,
         )
 
-    def apply_capture_target(self, capture_target: CaptureTargetIntent) -> AppSettings:
+    def apply_capture_target(self, capture_target: CaptureTargetIntent) -> AppSettingsVNext:
         if self.canonical is None:
             self.canonical = new_settings_for_first_run()
         snapshot = self.persistence.snapshot(self.canonical)
         self.canonical = with_capture_target(self.canonical, capture_target)
         try:
-            projected = self.compatibility_projection()
             self.persist()
         except Exception:
             self.canonical = self.persistence.rollback(snapshot)
             raise
-        return projected
+        return self.require_canonical()
 
     def update_capture_target(
         self,
-        compatibility_settings: AppSettings,
+        settings: AppSettingsVNext,
         capture_target: CaptureTargetIntent,
-    ) -> AppSettings:
+    ) -> AppSettingsVNext:
         if self.canonical is None:
-            self.canonical = self.persistence.project(
-                compatibility_settings,
-                canonical=None,
-                authoritative=False,
-            )
+            self.canonical = settings
         snapshot = self.persistence.snapshot(self.canonical)
         desktop_audio = self.canonical.intent.desktop_audio
         self.canonical = with_capture_target(
@@ -538,54 +470,104 @@ class SettingsOwner:
                     self.canonical.intent,
                     desktop_audio=replace(
                         desktop_audio,
-                        vad_speech_threshold=(
-                            compatibility_settings.desktop_audio.vad_speech_threshold
-                        ),
-                        vad_hangover_ms=compatibility_settings.desktop_audio.vad_hangover_ms,
-                        vad_pre_roll_ms=compatibility_settings.desktop_audio.vad_pre_roll_ms,
+                        vad_speech_threshold=settings.intent.desktop_audio.vad_speech_threshold,
+                        vad_hangover_ms=settings.intent.desktop_audio.vad_hangover_ms,
+                        vad_pre_roll_ms=settings.intent.desktop_audio.vad_pre_roll_ms,
                     ),
                 ),
             ),
             capture_target,
         )
         try:
-            projected = self.compatibility_projection()
             self.persist()
         except Exception:
             self.canonical = self.persistence.rollback(snapshot)
             raise
-        return projected
+        return self.require_canonical()
 
-    def remember_projection(self, settings: AppSettings) -> None:
+    def materialize_translation(self, settings: AppSettingsVNext) -> AppSettingsVNext:
+        return materialize_canonical_translation_settings(settings)
+
+    def normalize_compatibility(self, settings: AppSettingsVNext) -> AppSettingsVNext:
+        return self.normalize(settings)
+
+    def project(
+        self,
+        settings: AppSettingsVNext,
+        *,
+        authoritative: bool,
+    ) -> AppSettingsVNext:
+        normalized = self.normalize(settings)
+        if not authoritative:
+            self.canonical = normalized
+        return normalized
+
+    def project_legacy_delta(
+        self,
+        base_settings: AppSettingsVNext | None,
+        next_settings: AppSettingsVNext,
+    ) -> AppSettingsVNext:
+        live = self.canonical
+        if live is None or base_settings is None:
+            return self.normalize(next_settings)
+        return apply_canonical_delta(
+            live,
+            self.normalize(base_settings),
+            self.normalize(next_settings),
+        )
+
+    def apply_legacy_delta(
+        self,
+        base_settings: AppSettingsVNext | None,
+        next_settings: AppSettingsVNext,
+    ) -> AppSettingsVNext:
+        return self.apply_canonical_delta(base_settings, next_settings)
+
+    @staticmethod
+    def legacy_snapshot_values(settings: AppSettingsVNext) -> dict[str, object]:
+        return canonical_snapshot_values(settings)
+
+    def create_legacy_patch_repository(
+        self,
+        *,
+        committed_settings: AppSettingsVNext,
+        base_settings: AppSettingsVNext | None = None,
+        surface: str = "translation_provider",
+        provider_verification_binding: ProviderVerificationBinding | None = None,
+        save_failure_sink: Callable[[str], None] | None = None,
+    ) -> CanonicalSettingsPatchRepository:
+        return self.create_canonical_patch_repository(
+            committed_settings=committed_settings,
+            base_settings=base_settings,
+            surface=surface,
+            provider_verification_binding=provider_verification_binding,
+            save_failure_sink=save_failure_sink,
+        )
+
+    def remember_projection(self, settings: AppSettingsVNext) -> None:
         self.projection_snapshot = copy.deepcopy(settings)
 
-    def begin(self, *, legacy_snapshot: AppSettings | None = None) -> None:
+    def begin(self, *, legacy_snapshot: AppSettingsVNext | None = None) -> None:
         if self._mutation_depth == 0:
-            self._rollback_snapshot = self.persistence.snapshot(self.canonical)
-            self._rollback_active_settings = self.current
-            self._rollback_legacy_snapshot = copy.deepcopy(
-                legacy_snapshot if legacy_snapshot is not None else self.current
+            self._rollback_snapshot = self.persistence.snapshot(
+                legacy_snapshot if legacy_snapshot is not None else self.canonical
             )
+            self._rollback_overlay_enabled = self._overlay_enabled
+            self._rollback_peer_translation_enabled = self._peer_translation_enabled
+            self._rollback_overlay_desktop_locked = self._overlay_desktop_locked
             self._rollback_authoritative = self.authoritative
             self._rollback_pending = True
+            if legacy_snapshot is not None and self.projection_snapshot is None:
+                self.projection_snapshot = copy.deepcopy(legacy_snapshot)
         self._mutation_depth += 1
 
     def rollback(self) -> None:
         if not self._rollback_pending:
             return
         self.canonical = self.persistence.rollback(self._rollback_snapshot)
-        active_settings = self._rollback_active_settings
-        legacy_snapshot = self._rollback_legacy_snapshot
-        if active_settings is not None and legacy_snapshot is not None:
-            for settings_field in fields(AppSettings):
-                setattr(
-                    active_settings,
-                    settings_field.name,
-                    copy.deepcopy(getattr(legacy_snapshot, settings_field.name)),
-                )
-            self.current = active_settings
-        else:
-            self.current = legacy_snapshot
+        self._overlay_enabled = self._rollback_overlay_enabled
+        self._peer_translation_enabled = self._rollback_peer_translation_enabled
+        self._overlay_desktop_locked = self._rollback_overlay_desktop_locked
         self.authoritative = self._rollback_authoritative
         self._mutation_depth = 1
         self.complete()
@@ -596,8 +578,9 @@ class SettingsOwner:
         self._mutation_depth -= 1
         if self._mutation_depth == 0:
             self._rollback_snapshot = None
-            self._rollback_legacy_snapshot = None
-            self._rollback_active_settings = None
+            self._rollback_overlay_enabled = False
+            self._rollback_peer_translation_enabled = False
+            self._rollback_overlay_desktop_locked = False
             self._rollback_authoritative = False
             self._rollback_pending = False
 
@@ -610,15 +593,151 @@ class SettingsOwner:
         return self._rollback_pending
 
 
+def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> AppSettingsVNext:
+    from puripuly_heart.config.llm_profiles import (
+        OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+        OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK,
+        OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED,
+        OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK,
+        OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED,
+        openrouter_alias_for_fields,
+    )
+
+    translation = settings.intent.translation
+    model = translation.model
+    connection = translation.connection
+    if model == "custom_http":
+        if connection == "custom_http":
+            return settings
+        return replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                translation=replace(translation, connection="custom_http"),
+            ),
+        )
+    updates: dict[str, object] = {}
+    if model == "gemma4_26b_31b":
+        selected_source = "managed" if connection == "managed" else "byok"
+        updates = {
+            "openrouter_model": "google/gemma-4-26b-a4b-it",
+            "openrouter_provider_routing": "gemma4_26b_31b_latency",
+            "openrouter_selected_source": selected_source,
+            "openrouter_selection_alias": (
+                OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED
+                if connection == "managed"
+                else OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK
+            ),
+        }
+    elif model == "gemma4_31b":
+        if connection == "cerebras":
+            updates = {
+                "openrouter_provider_routing": "default",
+                "cerebras": replace(translation.cerebras, llm_model="gemma-4-31b"),
+            }
+        else:
+            selected_source = "managed" if connection == "managed" else "byok"
+            updates = {
+                "openrouter_model": "google/gemma-4-31b-it",
+                "openrouter_provider_routing": "gemma4_31b_latency",
+                "openrouter_selected_source": selected_source,
+                "openrouter_selection_alias": (
+                    OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED
+                    if connection == "managed"
+                    else OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK
+                ),
+            }
+    elif model == "gemma4":
+        selected_source = "managed" if connection == "managed" else "byok"
+        openrouter_model = "google/gemma-4-26b-a4b-it"
+        updates = {
+            "openrouter_model": openrouter_model,
+            "openrouter_provider_routing": "gemma4_26b_latency",
+            "openrouter_selected_source": selected_source,
+            "openrouter_selection_alias": openrouter_alias_for_fields(
+                model=openrouter_model,
+                source=selected_source,
+            ),
+        }
+    elif model == "deepseek_v4_flash":
+        if connection == "official_byok":
+            updates = {
+                "openrouter_provider_routing": "default",
+                "deepseek": replace(translation.deepseek, llm_model="deepseek-v4-flash"),
+            }
+        else:
+            selected_source = "managed" if connection in {"managed", "managed_china"} else "byok"
+            openrouter_model = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+            updates = {
+                "openrouter_model": openrouter_model,
+                "openrouter_provider_routing": (
+                    "deepseek_only" if connection == "managed_china" else "default"
+                ),
+                "openrouter_selected_source": selected_source,
+                "openrouter_selection_alias": openrouter_alias_for_fields(
+                    model=openrouter_model,
+                    source=selected_source,
+                ),
+            }
+    elif model == "gemini37_flash":
+        if connection == "openrouter":
+            openrouter_model = "google/gemini-3.7-flash"
+            updates = {
+                "openrouter_model": openrouter_model,
+                "openrouter_provider_routing": "google_gemini_latency",
+                "openrouter_selected_source": "byok",
+                "openrouter_selection_alias": openrouter_alias_for_fields(
+                    model=openrouter_model,
+                    source="byok",
+                ),
+            }
+        else:
+            updates = {
+                "openrouter_provider_routing": "default",
+                "gemini": replace(translation.gemini, llm_model="gemini-3.7-flash"),
+            }
+    elif model == "gemini31_flash_lite":
+        if connection == "openrouter":
+            openrouter_model = "google/gemini-3.1-flash-lite"
+            updates = {
+                "openrouter_model": openrouter_model,
+                "openrouter_provider_routing": "google_gemini_latency",
+                "openrouter_selected_source": "byok",
+                "openrouter_selection_alias": openrouter_alias_for_fields(
+                    model=openrouter_model,
+                    source="byok",
+                ),
+            }
+        else:
+            updates = {
+                "openrouter_provider_routing": "default",
+                "gemini": replace(translation.gemini, llm_model="gemini-3.1-flash-lite"),
+            }
+    elif model == "local_llm":
+        updates = {"openrouter_provider_routing": "default"}
+    elif model in {"managed_gemma", "managed_gemma_12b"}:
+        updates = {"openrouter_provider_routing": "default"}
+    else:
+        updates = {
+            "openrouter_provider_routing": "default",
+            "qwen": replace(translation.qwen, llm_model="qwen3.5-plus"),
+        }
+    return replace(
+        settings,
+        intent=replace(settings.intent, translation=replace(translation, **updates)),
+    )
+
+
 def compose_settings_owner(path: Path) -> SettingsOwner:
     return SettingsOwner(path=path, persistence=compose_canonical_settings_persistence())
 
 
 __all__ = [
-    "LegacySettingsPatchRepository",
+    "CanonicalSettingsPatchRepository",
     "SettingsOwner",
     "SettingsOwnerStartResult",
     "compose_canonical_settings_persistence",
     "compose_settings_owner",
-    "legacy_settings_snapshot_values",
+    "canonical_snapshot_values",
+    "materialize_canonical_translation_settings",
 ]

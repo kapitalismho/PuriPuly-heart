@@ -16,6 +16,7 @@ from puripuly_heart.config.settings import (
     LLMProviderName,
     OpenRouterCredentialSource,
     TranslationConnection,
+    TranslationModel,
 )
 from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 
@@ -39,7 +40,6 @@ def _owner(settings: AppSettings) -> SettingsOwner:
         path=Path("settings.json"),
         persistence=SettingsVNextCanonicalPersistenceAdapter(),
         canonical=from_legacy_app_settings(settings),
-        current=settings,
         authoritative=True,
     )
 
@@ -86,6 +86,7 @@ def test_state_resolves_managed_selection_and_secret_through_injected_store() ->
 def test_state_contains_secret_resolution_failure_as_key_unavailable() -> None:
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.OPENROUTER
+    settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
     settings.translation.connection = TranslationConnection.MANAGED_CHINA
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
 

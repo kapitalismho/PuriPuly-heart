@@ -254,7 +254,7 @@ class UiSettingsRuntimeAdapter:
         *,
         preserve_custom_vocab_draft: bool = False,
     ) -> bool:
-        settings = self.settings.current
+        settings = self.settings.canonical
         if settings is None:
             return False
         provider, general, prompt, overlay = settings_view_surface_snapshots(settings)
@@ -270,7 +270,7 @@ class UiSettingsRuntimeAdapter:
         )
 
     def refresh_settings_after_openrouter_pkce_success(self) -> bool:
-        settings = self.settings.current
+        settings = self.settings.canonical
         if settings is None:
             return False
         provider, _general, prompt, _overlay = settings_view_surface_snapshots(settings)
@@ -292,26 +292,26 @@ class UiSettingsRuntimeAdapter:
         return await self.application.apply(settings)
 
     async def apply_telemetry_enabled(self, enabled: bool) -> object | None:
-        settings = self.settings.current
+        settings = self.settings.canonical
         if settings is None:
             return None
         await self.application.apply(self.telemetry_enabled_settings(settings, enabled))
-        return self.settings.current
+        return self.settings.canonical
 
     async def apply_settings_intent(self, intent: ImmediateSettingsIntent) -> object:
-        settings = self.settings.current
+        settings = self.settings.canonical
         if settings is None:
             return False
         return await self.application.apply(materialize_immediate_settings_intent(settings, intent))
 
     async def apply_prompt_intent(self, intent: PromptApplyIntent) -> object:
-        settings = self.settings.current
+        settings = self.settings.canonical
         if settings is None:
             return False
         return await self.application.apply(materialize_prompt_apply_intent(settings, intent))
 
     def materialize_provider_intent(self, intent: ProviderApplyIntent) -> object:
-        settings = self.settings.current
+        settings = self.settings.canonical
         if settings is None:
             raise RuntimeError("settings owner has no compatibility settings")
         return materialize_provider_apply_intent(
@@ -321,13 +321,13 @@ class UiSettingsRuntimeAdapter:
         )
 
     def overlay_snapshot(self) -> OverlaySettingsSnapshot | None:
-        settings = self.settings.current
+        settings = self.settings.canonical
         if settings is None:
             return None
         return settings_view_surface_snapshots(settings)[3]
 
     def general_snapshot(self) -> GeneralSettingsSnapshot | None:
-        settings = self.settings.current
+        settings = self.settings.canonical
         if settings is None:
             return None
         return settings_view_surface_snapshots(settings)[1]
@@ -394,12 +394,17 @@ class UiProviderRuntimeAdapter:
         return self.managed.pkce_flow.reopen_authorization_url()
 
     def build_managed_openrouter_byok_target(self) -> OpenRouterPkceTarget | None:
-        target_settings = self.build_byok_target_settings(self.settings.current)
-        if target_settings is None or target_settings.openrouter.selection_alias is None:
+        from puripuly_heart.config.provider_values import OpenRouterSelectionAlias
+
+        target_settings = self.build_byok_target_settings(self.settings.canonical)
+        if target_settings is None:
+            return None
+        alias = target_settings.intent.translation.openrouter_selection_alias
+        if alias is None:
             return None
         provider, _general, _prompt, _overlay = settings_view_surface_snapshots(target_settings)
         return OpenRouterPkceTarget(
-            target_settings.openrouter.selection_alias,
+            OpenRouterSelectionAlias(alias),
             provider_intent=ProviderApplyIntent(
                 (
                     TranslationSelectionEdit(
@@ -413,7 +418,7 @@ class UiProviderRuntimeAdapter:
                     ),
                 )
             ),
-            system_prompt=target_settings.system_prompt,
+            system_prompt=target_settings.intent.prompts.system_prompt,
         )
 
     async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
@@ -429,13 +434,15 @@ class UiProviderRuntimeAdapter:
 
     async def persist_provider_secret_change(self, key: str, value: str) -> bool:
         succeeded = await self.provider_settings.change_secret(key, value)
-        current = self.settings.current
-        http_extension_id = None if current is None else current.translation.http_extension_id
+        current = self.settings.canonical
+        http_extension_id = (
+            None if current is None else current.intent.translation.http_extension_id
+        )
         if (
             succeeded
             and key.startswith("http_extension.")
             and current is not None
-            and current.translation.model == "custom_http"
+            and current.intent.translation.model == "custom_http"
             and http_extension_id is not None
             and key.startswith(http_extension_secret_key_prefix(http_extension_id))
         ):
@@ -469,12 +476,12 @@ class UiEngagementRuntimeAdapter:
     after_launch: ApplicationAfterLaunchOwner
 
     def get_event_language_codes(self) -> tuple[str | None, str | None]:
-        settings = self.settings.current
+        settings = self.settings.canonical
         if settings is None:
             return None, None
         return (
-            settings.languages.source_language,
-            settings.languages.target_language,
+            settings.intent.languages.source_language,
+            settings.intent.languages.target_language,
         )
 
     def schedule_github_star_prompt_translation_success_observed(self) -> None:
@@ -495,7 +502,7 @@ class UiEngagementRuntimeAdapter:
         )
 
         async def persist(updated: AppActiveDayTelemetryState) -> bool:
-            current = self.settings.current
+            current = self.settings.canonical
             if current is None:
                 return False
             next_settings = copy.deepcopy(current)

@@ -119,22 +119,15 @@ class PeerCaptureTargetApplicationOwner:
         return "device:"
 
     def _resolve_target(self) -> ResolvedDesktopAudioCaptureTarget | None:
-        canonical = getattr(self.settings, "canonical", None)
-        if canonical is not None:
-            return resolve_desktop_audio_capture_target(
-                canonical.intent.desktop_audio.capture_target
-            )
-        current = self.settings.current
-        if current is None:
+        canonical = self.settings.canonical
+        if canonical is None:
             return None
-        desktop_audio = current.desktop_audio
-        return self._target_resolution.resolve(
-            legacy_output_device=desktop_audio.output_device,
-            persisted_capture_target=desktop_audio.runtime_capture_target,
+        return resolve_desktop_audio_capture_target(
+            canonical.intent.desktop_audio.capture_target
         )
 
     async def apply(self, value: str) -> None:
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None:
             return
         apply_capture_target = getattr(self.settings, "apply_capture_target", None)
@@ -145,9 +138,7 @@ class PeerCaptureTargetApplicationOwner:
                 current,
                 self.decode_option(value),
             )
-        next_settings.ui.overlay_enabled = current.ui.overlay_enabled
-        next_settings.ui.peer_translation_enabled = current.ui.peer_translation_enabled
-        self.settings.current = next_settings
+        self.settings.canonical = next_settings
         self.settings.authoritative = True
         self.settings.remember_projection(next_settings)
         self.warning_reset()

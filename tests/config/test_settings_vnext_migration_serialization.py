@@ -1502,6 +1502,30 @@ def test_capture_target_resolution_excludes_pids_and_runtime_state() -> None:
     )
 
 
+def test_current_vnext_unknown_fields_round_trip_through_compatibility_extensions(
+    tmp_path: Path,
+) -> None:
+    serialization = _serialization()
+    compat = _compat()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["future_product_flag"] = True
+    raw["intent"]["ui"]["future_toggle"] = "keep-me"
+    path = tmp_path / "settings.json"
+    _write_json_bytes(path, raw)
+
+    persisted = serialization.to_dict(serialization.from_dict(raw))
+    assert persisted["future_product_flag"] is True
+    assert persisted["intent"]["ui"]["future_toggle"] == "keep-me"
+
+    result = compat.load_vnext_settings(path)
+    assert result.ok
+    assert result.migrated is False
+    assert result.settings is not None
+    saved = serialization.to_dict(result.settings)
+    assert saved["future_product_flag"] is True
+    assert saved["intent"]["ui"]["future_toggle"] == "keep-me"
+
+
 def test_save_vnext_settings_normalizes_stale_settings_version_to_current(
     tmp_path: Path,
 ) -> None:

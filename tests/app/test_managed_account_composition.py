@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import cast
 
 import pytest
@@ -29,6 +30,7 @@ from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.app.services.canonical_settings_persistence import (
     compose_settings_owner,
+    materialize_canonical_translation_settings,
 )
 from puripuly_heart.app.services.openrouter_pkce_flow import (
     OpenRouterPkceApplicationOwner,
@@ -36,13 +38,11 @@ from puripuly_heart.app.services.openrouter_pkce_flow import (
 )
 from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
 from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
     OpenRouterCredentialSource,
     TranslationConnection,
     TranslationModel,
-    materialize_translation_settings,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
@@ -64,12 +64,29 @@ class SecretStore:
         self.values.pop(key, None)
 
 
-def _managed_settings() -> AppSettings:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.translation.connection = TranslationConnection.MANAGED
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    return settings
+def _managed_settings() -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                connection=TranslationConnection.MANAGED.value,
+                openrouter_selected_source=OpenRouterCredentialSource.MANAGED.value,
+            ),
+        ),
+    )
+
+
+def _with_broker_url(settings: AppSettingsVNext, url: str) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(settings.intent.translation, openrouter_broker_base_url=url),
+        ),
+    )
 
 
 @pytest.mark.asyncio
@@ -77,14 +94,14 @@ async def test_release_runtime_owns_selection_and_broker_fallback(
     tmp_path,
 ) -> None:
     owner = compose_settings_owner(tmp_path / "settings.json")
-    owner.current = _managed_settings()
+    owner.canonical = _managed_settings()
     runtime = ManagedOpenRouterReleaseRuntime(
         settings=owner,
         config_path=owner.path,
         callback_received=lambda: None,
     )
 
-    owner.current.openrouter.broker_base_url = "https://broker.example.test/"
+    owner.canonical = _with_broker_url(owner.canonical, "https://broker.example.test/")
     service = await runtime.rebuild(secrets=SecretStore())
 
     assert runtime.selected() is True
@@ -93,13 +110,22 @@ async def test_release_runtime_owns_selection_and_broker_fallback(
     assert service.client.base_url == "https://broker.example.test"
     assert service.raw_hardware_fingerprint_provider is get_raw_hardware_fingerprint
 
-    owner.current.openrouter.broker_base_url = "https://broker.example.test/prefix"
+    owner.canonical = _with_broker_url(owner.canonical, "https://broker.example.test/prefix")
     service = await runtime.rebuild(secrets=SecretStore())
 
     assert isinstance(service, ManagedOpenRouterReleaseService)
     assert isinstance(service.client, UnavailableManagedOpenRouterReleaseClient)
 
-    owner.current.translation.connection = TranslationConnection.OPENROUTER
+    owner.canonical = replace(
+        owner.canonical,
+        intent=replace(
+            owner.canonical.intent,
+            translation=replace(
+                owner.canonical.intent.translation,
+                connection=TranslationConnection.OPENROUTER.value,
+            ),
+        ),
+    )
     assert await runtime.rebuild(secrets=SecretStore()) is None
     assert runtime.selected() is False
 
@@ -172,8 +198,17 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
     tmp_path,
 ) -> None:
     owner = compose_settings_owner(tmp_path / "settings.json")
-    owner.current = _managed_settings()
-    owner.current.managed_identity.referral_id = " 7kq9m2 "
+    managed = _managed_settings()
+    owner.canonical = replace(
+        managed,
+        state=replace(
+            managed.state,
+            managed_connection=replace(
+                managed.state.managed_connection,
+                referral_id=" 7kq9m2 ",
+            ),
+        ),
+    )
     store = SecretStore()
 
     secret_store_calls: list[tuple[object, object]] = []
@@ -238,7 +273,7 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
     components.release.callback_received()
     assert callback_events == ["callback"]
 
-    secret_adapter = components.pkce.secret_store_factory(owner.current)
+    secret_adapter = components.pkce.secret_store_factory(owner.canonical)
     assert isinstance(secret_adapter, SyncSecretStoreAdapter)
     await secret_adapter.set_secret(OPENROUTER_BYOK_API_KEY_SECRET, "secret")
     assert OPENROUTER_BYOK_API_KEY_SECRET == "openrouter_api_key"
@@ -256,10 +291,19 @@ async def test_managed_account_warmup_and_teardown_own_gemma_lifecycle(
     tmp_path,
 ) -> None:
     owner = compose_settings_owner(tmp_path / "settings.json")
-    settings = AppSettings()
-    settings.translation.model = TranslationModel.MANAGED_GEMMA
-    settings.translation.connection = TranslationConnection.GPU
-    owner.current = materialize_translation_settings(settings)
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model=TranslationModel.MANAGED_GEMMA.value,
+                connection=TranslationConnection.GPU.value,
+            ),
+        ),
+    )
+    owner.canonical = materialize_canonical_translation_settings(settings)
     events: list[str] = []
 
     class ManagedGemma:

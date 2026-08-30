@@ -13,6 +13,7 @@ from puripuly_heart.config.runtime_resolution import (
     resolve_stt_config,
 )
 from puripuly_heart.config.settings import AppSettings, STTProviderName
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 
 
 class _MemorySecrets:
@@ -52,7 +53,7 @@ def test_factory_builds_custom_backend_without_requiring_secret() -> None:
     settings.custom_stt.endpoint = "http://127.0.0.1:8000/v1"
     settings.custom_stt.model = "whisper-1"
 
-    resolved = resolve_self_stt_runtime_config(settings)
+    resolved = resolve_self_stt_runtime_config(from_legacy_app_settings(settings))
     backend = create_stt_backend_from_resolved_config(resolved, secrets=_MemorySecrets())
 
     assert backend.mode == "offline"
@@ -69,7 +70,7 @@ def test_custom_offline_provider_uses_transcription_even_if_stored_mode_differs(
     settings.custom_stt.endpoint = "http://127.0.0.1:8000/v1"
     settings.custom_stt.model = "whisper-1"
 
-    resolved = resolve_self_stt_runtime_config(settings)
+    resolved = resolve_self_stt_runtime_config(from_legacy_app_settings(settings))
 
     assert resolved.provider == STT_PROVIDER_CUSTOM_OFFLINE
     assert resolved.provider_options["mode"] == "offline"
@@ -102,7 +103,7 @@ def test_custom_stt_runtime_extra_flows_to_backend() -> None:
     settings.custom_stt.extra = {"prompt": "hello", "max_tokens": 16}
     settings.validate()
 
-    resolved = resolve_self_stt_runtime_config(settings)
+    resolved = resolve_self_stt_runtime_config(from_legacy_app_settings(settings))
     assert resolved.provider_options["extra"] == {"prompt": "hello", "max_tokens": 16}
 
     backend = create_stt_backend_from_resolved_config(resolved, secrets=_MemorySecrets())

@@ -230,6 +230,7 @@ LAYER_RULES = (
             "puripuly_heart.app.services.capture.peer_capture_target_application",
             "puripuly_heart.app.services.provider.provider_settings",
             "puripuly_heart.app.services.settings.settings_application",
+            "puripuly_heart.app.services.settings.settings_mutation_legacy",
             "puripuly_heart.app.services.settings.settings_runtime_effects",
         ),
         forbidden_layers=frozenset(
@@ -1092,20 +1093,23 @@ def test_canonical_settings_persistence_composition_uses_only_public_settings_ty
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
-    assert imports["puripuly_heart.config.settings"] == {"AppSettings"}
+    assert "puripuly_heart.config.settings" not in imports
     assert imports["puripuly_heart.config.settings_vnext.defaults"] == {
         "new_settings_for_first_run"
     }
     assert imports["puripuly_heart.config.settings_vnext.schema"] == {
         "AppSettingsVNext",
         "CaptureTargetIntent",
+        "ProviderVerificationEntry",
         "with_capture_target",
+        "with_telemetry_enabled",
+        "with_translation_runtime_policy",
     }
-    assert {
-        "puripuly_heart.config.settings_vnext.facade",
-        "puripuly_heart.config.settings_vnext.migration",
-        "puripuly_heart.config.settings_vnext.serialization",
-    }.isdisjoint(imports)
+    assert imports["puripuly_heart.config.settings_vnext.migration"] == {
+        "apply_canonical_delta",
+        "merge_canonical_payload",
+    }
+    assert "puripuly_heart.config.settings_vnext.facade" not in imports
 
 
 def test_capture_target_compatibility_service_delegates_to_settings_owner() -> None:
@@ -1630,9 +1634,7 @@ def test_r00_legacy_settings_reachability_census_matches_the_pinned_baseline() -
     expected_current.pop("src/puripuly_heart/app/wiring/wiring_secrets_factory.py")
     expected_current.pop("src/puripuly_heart/app/services/settings/settings_application.py")
     expected_current.pop("src/puripuly_heart/app/services/settings/settings_runtime_effects.py")
-    expected_current["src/puripuly_heart/app/services/canonical_settings_persistence.py"] = {
-        "AppSettings"
-    }
+    expected_current.pop("src/puripuly_heart/app/services/canonical_settings_persistence.py")
     actual_current: dict[str, set[str]] = {}
     for source_path in SOURCE_PACKAGE_ROOT.rglob("*.py"):
         tree = ast.parse(source_path.read_text(encoding="utf-8"))

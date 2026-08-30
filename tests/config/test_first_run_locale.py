@@ -186,7 +186,7 @@ def test_settings_owner_first_run_uses_detected_system_locale(
 
     loaded = compose_settings_owner(path).start().settings
 
-    assert loaded.ui.locale == "ko"
+    assert loaded.intent.ui.locale == "ko"
     assert legacy_projected_settings_file(path)["ui"]["locale"] == "ko"
 
 

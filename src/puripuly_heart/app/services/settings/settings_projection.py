@@ -15,7 +15,7 @@ from puripuly_heart.app.ports.settings_view import (
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 
 from .settings_mutation_legacy import (
-    _apply_settings_path_patch,
+    apply_settings_path_patch,
     _SettingsPathSnapshot,
     build_overlay_osc_output_settings_path_patch,
     build_stt_language_audio_settings_path_patch,
@@ -115,9 +115,7 @@ class SettingsProjectionOwner:
         settings = self.current_settings()
         if not change.can_rebase or settings is None:
             return copy.deepcopy(change.pending_settings)
-        merged_settings = copy.deepcopy(settings)
-        _apply_settings_path_patch(merged_settings, change.values_by_path)
-        return merged_settings
+        return apply_settings_path_patch(settings, change.values_by_path)
 
     def render_surfaces(
         self,

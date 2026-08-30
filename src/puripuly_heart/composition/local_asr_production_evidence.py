@@ -19,9 +19,9 @@ from puripuly_heart.app.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
 )
 from puripuly_heart.app.wiring_stt_factory import (
-    build_peer_capture_session_config,
+    build_peer_capture_session_config_from_vnext,
     build_peer_stt_provider_request,
-    build_self_stt_provider_request,
+    build_self_stt_provider_request_from_vnext,
 )
 from puripuly_heart.composition.application_runtime import (
     compose_application_runtime,
@@ -104,7 +104,7 @@ class _ApplicationLocalASRProductionEvidence:
         *,
         warmup: bool,
     ) -> ProviderRuntimeBuildRequest:
-        return build_self_stt_provider_request(settings, warmup=warmup)
+        return build_self_stt_provider_request_from_vnext(settings, warmup=warmup)
 
     def build_peer_provider_request(
         self,
@@ -112,10 +112,10 @@ class _ApplicationLocalASRProductionEvidence:
         *,
         warmup: bool,
     ) -> ProviderRuntimeBuildRequest:
-        config = build_peer_capture_session_config(settings)
+        config = build_peer_capture_session_config_from_vnext(settings)
         return build_peer_stt_provider_request(
             config,
-            gpu_device_id=settings.stt.gpu_device_id,
+            gpu_device_id=settings.intent.stt.gpu_device_id,
             warmup=warmup,
         )
 

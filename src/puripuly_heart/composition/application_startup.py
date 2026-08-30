@@ -59,7 +59,7 @@ class ApplicationStartupAdapter:
 
     async def prepare_startup_settings(self) -> ApplicationStartupState:
         loaded_settings = self.settings_loader()
-        self.settings.current = loaded_settings
+        self.settings.canonical = loaded_settings
         self.settings.authoritative = True
         self.settings.remember_projection(loaded_settings)
         await self.provisioning.inspect_cpu()
@@ -79,19 +79,17 @@ class ApplicationStartupAdapter:
                 loaded_settings,
                 fallback_plan,
             )
-            self.settings.current = normalized_settings
+            self.settings.canonical = normalized_settings
             if not self.settings.save_current(failure_sink=self.save_failure_sink):
-                self.settings.current = loaded_settings
+                self.settings.canonical = loaded_settings
                 fallback_channels = ()
             else:
-                loaded_settings.provider.stt = normalized_settings.provider.stt
-                loaded_settings.provider.peer_stt = normalized_settings.provider.peer_stt
-                self.settings.current = loaded_settings
-        settings = self.settings.current
+                self.settings.canonical = normalized_settings
+        settings = self.settings.canonical
         if settings is None:
             raise RuntimeError("Application settings were not retained")
-        settings.ui.overlay_enabled = False
-        settings.ui.peer_translation_enabled = False
+        self.settings.set_overlay_enabled(False)
+        self.settings.set_peer_translation_enabled(False)
         return ApplicationStartupState(
             settings=settings,
             fallback_channels=fallback_channels,
@@ -102,7 +100,7 @@ class ApplicationStartupAdapter:
         settings = state.settings
         self.calibration.sync_from_settings(settings)
         self.calibration.replace_draft(None)
-        self.presentation.set_locale(settings.ui.locale)
+        self.presentation.set_locale(settings.intent.ui.locale)
         self.sync_presentation()
         self.notify_fallback(
             state.fallback_channels,
@@ -119,10 +117,10 @@ class ApplicationStartupAdapter:
         await self.pipeline_launcher.launch(
             runtime_pipeline_inputs_from_vnext(
                 self.settings.project(settings, authoritative=self.settings.authoritative),
-                peer_translation_enabled=settings.ui.peer_translation_enabled,
+                peer_translation_enabled=self.settings.peer_translation_enabled(),
             ),
             secrets=create_secret_store(
-                settings.secrets,
+                settings.intent.secrets,
                 config_path=self.pipeline_launcher.config_path,
             ),
             vrc_mic_state=self.pipeline.vrc_mic_state,
@@ -135,19 +133,32 @@ class ApplicationStartupAdapter:
             raise RuntimeError("Application pipeline did not provide runtime components")
         local_asr_runtime = components.local_asr_runtime
         llm_runtime = components.llm_runtime
-        stt_provider = settings.provider.stt.value
-        if self.stt_requires_secret(settings.provider.stt):
+        from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
+            provider_llm_for_translation,
+        )
+        from puripuly_heart.config.provider_values import LLMProviderName, STTProviderName
+
+        stt_provider = settings.intent.stt.provider
+        if self.stt_requires_secret(STTProviderName(stt_provider)):
             stt_key_map = {"qwen_asr": self.alibaba_verified_key()}
             stt_verified_key = stt_key_map.get(stt_provider, stt_provider)
-            stt_verified = getattr(settings.api_key_verified, stt_verified_key, False)
+            stt_entry = getattr(
+                settings.state.provider_verification,
+                stt_verified_key,
+                None,
+            )
+            stt_verified = getattr(stt_entry, "status", None) == "verified"
             stt_needs_key = (
                 local_asr_runtime.snapshot.channel_for("self").provider_id is None
             ) or (not stt_verified)
         else:
             stt_needs_key = False
         self.presentation.set_dashboard_stt_needs_key(stt_needs_key)
-        llm_provider = settings.provider.llm.value
-        if self.llm_requires_secret(settings.provider.llm):
+        llm_provider = provider_llm_for_translation(
+            settings.intent.translation.model,
+            settings.intent.translation.connection,
+        )
+        if self.llm_requires_secret(LLMProviderName(llm_provider)):
             llm_key_map = {
                 "gemini": "google",
                 "openrouter": "openrouter",
@@ -155,7 +166,12 @@ class ApplicationStartupAdapter:
                 "qwen": self.alibaba_verified_key(),
             }
             llm_verified_key = llm_key_map.get(llm_provider, llm_provider)
-            llm_verified = getattr(settings.api_key_verified, llm_verified_key, False)
+            llm_entry = getattr(
+                settings.state.provider_verification,
+                llm_verified_key,
+                None,
+            )
+            llm_verified = getattr(llm_entry, "status", None) == "verified"
             translation_needs_key = (
                 False
                 if self.managed_translation_available()

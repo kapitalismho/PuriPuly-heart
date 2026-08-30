@@ -131,7 +131,7 @@ def compose_github_star_prompt_owner(
         return connection_for(value) in _USER_OWNED_CLOUD_CONNECTIONS
 
     def is_eligible() -> bool:
-        current = settings.current
+        current = settings.canonical
         connection = connection_for(current)
         if connection in _MANAGED_CONNECTIONS:
             remaining_percent = managed_remaining_percent()
@@ -140,12 +140,12 @@ def compose_github_star_prompt_owner(
                 and remaining_percent <= GITHUB_STAR_PROMPT_MANAGED_REMAINING_PERCENT_THRESHOLD
             )
         if connection in _USER_OWNED_CLOUD_CONNECTIONS and current is not None:
-            ui = getattr(current, "ui", None)
-            return bool(getattr(ui, "github_star_prompt_translation_success_observed", False))
+            prompt = current.state.github_star_prompt
+            return bool(prompt.translation_success_observed)
         return False
 
     return GithubStarPromptOwner(
-        settings_provider=lambda: settings.current,
+        settings_provider=lambda: settings.canonical,
         persist_settings_state=persist_state,
         is_eligible=is_eligible,
         has_user_owned_cloud_connection=has_user_owned_cloud_connection,

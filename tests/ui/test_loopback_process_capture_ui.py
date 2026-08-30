@@ -18,9 +18,17 @@ from puripuly_heart.app.services.peer_capture_target_application import (
 )
 from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
 
+from puripuly_heart.config.capture_target_resolution import (
+    resolve_desktop_audio_capture_target,
+)
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import AppSettings
-from puripuly_heart.config.settings_vnext.schema import ProcessCaptureTargetIntent
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.settings_vnext.schema import (
+    CaptureTargetIntent,
+    ProcessCaptureTargetIntent,
+    with_capture_target,
+)
 from puripuly_heart.core.peer_capture import (
     PeerCaptureTargetIntent as CorePeerCaptureTargetIntent,
 )
@@ -75,6 +83,29 @@ def _presentation(
     return FletUiPresentationAdapter(app)
 
 
+def _vnext(settings: AppSettings | None = None):
+    return from_legacy_app_settings(
+        settings or AppSettings(),
+        preserve_provider_verification=True,
+    )
+
+
+def _capture_intent(resolved: ResolvedDesktopAudioCaptureTarget) -> CaptureTargetIntent:
+    if resolved.kind == "process":
+        if resolved.process_kind == "discord":
+            process = ProcessCaptureTargetIntent.discord(resolved.discord_channel or "stable")
+        elif resolved.process_kind == "vrchat":
+            process = ProcessCaptureTargetIntent.vrchat(resolved.executable_identity or "")
+        else:
+            process = ProcessCaptureTargetIntent.generic_executable(
+                resolved.executable_identity or ""
+            )
+        return CaptureTargetIntent.process_target(process)
+    if resolved.kind == "named_output_device":
+        return CaptureTargetIntent.named_output_device(resolved.device_name or "")
+    return CaptureTargetIntent.default_output_device()
+
+
 def _capture_target_owner(
     *,
     settings: AppSettings | None = None,
@@ -82,7 +113,7 @@ def _capture_target_owner(
     devices: tuple[str, ...] = (),
 ) -> PeerCaptureTargetApplicationOwner:
     return PeerCaptureTargetApplicationOwner(
-        settings=SimpleNamespace(current=settings),
+        settings=SimpleNamespace(canonical=_vnext(settings)),
         localize=t,
         processes=SimpleNamespace(candidates=lambda: candidates),
         devices=SimpleNamespace(names=lambda: devices),
@@ -473,12 +504,16 @@ def test_capture_target_owner_lists_enabled_processes_before_disabled_and_device
 
 
 def test_loopback_summary_prefers_localized_process_name() -> None:
-    settings = AppSettings()
-    owner = _capture_target_owner(settings=settings)
-    settings.desktop_audio.runtime_capture_target = ResolvedDesktopAudioCaptureTarget(
-        kind="process",
-        process_kind="vrchat",
-        executable_identity=r"c:\vrchat\vrchat.exe",
+    owner = _capture_target_owner()
+    owner.settings.canonical = with_capture_target(
+        owner.settings.canonical,
+        _capture_intent(
+            ResolvedDesktopAudioCaptureTarget(
+                kind="process",
+                process_kind="vrchat",
+                executable_identity=r"c:\vrchat\vrchat.exe",
+            )
+        ),
     )
     set_locale("en")
     assert owner.summary() == t("settings.desktop_audio.process.vrchat")
@@ -487,29 +522,43 @@ def test_loopback_summary_prefers_localized_process_name() -> None:
         ("ptb", "DiscordPTB.exe", "settings.desktop_audio.process.discord_ptb"),
         ("canary", "DiscordCanary.exe", "settings.desktop_audio.process.discord_canary"),
     ):
-        settings.desktop_audio.runtime_capture_target = ResolvedDesktopAudioCaptureTarget(
-            kind="process",
-            process_kind="discord",
-            discord_channel=channel,
-            executable_basename=basename,
+        owner.settings.canonical = with_capture_target(
+            owner.settings.canonical,
+            _capture_intent(
+                ResolvedDesktopAudioCaptureTarget(
+                    kind="process",
+                    process_kind="discord",
+                    discord_channel=channel,
+                    executable_basename=basename,
+                )
+            ),
         )
         assert owner.summary() == t(key)
-    settings.desktop_audio.runtime_capture_target = ResolvedDesktopAudioCaptureTarget(
-        kind="process",
-        process_kind="generic_executable",
-        executable_identity=r"c:\apps\game\game.exe",
+    owner.settings.canonical = with_capture_target(
+        owner.settings.canonical,
+        _capture_intent(
+            ResolvedDesktopAudioCaptureTarget(
+                kind="process",
+                process_kind="generic_executable",
+                executable_identity=r"c:\apps\game\game.exe",
+            )
+        ),
     )
     assert owner.summary() == "game"
 
 
 def test_list_options_preserves_saved_process_when_stopped() -> None:
-    settings = AppSettings()
-    settings.desktop_audio.runtime_capture_target = ResolvedDesktopAudioCaptureTarget(
-        kind="process",
-        process_kind="vrchat",
-        executable_identity=r"c:\vrchat\vrchat.exe",
+    owner = _capture_target_owner(devices=("Speakers",))
+    owner.settings.canonical = with_capture_target(
+        owner.settings.canonical,
+        _capture_intent(
+            ResolvedDesktopAudioCaptureTarget(
+                kind="process",
+                process_kind="vrchat",
+                executable_identity=r"c:\vrchat\vrchat.exe",
+            )
+        ),
     )
-    owner = _capture_target_owner(settings=settings, devices=("Speakers",))
     options = owner.options()
     current = owner.current_value()
     process_options = [option for option in options if option.value.startswith("process:")]
@@ -520,10 +569,11 @@ def test_list_options_preserves_saved_process_when_stopped() -> None:
     assert process_options[0].disabled is False
     assert "\\" not in process_options[0].label
     assert "pid" not in process_options[0].label.lower()
-    assert settings.desktop_audio.runtime_capture_target.kind == "process"
-    assert settings.desktop_audio.runtime_capture_target.executable_identity == (
-        r"c:\vrchat\vrchat.exe"
+    resolved = resolve_desktop_audio_capture_target(
+        owner.settings.canonical.intent.desktop_audio.capture_target
     )
+    assert resolved.kind == "process"
+    assert resolved.executable_identity == r"c:\vrchat\vrchat.exe"
 
 
 def test_settings_capture_target_refresh_preserves_unrelated_drafts() -> None:
@@ -545,7 +595,7 @@ def test_settings_capture_target_refresh_preserves_unrelated_drafts() -> None:
     view.on_loopback_capture_summary = lambda: "VRChat"
     saved = AppSettings()
     saved.desktop_audio.output_device = "Saved device"
-    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(saved)
+    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(_vnext(saved))
     provider_before = view._provider_snapshot
     provider_draft_before = view._provider_draft
 
@@ -562,19 +612,21 @@ def test_settings_capture_target_refresh_preserves_unrelated_drafts() -> None:
 
 @pytest.mark.asyncio
 async def test_capture_target_owner_publishes_general_snapshot_after_apply() -> None:
-    current = AppSettings()
-    next_settings = copy.deepcopy(current)
-    next_settings.desktop_audio.output_device = "Headset"
-    projections: list[AppSettings] = []
+    current = _vnext()
+    next_settings = with_capture_target(
+        current,
+        CaptureTargetIntent.named_output_device("Headset"),
+    )
+    projections: list[object] = []
     presented: list[object] = []
     settings = SimpleNamespace(
-        current=current,
+        canonical=current,
         authoritative=False,
         update_capture_target=lambda _current, _intent: next_settings,
         remember_projection=lambda value: projections.append(value),
     )
 
-    async def apply_capture_target(_settings: AppSettings) -> None:
+    async def apply_capture_target(_settings) -> None:
         return None
 
     owner = PeerCaptureTargetApplicationOwner(
@@ -589,7 +641,7 @@ async def test_capture_target_owner_publishes_general_snapshot_after_apply() -> 
 
     await owner.apply("device:Headset")
 
-    assert settings.current is next_settings
+    assert settings.canonical is next_settings
     assert settings.authoritative is True
     assert projections == [next_settings]
     assert len(presented) == 1
@@ -650,7 +702,7 @@ def test_settings_capture_target_rebase_updates_all_retained_apply_sources(
     committed = AppSettings()
     committed.desktop_audio.output_device = committed_output
     committed.desktop_audio.runtime_capture_target = committed_target
-    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(committed)
+    _provider, general, _prompt, _overlay = settings_view_surface_snapshots(_vnext(committed))
     provider_before = view._provider_snapshot
     provider_draft_before = view._provider_draft
     prompt_before = view._prompt_snapshot

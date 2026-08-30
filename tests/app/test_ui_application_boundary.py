@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -19,6 +20,7 @@ from puripuly_heart.app.services.ui_application import (
     UiApplicationBoundary as ProductionUiApplicationBoundary,
 )
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_FREEZE_INGRESS
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 
@@ -37,11 +39,13 @@ class RecordingBackend:
     def __init__(self) -> None:
         self.config_path = Path("settings.json")
         self.runtime_logging_mode = "detailed"
-        self.settings = SimpleNamespace(
-            ui=SimpleNamespace(peer_translation_eula_accepted=False),
-            provider=SimpleNamespace(llm=SimpleNamespace(value="local_llm")),
-            overlay=SimpleNamespace(target=SimpleNamespace(value="desktop")),
-            api_key_verified=SimpleNamespace(openrouter=True),
+        self.settings = replace(
+            AppSettingsVNext(),
+            intent=replace(
+                AppSettingsVNext().intent,
+                translation=replace(AppSettingsVNext().intent.translation, model="local_llm"),
+                overlay=replace(AppSettingsVNext().intent.overlay, target="desktop"),
+            ),
         )
         self.hub = SimpleNamespace(
             translation_enabled=True,
@@ -122,7 +126,19 @@ class RecordingBackend:
         self.events.append(("persist",))
 
     def clear_provider_verification(self, provider: str) -> None:
-        setattr(self.settings.api_key_verified, provider, False)
+        from puripuly_heart.config.settings_vnext.schema import ProviderVerificationEntry
+
+        verification = self.settings.state.provider_verification
+        self.settings = replace(
+            self.settings,
+            state=replace(
+                self.settings.state,
+                provider_verification=replace(
+                    verification,
+                    **{provider: ProviderVerificationEntry(status="unknown")},
+                ),
+            ),
+        )
         self.events.append(("clear-verification", provider))
 
     async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
@@ -238,9 +254,16 @@ def test_compatibility_settings_is_detached_and_missing_ui_state_stays_unknown()
     boundary = UiApplicationBoundary(backend)
 
     detached = boundary.compatibility_settings()
-    detached.ui.peer_translation_eula_accepted = True
-
-    assert backend.settings.ui.peer_translation_eula_accepted is False
+    assert detached == backend.settings
+    assert detached is not backend.settings
+    _ = replace(
+        detached,
+        state=replace(
+            detached.state,
+            peer_translation=replace(detached.state.peer_translation, eula_accepted=True),
+        ),
+    )
+    assert backend.settings.state.peer_translation.eula_accepted is False
     backend.settings = None
     assert boundary.state().peer_translation_eula_accepted is None
 
@@ -314,7 +337,7 @@ async def test_eula_acceptance_is_owned_at_the_boundary_before_peer_enable() -> 
 
     assert result is True
     assert backend.events[0][0] == "settings"
-    assert backend.settings.ui.peer_translation_eula_accepted is True
+    assert backend.settings.state.peer_translation.eula_accepted is True
     assert backend.events[1] == ("peer", True)
 
 
@@ -585,7 +608,16 @@ async def test_boundary_preserves_settings_failure_and_restart_projection() -> N
         await UiApplicationBoundary(failing_backend).apply_settings(object())
 
     restored_backend = RecordingBackend()
-    restored_backend.settings.ui.peer_translation_eula_accepted = True
+    restored_backend.settings = replace(
+        restored_backend.settings,
+        state=replace(
+            restored_backend.settings.state,
+            peer_translation=replace(
+                restored_backend.settings.state.peer_translation,
+                eula_accepted=True,
+            ),
+        ),
+    )
     restored = UiApplicationBoundary(restored_backend)
 
     assert restored.state().peer_translation_eula_accepted is True
@@ -612,10 +644,10 @@ async def test_telemetry_and_verification_mutations_stay_behind_named_intents() 
     boundary = UiApplicationBoundary(backend)
 
     returned = await boundary.apply_telemetry_enabled(True)
+    assert returned is backend.settings
     boundary.clear_provider_verification("openrouter")
 
-    assert returned is backend.settings
-    assert backend.settings.api_key_verified.openrouter is False
+    assert backend.settings.state.provider_verification.openrouter.status == "unknown"
     assert backend.events == [
         ("telemetry", True),
         ("clear-verification", "openrouter"),

@@ -13,6 +13,7 @@ from puripuly_heart.config.settings import (
     TranslationConnection,
     TranslationModel,
 )
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 
 
 class FakeSender:
@@ -76,7 +77,7 @@ def test_state_publisher_uses_translation_selection_ids(
     settings = AppSettings()
     settings.translation.model = model
     settings.translation.connection = connection
-    state = state_from_settings(settings)
+    state = state_from_settings(from_legacy_app_settings(settings))
     sender = FakeSender()
 
     OscStatePublisher(sender).start(state)
@@ -123,7 +124,7 @@ def test_state_from_settings_publishes_each_fallback_alias(
     settings.translation.fallback.model = model
     settings.translation.fallback.connection = connection
 
-    assert state_from_settings(settings).fallback == expected
+    assert state_from_settings(from_legacy_app_settings(settings)).fallback == expected
 
 
 @pytest.mark.parametrize(
@@ -142,6 +143,6 @@ def test_state_publisher_publishes_custom_asr_ids(
     settings.provider.stt = provider
     sender = FakeSender()
 
-    OscStatePublisher(sender).start(state_from_settings(settings))
+    OscStatePublisher(sender).start(state_from_settings(from_legacy_app_settings(settings)))
 
     assert ("/avatar/parameters/PuriPuly_SelfASR", expected_id) in sender.messages

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
@@ -124,7 +124,7 @@ class OpenRouterPkceApplicationOwner:
         target: OpenRouterPkceTarget,
         launch_source: str,
     ) -> bool:
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None:
             return False
         selection_alias = target.selection_alias
@@ -154,7 +154,7 @@ class OpenRouterPkceApplicationOwner:
             )
             return False
 
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None:
             return False
         updated = materialize_provider_apply_intent(
@@ -162,14 +162,22 @@ class OpenRouterPkceApplicationOwner:
             target.provider_intent,
             materialize_translation=self.settings.materialize_translation,
         )
-        updated.provider.llm = LLMProviderName.OPENROUTER
-        updated.openrouter.selection_alias = OpenRouterSelectionAlias(profile.alias)
-        updated.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-        updated.openrouter.llm_model = OpenRouterLLMModel(profile.openrouter_model)
-        updated.api_key_verified.openrouter = True
+        next_prompts = updated.intent.prompts
         if target.system_prompt is not None:
-            updated.system_prompt = target.system_prompt
-            updated.system_prompts = {}
+            next_prompts = replace(next_prompts, system_prompt=target.system_prompt)
+        updated = replace(
+            updated,
+            intent=replace(
+                updated.intent,
+                translation=replace(
+                    updated.intent.translation,
+                    openrouter_selection_alias=profile.alias,
+                    openrouter_selected_source="byok",
+                    openrouter_model=profile.openrouter_model,
+                ),
+                prompts=next_prompts,
+            ),
+        )
         plan = self.provider_runtime.build_plan(
             updated,
             force_rebuild_llm=True,

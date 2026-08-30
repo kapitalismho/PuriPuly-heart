@@ -60,31 +60,17 @@ from .wiring_translation_runtime_configuration import (
 )
 
 
-def _runtime_peer_translation_enabled(settings: object) -> bool:
-    ui = getattr(settings, "ui", None)
-    return bool(getattr(ui, "peer_translation_enabled", False))
+def _runtime_peer_translation_enabled(owner: object) -> bool:
+    flag = getattr(owner, "peer_translation_enabled", None)
+    if callable(flag):
+        return bool(flag())
+    return False
 
 
 def project_translation_runtime_settings(
-    settings: object,
+    settings: AppSettingsVNext,
 ) -> TranslationRuntimeSettingsValues:
-    return TranslationRuntimeSettingsValues(
-        source_language=settings.languages.source_language,
-        target_language=settings.languages.target_language,
-        peer_source_language=settings.languages.peer_source_language,
-        peer_target_language=settings.languages.peer_target_language,
-        system_prompt=settings.system_prompt,
-        chatbox_include_source=settings.osc.chatbox_include_source,
-        hangover_s=(
-            settings.stt.low_latency_vad_hangover_ms / 1000.0
-            if FIXED_TRANSLATION_POLICY.fast_translation_enabled
-            else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
-        ),
-        peer_hangover_s=settings.desktop_audio.vad_hangover_ms / 1000.0,
-        low_latency_mode=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
-        low_latency_merge_gap_ms=settings.stt.low_latency_merge_gap_ms,
-        low_latency_spec_retry_max=settings.stt.low_latency_spec_retry_max,
-    )
+    return project_translation_runtime_settings_from_vnext(settings)
 
 
 def project_translation_runtime_settings_from_vnext(
@@ -125,6 +111,7 @@ class ProviderRuntimeSignatures:
         *,
         canonical: AppSettingsVNext,
         peer: PeerApplicationOwner,
+        peer_translation_enabled: bool = False,
     ) -> None:
         self.last_self_runtime = build_self_stt_runtime_signature_from_vnext(canonical)
         self.last_self_provider = build_self_stt_provider_signature_from_vnext(canonical)
@@ -134,7 +121,7 @@ class ProviderRuntimeSignatures:
         )
         peer.last_runtime_signature = build_peer_stt_runtime_signature_from_vnext(canonical)
         peer.last_provider_signature = build_peer_stt_provider_signature_from_vnext(canonical)
-        peer.last_intent_enabled = _runtime_peer_translation_enabled(settings)
+        peer.last_intent_enabled = bool(peer_translation_enabled)
         peer.last_activation_requested = peer.activation_requested(
             intent_enabled=peer.last_intent_enabled,
             eula_accepted=canonical.state.peer_translation.eula_accepted,
@@ -228,7 +215,7 @@ class ProviderRuntimeEffects:
         canonical = self.canonical_settings(settings)
         translation = canonical.intent.translation
         provider_llm = provider_llm_for_translation(translation.model, translation.connection)
-        self.settings.current = settings
+        self.settings.canonical = settings
         self.clear_local_pending()
         self.sync_local_notice()
         if (
@@ -252,7 +239,7 @@ class ProviderRuntimeEffects:
 
     async def refresh_peer(self) -> None:
         await self.refresh_peer_runtime()
-        current = self.settings.current
+        current = self.settings.canonical
         if current is not None:
             self.sync_effective_flags(current)
         self.refresh_overlay()
@@ -265,7 +252,7 @@ class ProviderRuntimeEffects:
         await self.rebuild_self_stt()
 
     async def rebuild_self_stt(self) -> None:
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None or self.local_asr_runtime_provider() is None:
             return
         owner = self.self_capture_owner()
@@ -364,7 +351,7 @@ def compose_provider_runtime(
     )
 
     def llm_context() -> LlmProviderRebuildContext | None:
-        current = settings.current
+        current = settings.canonical
         runtime = llm_runtime_provider()
         if current is None or runtime is None:
             return None
@@ -418,7 +405,7 @@ def compose_provider_runtime(
                 translation_enabled=bool(
                     config is not None and config.snapshot().value.translation_enabled
                 ),
-                peer_translation_enabled=_runtime_peer_translation_enabled(settings_value),
+                peer_translation_enabled=settings.peer_translation_enabled(),
             )
             if not translation_on:
                 return _translation_backend_from_canonical(
@@ -467,11 +454,12 @@ def compose_provider_runtime(
             current,
             canonical=canonical_settings(current),
             peer=peer(),
+            peer_translation_enabled=settings.peer_translation_enabled(),
         )
         additional_signature_sink(current)
 
     def capture_signatures_before_canonical_mutation() -> None:
-        current = settings.current
+        current = settings.canonical
         if current is None:
             return
         signature_state.capture_peer_before_canonical_mutation(
@@ -489,7 +477,7 @@ def compose_provider_runtime(
         refresh_self_stt=effects.refresh_self_stt,
         signature_sink=sync_signatures,
         llm_retry_sink=signature_state.mark_llm_retry,
-        current_settings_provider=lambda: settings.current,
+        current_settings_provider=lambda: settings.canonical,
         signature_cache_provider=lambda: signature_state.cache(peer()),
         self_signature_builder=lambda current: build_self_stt_provider_signature_from_vnext(
             canonical_settings(current)

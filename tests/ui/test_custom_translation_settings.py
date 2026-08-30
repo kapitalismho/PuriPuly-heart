@@ -124,11 +124,12 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.model is TranslationModel.CUSTOM_HTTP
-    assert pending.translation.connection is TranslationConnection.CUSTOM_HTTP
-    assert pending.translation.previous_llm_model is TranslationModel.QWEN_35_PLUS
-    assert pending.provider.llm is LLMProviderName.QWEN
-    assert pending.translation.fallback == fallback
+    assert pending.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
+    assert pending.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
+    assert pending.intent.translation.previous_llm_model == TranslationModel.QWEN_35_PLUS.value
+    assert pending.intent.translation.fallback.enabled == fallback.enabled
+    assert pending.intent.translation.fallback.model == fallback.model.value
+    assert pending.intent.translation.fallback.connection == fallback.connection.value
     assert view._http_extension_row.visible is True
     assert view._http_extension_host.visible is True
     assert view._translation_connection_row.visible is False
@@ -143,7 +144,7 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.http_extension_id == "demo"
+    assert pending.intent.translation.http_extension_id == "demo"
     assert set(view._http_extension_secret_fields) == {"api_key"}
     assert view._http_extension_secret_fields["api_key"].value == "saved-secret"
     assert view._http_extension_secret_fields["api_key"].password is True
@@ -153,11 +154,12 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.model is TranslationModel.QWEN_35_PLUS
-    assert pending.translation.connection is TranslationConnection.OFFICIAL_BYOK
-    assert pending.translation.previous_llm_model is None
-    assert pending.translation.fallback == fallback
-    assert pending.provider.llm is LLMProviderName.QWEN
+    assert pending.intent.translation.model == TranslationModel.QWEN_35_PLUS.value
+    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
+    assert pending.intent.translation.previous_llm_model is None
+    assert pending.intent.translation.fallback.enabled == fallback.enabled
+    assert pending.intent.translation.fallback.model == fallback.model.value
+    assert pending.intent.translation.fallback.connection == fallback.connection.value
 
 
 def test_custom_http_credentials_use_namespaced_secret_callback_and_reload_isolated_errors(
@@ -279,7 +281,7 @@ def test_custom_http_card_surfaces_missing_selected_extension_without_fallback(
         "settings.http_extension.none"
     )
     assert view._http_extension_selected_id == "demo"
-    assert view.build_provider_apply_settings().translation.http_extension_id == "demo"
+    assert view.build_provider_apply_settings().intent.translation.http_extension_id == "demo"
     assert len(view._http_extension_credentials.controls) == 0
     assert changed == [True]
 

@@ -12,11 +12,12 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from uuid import uuid4
 
-from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
-    SettingsVNextCanonicalPersistenceAdapter,
-)
 from puripuly_heart.app.services.managed_gemma_translation import (
     ManagedGemmaTranslationOwner,
+)
+from puripuly_heart.app.wiring.wiring_llm_factory import (
+    llm_factory_extras_from_vnext,
+    runtime_resolution_input_from_vnext,
 )
 from puripuly_heart.app.wiring.wiring_managed_gemma import managed_gemma_selection
 from puripuly_heart.app.wiring.wiring_translation_backend import (
@@ -274,7 +275,7 @@ def _settings(backend: str) -> object:
             ),
         ),
     )
-    return SettingsVNextCanonicalPersistenceAdapter().compatibility_projection(canonical)
+    return canonical
 
 
 def _is_managed_only_backend(backend: object) -> bool:
@@ -324,9 +325,11 @@ async def _run_backend(
                 f"{activation.readiness.effective_backend} instead of {expected_effective}"
             )
         translation_backend = create_translation_backend(
-            settings,
+            translation_model=settings.intent.translation.model,
             secrets=InMemorySecretStore(),
             http_extensions=HttpExtensionRegistry(model_dir.parent / "unused-http-extensions"),
+            runtime_input=runtime_resolution_input_from_vnext(settings),
+            extras=llm_factory_extras_from_vnext(settings),
             managed_gemma_runtime=activation.runtime,
             managed_gemma_release=activation.release,
         )

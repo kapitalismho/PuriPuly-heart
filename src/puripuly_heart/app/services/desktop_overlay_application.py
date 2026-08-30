@@ -4,7 +4,7 @@ import asyncio
 import copy
 import logging
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from puripuly_heart.app.ports.desktop_overlay import (
@@ -17,6 +17,11 @@ from puripuly_heart.app.services.canonical_settings_persistence import SettingsO
 from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
 from puripuly_heart.config.resolved import OVERLAY_TARGET_DESKTOP, ResolvedOverlayConfig
+from puripuly_heart.config.settings_vnext.schema import (
+    AppSettingsVNext,
+    DesktopFletOverlayIntent,
+    DesktopFletOverlayPositionIntent,
+)
 from puripuly_heart.core.runtime.desktop_overlay_bounds import (
     DesktopOverlayBoundsOwner,
     is_finite_non_bool_number,
@@ -201,7 +206,7 @@ class DesktopOverlayApplicationOwner:
 
     async def set_captions_locked(self, locked: bool) -> None:
         overlay = self.overlay_provider()
-        if self.settings.current is None or overlay.state != "connected":
+        if self.settings.canonical is None or overlay.state != "connected":
             return
         if overlay.active_target != OVERLAY_TARGET_DESKTOP or overlay.current_bridge() is None:
             return
@@ -210,7 +215,7 @@ class DesktopOverlayApplicationOwner:
             self.set_interaction_mode(mode)
 
     async def set_size_preset(self, size_preset: str) -> None:
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None:
             return
         normalized = (
@@ -218,10 +223,21 @@ class DesktopOverlayApplicationOwner:
             if size_preset in self.policy.size_presets
             else self.policy.default_size_preset
         )
-        if current.overlay.desktop_flet.size_preset == normalized:
+        if current.intent.overlay.desktop_flet.size_preset == normalized:
             return
-        updated = copy.deepcopy(current)
-        updated.overlay.desktop_flet.size_preset = normalized
+        updated = replace(
+            current,
+            intent=replace(
+                current.intent,
+                overlay=replace(
+                    current.intent.overlay,
+                    desktop_flet=replace(
+                        current.intent.overlay.desktop_flet,
+                        size_preset=normalized,
+                    ),
+                ),
+            ),
+        )
         await self.settings_application_provider().apply(updated)
 
     async def reset_position(self) -> None:
@@ -360,17 +376,29 @@ class DesktopOverlayApplicationOwner:
         )
 
     async def persist_bounds(self, bounds: DesktopBounds) -> None:
-        current = self.settings.current
+        current = self.settings.canonical
         overlay = self.overlay_provider()
         if current is None or overlay.active_target != OVERLAY_TARGET_DESKTOP:
             return
         if self._bounds.bounds_from_payload(bounds) is None:
             return
-        updated = copy.deepcopy(current)
-        desktop = updated.overlay.desktop_flet
-        desktop.position.x = bounds["x"]
-        desktop.position.y = bounds["y"]
-        desktop.position.validate()
+        desktop = current.intent.overlay.desktop_flet
+        updated = replace(
+            current,
+            intent=replace(
+                current.intent,
+                overlay=replace(
+                    current.intent.overlay,
+                    desktop_flet=replace(
+                        desktop,
+                        position=DesktopFletOverlayPositionIntent(
+                            x=bounds["x"],
+                            y=bounds["y"],
+                        ),
+                    ),
+                ),
+            ),
+        )
         application = self.settings_application_provider()
         if not await application.apply_overlay_osc_output(updated):
             return
@@ -379,16 +407,16 @@ class DesktopOverlayApplicationOwner:
         self._log(
             "[DesktopOverlay][Bounds] persisted "
             f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-            f"height={bounds['height']} size_preset={desktop.size_preset}"
+            f"height={bounds['height']} size_preset={updated.intent.overlay.desktop_flet.size_preset}"
         )
 
     async def _reset(self) -> None:
-        current = self.settings.current
+        current = self.settings.canonical
         overlay = self.overlay_provider()
         if current is None:
             return
         configured_desktop = (
-            OverlayApplicationOwner.normalized_target(current.overlay.target)
+            OverlayApplicationOwner.normalized_target(current.intent.overlay.target)
             == OVERLAY_TARGET_DESKTOP
         )
         renderer_active = bool(
@@ -398,17 +426,24 @@ class DesktopOverlayApplicationOwner:
             return
         await self._bounds.cancel()
         self.drain_pending_user_bounds_events()
-        updated = copy.deepcopy(current)
-        desktop = updated.overlay.desktop_flet
-        desktop.position.x = None
-        desktop.position.y = None
-        desktop.validate()
+        updated = replace(
+            current,
+            intent=replace(
+                current.intent,
+                overlay=replace(
+                    current.intent.overlay,
+                    desktop_flet=replace(
+                        current.intent.overlay.desktop_flet,
+                        position=DesktopFletOverlayPositionIntent(x=None, y=None),
+                    ),
+                ),
+            ),
+        )
         application = self.settings_application_provider()
         routed = await application.apply_overlay_osc_output(updated)
         if routed and not application.results.committed():
             return
-        if self.settings.current is not None:
-            self.settings.current.overlay.desktop_flet.locked = False
+        self.settings.set_overlay_desktop_locked(False)
         self.set_interaction_mode(DESKTOP_INTERACTION_MODE_EDIT)
         if not renderer_active:
             return
@@ -421,17 +456,17 @@ class DesktopOverlayApplicationOwner:
         await self.broadcast_bounds(self.center_bounds_for_current_preset())
 
     def center_bounds_for_current_preset(self) -> DesktopBounds:
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None:
             width, height = self.dimensions("medium")
         else:
-            width, height = self.dimensions(current.overlay.desktop_flet.size_preset)
+            width, height = self.dimensions(current.intent.overlay.desktop_flet.size_preset)
         return self.centered_bounds(width=width, height=height)
 
     def runtime_is_running_for_settings(self, settings: Any) -> bool:
         overlay = self.overlay_provider()
         return bool(
-            settings.ui.overlay_enabled
+            self.settings.overlay_enabled()
             and overlay.active_target == OVERLAY_TARGET_DESKTOP
             and overlay.current_bridge() is not None
         )
@@ -460,10 +495,8 @@ class DesktopOverlayApplicationOwner:
     ) -> tuple[DesktopRuntimeControl, ...]:
         if previous_settings is None:
             return ()
-        previous = copy.deepcopy(previous_settings.overlay.desktop_flet)
-        previous.validate()
-        next_desktop = next_settings.overlay.desktop_flet
-        next_desktop.validate()
+        previous = previous_settings.intent.overlay.desktop_flet
+        next_desktop = next_settings.intent.overlay.desktop_flet
         if not self.runtime_is_running_for_settings(next_settings):
             return ()
         controls: list[DesktopRuntimeControl] = []
@@ -474,23 +507,17 @@ class DesktopOverlayApplicationOwner:
                 previous_desktop_settings=previous,
                 next_size_preset=next_desktop.size_preset,
             )
-            if previous.position.x is not None and previous.position.y is not None:
-                next_desktop.position.x = bounds["x"]
-                next_desktop.position.y = bounds["y"]
-                next_desktop.position.validate()
             controls.append({"command": "apply_window_bounds", **bounds})
         if (
-            previous.visual.text_scale != next_desktop.visual.text_scale
-            or previous.visual.background_alpha != next_desktop.visual.background_alpha
-            or previous.visual.outline_width != next_desktop.visual.outline_width
+            previous.visual.background_alpha != next_desktop.visual.background_alpha
             or previous.swap_caption_languages != next_desktop.swap_caption_languages
         ):
             controls.append(
                 {
                     "command": "apply_visual_config",
-                    "text_scale": next_desktop.visual.text_scale,
+                    "text_scale": self.policy.default_text_scale,
                     "background_alpha": next_desktop.visual.background_alpha,
-                    "outline_width": next_desktop.visual.outline_width,
+                    "outline_width": None,
                     "swap_caption_languages": next_desktop.swap_caption_languages,
                 }
             )
@@ -501,10 +528,8 @@ class DesktopOverlayApplicationOwner:
         previous_settings: Any,
         next_settings: Any,
     ) -> None:
-        previous = copy.deepcopy(previous_settings.overlay.desktop_flet)
-        previous.validate()
-        next_desktop = next_settings.overlay.desktop_flet
-        next_desktop.validate()
+        previous = previous_settings.intent.overlay.desktop_flet
+        next_desktop = next_settings.intent.overlay.desktop_flet
         if (
             previous.size_preset == next_desktop.size_preset
             or not self.runtime_is_running_for_settings(next_settings)
@@ -514,18 +539,15 @@ class DesktopOverlayApplicationOwner:
         self.drain_pending_user_bounds_events()
         if previous.position.x is None or previous.position.y is None:
             return
-        bounds = self.center_preserving_bounds(
+        self.center_preserving_bounds(
             previous_desktop_settings=previous,
             next_size_preset=next_desktop.size_preset,
         )
-        next_desktop.position.x = bounds["x"]
-        next_desktop.position.y = bounds["y"]
-        next_desktop.position.validate()
 
     def sync_from_settings(self, settings: Any) -> None:
         overlay = self.overlay_provider()
         if (
-            OverlayApplicationOwner.normalized_target(settings.overlay.target)
+            OverlayApplicationOwner.normalized_target(settings.intent.overlay.target)
             != OVERLAY_TARGET_DESKTOP
         ):
             return

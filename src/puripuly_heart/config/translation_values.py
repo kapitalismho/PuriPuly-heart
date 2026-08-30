@@ -95,11 +95,33 @@ def default_translation_connection(model: TranslationModel) -> TranslationConnec
     return supported_connections[0]
 
 
+_MANAGED_GEMMA_MODELS = frozenset({"managed_gemma", "managed_gemma_12b"})
+
+
+def provider_llm_for_translation(model: str, connection: str) -> str:
+    if model in _MANAGED_GEMMA_MODELS:
+        return "managed_gemma"
+    if model == "local_llm":
+        return "local_llm"
+    if model == "gemma4_31b_cerebras" or (model == "gemma4_31b" and connection == "cerebras"):
+        return "cerebras"
+    if model in {"gemini37_flash", "gemini31_flash_lite"}:
+        if connection == "openrouter":
+            return "openrouter"
+        return "gemini"
+    if model in {"deepseek_v4_flash", "deepseek_v4_pro"} and connection == "official_byok":
+        return "deepseek"
+    if model == "qwen35_plus":
+        return "qwen"
+    return "openrouter"
+
+
 __all__ = [
     "TRANSLATION_CONNECTIONS_BY_MODEL",
     "TRANSLATION_CONNECTION_PRIORITY",
     "TranslationConnection",
     "TranslationModel",
     "default_translation_connection",
+    "provider_llm_for_translation",
     "supported_translation_connections",
 ]

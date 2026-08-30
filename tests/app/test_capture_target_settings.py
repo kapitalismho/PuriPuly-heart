@@ -14,11 +14,10 @@ from puripuly_heart.app.adapters import (
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
-from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.config.settings_vnext import compat
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings, save_vnext_settings
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.config.settings_vnext.schema import (
+    AppSettingsVNext,
     CaptureTargetIntent,
     ProcessCaptureTargetIntent,
 )
@@ -45,7 +44,7 @@ def test_capture_target_persistence_creates_an_absent_settings_file(tmp_path: Pa
 
 def test_capture_target_persistence_updates_valid_canonical_settings(tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
-    save_vnext_settings(path, from_legacy_app_settings(AppSettings()))
+    save_vnext_settings(path, AppSettingsVNext())
 
     saved = persist_desktop_audio_capture_target(path, _process_target())
 
@@ -149,7 +148,7 @@ def test_capture_target_persistence_loads_existing_file_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     path = tmp_path / "settings.json"
-    save_vnext_settings(path, from_legacy_app_settings(AppSettings()))
+    save_vnext_settings(path, AppSettingsVNext())
     original_load = persistence_adapter.load_vnext_settings
     loads: list[Path] = []
 
@@ -164,32 +163,26 @@ def test_capture_target_persistence_loads_existing_file_once(
     assert loads == [path]
 
 
-def test_capture_target_projection_failure_does_not_change_persisted_state(
+def test_capture_target_persist_failure_does_not_change_persisted_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     path = tmp_path / "settings.json"
-    save_vnext_settings(path, from_legacy_app_settings(AppSettings()))
+    save_vnext_settings(path, AppSettingsVNext())
     original_bytes = path.read_bytes()
-    original_projection = SettingsVNextCanonicalPersistenceAdapter.compatibility_projection
-    projections = 0
 
-    def fail_second_projection(self, settings):
-        nonlocal projections
-        projections += 1
-        if projections == 2:
-            raise RuntimeError("raw projection failure")
-        return original_projection(self, settings)
+    def fail_persist(self, _path: Path, _settings: AppSettingsVNext) -> None:
+        raise RuntimeError("raw persist failure")
 
     monkeypatch.setattr(
         SettingsVNextCanonicalPersistenceAdapter,
-        "compatibility_projection",
-        fail_second_projection,
+        "persist",
+        fail_persist,
     )
 
     with pytest.raises(CaptureTargetSettingsError) as raised:
         persist_desktop_audio_capture_target(path, _process_target())
 
     assert raised.value.status == "save_failed"
-    assert "raw projection failure" not in str(raised.value)
+    assert "raw persist failure" not in str(raised.value)
     assert path.read_bytes() == original_bytes

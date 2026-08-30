@@ -506,7 +506,18 @@ class UiApplicationBoundary:
     async def accept_peer_translation_eula_and_enable(self) -> object:
         settings = self.compatibility_settings()
         if settings is not None:
-            settings.ui.peer_translation_eula_accepted = True
+            from dataclasses import replace
+
+            settings = replace(
+                settings,
+                state=replace(
+                    settings.state,
+                    peer_translation=replace(
+                        settings.state.peer_translation,
+                        eula_accepted=True,
+                    ),
+                ),
+            )
             await self.apply_settings(settings)
         return await self.set_peer_translation_enabled(True)
 

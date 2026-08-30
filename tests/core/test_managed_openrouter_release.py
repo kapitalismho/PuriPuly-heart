@@ -7,7 +7,7 @@ import hashlib
 import sys
 import threading
 import types
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 from uuid import uuid4
 
@@ -52,10 +52,43 @@ from puripuly_heart.config.settings import (
     TranslationConnection,
     TranslationModel,
 )
+from puripuly_heart.config.llm_profiles import get_openrouter_llm_profile
+from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.managed_identity import ensure_managed_identity_bundle
 from puripuly_heart.core.runtime import OAuthRuntime
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.domain.models import Translation
+
+
+def _canonical_settings(settings: AppSettings) -> AppSettingsVNext:
+    canonical = from_legacy_app_settings(settings)
+    alias = settings.openrouter.selection_alias
+    alias_value = getattr(alias, "value", alias)
+    if not alias_value or alias_value == "none":
+        return canonical
+    profile = get_openrouter_llm_profile(str(alias_value))
+    if profile is None:
+        return canonical
+    translation = canonical.intent.translation
+    return replace(
+        canonical,
+        intent=replace(
+            canonical.intent,
+            translation=replace(
+                translation,
+                openrouter_selection_alias=str(alias_value),
+                openrouter_model=profile.openrouter_model,
+                openrouter_selected_source=str(
+                    getattr(
+                        settings.openrouter.selected_source,
+                        "value",
+                        settings.openrouter.selected_source,
+                    )
+                ),
+            ),
+        ),
+    )
 
 
 @dataclass
@@ -271,7 +304,9 @@ def _make_service(
         )
 
     service_kwargs: dict[str, Any] = {
-        "openrouter_config": build_openrouter_release_runtime_config(resolved_settings),
+        "openrouter_config": build_openrouter_release_runtime_config(
+            _canonical_settings(resolved_settings)
+        ),
         "managed_state": ManagedIdentityStateAdapter(resolved_settings, persist),
         "secrets": resolved_secrets,
         "client": client,
@@ -1399,7 +1434,7 @@ async def test_issue_persists_managed_user_identifier_after_managed_key_success(
     )
     assert (
         load_managed_openrouter_user_identifier(
-            build_openrouter_credential_runtime_config(settings), secrets=secrets
+            build_openrouter_credential_runtime_config(_canonical_settings(settings)), secrets=secrets
         )
         == "user-123"
     )
@@ -1530,7 +1565,7 @@ async def test_direct_issue_pending_ack_persist_failure_happens_before_local_key
         raise RuntimeError("pending persist failed")
 
     service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, fail_persist),
         secrets=secrets,
         client=client,
@@ -1648,7 +1683,7 @@ async def test_issue_keeps_ready_and_cleans_managed_user_identifier_cache_on_sec
     assert secrets.get(OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET) is None
     assert (
         load_managed_openrouter_user_identifier(
-            build_openrouter_credential_runtime_config(settings), secrets=secrets
+            build_openrouter_credential_runtime_config(_canonical_settings(settings)), secrets=secrets
         )
         is None
     )
@@ -1701,7 +1736,7 @@ async def test_issue_omission_or_invalid_user_id_preserves_existing_managed_user
     )
     assert (
         load_managed_openrouter_user_identifier(
-            build_openrouter_credential_runtime_config(settings), secrets=secrets
+            build_openrouter_credential_runtime_config(_canonical_settings(settings)), secrets=secrets
         )
         == "cached-user-1"
     )
@@ -1856,7 +1891,7 @@ async def test_prepare_for_translation_preserves_legacy_hardware_hash_provider_s
     secrets = InMemorySecretStore()
 
     service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
         secrets=secrets,
         client=client,
@@ -2090,7 +2125,7 @@ async def test_issue_honors_retry_after_without_starting_parallel_retries() -> N
     monotonic_now = {"value": 1_000}
 
     service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
         secrets=secrets,
         client=client,
@@ -2146,7 +2181,7 @@ async def test_prepare_for_translation_honors_retry_after_while_pending_release_
         )
     )
     service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
         secrets=secrets,
         client=client,
@@ -2472,7 +2507,7 @@ async def test_issue_restarts_when_identity_bundle_regenerates_before_issue() ->
         issue_result=ManagedOpenRouterIssueSuccess(openrouter_api_key="managed-key")
     )
     service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
         secrets=InMemorySecretStore(),
         client=client,
@@ -2554,7 +2589,7 @@ async def test_issue_stops_and_restores_pending_release_state_when_cleanup_persi
         raise RuntimeError("settings persistence failed")
 
     service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, persist_and_fail),
         secrets=secrets,
         client=client,

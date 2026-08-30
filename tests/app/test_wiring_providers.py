@@ -1345,7 +1345,7 @@ def test_create_llm_provider_openrouter_legacy_qwen_fallback_alias_is_ignored() 
     )
     secrets = InMemorySecretStore()
     managed_release_service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
         secrets=secrets,
         client=object(),
@@ -1389,7 +1389,7 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_uses_fallback_
     )
     secrets = InMemorySecretStore()
     managed_release_service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
         secrets=secrets,
         client=object(),
@@ -1511,7 +1511,7 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_clears_primary
     )
     secrets = InMemorySecretStore()
     managed_release_service = ManagedOpenRouterReleaseService(
-        openrouter_config=build_openrouter_release_runtime_config(settings),
+        openrouter_config=build_openrouter_release_runtime_config(_canonical_settings(settings)),
         managed_state=ManagedIdentityStateAdapter(settings, lambda _updated: None),
         secrets=secrets,
         client=object(),
@@ -2025,7 +2025,7 @@ def test_resolve_peer_stt_config_always_uses_self_deepgram_model() -> None:
     settings.provider.peer_stt = STTProviderName.DEEPGRAM
     settings.deepgram_stt.model = "nova-3-general"
 
-    resolved = resolve_peer_stt_config(settings)
+    resolved = resolve_peer_stt_config(_canonical_settings(settings))
 
     assert resolved.provider == STTProviderName.DEEPGRAM
     assert resolved.model == "nova-3-general"
@@ -2040,7 +2040,7 @@ def test_resolve_peer_stt_config_exposes_legacy_provider_specific_fields() -> No
     settings.soniox_stt.keepalive_interval_s = 12.5
     settings.soniox_stt.trailing_silence_ms = 700
 
-    resolved = resolve_peer_stt_config(settings)
+    resolved = resolve_peer_stt_config(_canonical_settings(settings))
 
     assert isinstance(resolved, ResolvedPeerSTTConfig)
     assert resolved.provider is STTProviderName.SONIOX
@@ -2057,8 +2057,14 @@ def test_resolve_peer_stt_config_exposes_legacy_provider_specific_fields() -> No
 
 
 def test_resolve_peer_stt_config_rejects_invalid_compatibility_provider() -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = "corrupt-peer-stt-provider"  # type: ignore[assignment]
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            peer_stt=replace(settings.intent.peer_stt, provider="corrupt-peer-stt-provider"),
+        ),
+    )
 
     with pytest.raises(ValueError, match="Unsupported peer STT provider"):
         resolve_peer_stt_config(settings)
@@ -2138,7 +2144,7 @@ def test_self_stt_runtime_signature_from_vnext_matches_bag_restart_fields() -> N
         canonical = from_legacy_app_settings(settings)
         assert build_self_stt_runtime_signature_from_vnext(
             canonical
-        ) == build_self_stt_runtime_signature(settings)
+        ) == build_self_stt_runtime_signature(canonical)
 
 
 def test_build_peer_stt_provider_signature_includes_backend_affecting_values() -> None:
@@ -2148,7 +2154,7 @@ def test_build_peer_stt_provider_signature_includes_backend_affecting_values() -
     settings.soniox_stt.model = "stt-rt-v4"
     settings.soniox_stt.trailing_silence_ms = 350
 
-    signature = build_peer_stt_provider_signature(settings)
+    signature = build_peer_stt_provider_signature(_canonical_settings(settings))
 
     assert STTProviderName.SONIOX in signature
     assert "zh-CN" in signature
@@ -2163,7 +2169,7 @@ def test_peer_auto_detection_keeps_self_language_restriction_separate() -> None:
     settings.languages.peer_source_mode = "auto"
     settings.languages.peer_expected_languages = ["ja", "zh-TW"]
 
-    peer = resolve_peer_stt_runtime_config(settings)
+    peer = resolve_peer_stt_runtime_config(_canonical_settings(settings))
     self_config = resolve_stt_config(
         self_stt_runtime_intent_from_vnext(from_legacy_app_settings(settings))
     )
@@ -2182,7 +2188,7 @@ def test_peer_auto_detection_falls_back_to_manual_configuration_for_other_provid
     settings.languages.peer_source_mode = "auto"
     settings.languages.peer_expected_languages = ["ja"]
 
-    peer = resolve_peer_stt_runtime_config(settings)
+    peer = resolve_peer_stt_runtime_config(_canonical_settings(settings))
 
     assert peer.source_language == settings.languages.effective_peer_source
     assert peer.provider_options == {}
@@ -2293,7 +2299,7 @@ def test_build_peer_stt_provider_signature_uses_fixed_16khz_runtime_contract() -
     settings.provider.peer_stt = STTProviderName.QWEN_ASR
     settings.audio.internal_sample_rate_hz = 8000
 
-    signature = build_peer_stt_provider_signature(settings)
+    signature = build_peer_stt_provider_signature(_canonical_settings(settings))
 
     assert signature[2] == 16000
 
@@ -2303,7 +2309,7 @@ def test_resolve_peer_stt_config_uses_shared_qwen_model_only() -> None:
     settings.provider.peer_stt = STTProviderName.QWEN_ASR
     settings.qwen_asr_stt.model = "self-qwen-asr"
 
-    resolved = resolve_peer_stt_config(settings)
+    resolved = resolve_peer_stt_config(_canonical_settings(settings))
 
     assert resolved.model == "self-qwen-asr"
 
@@ -2373,7 +2379,7 @@ def test_resolve_peer_stt_config_uses_shared_soniox_endpoint_keepalive_and_trail
     settings.soniox_stt.keepalive_interval_s = 12.5
     settings.soniox_stt.trailing_silence_ms = 900
 
-    resolved = resolve_peer_stt_config(settings)
+    resolved = resolve_peer_stt_config(_canonical_settings(settings))
 
     assert resolved.model == "self-soniox"
     assert resolved.endpoint == "wss://self-soniox.example/realtime"
