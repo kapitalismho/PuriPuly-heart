@@ -356,7 +356,6 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset()
 SETTINGS_COMPATIBILITY_SOURCE_PATHS = frozenset(
     {
         "src/puripuly_heart/config/settings_vnext/compat.py",
-        "src/puripuly_heart/config/settings_vnext/canonical_persistence.py",
         "src/puripuly_heart/config/settings_vnext/facade.py",
         "src/puripuly_heart/config/settings_vnext/migration.py",
         "src/puripuly_heart/config/settings_vnext/serialization.py",
