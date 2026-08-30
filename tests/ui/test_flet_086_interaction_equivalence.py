@@ -72,13 +72,13 @@ def test_language_card_hover_reacts_to_boolean_payloads(monkeypatch: pytest.Monk
         on_peer_target_click=lambda: None,
         on_peer_swap_click=lambda: None,
     )
-    monkeypatch.setattr(type(card._self_row._source_text), "update", lambda self: None)
+    monkeypatch.setattr(type(card._self_row._source_slot._text), "update", lambda self: None)
 
-    card._self_row._on_source_hover(SimpleNamespace(data=True))
-    assert card._self_row._source_text.color == COLOR_PRIMARY
+    card._self_row._source_slot._on_hover(SimpleNamespace(data=True))
+    assert card._self_row._source_slot._text.color == COLOR_PRIMARY
 
-    card._self_row._on_source_hover(SimpleNamespace(data=False))
-    assert card._self_row._source_text.color == COLOR_NEUTRAL_DARK
+    card._self_row._source_slot._on_hover(SimpleNamespace(data=False))
+    assert card._self_row._source_slot._text.color == COLOR_NEUTRAL_DARK
 
 
 def test_bottom_nav_hover_reacts_to_boolean_payloads(monkeypatch: pytest.MonkeyPatch) -> None:

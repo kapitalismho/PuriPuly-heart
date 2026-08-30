@@ -314,6 +314,7 @@ class SettingsApplicationOwner:
         updated = copy.deepcopy(current)
         updated.languages.source_language = change.source_code
         updated.languages.target_language = change.target_code
+        updated.languages.secondary_target_language = change.secondary_target_code
         updated.languages.peer_source_mode = change.peer_source_mode
         updated.languages.peer_source_language = change.peer_source_code
         updated.languages.peer_target_language = change.peer_target_code

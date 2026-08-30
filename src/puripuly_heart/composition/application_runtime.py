@@ -1110,6 +1110,7 @@ def compose_application_runtime(
         presentation.set_dashboard_languages(
             source_language=value.languages.source_language,
             target_language=value.languages.target_language,
+            secondary_target_language=value.languages.secondary_target_language,
             peer_source_language=value.languages.peer_source_language,
             peer_target_language=value.languages.peer_target_language,
             peer_source_mode=value.languages.peer_source_mode,

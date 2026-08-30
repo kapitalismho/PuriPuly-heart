@@ -62,6 +62,7 @@ __all__ = [
 ]
 OVERLAY_YIELDING_NOTICE_SOURCES = {"overlay_fallback", "overlay_failure"}
 PEER_SOURCE_MODE_AUTO = "auto"
+SECONDARY_TARGET_NONE = "none"
 
 
 class DashboardView(ft.Column):
@@ -111,6 +112,7 @@ class DashboardView(ft.Column):
         # Current language settings
         self._source_lang_code = "ko"
         self._target_lang_code = "en"
+        self._secondary_target_lang_code = ""
         self._peer_source_lang_code = "en"
         self._peer_target_lang_code = "ko"
         self._peer_source_mode = "manual"
@@ -169,10 +171,7 @@ class DashboardView(ft.Column):
             on_peer_source_click=self._open_peer_source_dialog,
             on_peer_target_click=self._open_peer_target_dialog,
             on_peer_swap_click=self._swap_peer_languages,
-        )
-        self.language_card.set_row_labels(
-            t("dashboard.language.self"),
-            t("dashboard.language.peer"),
+            on_self_secondary_target_click=self._open_secondary_target_dialog,
         )
         self._refresh_language_card()
         self._update_input_font()
@@ -368,6 +367,23 @@ class DashboardView(ft.Column):
         )
         modal.open(current=self._target_lang_code, recent=self._recent_target_langs)
 
+    def _open_secondary_target_dialog(self):
+        modal = LanguageModal(
+            page=self.page,
+            languages=((SECONDARY_TARGET_NONE, ""), *self._LANG_OPTIONS),
+            on_select=self._on_secondary_target_select,
+            label_for_code=lambda code: (
+                t("dashboard.language.secondary_target.none")
+                if code == SECONDARY_TARGET_NONE
+                else language_name(code)
+            ),
+            disabled_codes={self._target_lang_code},
+        )
+        modal.open(
+            current=self._secondary_target_lang_code or SECONDARY_TARGET_NONE,
+            recent=self._recent_target_langs,
+        )
+
     def _open_peer_source_dialog(self):
         modal = LanguageModal(
             page=self.page,
@@ -413,8 +429,22 @@ class DashboardView(ft.Column):
         self._notify_language_change()
 
     def _on_target_select(self, lang_code: str):
-        """Handle target language selection."""
+        """Handle primary target language selection."""
         self._target_lang_code = lang_code
+        if self._secondary_target_lang_code == lang_code:
+            self._secondary_target_lang_code = ""
+        self._add_to_recent(lang_code, is_source=False)
+        self._refresh_language_card()
+        self._notify_language_change()
+
+    def _on_secondary_target_select(self, lang_code: str):
+        """Handle secondary target language selection."""
+        if lang_code == SECONDARY_TARGET_NONE or lang_code == self._target_lang_code:
+            self._secondary_target_lang_code = ""
+            self._refresh_language_card()
+            self._notify_language_change()
+            return
+        self._secondary_target_lang_code = lang_code
         self._add_to_recent(lang_code, is_source=False)
         self._refresh_language_card()
         self._notify_language_change()
@@ -438,11 +468,13 @@ class DashboardView(ft.Column):
         self._notify_language_change()
 
     def _swap_languages(self):
-        """Swap source and target languages."""
+        """Swap source and primary target languages, leaving the secondary target alone."""
         self._source_lang_code, self._target_lang_code = (
             self._target_lang_code,
             self._source_lang_code,
         )
+        if self._secondary_target_lang_code == self._target_lang_code:
+            self._secondary_target_lang_code = ""
         self._update_input_font()
         self._refresh_language_card()
         self._notify_language_change()
@@ -477,6 +509,7 @@ class DashboardView(ft.Column):
                 LanguageSelectionChange(
                     source_code=self._source_lang_code,
                     target_code=self._target_lang_code,
+                    secondary_target_code=self._secondary_target_lang_code,
                     peer_source_code=self._peer_source_lang_code,
                     peer_target_code=self._peer_target_lang_code,
                     peer_source_mode=self._peer_source_mode,
@@ -503,6 +536,11 @@ class DashboardView(ft.Column):
                 else language_name(self._effective_peer_source_lang_code())
             ),
             language_name(self._effective_peer_target_lang_code()),
+            (
+                language_name(self._secondary_target_lang_code)
+                if self._secondary_target_lang_code
+                else ""
+            ),
         )
 
     def set_status(self, status: str) -> None:
@@ -519,9 +557,13 @@ class DashboardView(ft.Column):
         peer_source_code: str = "",
         peer_target_code: str = "",
         peer_source_mode: str = "manual",
+        secondary_target_code: str = "",
     ) -> None:
         self._source_lang_code = source_code
         self._target_lang_code = target_code
+        self._secondary_target_lang_code = (
+            "" if secondary_target_code == target_code else secondary_target_code
+        )
         self._peer_source_lang_code = peer_source_code
         self._peer_target_lang_code = peer_target_code
         self._peer_source_mode = peer_source_mode
@@ -908,10 +950,6 @@ class DashboardView(ft.Column):
         self.display_card.apply_locale(
             display_font_family=self._ui_font(),
             input_font_family=font_for_language(self._source_lang_code),
-        )
-        self.language_card.set_row_labels(
-            t("dashboard.language.self"),
-            t("dashboard.language.peer"),
         )
         self._refresh_language_card()
         if not self._process_capture_warning_active and self._stt_showing_warning:

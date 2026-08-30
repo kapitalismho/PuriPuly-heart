@@ -96,6 +96,7 @@ class UiPresentationPort(Protocol):
         recent_source_languages: list[str],
         recent_target_languages: list[str],
         peer_auto_detect_available: bool,
+        secondary_target_language: str = "",
     ) -> None: ...
 
     def project_osc_control_state(self, state: OscControlPresentationState) -> None: ...

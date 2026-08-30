@@ -260,12 +260,40 @@ class FletUiPresentationAdapter:
         recent_source_languages: list[str],
         recent_target_languages: list[str],
         peer_auto_detect_available: bool,
+        secondary_target_language: str = "",
     ) -> None:
         dashboard = getattr(self._app, "view_dashboard", None)
         if dashboard is None:
             return
         set_languages = getattr(dashboard, "set_languages_from_codes", None)
         if not callable(set_languages):
+            return
+        try:
+            inspect.signature(set_languages).bind(
+                source_language,
+                target_language,
+                peer_source_language,
+                peer_target_language,
+                peer_source_mode,
+                secondary_target_language,
+            )
+        except (TypeError, ValueError):
+            pass
+        else:
+            set_languages(
+                source_language,
+                target_language,
+                peer_source_language,
+                peer_target_language,
+                peer_source_mode,
+                secondary_target_language,
+            )
+            self._set_dashboard_language_extras(
+                dashboard,
+                recent_source_languages=recent_source_languages,
+                recent_target_languages=recent_target_languages,
+                peer_auto_detect_available=peer_auto_detect_available,
+            )
             return
         try:
             inspect.signature(set_languages).bind(
@@ -290,6 +318,21 @@ class FletUiPresentationAdapter:
                 peer_target_language,
                 peer_source_mode,
             )
+        self._set_dashboard_language_extras(
+            dashboard,
+            recent_source_languages=recent_source_languages,
+            recent_target_languages=recent_target_languages,
+            peer_auto_detect_available=peer_auto_detect_available,
+        )
+
+    @staticmethod
+    def _set_dashboard_language_extras(
+        dashboard: object,
+        *,
+        recent_source_languages: list[str],
+        recent_target_languages: list[str],
+        peer_auto_detect_available: bool,
+    ) -> None:
         set_recent = getattr(dashboard, "set_recent_languages", None)
         if callable(set_recent):
             set_recent(
