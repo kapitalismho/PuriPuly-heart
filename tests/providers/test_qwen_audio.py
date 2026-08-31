@@ -494,7 +494,8 @@ async def test_finish_send_failure_reaches_single_terminal_event() -> None:
 
 @pytest.mark.asyncio
 async def test_blocked_audio_send_timeout_closes_session() -> None:
-    _, session, socket, _ = await open_fake(send_timeout_s=0.01)
+    _, session, socket, _ = await open_fake()
+    setattr(session, "send_timeout_s", 0.01)
     socket.block_audio = True
     sending = asyncio.create_task(session.send_audio(b"blocked"))
     await asyncio.wait_for(socket.audio_started.wait(), timeout=1)
