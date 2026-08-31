@@ -37,10 +37,6 @@ param(
     [int]$InitialGraceSeconds = 180,
 
     [Parameter()]
-    [ValidateRange(0.0, 72.0)]
-    [double]$MaxRuntimeHours = 20.0,
-
-    [Parameter()]
     [string]$AbsoluteDeadlineUtc,
 
     [Parameter()]
@@ -52,6 +48,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+$script:WatchdogParameterSetName = $PSCmdlet.ParameterSetName
 
 function Write-AtomicJson {
     param(
@@ -83,6 +80,86 @@ function Read-JsonFile {
     return Get-Content -LiteralPath $Path -Raw -Encoding utf8 | ConvertFrom-Json
 }
 
+function Get-FileSha256 {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Get-ConfigDeadlineText {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $raw = Get-Content -LiteralPath $Path -Raw -Encoding utf8
+    $matches = [regex]::Matches($raw, '"absolute_deadline_utc"\s*:\s*"([^"]+)"')
+    if ($matches.Count -ne 1) {
+        throw "Run config must contain exactly one absolute_deadline_utc string."
+    }
+    return $matches[0].Groups[1].Value
+}
+
+function ConvertFrom-ConfigDeadline {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Value
+    )
+
+    $text = [string]$Value
+    if (
+        [string]::IsNullOrWhiteSpace($text) -or
+        $text -notmatch '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{6})?\+00:00$' -or
+        $text -match '\.000000\+00:00$'
+    ) {
+        throw "Run config absolute_deadline_utc must be a canonical UTC timestamp."
+    }
+    $parsed = [DateTimeOffset]::MinValue
+    if (-not [DateTimeOffset]::TryParse($text, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsed)) {
+        throw "Run config absolute_deadline_utc must be a canonical UTC timestamp."
+    }
+    if ($parsed.Offset -ne [TimeSpan]::Zero) {
+        throw "Run config absolute_deadline_utc must be UTC."
+    }
+    return $parsed.ToUniversalTime()
+}
+
+function Assert-ControlSnapshot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Snapshot
+    )
+
+    $config = $Snapshot.Config
+    $state = $Snapshot.State
+    $heartbeat = $Snapshot.Heartbeat
+    $configHash = [string]$Snapshot.ConfigSha256
+    if ([int]$config.schema_version -ne 2) {
+        throw "Run config schema_version must be 2."
+    }
+    if ($configHash -notmatch '^[0-9a-f]{64}$') {
+        throw "Run config SHA-256 is invalid."
+    }
+    if ([string]$state.config_sha256 -cne $configHash) {
+        throw "State is not bound to the durable run config."
+    }
+    if ([string]$heartbeat.config_sha256 -cne $configHash) {
+        throw "Heartbeat is not bound to the durable run config."
+    }
+    $runId = [string]$config.run_id
+    if ([string]::IsNullOrWhiteSpace($runId) -or [string]$state.run_id -cne $runId -or [string]$heartbeat.run_id -cne $runId) {
+        throw "Config, state, and heartbeat run IDs differ."
+    }
+    return @{
+        RunId = $runId
+        ConfigSha256 = $configHash
+        Deadline = ConvertFrom-ConfigDeadline -Value $Snapshot.ConfigDeadlineText
+    }
+}
+
 function ConvertTo-IsoTimestamp {
     param(
         [Parameter()]
@@ -107,19 +184,93 @@ function Invoke-Captured {
         [string]$FilePath,
 
         [Parameter(Mandatory = $true)]
-        [string[]]$ArgumentList
+        [string[]]$ArgumentList,
+
+        [Parameter()]
+        [object]$DeadlineUtc,
+
+        [Parameter()]
+        [ValidateRange(0, 300)]
+        [int]$TimeoutSeconds = 0
     )
 
-    $output = & $FilePath @ArgumentList 2>&1 | Out-String
-    return @{
-        ExitCode = $LASTEXITCODE
-        Output = $output.Trim()
+    $timeoutMilliseconds = -1
+    if ($null -ne $DeadlineUtc) {
+        $remainingMilliseconds = ([DateTimeOffset]$DeadlineUtc - [DateTimeOffset]::UtcNow).TotalMilliseconds
+        if ($remainingMilliseconds -le 0) {
+            return @{ ExitCode = 124; Output = "command_deadline_reached" }
+        }
+        $timeoutMilliseconds = [int][Math]::Min([int]::MaxValue, [Math]::Ceiling($remainingMilliseconds))
+    }
+    if ($TimeoutSeconds -gt 0) {
+        $fixedMilliseconds = $TimeoutSeconds * 1000
+        if ($timeoutMilliseconds -lt 0 -or $fixedMilliseconds -lt $timeoutMilliseconds) {
+            $timeoutMilliseconds = $fixedMilliseconds
+        }
+    }
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FilePath
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.CreateNoWindow = $true
+    foreach ($argument in $ArgumentList) {
+        $startInfo.ArgumentList.Add($argument)
+    }
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            return @{ ExitCode = 125; Output = "command_start_failed" }
+        }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $completed = if ($timeoutMilliseconds -lt 0) {
+            $process.WaitForExit()
+            $true
+        }
+        else {
+            $process.WaitForExit($timeoutMilliseconds)
+        }
+        if (-not $completed) {
+            $killFailed = $false
+            try {
+                $process.Kill($true)
+            }
+            catch {
+                $killFailed = $true
+            }
+            $killConfirmed = $process.WaitForExit(1000)
+            if ($killFailed -or -not $killConfirmed) {
+                return @{ ExitCode = 126; Output = "command_kill_unconfirmed" }
+            }
+            return @{ ExitCode = 124; Output = "command_timeout" }
+        }
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        return @{
+            ExitCode = $process.ExitCode
+            Output = (($stdout + $stderr) | Out-String).Trim()
+        }
+    }
+    finally {
+        $process.Dispose()
     }
 }
 
 function Get-ControlSnapshot {
-    if ($PSCmdlet.ParameterSetName -eq "Local") {
+    param(
+        [Parameter()]
+        [object]$DeadlineUtc
+    )
+
+    if ($script:WatchdogParameterSetName -eq "Local") {
+        $configPath = Join-Path $LocalControlDirectory "run_config.json"
         return @{
+            Config = Read-JsonFile -Path $configPath
+            ConfigSha256 = Get-FileSha256 -Path $configPath
+            ConfigDeadlineText = Get-ConfigDeadlineText -Path $configPath
             State = Read-JsonFile -Path (Join-Path $LocalControlDirectory "state.json")
             Heartbeat = Read-JsonFile -Path (Join-Path $LocalControlDirectory "heartbeat.json")
         }
@@ -136,15 +287,23 @@ function Get-ControlSnapshot {
         if (-not [string]::IsNullOrWhiteSpace($IdentityFile)) {
             $arguments += @("-i", $IdentityFile)
         }
-        $stateCopy = Invoke-Captured -FilePath $scp -ArgumentList ($arguments + @("${SshTarget}:$RemoteRunRoot/control/state.json", (Join-Path $temporary "state.json")))
+        $configPath = Join-Path $temporary "run_config.json"
+        $configCopy = Invoke-Captured -FilePath $scp -ArgumentList ($arguments + @("${SshTarget}:$RemoteRunRoot/control/run_config.json", $configPath)) -DeadlineUtc $DeadlineUtc
+        if ($configCopy.ExitCode -ne 0) {
+            throw "Failed to fetch remote run_config.json with exit code $($configCopy.ExitCode)."
+        }
+        $stateCopy = Invoke-Captured -FilePath $scp -ArgumentList ($arguments + @("${SshTarget}:$RemoteRunRoot/control/state.json", (Join-Path $temporary "state.json"))) -DeadlineUtc $DeadlineUtc
         if ($stateCopy.ExitCode -ne 0) {
             throw "Failed to fetch remote state.json with exit code $($stateCopy.ExitCode)."
         }
-        $heartbeatCopy = Invoke-Captured -FilePath $scp -ArgumentList ($arguments + @("${SshTarget}:$RemoteRunRoot/control/heartbeat.json", (Join-Path $temporary "heartbeat.json")))
+        $heartbeatCopy = Invoke-Captured -FilePath $scp -ArgumentList ($arguments + @("${SshTarget}:$RemoteRunRoot/control/heartbeat.json", (Join-Path $temporary "heartbeat.json"))) -DeadlineUtc $DeadlineUtc
         if ($heartbeatCopy.ExitCode -ne 0) {
             throw "Failed to fetch remote heartbeat.json with exit code $($heartbeatCopy.ExitCode)."
         }
         return @{
+            Config = Read-JsonFile -Path $configPath
+            ConfigSha256 = Get-FileSha256 -Path $configPath
+            ConfigDeadlineText = Get-ConfigDeadlineText -Path $configPath
             State = Read-JsonFile -Path (Join-Path $temporary "state.json")
             Heartbeat = Read-JsonFile -Path (Join-Path $temporary "heartbeat.json")
         }
@@ -155,7 +314,7 @@ function Get-ControlSnapshot {
 }
 
 function Get-PodStatus {
-    $result = Invoke-Captured -FilePath $RunPodCliPath -ArgumentList @("pod", "get", $PodId, "--output", "json")
+    $result = Invoke-Captured -FilePath $RunPodCliPath -ArgumentList @("pod", "get", $PodId, "--output", "json") -TimeoutSeconds 30
     if ($result.ExitCode -ne 0) {
         return @{
             query_exit_code = $result.ExitCode
@@ -204,6 +363,8 @@ function Stop-WatchedPod {
             schema_version = 1
             artifact_role = "issue_107_external_watchdog_receipt"
             pod_id = $PodId
+            run_id = $script:RunId
+            config_sha256 = $script:ConfigSha256
             state = "would_stop"
             reason = $Reason
             armed_at = $script:ArmedAt.ToString("o")
@@ -224,6 +385,8 @@ function Stop-WatchedPod {
                 schema_version = 1
                 artifact_role = "issue_107_external_watchdog_receipt"
                 pod_id = $PodId
+                run_id = $script:RunId
+                config_sha256 = $script:ConfigSha256
                 state = "stop_failed"
                 reason = $Reason
                 failure = "missing_local_runpod_api_key"
@@ -241,7 +404,7 @@ function Stop-WatchedPod {
 
         $attemptCount += 1
         $attemptedAt = [DateTimeOffset]::UtcNow
-        $stop = Invoke-Captured -FilePath $RunPodCliPath -ArgumentList @("pod", "stop", $PodId, "--output", "json")
+        $stop = Invoke-Captured -FilePath $RunPodCliPath -ArgumentList @("pod", "stop", $PodId, "--output", "json") -TimeoutSeconds 30
         $podStatus = Get-PodStatus
         $runtimeStatus = [string]$podStatus.runtime_status
         if (-not [string]::IsNullOrWhiteSpace($runtimeStatus) -and $runtimeStatus.ToLowerInvariant() -in @("stopped", "exited", "terminated")) {
@@ -250,6 +413,8 @@ function Stop-WatchedPod {
                 schema_version = 1
                 artifact_role = "issue_107_external_watchdog_receipt"
                 pod_id = $PodId
+                run_id = $script:RunId
+                config_sha256 = $script:ConfigSha256
                 state = "stop_confirmed"
                 reason = $Reason
                 armed_at = $script:ArmedAt.ToString("o")
@@ -271,6 +436,8 @@ function Stop-WatchedPod {
             schema_version = 1
             artifact_role = "issue_107_external_watchdog_receipt"
             pod_id = $PodId
+            run_id = $script:RunId
+            config_sha256 = $script:ConfigSha256
             state = "stop_retrying"
             reason = $Reason
             armed_at = $script:ArmedAt.ToString("o")
@@ -292,7 +459,7 @@ function Stop-WatchedPod {
 if (-not (Test-Path -LiteralPath $RunPodCliPath -PathType Leaf)) {
     throw "RunPod CLI not found: $RunPodCliPath"
 }
-if ($PSCmdlet.ParameterSetName -eq "Local" -and -not (Test-Path -LiteralPath $LocalControlDirectory -PathType Container)) {
+if ($script:WatchdogParameterSetName -eq "Local" -and -not (Test-Path -LiteralPath $LocalControlDirectory -PathType Container)) {
     throw "Local control directory not found: $LocalControlDirectory"
 }
 if ($StaleHeartbeatSeconds -le $PollSeconds) {
@@ -317,29 +484,53 @@ if ($absoluteDeadlineProvided) {
 if (-not $DryRun -and $InitialGraceSeconds -lt 30) {
     throw "InitialGraceSeconds must be at least 30 for a live watchdog."
 }
-if (-not $DryRun -and -not $absoluteDeadlineProvided -and $MaxRuntimeHours -lt 0.1) {
-    throw "MaxRuntimeHours must be at least 0.1 for a live watchdog."
-}
-if (-not $DryRun -and $absoluteDeadlineProvided -and $parsedAbsoluteDeadline -le [DateTimeOffset]::UtcNow) {
-    throw "AbsoluteDeadlineUtc must be in the future before arming a live watchdog."
+if (-not $DryRun -and -not $absoluteDeadlineProvided) {
+    throw "AbsoluteDeadlineUtc is required as a local cross-check for a live watchdog."
 }
 if (-not $DryRun -and [string]::IsNullOrWhiteSpace($env:RUNPOD_API_KEY)) {
     throw "RUNPOD_API_KEY must be present in the local watchdog environment before arming."
 }
 
-$script:ArmedAt = [DateTimeOffset]::UtcNow
-if ($absoluteDeadlineProvided) {
-    $script:Deadline = $parsedAbsoluteDeadline
-    $script:DeadlineSource = "absolute_utc"
+$initialFetchDeadline = if ($absoluteDeadlineProvided) { $parsedAbsoluteDeadline } else { $null }
+try {
+    $initialSnapshot = Get-ControlSnapshot -DeadlineUtc $initialFetchDeadline
+    $initialBinding = Assert-ControlSnapshot -Snapshot $initialSnapshot
 }
-else {
-    $script:Deadline = $script:ArmedAt.AddHours($MaxRuntimeHours)
-    $script:DeadlineSource = "armed_at_plus_max_runtime"
+catch {
+    if (-not $DryRun -and $absoluteDeadlineProvided -and [DateTimeOffset]::UtcNow -ge $parsedAbsoluteDeadline) {
+        $script:RunId = $null
+        $script:ConfigSha256 = $null
+        $script:Deadline = $parsedAbsoluteDeadline
+        $script:DeadlineSource = "required_operator_cross_check_before_config_binding"
+        $script:ArmedAt = [DateTimeOffset]::UtcNow
+        Stop-WatchedPod -Reason "absolute_deadline_before_config_binding" -ObservedState $null -ObservedHeartbeat $null
+        return
+    }
+    throw "Cannot arm without an exact config/state/heartbeat binding: $($_.Exception.Message)"
+}
+$script:RunId = [string]$initialBinding.RunId
+$script:ConfigSha256 = [string]$initialBinding.ConfigSha256
+$script:Deadline = [DateTimeOffset]$initialBinding.Deadline
+$script:DeadlineSource = "immutable_run_config"
+if ($absoluteDeadlineProvided -and $parsedAbsoluteDeadline -ne $script:Deadline) {
+    $configDeadline = $script:Deadline
+    $script:Deadline = if ($parsedAbsoluteDeadline -lt $configDeadline) { $parsedAbsoluteDeadline } else { $configDeadline }
+    $script:DeadlineSource = "deadline_mismatch_conservative_minimum"
+    $script:ArmedAt = [DateTimeOffset]::UtcNow
+    Stop-WatchedPod -Reason "deadline_mismatch_before_arm" -ObservedState $initialSnapshot.State -ObservedHeartbeat $initialSnapshot.Heartbeat
+    return
+}
+$script:ArmedAt = [DateTimeOffset]::UtcNow
+if ($script:Deadline -le $script:ArmedAt) {
+    Stop-WatchedPod -Reason "absolute_deadline_before_arm" -ObservedState $initialSnapshot.State -ObservedHeartbeat $initialSnapshot.Heartbeat
+    return
 }
 Write-AtomicJson -Path $ReceiptPath -Value @{
     schema_version = 1
     artifact_role = "issue_107_external_watchdog_receipt"
     pod_id = $PodId
+    run_id = $script:RunId
+    config_sha256 = $script:ConfigSha256
     state = "armed"
     armed_at = $script:ArmedAt.ToString("o")
     deadline = $script:Deadline.ToString("o")
@@ -347,10 +538,11 @@ Write-AtomicJson -Path $ReceiptPath -Value @{
     poll_seconds = $PollSeconds
     stale_heartbeat_seconds = $StaleHeartbeatSeconds
     initial_grace_seconds = $InitialGraceSeconds
-    mode = if ($PSCmdlet.ParameterSetName -eq "Local") { "local_control_files" } else { "remote_scp_poll" }
+    mode = if ($script:WatchdogParameterSetName -eq "Local") { "local_control_files" } else { "remote_scp_poll" }
     dry_run = [bool]$DryRun
 }
 
+$pendingSnapshot = $initialSnapshot
 while ($true) {
     $now = [DateTimeOffset]::UtcNow
     if ($now -ge $script:Deadline) {
@@ -358,11 +550,19 @@ while ($true) {
         break
     }
 
-    $snapshot = $null
+    $snapshot = $pendingSnapshot
+    $pendingSnapshot = $null
     try {
-        $snapshot = Get-ControlSnapshot
+        if ($null -eq $snapshot) {
+            $snapshot = Get-ControlSnapshot -DeadlineUtc $script:Deadline
+        }
     }
     catch {
+        $now = [DateTimeOffset]::UtcNow
+        if ($now -ge $script:Deadline) {
+            Stop-WatchedPod -Reason "absolute_deadline" -ObservedState $null -ObservedHeartbeat $null
+            break
+        }
         $graceElapsed = ($now - $script:ArmedAt).TotalSeconds -ge $InitialGraceSeconds
         if ($graceElapsed) {
             Stop-WatchedPod -Reason "control_unreachable_after_initial_grace" -ObservedState $null -ObservedHeartbeat $null
@@ -371,8 +571,24 @@ while ($true) {
     }
 
     if ($null -ne $snapshot) {
+        try {
+            $binding = Assert-ControlSnapshot -Snapshot $snapshot
+        }
+        catch {
+            Stop-WatchedPod -Reason "control_binding_invalid" -ObservedState $snapshot.State -ObservedHeartbeat $snapshot.Heartbeat
+            break
+        }
+        if ([string]$binding.RunId -cne $script:RunId -or [string]$binding.ConfigSha256 -cne $script:ConfigSha256 -or [DateTimeOffset]$binding.Deadline -ne $script:Deadline) {
+            Stop-WatchedPod -Reason "control_binding_changed" -ObservedState $snapshot.State -ObservedHeartbeat $snapshot.Heartbeat
+            break
+        }
+        $now = [DateTimeOffset]::UtcNow
         $state = $snapshot.State
         $heartbeat = $snapshot.Heartbeat
+        if ($now -ge $script:Deadline) {
+            Stop-WatchedPod -Reason "absolute_deadline" -ObservedState $state -ObservedHeartbeat $heartbeat
+            break
+        }
         $status = [string]$state.status
         if ($status -in @("WAITING_FOR_DECISION", "ERROR", "COMPLETED")) {
             Stop-WatchedPod -Reason "control_status_$($status.ToLowerInvariant())" -ObservedState $state -ObservedHeartbeat $heartbeat
@@ -399,5 +615,10 @@ while ($true) {
     if ($Once) {
         break
     }
-    Start-Sleep -Seconds $PollSeconds
+    $remainingSeconds = ($script:Deadline - [DateTimeOffset]::UtcNow).TotalSeconds
+    if ($remainingSeconds -le 0) {
+        continue
+    }
+    $sleepMilliseconds = [int][Math]::Ceiling([Math]::Min($PollSeconds, $remainingSeconds) * 1000.0)
+    Start-Sleep -Milliseconds $sleepMilliseconds
 }

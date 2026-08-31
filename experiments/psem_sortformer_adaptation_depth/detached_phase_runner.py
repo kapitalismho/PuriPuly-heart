@@ -21,6 +21,17 @@ HEARTBEAT_INTERVAL_SECONDS = 15.0
 RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}")
 GIT_HEAD_PATTERN = re.compile(r"[0-9a-f]{40}")
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+DECISION_KEYS = {
+    "schema_version",
+    "artifact_role",
+    "run_id",
+    "config_sha256",
+    "gate_id",
+    "action",
+    "rationale",
+    "created_at",
+}
+ARCHIVED_DECISION_KEYS = DECISION_KEYS | {"consumed_at"}
 STATUS_VALUES = {
     "STARTING",
     "RUNNING",
@@ -34,8 +45,27 @@ class ControlPlaneError(RuntimeError):
     pass
 
 
+class DeadlineExceededError(ControlPlaneError):
+    pass
+
+
 def utc_now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def parse_absolute_deadline(value: object) -> datetime:
+    if not isinstance(value, str):
+        raise ControlPlaneError("absolute_deadline_utc must be a canonical UTC timestamp")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ControlPlaneError("absolute_deadline_utc must be a canonical UTC timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ControlPlaneError("absolute_deadline_utc must be a canonical UTC timestamp")
+    normalized = parsed.astimezone(UTC)
+    if parsed.utcoffset().total_seconds() != 0 or normalized.isoformat() != value:
+        raise ControlPlaneError("absolute_deadline_utc must be a canonical UTC timestamp")
+    return normalized
 
 
 def canonical_bytes(value: object) -> bytes:
@@ -79,6 +109,27 @@ def atomic_write_json(path: Path, value: object) -> None:
     atomic_write_bytes(path, canonical_bytes(value))
 
 
+def atomic_create_bytes(path: Path, payload: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with temporary.open("xb") as output:
+            output.write(payload)
+            output.flush()
+            os.fsync(output.fileno())
+        try:
+            os.link(temporary, path)
+        except FileExistsError as exc:
+            raise ControlPlaneError(f"refusing to overwrite existing file: {path}") from exc
+        fsync_directory(path.parent)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def atomic_create_json(path: Path, value: object) -> None:
+    atomic_create_bytes(path, canonical_bytes(value))
+
+
 def load_json_object(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -96,6 +147,34 @@ def append_event(path: Path, event: Mapping[str, object]) -> None:
         output.write(payload + "\n")
         output.flush()
         os.fsync(output.fileno())
+
+
+def append_event_once(path: Path, event: Mapping[str, object]) -> None:
+    event_id = event.get("event_id")
+    if not isinstance(event_id, str) or SHA256_PATTERN.fullmatch(event_id) is None:
+        raise ControlPlaneError("idempotent event requires an exact event_id")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = b""
+    if path.exists():
+        with path.open("r+b") as stream:
+            payload = stream.read()
+            if payload and not payload.endswith(b"\n"):
+                boundary = payload.rfind(b"\n") + 1
+                stream.seek(boundary)
+                stream.truncate()
+                stream.flush()
+                os.fsync(stream.fileno())
+                payload = payload[:boundary]
+        for raw_line in payload.splitlines():
+            try:
+                existing = json.loads(raw_line.decode("utf-8"))
+            except (UnicodeError, json.JSONDecodeError) as exc:
+                raise ControlPlaneError("events log contains a malformed record") from exc
+            if isinstance(existing, dict) and existing.get("event_id") == event_id:
+                if existing != dict(event):
+                    raise ControlPlaneError("events log contains a conflicting event_id")
+                return
+    append_event(path, event)
 
 
 def contains_runpod_api_key(value: object) -> bool:
@@ -160,8 +239,9 @@ def validate_artifacts(value: object, field: str, require_hash: bool) -> None:
 
 
 def validate_config(value: dict[str, Any]) -> None:
-    if value.get("schema_version") != 1:
-        raise ControlPlaneError("run config schema_version must be 1")
+    if value.get("schema_version") != 2:
+        raise ControlPlaneError("run config schema_version must be 2")
+    parse_absolute_deadline(value.get("absolute_deadline_utc"))
     run_id = value.get("run_id")
     if not isinstance(run_id, str) or RUN_ID_PATTERN.fullmatch(run_id) is None:
         raise ControlPlaneError("run_id is invalid")
@@ -181,6 +261,7 @@ def validate_config(value: dict[str, Any]) -> None:
     if not isinstance(phases, list) or not phases:
         raise ControlPlaneError("phases must be a nonempty array")
     phase_ids: list[str] = []
+    gate_ids: set[str] = set()
     for index, phase in enumerate(phases):
         if not isinstance(phase, dict):
             raise ControlPlaneError(f"phases[{index}] must be an object")
@@ -205,8 +286,14 @@ def validate_config(value: dict[str, Any]) -> None:
         )
         gate = phase.get("decision_gate_after")
         if gate is not None:
-            if not isinstance(gate, dict) or not isinstance(gate.get("id"), str):
+            gate_id = gate.get("id") if isinstance(gate, dict) else None
+            if (
+                not isinstance(gate_id, str)
+                or RUN_ID_PATTERN.fullmatch(gate_id) is None
+                or gate_id in gate_ids
+            ):
                 raise ControlPlaneError(f"phases[{index}].decision_gate_after is invalid")
+            gate_ids.add(gate_id)
             actions = gate.get("actions")
             if not isinstance(actions, dict) or not actions:
                 raise ControlPlaneError(f"phases[{index}] gate actions must be nonempty")
@@ -363,6 +450,7 @@ def heartbeat_loop(
             heartbeat = {
                 "schema_version": 1,
                 "run_id": state["run_id"],
+                "config_sha256": state["config_sha256"],
                 "status": state["status"],
                 "active_phase": state.get("active_phase"),
                 "sequence": sequence,
@@ -381,31 +469,52 @@ def heartbeat_loop(
             return
 
 
-def terminate_process_group(process: subprocess.Popen[bytes]) -> None:
-    if process.poll() is not None:
-        return
+def kill_process_group(process: subprocess.Popen[bytes]) -> None:
     if os.name == "nt":
-        subprocess.run(
+        result = subprocess.run(
             ["taskkill", "/PID", str(process.pid), "/T", "/F"],
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+        if result.returncode != 0 and process.poll() is None:
+            process.kill()
     else:
         try:
-            os.killpg(process.pid, signal.SIGTERM)
+            os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
-            return
+            pass
     try:
         process.wait(timeout=5.0)
     except subprocess.TimeoutExpired:
-        if os.name == "nt":
-            process.kill()
-        else:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                return
+        process.kill()
+        process.wait(timeout=5.0)
+
+
+def terminate_process_group(process: subprocess.Popen[bytes]) -> None:
+    if os.name == "nt":
+        kill_process_group(process)
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    grace_deadline = time.monotonic() + 5.0
+    while time.monotonic() < grace_deadline:
+        process.poll()
+        try:
+            os.killpg(process.pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.05)
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    try:
+        process.wait(timeout=5.0)
+    except subprocess.TimeoutExpired:
+        process.kill()
         process.wait(timeout=5.0)
 
 
@@ -467,6 +576,9 @@ def run_phase(
     heartbeat_errors: queue.SimpleQueue[BaseException],
 ) -> None:
     raise_if_heartbeat_failed(heartbeat_errors)
+    deadline = parse_absolute_deadline(config.get("absolute_deadline_utc"))
+    if datetime.now(UTC) >= deadline:
+        raise DeadlineExceededError("immutable billing deadline reached before phase start")
     phase_id = phase["id"]
     if phase_id in state["completed_phases"]:
         raise ControlPlaneError(f"refusing to execute completed phase again: {phase_id}")
@@ -526,10 +638,21 @@ def run_phase(
         try:
             while process.poll() is None:
                 raise_if_heartbeat_failed(heartbeat_errors)
+                remaining_seconds = (deadline - datetime.now(UTC)).total_seconds()
+                if remaining_seconds <= 0:
+                    kill_process_group(process)
+                    raise DeadlineExceededError(
+                        "immutable billing deadline reached during active phase"
+                    )
                 try:
-                    process.wait(timeout=0.1)
+                    process.wait(timeout=min(0.1, remaining_seconds))
                 except subprocess.TimeoutExpired:
                     pass
+            if datetime.now(UTC) >= deadline:
+                kill_process_group(process)
+                raise DeadlineExceededError(
+                    "phase completion occurred at or after the immutable billing deadline"
+                )
             raise_if_heartbeat_failed(heartbeat_errors)
         except BaseException:
             terminate_process_group(process)
@@ -614,40 +737,131 @@ def run_phase(
     write_state(paths, state)
 
 
+def decision_archive_path(paths: Mapping[str, Path], gate_id: str) -> Path:
+    if RUN_ID_PATTERN.fullmatch(gate_id) is None:
+        raise ControlPlaneError("decision gate id is not safe for archival")
+    return paths["decisions"] / f"{gate_id}-decision.json"
+
+
+def validate_operator_decision(
+    decision: dict[str, Any],
+    config: Mapping[str, Any],
+    state: Mapping[str, Any],
+    gate: Mapping[str, Any],
+    configured_gate: Mapping[str, Any],
+) -> None:
+    if set(decision) != DECISION_KEYS:
+        raise ControlPlaneError("decision schema is invalid")
+    created_at = decision.get("created_at")
+    try:
+        created = parse_absolute_deadline(created_at)
+    except ControlPlaneError as exc:
+        raise ControlPlaneError("decision timestamp is invalid") from exc
+    if (
+        decision.get("schema_version") != 1
+        or decision.get("artifact_role") != "detached_operator_decision"
+        or decision.get("run_id") != config["run_id"]
+        or decision.get("config_sha256") != state["config_sha256"]
+        or decision.get("gate_id") != gate["id"]
+        or decision.get("action") not in configured_gate["actions"]
+        or not isinstance(decision.get("rationale"), str)
+        or not decision["rationale"].strip()
+        or created > datetime.now(UTC)
+        or contains_runpod_api_key(decision)
+    ):
+        raise ControlPlaneError("decision does not match the active gate")
+
+
+def operator_decision_payload(value: Mapping[str, Any]) -> dict[str, Any]:
+    if not DECISION_KEYS <= set(value):
+        raise ControlPlaneError("archived decision schema is invalid")
+    return {key: value[key] for key in DECISION_KEYS}
+
+
+def validate_archived_decision(
+    archived: dict[str, Any],
+    config: Mapping[str, Any],
+    state: Mapping[str, Any],
+    gate: Mapping[str, Any],
+    configured_gate: Mapping[str, Any],
+) -> dict[str, Any]:
+    if set(archived) != ARCHIVED_DECISION_KEYS:
+        raise ControlPlaneError("archived decision schema is invalid")
+    decision = operator_decision_payload(archived)
+    validate_operator_decision(decision, config, state, gate, configured_gate)
+    try:
+        consumed = parse_absolute_deadline(archived.get("consumed_at"))
+        created = parse_absolute_deadline(decision["created_at"])
+    except ControlPlaneError as exc:
+        raise ControlPlaneError("archived decision timestamp is invalid") from exc
+    if consumed < created or consumed > datetime.now(UTC):
+        raise ControlPlaneError("archived decision timestamp is invalid")
+    return decision
+
+
+def decision_event(
+    archived: Mapping[str, Any], event: str, archive_name: str | None = None
+) -> dict[str, object]:
+    decision = operator_decision_payload(archived)
+    decision_sha256 = sha256_bytes(canonical_bytes(decision))
+    at = archived["consumed_at"] if event == "decision_consumed" else decision["created_at"]
+    value: dict[str, object] = {
+        "at": at,
+        "event": event,
+        "gate_id": decision["gate_id"],
+        "action": decision["action"],
+        "decision_sha256": decision_sha256,
+    }
+    if archive_name is not None:
+        value["decision_file"] = archive_name
+    value["event_id"] = sha256_bytes(canonical_bytes(value))
+    return value
+
+
 def consume_decision(config: dict[str, Any], paths: dict[str, Path], state: dict[str, Any]) -> bool:
     if state["status"] != "WAITING_FOR_DECISION":
         return True
-    if not paths["decision"].is_file():
-        return False
-    decision = load_json_object(paths["decision"])
     gate = state.get("waiting_gate")
     if not isinstance(gate, dict):
         raise ControlPlaneError("waiting state has no gate")
     phase = phase_by_id(config, gate["after_phase"])
     configured_gate = phase["decision_gate_after"]
-    if (
-        decision.get("schema_version") != 1
-        or decision.get("run_id") != config["run_id"]
-        or decision.get("config_sha256") != state["config_sha256"]
-        or decision.get("gate_id") != gate["id"]
-        or decision.get("action") not in configured_gate["actions"]
-    ):
-        raise ControlPlaneError("decision does not match the active gate")
-    action = decision["action"]
-    archive_name = f"{gate['id']}-{uuid.uuid4().hex}.json"
-    os.replace(paths["decision"], paths["decisions"] / archive_name)
-    fsync_directory(paths["decisions"])
-    target = configured_gate["actions"][action]
-    append_event(
+    archive = decision_archive_path(paths, gate["id"])
+    candidates = sorted(paths["decisions"].glob(f"{gate['id']}-*.json"))
+    if any(candidate != archive for candidate in candidates):
+        raise ControlPlaneError("conflicting archived decisions exist for the active gate")
+    live_exists = paths["decision"].is_file()
+    archive_exists = archive.is_file()
+    if not live_exists and not archive_exists:
+        return False
+    live_decision = None
+    if live_exists:
+        live_decision = load_json_object(paths["decision"])
+        validate_operator_decision(live_decision, config, state, gate, configured_gate)
+    if archive_exists:
+        archived = load_json_object(archive)
+        decision = validate_archived_decision(archived, config, state, gate, configured_gate)
+        if live_decision is not None and live_decision != decision:
+            raise ControlPlaneError("live and archived decisions conflict")
+    else:
+        if live_decision is None:
+            raise ControlPlaneError("decision journal is unavailable")
+        archived = {**live_decision, "consumed_at": utc_now()}
+        atomic_create_json(archive, archived)
+        decision = validate_archived_decision(archived, config, state, gate, configured_gate)
+    if paths["decision"].exists():
+        current_live = load_json_object(paths["decision"])
+        if current_live != decision:
+            raise ControlPlaneError("live and archived decisions conflict")
+        paths["decision"].unlink()
+        fsync_directory(paths["control"])
+    append_event_once(paths["events"], decision_event(archived, "decision_recorded"))
+    append_event_once(
         paths["events"],
-        {
-            "at": utc_now(),
-            "event": "decision_consumed",
-            "gate_id": gate["id"],
-            "action": action,
-            "decision_file": archive_name,
-        },
+        decision_event(archived, "decision_consumed", archive.name),
     )
+    action = decision["action"]
+    target = configured_gate["actions"][action]
     if target is None:
         state.update(
             {
@@ -756,47 +970,60 @@ def execute(
 def write_decision(run_root: Path, gate_id: str, action: str, rationale: str) -> dict[str, Any]:
     reject_runpod_api_key_environment()
     paths = state_paths(run_root.resolve())
-    state = load_json_object(paths["state"])
-    config = load_json_object(paths["config"])
-    validate_config(config)
-    gate = state.get("waiting_gate")
-    if state.get("status") != "WAITING_FOR_DECISION" or not isinstance(gate, dict):
-        raise ControlPlaneError("run is not waiting for a decision")
-    if gate.get("id") != gate_id or action not in gate.get("actions", []):
-        raise ControlPlaneError("decision is not allowed at the active gate")
-    if not rationale.strip():
-        raise ControlPlaneError("decision rationale is required")
-    if paths["decision"].exists():
-        raise ControlPlaneError("an unconsumed decision already exists")
-    decision = {
-        "schema_version": 1,
-        "artifact_role": "detached_operator_decision",
-        "run_id": state["run_id"],
-        "config_sha256": state["config_sha256"],
-        "gate_id": gate_id,
-        "action": action,
-        "rationale": rationale,
-        "created_at": utc_now(),
-    }
-    if contains_runpod_api_key(decision):
-        raise ControlPlaneError("decision must not contain RUNPOD_API_KEY")
-    atomic_write_json(paths["decision"], decision)
-    append_event(
-        paths["events"],
-        {"at": utc_now(), "event": "decision_recorded", "gate_id": gate_id, "action": action},
-    )
-    return decision
+    token = acquire_lock(paths["lock"], False)
+    try:
+        state = load_json_object(paths["state"])
+        config = load_json_object(paths["config"])
+        validate_config(config)
+        config_sha256 = sha256_bytes(canonical_bytes(config))
+        if state.get("config_sha256") != config_sha256:
+            raise ControlPlaneError("state is bound to a different run config")
+        gate = state.get("waiting_gate")
+        if state.get("status") != "WAITING_FOR_DECISION" or not isinstance(gate, dict):
+            raise ControlPlaneError("run is not waiting for a decision")
+        if gate.get("id") != gate_id or action not in gate.get("actions", []):
+            raise ControlPlaneError("decision is not allowed at the active gate")
+        if not rationale.strip():
+            raise ControlPlaneError("decision rationale is required")
+        archive = decision_archive_path(paths, gate_id)
+        archived = sorted(paths["decisions"].glob(f"{gate_id}-*.json"))
+        if paths["decision"].exists() or archive.exists() or archived:
+            raise ControlPlaneError("a decision already exists for the active gate")
+        decision = {
+            "schema_version": 1,
+            "artifact_role": "detached_operator_decision",
+            "run_id": state["run_id"],
+            "config_sha256": state["config_sha256"],
+            "gate_id": gate_id,
+            "action": action,
+            "rationale": rationale,
+            "created_at": utc_now(),
+        }
+        phase = phase_by_id(config, gate["after_phase"])
+        validate_operator_decision(
+            decision,
+            config,
+            state,
+            gate,
+            phase["decision_gate_after"],
+        )
+        atomic_create_json(paths["decision"], decision)
+        append_event_once(paths["events"], decision_event(decision, "decision_recorded"))
+        return decision
+    finally:
+        release_lock(paths["lock"], token)
 
 
 def self_test_config(
     persistent_root: Path, run_id: str, phases: list[dict[str, object]]
 ) -> dict[str, object]:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "run_id": run_id,
         "persistent_root": str(persistent_root),
         "repository_root": str(Path.cwd().resolve()),
         "candidate_git_head": "0" * 40,
+        "absolute_deadline_utc": "2999-01-01T00:00:00+00:00",
         "phases": phases,
     }
 

@@ -164,6 +164,11 @@ def _format_datetime(value: datetime) -> str:
     return value.isoformat()
 
 
+def _absolute_deadline(args: argparse.Namespace) -> datetime:
+    started = args.billing_started_at.astimezone(UTC)
+    return started + timedelta(seconds=args.max_runtime_hours * 3600.0)
+
+
 def _common_phase_argv(args: argparse.Namespace, phase_id: str) -> list[str]:
     return [
         "--run-id",
@@ -272,11 +277,12 @@ def _build_config(args: argparse.Namespace) -> dict[str, Any]:
         ),
     ]
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "run_id": args.run_id,
         "persistent_root": str(args.persistent_root),
         "repository_root": str(args.repository_root),
         "candidate_git_head": args.candidate_git_head,
+        "absolute_deadline_utc": _absolute_deadline(args).isoformat(),
         "first_phase": "bootstrap-f0",
         "phases": phases,
     }
@@ -532,10 +538,10 @@ def _cost_seconds(args: argparse.Namespace) -> tuple[float, float]:
     now = datetime.now(UTC)
     started = args.billing_started_at.astimezone(UTC)
     authorized_seconds = args.max_runtime_hours * 3600.0
-    deadline = started + timedelta(seconds=authorized_seconds)
+    deadline = _absolute_deadline(args)
     if now < started:
         raise LaunchError("billing start is in the future")
-    if now > deadline:
+    if now >= deadline:
         raise LaunchError("authorized billing deadline has passed")
     actual = (now - started).total_seconds()
     projected = authorized_seconds - actual
@@ -585,6 +591,7 @@ def _phase_summary(
         "config_sha256": config_sha256,
         "phase_id": phase_id,
         "image_identity": IMAGE_IDENTITY,
+        "absolute_deadline_utc": _absolute_deadline(args).isoformat(),
         "started_at": started_at,
         "completed_at": datetime.now(UTC).isoformat(),
         "storage_evidence": [dict(snapshot) for snapshot in storage],
@@ -608,6 +615,7 @@ def write_config(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "output": str(output),
         "config_sha256": sha256_bytes(canonical_bytes(config)),
+        "absolute_deadline_utc": config["absolute_deadline_utc"],
         "run_root": str(_run_root(args).resolve()),
         "phases": [phase["id"] for phase in config["phases"]],
     }
@@ -1111,12 +1119,12 @@ def _load_open_ta_decision(
     run_root: Path, run_id: str, config_sha256: str
 ) -> tuple[Path, dict[str, Any]]:
     decision_dir = run_root / "control" / "decisions"
+    path = decision_dir / "after-h-t2-dev-decision.json"
     candidates = sorted(decision_dir.glob("after-h-t2-dev-*.json"))
-    if len(candidates) != 1:
-        raise LaunchError("exactly one archived after-h-t2-dev decision is required")
+    if candidates != [path]:
+        raise LaunchError("the exact archived after-h-t2-dev decision is required")
     if (run_root / "control" / "decision.json").exists():
         raise LaunchError("an unconsumed detached decision is present")
-    path = candidates[0]
     decision = load_json_object(path)
     expected_keys = {
         "schema_version",
@@ -1127,11 +1135,13 @@ def _load_open_ta_decision(
         "action",
         "rationale",
         "created_at",
+        "consumed_at",
     }
     if set(decision) != expected_keys:
         raise LaunchError("archived detached decision schema is invalid")
     try:
         created_at = _aware_datetime(str(decision["created_at"]))
+        consumed_at = _aware_datetime(str(decision["consumed_at"]))
     except argparse.ArgumentTypeError as exc:
         raise LaunchError("archived detached decision timestamp is invalid") from exc
     if (
@@ -1143,7 +1153,8 @@ def _load_open_ta_decision(
         or decision["action"] != "open_ta"
         or not isinstance(decision["rationale"], str)
         or not decision["rationale"].strip()
-        or created_at > datetime.now(created_at.tzinfo)
+        or created_at > consumed_at
+        or consumed_at > datetime.now(consumed_at.tzinfo)
     ):
         raise LaunchError("archived detached open_ta decision is not authorized")
     return path, decision
