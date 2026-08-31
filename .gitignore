@@ -229,7 +229,6 @@ Installer_output/
 refactoring/
 .tmp/
 /scripts/*
-!/scripts/qwen_audio_live.py
 !/scripts/bench_*.py
 !/scripts/ci/
 /scripts/ci/*
