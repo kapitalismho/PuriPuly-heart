@@ -270,6 +270,7 @@ STT_DEFAULT_LOW_LATENCY_MERGE_GAP_MS: Final = 600
 STT_DEFAULT_LOW_LATENCY_SPEC_RETRY_MAX: Final = 10
 DEEPGRAM_STT_MODEL_NOVA_3: Final = "nova-3"
 QWEN_ASR_STT_MODEL_REALTIME: Final = "qwen3-asr-flash-realtime"
+QWEN_ASR_STT_MODEL_AUDIO_STREAMING: Final = "qwen-audio-3.0-asr-flash-streaming"
 SONIOX_STT_MODEL_RT_V5: Final = "stt-rt-v5"
 SONIOX_STT_DEFAULT_ENDPOINT: Final = "wss://stt-rt.soniox.com/transcribe-websocket"
 SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S: Final = 10.0
@@ -575,10 +576,14 @@ def _qwen_service_endpoint(region: str) -> str:
     return "https://dashscope.aliyuncs.com/api/v1"
 
 
-def _qwen_asr_endpoint(region: str) -> str:
+def _qwen_asr_endpoint(
+    region: str,
+    model: str = QWEN_ASR_STT_MODEL_REALTIME,
+) -> str:
+    suffix = "/inference" if model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING else "/realtime"
     if region == QWEN_REGION_SINGAPORE:
-        return "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
-    return "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+        return f"wss://dashscope-intl.aliyuncs.com/api-ws/v1{suffix}"
+    return f"wss://dashscope.aliyuncs.com/api-ws/v1{suffix}"
 
 
 def _translation_connection_from_openrouter_source(
@@ -1239,7 +1244,7 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
     elif provider == STT_PROVIDER_QWEN_ASR:
         model = intent.qwen_asr_model
         region = intent.qwen_region
-        endpoint = _qwen_asr_endpoint(intent.qwen_region)
+        endpoint = _qwen_asr_endpoint(intent.qwen_region, intent.qwen_asr_model)
         credential = _required_credential(
             CREDENTIAL_SOURCE_SECRET_STORE,
             _qwen_credential_reference(intent.qwen_region),
@@ -1649,9 +1654,9 @@ __all__ = [
     "PROVIDER_LOCAL_LLM",
     "PROVIDER_OPENROUTER",
     "PROVIDER_QWEN",
-    "QWEN_MODEL_35_PLUS",
     "QWEN_MODEL_35_FLASH",
     "QWEN_ASR_STT_MODEL_REALTIME",
+    "QWEN_ASR_STT_MODEL_AUDIO_STREAMING",
     "QWEN_REGION_BEIJING",
     "QWEN_REGION_SINGAPORE",
     "RuntimeResolutionInput",
@@ -1705,7 +1710,6 @@ __all__ = [
     "TRANSLATION_MODEL_MANAGED_GEMMA",
     "TRANSLATION_MODEL_MANAGED_GEMMA_12B",
     "TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH",
-    "TRANSLATION_MODEL_QWEN_35_PLUS",
     "TRANSLATION_MODELS",
     "TranslationConnectionName",
     "TranslationFallbackRuntimeIntent",

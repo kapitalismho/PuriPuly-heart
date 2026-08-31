@@ -65,6 +65,7 @@ from puripuly_heart.app.ports.settings_view import (
     ProviderApplyIntent,
     ProviderSettingsEdit,
     ProviderSettingsSnapshot,
+    QwenAsrModelEdit,
     QwenRegionEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
@@ -102,6 +103,7 @@ from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
+    QwenASRSTTModel,
     QwenRegion,
     STTProviderName,
     display_stt_provider,
@@ -211,6 +213,10 @@ _STT_UI_PROVIDERS = (
     STTProviderName.CUSTOM_OFFLINE,
     STTProviderName.CUSTOM_REALTIME,
 )
+_QWEN_ASR_MODELS = (
+    QwenASRSTTModel.REALTIME,
+    QwenASRSTTModel.AUDIO_STREAMING,
+)
 _STT_SECTION_ORDER = (
     "settings.stt.section.recommended_cloud",
     "settings.stt.section.recommended_local",
@@ -240,8 +246,7 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
     TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
     TranslationModel.GEMINI_37_FLASH: "provider.gemini37_flash",
-    TranslationModel.GEMINI_31_FLASH_LITE: "provider.gemini31_flash_lite",
-    TranslationModel.QWEN_35_PLUS: "provider.qwen35_plus",
+    TranslationModel.QWEN_38_FLASH: "provider.qwen38_flash",
     TranslationModel.LOCAL_LLM: "provider.local_llms",
     TranslationModel.CUSTOM_HTTP: "provider.custom_http",
 }
@@ -270,8 +275,7 @@ _TRANSLATION_MODELS = (
     TranslationModel.LOCAL_LLM,
     TranslationModel.CUSTOM_HTTP,
     TranslationModel.GEMINI_37_FLASH,
-    TranslationModel.GEMINI_31_FLASH_LITE,
-    TranslationModel.QWEN_35_PLUS,
+    TranslationModel.QWEN_38_FLASH,
 )
 _TRANSLATION_MODEL_SECTION_ORDER = (
     "settings.translation_model.section.recommended_cloud",
@@ -290,8 +294,7 @@ _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
     TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
     TranslationModel.GEMINI_37_FLASH: "settings.translation_model.section.others",
-    TranslationModel.GEMINI_31_FLASH_LITE: "settings.translation_model.section.others",
-    TranslationModel.QWEN_35_PLUS: "settings.translation_model.section.others",
+    TranslationModel.QWEN_38_FLASH: "settings.translation_model.section.others",
 }
 _TRANSLATION_MODELS_WITHOUT_PROVIDER_FALLBACK = frozenset(
     {
@@ -1210,6 +1213,11 @@ class SettingsView(ft.Column):
             on_click=self._on_qwen_region_click,
             visible=False,  # Hidden by default, updated by visibility logic
         )
+        self._qwen_asr_model_btn = _make_text_button(
+            f"{t('settings.qwen_asr_model')} {t('stt.model.qwen3-asr-flash-realtime')}",
+            on_click=self._on_qwen_asr_model_click,
+            visible=False,
+        )
 
         # API Key fields
         self._deepgram_key = ApiKeyField(
@@ -1430,6 +1438,7 @@ class SettingsView(ft.Column):
             controls=[
                 self._api_title,
                 ft.Container(expand=True),
+                self._qwen_asr_model_btn,
                 self._qwen_region_btn,
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -3520,6 +3529,9 @@ class SettingsView(ft.Column):
             ),
         )
 
+    def _qwen_model_label(self, model: str) -> str:
+        return t(f"stt.model.{model}", default=model)
+
     def _stt_provider_display_label(
         self,
         provider: STTProviderName,
@@ -3844,6 +3856,10 @@ class SettingsView(ft.Column):
             self._get_translation_connection_display_label(provider),
         )
         self._sync_translation_connection_title(provider)
+        _set_text_button_label(
+            self._qwen_asr_model_btn,
+            f"{t('settings.qwen_asr_model')} {self._qwen_model_label(provider.qwen_asr_model)}",
+        )
         self._sync_openrouter_fallback_card(provider)
         self._local_llm_base_url.value = provider.local_llm_base_url
         self._local_llm_base_url.error = None
@@ -4393,11 +4409,13 @@ class SettingsView(ft.Column):
         ):
             qwen_regions.add(settings.qwen_region)
 
-        self._qwen_region_btn.visible = (
-            stt == STTProviderName.QWEN_ASR
-            or (not is_custom_http and llm == LLMProviderName.QWEN)
-            or peer_stt == STTProviderName.QWEN_ASR
+        qwen_stt_selected = (
+            stt == STTProviderName.QWEN_ASR or peer_stt == STTProviderName.QWEN_ASR
         )
+        self._qwen_region_btn.visible = (
+            qwen_stt_selected or (not is_custom_http and llm == LLMProviderName.QWEN)
+        )
+        self._qwen_asr_model_btn.visible = qwen_stt_selected
         self._alibaba_key_beijing.visible = QwenRegion.BEIJING in qwen_regions
         self._alibaba_key_singapore.visible = QwenRegion.SINGAPORE in qwen_regions
         api_keys_card = getattr(self, "_api_keys_card", None)
@@ -4414,6 +4432,7 @@ class SettingsView(ft.Column):
                     self._alibaba_key_singapore,
                     self._openrouter_key,
                     self._openrouter_pkce_button_row,
+                    self._qwen_asr_model_btn,
                     self._qwen_region_btn,
                     getattr(self, "_http_extension_credentials", None),
                 )
@@ -4491,7 +4510,11 @@ class SettingsView(ft.Column):
         warning = (
             None
             if selection.fallback_applied or not selection.supported
-            else get_stt_compatibility_warning(source_lang, provider.value)
+            else get_stt_compatibility_warning(
+                source_lang,
+                provider.value,
+                current_settings.qwen_asr_model,
+            )
         )
         if warning:
             message = t(warning.key, language=language_name(warning.language_code))
@@ -4749,10 +4772,7 @@ class SettingsView(ft.Column):
                     if openrouter_source == OpenRouterCredentialSource.MANAGED
                     else OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK
                 )
-        elif model in {
-            TranslationModel.GEMINI_37_FLASH,
-            TranslationModel.GEMINI_31_FLASH_LITE,
-        }:
+        elif model == TranslationModel.GEMINI_37_FLASH:
             llm_provider = (
                 LLMProviderName.GEMINI
                 if connection == TranslationConnection.OFFICIAL_BYOK
@@ -4760,13 +4780,9 @@ class SettingsView(ft.Column):
             )
             if llm_provider == LLMProviderName.OPENROUTER:
                 openrouter_source = OpenRouterCredentialSource.BYOK
-                if model == TranslationModel.GEMINI_37_FLASH:
-                    openrouter_model = OpenRouterLLMModel.GEMINI_37_FLASH
-                    openrouter_alias = OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK
-                else:
-                    openrouter_model = OpenRouterLLMModel.GEMINI_31_FLASH_LITE
-                    openrouter_alias = OpenRouterSelectionAlias.GEMINI31_FLASH_LITE_BYOK
-        elif model == TranslationModel.QWEN_35_PLUS:
+                openrouter_model = OpenRouterLLMModel.GEMINI_37_FLASH
+                openrouter_alias = OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK
+        elif model == TranslationModel.QWEN_38_FLASH:
             llm_provider = LLMProviderName.QWEN
         elif model in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}:
             llm_provider = LLMProviderName.MANAGED_GEMMA
@@ -5062,6 +5078,46 @@ class SettingsView(ft.Column):
         if is_control_mounted(self):
             self._ui_text.update()
         self._emit_settings_changed(LocaleSettingsIntent(value))
+
+    def _on_qwen_asr_model_click(self, e) -> None:
+        if not is_control_mounted(self):
+            return
+        options = [
+            OptionItem(value=model.value, label=self._qwen_model_label(model.value))
+            for model in _QWEN_ASR_MODELS
+        ]
+        settings = self._build_settings_with_provider_draft()
+        current = (
+            settings.qwen_asr_model
+            if settings is not None
+            else QwenASRSTTModel.REALTIME.value
+        )
+        SettingsModal(
+            self.page,
+            t("settings.qwen_asr_model"),
+            options,
+            self._on_qwen_asr_model_selected,
+            show_description=False,
+        ).open(current)
+
+    def _on_qwen_asr_model_selected(self, value: str) -> None:
+        if self._provider_snapshot is None or value not in {model.value for model in _QWEN_ASR_MODELS}:
+            return
+        settings = self._build_settings_with_provider_draft()
+        assert settings is not None
+        if settings.qwen_asr_model == value:
+            return
+        draft = self._ensure_provider_settings_draft()
+        self._provider_draft = replace(draft, qwen_asr_model=value)
+        self._record_provider_edit(QwenAsrModelEdit(value))
+        self.has_provider_changes = True
+        _set_text_button_label(
+            self._qwen_asr_model_btn,
+            f"{t('settings.qwen_asr_model')} {self._qwen_model_label(value)}",
+        )
+        if is_control_mounted(self):
+            self._qwen_asr_model_btn.update()
+        self._update_api_visibility()
 
     def _on_qwen_region_click(self, e) -> None:
         """Open Qwen region selection modal."""
@@ -6738,6 +6794,8 @@ class SettingsView(ft.Column):
 
         if self._qwen_region_btn:
             self._qwen_region_btn.style = self._get_button_style(ui_font)
+        if self._qwen_asr_model_btn:
+            self._qwen_asr_model_btn.style = self._get_button_style(ui_font)
         if self._openrouter_pkce_button:
             self._sync_openrouter_pkce_button_state(display_settings)
         self._sync_clickable_text_control_fonts(ui_font)
@@ -6778,6 +6836,10 @@ class SettingsView(ft.Column):
                 self._get_translation_connection_display_label(display_settings),
             )
             self._sync_translation_connection_title(display_settings)
+            _set_text_button_label(
+                self._qwen_asr_model_btn,
+                f"{t('settings.qwen_asr_model')} {self._qwen_model_label(display_settings.qwen_asr_model)}",
+            )
             self._sync_openrouter_fallback_card(display_settings)
             self._sync_http_extension_card(display_settings, force_credentials=True)
             self._sync_managed_key_card(display_settings)

@@ -48,6 +48,7 @@ from puripuly_heart.app.ports.settings_view import (
     ProviderApplyIntent,
     ProviderSettingsSnapshot,
     ProviderVerificationSnapshot,
+    QwenAsrModelEdit,
     QwenRegionEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
@@ -228,6 +229,7 @@ def settings_view_surface_snapshots(
             gpu_device_id=translation.gpu_device_id,
         ),
         stt_gpu_device_id=intent.stt.gpu_device_id,
+        qwen_asr_model=intent.stt.qwen_asr.model,
         qwen_region=QwenRegion(intent.translation.qwen.region),
         local_llm_base_url=intent.local_llm.base_url,
         local_llm_model=intent.local_llm.model,
@@ -671,6 +673,14 @@ def materialize_provider_apply_intent(
                         updated.intent.translation.qwen,
                         region=str(getattr(edit.region, "value", edit.region)),
                     ),
+                ),
+            )
+        elif isinstance(edit, QwenAsrModelEdit):
+            updated = _with_intent(
+                updated,
+                stt=replace(
+                    updated.intent.stt,
+                    qwen_asr=replace(updated.intent.stt.qwen_asr, model=edit.model),
                 ),
             )
         elif isinstance(edit, LocalLlmBaseUrlEdit):

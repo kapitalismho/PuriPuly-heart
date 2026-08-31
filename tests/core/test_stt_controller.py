@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,7 +19,7 @@ from puripuly_heart.core.runtime_logging import SessionLoggingMode, SessionRunti
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
-from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
+from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.domain.events import (
     STTErrorEvent,
     STTFinalEvent,
@@ -28,6 +29,10 @@ from puripuly_heart.domain.events import (
 )
 from puripuly_heart.domain.models import FinalLanguageRun
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
+from puripuly_heart.providers.stt.qwen_audio import (
+    QWEN_AUDIO_MODEL,
+    QwenAudioStreamingSTTBackend,
+)
 from tests.helpers.fakes import samples
 
 
@@ -149,6 +154,48 @@ class FakeBackend:
         s = FakeSession()
         self.sessions.append(s)
         return s
+
+class QwenAudioBridgeSocket:
+    def __init__(self, final_text: str, *, auto_finish: bool = True) -> None:
+        self.final_text = final_text
+        self.auto_finish = auto_finish
+        self.sent: list[str | bytes] = []
+        self.incoming: asyncio.Queue[object] = asyncio.Queue()
+        self.closed = False
+
+    async def send(self, value: str | bytes) -> None:
+        self.sent.append(value)
+        if not isinstance(value, str):
+            return
+        message = json.loads(value)
+        header = message["header"]
+        if header["action"] == "run-task":
+            await self.incoming.put({"header": {"event": "task-started", "task_id": header["task_id"]}})
+        elif header["action"] == "finish-task" and self.auto_finish:
+            await self.incoming.put(
+                {
+                    "header": {"event": "result-generated", "task_id": header["task_id"]},
+                    "payload": {
+                        "output": {
+                            "sentence": {
+                                "sentence_end": True,
+                                "sentence_id": "1",
+                                "text": self.final_text,
+                            }
+                        }
+                    },
+                }
+            )
+            await self.incoming.put({"header": {"event": "task-finished", "task_id": header["task_id"]}})
+
+    async def recv(self) -> object:
+        return await self.incoming.get()
+
+    async def close(self) -> None:
+        self.closed = True
+        await self.incoming.put(None)
+
+
 
 
 class ClosableFakeBackend(FakeBackend):
@@ -1609,7 +1656,7 @@ async def test_local_qwen_empty_decode_keeps_next_final_on_next_utterance(
         await stt.close()
 
 
-async def test_local_qwen_bridging_reset_preserves_final_id_fifo_across_sessions(
+async def test_local_qwen_bridging_reset_retires_old_pending_boundaries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     first_started = asyncio.Event()
@@ -1681,18 +1728,9 @@ async def test_local_qwen_bridging_reset_preserves_final_id_fifo_across_sessions
         assert decode_count == 1
 
         release_first.set()
-        final_events = [
-            await _next_typed_event(stream, STTFinalEvent),
-            await _next_typed_event(stream, STTFinalEvent),
-            await _next_typed_event(stream, STTFinalEvent),
-        ]
-
-        assert [event.utterance_id for event in final_events] == utterance_ids
-        assert [event.transcript.text for event in final_events] == [
-            "final-1",
-            "final-2",
-            "final-3",
-        ]
+        final_event = await _next_typed_event(stream, STTFinalEvent)
+        assert final_event.utterance_id == utterance_ids[2]
+        assert final_event.transcript.text == "final-3"
     finally:
         release_first.set()
         await stt.close()
@@ -2330,7 +2368,7 @@ async def test_managed_stt_provider_final_without_pending_uses_active_fallback()
         await stt.close()
 
 
-async def test_managed_stt_provider_bridging_reset_preserves_pending_final() -> None:
+async def test_managed_stt_provider_bridging_reset_retires_old_pending_final() -> None:
     backend = StopFinalizingBackend(first_stop_final_text="drained final")
     stt = ManagedSTTProvider(
         backend=backend,
@@ -2365,11 +2403,8 @@ async def test_managed_stt_provider_bridging_reset_preserves_pending_final() -> 
 
         await stt._reset_with_bridging()
 
-        event = await _next_typed_event(stream, STTFinalEvent)
-
         assert len(backend.sessions) == 2
-        assert event.utterance_id == pending_utterance_id
-        assert event.transcript.text == "drained final"
+        assert not stt._pending_final_utterance_ids
     finally:
         await stt.close()
 
@@ -2769,3 +2804,215 @@ async def test_stt_event_ingress_records_enqueue_before_handler_start() -> None:
     assert [name for name, _fields in stages] == ["stt_enqueue", "stt_handler_start"]
     assert stages[1][1]["queue_depth"] == 0
     await stt.close()
+
+
+@pytest.mark.asyncio
+async def test_qwen_audio_bridging_reset_discards_old_active_boundary() -> None:
+    sockets: list[QwenAudioBridgeSocket] = []
+
+    async def connect(*args: object, **kwargs: object) -> QwenAudioBridgeSocket:
+        socket = QwenAudioBridgeSocket(f"final-{len(sockets) + 1}")
+        sockets.append(socket)
+        return socket
+
+    backend = QwenAudioStreamingSTTBackend(
+        api_key="test-key",
+        language="ko",
+        model=QWEN_AUDIO_MODEL,
+        websocket_factory=connect,
+        connect_timeout_s=1,
+        task_start_timeout_s=1,
+        task_finish_timeout_s=0.05,
+        send_timeout_s=0.05,
+    )
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        stt_provider_name=STTProviderName.QWEN_ASR,
+        reset_deadline_s=90.0,
+        drain_timeout_s=0.2,
+        bridging_ms=64,
+        finalize_grace_s=0.0,
+    )
+    stream = stt.events()
+    utterance_id = uuid4()
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        assert len(sockets) == 1
+        old_socket = sockets[0]
+
+        await stt._reset_with_bridging()
+        assert len(sockets) == 2
+        new_socket = sockets[1]
+        for _ in range(100):
+            if old_socket.closed:
+                break
+            await asyncio.sleep(0)
+        assert old_socket.closed
+        old_actions = [
+            json.loads(value)["header"]["action"]
+            for value in old_socket.sent
+            if isinstance(value, str)
+        ]
+        assert old_actions.count("finish-task") == 0
+
+        await stt.handle_vad_event(SpeechEnd(utterance_id))
+        final_event = await _next_typed_event(stream, STTFinalEvent)
+        assert final_event.utterance_id == utterance_id
+        assert final_event.transcript.utterance_id == utterance_id
+        assert final_event.transcript.text == "final-2"
+        new_actions = [
+            json.loads(value)["header"]["action"]
+            for value in new_socket.sent
+            if isinstance(value, str)
+        ]
+        assert new_actions.count("finish-task") == 1
+    finally:
+        await stt.close()
+
+
+
+
+@pytest.mark.asyncio
+async def test_qwen_audio_bridge_retires_pending_old_boundary_before_new_final() -> None:
+    sockets: list[QwenAudioBridgeSocket] = []
+
+    async def connect(*args: object, **kwargs: object) -> QwenAudioBridgeSocket:
+        socket = QwenAudioBridgeSocket(
+            "old" if not sockets else "second",
+            auto_finish=bool(sockets),
+        )
+        sockets.append(socket)
+        return socket
+
+    backend = QwenAudioStreamingSTTBackend(
+        api_key="test-key",
+        language="ko",
+        model=QWEN_AUDIO_MODEL,
+        websocket_factory=connect,
+        connect_timeout_s=1,
+        task_start_timeout_s=1,
+        task_finish_timeout_s=0.05,
+        send_timeout_s=0.05,
+    )
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        stt_provider_name=STTProviderName.QWEN_ASR,
+        reset_deadline_s=90.0,
+        drain_timeout_s=0.2,
+        bridging_ms=64,
+        finalize_grace_s=0.0,
+    )
+    stream = stt.events()
+    pending_id = uuid4()
+    active_id = uuid4()
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                pending_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(pending_id))
+        await stt.handle_vad_event(
+            SpeechStart(
+                active_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        await stt._reset_with_bridging()
+        assert len(sockets) == 2
+        assert not stt._pending_final_utterance_ids
+
+        await stt.handle_vad_event(SpeechEnd(active_id))
+        final_event = await _next_typed_event(stream, STTFinalEvent)
+        assert final_event.utterance_id == active_id
+        assert final_event.transcript.utterance_id == active_id
+        assert final_event.transcript.text == "second"
+        assert not stt._pending_final_utterance_ids
+    finally:
+        await stt.close()
+
+
+@pytest.mark.asyncio
+async def test_qwen_audio_bridge_cutover_captures_boundary_during_delayed_open() -> None:
+    sockets: list[QwenAudioBridgeSocket] = []
+    replacement_open_started = asyncio.Event()
+    release_replacement_open = asyncio.Event()
+
+    async def connect(*args: object, **kwargs: object) -> QwenAudioBridgeSocket:
+        socket = QwenAudioBridgeSocket(
+            "u1-old" if not sockets else "u2",
+            auto_finish=bool(sockets),
+        )
+        sockets.append(socket)
+        if len(sockets) == 2:
+            replacement_open_started.set()
+            await release_replacement_open.wait()
+        return socket
+
+    backend = QwenAudioStreamingSTTBackend(
+        api_key="test-key",
+        language="ko",
+        model=QWEN_AUDIO_MODEL,
+        websocket_factory=connect,
+        connect_timeout_s=1,
+        task_start_timeout_s=1,
+        task_finish_timeout_s=0.05,
+        send_timeout_s=0.05,
+    )
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        stt_provider_name=STTProviderName.QWEN_ASR,
+        reset_deadline_s=90.0,
+        drain_timeout_s=0.2,
+        bridging_ms=64,
+        finalize_grace_s=0.0,
+    )
+    stream = stt.events()
+    first_id = uuid4()
+    second_id = uuid4()
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                first_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+
+        reset_task = asyncio.create_task(stt._reset_with_bridging())
+        await replacement_open_started.wait()
+        await stt.handle_vad_event(SpeechEnd(first_id))
+        release_replacement_open.set()
+        await reset_task
+
+        await stt.handle_vad_event(
+            SpeechStart(
+                second_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        await stt.handle_vad_event(SpeechEnd(second_id))
+        final_event = await _next_typed_event(stream, STTFinalEvent)
+        assert final_event.utterance_id == second_id
+        assert final_event.transcript.utterance_id == second_id
+        assert final_event.transcript.text == "u2"
+        assert not stt._pending_final_utterance_ids
+    finally:
+        release_replacement_open.set()
+        await stt.close()

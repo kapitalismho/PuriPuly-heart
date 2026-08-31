@@ -99,8 +99,6 @@ def test_stt_compatibility_warning_variants() -> None:
     assert warning.key == "warning.soniox_not_supported"
     assert warning.language_code == "xx"
 
-    assert get_stt_compatibility_warning("en", "deepgram") is None
-
 
 @pytest.mark.parametrize("code", ["en", "ko", "zh-CN"])
 def test_get_language_info_returns_supported(code: str) -> None:

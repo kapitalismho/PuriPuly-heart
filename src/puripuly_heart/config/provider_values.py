@@ -123,6 +123,11 @@ class QwenLLMModel(str, Enum):
     QWEN_38_FLASH = "qwen3.8-flash"
 
 
+class QwenASRSTTModel(str, Enum):
+    REALTIME = "qwen3-asr-flash-realtime"
+    AUDIO_STREAMING = "qwen-audio-3.0-asr-flash-streaming"
+
+
 class SecretsBackend(str, Enum):
     KEYRING = "keyring"
     ENCRYPTED_FILE = "encrypted_file"
@@ -229,6 +234,7 @@ __all__ = [
     "OpenRouterLLMModel",
     "OpenRouterSelectionAlias",
     "QwenLLMModel",
+    "QwenASRSTTModel",
     "QwenRegion",
     "STTProviderName",
     "SecretsBackend",

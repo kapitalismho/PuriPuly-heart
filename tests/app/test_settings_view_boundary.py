@@ -29,6 +29,7 @@ from puripuly_heart.app.ports.settings_view import (
     PromptApplyIntent,
     ProviderApplyIntent,
     QwenRegionEdit,
+    QwenAsrModelEdit,
     SelfSttProviderEdit,
     SttGpuDeviceEdit,
     SystemPromptEdit,
@@ -71,6 +72,7 @@ def test_surface_projection_returns_independent_frozen_snapshots() -> None:
     provider, general, prompt, overlay = settings_view_surface_snapshots(settings)
 
     assert provider.translation.model.value == settings.intent.translation.model
+    assert provider.qwen_asr_model == settings.intent.stt.qwen_asr.model
     assert general.locale == settings.intent.ui.locale
     assert prompt.custom_vocabulary_terms == ("PuriPuly",)
     assert prompt.custom_vocabulary_other_languages_have_terms is True
@@ -259,6 +261,7 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
                 LocalLlmBaseUrlEdit("http://draft.local:11434"),
                 CustomSttEndpointEdit("https://draft.invalid/v1/audio/transcriptions"),
                 QwenRegionEdit(QwenRegion.SINGAPORE),
+                QwenAsrModelEdit("qwen-audio-3.0-asr-flash-streaming"),
                 SystemPromptEdit("focused prompt"),
             )
         ),
@@ -289,6 +292,7 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
     assert updated.intent.stt.custom.model == "latest-custom-model"
     assert updated.intent.stt.custom.extra == {"latest": True}
     assert translation.qwen.region == QwenRegion.SINGAPORE.value
+    assert updated.intent.stt.qwen_asr.model == "qwen-audio-3.0-asr-flash-streaming"
     assert updated.intent.prompts.system_prompt == "focused prompt"
     assert updated.intent.languages.source_language == "ja"
     assert updated.intent.audio.input_device == "latest microphone"

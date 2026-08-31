@@ -55,6 +55,7 @@ class ProviderSettingsSnapshot:
     translation: TranslationSelectionSnapshot
     stt_gpu_device_id: str
     qwen_region: QwenRegion
+    qwen_asr_model: str
     local_llm_base_url: str
     local_llm_model: str
     local_llm_extra_body_json: str
@@ -68,7 +69,6 @@ class ProviderSettingsSnapshot:
     openrouter_selection_alias: OpenRouterSelectionAlias | None
     verified: ProviderVerificationSnapshot
     managed_referral_id: str | None
-
 
 @dataclass(frozen=True, slots=True)
 class GeneralSettingsSnapshot:
@@ -305,6 +305,11 @@ class QwenRegionEdit:
 
 
 @dataclass(frozen=True, slots=True)
+class QwenAsrModelEdit:
+    model: str
+
+
+@dataclass(frozen=True, slots=True)
 class LocalLlmBaseUrlEdit:
     base_url: str
 
@@ -353,6 +358,7 @@ ProviderSettingsEdit: TypeAlias = (
     | TranslationFallbackEdit
     | TranslationHttpExtensionEdit
     | QwenRegionEdit
+    | QwenAsrModelEdit
     | LocalLlmBaseUrlEdit
     | LocalLlmModelEdit
     | LocalLlmExtraBodyEdit
@@ -424,6 +430,7 @@ __all__ = [
     "ProviderSettingsSnapshot",
     "ProviderVerificationSnapshot",
     "QwenRegionEdit",
+    "QwenAsrModelEdit",
     "SelfSttProviderEdit",
     "SelfVadSettingsIntent",
     "SttGpuDeviceEdit",

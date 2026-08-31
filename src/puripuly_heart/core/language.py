@@ -110,6 +110,7 @@ def map_detected_language_for_llm(language: str) -> DetectedLanguageForLLM | Non
 
 # Qwen ASR language code mapping (ISO 639-1 -> Qwen ASR codes)
 _QWEN_ASR_LANGUAGE_MAP: dict[str, str] = {
+    "zh": "zh",
     "zh-CN": "zh",
     "zh-TW": "zh",  # Qwen ASR uses "zh" for both Mandarin variants
     "ko": "ko",
@@ -136,6 +137,75 @@ _QWEN_ASR_LANGUAGE_MAP: dict[str, str] = {
     "pl": "pl",
     "sv": "sv",
 }
+_QWEN_AUDIO_ASR_LANGUAGE_MAP: dict[str, str] = {
+    "zh": "zh",
+    "zh-CN": "zh",
+    "zh-TW": "zh",
+    "ko": "ko",
+    "ja": "ja",
+    "en": "en",
+    "vi": "vi",
+    "th": "th",
+    "id": "id",
+    "ms": "ms",
+    "tl": "tl",
+    "hi": "hi",
+    "ar": "ar",
+    "fr": "fr",
+    "de": "de",
+    "es": "es",
+    "pt": "pt",
+    "ru": "ru",
+    "it": "it",
+    "nl": "nl",
+    "sv": "sv",
+    "da": "da",
+    "fi": "fi",
+    "no": "no",
+    "el": "el",
+    "pl": "pl",
+    "cs": "cs",
+    "hu": "hu",
+    "ro": "ro",
+    "bg": "bg",
+    "hr": "hr",
+    "sk": "sk",
+}
+
+
+def _language_from_map(code: str, language_map: dict[str, str]) -> str:
+    if code in language_map:
+        return language_map[code]
+    base_code = code.split("-")[0].lower()
+    return language_map.get(base_code, "en")
+
+
+def get_qwen3_asr_language(code: str) -> str:
+    return _language_from_map(code, _QWEN_ASR_LANGUAGE_MAP)
+
+
+def get_qwen_asr_language(code: str) -> str:
+    return get_qwen3_asr_language(code)
+
+
+def get_qwen_audio_asr_language(code: str) -> str:
+    return _language_from_map(code, _QWEN_AUDIO_ASR_LANGUAGE_MAP)
+
+
+def is_qwen3_asr_supported(code: str) -> bool:
+    if code in _QWEN_ASR_LANGUAGE_MAP:
+        return True
+    return code.split("-")[0].lower() in _QWEN_ASR_LANGUAGE_MAP
+
+
+def is_qwen_asr_supported(code: str) -> bool:
+    return is_qwen3_asr_supported(code)
+
+
+def is_qwen_audio_asr_supported(code: str) -> bool:
+    if code in _QWEN_AUDIO_ASR_LANGUAGE_MAP:
+        return True
+    return code.split("-")[0].lower() in _QWEN_AUDIO_ASR_LANGUAGE_MAP
 
 _LOCAL_QWEN_LANGUAGE_HINT_MAP: dict[str, str] = {
     "en": "en",
@@ -147,14 +217,6 @@ _LOCAL_QWEN_LANGUAGE_HINT_MAP: dict[str, str] = {
 }
 
 
-def get_qwen_asr_language(code: str) -> str:
-    """Get Qwen-ASR compatible language code. Falls back to 'en' if unknown."""
-    # Try exact match first (e.g., "zh-CN")
-    if code in _QWEN_ASR_LANGUAGE_MAP:
-        return _QWEN_ASR_LANGUAGE_MAP[code]
-    # Try base code (e.g., "ko-KR" -> "ko")
-    base_code = code.split("-")[0].lower()
-    return _QWEN_ASR_LANGUAGE_MAP.get(base_code, "en")
 
 
 def get_local_qwen_language_hint(code: str) -> str | None:
@@ -238,12 +300,6 @@ def is_deepgram_supported(code: str) -> bool:
     return base_code in _DEEPGRAM_SUPPORTED
 
 
-def is_qwen_asr_supported(code: str) -> bool:
-    """Check if a language is supported by Qwen ASR."""
-    if code in _QWEN_ASR_LANGUAGE_MAP:
-        return True
-    base_code = code.split("-")[0].lower()
-    return base_code in _QWEN_ASR_LANGUAGE_MAP
 
 
 def is_soniox_supported(code: str) -> bool:
@@ -251,7 +307,11 @@ def is_soniox_supported(code: str) -> bool:
     return get_language_info(code) is not None
 
 
-def get_stt_compatibility_warning(code: str, stt_provider: str) -> SttCompatibilityWarning | None:
+def get_stt_compatibility_warning(
+    code: str,
+    stt_provider: str,
+    stt_model: str | None = None,
+) -> SttCompatibilityWarning | None:
     """Return a warning key if the language is not supported by the STT provider."""
     lang_info = get_language_info(code)
     lang_code = lang_info.code if lang_info else code
@@ -261,7 +321,17 @@ def get_stt_compatibility_warning(code: str, stt_provider: str) -> SttCompatibil
             return SttCompatibilityWarning("warning.deepgram_suggest_qwen", lang_code)
         return SttCompatibilityWarning("warning.deepgram_not_supported", lang_code)
 
-    if stt_provider in {"qwen_asr", "local_qwen"} and not is_qwen_asr_supported(code):
+    if stt_provider == "qwen_asr":
+        qwen_supported = (
+            is_qwen_audio_asr_supported(code)
+            if stt_model == "qwen-audio-3.0-asr-flash-streaming"
+            else is_qwen_asr_supported(code)
+        )
+        if not qwen_supported:
+            if is_deepgram_supported(code):
+                return SttCompatibilityWarning("warning.qwen_suggest_deepgram", lang_code)
+            return SttCompatibilityWarning("warning.qwen_not_supported", lang_code)
+    elif stt_provider == "local_qwen" and not is_qwen_asr_supported(code):
         if is_deepgram_supported(code):
             return SttCompatibilityWarning("warning.qwen_suggest_deepgram", lang_code)
         return SttCompatibilityWarning("warning.qwen_not_supported", lang_code)
