@@ -19,6 +19,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 HEARTBEAT_INTERVAL_SECONDS = 15.0
 RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}")
+GIT_HEAD_PATTERN = re.compile(r"[0-9a-f]{40}")
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 STATUS_VALUES = {
     "STARTING",
@@ -164,6 +165,14 @@ def validate_config(value: dict[str, Any]) -> None:
     run_id = value.get("run_id")
     if not isinstance(run_id, str) or RUN_ID_PATTERN.fullmatch(run_id) is None:
         raise ControlPlaneError("run_id is invalid")
+    candidate_git_head = value.get("candidate_git_head")
+    if (
+        not isinstance(candidate_git_head, str)
+        or GIT_HEAD_PATTERN.fullmatch(candidate_git_head) is None
+    ):
+        raise ControlPlaneError(
+            "candidate_git_head must be exactly 40 lowercase hexadecimal characters"
+        )
     for field in ("persistent_root", "repository_root"):
         raw = value.get(field)
         if not isinstance(raw, str) or not Path(raw).is_absolute():
@@ -787,6 +796,7 @@ def self_test_config(
         "run_id": run_id,
         "persistent_root": str(persistent_root),
         "repository_root": str(Path.cwd().resolve()),
+        "candidate_git_head": "0" * 40,
         "phases": phases,
     }
 

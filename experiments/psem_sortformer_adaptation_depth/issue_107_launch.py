@@ -15,6 +15,7 @@ from typing import Any, Mapping, Sequence
 
 from experiments.psem_sortformer_adaptation_depth.authority_registry import authority_registry_root
 from experiments.psem_sortformer_adaptation_depth.detached_phase_runner import (
+    GIT_HEAD_PATTERN,
     canonical_bytes,
     fsync_directory,
     load_json_object,
@@ -58,6 +59,14 @@ def _positive_int(value: str) -> int:
     return parsed
 
 
+def _candidate_git_head(value: str) -> str:
+    if GIT_HEAD_PATTERN.fullmatch(value) is None:
+        raise argparse.ArgumentTypeError(
+            "candidate Git head must be exactly 40 lowercase hexadecimal characters"
+        )
+    return value
+
+
 def _aware_datetime(value: str) -> datetime:
     normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
     try:
@@ -67,6 +76,32 @@ def _aware_datetime(value: str) -> datetime:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise argparse.ArgumentTypeError("timestamp must include a timezone offset")
     return parsed
+
+
+def _require_exact_candidate_repository(args: argparse.Namespace) -> None:
+    repository_root = args.repository_root.resolve()
+    try:
+        head_result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repository_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=repository_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError, UnicodeError) as exc:
+        raise LaunchError("failed to inspect the candidate Git repository") from exc
+    observed_head = head_result.stdout.strip()
+    if observed_head != args.candidate_git_head:
+        raise LaunchError("repository HEAD differs from the authorized candidate Git head")
+    if status_result.stdout:
+        raise LaunchError("candidate Git repository must be clean")
 
 
 def _canonical_sha256(value: object) -> str:
@@ -137,6 +172,8 @@ def _common_phase_argv(args: argparse.Namespace, phase_id: str) -> list[str]:
         str(args.persistent_root),
         "--repository-root",
         str(args.repository_root),
+        "--candidate-git-head",
+        args.candidate_git_head,
         "--checkpoint",
         str(args.checkpoint),
         "--corpus-root",
@@ -239,12 +276,19 @@ def _build_config(args: argparse.Namespace) -> dict[str, Any]:
         "run_id": args.run_id,
         "persistent_root": str(args.persistent_root),
         "repository_root": str(args.repository_root),
+        "candidate_git_head": args.candidate_git_head,
         "first_phase": "bootstrap-f0",
         "phases": phases,
     }
 
 
 def _validate_common(args: argparse.Namespace) -> None:
+    candidate_git_head = getattr(args, "candidate_git_head", None)
+    if (
+        not isinstance(candidate_git_head, str)
+        or GIT_HEAD_PATTERN.fullmatch(candidate_git_head) is None
+    ):
+        raise LaunchError("candidate Git head must be exactly 40 lowercase hexadecimal characters")
     if args.image_identity != IMAGE_IDENTITY:
         raise LaunchError("image identity differs from the authorized digest")
     if not args.hourly_price_source.strip():
@@ -287,6 +331,7 @@ def _load_runtime_context(
 ) -> tuple[Path, str, dict[str, Any]]:
     _reject_sensitive_environment()
     _validate_common(args)
+    _require_exact_candidate_repository(args)
     if args.persistent_root.resolve() != STORAGE_ROOT.resolve():
         raise LaunchError("runtime persistent root must be /workspace")
     run_root = _run_root(args).resolve()
@@ -552,6 +597,7 @@ def _phase_summary(
 
 def write_config(args: argparse.Namespace) -> dict[str, Any]:
     _validate_common(args)
+    _require_exact_candidate_repository(args)
     output = args.output.resolve()
     repository_root = args.repository_root.resolve()
     if output == repository_root or output.is_relative_to(repository_root):
@@ -1197,6 +1243,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, phase: bool) -> No
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--persistent-root", type=_absolute_path, required=True)
     parser.add_argument("--repository-root", type=_absolute_path, required=True)
+    parser.add_argument("--candidate-git-head", type=_candidate_git_head, required=True)
     parser.add_argument("--checkpoint", type=_absolute_path, required=True)
     parser.add_argument("--corpus-root", type=_absolute_path, required=True)
     parser.add_argument("--reference-root", type=_absolute_path, required=True)

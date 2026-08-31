@@ -33,7 +33,7 @@ For `persistent_root=/workspace` and `run_id=<id>`, the runner creates:
 
 ## Run configuration
 
-Generate the immutable schema-v1 config inside the exact derived image that will run the Pod. This is required because the generated phase argv serializes `sys.executable`; it must be the Pod interpreter, not a host or substitute environment interpreter. The generator requires all runtime paths and billing controls, fixes the container identity, rejects a projected deadline cost above USD 30, and requires the timezone-aware billing start to be no later than the current time with its maximum-runtime deadline still active. It validates the result with `detached_phase_runner.validate_config`, writes canonical JSON atomically, and refuses to overwrite an existing output. `/opt/nemo` is the expected checkout location in the prepared image and is passed explicitly; path validation itself accepts any absolute checkout path.
+Generate the immutable schema-v1 config inside the exact derived image that will run the Pod. This is required because the generated phase argv serializes `sys.executable`; it must be the Pod interpreter, not a host or substitute environment interpreter. The generator requires the exact 40-lowercase-hex candidate Git head, verifies that `repository_root` is at that head with an empty `git status --porcelain --untracked-files=all`, and stores the head in the immutable config and every phase argv. Every phase repeats both Git checks before runtime work. The generator also requires all runtime paths and billing controls, fixes the container identity, rejects a projected deadline cost above USD 30, and requires the timezone-aware billing start to be no later than the current time with its maximum-runtime deadline still active. It validates the result with `detached_phase_runner.validate_config`, writes canonical JSON atomically, and refuses to overwrite an existing output. `/opt/nemo` is the expected checkout location in the prepared image and is passed explicitly; path validation itself accepts any absolute checkout path.
 
 Phase execution requires `persistent_root=/workspace`. Every phase fails closed unless `/workspace` reports at least 30,000,000,000 total bytes and the current free bytes meet the configured reserve. `--minimum-free-bytes` cannot be lower than 8 GiB (`8589934592` bytes), but 8 GiB is only the code floor. Before a live launch, retain the mounted-volume capacity receipt and choose a conservative operator reserve at or above that floor based on the observed capacity and expected outputs; a higher value is accepted.
 
@@ -44,6 +44,7 @@ python -m experiments.psem_sortformer_adaptation_depth.issue_107_launch write-co
   --run-id issue-107-a40-20260831-01 \
   --persistent-root /workspace \
   --repository-root /workspace/repo \
+  --candidate-git-head <exact-bundle-head> \
   --checkpoint /workspace/issue-107/assets/checkpoints/diar_streaming_sortformer_4spk-v2.1.nemo \
   --corpus-root /workspace/issue-107/assets/corpus \
   --reference-root /workspace/issue-107/assets/reference \
@@ -92,6 +93,7 @@ The generated topology and phase-specific command prefixes are exact. Each phase
 --run-id <run-id>
 --persistent-root <absolute-persistent-root>
 --repository-root <absolute-repository-root>
+--candidate-git-head <exact-40-lowercase-hex-bundle-head>
 --checkpoint <absolute-checkpoint>
 --corpus-root <absolute-corpus-root>
 --reference-root <absolute-reference-root>
