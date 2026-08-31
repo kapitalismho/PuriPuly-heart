@@ -316,14 +316,16 @@ def _self_stt_custom_vocabulary_signature_for_provider(
     terms: Mapping[str, list[str]],
     source_language: str,
 ) -> tuple[bool, tuple[str, ...]]:
-    if provider not in {
-        STTProviderName.DEEPGRAM,
-        STTProviderName.LOCAL_QWEN,
-        STTProviderName.SONIOX,
+    provider_value = provider.value if isinstance(provider, STTProviderName) else str(provider)
+    if provider_value not in {
+        STTProviderName.DEEPGRAM.value,
+        STTProviderName.LOCAL_QWEN.value,
+        STTProviderName.QWEN_ASR.value,
+        STTProviderName.SONIOX.value,
     }:
         return False, ()
     config = CustomVocabularyRuntimeConfig(enabled=enabled, terms=terms)
-    if provider == STTProviderName.LOCAL_QWEN:
+    if provider_value == STTProviderName.LOCAL_QWEN.value:
         return enabled, tuple(get_effective_local_qwen_hotwords(config, source_language))
     return enabled, tuple(get_effective_custom_terms(config, source_language))
 
@@ -521,6 +523,12 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
 def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> tuple[object, ...]:
     intent = settings.intent
     provider = intent.stt.provider
+    custom_vocab_enabled, custom_terms = _self_stt_custom_vocabulary_signature_for_provider(
+        provider=provider,
+        enabled=intent.stt.custom_vocabulary_enabled,
+        terms=intent.stt.custom_terms,
+        source_language=intent.languages.source_language,
+    )
     transition = build_self_local_asr_transition_request_from_vnext(settings, trigger="runtime")
     return (
         provider,
@@ -545,6 +553,8 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         intent.stt.custom.compatibility if is_custom_stt_provider(provider) else None,
         intent.stt.custom.endpoint if is_custom_stt_provider(provider) else None,
         intent.stt.custom.model if is_custom_stt_provider(provider) else None,
+        custom_vocab_enabled,
+        custom_terms,
         custom_stt_secret_generation() if is_custom_stt_provider(provider) else None,
         (
             str(default_local_stt_model_dir())
@@ -735,6 +745,7 @@ def create_stt_backend_from_resolved_config(
                 endpoint=_qwen_asr_endpoint_for_resolved_config(config),
                 language=get_qwen_audio_asr_language(config.source_language),
                 sample_rate_hz=config.sample_rate_hz,
+                hotwords=keyterms,
             )
         from puripuly_heart.core.language import get_qwen_asr_language
         from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend

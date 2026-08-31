@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 QWEN_AUDIO_MODEL = "qwen-audio-3.0-asr-flash-streaming"
 QWEN_AUDIO_DEFAULT_ENDPOINT = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
+QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT = 4
 
 
 class QwenAudioSessionState(str, Enum):
@@ -39,13 +40,45 @@ class QwenAudioProtocolError(RuntimeError):
 
 
 class QwenAudioTaskFailedError(QwenAudioProtocolError):
-    def __init__(self, error_code: str, error_message: str):
+    def __init__(self, error_code: str, error_message: str, *, hotwords_rejected: bool = False):
         self.error_code = error_code or "UNKNOWN"
         self.error_message = error_message or "Qwen Audio task failed"
-        super().__init__(f"Qwen Audio task failed: {self.error_code}: {self.error_message}")
+        self.hotwords_rejected = hotwords_rejected
+        label = "hotword parameters rejected" if hotwords_rejected else "task failed"
+        super().__init__(f"Qwen Audio {label}: {self.error_code}: {self.error_message}")
 
 
 WebSocketFactory = Callable[..., Awaitable[Any]]
+HotwordInput = Mapping[str, int] | Sequence[str]
+
+
+def _normalized_vocabulary(
+    hotwords: HotwordInput | None,
+    *,
+    default_weight: int = QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT,
+) -> dict[str, int]:
+    if not isinstance(default_weight, int) or isinstance(default_weight, bool):
+        default_weight = QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT
+    if default_weight not in (1, 2, 3, 4, 5, 50):
+        default_weight = QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT
+    if hotwords is None:
+        return {}
+    result: dict[str, int] = {}
+    if isinstance(hotwords, Mapping):
+        source = hotwords.items()
+    else:
+        source = ((term, default_weight) for term in hotwords)
+    for raw_term, raw_weight in source:
+        if not isinstance(raw_term, str):
+            continue
+        term = raw_term.strip()
+        if not term or term in result:
+            continue
+        weight = raw_weight if isinstance(raw_weight, int) and not isinstance(raw_weight, bool) else default_weight
+        if weight not in (1, 2, 3, 4, 5, 50):
+            weight = default_weight
+        result[term] = weight
+    return result
 
 
 def _join_sentences(sentences: Sequence[str]) -> str:
@@ -79,6 +112,8 @@ class QwenAudioStreamingSTTBackend(STTBackend):
     task_start_timeout_s: float = 5.0
     task_finish_timeout_s: float = 5.0
     send_timeout_s: float = 5.0
+    hotwords: HotwordInput = ()
+    hotword_weight: int = QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT
     websocket_factory: WebSocketFactory | None = None
 
     async def open_session(self) -> STTBackendSession:
@@ -108,6 +143,8 @@ class QwenAudioStreamingSTTBackend(STTBackend):
             task_start_timeout_s=self.task_start_timeout_s,
             task_finish_timeout_s=self.task_finish_timeout_s,
             send_timeout_s=self.send_timeout_s,
+            hotwords=self.hotwords,
+            hotword_weight=self.hotword_weight,
             websocket_factory=self.websocket_factory,
         )
         try:
@@ -154,6 +191,8 @@ class _QwenAudioSession(STTBackendSession):
     task_start_timeout_s: float
     task_finish_timeout_s: float
     send_timeout_s: float
+    hotwords: HotwordInput = ()
+    hotword_weight: int = QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT
     websocket_factory: WebSocketFactory | None = None
 
     _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
@@ -209,6 +248,11 @@ class _QwenAudioSession(STTBackendSession):
     def task_id(self) -> str | None:
         return self._task_id
 
+    def update_hotwords(self, hotwords: HotwordInput) -> None:
+        self.hotwords = hotwords
+
+    def _vocabulary(self) -> dict[str, int]:
+        return _normalized_vocabulary(self.hotwords, default_weight=self.hotword_weight)
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
@@ -267,6 +311,9 @@ class _QwenAudioSession(STTBackendSession):
             "multi_threshold_mode_enabled": False,
             "heartbeat": True,
         }
+        vocabulary = self._vocabulary()
+        if vocabulary:
+            parameters["vocabulary"] = vocabulary
         payload = {
             "header": {"action": "run-task", "task_id": task_id, "streaming": "duplex"},
             "payload": {
@@ -541,7 +588,17 @@ class _QwenAudioSession(STTBackendSession):
             return
         error_code = str(header.get("error_code") or "UNKNOWN")
         error_message = str(header.get("error_message") or "Qwen Audio task failed")
-        await self._fail(QwenAudioTaskFailedError(error_code, error_message))
+        normalized = f"{error_code} {error_message}".casefold()
+        hotwords_rejected = bool(self._vocabulary()) and any(
+            token in normalized for token in ("vocabulary", "hotword", "workspace", "sub-workspace")
+        )
+        await self._fail(
+            QwenAudioTaskFailedError(
+                error_code,
+                error_message,
+                hotwords_rejected=hotwords_rejected,
+            )
+        )
 
     async def _finish_active_task(self) -> None:
         async with self._send_lock:
@@ -835,6 +892,7 @@ class _QwenAudioSession(STTBackendSession):
 
 __all__ = [
     "QWEN_AUDIO_DEFAULT_ENDPOINT",
+    "QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT",
     "QWEN_AUDIO_MODEL",
     "QwenAudioProtocolError",
     "QwenAudioSessionState",

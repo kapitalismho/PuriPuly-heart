@@ -55,6 +55,7 @@ class FakeWebSocket:
 
 async def open_fake(
     *,
+    hotwords: object = (),
     task_start_timeout_s: float = 1,
     task_finish_timeout_s: float = 0.2,
     send_timeout_s: float = 5,
@@ -67,6 +68,7 @@ async def open_fake(
     backend = QwenAudioStreamingSTTBackend(
         api_key="test-key",
         language="ko",
+        hotwords=hotwords,
         websocket_factory=connect,
         connect_timeout_s=1,
         task_start_timeout_s=task_start_timeout_s,
@@ -88,7 +90,7 @@ async def next_event(session: object):
 
 @pytest.mark.asyncio
 async def test_normal_task_aggregates_only_sentence_finals() -> None:
-    _, session, socket, task_id = await open_fake()
+    _, session, socket, task_id = await open_fake(hotwords=["PuriPuly"])
     await session.send_audio(b"pcm")
     await socket.push(
         {
@@ -113,6 +115,7 @@ async def test_normal_task_aggregates_only_sentence_finals() -> None:
     event = await next_event(session)
     assert event.text == "첫 문장.둘째 문장."
     assert event.is_final
+    assert json.loads(socket.sent[0])['payload']['parameters']['vocabulary'] == {'PuriPuly': 4}
     await session.abort_for_toggle_off()
 
 
@@ -184,6 +187,20 @@ async def test_stale_and_duplicate_events_do_not_consume_next_boundary() -> None
 
 
 @pytest.mark.asyncio
+async def test_hotword_update_is_applied_on_next_task_and_abort_suppresses_events() -> None:
+    _, session, socket, first_id = await open_fake(hotwords=["old"])
+    session.update_hotwords(["new"])
+    await session.on_speech_end()
+    await socket.push({'header': {'event': 'task-finished', 'task_id': first_id}})
+    while len(socket.sent) < 3:
+        await asyncio.sleep(0)
+    second_id = json.loads(socket.sent[2])['header']['task_id']
+    assert json.loads(socket.sent[2])['payload']['parameters']['vocabulary'] == {'new': 4}
+    await socket.push({'header': {'event': 'task-started', 'task_id': second_id}})
+    await session.on_speech_end()
+    await session.abort_for_toggle_off()
+    assert session.state is QwenAudioSessionState.CLOSING
+    assert socket.closed
 
 
 @pytest.mark.asyncio
@@ -251,6 +268,24 @@ async def test_task_finish_timeout_emits_empty_boundary_then_failure() -> None:
 
 
 @pytest.mark.asyncio
+async def test_vocabulary_rejection_is_diagnosable() -> None:
+    _, session, socket, task_id = await open_fake(hotwords=["PuriPuly"])
+    await session.on_speech_end()
+    await socket.push(
+        {
+            "header": {
+                "event": "task-failed",
+                "task_id": task_id,
+                "error_code": "VOCABULARY_NOT_SUPPORTED",
+                "error_message": "vocabulary is not supported",
+            }
+        }
+    )
+    event = await next_event(session)
+    assert event.text == ""
+    with pytest.raises(QwenAudioTaskFailedError) as failure:
+        await next_event(session)
+    assert failure.value.hotwords_rejected
 
 
 @pytest.mark.asyncio
@@ -261,6 +296,24 @@ async def test_socket_close_reports_protocol_failure() -> None:
         await asyncio.wait_for(next_event(session), timeout=1)
 
 
+def test_factory_selects_qwen_audio_protocol_and_source_terms() -> None:
+    resolved = resolve_stt_config(
+        STTRuntimeIntent(
+            provider="qwen_asr",
+            source_language="tl",
+            qwen_asr_model=QWEN_AUDIO_MODEL,
+            qwen_region="singapore",
+            custom_vocabulary_enabled=True,
+            custom_terms={"tl": ("PuriPuly", "Qwen")},
+        )
+    )
+    secrets = InMemorySecretStore()
+    secrets.set("alibaba_api_key_singapore", "test-key")
+    backend = create_stt_backend_from_resolved_config(resolved, secrets=secrets)
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
+    assert backend.language == "tl"
+    assert backend.endpoint.endswith("/api-ws/v1/inference")
+    assert tuple(backend.hotwords) == ("PuriPuly", "Qwen")
 
 async def wait_for_condition(predicate) -> None:
     for _ in range(1000):

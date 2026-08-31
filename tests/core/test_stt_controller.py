@@ -32,6 +32,7 @@ from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBac
 from puripuly_heart.providers.stt.qwen_audio import (
     QWEN_AUDIO_MODEL,
     QwenAudioStreamingSTTBackend,
+    QwenAudioTaskFailedError,
 )
 from tests.helpers.fakes import samples
 
@@ -197,6 +198,21 @@ class QwenAudioBridgeSocket:
 
 
 
+class HotwordRejectingBackend:
+    def __init__(self) -> None:
+        self.open_calls = 0
+        self.hotwords = ("PuriPuly", "VRChat")
+        self.reject = True
+
+    async def open_session(self):
+        self.open_calls += 1
+        if not self.reject:
+            return FakeSession()
+        raise QwenAudioTaskFailedError(
+            "VOCABULARY_NOT_SUPPORTED",
+            "vocabulary is not supported",
+            hotwords_rejected=True,
+        )
 
 class ClosableFakeBackend(FakeBackend):
     def __init__(self) -> None:
@@ -2878,6 +2894,52 @@ async def test_qwen_audio_bridging_reset_discards_old_active_boundary() -> None:
         await stt.close()
 
 
+@pytest.mark.parametrize("channel", ("self", "peer"))
+@pytest.mark.asyncio
+async def test_qwen_hotword_rejection_latches_until_vocabulary_reset(channel: str) -> None:
+    backend = HotwordRejectingBackend()
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        channel=channel,
+        stt_provider_name=STTProviderName.QWEN_ASR,
+        connect_attempts=4,
+        connect_retry_base_s=0.000001,
+        connect_retry_max_s=0.000001,
+    )
+    first_id = uuid4()
+    second_id = uuid4()
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                first_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        for _ in range(3):
+            await stt.handle_vad_event(SpeechChunk(first_id, samples(0.25)))
+        assert backend.open_calls == 1
+        assert stt.state is STTSessionState.DISCONNECTED
+        queued_events: list[object] = []
+        while not stt._events.empty():
+            queued_events.append(stt._events.get_nowait())
+        assert sum(isinstance(item, STTErrorEvent) for item in queued_events) == 1
+        assert backend.hotwords == ("PuriPuly", "VRChat")
+
+        backend.reject = False
+        backend.hotwords = ("new-term",)
+        await stt.handle_vad_event(
+            SpeechStart(
+                second_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        assert backend.open_calls == 2
+        assert stt.state is STTSessionState.STREAMING
+    finally:
+        await stt.close()
 
 
 @pytest.mark.asyncio

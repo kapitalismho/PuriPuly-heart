@@ -107,6 +107,11 @@ class ManagedSTTProvider:
         repr=False,
     )
     _publication_generation: int = field(init=False, default=0, repr=False)
+    _hotword_rejection_key: tuple[object, ...] | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
 
     def __post_init__(self) -> None:
         if self.channel not in ("self", "peer"):
@@ -141,6 +146,28 @@ class ManagedSTTProvider:
             return "stt"
         return self.stt_provider_name.value
 
+    def _hotword_rejection_signature(self) -> tuple[object, ...]:
+        backend = self.backend
+        hotwords = getattr(backend, "hotwords", None)
+        if isinstance(hotwords, (list, tuple)):
+            vocabulary = tuple(str(item) for item in hotwords)
+        else:
+            vocabulary = repr(hotwords)
+        return (
+            id(backend),
+            self._provider_label(),
+            repr(getattr(backend, "model", None)),
+            repr(getattr(backend, "language", None)),
+            repr(getattr(backend, "config_generation", None)),
+            vocabulary,
+            self._publication_generation,
+        )
+
+    def _hotword_rejection_is_latched(self) -> bool:
+        return (
+            self._hotword_rejection_key is not None
+            and self._hotword_rejection_key == self._hotword_rejection_signature()
+        )
 
     @property
     def state(self) -> STTSessionState:
@@ -200,6 +227,7 @@ class ManagedSTTProvider:
 
     async def close(self) -> None:
         self._closing = True
+        self._hotword_rejection_key = None
         try:
             await self._set_state(
                 STTSessionState.DRAINING if self._active_session else STTSessionState.DISCONNECTED
@@ -229,6 +257,7 @@ class ManagedSTTProvider:
 
     async def abort_for_toggle_off(self) -> None:
         self._closing = True
+        self._hotword_rejection_key = None
         self._publication_generation += 1
         discarded_audio_samples = (
             int(self._audio_ring.get_last_samples(self._audio_ring.capacity_samples).size)
@@ -467,6 +496,7 @@ class ManagedSTTProvider:
         await reached.wait()
 
     async def reconfigure_session_options(self, options: LocalASRSessionOptions) -> None:
+        self._hotword_rejection_key = None
         self._pending_session_options = options
 
     async def warmup(self) -> None:
@@ -476,6 +506,8 @@ class ManagedSTTProvider:
 
     async def _on_speech_start(self, event: SpeechStart) -> None:
         await self._apply_pending_session_options()
+        if self._hotword_rejection_is_latched():
+            return
         self._active_utterance_id = event.utterance_id
         self._diagnostic_chunk_count = 0
         self._diagnostic_sample_count = 0
@@ -485,6 +517,8 @@ class ManagedSTTProvider:
         self._stt_fault_logged_for_utterance = False
 
         if not await self._ensure_session():
+            if self._hotword_rejection_is_latched():
+                self._active_utterance_id = None
             return
 
         await self._send_audio(event.pre_roll)
@@ -500,6 +534,8 @@ class ManagedSTTProvider:
         self._pending_session_options = None
 
     async def _on_speech_chunk(self, event: SpeechChunk) -> None:
+        if self._hotword_rejection_is_latched():
+            return
         self._active_utterance_id = event.utterance_id
         if not await self._ensure_session():
             return
@@ -643,10 +679,14 @@ class ManagedSTTProvider:
     async def _ensure_session(self) -> bool:
         if self._active_session is not None:
             return True
+        if self._hotword_rejection_is_latched():
+            return False
 
         async with self._session_open_lock:
             if self._active_session is not None:
                 return True
+            if self._hotword_rejection_is_latched():
+                return False
 
             await self._set_state(STTSessionState.CONNECTING)
             last_exc: Exception | None = None
@@ -678,6 +718,18 @@ class ManagedSTTProvider:
                             level=logging.WARNING,
                             fallback_level=logging.WARNING,
                         )
+                        if getattr(exc, "hotwords_rejected", False):
+                            self._hotword_rejection_key = self._hotword_rejection_signature()
+                            self._emit_basic(
+                                "[STT][HotwordRejected] channel=%s provider=%s "
+                                "vocabulary=%s; awaiting configuration reset",
+                                self.channel,
+                                self._provider_label(),
+                                getattr(self.backend, "hotwords", None),
+                                level=logging.ERROR,
+                                fallback_level=logging.ERROR,
+                            )
+                            break
                         if attempt < self.connect_attempts:
                             delay = min(
                                 self.connect_retry_base_s * (2 ** (attempt - 1)),
