@@ -953,6 +953,7 @@ def compose_application_runtime(
         return provider in {
             STTProviderName.DEEPGRAM,
             STTProviderName.QWEN_ASR,
+            STTProviderName.QWEN_AUDIO,
             STTProviderName.SONIOX,
         }
 

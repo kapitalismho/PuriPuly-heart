@@ -17,6 +17,8 @@ from puripuly_heart.config.provider_values import (
     STTProviderName,
     custom_stt_selection_for_provider,
     is_custom_stt_provider,
+    is_qwen_cloud_stt_provider,
+    qwen_cloud_stt_model_for_provider,
 )
 from puripuly_heart.config.resolved import (
     ResolvedCredentialRequirement,
@@ -112,7 +114,7 @@ class ResolvedPeerSTTConfig:
     def model(self) -> str | None:
         if self.provider == STTProviderName.DEEPGRAM:
             return self.deepgram_model
-        if self.provider == STTProviderName.QWEN_ASR:
+        if self.provider in {STTProviderName.QWEN_ASR, STTProviderName.QWEN_AUDIO}:
             return self.qwen_model
         if self.provider == STTProviderName.SONIOX:
             return self.soniox_model
@@ -126,7 +128,7 @@ class ResolvedPeerSTTConfig:
 
     @property
     def region(self) -> QwenRegion | None:
-        if self.provider == STTProviderName.QWEN_ASR:
+        if self.provider in {STTProviderName.QWEN_ASR, STTProviderName.QWEN_AUDIO}:
             return self.qwen_region
         return None
 
@@ -165,10 +167,18 @@ def _stt_provider_value_or_raise(
     return _stt_provider_name_or_raise(provider, peer=peer).value
 
 
+def _qwen_runtime_provider_and_model(provider: str, stored_model: str) -> tuple[str, str]:
+    model = qwen_cloud_stt_model_for_provider(provider)
+    if model is None:
+        return provider, stored_model
+    return STT_PROVIDER_QWEN_ASR, model
+
+
 def self_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntimeIntent:
     intent = settings.intent
     source_language = intent.languages.source_language
     provider = _stt_provider_value_or_raise(intent.stt.provider, peer=False)
+    provider, qwen_asr_model = _qwen_runtime_provider_and_model(provider, intent.stt.qwen_asr.model)
     soniox_language_hints = None
     soniox_language_hints_strict = False
     if provider == STT_PROVIDER_SONIOX:
@@ -212,7 +222,7 @@ def self_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         ),
         custom_terms={source_language: terms} if terms else {},
         deepgram_model=intent.stt.deepgram.model,
-        qwen_asr_model=intent.stt.qwen_asr.model,
+        qwen_asr_model=qwen_asr_model,
         qwen_region=intent.translation.qwen.region,
         soniox_model=intent.stt.soniox.model,
         soniox_endpoint=intent.stt.soniox.endpoint,
@@ -231,6 +241,7 @@ def self_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
 def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntimeIntent:
     intent = settings.intent
     provider = intent.peer_stt.provider
+    provider, qwen_asr_model = _qwen_runtime_provider_and_model(provider, intent.stt.qwen_asr.model)
     automatic = intent.languages.peer_source_mode == "auto"
     automatic_soniox = provider == STT_PROVIDER_SONIOX and automatic
     source_language = intent.languages.peer_source_language or intent.languages.source_language
@@ -276,7 +287,7 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         custom_vocabulary_enabled=False,
         custom_terms={},
         deepgram_model=intent.stt.deepgram.model,
-        qwen_asr_model=intent.stt.qwen_asr.model,
+        qwen_asr_model=qwen_asr_model,
         qwen_region=intent.translation.qwen.region,
         soniox_model=intent.stt.soniox.model,
         soniox_endpoint=intent.stt.soniox.endpoint,
@@ -322,10 +333,8 @@ def _self_stt_custom_vocabulary_signature_for_provider(
     if provider_value in {
         STTProviderName.DEEPGRAM.value,
         STTProviderName.SONIOX.value,
-    } or (
-        provider_value == STTProviderName.QWEN_ASR.value
-        and (model is None or model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING)
-    ):
+        STTProviderName.QWEN_AUDIO.value,
+    }:
         return enabled, tuple(get_effective_custom_terms(config, source_language))
     return False, ()
 
@@ -489,14 +498,14 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
         1,
         intent.stt.gpu_device_id if provider == STTProviderName.LOCAL_QWEN_GPU.value else None,
         intent.stt.deepgram.model if provider == STTProviderName.DEEPGRAM.value else None,
-        intent.translation.qwen.region if provider == STTProviderName.QWEN_ASR.value else None,
-        intent.stt.qwen_asr.model if provider == STTProviderName.QWEN_ASR.value else None,
+        intent.translation.qwen.region if is_qwen_cloud_stt_provider(provider) else None,
+        qwen_cloud_stt_model_for_provider(provider),
         (
             _qwen_asr_endpoint_for_region(
                 intent.translation.qwen.region,
-                intent.stt.qwen_asr.model,
+                qwen_cloud_stt_model_for_provider(provider),
             )
-            if provider == STTProviderName.QWEN_ASR.value
+            if is_qwen_cloud_stt_provider(provider)
             else None
         ),
         intent.stt.soniox.model if provider == STTProviderName.SONIOX.value else None,
@@ -537,8 +546,8 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         None if transition is not None else intent.languages.source_language,
         None if transition is None else transition.model_id,
         intent.stt.deepgram.model if provider == STTProviderName.DEEPGRAM.value else None,
-        intent.translation.qwen.region if provider == STTProviderName.QWEN_ASR.value else None,
-        intent.stt.qwen_asr.model if provider == STTProviderName.QWEN_ASR.value else None,
+        intent.translation.qwen.region if is_qwen_cloud_stt_provider(provider) else None,
+        qwen_cloud_stt_model_for_provider(provider),
         intent.stt.soniox.model if provider == STTProviderName.SONIOX.value else None,
         intent.stt.soniox.endpoint if provider == STTProviderName.SONIOX.value else None,
         (
@@ -832,13 +841,13 @@ def resolve_peer_stt_config(settings: AppSettingsVNext) -> ResolvedPeerSTTConfig
             deepgram_model=intent.stt.deepgram.model,
         )
 
-    if provider == STTProviderName.QWEN_ASR:
+    if provider in {STTProviderName.QWEN_ASR, STTProviderName.QWEN_AUDIO}:
         return ResolvedPeerSTTConfig(
             provider=provider,
             source_language=peer_source_language,
             sample_rate_hz=STT_INTERNAL_SAMPLE_RATE_HZ,
             keyterms=keyterms,
-            qwen_model=intent.stt.qwen_asr.model,
+            qwen_model=qwen_cloud_stt_model_for_provider(provider) or intent.stt.qwen_asr.model,
             qwen_region=QwenRegion(intent.translation.qwen.region),
         )
 

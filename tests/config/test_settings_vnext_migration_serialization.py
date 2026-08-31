@@ -187,6 +187,38 @@ def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
     }
 
 
+def test_vnext_dict_migrates_shared_qwen_audio_model_to_per_channel_provider() -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["intent"]["stt"]["provider"] = "qwen_asr"
+    canonical["intent"]["stt"]["qwen_asr"] = {"model": "qwen-audio-3.0-asr-flash-streaming"}
+    canonical["intent"]["peer_stt"]["provider"] = "qwen_asr"
+
+    migrated = migration.from_dict(canonical)
+    result = serialization.to_dict(migrated)["intent"]
+
+    assert result["stt"]["provider"] == "qwen_audio"
+    assert result["peer_stt"]["provider"] == "qwen_audio"
+    assert result["stt"]["qwen_asr"]["model"] == "qwen3-asr-flash-realtime"
+
+
+def test_vnext_dict_preserves_split_qwen_cloud_providers_with_leftover_audio_model() -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["intent"]["stt"]["provider"] = "qwen_asr"
+    canonical["intent"]["stt"]["qwen_asr"] = {"model": "qwen-audio-3.0-asr-flash-streaming"}
+    canonical["intent"]["peer_stt"]["provider"] = "qwen_audio"
+
+    migrated = migration.from_dict(canonical)
+    result = serialization.to_dict(migrated)["intent"]
+
+    assert result["stt"]["provider"] == "qwen_asr"
+    assert result["peer_stt"]["provider"] == "qwen_audio"
+    assert result["stt"]["qwen_asr"]["model"] == "qwen3-asr-flash-realtime"
+
+
 def test_vnext_dict_migrates_qwen_35_plus_nested_fields() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 

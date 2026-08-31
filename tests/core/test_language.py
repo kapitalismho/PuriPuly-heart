@@ -86,6 +86,9 @@ def test_stt_compatibility_warning_variants() -> None:
     assert warning.key == "warning.qwen_suggest_deepgram"
     assert warning.language_code == "bg"
 
+    warning = get_stt_compatibility_warning("bg", "qwen_audio")
+    assert warning is None
+
     warning = get_stt_compatibility_warning("xx", "deepgram")
     assert warning is not None
     assert warning.key == "warning.deepgram_not_supported"

@@ -141,7 +141,10 @@ class ApplicationStartupAdapter:
 
         stt_provider = settings.intent.stt.provider
         if self.stt_requires_secret(STTProviderName(stt_provider)):
-            stt_key_map = {"qwen_asr": self.alibaba_verified_key()}
+            stt_key_map = {
+                "qwen_asr": self.alibaba_verified_key(),
+                "qwen_audio": self.alibaba_verified_key(),
+            }
             stt_verified_key = stt_key_map.get(stt_provider, stt_provider)
             stt_entry = getattr(
                 settings.state.provider_verification,

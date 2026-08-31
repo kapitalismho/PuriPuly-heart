@@ -375,6 +375,7 @@ def _vnext(
     peer_source_mode: str | None = None,
     peer_expected_languages: list[str] | None = None,
     qwen_region: str | None = None,
+    qwen_asr_model: str | None = None,
     custom_terms: dict[str, list[str]] | None = None,
     custom_vocabulary_enabled: bool | None = None,
     gpu_device_id: str | None = None,
@@ -468,6 +469,8 @@ def _vnext(
     stt = current.intent.stt
     if stt_provider is not None:
         stt = replace(stt, provider=stt_provider)
+    if qwen_asr_model is not None:
+        stt = replace(stt, qwen_asr=replace(stt.qwen_asr, model=qwen_asr_model))
     if custom_terms is not None:
         stt = replace(stt, custom_terms=custom_terms)
     if custom_vocabulary_enabled is not None:
@@ -2478,6 +2481,7 @@ def test_on_stt_selected_routes_compatibility_warning_through_snackbar_callback(
     monkeypatch.setattr(view._qwen_region_btn, "update", lambda: None)
     monkeypatch.setattr(view._api_keys_column, "update", lambda: None)
     monkeypatch.setattr(view._stt_text, "update", lambda: None)
+    monkeypatch.setattr(view._peer_stt_text, "update", lambda: None)
     view.show_snackbar = lambda message, color: snackbars.append((message, color))
     warning = SimpleNamespace(key="warning.deepgram_not_supported", language_code="xx")
     monkeypatch.setattr(
@@ -2576,11 +2580,86 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
         STTProviderName.LOCAL_QWEN_GPU.value,
         STTProviderName.DEEPGRAM.value,
         STTProviderName.QWEN_ASR.value,
+        STTProviderName.QWEN_AUDIO.value,
         STTProviderName.SONIOX.value,
         STTProviderName.CUSTOM_OFFLINE.value,
         STTProviderName.CUSTOM_REALTIME.value,
     }
     assert STTProviderName.LOCAL_QWEN_GPU.value in {option.value for option in options}
+    qwen_audio_option = next(
+        option for option in options if option.value == STTProviderName.QWEN_AUDIO.value
+    )
+    assert qwen_audio_option.label == t("provider.qwen_audio")
+    assert qwen_audio_option.description == ""
+
+
+def test_qwen_asr_model_button_is_removed_from_api_key_card(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+
+    assert not hasattr(view, "_qwen_asr_model_btn")
+    assert not hasattr(view, "_on_qwen_asr_model_click")
+
+
+def test_selecting_qwen_audio_stores_qwen_audio_provider_without_changing_peer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettingsVNext()
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    view._on_stt_selected(STTProviderName.QWEN_AUDIO.value)
+
+    pending = view.build_provider_apply_settings()
+
+    assert pending is not None
+    assert pending.intent.stt.provider == STTProviderName.QWEN_AUDIO.value
+    assert pending.intent.peer_stt.provider == settings.intent.peer_stt.provider
+    assert view._stt_text.content.value == t("provider.qwen_audio")
+
+
+def test_selecting_qwen_asr_from_qwen_audio_does_not_change_peer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _vnext(
+        stt_provider=STTProviderName.QWEN_AUDIO,
+        peer_stt_provider=STTProviderName.QWEN_ASR,
+    )
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    assert view._stt_text.content.value == t("provider.qwen_audio")
+    assert view._peer_stt_text.content.value == t("provider.qwen_asr")
+
+    view._on_stt_selected(STTProviderName.QWEN_ASR.value)
+
+    pending = view.build_provider_apply_settings()
+
+    assert pending is not None
+    assert pending.intent.stt.provider == STTProviderName.QWEN_ASR.value
+    assert pending.intent.peer_stt.provider == STTProviderName.QWEN_ASR.value
+    assert view._stt_text.content.value == t("provider.qwen_asr")
+    assert view._peer_stt_text.content.value == t("provider.qwen_asr")
+
+
+def test_selecting_peer_qwen_audio_does_not_change_self(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettingsVNext()
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    view._on_peer_stt_selected(STTProviderName.QWEN_AUDIO.value)
+
+    pending = view.build_provider_apply_settings()
+
+    assert pending is not None
+    assert pending.intent.peer_stt.provider == STTProviderName.QWEN_AUDIO.value
+    assert pending.intent.stt.provider == settings.intent.stt.provider
+    assert view._peer_stt_text.content.value == t("provider.qwen_audio")
+    assert view._stt_text.content.value == t("provider.local_cpu_auto")
 
 
 def test_peer_stt_local_qwen_choice_can_be_persisted(

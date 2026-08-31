@@ -318,10 +318,10 @@ def get_stt_compatibility_warning(
             return SttCompatibilityWarning("warning.deepgram_suggest_qwen", lang_code)
         return SttCompatibilityWarning("warning.deepgram_not_supported", lang_code)
 
-    if stt_provider == "qwen_asr":
+    if stt_provider in {"qwen_asr", "qwen_audio"}:
         qwen_supported = (
             is_qwen_audio_asr_supported(code)
-            if stt_model == "qwen-audio-3.0-asr-flash-streaming"
+            if stt_provider == "qwen_audio"
             else is_qwen_asr_supported(code)
         )
         if not qwen_supported:

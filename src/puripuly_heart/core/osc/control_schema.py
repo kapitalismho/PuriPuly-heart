@@ -172,6 +172,7 @@ ASR_ID_BY_PROVIDER: Final[Mapping[str, int]] = MappingProxyType(
     {
         **{value: identifier for identifier, value in ASR_IDS.items()},
         "custom": 8,
+        "qwen_audio": 6,
     }
 )
 TRANSLATION_MODEL_ID_BY_VALUE: Final[Mapping[str, int]] = MappingProxyType(

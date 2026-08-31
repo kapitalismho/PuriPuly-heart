@@ -65,7 +65,6 @@ from puripuly_heart.app.ports.settings_view import (
     ProviderApplyIntent,
     ProviderSettingsEdit,
     ProviderSettingsSnapshot,
-    QwenAsrModelEdit,
     QwenRegionEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
@@ -103,11 +102,11 @@ from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
-    QwenASRSTTModel,
     QwenRegion,
     STTProviderName,
     display_stt_provider,
     is_custom_stt_provider,
+    is_qwen_cloud_stt_provider,
     normalize_local_llm_base_url,
     normalize_owned_referral_id,
 )
@@ -209,13 +208,10 @@ _STT_UI_PROVIDERS = (
     STTProviderName.LOCAL_QWEN_GPU,
     STTProviderName.DEEPGRAM,
     STTProviderName.QWEN_ASR,
+    STTProviderName.QWEN_AUDIO,
     STTProviderName.SONIOX,
     STTProviderName.CUSTOM_OFFLINE,
     STTProviderName.CUSTOM_REALTIME,
-)
-_QWEN_ASR_MODELS = (
-    QwenASRSTTModel.REALTIME,
-    QwenASRSTTModel.AUDIO_STREAMING,
 )
 _STT_SECTION_ORDER = (
     "settings.stt.section.recommended_cloud",
@@ -230,6 +226,7 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.SONIOX: "settings.stt.section.recommended_cloud",
     STTProviderName.LOCAL_CPU_AUTO: "settings.stt.section.recommended_local",
     STTProviderName.QWEN_ASR: "settings.stt.section.cloud",
+    STTProviderName.QWEN_AUDIO: "settings.stt.section.cloud",
     STTProviderName.CUSTOM: "settings.stt.section.custom",
     STTProviderName.CUSTOM_OFFLINE: "settings.stt.section.custom",
     STTProviderName.CUSTOM_REALTIME: "settings.stt.section.custom",
@@ -1213,11 +1210,6 @@ class SettingsView(ft.Column):
             on_click=self._on_qwen_region_click,
             visible=False,  # Hidden by default, updated by visibility logic
         )
-        self._qwen_asr_model_btn = _make_text_button(
-            f"{t('settings.qwen_asr_model')} {t('stt.model.qwen3-asr-flash-realtime')}",
-            on_click=self._on_qwen_asr_model_click,
-            visible=False,
-        )
 
         # API Key fields
         self._deepgram_key = ApiKeyField(
@@ -1439,7 +1431,6 @@ class SettingsView(ft.Column):
                 self._api_title,
                 ft.Container(expand=True),
                 self._qwen_region_btn,
-                self._qwen_asr_model_btn,
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -3529,21 +3520,33 @@ class SettingsView(ft.Column):
             ),
         )
 
-    def _qwen_model_label(self, model: str) -> str:
-        label_keys = {
-            QwenASRSTTModel.REALTIME.value: "stt.model.qwen3-asr-flash-realtime",
-            QwenASRSTTModel.AUDIO_STREAMING.value: "stt.model.qwen-audio-3.0-asr-flash-streaming",
-        }
-        key = label_keys.get(model)
-        return t(key, default=model) if key is not None else model
-
     def _stt_provider_display_label(
         self,
         provider: STTProviderName,
         *,
         custom_mode: str = "offline",
+        qwen_asr_model: str | None = None,
     ) -> str:
-        return provider_label(display_stt_provider(provider, custom_mode=custom_mode).value)
+        return provider_label(
+            display_stt_provider(
+                provider,
+                custom_mode=custom_mode,
+                qwen_asr_model=qwen_asr_model,
+            ).value
+        )
+
+    def _display_stt_choice(
+        self,
+        settings: ProviderSettingsSnapshot,
+        *,
+        peer: bool = False,
+    ) -> STTProviderName:
+        provider = self._effective_peer_stt_provider(settings) if peer else settings.stt_provider
+        return display_stt_provider(
+            provider,
+            custom_mode=settings.custom_stt_mode,
+            qwen_asr_model=settings.qwen_asr_model,
+        )
 
     def _normalized_peer_stt_provider(self, provider: STTProviderName) -> STTProviderName:
         return provider
@@ -3575,10 +3578,15 @@ class SettingsView(ft.Column):
         auto_unavailable = (
             provider == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available
         )
+        description = (
+            ""
+            if provider == STTProviderName.QWEN_AUDIO
+            else t(f"provider.{provider.value}.description", default="")
+        )
         return OptionItem(
             value=provider.value,
             label=provider_label(provider.value),
-            description=t(f"provider.{provider.value}.description", default=""),
+            description=description,
             disabled=auto_unavailable,
         )
 
@@ -3840,6 +3848,7 @@ class SettingsView(ft.Column):
             self._stt_provider_display_label(
                 provider.stt_provider,
                 custom_mode=provider.custom_stt_mode,
+                qwen_asr_model=provider.qwen_asr_model,
             ),
         )
         self._set_unit_card_value_text(
@@ -3847,6 +3856,7 @@ class SettingsView(ft.Column):
             self._stt_provider_display_label(
                 self._effective_peer_stt_provider(provider),
                 custom_mode=provider.custom_stt_mode,
+                qwen_asr_model=provider.qwen_asr_model,
             ),
         )
         self._update_api_visibility()
@@ -3861,10 +3871,6 @@ class SettingsView(ft.Column):
             self._get_translation_connection_display_label(provider),
         )
         self._sync_translation_connection_title(provider)
-        _set_text_button_label(
-            self._qwen_asr_model_btn,
-            f"{t('settings.qwen_asr_model')} {self._qwen_model_label(provider.qwen_asr_model)}",
-        )
         self._sync_openrouter_fallback_card(provider)
         self._local_llm_base_url.value = provider.local_llm_base_url
         self._local_llm_base_url.error = None
@@ -4067,20 +4073,7 @@ class SettingsView(ft.Column):
         if display_settings is None:
             return
         if control in {"PuriPuly_SelfASR", "PuriPuly_PeerASR"}:
-            self._set_unit_card_value_text(
-                self._stt_text,
-                self._stt_provider_display_label(
-                    display_settings.stt_provider,
-                    custom_mode=display_settings.custom_stt_mode,
-                ),
-            )
-            self._set_unit_card_value_text(
-                self._peer_stt_text,
-                self._stt_provider_display_label(
-                    self._effective_peer_stt_provider(display_settings),
-                    custom_mode=display_settings.custom_stt_mode,
-                ),
-            )
+            self._sync_stt_provider_labels(display_settings)
             self._sync_custom_stt_card(display_settings)
             self._update_api_visibility()
             _update_control_if_mounted(self._stt_text)
@@ -4408,19 +4401,16 @@ class SettingsView(ft.Column):
 
         qwen_regions: set[QwenRegion] = set()
         if (
-            stt == STTProviderName.QWEN_ASR
+            is_qwen_cloud_stt_provider(stt)
             or (not is_custom_http and llm == LLMProviderName.QWEN)
-            or peer_stt == STTProviderName.QWEN_ASR
+            or is_qwen_cloud_stt_provider(peer_stt)
         ):
             qwen_regions.add(settings.qwen_region)
 
-        qwen_stt_selected = stt == STTProviderName.QWEN_ASR or peer_stt == STTProviderName.QWEN_ASR
-        qwen_asr_model_btn = getattr(self, "_qwen_asr_model_btn", None)
+        qwen_stt_selected = is_qwen_cloud_stt_provider(stt) or is_qwen_cloud_stt_provider(peer_stt)
         self._qwen_region_btn.visible = qwen_stt_selected or (
             not is_custom_http and llm == LLMProviderName.QWEN
         )
-        if qwen_asr_model_btn is not None:
-            qwen_asr_model_btn.visible = qwen_stt_selected
         self._alibaba_key_beijing.visible = QwenRegion.BEIJING in qwen_regions
         self._alibaba_key_singapore.visible = QwenRegion.SINGAPORE in qwen_regions
         api_keys_card = getattr(self, "_api_keys_card", None)
@@ -4436,7 +4426,6 @@ class SettingsView(ft.Column):
                     self._alibaba_key_beijing,
                     self._alibaba_key_singapore,
                     self._openrouter_pkce_button_row,
-                    qwen_asr_model_btn,
                     self._qwen_region_btn,
                     getattr(self, "_http_extension_credentials", None),
                 )
@@ -4457,10 +4446,7 @@ class SettingsView(ft.Column):
         options = [self._classified_stt_option_item(provider) for provider in ordered_providers]
         display_settings = self._build_settings_with_provider_draft()
         current = (
-            display_stt_provider(
-                display_settings.stt_provider,
-                custom_mode=display_settings.custom_stt_mode,
-            ).value
+            self._display_stt_choice(display_settings).value
             if display_settings is not None
             else STTProviderName.LOCAL_CPU_AUTO.value
         )
@@ -4481,20 +4467,24 @@ class SettingsView(ft.Column):
             return
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
-        provider = STTProviderName(value)
-        if provider == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available:
+        selected = STTProviderName(value)
+        if selected == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available:
+            return
+        if self._display_stt_choice(current_settings) == selected:
             return
         old_provider = current_settings.stt_provider.value
-        if old_provider == provider.value:
-            return
         self._emit_runtime_basic(
-            f"[Settings] STT provider changed: {old_provider} -> {provider.value}"
+            f"[Settings] STT provider changed: {old_provider} -> {selected.value}"
         )
         draft = self._ensure_provider_settings_draft()
-        self._provider_draft = replace(draft, stt_provider=provider)
-        self._record_provider_edit(SelfSttProviderEdit(self._provider_draft.stt_provider))
+        self._provider_draft = replace(
+            draft,
+            stt_provider=selected,
+        )
+        if selected != current_settings.stt_provider:
+            self._record_provider_edit(SelfSttProviderEdit(selected))
         if (
-            provider == STTProviderName.LOCAL_QWEN_GPU
+            selected == STTProviderName.LOCAL_QWEN_GPU
             and self.on_gpu_discovery_requested is not None
         ):
             self.on_gpu_discovery_requested()
@@ -4502,11 +4492,10 @@ class SettingsView(ft.Column):
         self._sync_gpu_device_card()
         self.has_provider_changes = True
 
-        # Update text
-        self._set_unit_card_value_text(self._stt_text, provider_label(provider.value))
+        self._sync_stt_provider_labels(self._provider_draft)
 
         source_lang = self._current_source_language()
-        selection = resolve_local_asr_selection(provider.value, source_lang)
+        selection = resolve_local_asr_selection(selected.value, source_lang)
         if selection.fallback_applied:
             self._show_stt_selection_notice(t("local_stt.language_fallback_qwen"))
         elif not selection.supported:
@@ -4516,8 +4505,7 @@ class SettingsView(ft.Column):
             if selection.fallback_applied or not selection.supported
             else get_stt_compatibility_warning(
                 source_lang,
-                provider.value,
-                current_settings.qwen_asr_model,
+                selected.value,
             )
         )
         if warning:
@@ -4528,6 +4516,7 @@ class SettingsView(ft.Column):
             self._qwen_region_btn.update()
             self._api_keys_column.update()
             self._stt_text.update()
+            self._peer_stt_text.update()
 
     def _on_peer_stt_click(self, e) -> None:
         if not is_control_mounted(self):
@@ -4542,17 +4531,11 @@ class SettingsView(ft.Column):
             self._classified_peer_stt_option_item(provider) for provider in ordered_providers
         ]
         display_settings = self._build_settings_with_provider_draft()
-        current_provider = (
-            display_settings.peer_stt_provider
+        current = (
+            self._display_stt_choice(display_settings, peer=True).value
             if display_settings is not None
-            else STTProviderName.LOCAL_CPU_AUTO
+            else STTProviderName.LOCAL_CPU_AUTO.value
         )
-        current = display_stt_provider(
-            self._normalized_peer_stt_provider(current_provider),
-            custom_mode=(
-                display_settings.custom_stt_mode if display_settings is not None else "offline"
-            ),
-        ).value
         SettingsModal(
             self.page,
             t("settings.section.peer_stt"),
@@ -4568,21 +4551,25 @@ class SettingsView(ft.Column):
             return
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
-        provider = STTProviderName(value)
-        if provider == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available:
+        selected = STTProviderName(value)
+        if selected == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available:
             return
-        if current_settings.peer_stt_provider == provider:
+        if self._display_stt_choice(current_settings, peer=True) == selected:
             return
         draft = self._ensure_provider_settings_draft()
-        self._provider_draft = replace(draft, peer_stt_provider=provider)
-        self._record_provider_edit(PeerSttProviderEdit(self._provider_draft.peer_stt_provider))
+        self._provider_draft = replace(
+            draft,
+            peer_stt_provider=selected,
+        )
+        if selected != current_settings.peer_stt_provider:
+            self._record_provider_edit(PeerSttProviderEdit(selected))
         if (
-            provider == STTProviderName.LOCAL_QWEN_GPU
+            selected == STTProviderName.LOCAL_QWEN_GPU
             and self.on_gpu_discovery_requested is not None
         ):
             self.on_gpu_discovery_requested()
         selection = resolve_local_asr_selection(
-            provider.value,
+            selected.value,
             (
                 self._general_snapshot.effective_peer_source_language
                 if self._general_snapshot is not None
@@ -4593,14 +4580,33 @@ class SettingsView(ft.Column):
             self._show_stt_selection_notice(t("local_stt.language_fallback_qwen"))
         elif not selection.supported:
             self._show_stt_selection_notice(t("local_stt.language_unsupported"))
-        self._set_unit_card_value_text(self._peer_stt_text, provider_label(value))
+        self._sync_stt_provider_labels(self._provider_draft)
         self._update_api_visibility()
         self._sync_gpu_device_card()
         if is_control_mounted(self):
             self._peer_stt_text.update()
+            self._stt_text.update()
             self._qwen_region_btn.update()
             self._api_keys_column.update()
         self.has_provider_changes = True
+
+    def _sync_stt_provider_labels(self, settings: ProviderSettingsSnapshot) -> None:
+        self._set_unit_card_value_text(
+            self._stt_text,
+            self._stt_provider_display_label(
+                settings.stt_provider,
+                custom_mode=settings.custom_stt_mode,
+                qwen_asr_model=settings.qwen_asr_model,
+            ),
+        )
+        self._set_unit_card_value_text(
+            self._peer_stt_text,
+            self._stt_provider_display_label(
+                self._effective_peer_stt_provider(settings),
+                custom_mode=settings.custom_stt_mode,
+                qwen_asr_model=settings.qwen_asr_model,
+            ),
+        )
 
     def _show_stt_selection_notice(self, message: str) -> None:
         if self.show_snackbar:
@@ -5082,46 +5088,6 @@ class SettingsView(ft.Column):
         if is_control_mounted(self):
             self._ui_text.update()
         self._emit_settings_changed(LocaleSettingsIntent(value))
-
-    def _on_qwen_asr_model_click(self, e) -> None:
-        if not is_control_mounted(self):
-            return
-        options = [
-            OptionItem(value=model.value, label=self._qwen_model_label(model.value))
-            for model in _QWEN_ASR_MODELS
-        ]
-        settings = self._build_settings_with_provider_draft()
-        current = (
-            settings.qwen_asr_model if settings is not None else QwenASRSTTModel.REALTIME.value
-        )
-        SettingsModal(
-            self.page,
-            t("settings.qwen_asr_model"),
-            options,
-            self._on_qwen_asr_model_selected,
-            show_description=False,
-        ).open(current)
-
-    def _on_qwen_asr_model_selected(self, value: str) -> None:
-        if self._provider_snapshot is None or value not in {
-            model.value for model in _QWEN_ASR_MODELS
-        }:
-            return
-        settings = self._build_settings_with_provider_draft()
-        assert settings is not None
-        if settings.qwen_asr_model == value:
-            return
-        draft = self._ensure_provider_settings_draft()
-        self._provider_draft = replace(draft, qwen_asr_model=value)
-        self._record_provider_edit(QwenAsrModelEdit(value))
-        self.has_provider_changes = True
-        _set_text_button_label(
-            self._qwen_asr_model_btn,
-            f"{t('settings.qwen_asr_model')} {self._qwen_model_label(value)}",
-        )
-        if is_control_mounted(self):
-            self._qwen_asr_model_btn.update()
-        self._update_api_visibility()
 
     def _on_qwen_region_click(self, e) -> None:
         """Open Qwen region selection modal."""
@@ -6798,8 +6764,6 @@ class SettingsView(ft.Column):
 
         if self._qwen_region_btn:
             self._qwen_region_btn.style = self._get_button_style(ui_font)
-        if self._qwen_asr_model_btn:
-            self._qwen_asr_model_btn.style = self._get_button_style(ui_font)
         if self._openrouter_pkce_button:
             self._sync_openrouter_pkce_button_state(display_settings)
         self._sync_clickable_text_control_fonts(ui_font)
@@ -6818,20 +6782,7 @@ class SettingsView(ft.Column):
                 glyph_text.size = 22
         # Update text controls with current selection labels
         if display_settings:
-            self._set_unit_card_value_text(
-                self._stt_text,
-                self._stt_provider_display_label(
-                    display_settings.stt_provider,
-                    custom_mode=display_settings.custom_stt_mode,
-                ),
-            )
-            self._set_unit_card_value_text(
-                self._peer_stt_text,
-                self._stt_provider_display_label(
-                    self._effective_peer_stt_provider(display_settings),
-                    custom_mode=display_settings.custom_stt_mode,
-                ),
-            )
+            self._sync_stt_provider_labels(display_settings)
             self._set_unit_card_value_text(
                 self._llm_text,
                 self._get_llm_display_label(display_settings),
@@ -6840,10 +6791,6 @@ class SettingsView(ft.Column):
                 self._get_translation_connection_display_label(display_settings),
             )
             self._sync_translation_connection_title(display_settings)
-            _set_text_button_label(
-                self._qwen_asr_model_btn,
-                f"{t('settings.qwen_asr_model')} {self._qwen_model_label(display_settings.qwen_asr_model)}",
-            )
             self._sync_openrouter_fallback_card(display_settings)
             self._sync_http_extension_card(display_settings, force_credentials=True)
             self._sync_managed_key_card(display_settings)

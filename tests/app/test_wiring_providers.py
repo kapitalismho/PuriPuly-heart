@@ -36,6 +36,7 @@ from puripuly_heart.app.wiring.wiring_llm_factory import (
 from puripuly_heart.app.wiring.wiring_stt_factory import (
     create_peer_stt_backend_from_resolved_config,
     create_stt_backend_from_resolved_config,
+    peer_stt_runtime_intent_from_vnext,
     resolve_peer_stt_runtime_config,
     resolve_self_stt_runtime_config_from_vnext,
     self_stt_runtime_intent_from_vnext,
@@ -2409,12 +2410,28 @@ def test_build_peer_stt_provider_signature_uses_fixed_16khz_runtime_contract() -
     assert signature[2] == 16000
 
 
-def test_resolve_peer_stt_config_uses_shared_qwen_model_only() -> None:
+def test_resolve_peer_stt_config_uses_provider_owned_qwen_model() -> None:
     settings = _vnext(peer_stt_provider="qwen_asr", qwen_asr_model="self-qwen-asr")
 
     resolved = resolve_peer_stt_config(settings)
 
-    assert resolved.model == "self-qwen-asr"
+    assert resolved.model == "qwen3-asr-flash-realtime"
+
+
+def test_mixed_qwen_cloud_providers_resolve_independent_models() -> None:
+    settings = _vnext(
+        stt_provider="qwen_asr",
+        peer_stt_provider="qwen_audio",
+        qwen_asr_model="self-qwen-asr",
+    )
+
+    self_intent = self_stt_runtime_intent_from_vnext(settings)
+    peer_intent = peer_stt_runtime_intent_from_vnext(settings)
+
+    assert self_intent.provider == "qwen_asr"
+    assert self_intent.qwen_asr_model == "qwen3-asr-flash-realtime"
+    assert peer_intent.provider == "qwen_asr"
+    assert peer_intent.qwen_asr_model == "qwen-audio-3.0-asr-flash-streaming"
 
 
 def test_create_peer_stt_backend_uses_peer_local_qwen_provider_and_fixed_sample_rate() -> None:

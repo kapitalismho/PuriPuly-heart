@@ -55,6 +55,7 @@ class STTProviderName(str, Enum):
     LOCAL_QWEN_GPU = "local_qwen_gpu"
     DEEPGRAM = "deepgram"
     QWEN_ASR = "qwen_asr"
+    QWEN_AUDIO = "qwen_audio"
     SONIOX = "soniox"
     CUSTOM = "custom"
     CUSTOM_OFFLINE = "custom_offline"
@@ -81,12 +82,29 @@ def display_stt_provider(
     provider: STTProviderName,
     *,
     custom_mode: str = "offline",
+    qwen_asr_model: str | None = None,
 ) -> STTProviderName:
-    if provider is not STTProviderName.CUSTOM:
-        return provider
-    if custom_mode == "realtime":
-        return STTProviderName.CUSTOM_REALTIME
-    return STTProviderName.CUSTOM_OFFLINE
+    if provider is STTProviderName.CUSTOM:
+        if custom_mode == "realtime":
+            return STTProviderName.CUSTOM_REALTIME
+        return STTProviderName.CUSTOM_OFFLINE
+    return provider
+
+
+def is_qwen_cloud_stt_provider(provider: STTProviderName | str | None) -> bool:
+    if provider is None:
+        return False
+    value = provider.value if isinstance(provider, STTProviderName) else str(provider)
+    return value in {STTProviderName.QWEN_ASR.value, STTProviderName.QWEN_AUDIO.value}
+
+
+def qwen_cloud_stt_model_for_provider(provider: STTProviderName | str) -> str | None:
+    value = provider.value if isinstance(provider, STTProviderName) else str(provider)
+    if value == STTProviderName.QWEN_AUDIO.value:
+        return QwenASRSTTModel.AUDIO_STREAMING.value
+    if value == STTProviderName.QWEN_ASR.value:
+        return QwenASRSTTModel.REALTIME.value
+    return None
 
 
 def custom_stt_selection_for_provider(
@@ -242,6 +260,8 @@ __all__ = [
     "custom_stt_selection_for_provider",
     "display_stt_provider",
     "is_custom_stt_provider",
+    "is_qwen_cloud_stt_provider",
     "normalize_owned_referral_id",
+    "qwen_cloud_stt_model_for_provider",
     "normalize_local_llm_base_url",
 ]

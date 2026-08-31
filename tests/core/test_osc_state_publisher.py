@@ -155,6 +155,7 @@ def test_state_from_settings_publishes_each_fallback_alias(
         (STTProviderName.CUSTOM_OFFLINE, 8),
         (STTProviderName.CUSTOM_REALTIME, 9),
         (STTProviderName.CUSTOM, 8),
+        (STTProviderName.QWEN_AUDIO, 6),
     ],
 )
 def test_state_publisher_publishes_custom_asr_ids(
