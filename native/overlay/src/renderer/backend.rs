@@ -173,6 +173,7 @@ pub struct CaptionRenderer {
     backend: RefCell<RenderBackend>,
     openvr_adapter_identity: AdapterIdentity,
     test_readiness_pending_yields: Cell<usize>,
+    test_readiness_pending_persists_across_cancellation: Cell<bool>,
     test_readiness_terminal_outcome: Cell<Option<ReadinessOutcome>>,
     test_readiness_call_count: Cell<usize>,
     test_readiness_pending_on_call: Cell<Option<(usize, usize)>>,
@@ -268,6 +269,7 @@ impl CaptionRenderer {
                 BackendMode::Test => RenderBackend::new_test()?,
             }),
             test_readiness_pending_yields: Cell::new(0),
+            test_readiness_pending_persists_across_cancellation: Cell::new(false),
             test_readiness_terminal_outcome: Cell::new(None),
             test_readiness_call_count: Cell::new(0),
             test_readiness_pending_on_call: Cell::new(None),
@@ -345,7 +347,12 @@ impl CaptionRenderer {
         }
         while self.test_readiness_pending_yields.get() > 0 {
             if cancellation.is_cancelled() {
-                self.test_readiness_pending_yields.set(0);
+                if !self
+                    .test_readiness_pending_persists_across_cancellation
+                    .get()
+                {
+                    self.test_readiness_pending_yields.set(0);
+                }
                 return ReadinessOutcome::Cancelled;
             }
             self.test_readiness_pending_yields
@@ -363,6 +370,12 @@ impl CaptionRenderer {
 
     pub fn set_test_readiness_pending_yields(&self, yields: usize) {
         self.test_readiness_pending_yields.set(yields);
+    }
+
+    #[doc(hidden)]
+    pub fn set_test_readiness_pending_persists_across_cancellation(&self, persists: bool) {
+        self.test_readiness_pending_persists_across_cancellation
+            .set(persists);
     }
 
     #[doc(hidden)]

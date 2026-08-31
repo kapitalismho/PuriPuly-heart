@@ -64,6 +64,12 @@ pub enum StartupError {
     OpenVrInit(String),
     #[error("renderer init failed: {0}")]
     RendererInit(String),
+    #[error("GPU readiness was cancelled")]
+    ReadinessCancelled,
+    #[error("GPU readiness query failed")]
+    ReadinessFailed,
+    #[error("GPU readiness made no progress")]
+    ReadinessStalled,
     #[error("startup failed: {0}")]
     Other(String),
 }
@@ -75,7 +81,10 @@ impl StartupError {
             Self::BridgeAuth(_) => 12,
             Self::SteamVrNotInstalled | Self::SteamVrNotRunning | Self::HmdNotFound => 20,
             Self::OpenVrInit(_) => 20,
-            Self::RendererInit(_) => 21,
+            Self::RendererInit(_)
+            | Self::ReadinessCancelled
+            | Self::ReadinessFailed
+            | Self::ReadinessStalled => 21,
             Self::Manifest(_) | Self::Other(_) => 1,
         }
     }
@@ -90,6 +99,9 @@ impl StartupError {
             Self::HmdNotFound => "hmd_not_found",
             Self::OpenVrInit(_) => "openvr_init_failed",
             Self::RendererInit(_) => "renderer_init_failed",
+            Self::ReadinessCancelled => "gpu_readiness_cancelled",
+            Self::ReadinessFailed => "gpu_query_failed",
+            Self::ReadinessStalled => "gpu_stalled",
             Self::Other(_) => "unknown",
         }
     }
@@ -113,6 +125,8 @@ pub enum RuntimeFailure {
     ReadinessCancelled,
     #[error("GPU readiness failed")]
     ReadinessFailed,
+    #[error("GPU readiness made no progress")]
+    ReadinessStalled,
 }
 
 impl RuntimeFailure {
@@ -120,9 +134,10 @@ impl RuntimeFailure {
         match self {
             Self::RuntimeDisconnected => "runtime_disconnected",
             Self::Stopped => "stopped",
-            Self::ReadinessTimedOut | Self::ReadinessCancelled | Self::ReadinessFailed => {
-                "renderer_init_failed"
-            }
+            Self::ReadinessTimedOut => "gpu_readiness_late",
+            Self::ReadinessCancelled => "gpu_readiness_cancelled",
+            Self::ReadinessFailed => "gpu_query_failed",
+            Self::ReadinessStalled => "gpu_stalled",
             Self::Bridge(_) | Self::Render(_) | Self::OpenVr(_) => "unknown",
         }
     }
@@ -1527,7 +1542,7 @@ pub const NATIVE_FRESH_RETRY_CADENCE: Duration = Duration::from_millis(100);
 pub const NATIVE_FRESH_RETRY_DEADLINE: Duration = Duration::from_millis(500);
 pub const NATIVE_FRESH_RETRY_MAX_COMPLETED: u32 = 5;
 pub const NATIVE_STREAM_RETRY_MAX_COMPLETED: u32 = 4;
-pub const NATIVE_READINESS_TIMEOUT_RETRY_MAX: u32 = NATIVE_FRESH_RETRY_MAX_COMPLETED;
+pub const NATIVE_READINESS_NO_PROGRESS_TIMEOUT: Duration = Duration::from_secs(2);
 const NATIVE_FRESH_AUDIT_CAPACITY: usize = 128;
 
 #[derive(Debug, Clone, Copy)]
@@ -1652,8 +1667,9 @@ pub struct NativePresentationOwner<S: OverlayFrameSubmitter> {
     fresh_retry_audit: VecDeque<NativeFreshAuditFact>,
     fresh_retry_audit_dropped: u64,
     successful_attempt_audit: VecDeque<PresentationCorrelation>,
-    consecutive_readiness_timeouts: u32,
-    max_consecutive_readiness_timeouts: u32,
+    readiness_timeouts_since_success: u32,
+    readiness_no_progress_timeout: Duration,
+    readiness_no_progress_deadline: Option<Instant>,
     readiness_retry_due: Option<Instant>,
 }
 
@@ -1684,8 +1700,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             fresh_retry_audit: VecDeque::with_capacity(NATIVE_FRESH_AUDIT_CAPACITY),
             fresh_retry_audit_dropped: 0,
             successful_attempt_audit: VecDeque::with_capacity(NATIVE_FRESH_AUDIT_CAPACITY),
-            consecutive_readiness_timeouts: 0,
-            max_consecutive_readiness_timeouts: NATIVE_READINESS_TIMEOUT_RETRY_MAX,
+            readiness_timeouts_since_success: 0,
+            readiness_no_progress_timeout: NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
+            readiness_no_progress_deadline: None,
             readiness_retry_due: None,
         }
     }
@@ -1723,8 +1740,14 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     }
 
     #[doc(hidden)]
-    pub fn set_max_consecutive_readiness_timeouts_for_test(&mut self, max_timeouts: u32) {
-        self.max_consecutive_readiness_timeouts = max_timeouts;
+    pub fn set_readiness_no_progress_timeout_for_test(&mut self, timeout: Duration) {
+        self.readiness_no_progress_timeout = timeout;
+        self.readiness_no_progress_deadline = None;
+    }
+
+    #[doc(hidden)]
+    pub fn readiness_timeout_count_for_test(&self) -> u32 {
+        self.readiness_timeouts_since_success
     }
 
     pub fn runtime(&self) -> &PresentationRuntime {
@@ -1774,7 +1797,8 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     }
 
     fn capture_successful_attempt(&mut self) {
-        self.consecutive_readiness_timeouts = 0;
+        self.readiness_timeouts_since_success = 0;
+        self.readiness_no_progress_deadline = None;
         self.readiness_retry_due = None;
         let Some(correlation) = self.runtime.last_presentation_correlation else {
             return;
@@ -2077,42 +2101,47 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     }
 
     fn next_retry_wake(&self) -> Option<Instant> {
-        [self.next_fresh_due(), self.readiness_retry_due]
-            .into_iter()
-            .flatten()
-            .min()
+        [
+            self.next_fresh_due(),
+            self.readiness_retry_due,
+            self.readiness_no_progress_deadline,
+        ]
+        .into_iter()
+        .flatten()
+        .min()
     }
 
     async fn note_readiness_timeout(
         &mut self,
         logger: &OverlayLogger,
     ) -> Result<(), RuntimeFailure> {
-        self.consecutive_readiness_timeouts = self.consecutive_readiness_timeouts.saturating_add(1);
+        let now = Instant::now();
+        self.readiness_timeouts_since_success =
+            self.readiness_timeouts_since_success.saturating_add(1);
+        let deadline = *self
+            .readiness_no_progress_deadline
+            .get_or_insert(now + self.readiness_no_progress_timeout);
+        if now >= deadline {
+            return Err(RuntimeFailure::ReadinessStalled);
+        }
         self.runtime.request_native_presentation_retry();
-        let due = Instant::now() + self.retry_policy.cadence;
-        let mut deferred_schedule = false;
+        let due = now + self.retry_policy.cadence;
+        self.readiness_retry_due = Some(due);
         if let Some(schedule) = self.self_schedule.as_mut() {
             schedule.next_due = due;
-            deferred_schedule = true;
         }
         if let Some(schedule) = self.peer_schedule.as_mut() {
             schedule.next_due = due;
-            deferred_schedule = true;
-        }
-        if !deferred_schedule {
-            self.readiness_retry_due = Some(due);
         }
         log_runtime_info(
             logger,
             format!(
-                "readiness_timeout_retry consecutive={} max={} physical_hmd_visibility=not_observable",
-                self.consecutive_readiness_timeouts, self.max_consecutive_readiness_timeouts,
+                "readiness_timeout_retry since_success={} remaining_ms={} physical_hmd_visibility=not_observable",
+                self.readiness_timeouts_since_success,
+                deadline.saturating_duration_since(now).as_millis(),
             ),
         )
         .await?;
-        if self.consecutive_readiness_timeouts >= self.max_consecutive_readiness_timeouts {
-            return Err(RuntimeFailure::ReadinessTimedOut);
-        }
         Ok(())
     }
 
@@ -2456,6 +2485,12 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         let mut pending_message = None;
         loop {
             self.pump_openvr_events(logger).await?;
+            if self
+                .readiness_no_progress_deadline
+                .is_some_and(|deadline| deadline <= Instant::now())
+            {
+                return Err(RuntimeFailure::ReadinessStalled);
+            }
             let hide_deadline = self.runtime.hide_deadline;
             let message = if let Some(message) = pending_message.take() {
                 Some(message)
@@ -2464,6 +2499,12 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     biased;
                     _ = sleep_until(self.next_retry_wake().unwrap_or_else(Instant::now)), if self.next_retry_wake().is_some() => {
                         let now = Instant::now();
+                        if self
+                            .readiness_no_progress_deadline
+                            .is_some_and(|deadline| deadline <= now)
+                        {
+                            return Err(RuntimeFailure::ReadinessStalled);
+                        }
                         let channels = self.due_fresh_channels(now);
                         if !channels.is_empty() {
                             let outcome = self.run_due_fresh_attempt(channels, bridge, logger).await?;
@@ -3412,9 +3453,10 @@ fn startup_error_from_runtime_failure(error: RuntimeFailure) -> StartupError {
     match error {
         RuntimeFailure::Render(message) => StartupError::RendererInit(message),
         RuntimeFailure::OpenVr(message) => StartupError::OpenVrInit(message),
-        RuntimeFailure::ReadinessTimedOut
-        | RuntimeFailure::ReadinessCancelled
-        | RuntimeFailure::ReadinessFailed => StartupError::RendererInit(error.to_string()),
+        RuntimeFailure::ReadinessTimedOut => StartupError::RendererInit(error.to_string()),
+        RuntimeFailure::ReadinessCancelled => StartupError::ReadinessCancelled,
+        RuntimeFailure::ReadinessFailed => StartupError::ReadinessFailed,
+        RuntimeFailure::ReadinessStalled => StartupError::ReadinessStalled,
         RuntimeFailure::Bridge(message) => StartupError::Other(message),
         RuntimeFailure::RuntimeDisconnected => {
             StartupError::Other("runtime disconnected before ready".into())
