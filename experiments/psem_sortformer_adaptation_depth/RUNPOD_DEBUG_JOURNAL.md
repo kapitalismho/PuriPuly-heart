@@ -413,3 +413,77 @@ These identities supersede the original `8165ed58` candidate binding for the liv
   - Resume worker PID `33552`, attempt `61e5faf81605493ea5b5668799988d23`, `worker_started_at=2026-08-31T17:40:18.1016756+00:00`, `worker_expires_at=2026-08-31T23:40:18.1016756+00:00`, `state=waiting_for_running_pod`.
 - Observed at `17:40:37Z`: pod-start `state=retrying`, attempt `2/120`, `start_exit_code=1`, `desiredStatus=EXITED`, `runtimeStatus=stopped`, `runtimeStatusReason=stopped_by_user`, next delay 30s. Same capacity/start-reject pattern as the earlier 96-attempt wait. GPU billing has not restarted.
 - Image, 40GB container disk, and 30GB `/workspace` (including the already transferred `a085748b` bundle) remain. No live handoff. Training has not started.
+
+## 2026-08-31 UTC — CUDA canary failed on an idealized streaming schedule, not prefix leakage
+
+- Resource: Pod `v6l27rdzg5s591`, Windows attempt `61e5faf81605493ea5b5668799988d23`.
+- After capacity returned, SSH and exact transfer completed. Remote resume reached `running_cuda_canary`. Repo HEAD on the volume was already `a085748b5aa59f69f918f62661ef3c4c6723cbd0`. Sortformer restore from the pinned `.nemo` succeeded.
+- Remote status (later quarantined as `.stale.0482433f…`): `state=failed`, `stage=running_cuda_canary`, `detail=stage=running_cuda_canary exit_code=1`, `updated_at=2026-08-31T18:18:07.001553+00:00`.
+- Direct log evidence: `RuntimeAuditError: streaming cache or prefix-causality evidence is invalid` from `build_timing_receipt` in `runtime_audit.py`. The dedicated prefix-causality failure string (`runtime evidence violates charged prefix causality…`) and the native-frame-contract string did **not** appear, so future-leakage and 80 ms / 1040 ms geometry had already passed.
+- Confirmed limitation: `_trace_matches_low_latency` required NeMo’s live `streaming_feat_loader` / `pre_encode` / `streaming_update` trace to match a CPU-fake chunk machine used only by unit tests. Contract requires prefix causality to run, native frame/delay, the #99 low-latency **module** preset, and a content-bound trace hash — not bit-identity with the fake schedule.
+- Windows worker then recorded `failed` and, under the old policy, `Stop-PodConfirmed` overwrote the error field with `stop_confirmed` / `resume_worker_failure`. GPU returned to `EXITED`. Subsequent user policy: worker failure must not stop the GPU; only the startup cost guard may stop it.
+- User characterized the remaining gate as research-grade strictness inappropriate for this engineering probe and asked to loosen matching gates before the next worker send.
+
+## 2026-08-31 UTC — canary schedule gate relaxed (candidate `323b1909`)
+
+- Action: keep prefix-causality execution, 1280-sample frames, 16640-sample delay, configured cache/FIFO caps, and trace hashing as hard checks. Stop using `_trace_matches_low_latency` as a blocking predicate. Record it on the timing receipt as `low_latency_schedule_matched`. Accept integer-like numeric types instead of `type(x) is int`. Require only the expected trace keys as a subset. Split the previous combined error into `streaming cache trace is empty, incomplete, or exceeds configured cache bounds` vs `prefix-causality evidence is invalid`.
+- Tests: `test_timing_receipt_records_schedule_mismatch_without_blocking` (forged middle-chunk `left_offset=0` now passes with `low_latency_schedule_matched=false`); `test_timing_receipt_rejects_empty_or_overfull_cache_trace` still fails closed. `test_runtime_audit.py` 11 passed.
+- Git: local commit `323b1909b36b4b8e3786c0f65ecc1fad07230437` (`fix: relax Issue 107 streaming-schedule canary gate`). Not pushed. Image digest unchanged.
+- Bundle rebound for the live worker: `puripuly-heart-323b1909b36b4b8e3786c0f65ecc1fad07230437.bundle`, `311921875` bytes, SHA-256 `78420843d020227dbcb31521890669890b46358e8614dda83e7436ef0ff484ba`. Manifest, static preflight, canary script, and remote-resume script HEAD/hash values rebound to this commit before the next send.
+
+## 2026-08-31 UTC — transferring simplified: skip-if-identical then in-Pod S3, else SCP
+
+- Failure mode: each resume re-SCP’d the full candidate bundle (~298 MB) over the Windows uplink even when `/workspace` already held the exact file, so `transferring` looked like training and wasted GPU-on time.
+- New `Transfer-File` order in `.cache/issue-107-resume-worker.ps1`:
+  1. If the remote path already has the expected byte length and SHA-256, skip (`transfer=skipped_identical`). No SCP.
+  2. Else if the entry has an EU-RO object key (checkpoint, diar package, NeMo source archive, corpus `psem-strategy-data-v2.tar.gz`), download inside the Pod with authenticated Boto3 against `s3api-eu-ro-1.runpod.io` / bucket `tifw77udi2`. Volume S3 access/secret values travel only through encrypted SSH stdin into `/tmp/issue-107-pod-s3-get.py` under isolated `/tmp/issue107-s3-venv` (`boto3==1.35.99`). Not placed in Pod configuration, argv, Git, journal, or the scientific environment. `RUNPOD_API_KEY` stays local.
+  3. Else SCP the local artifact (new git bundle, refreshed receipts, canary/resume scripts).
+- Helper identity: `.cache/issue-107-pod-s3-get.py`, copied to `/tmp/issue-107-pod-s3-get.py` only when remote size/SHA differ.
+- Live rebound worker at `18:45:34Z`: attempt `b801a952cd2942f382000ac52077c342`, candidate `323b1909…`, SSH `194.68.245.51:22095`, `state=transferring` after TOFU. GPU remains running. Guard `first_running_at=2026-08-31T18:24:19Z`, unhanded cap 5400 s. Worker failure still must not stop the Pod. No live handoff. Training has not started.
+
+## 2026-08-31 UTC — 323b1909 Windows worker lost the prepare race; leftover a085748b canary then failed again
+
+- User watch at `18:47:51Z` showing `state=failed` / empty SSH is the real `.cache/issue-107-resume-worker-status.json`. `updated_at` displays as local DateTime because the watch uses `ConvertFrom-Json`; the file stores `2026-08-31T18:46:21.0131996+00:00`. Catch-path status rewrite omits `ssh_host`/`ssh_port`, so those fields go blank on failure. PID receipt is stale (`33552` from 17:40, process dead). No `issue-107-resume-worker.ps1` process remains.
+- Windows attempt `b801a952cd2942f382000ac52077c342` reached TOFU/`transferring` then threw `failed to prepare remote transfer directories or another resume worker is active`. Prepare is `mkdir -p … && pgrep -f '[r]emote-resume-a085748b.sh' && mv stale status`. `mkdir` works; `/workspace` is mounted. The throw is the `pgrep` exclusivity gate (`exit 41`).
+- Occupant was leftover remote attempt `828b7ba9d0114c5d93bd255e2d2a1116` (Windows worker from the 18:24 restart, still on candidate `a085748b`, not `323b1909`). It launched remote-resume around 18:32, fetched the old bundle, and was still in CUDA canary when `b801a952` connected at 18:45:34. That canary finished `failed` at `18:47:23Z`: `stage=running_cuda_canary exit_code=1`, scratch `preconfig-canary-a085748b.PtIz1B`, same old `RuntimeAuditError: streaming cache or prefix-causality evidence is invalid`. Repo HEAD on the volume is still `a085748b`. `low_latency_schedule_matched` is absent. The `323b1909` bundle was never copied (`packages/` has `a085748b` + `8165ed58` only).
+- After that canary exited, `pgrep` for remote-resume is empty. GPU policy held: worker catch wrote `gpu_stop_on_worker_failure=false` and did not stop the Pod. Pod `v6l27rdzg5s591` still `RUNNING` / `runtimeStatus=running`, SSH `194.68.245.51:22095`, uptime ~1543 s at inspect, cost `$0.44/h` + storage. Guard PID `37840` `guarding_start`, `first_running_at=2026-08-31T18:24:19Z`, unhanded ~1475/5400 s (~19:54:19Z force-stop if still unhanded). No live handoff. Training has not started.
+- Next bounded action, not yet taken: send one Windows worker on `323b1909` now that the leftover remote-resume is gone, so skip/S3/SCP can land the new bundle and the relaxed canary can run. Do not stop the GPU to do that.
+
+## 2026-08-31 UTC — worker still failed; leftover canary gone; cost guard died
+
+- Re-inspect at `18:54:20Z`. Windows attempt `b801a952…` status unchanged: `state=failed`, `updated_at=18:46:21Z`, `error=failed to prepare remote transfer directories or another resume worker is active`. No `issue-107-resume-worker.ps1` process. PID receipt still names `33552` (dead). Scheduled task `issue-107-resume-worker-once` last ran `18:45:45Z` with result `1` and has no next run.
+- Remote leftover occupant is gone: `pgrep -f '[r]emote-resume-a085748b.sh'` exit 1. `nvidia-smi` A40 `0 %`, `0 MiB` / `46068 MiB`. Remote status still the failed `828b7ba9` canary at `18:47:23Z`. Repo HEAD still `a085748b`. `packages/` still has no `323b1909` bundle.
+- Pod `v6l27rdzg5s591` remains `RUNNING` / `runtimeStatus=running`, SSH `194.68.245.51:22095`, uptime `1813` s, `$0.44/h` + storage. No live handoff. Training has not started.
+- Cost guard PID `37840` is dead. Guard status last write `18:48:55Z` (`unhanded_running_seconds=1475`, `first_running_at=18:24:19Z`). Stdout/stderr logs empty and not updated by this guard instance. The in-memory 5400 s unhanded stop near `19:54:19Z` will not fire unless a new guard is started. Restarting the guard would reset that window; that is a new cost-window decision, not yet taken.
+
+## 2026-08-31 UTC — cost guard relaunched; 323b1909 worker sent after empty prepare race
+
+- User approved a fresh 5400 s unhanded window and a new `323b1909` worker. Preflight: remote `pgrep -f '[r]emote-resume-a085748b.sh'` exit 1, A40 `0 %` / `0 MiB`, local bundle/canary/resume-script hashes match the worker file table. Guard `$head` rebound from `a085748b` to `323b1909` so a later live handoff can bind. Launch via one-shot scheduled `cmd start /min` so neither process is in the agent job object; launcher tasks unregistered after spawn.
+- Cost guard PID `17604` (cmd parent `21816`), `guard_started_at=2026-08-31T18:58:47Z`, `first_running_at=2026-08-31T18:58:49Z`, cap 5400 s (~`20:28:49Z` force-stop if still unhanded). Script SHA-256 `0c70c48c1275392695ab5aad9a5509e9fce44b5e7f9c6fb99e2d9b0d5cf3166a`.
+- Windows worker PID `21828` (cmd parent `31112`), attempt `6d6f6e102b4243c6aa3ffc73bde69679`, `worker_started_at=2026-08-31T18:58:50Z`, candidate `323b1909…`, SSH `194.68.245.51:22095`. Prepare passed. At `18:59:51Z`: `state=transferring`, `transfer=skipped_identical` for `/workspace/issue-107/packages/nemo-1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6.tar.gz`. Worker failure still must not stop the Pod.
+- Pod `v6l27rdzg5s591` remains `RUNNING` / `$0.44/h` + storage. No live handoff. Training has not started.
+
+## 2026-08-31 UTC — 323b1909 CUDA canary: schedule gate passed; raw-waveform autograd check failed
+
+- Windows attempt `6d6f6e102b4243c6aa3ffc73bde69679` `state=failed` at `19:11:54Z`, `error=remote resume worker failed: stage=running_cuda_canary exit_code=1`. `gpu_stop_on_worker_failure=false`. Worker PID `21828` exited. Guard PID `17604` still `guarding_start`, unhanded ~801/5400 s (`first_running_at=18:58:49Z`, force-stop ~`20:28:49Z` if still unhanded). A40 idle. No live handoff. Training has not started.
+- Confirmed the relaxed candidate actually ran: remote HEAD `323b1909b36b4b8e3786c0f65ecc1fad07230437`, bundle present (`311921875` bytes at `19:05Z`), `runtime_audit.py` has the split errors and `low_latency_schedule_matched`. The old combined string is absent. Remote status `attempt_id` matches. Scratch `preconfig-canary-a085748b.xARyQb`.
+- Timing / prefix-causality passed. Failure is the next gate, H-HEAD gradient canary: `RuntimeAuditError: canary loss is not differentiably dependent on raw waveform` at `runtime_audit.py:1078` after `loss.backward()`. Earlier in the same function: finite scalar loss, authorized-module reach, exact tap geometry, and `_waveform_dependence` (numeric change of `psem_head` when the waveform is perturbed) had already passed. The throw is `canary_waveform.grad` is None, non-finite, or all-zero. Parameter-grad and one-step-update checks never ran.
+- This is not a leftover `a085748b` schedule replica. It is a research-grade autograd-to-16 kHz-samples check. H-HEAD only trains `psem_head`; NeMo `process_signal` / streaming cache can keep value dependence while severing input autograd (`oom_safe_feature_extraction` explicitly `detach()`s; eval streaming also `del audio_signal` + `empty_cache()`). Next bounded action, not yet taken: record waveform-grad as a receipt flag like the schedule matcher, and keep blocking on finite loss, module reach, trainable `psem_head` grads, frozen encoder unchanged, and one-step update.
+
+## 2026-08-31 UTC — canary/audit gates inventoried; engineering-probe minimum only
+
+- Authority: issue-107 hobby-engineering probe (`runtime_contract.json` `cost_bounded_hobby_engineering_probe`, README claim boundary). Not the superseded research body. CUDA canary is a GPU-waste gate before 32-step smoke / 256-step train, not a paper.
+- Blocking checks **kept** (would waste the A40 or train the wrong object):
+  - right checkpoint/graph: Sortformer wrapper, 18 layers, 4 slots, hidden 192, #99 low-latency module preset, GRU-64 PSEM head, Identity evidence taps
+  - exact parameter policy and optimizer groups; trainable arm has parameters
+  - 30 s finite PCM; native 80 ms / 1.04 s / 4-slot timing; prefix causality (future leak); streaming trace non-empty and cache/FIFO within preset caps
+  - finite scalar loss; authorized modules actually ran; trainable params get finite nonzero grads; frozen params get no nonzero grad; finite clip; one-step update matches the whitelist
+- Blocking checks **removed** (research-grade, already passed or not needed to start H-HEAD):
+  - `canary loss is not differentiably dependent on raw waveform` (the 19:11 fail)
+  - `_waveform_dependence` extra forwards / all-modules numeric perturbation
+  - `exact fixed runtime canary path` (`FIXED_RUNTIME_CANARY_METHODS` object identity)
+  - exact 375/192/4 tap geometry as a raise (`tap_geometry_matched` is now a receipt flag)
+  - CPU-fake streaming schedule (already a flag in `323b1909`)
+- Receipt validators no longer require `raw_waveform_gradient_nonzero is True` or all-True `raw_waveform_dependence`. Those fields remain on the receipt. Tests: `test_runtime_audit.py` + `test_receipts.py` passed; full `experiments/psem_sortformer_adaptation_depth/tests` passed.
+- Not in this cut: EVAL freeze, USD-30, V2 data identity, TRAIN-only, staged H-before-T2. Those are operator/protocol, not the CUDA canary.
+- Code is local uncommitted relative to `323b1909`. GPU `v6l27rdzg5s591` still running under the 18:58Z guard. No new worker sent. No live handoff. Training has not started.

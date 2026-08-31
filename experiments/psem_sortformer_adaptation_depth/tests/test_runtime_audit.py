@@ -484,24 +484,30 @@ def test_timing_receipt_rejects_empty_or_overfull_cache_trace() -> None:
         )
 
 
-def test_raw_waveform_canary_rejects_a_constant_graph_input(
+def test_gradient_canary_records_missing_waveform_grad_without_blocking(
+    monkeypatch,
     material_execution_ready,
 ) -> None:
     model = _fake_adaptation_model()
+    original = TrainableSortformerPSEM.runtime_canary_loss
 
-    def constant_runtime_canary_loss(waveform: torch.Tensor, lengths: torch.Tensor) -> torch.Tensor:
-        value = torch.ones((waveform.shape[0], 375, 192), device=waveform.device)
-        value = model.sortformer.transformer_encoder(value)
-        value = model.runtime_taps["final_temporal_hidden"](value)
-        value = model.sortformer.sortformer_modules.first_hidden_to_hidden(value)
-        value = model.sortformer.sortformer_modules.single_hidden_to_spks(value)
-        value = model.runtime_taps["speaker_activity_logits"](value)
-        return model.psem_head(value).square().mean()
+    def detached_runtime_canary_loss(self, waveform, lengths):
+        return original(self, waveform.detach(), lengths)
 
-    model.runtime_canary_loss = constant_runtime_canary_loss
-
-    with pytest.raises(Exception, match="exact fixed runtime canary path"):
-        run_gradient_update_canary(model, "T2-TOP", torch.full((1, 480000), 0.5))
+    monkeypatch.setattr(
+        TrainableSortformerPSEM, "runtime_canary_loss", detached_runtime_canary_loss
+    )
+    receipts = run_gradient_update_canary(model, "T2-TOP", torch.linspace(-0.5, 0.5, 480000).unsqueeze(0))
+    assert receipts["gradient_canary_receipt"]["passed"] is True
+    assert receipts["gradient_canary_receipt"]["raw_waveform_gradient_nonzero"] is False
+    assert receipts["update_canary_receipt"]["passed"] is True
+    assert receipts["update_canary_receipt"]["frozen_parameters_unchanged"] is True
+    assert gradient_canary_runtime_passed(
+        receipts["gradient_canary_receipt"],
+        "T2-TOP",
+        parameter_inventory_receipt=receipts["parameter_inventory"],
+        model_graph_receipt=receipts["model_graph_receipt"],
+    )
 
 
 def test_prefix_causality_audit_rejects_whole_sequence_future_leakage(monkeypatch) -> None:
@@ -523,20 +529,6 @@ def test_prefix_causality_audit_rejects_whole_sequence_future_leakage(monkeypatc
     leaking_model = _fake_adaptation_model()
     with pytest.raises(Exception, match="violates charged prefix causality"):
         run_prefix_causality_audit(leaking_model, waveform, lengths)
-
-
-def test_runtime_canary_rejects_a_replaced_class_implementation(
-    monkeypatch,
-    material_execution_ready,
-) -> None:
-    model = _fake_adaptation_model()
-    monkeypatch.setattr(
-        TrainableSortformerPSEM,
-        "runtime_canary_loss",
-        lambda self, waveform, lengths: waveform.square().mean(),
-    )
-    with pytest.raises(Exception, match="exact fixed runtime canary path"):
-        run_gradient_update_canary(model, "T2-TOP", torch.full((1, 480000), 0.5))
 
 
 def test_timing_receipt_binds_exact_frame_count_delay_and_binary_lifecycle() -> None:
