@@ -80,11 +80,11 @@ def test_dependency_lock_requires_exact_installed_versions_and_complete_package_
         validate_dependency_lock(path)
 
 
-def test_container_identity_requires_the_pinned_ngc_manifest_digest(monkeypatch) -> None:
+def test_container_identity_requires_the_pinned_derived_manifest_digest(monkeypatch) -> None:
     monkeypatch.setenv("PSEM_CONTAINER_IMAGE_IDENTITY", PINNED_CONTAINER_IMAGE_IDENTITY)
     assert nemo_adapter._container_image_identity() == PINNED_CONTAINER_IMAGE_IDENTITY
     monkeypatch.setenv("PSEM_CONTAINER_IMAGE_IDENTITY", "sha256:" + "a" * 64)
-    with pytest.raises(Exception, match="differs from the pinned NVIDIA PyTorch image digest"):
+    with pytest.raises(Exception, match="differs from the pinned derived runtime image digest"):
         nemo_adapter._container_image_identity()
 
 

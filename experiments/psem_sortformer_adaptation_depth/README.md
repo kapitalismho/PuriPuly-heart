@@ -19,11 +19,15 @@ uv run --project experiments\speaker_representation_scd\environment --frozen pyt
 
 Static verification binds the current `contract.json`, `config.json`, `runtime_contract.json`, `runtime_environment.json`, immutable V2 data artifacts, and issue-99 predecessor evidence. Runtime preflight authorizes material work only when those controls, a clean committed candidate, the pinned runtime, and all external paths are present and exact.
 
+## Compatible single-CUDA-GPU runtime preparation
+
+The local derived-image build and validation procedure for a compatible single-CUDA-GPU runtime is documented in [`environment/README.md`](environment/README.md). An A40 remains the preferred deployment target. Detached phase execution, durable heartbeats, operator decision gates, and the external Windows stop watchdog are documented in [`DETACHED_EXECUTION.md`](DETACHED_EXECUTION.md). Neither procedure authorizes registry publication, Pod creation, training, or deployment.
+
 ## Retained invariants
 
 - immutable `PSEM-STRATEGY-DATA-v2` TRAIN/DEV/EVAL assignments;
 - exact official `diar_streaming_sortformer_4spk-v2.1.nemo` artifact;
-- pinned NeMo revision and immutable NVIDIA container identity;
+- pinned NeMo revision, immutable derived runtime identity, and pinned NVIDIA base provenance;
 - raw 16 kHz waveform, four slots, native 80 ms grid, and 1.04 s evidence delay;
 - the existing causal GRU-64 PSEM head, composite loss, optimizer groups, learning rates, and 30 s sequence geometry;
 - identical TRAIN window and augmentation identities across compared arms;

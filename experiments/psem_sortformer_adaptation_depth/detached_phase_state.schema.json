@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puripuly-heart.invalid/schemas/issue-107-detached-phase-state-v1.json",
+  "title": "Issue 107 detached phase state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "config_sha256",
+    "status",
+    "active_phase",
+    "next_phase",
+    "completed_phases",
+    "waiting_gate",
+    "error",
+    "started_at",
+    "updated_at",
+    "completed_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
+    },
+    "config_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "status": {
+      "enum": [
+        "STARTING",
+        "RUNNING",
+        "WAITING_FOR_DECISION",
+        "COMPLETED",
+        "ERROR"
+      ]
+    },
+    "active_phase": {
+      "type": ["string", "null"]
+    },
+    "next_phase": {
+      "type": ["string", "null"]
+    },
+    "completed_phases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "waiting_gate": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "after_phase", "actions", "entered_at"],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "after_phase": {
+              "type": "string"
+            },
+            "actions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "entered_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      ]
+    },
+    "error": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "message", "at"],
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      ]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    }
+  }
+}

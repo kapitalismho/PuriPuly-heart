@@ -8,20 +8,23 @@
     "pytorch_requirement": ">=2.5"
   },
   "container": {
-    "image": "nvcr.io/nvidia/pytorch@sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
-    "tag": "25.01-py3",
-    "manifest_digest": "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
-    "source": "NVIDIA NeMo pinned-commit README NGC PyTorch container recipe",
+    "image": "kapitalismho/puripuly-heart@sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7",
+    "tag": "issue107-runtime-v1.0.0-eac271a6",
+    "manifest_digest": "sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7",
+    "source": "validated Issue 107 runtime derived from the pinned NVIDIA NGC PyTorch base",
+    "base_image": "nvcr.io/nvidia/pytorch@sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
+    "base_manifest_digest": "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
     "image_identity_must_match_manifest_digest": true
   },
   "nemo": {
     "repository": "https://github.com/NVIDIA-NeMo/NeMo.git",
     "revision": "1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6",
     "install": [
-      "bash docker/common/install_dep.sh --library all",
-      "python -m pip install -e \".[asr]\"",
+      "python -m pip install --constraint /opt/psem/base-protected-constraints.txt --constraint /opt/psem/repair-constraints.txt --constraint /opt/psem/runtime-constraints.txt --editable \".[asr]\"",
+      "python -m pip install --constraint /opt/psem/base-protected-constraints.txt --constraint /opt/psem/repair-constraints.txt --constraint /opt/psem/runtime-constraints.txt --requirement /opt/psem/repair-constraints.txt",
       "python -m pip check"
     ],
+    "dependency_policy": "preserve the protected NGC inventory and apply only the baked constrained repair set",
     "loaded_module_origin_must_be_checkout": true
   },
   "compute": {
@@ -44,7 +47,7 @@
     "complete_installed_distribution_inventory": true,
     "container_image_identity": true,
     "container_image_identity_environment_variable": "PSEM_CONTAINER_IMAGE_IDENTITY",
-    "container_image_identity_expected": "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
+    "container_image_identity_expected": "sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7",
     "protocol_registry_root_environment_variable": "PSEM_PROTOCOL_REGISTRY_ROOT",
     "protocol_registry_is_distinct_from_output_root": true,
     "nvidia_driver_and_cuda_identity": true,

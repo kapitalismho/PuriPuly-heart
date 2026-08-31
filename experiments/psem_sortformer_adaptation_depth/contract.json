@@ -60,8 +60,8 @@
   },
   "runtime_environment": {
     "path": "experiments/psem_sortformer_adaptation_depth/runtime_environment.json",
-    "sha256": "ef988e8934c619619966a38cb6c3ac11a92fae678f19f4bfd2a76ee64f58c27b",
-    "container_image_identity": "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
+    "sha256": "5f1b93a4b167e9f94c530978925d647cdd6b2d53a28f5dc814e5c4c661430f58",
+    "container_image_identity": "sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7",
     "dependency_inventory_status": "must_match_generated_complete_lock"
   },
   "decision": "choose the shallowest clear short-budget engineering direction or stop",

@@ -39,7 +39,7 @@ from experiments.psem_sortformer_adaptation_depth.runtime_audit import (
 
 NEMO_REVISION = "1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6"
 PINNED_CONTAINER_IMAGE_IDENTITY = (
-    "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb"
+    "sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7"
 )
 FRAME_SAMPLES = 1280
 REQUIRED_LOCK_PACKAGES = {
@@ -82,7 +82,7 @@ def _container_image_identity() -> str:
     value = os.environ.get("PSEM_CONTAINER_IMAGE_IDENTITY", "").strip()
     if value != PINNED_CONTAINER_IMAGE_IDENTITY:
         raise NeMoAdapterError(
-            "PSEM_CONTAINER_IMAGE_IDENTITY differs from the pinned NVIDIA PyTorch image digest"
+            "PSEM_CONTAINER_IMAGE_IDENTITY differs from the pinned derived runtime image digest"
         )
     return value
 

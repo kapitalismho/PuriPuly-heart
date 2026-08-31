@@ -241,6 +241,10 @@ refactoring/
 /scripts/release/*
 !/scripts/release/unattended-runtime-evidence.py
 !/scripts/release/huggingface-xet-frozen-smoke.py
+!/scripts/experiments/
+/scripts/experiments/*
+!/scripts/experiments/watch-issue-107-a40.ps1
+/packages.zip
 .codex/
 .agent/
 .agents/*
