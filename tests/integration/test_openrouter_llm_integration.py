@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from uuid import UUID
 
 import pytest
@@ -11,15 +12,14 @@ from puripuly_heart.app.wiring.wiring_llm_factory import (
     llm_factory_extras_from_vnext,
     runtime_resolution_input_from_vnext,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    OpenRouterCredentialSource,
-    OpenRouterFallbackSelectionAlias,
+from puripuly_heart.config.provider_values import (
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
 )
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.settings_vnext.schema import (
+    AppSettingsVNext,
+    TranslationFallbackIntent,
+)
 from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.domain.models import Translation
@@ -106,18 +106,25 @@ async def test_openrouter_cached_managed_key_translation_smoke(
     api_key = require_env("OPENROUTER_TEST_CACHED_MANAGED_API_KEY")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_MANAGED
-    settings.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.NONE
+    settings = AppSettingsVNext()
+    canonical = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
+                openrouter_selected_source="managed",
+                openrouter_selection_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED.value,
+                fallback=TranslationFallbackIntent(selection_alias="none"),
+            ),
+        ),
+    )
 
     secrets = InMemorySecretStore()
     secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, api_key)
 
     managed_release_service = FailFastManagedReleaseService()
-    canonical = from_legacy_app_settings(settings)
     provider = create_llm_provider(
         runtime_resolution_input_from_vnext(canonical),
         secrets=secrets,

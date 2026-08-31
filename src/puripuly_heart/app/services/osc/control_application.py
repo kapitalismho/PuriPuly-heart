@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from puripuly_heart.app.ports.osc_control import (
     FALLBACK_IDS,
     OscControlApplicationPort,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 from .state_publisher import fallback_alias_from_settings
 
-SettingsProvider = Callable[[], object | None]
-SettingsApply = Callable[[object], Awaitable[object]]
+SettingsProvider = Callable[[], AppSettingsVNext | None]
+SettingsApply = Callable[[AppSettingsVNext], Awaitable[object]]
 ApplicationCall = Callable[..., Awaitable[object]]
 TranslationModelNormalizer = Callable[[object], object]
 
@@ -87,39 +88,58 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
             )
         )
 
+    async def set_secondary_target_language(self, language: str) -> object:
+        current = self.settings_provider()
+        if current is None:
+            raise RuntimeError("OSC control settings are unavailable")
+        normalized = "" if language == current.intent.languages.target_language else language
+        if current.intent.languages.secondary_target_language == normalized:
+            return True
+        return await self._apply_settings(
+            lambda settings: _with_languages(
+                settings,
+                secondary_target_language=normalized,
+            )
+        )
+
     async def set_peer_auto_detect(self, enabled: bool) -> object:
         current = self.settings_provider()
-        if current is not None and current.languages.peer_source_mode == (
+        if current is not None and current.intent.languages.peer_source_mode == (
             "auto" if enabled else "manual"
         ):
             return True
         return await self._apply_settings(
-            lambda settings: setattr(
-                settings.languages, "peer_source_mode", "auto" if enabled else "manual"
+            lambda settings: _with_languages(
+                settings,
+                peer_source_mode="auto" if enabled else "manual",
             )
         )
 
     async def set_self_asr(self, provider: str) -> object:
         current = self.settings_provider()
-        if current is not None and _enum_value_for_compare(current.provider.stt) == provider:
+        if current is not None and current.intent.stt.provider == provider:
             return True
         return await self._apply_settings(
-            lambda settings: setattr(
-                settings.provider,
-                "stt",
-                _enum_value(settings.provider.stt, provider),
+            lambda settings: replace(
+                settings,
+                intent=replace(
+                    settings.intent,
+                    stt=replace(settings.intent.stt, provider=provider),
+                ),
             )
         )
 
     async def set_peer_asr(self, provider: str) -> object:
         current = self.settings_provider()
-        if current is not None and _enum_value_for_compare(current.provider.peer_stt) == provider:
+        if current is not None and current.intent.peer_stt.provider == provider:
             return True
         return await self._apply_settings(
-            lambda settings: setattr(
-                settings.provider,
-                "peer_stt",
-                _enum_value(settings.provider.peer_stt, provider),
+            lambda settings: replace(
+                settings,
+                intent=replace(
+                    settings.intent,
+                    peer_stt=replace(settings.intent.peer_stt, provider=provider),
+                ),
             )
         )
 
@@ -131,11 +151,8 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         current = self.settings_provider()
         if (
             current is not None
-            and _osc_translation_model_value(current.translation.model) == model
-            and (
-                connection is None
-                or _enum_value_for_compare(current.translation.connection) == connection
-            )
+            and _osc_translation_model_value(current.intent.translation.model) == model
+            and (connection is None or current.intent.translation.connection == connection)
         ):
             return True
         return await self._apply_settings(
@@ -150,18 +167,30 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
 
     async def set_mute_sync(self, enabled: bool) -> object:
         current = self.settings_provider()
-        if current is not None and bool(current.osc.vrc_mic_intercept) is bool(enabled):
+        if current is not None and bool(current.intent.osc.vrc_mic_intercept) is bool(enabled):
             return True
         return await self._apply_settings(
-            lambda settings: setattr(settings.osc, "vrc_mic_intercept", bool(enabled))
+            lambda settings: replace(
+                settings,
+                intent=replace(
+                    settings.intent,
+                    osc=replace(settings.intent.osc, vrc_mic_intercept=bool(enabled)),
+                ),
+            )
         )
 
     async def set_chatbox_source(self, enabled: bool) -> object:
         current = self.settings_provider()
-        if current is not None and bool(current.osc.chatbox_include_source) is bool(enabled):
+        if current is not None and bool(current.intent.osc.chatbox_include_source) is bool(enabled):
             return True
         return await self._apply_settings(
-            lambda settings: setattr(settings.osc, "chatbox_include_source", bool(enabled))
+            lambda settings: replace(
+                settings,
+                intent=replace(
+                    settings.intent,
+                    osc=replace(settings.intent.osc, chatbox_include_source=bool(enabled)),
+                ),
+            )
         )
 
     async def _call_runtime(
@@ -179,13 +208,16 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
                 return await fallback(value)
         raise RuntimeError(f"OSC control application command is not wired: {fallback_name}")
 
-    async def _apply_settings(self, mutator: Callable[[object], object]) -> object:
+    async def _apply_settings(
+        self, mutator: Callable[[AppSettingsVNext], AppSettingsVNext]
+    ) -> object:
         current = self.settings_provider()
         if current is None:
             raise RuntimeError("OSC control settings are unavailable")
         previous = copy.deepcopy(current)
-        updated = copy.deepcopy(current)
-        mutator(updated)
+        updated = mutator(copy.deepcopy(current))
+        if updated is None:
+            updated = current
         result = await self.apply_settings(updated)
         actual = self.settings_provider()
         if not _settings_control_values_match(actual, updated):
@@ -199,87 +231,72 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
 
     @staticmethod
     def _set_languages(
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         self_source: str,
         self_target: str,
         peer_source: str,
         peer_target: str,
-    ) -> None:
-        settings.languages.source_language = self_source
-        settings.languages.target_language = self_target
-        settings.languages.peer_source_language = peer_source
-        settings.languages.peer_target_language = peer_target
+    ) -> AppSettingsVNext:
+        secondary_target_language = settings.intent.languages.secondary_target_language
+        if secondary_target_language == self_target:
+            secondary_target_language = ""
+        return _with_languages(
+            settings,
+            source_language=self_source,
+            target_language=self_target,
+            secondary_target_language=secondary_target_language,
+            peer_source_language=peer_source,
+            peer_target_language=peer_target,
+        )
 
     def _set_translation_model(
         self,
-        settings: object,
+        settings: AppSettingsVNext,
         model: str,
         connection: str | None,
-    ) -> None:
-        current_model = settings.translation.model
-        current_value = getattr(current_model, "value", current_model)
-        if model == "custom_http" and current_value != "custom_http":
-            settings.translation.previous_llm_model = current_model
-        settings.translation.model = _enum_value(settings.translation.model, model)
-        if connection is not None:
-            settings.translation.connection = _enum_value(
-                settings.translation.connection,
-                connection,
-            )
-        self.translation_model_normalizer(settings)
+    ) -> AppSettingsVNext:
+        translation = settings.intent.translation
+        current_value = translation.model
+        next_translation = replace(
+            translation,
+            previous_llm_model=(
+                translation.model
+                if model == "custom_http" and current_value != "custom_http"
+                else translation.previous_llm_model
+            ),
+            model=model,
+            connection=connection if connection is not None else translation.connection,
+        )
+        updated = replace(
+            settings,
+            intent=replace(settings.intent, translation=next_translation),
+        )
+        return self.translation_model_normalizer(updated)
 
     @staticmethod
-    def _set_fallback(settings: object, alias: str) -> None:
+    def _set_fallback(settings: AppSettingsVNext, alias: str) -> AppSettingsVNext:
         if alias not in FALLBACK_IDS.values():
             raise ValueError(f"unknown OSC fallback alias: {alias}")
-        if alias == "none":
-            settings.translation.fallback.enabled = False
-            return
-        specs: dict[str, tuple[str, str]] = {
-            "deepseek_v4_flash_official": (
-                "deepseek_v4_flash",
-                "official_byok",
+        fallback = settings.intent.translation.fallback
+        next_fallback = replace(fallback, selection_alias=alias)
+        return replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                translation=replace(settings.intent.translation, fallback=next_fallback),
             ),
-            "openrouter_deepseek_v4_flash": (
-                "deepseek_v4_flash",
-                "openrouter",
-            ),
-            "openrouter_gemma4_26b_a4b": (
-                "gemma4",
-                "openrouter",
-            ),
-            "openrouter_gemma4_26b_31b": (
-                "gemma4_26b_31b",
-                "openrouter",
-            ),
-            "openrouter_gemma4_31b": (
-                "gemma4_31b",
-                "openrouter",
-            ),
-            "managed_gemma4_26b_31b": (
-                "gemma4_26b_31b",
-                "managed",
-            ),
-            "managed_gemma4_31b": (
-                "gemma4_31b",
-                "managed",
-            ),
-            "cerebras_gemma4_31b": (
-                "gemma4_31b",
-                "cerebras",
-            ),
-        }
-        model, connection = specs[alias]
-        settings.translation.fallback.enabled = True
-        settings.translation.fallback.model = _enum_value(
-            settings.translation.fallback.model,
-            model,
         )
-        settings.translation.fallback.connection = _enum_value(
-            settings.translation.fallback.connection,
-            connection,
-        )
+
+
+def _with_languages(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            languages=replace(settings.intent.languages, **changes),
+        ),
+    )
 
 
 def _enum_value(current: object, value: str) -> object:
@@ -298,7 +315,7 @@ def _language_values_match(
     peer_source: str,
     peer_target: str,
 ) -> bool:
-    languages = settings.languages
+    languages = settings.intent.languages
     return (
         languages.source_language == self_source
         and languages.target_language == self_target
@@ -311,22 +328,23 @@ def _settings_control_values_match(actual: object | None, expected: object) -> b
     if actual is None:
         return False
     fields = (
-        ("languages", "source_language"),
-        ("languages", "target_language"),
-        ("languages", "peer_source_language"),
-        ("languages", "peer_target_language"),
-        ("languages", "peer_source_mode"),
-        ("provider", "stt"),
-        ("provider", "peer_stt"),
-        ("translation", "model"),
-        ("translation", "connection"),
-        ("translation", "http_extension_id"),
-        ("translation", "previous_llm_model"),
-        ("translation.fallback", "enabled"),
-        ("translation.fallback", "model"),
-        ("translation.fallback", "connection"),
-        ("osc", "vrc_mic_intercept"),
-        ("osc", "chatbox_include_source"),
+        ("intent.languages", "source_language"),
+        ("intent.languages", "target_language"),
+        ("intent.languages", "secondary_target_language"),
+        ("intent.languages", "peer_source_language"),
+        ("intent.languages", "peer_target_language"),
+        ("intent.languages", "peer_source_mode"),
+        ("intent.stt", "provider"),
+        ("intent.peer_stt", "provider"),
+        ("intent.translation", "model"),
+        ("intent.translation", "connection"),
+        ("intent.translation", "http_extension_id"),
+        ("intent.translation", "previous_llm_model"),
+        ("intent.translation.fallback", "enabled"),
+        ("intent.translation.fallback", "model"),
+        ("intent.translation.fallback", "connection"),
+        ("intent.osc", "vrc_mic_intercept"),
+        ("intent.osc", "chatbox_include_source"),
     )
     for owner_path, field_name in fields:
         actual_owner = _nested_attribute(actual, owner_path)

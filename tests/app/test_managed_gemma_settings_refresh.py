@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import copy
+from dataclasses import replace
 
 import pytest
 
@@ -9,16 +9,37 @@ from puripuly_heart.app.services.settings.settings_runtime_effects import (
     managed_gemma_prefix_refresh_required,
     refresh_managed_gemma_prefix,
 )
-from puripuly_heart.config.settings import AppSettings, TranslationModel
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import TranslationModel
+
+
+def _with_model(settings: AppSettingsVNext, model: str) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(settings.intent.translation, model=model),
+        ),
+    )
+
+
+def _with_prompt(settings: AppSettingsVNext, prompt: str) -> AppSettingsVNext:
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            prompts=replace(settings.intent.prompts, system_prompt=prompt),
+        ),
+    )
 
 
 def _transition(
-    previous: AppSettings | None,
-    current: AppSettings,
+    previous: AppSettingsVNext | None,
+    current: AppSettingsVNext,
     *,
     source_changed: bool = False,
     target_changed: bool = False,
-) -> SettingsRuntimeTransition[AppSettings]:
+) -> SettingsRuntimeTransition[AppSettingsVNext]:
     return SettingsRuntimeTransition(
         settings=current,
         previous_settings=previous,
@@ -42,15 +63,10 @@ def _transition(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("change", ["source", "target", "prompt"])
 async def test_managed_gemma_language_or_prompt_change_rebuilds_prefix(change: str) -> None:
-    previous = AppSettings()
-    previous.translation.model = TranslationModel.MANAGED_GEMMA
-    current = copy.deepcopy(previous)
-    if change == "source":
-        current.languages.source_language = "ja"
-    elif change == "target":
-        current.languages.target_language = "ko"
-    else:
-        current.system_prompt = "changed prompt"
+    previous = _with_model(AppSettingsVNext(), TranslationModel.MANAGED_GEMMA.value)
+    current = previous
+    if change == "prompt":
+        current = _with_prompt(previous, "changed prompt")
     transition = _transition(
         previous,
         current,
@@ -71,9 +87,8 @@ async def test_managed_gemma_language_or_prompt_change_rebuilds_prefix(change: s
 
 @pytest.mark.asyncio
 async def test_non_managed_prompt_change_does_not_rebuild_managed_prefix() -> None:
-    previous = AppSettings()
-    current = copy.deepcopy(previous)
-    current.system_prompt = "changed prompt"
+    previous = AppSettingsVNext()
+    current = _with_prompt(previous, "changed prompt")
     transition = _transition(previous, current)
     rebuilds = 0
 
@@ -89,11 +104,8 @@ async def test_non_managed_prompt_change_does_not_rebuild_managed_prefix() -> No
 
 @pytest.mark.asyncio
 async def test_failed_managed_prefix_rebuild_reports_runtime_apply_failure() -> None:
-    previous = AppSettings()
-    previous.translation.model = TranslationModel.MANAGED_GEMMA
-    current = copy.deepcopy(previous)
-    current.languages.target_language = "ja"
-    transition = _transition(previous, current, target_changed=True)
+    previous = _with_model(AppSettingsVNext(), TranslationModel.MANAGED_GEMMA.value)
+    transition = _transition(previous, previous, target_changed=True)
 
     async def rebuild() -> bool:
         return False

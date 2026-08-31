@@ -15,7 +15,7 @@ from uuid import uuid4
 import numpy as np
 import pytest
 
-from puripuly_heart.config.settings import QwenRegion, QwenSettings
+from puripuly_heart.config.provider_values import QwenRegion
 
 INTEGRATION_ENV = "INTEGRATION"
 EVENT_POLL_TIMEOUT_S = float(os.getenv("INTEGRATION_EVENT_POLL_TIMEOUT_S", "0.1"))
@@ -187,21 +187,28 @@ def chunk_audio(
     return chunks, chunk_samples
 
 
-def qwen_settings_from_env() -> QwenSettings:
+def qwen_region_from_env() -> QwenRegion:
     region_raw = os.getenv("QWEN_REGION", QwenRegion.BEIJING.value).lower()
     try:
-        region = QwenRegion(region_raw)
+        return QwenRegion(region_raw)
     except ValueError:
-        region = QwenRegion.BEIJING
-    return QwenSettings(region=region)
+        return QwenRegion.BEIJING
 
 
 def get_qwen_asr_endpoint() -> str:
-    return os.getenv("QWEN_ASR_ENDPOINT", qwen_settings_from_env().get_asr_endpoint())
+    if qwen_region_from_env() is QwenRegion.SINGAPORE:
+        default = "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+    else:
+        default = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+    return os.getenv("QWEN_ASR_ENDPOINT", default)
 
 
 def get_qwen_base_url() -> str:
-    return os.getenv("QWEN_BASE_URL", qwen_settings_from_env().get_llm_base_url())
+    if qwen_region_from_env() is QwenRegion.SINGAPORE:
+        default = "https://dashscope-intl.aliyuncs.com/api/v1"
+    else:
+        default = "https://dashscope.aliyuncs.com/api/v1"
+    return os.getenv("QWEN_BASE_URL", default)
 
 
 def to_async_qwen_base_url(base_url: str) -> str:

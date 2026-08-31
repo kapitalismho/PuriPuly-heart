@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from puripuly_heart.app.services.settings_application import (
     materialize_immediate_settings_intent,
@@ -11,12 +13,33 @@ from puripuly_heart.app.services.settings_application import (
 from puripuly_heart.app.ports.settings_view import (
     DesktopOverlayPositionResetIntent,
     DesktopOverlaySizeIntent,
+    PromptApplyIntent,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import (
-    materialize_compatibility_translation_settings,
+    materialize_canonical_translation_settings,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.ui.i18n import get_locale, set_locale
 from puripuly_heart.ui.views.settings import SettingsView
+
+
+def _canonical_settings(settings: object) -> object:
+    return settings
+
+
+def _with_resolved_prompt(canonical: object, prompt_snapshot: object) -> object:
+    if not isinstance(canonical, AppSettingsVNext) or prompt_snapshot is None:
+        return canonical
+    system_prompt = getattr(prompt_snapshot, "system_prompt", None)
+    if not isinstance(system_prompt, str):
+        return canonical
+    return replace(
+        canonical,
+        intent=replace(
+            canonical.intent,
+            prompts=replace(canonical.intent.prompts, system_prompt=system_prompt),
+        ),
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -36,9 +59,10 @@ def settings_view_typed_boundary_adapter(monkeypatch: pytest.MonkeyPatch):
     consume_prompt = SettingsView.consume_prompt_apply_settings
 
     def set_compatibility_settings(view, settings):
-        view._test_compatibility_settings = settings
-        if settings is not None:
-            provider, general, prompt, overlay = settings_view_surface_snapshots(settings)
+        canonical = _canonical_settings(settings)
+        view._test_compatibility_settings = canonical
+        if canonical is not None:
+            provider, general, prompt, overlay = settings_view_surface_snapshots(canonical)
             view._provider_snapshot = provider
             view._provider_draft = None
             view._provider_edits = {}
@@ -55,7 +79,9 @@ def settings_view_typed_boundary_adapter(monkeypatch: pytest.MonkeyPatch):
         if settings is None:
             view._provider_draft = None
             return
-        provider, _general, _prompt, _overlay = settings_view_surface_snapshots(settings)
+        provider, _general, _prompt, _overlay = settings_view_surface_snapshots(
+            _canonical_settings(settings)
+        )
         view._provider_draft = provider
 
     def get_provider_draft(view):
@@ -66,7 +92,7 @@ def settings_view_typed_boundary_adapter(monkeypatch: pytest.MonkeyPatch):
         return materialize_provider_apply_intent(
             current,
             intent,
-            materialize_translation=materialize_compatibility_translation_settings,
+            materialize_translation=materialize_canonical_translation_settings,
         )
 
     def load_adapter(
@@ -81,8 +107,9 @@ def settings_view_typed_boundary_adapter(monkeypatch: pytest.MonkeyPatch):
         preserve_custom_vocab_draft=False,
     ):
         if settings is not None:
-            provider, general, prompt, overlay = settings_view_surface_snapshots(settings)
-            view._test_compatibility_settings = settings
+            canonical = _canonical_settings(settings)
+            provider, general, prompt, overlay = settings_view_surface_snapshots(canonical)
+            view._test_compatibility_settings = canonical
         result = load(
             view,
             provider=provider,
@@ -92,9 +119,11 @@ def settings_view_typed_boundary_adapter(monkeypatch: pytest.MonkeyPatch):
             config_path=config_path,
             preserve_custom_vocab_draft=preserve_custom_vocab_draft,
         )
-        if settings is not None and view._prompt_snapshot is not None:
-            settings.system_prompt = view._prompt_snapshot.system_prompt
-            settings.system_prompts = {}
+        if settings is not None:
+            view._test_compatibility_settings = _with_resolved_prompt(
+                view._test_compatibility_settings,
+                view._prompt_snapshot,
+            )
         return result
 
     def refresh_adapter(
@@ -106,8 +135,9 @@ def settings_view_typed_boundary_adapter(monkeypatch: pytest.MonkeyPatch):
         config_path,
     ):
         if settings is not None:
-            provider, _general, prompt, _overlay = settings_view_surface_snapshots(settings)
-            view._test_compatibility_settings = settings
+            canonical = _canonical_settings(settings)
+            provider, _general, prompt, _overlay = settings_view_surface_snapshots(canonical)
+            view._test_compatibility_settings = canonical
         return refresh(
             view,
             provider=provider,
@@ -123,7 +153,7 @@ def settings_view_typed_boundary_adapter(monkeypatch: pytest.MonkeyPatch):
         return materialize_provider_apply_intent(
             current,
             intent,
-            materialize_translation=materialize_compatibility_translation_settings,
+            materialize_translation=materialize_canonical_translation_settings,
         )
 
     def consume_prompt_adapter(view):
@@ -159,11 +189,12 @@ def settings_view_typed_boundary_adapter(monkeypatch: pytest.MonkeyPatch):
         current = get_compatibility_settings(view)
         if current is None:
             return
-        updated = (
-            intent
-            if hasattr(intent, "system_prompt")
-            else materialize_prompt_apply_intent(current, intent)
-        )
+        if isinstance(intent, PromptApplyIntent):
+            updated = materialize_prompt_apply_intent(current, intent)
+        elif isinstance(intent, AppSettingsVNext):
+            updated = intent
+        else:
+            updated = materialize_prompt_apply_intent(current, intent)
         view._test_compatibility_settings = updated
         if view.on_prompt_apply_settings:
             view.on_prompt_apply_settings(updated)

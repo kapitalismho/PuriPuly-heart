@@ -11,6 +11,7 @@ import sys
 import time
 import traceback
 import wave
+from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -182,15 +183,21 @@ async def _execute(
         config_path=default_settings_path(),
     )
     settings = application.load_compatibility_settings()
-    provider_type = type(settings.provider.stt)
-    settings.provider.stt = provider_type("local_qwen_gpu")
-    settings.provider.peer_stt = provider_type("local_qwen_gpu")
-    settings.provider.llm = type(settings.provider.llm)("local_llm")
-    settings.secrets.backend = type(settings.secrets.backend)("encrypted_file")
-    settings.secrets.encrypted_file_path = "release-evidence-secrets.json"
-    settings.stt.gpu_device_id = "auto"
-    settings.ui.peer_translation_enabled = False
-    settings.osc.chatbox_send = False
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            stt=replace(settings.intent.stt, provider="local_qwen_gpu", gpu_device_id="auto"),
+            peer_stt=replace(settings.intent.peer_stt, provider="local_qwen_gpu"),
+            translation=replace(settings.intent.translation, model="local_llm"),
+            secrets=replace(
+                settings.intent.secrets,
+                backend="encrypted_file",
+                encrypted_file_path="release-evidence-secrets.json",
+            ),
+            osc=replace(settings.intent.osc, chatbox_send=False),
+        ),
+    )
     os.environ["PURIPULY_HEART_SECRETS_PASSPHRASE"] = uuid4().hex
     self_events: list[object] = []
     peer_events: list[object] = []
@@ -220,7 +227,7 @@ async def _execute(
         report["composition"] = {
             **application.composition_facts(),
             "external_llm_disabled": True,
-            "secrets_backend": settings.secrets.backend.value,
+            "secrets_backend": settings.intent.secrets.backend,
         }
         _attach_event_evidence(owner, self_events, peer_events, retired_events)
         await application.start_runtime()
@@ -231,7 +238,13 @@ async def _execute(
             for item in discovery.gpu.devices
             if expected_gpu_name.casefold() in f"{item.name} {item.description}".casefold()
         )
-        settings.stt.gpu_device_id = physical.device_id
+        settings = replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                stt=replace(settings.intent.stt, gpu_device_id=physical.device_id),
+            ),
+        )
         report["selected_device"] = dataclasses.asdict(physical)
 
         self_request = application.build_self_provider_request(settings, warmup=True)

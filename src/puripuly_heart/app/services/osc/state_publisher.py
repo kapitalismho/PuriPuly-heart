@@ -10,6 +10,7 @@ from puripuly_heart.app.ports.osc_control import (
     FALLBACK_ID_BY_ALIAS,
     LANGUAGE_ID_BY_CODE,
     OSC_PARAMETER_ADDRESS_PREFIX,
+    SECONDARY_LANGUAGE_ID_BY_CODE,
     OscControlCodecError,
     OscSenderPort,
     translation_model_id_for_selection,
@@ -28,6 +29,7 @@ class OscCanonicalState:
     chatbox_source: bool = False
     self_source_language: str = "ko"
     self_target_language: str = "en"
+    self_secondary_target_language: str = ""
     peer_source_language: str = "en"
     peer_target_language: str = "ko"
     self_asr: str = "local_cpu_auto"
@@ -152,6 +154,9 @@ class OscStatePublisher:
             {
                 "PuriPuly_SelfSrcLang": LANGUAGE_ID_BY_CODE[fields_by_name["self_source_language"]],
                 "PuriPuly_SelfDstLang": LANGUAGE_ID_BY_CODE[fields_by_name["self_target_language"]],
+                "PuriPuly_SelfDstLang2": SECONDARY_LANGUAGE_ID_BY_CODE[
+                    fields_by_name["self_secondary_target_language"]
+                ],
                 "PuriPuly_PeerSrcLang": LANGUAGE_ID_BY_CODE[fields_by_name["peer_source_language"]],
                 "PuriPuly_PeerDstLang": LANGUAGE_ID_BY_CODE[fields_by_name["peer_target_language"]],
                 "PuriPuly_SelfASR": ASR_ID_BY_PROVIDER[fields_by_name["self_asr"]],
@@ -174,23 +179,26 @@ def state_from_settings(
     translation: bool = False,
     captions: bool = False,
 ) -> OscCanonicalState:
-    languages = settings.languages
+    intent = settings.intent
+    languages = intent.languages
+    translation_intent = intent.translation
     return OscCanonicalState(
         self_capture=self_capture,
         peer_capture=peer_capture,
         translation=translation,
         captions=captions,
         peer_source_auto=languages.peer_source_mode == "auto",
-        mute_sync=bool(settings.osc.vrc_mic_intercept),
-        chatbox_source=bool(settings.osc.chatbox_include_source),
+        mute_sync=bool(intent.osc.vrc_mic_intercept),
+        chatbox_source=bool(intent.osc.chatbox_include_source),
         self_source_language=languages.source_language,
         self_target_language=languages.target_language,
+        self_secondary_target_language=languages.secondary_target_language,
         peer_source_language=languages.peer_source_language,
         peer_target_language=languages.peer_target_language,
-        self_asr=_osc_asr_provider(settings.provider.stt, settings.custom_stt.mode),
-        peer_asr=_osc_asr_provider(settings.provider.peer_stt, settings.custom_stt.mode),
-        translation_model=settings.translation.model.value,
-        translation_connection=settings.translation.connection.value,
+        self_asr=_osc_asr_provider(intent.stt.provider, intent.stt.custom.mode),
+        peer_asr=_osc_asr_provider(intent.peer_stt.provider, intent.stt.custom.mode),
+        translation_model=translation_intent.model,
+        translation_connection=translation_intent.connection,
         fallback=fallback_alias_from_settings(settings),
     )
 
@@ -205,11 +213,11 @@ def _osc_asr_provider(provider: object, custom_mode: object) -> str:
 
 
 def fallback_alias_from_settings(settings: Any) -> str:
-    fallback = settings.translation.fallback
+    fallback = settings.intent.translation.fallback
     if not fallback.enabled:
         return "none"
-    model = getattr(fallback.model, "value", fallback.model)
-    connection = getattr(fallback.connection, "value", fallback.connection)
+    model = fallback.model
+    connection = fallback.connection
     aliases = {
         ("deepseek_v4_flash", "official_byok"): "deepseek_v4_flash_official",
         ("deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",

@@ -9,7 +9,6 @@ from puripuly_heart.app.wiring.wiring_llm_factory import (
     runtime_resolution_input_from_vnext,
 )
 from puripuly_heart.app.wiring.wiring_translation_backend import create_translation_backend
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.release_evidence import managed_gemma_production as evidence
@@ -144,16 +143,17 @@ async def test_cleanup_retries_owner_when_backend_close_fails() -> None:
 def test_managed_gemma_evidence_settings_disable_provider_fallback(tmp_path: Path) -> None:
     for backend in ("cpu", "gpu"):
         settings = evidence._settings(backend)
+        translation = settings.intent.translation
         translation_backend = create_translation_backend(
-            translation_model=settings.translation.model,
+            translation_model=translation.model,
             secrets=InMemorySecretStore(),
             http_extensions=HttpExtensionRegistry(tmp_path),
-            runtime_input=runtime_resolution_input_from_vnext(from_legacy_app_settings(settings)),
-            extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
+            runtime_input=runtime_resolution_input_from_vnext(settings),
+            extras=llm_factory_extras_from_vnext(settings),
             managed_gemma_runtime=object(),
         )
 
-        assert settings.translation.model.value == "managed_gemma"
-        assert settings.translation.connection.value == backend
-        assert settings.translation.fallback.enabled is True
+        assert translation.model == "managed_gemma"
+        assert translation.connection == backend
+        assert translation.fallback.enabled is True
         assert evidence._is_managed_only_backend(translation_backend)

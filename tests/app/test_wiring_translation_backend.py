@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import get_type_hints
 
@@ -22,13 +23,7 @@ from puripuly_heart.app.wiring.wiring_provider_runtime import compose_provider_r
 from puripuly_heart.app.wiring.wiring_provider_runtime_policy import build_llm_provider_signature
 from puripuly_heart.app.wiring.wiring_runtime_pipeline import compose_runtime_pipeline
 from puripuly_heart.app.wiring.wiring_translation_backend import create_translation_backend
-from puripuly_heart.config.settings import (
-    AppSettings,
-    TranslationConnection,
-    TranslationModel,
-    TranslationSettings,
-)
-from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.orchestrator.ports import TranslationRuntimeLoggingPort
@@ -63,14 +58,20 @@ def _registry(tmp_path: Path) -> HttpExtensionRegistry:
     return registry
 
 
-def _custom_settings() -> AppSettings:
-    settings = AppSettings()
-    settings.translation = TranslationSettings(
-        model=TranslationModel.CUSTOM_HTTP,
-        connection=TranslationConnection.CUSTOM_HTTP,
-        http_extension_id="libretranslate",
+def _custom_settings() -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model="custom_http",
+                connection="custom_http",
+                http_extension_id="libretranslate",
+            ),
+        ),
     )
-    return settings
 
 
 @pytest.mark.asyncio
@@ -80,7 +81,13 @@ async def test_custom_http_factory_creates_only_the_extension_backend(
 ) -> None:
     registry = _registry(tmp_path)
     settings = _custom_settings()
-    settings.llm.concurrency_limit = 2
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(settings.intent.translation, concurrency_limit=2),
+        ),
+    )
     monkeypatch.setattr(
         wiring_module,
         "create_llm_provider",
@@ -88,11 +95,11 @@ async def test_custom_http_factory_creates_only_the_extension_backend(
     )
 
     backend = create_translation_backend(
-        translation_model=settings.translation.model,
+        translation_model=settings.intent.translation.model,
         secrets=InMemorySecretStore(),
         http_extensions=registry,
-        http_extension_id=settings.translation.http_extension_id,
-        concurrency_limit=settings.llm.concurrency_limit,
+        http_extension_id=settings.intent.translation.http_extension_id,
+        concurrency_limit=settings.intent.translation.concurrency_limit,
         managed_release_service=pytest.fail,
     )
 
@@ -103,22 +110,28 @@ async def test_custom_http_factory_creates_only_the_extension_backend(
 
 def test_custom_http_factory_rejects_missing_selected_extension(tmp_path: Path) -> None:
     settings = _custom_settings()
-    settings.translation.http_extension_id = "missing"
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(settings.intent.translation, http_extension_id="missing"),
+        ),
+    )
 
     with pytest.raises(ValueError, match="selected HTTP extension is unavailable"):
         create_translation_backend(
-            translation_model=settings.translation.model,
+            translation_model=settings.intent.translation.model,
             secrets=InMemorySecretStore(),
             http_extensions=_registry(tmp_path),
-            http_extension_id=settings.translation.http_extension_id,
+            http_extension_id=settings.intent.translation.http_extension_id,
         )
 
 
 def test_llm_factory_path_remains_delegated(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     expected = object()
     calls: list[object] = []
-    runtime_input = runtime_resolution_input_from_vnext(from_legacy_app_settings(settings))
+    runtime_input = runtime_resolution_input_from_vnext(settings)
 
     def create_llm(runtime_input_value: object, **_kwargs: object) -> object:
         calls.append(runtime_input_value)
@@ -127,11 +140,11 @@ def test_llm_factory_path_remains_delegated(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(wiring_module, "create_llm_provider", create_llm)
 
     result = create_translation_backend(
-        translation_model=settings.translation.model,
+        translation_model=settings.intent.translation.model,
         secrets=InMemorySecretStore(),
         http_extensions=HttpExtensionRegistry(Path("unused")),
         runtime_input=runtime_input,
-        extras=llm_factory_extras_from_vnext(from_legacy_app_settings(settings)),
+        extras=llm_factory_extras_from_vnext(settings),
     )
 
     assert isinstance(result, LlmTranslationBackend)
@@ -159,17 +172,13 @@ def test_custom_http_definition_fingerprint_rebuilds_runtime_signature(tmp_path:
     registry = _registry(tmp_path)
     settings = _custom_settings()
 
-    before = build_llm_provider_signature(
-        from_legacy_app_settings(settings), http_extensions=registry
-    )
+    before = build_llm_provider_signature(settings, http_extensions=registry)
     extension_path = tmp_path / "libretranslate.json"
     changed = json.loads(extension_path.read_text(encoding="utf-8"))
     changed["description"] = "Changed local definition"
     extension_path.write_text(json.dumps(changed), encoding="utf-8")
     registry.reload()
-    after = build_llm_provider_signature(
-        from_legacy_app_settings(settings), http_extensions=registry
-    )
+    after = build_llm_provider_signature(settings, http_extensions=registry)
 
     assert before != after
     assert "local-secret" not in repr(after)

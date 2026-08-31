@@ -17,6 +17,7 @@ from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaNoticeAction,
     OverlayPeerPresentationState,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 class UiInputRuntimePort(Protocol):
@@ -55,9 +56,9 @@ class UiSettingsRuntimePort(Protocol):
         change: LanguageSelectionChange,
     ) -> None: ...
 
-    def capture_settings_view_change(self, settings: object) -> object: ...
+    def capture_settings_view_change(self, settings: AppSettingsVNext) -> object: ...
 
-    def merge_settings_view_change_with_current(self, captured: object) -> object: ...
+    def merge_settings_view_change_with_current(self, captured: object) -> AppSettingsVNext: ...
 
     def refresh_settings_projection(
         self,
@@ -69,10 +70,10 @@ class UiSettingsRuntimePort(Protocol):
 
     def merge_settings_tab_apply_with_current_languages(
         self,
-        settings: object,
-    ) -> object: ...
+        settings: AppSettingsVNext,
+    ) -> AppSettingsVNext: ...
 
-    async def apply_settings(self, settings: object) -> object: ...
+    async def apply_settings(self, settings: AppSettingsVNext) -> object: ...
 
     async def apply_telemetry_enabled(self, enabled: bool) -> object | None: ...
 
@@ -80,7 +81,7 @@ class UiSettingsRuntimePort(Protocol):
 
     async def apply_prompt_intent(self, intent: PromptApplyIntent) -> object: ...
 
-    def materialize_provider_intent(self, intent: ProviderApplyIntent) -> object: ...
+    def materialize_provider_intent(self, intent: ProviderApplyIntent) -> AppSettingsVNext: ...
 
     def overlay_snapshot(self) -> OverlaySettingsSnapshot | None: ...
 
@@ -90,7 +91,7 @@ class UiSettingsRuntimePort(Protocol):
 class UiProviderRuntimePort(Protocol):
     async def apply_providers(
         self,
-        settings: object | None = None,
+        settings: AppSettingsVNext | None = None,
         *,
         force_rebuild_llm: bool = False,
         persist_settings: bool = True,

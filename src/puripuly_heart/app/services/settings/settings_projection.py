@@ -13,10 +13,11 @@ from puripuly_heart.app.ports.settings_view import (
     ProviderSettingsSnapshot,
 )
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 from .settings_mutation_legacy import (
-    _apply_settings_path_patch,
     _SettingsPathSnapshot,
+    apply_settings_path_patch,
     build_overlay_osc_output_settings_path_patch,
     build_stt_language_audio_settings_path_patch,
     build_ui_prompt_clipboard_state_settings_path_patch,
@@ -29,7 +30,7 @@ from .settings_mutation_legacy import (
 @dataclass(frozen=True, slots=True)
 class SettingsViewSettingsChange:
     values_by_path: Mapping[str, object]
-    pending_settings: object
+    pending_settings: AppSettingsVNext
     can_rebase: bool
 
     def __post_init__(self) -> None:
@@ -41,7 +42,7 @@ class SettingsViewSettingsChange:
 class SettingsProjectionOwner:
     presentation: UiPresentationPort
     config_path: Path
-    current_settings: Callable[[], object | None]
+    current_settings: Callable[[], AppSettingsVNext | None]
     _order22_baseline: _SettingsPathSnapshot | None = field(
         init=False,
         default=None,
@@ -62,33 +63,33 @@ class SettingsProjectionOwner:
     def order22_baseline(self) -> object | None:
         return self._order22_baseline
 
-    def remember_order22(self, settings: object | None) -> None:
+    def remember_order22(self, settings: AppSettingsVNext | None) -> None:
         self._order22_baseline = (
             settings_path_snapshot_for_stt_language_audio(settings)
             if settings is not None
             else None
         )
 
-    def remember_order23(self, settings: object | None) -> None:
+    def remember_order23(self, settings: AppSettingsVNext | None) -> None:
         self._order23_baseline = (
             settings_path_snapshot_for_overlay_osc_output(settings)
             if settings is not None
             else None
         )
 
-    def remember_order24(self, settings: object | None) -> None:
+    def remember_order24(self, settings: AppSettingsVNext | None) -> None:
         self._order24_baseline = (
             settings_path_snapshot_for_ui_prompt_clipboard_state(settings)
             if settings is not None
             else None
         )
 
-    def remember_all(self, settings: object | None) -> None:
+    def remember_all(self, settings: AppSettingsVNext | None) -> None:
         self.remember_order22(settings)
         self.remember_order23(settings)
         self.remember_order24(settings)
 
-    def capture(self, pending_settings: object) -> SettingsViewSettingsChange:
+    def capture(self, pending_settings: AppSettingsVNext) -> SettingsViewSettingsChange:
         baselines = (
             self._order22_baseline,
             self._order23_baseline,
@@ -111,13 +112,11 @@ class SettingsProjectionOwner:
             can_rebase=True,
         )
 
-    def merge_with_current(self, change: SettingsViewSettingsChange) -> object:
+    def merge_with_current(self, change: SettingsViewSettingsChange) -> AppSettingsVNext:
         settings = self.current_settings()
         if not change.can_rebase or settings is None:
             return copy.deepcopy(change.pending_settings)
-        merged_settings = copy.deepcopy(settings)
-        _apply_settings_path_patch(merged_settings, change.values_by_path)
-        return merged_settings
+        return apply_settings_path_patch(settings, change.values_by_path)
 
     def render_surfaces(
         self,
@@ -126,7 +125,7 @@ class SettingsProjectionOwner:
         general: GeneralSettingsSnapshot,
         prompt: PromptSettingsSnapshot,
         overlay: OverlaySettingsSnapshot,
-        compatibility_settings: object,
+        compatibility_settings: AppSettingsVNext,
         preserve_custom_vocab_draft: bool = False,
     ) -> bool | None:
         try:
@@ -145,7 +144,7 @@ class SettingsProjectionOwner:
 
     def render(
         self,
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         preserve_custom_vocab_draft: bool = False,
     ) -> bool | None:
@@ -166,7 +165,7 @@ class SettingsProjectionOwner:
         *,
         provider: ProviderSettingsSnapshot,
         prompt: PromptSettingsSnapshot,
-        compatibility_settings: object,
+        compatibility_settings: AppSettingsVNext,
     ) -> bool | None:
         try:
             loaded = self.presentation.refresh_settings_after_openrouter_pkce_success(
@@ -181,8 +180,8 @@ class SettingsProjectionOwner:
 
     def order22_patch_base_and_values(
         self,
-        next_settings: object,
-    ) -> tuple[object, dict[str, object]] | None:
+        next_settings: AppSettingsVNext,
+    ) -> tuple[AppSettingsVNext, dict[str, object]] | None:
         return self._patch_base_and_values(
             next_settings,
             baseline=self._order22_baseline,
@@ -191,8 +190,8 @@ class SettingsProjectionOwner:
 
     def order23_patch_base_and_values(
         self,
-        next_settings: object,
-    ) -> tuple[object, dict[str, object]] | None:
+        next_settings: AppSettingsVNext,
+    ) -> tuple[AppSettingsVNext, dict[str, object]] | None:
         return self._patch_base_and_values(
             next_settings,
             baseline=self._order23_baseline,
@@ -201,8 +200,8 @@ class SettingsProjectionOwner:
 
     def order24_patch_base_and_values(
         self,
-        next_settings: object,
-    ) -> tuple[object, dict[str, object]] | None:
+        next_settings: AppSettingsVNext,
+    ) -> tuple[AppSettingsVNext, dict[str, object]] | None:
         return self._patch_base_and_values(
             next_settings,
             baseline=self._order24_baseline,
@@ -211,11 +210,11 @@ class SettingsProjectionOwner:
 
     def _patch_base_and_values(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
         *,
         baseline: _SettingsPathSnapshot | None,
-        build_patch: Callable[[object, object], dict[str, object]],
-    ) -> tuple[object, dict[str, object]] | None:
+        build_patch: Callable[[AppSettingsVNext, AppSettingsVNext], dict[str, object]],
+    ) -> tuple[AppSettingsVNext, dict[str, object]] | None:
         settings = self.current_settings()
         if settings is None:
             return None

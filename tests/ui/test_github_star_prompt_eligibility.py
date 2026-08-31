@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -14,19 +15,13 @@ from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
 from puripuly_heart.app.services import canonical_settings_persistence as settings_module
 from puripuly_heart.app.services.canonical_settings_persistence import (
     compose_settings_owner,
+    materialize_canonical_translation_settings,
 )
 from puripuly_heart.app.services.github_star_prompt_settings import (
     compose_github_star_prompt_owner,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    TranslationConnection,
-    TranslationModel,
-    from_dict,
-    materialize_translation_settings,
-    to_dict,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.settings_vnext.serialization import to_dict as canonical_to_dict
 from puripuly_heart.domain.events import UIEvent, UIEventType
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata
@@ -39,9 +34,9 @@ from puripuly_heart.ui.event_bridge import (
 
 
 class PromptBackend:
-    def __init__(self, settings: AppSettings) -> None:
+    def __init__(self, settings: AppSettingsVNext) -> None:
         self.settings_owner = compose_settings_owner(Path("settings.json"))
-        self.settings_owner.current = settings
+        self.settings_owner.canonical = settings
         self.usage = SimpleNamespace(usage_metadata=None)
         self.owner = compose_github_star_prompt_owner(
             settings=self.settings_owner,
@@ -55,8 +50,8 @@ class PromptBackend:
         )
 
     @property
-    def settings(self) -> AppSettings:
-        return self.settings_owner.current
+    def settings(self) -> AppSettingsVNext:
+        return self.settings_owner.canonical
 
     def _get_managed_usage_owner(self) -> object:
         return self.usage
@@ -74,29 +69,53 @@ class PromptBackend:
         return await self.owner.persist_translation_success_observed()
 
 
-def _prompt_backend_for(settings: AppSettings) -> PromptBackend:
+def _prompt_backend_for(settings: AppSettingsVNext) -> PromptBackend:
     return PromptBackend(settings)
 
 
 def _patch_settings_save(monkeypatch: pytest.MonkeyPatch, callback) -> None:
     def persist(owner) -> None:
-        callback(owner.path, owner.compatibility_projection())
+        callback(owner.path, owner.canonical)
 
     monkeypatch.setattr(settings_module.SettingsOwner, "persist", persist)
 
 
-def _settings_for_connection(connection: TranslationConnection) -> AppSettings:
-    settings = AppSettings()
-    settings.translation.connection = connection
-    if connection == TranslationConnection.MANAGED_CHINA:
-        settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
-    elif connection == TranslationConnection.OFFICIAL_BYOK:
-        settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
-    elif connection == TranslationConnection.OLLAMA:
-        settings.translation.model = TranslationModel.LOCAL_LLM
-    settings.translation.connection_history[settings.translation.model.value] = connection
-    materialize_translation_settings(settings)
-    return settings
+def _settings_for_connection(connection: str) -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    model = settings.intent.translation.model
+    if connection in {"managed_china", "official_byok"}:
+        model = "deepseek_v4_flash"
+    elif connection == "ollama":
+        model = "local_llm"
+    history = dict(settings.intent.translation.connection_history)
+    history[model] = connection
+    return materialize_canonical_translation_settings(
+        replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                translation=replace(
+                    settings.intent.translation,
+                    model=model,
+                    connection=connection,
+                    connection_history=history,
+                ),
+            ),
+        )
+    )
+
+
+def _with_star_success(settings: AppSettingsVNext) -> AppSettingsVNext:
+    return replace(
+        settings,
+        state=replace(
+            settings.state,
+            github_star_prompt=replace(
+                settings.state.github_star_prompt,
+                translation_success_observed=True,
+            ),
+        ),
+    )
 
 
 async def _wait_until(predicate, *, attempts: int = 20) -> None:
@@ -108,16 +127,14 @@ async def _wait_until(predicate, *, attempts: int = 20) -> None:
 
 
 def test_official_byok_fixture_uses_supported_model_provider_combo() -> None:
-    settings = _settings_for_connection(TranslationConnection.OFFICIAL_BYOK)
+    settings = _settings_for_connection("official_byok")
 
-    settings.validate()
-
-    assert settings.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
-    assert settings.provider.llm == LLMProviderName.DEEPSEEK
+    assert settings.intent.translation.model == "deepseek_v4_flash"
+    assert settings.intent.translation.connection == "official_byok"
 
 
 def test_github_star_prompt_is_eligible_for_managed_remaining_percent_at_threshold() -> None:
-    controller = _prompt_backend_for(_settings_for_connection(TranslationConnection.MANAGED))
+    controller = _prompt_backend_for(_settings_for_connection("managed"))
     controller._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
         limit_usd=100.0,
         remaining_usd=60.0,
@@ -139,7 +156,7 @@ def test_github_star_prompt_is_eligible_for_managed_remaining_percent_at_thresho
 def test_github_star_prompt_skips_managed_when_usage_metadata_is_unavailable(
     metadata: OpenRouterKeyMetadata | None,
 ) -> None:
-    controller = _prompt_backend_for(_settings_for_connection(TranslationConnection.MANAGED))
+    controller = _prompt_backend_for(_settings_for_connection("managed"))
     controller._get_managed_usage_owner().usage_metadata = metadata
 
     assert controller.is_github_star_prompt_eligible() is False
@@ -147,27 +164,25 @@ def test_github_star_prompt_skips_managed_when_usage_metadata_is_unavailable(
 
 @pytest.mark.parametrize(
     "connection",
-    [TranslationConnection.OPENROUTER, TranslationConnection.OFFICIAL_BYOK],
+    ["openrouter", "official_byok"],
 )
 def test_github_star_prompt_is_eligible_for_recorded_user_owned_cloud_success(
-    connection: TranslationConnection,
+    connection: str,
 ) -> None:
-    settings = _settings_for_connection(connection)
-    settings.ui.github_star_prompt_translation_success_observed = True
+    settings = _with_star_success(_settings_for_connection(connection))
     controller = _prompt_backend_for(settings)
 
     assert controller.is_github_star_prompt_eligible() is True
 
 
 def test_github_star_prompt_skips_user_owned_cloud_without_recorded_success() -> None:
-    controller = _prompt_backend_for(_settings_for_connection(TranslationConnection.OPENROUTER))
+    controller = _prompt_backend_for(_settings_for_connection("openrouter"))
 
     assert controller.is_github_star_prompt_eligible() is False
 
 
 def test_github_star_prompt_excludes_local_ollama_from_user_owned_cloud_path() -> None:
-    settings = _settings_for_connection(TranslationConnection.OLLAMA)
-    settings.ui.github_star_prompt_translation_success_observed = True
+    settings = _with_star_success(_settings_for_connection("ollama"))
     controller = _prompt_backend_for(settings)
 
     assert controller.is_github_star_prompt_eligible() is False
@@ -175,60 +190,59 @@ def test_github_star_prompt_excludes_local_ollama_from_user_owned_cloud_path() -
 
 @pytest.mark.parametrize(
     "connection",
-    [TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA],
+    ["managed", "managed_china"],
 )
 def test_github_star_prompt_excludes_managed_connections_from_user_owned_cloud_path(
-    connection: TranslationConnection,
+    connection: str,
 ) -> None:
-    settings = _settings_for_connection(connection)
-    settings.ui.github_star_prompt_translation_success_observed = True
+    settings = _with_star_success(_settings_for_connection(connection))
     controller = _prompt_backend_for(settings)
 
     assert controller.is_github_star_prompt_eligible() is False
 
 
 def test_github_star_prompt_skips_ineligible_new_user_state() -> None:
-    controller = _prompt_backend_for(AppSettings())
+    controller = _prompt_backend_for(AppSettingsVNext())
 
     assert controller.is_github_star_prompt_eligible() is False
 
 
 @pytest.mark.parametrize(
     "connection",
-    [TranslationConnection.OPENROUTER, TranslationConnection.OFFICIAL_BYOK],
+    ["openrouter", "official_byok"],
 )
 def test_user_owned_cloud_translation_success_observation_persists_through_settings(
     monkeypatch: pytest.MonkeyPatch,
-    connection: TranslationConnection,
+    connection: str,
 ) -> None:
     settings = _settings_for_connection(connection)
     controller = _prompt_backend_for(settings)
     saved_payloads: list[dict[str, object]] = []
 
-    def fake_save_settings(_path: Path, updated: AppSettings) -> None:
-        saved_payloads.append(to_dict(updated))
+    def fake_save_settings(_path: Path, updated: AppSettingsVNext) -> None:
+        saved_payloads.append(canonical_to_dict(updated))
 
     _patch_settings_save(monkeypatch, fake_save_settings)
 
     assert controller._get_github_star_prompt_owner().record_translation_success_observed() is True
 
-    assert settings.ui.github_star_prompt_translation_success_observed is True
+    assert controller.settings.state.github_star_prompt.translation_success_observed is True
     assert saved_payloads
-    restored = from_dict(saved_payloads[-1])
-    assert restored.ui.github_star_prompt_translation_success_observed is True
+    restored = saved_payloads[-1]["state"]["github_star_prompt"]
+    assert restored["translation_success_observed"] is True
 
 
 @pytest.mark.parametrize(
     "connection",
     [
-        TranslationConnection.MANAGED,
-        TranslationConnection.MANAGED_CHINA,
-        TranslationConnection.OLLAMA,
+        "managed",
+        "managed_china",
+        "ollama",
     ],
 )
 def test_translation_success_observation_ignores_non_user_owned_cloud_connections(
     monkeypatch: pytest.MonkeyPatch,
-    connection: TranslationConnection,
+    connection: str,
 ) -> None:
     settings = _settings_for_connection(connection)
     controller = _prompt_backend_for(settings)
@@ -241,7 +255,7 @@ def test_translation_success_observation_ignores_non_user_owned_cloud_connection
 
     assert controller._get_github_star_prompt_owner().record_translation_success_observed() is False
 
-    assert settings.ui.github_star_prompt_translation_success_observed is False
+    assert controller.settings.state.github_star_prompt.translation_success_observed is False
     assert save_calls == []
 
 
@@ -299,7 +313,7 @@ async def test_event_bridge_schedules_github_star_observation_after_translation_
 async def test_event_bridge_records_successful_translation_for_user_owned_cloud_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = _settings_for_connection(TranslationConnection.OPENROUTER)
+    settings = _settings_for_connection("openrouter")
     controller = _prompt_backend_for(settings)
     saved_payloads: list[dict[str, object]] = []
 
@@ -307,8 +321,8 @@ async def test_event_bridge_records_successful_translation_for_user_owned_cloud_
         def set_display_translation_text(self, *_args: object, **_kwargs: object) -> None:
             return None
 
-    def fake_save_settings(_path: Path, updated: AppSettings) -> None:
-        saved_payloads.append(to_dict(updated))
+    def fake_save_settings(_path: Path, updated: AppSettingsVNext) -> None:
+        saved_payloads.append(canonical_to_dict(updated))
 
     _patch_settings_save(monkeypatch, fake_save_settings)
 
@@ -338,5 +352,5 @@ async def test_event_bridge_records_successful_translation_for_user_owned_cloud_
 
     await _wait_until(lambda: bool(saved_payloads))
 
-    assert settings.ui.github_star_prompt_translation_success_observed is True
+    assert controller.settings.state.github_star_prompt.translation_success_observed is True
     assert saved_payloads

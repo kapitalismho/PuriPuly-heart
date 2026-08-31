@@ -44,8 +44,14 @@ from puripuly_heart.app.services.application_shutdown import (
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
 from puripuly_heart.app.services.canonical_settings_persistence import (
-    materialize_compatibility_translation_settings,
+    materialize_canonical_translation_settings,
 )
+
+
+def _canonical_settings(settings: object) -> object:
+    return settings
+
+
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
@@ -104,7 +110,7 @@ class UiApplicationRuntimeStub:
         return merge(captured) if callable(merge) else captured
 
     def _compatibility_settings(self):
-        return getattr(self._backend, "settings", None)
+        return _canonical_settings(getattr(self._backend, "settings", None))
 
     def general_snapshot(self):
         settings = self._compatibility_settings()
@@ -149,7 +155,7 @@ class UiApplicationRuntimeStub:
             return materialize_provider_apply_intent(
                 current,
                 intent,
-                materialize_translation=materialize_compatibility_translation_settings,
+                materialize_translation=materialize_canonical_translation_settings,
             )
         return intent
 
@@ -280,7 +286,7 @@ class UiApplicationStateRuntimeStub:
 
     @property
     def compatibility_settings(self) -> object | None:
-        return getattr(self._backend, "settings", None)
+        return _canonical_settings(getattr(self._backend, "settings", None))
 
     @property
     def translation_enabled(self) -> bool:
@@ -301,10 +307,12 @@ class UiApplicationStateRuntimeStub:
     @property
     def peer_translation_eula_accepted(self) -> bool | None:
         settings = self.compatibility_settings
-        ui = getattr(settings, "ui", None)
-        return (
-            bool(getattr(ui, "peer_translation_eula_accepted", False)) if ui is not None else None
-        )
+        if settings is None:
+            return None
+        peer = getattr(getattr(settings, "state", None), "peer_translation", None)
+        if peer is None:
+            return None
+        return bool(getattr(peer, "eula_accepted", False))
 
     @property
     def microphone_test_active(self) -> bool:
@@ -312,17 +320,24 @@ class UiApplicationStateRuntimeStub:
 
     @property
     def provider_name(self) -> str | None:
+        from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
+            provider_llm_for_translation,
+        )
+
         settings = self.compatibility_settings
-        provider = getattr(getattr(settings, "provider", None), "llm", None)
-        value = getattr(provider, "value", provider)
-        return str(value) if value is not None else None
+        intent = getattr(settings, "intent", None)
+        translation = getattr(intent, "translation", None)
+        if translation is None:
+            return None
+        return provider_llm_for_translation(translation.model, translation.connection)
 
     @property
     def overlay_target(self) -> str | None:
         settings = self.compatibility_settings
-        target = getattr(getattr(settings, "overlay", None), "target", None)
-        value = getattr(target, "value", target)
-        return str(value) if value is not None else None
+        target = getattr(
+            getattr(getattr(settings, "intent", None), "overlay", None), "target", None
+        )
+        return str(target) if target is not None else None
 
     @property
     def desktop_overlay_captions_locked(self) -> bool:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -10,12 +11,9 @@ from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
 
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    STTProviderName,
-    to_dict,
-)
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.settings_vnext import serialization
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_FAILED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -26,25 +24,25 @@ from puripuly_heart.core.messages import (
 
 
 class FakeSettingsOwner:
-    def __init__(self, current: AppSettings, events: list[object]) -> None:
-        self.current = current
+    def __init__(self, current: AppSettingsVNext, events: list[object]) -> None:
+        self.canonical = current
         self.projection_snapshot = copy.deepcopy(current)
         self.events = events
         self.mutation_depth = 0
         self.rollback_pending = False
 
     @staticmethod
-    def legacy_snapshot_values(settings: AppSettings) -> dict[str, object]:
-        return to_dict(settings)
+    def snapshot_values(settings: AppSettingsVNext) -> dict[str, object]:
+        return serialization.to_dict(settings)
 
-    def project_legacy_delta(
+    def project_canonical_delta(
         self,
-        _base: AppSettings,
-        _next: AppSettings,
+        _base: AppSettingsVNext,
+        _next: AppSettingsVNext,
     ) -> object:
         return object()
 
-    def create_legacy_patch_repository(self, **_kwargs) -> object:
+    def create_canonical_patch_repository(self, **_kwargs) -> object:
         return object()
 
     def begin(self, **_kwargs) -> None:
@@ -52,7 +50,7 @@ class FakeSettingsOwner:
         self.rollback_pending = True
         self.events.append("begin")
 
-    def apply_legacy_delta(self, _base: AppSettings, _next: AppSettings) -> None:
+    def apply_canonical_delta(self, _base: AppSettingsVNext, _next: AppSettingsVNext) -> None:
         self.events.append("delta")
 
     def persist(self) -> None:
@@ -67,7 +65,7 @@ class FakeSettingsOwner:
         self.rollback_pending = False
         self.events.append("rollback")
 
-    def remember_projection(self, _settings: AppSettings) -> None:
+    def remember_projection(self, _settings: AppSettingsVNext) -> None:
         self.events.append("projection")
 
     def complete(self) -> None:
@@ -136,10 +134,10 @@ def _owner(
     apply_order24=None,
     events: list[object],
 ) -> ProviderApplicationOwner:
-    async def preserve(_settings: AppSettings) -> None:
+    async def preserve(_settings: AppSettingsVNext) -> None:
         events.append("preserve")
 
-    async def no_order24(_settings: AppSettings) -> bool:
+    async def no_order24(_settings: AppSettingsVNext) -> bool:
         return False
 
     return ProviderApplicationOwner(
@@ -172,9 +170,17 @@ async def test_provider_application_owner_routes_translation_patch_through_mutat
     events: list[object] = []
     requests: list[object] = []
     results = SettingsTransactionResultOwner()
-    baseline = AppSettings()
-    pending = copy.deepcopy(baseline)
-    pending.llm.concurrency_limit = baseline.llm.concurrency_limit + 1
+    baseline = AppSettingsVNext()
+    pending = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            translation=replace(
+                baseline.intent.translation,
+                concurrency_limit=baseline.intent.translation.concurrency_limit + 1,
+            ),
+        ),
+    )
     settings = FakeSettingsOwner(baseline, events)
     owner = _owner(
         settings=settings,
@@ -189,9 +195,12 @@ async def test_provider_application_owner_routes_translation_patch_through_mutat
     assert result is True
     assert len(requests) == 1
     assert requests[0].values == {
-        "llm.concurrency_limit": pending.llm.concurrency_limit,
+        "intent.translation.concurrency_limit": pending.intent.translation.concurrency_limit,
     }
-    assert settings.current.llm.concurrency_limit == pending.llm.concurrency_limit
+    assert (
+        settings.canonical.intent.translation.concurrency_limit
+        == pending.intent.translation.concurrency_limit
+    )
     assert events[0] == "preserve"
     assert events[-1] == "sync_ui"
 
@@ -201,16 +210,25 @@ async def test_provider_application_owner_routes_combined_surfaces_in_order() ->
     events: list[object] = []
     requests: list[object] = []
     results = SettingsTransactionResultOwner()
-    baseline = AppSettings()
-    pending = copy.deepcopy(baseline)
-    pending.provider.llm = LLMProviderName.LOCAL_LLM
-    pending.provider.stt = STTProviderName.SONIOX
-    pending.ui.locale = "ja"
+    baseline = AppSettingsVNext()
+    pending = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            translation=replace(
+                baseline.intent.translation,
+                model="local_llm",
+                connection="ollama",
+            ),
+            stt=replace(baseline.intent.stt, provider=STTProviderName.SONIOX.value),
+            ui=replace(baseline.intent.ui, locale="ja"),
+        ),
+    )
     settings = FakeSettingsOwner(baseline, events)
 
-    async def apply_order24(next_settings: AppSettings) -> bool:
+    async def apply_order24(next_settings: AppSettingsVNext) -> bool:
         events.append("order24")
-        settings.current = next_settings
+        settings.canonical = next_settings
         results.set(_applied_result())
         return True
 
@@ -220,8 +238,8 @@ async def test_provider_application_owner_routes_combined_surfaces_in_order() ->
         service=RecordingMutationService(requests),
         results=results,
         order24_patch_provider=lambda _settings: (
-            copy.deepcopy(settings.current),
-            {"ui.locale": "ja"},
+            copy.deepcopy(settings.canonical),
+            {"intent.ui.locale": "ja"},
         ),
         apply_order24=apply_order24,
         events=events,
@@ -235,9 +253,9 @@ async def test_provider_application_owner_routes_combined_surfaces_in_order() ->
         "settings.stt_language_audio",
     ]
     assert events.count("order24") == 1
-    assert settings.current.provider.llm == LLMProviderName.LOCAL_LLM
-    assert settings.current.provider.stt == STTProviderName.SONIOX
-    assert settings.current.ui.locale == "ja"
+    assert settings.canonical.intent.translation.model == "local_llm"
+    assert settings.canonical.intent.stt.provider == STTProviderName.SONIOX.value
+    assert settings.canonical.intent.ui.locale == "ja"
 
 
 @pytest.mark.asyncio
@@ -262,7 +280,7 @@ async def test_provider_application_owner_force_rebuild_owns_direct_apply_sequen
     for runtime_mode, expected_status, expected_code in cases:
         events: list[object] = []
         results = SettingsTransactionResultOwner()
-        settings = FakeSettingsOwner(AppSettings(), events)
+        settings = FakeSettingsOwner(AppSettingsVNext(), events)
         owner = _owner(
             settings=settings,
             runtime=FakeRuntimeOwner(events, mode=runtime_mode),
@@ -298,7 +316,7 @@ async def test_provider_application_owner_force_rebuild_owns_direct_apply_sequen
 async def test_provider_application_owner_runtime_only_apply_does_not_persist() -> None:
     events: list[object] = []
     owner = _owner(
-        settings=FakeSettingsOwner(AppSettings(), events),
+        settings=FakeSettingsOwner(AppSettingsVNext(), events),
         runtime=FakeRuntimeOwner(events),
         service=RecordingMutationService([]),
         results=SettingsTransactionResultOwner(),
@@ -315,7 +333,7 @@ async def test_provider_application_owner_runtime_only_apply_does_not_persist() 
 async def test_provider_application_owner_runtime_only_apply_can_preserve_ui_draft() -> None:
     events: list[object] = []
     owner = _owner(
-        settings=FakeSettingsOwner(AppSettings(), events),
+        settings=FakeSettingsOwner(AppSettingsVNext(), events),
         runtime=FakeRuntimeOwner(events),
         service=RecordingMutationService([]),
         results=SettingsTransactionResultOwner(),

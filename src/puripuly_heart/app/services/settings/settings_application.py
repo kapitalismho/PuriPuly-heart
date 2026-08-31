@@ -4,7 +4,7 @@ import asyncio
 import copy
 import json
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyPort
@@ -84,7 +84,26 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     _ui_prompt_clipboard_state_runtime_degraded_transaction_result,
     _ui_prompt_clipboard_state_save_failed_transaction_result,
 )
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.overlay_calibration import OverlayCalibration
+from puripuly_heart.config.provider_values import (
+    LLMProviderName,
+    OpenRouterCredentialSource,
+    OpenRouterLLMModel,
+    OpenRouterSelectionAlias,
+    QwenRegion,
+    STTProviderName,
+)
+from puripuly_heart.config.settings_vnext.schema import (
+    AppSettingsVNext,
+    DesktopFletOverlayPositionIntent,
+    TranslationFallbackIntent,
+    _infer_translation_fallback_alias,
+)
+from puripuly_heart.config.translation_values import (
+    TranslationConnection,
+    TranslationModel,
+    provider_llm_for_translation,
+)
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
@@ -99,7 +118,7 @@ from .settings_mutation import (
     UiPromptClipboardStateSettingsMutation,
 )
 from .settings_mutation_legacy import (
-    _apply_settings_path_patch,
+    apply_settings_path_patch,
     build_overlay_osc_output_settings_path_patch,
     settings_path_mutation_validator_for_command,
 )
@@ -131,16 +150,46 @@ def _settings_mutation_committed(result: TransactionResult) -> bool:
     }
 
 
-def _copy_runtime_only_ui_state(source: object, target: object) -> None:
-    target.ui.overlay_enabled = bool(source.ui.overlay_enabled)
-    target.ui.peer_translation_enabled = bool(source.ui.peer_translation_enabled)
+def _copy_runtime_only_ui_state(source: object, target: object) -> object:
+    return target
 
 
-def _active_prompt_key(settings: object) -> str:
-    provider = settings.provider.llm.value
+def _active_prompt_key(settings: AppSettingsVNext) -> str:
+    provider = provider_llm_for_translation(
+        settings.intent.translation.model,
+        settings.intent.translation.connection,
+    )
     if provider in {"gemini", "openrouter", "deepseek", "local_llm", "managed_gemma"}:
         return provider
     return "qwen"
+
+
+def _translation_model(value: object) -> TranslationModel:
+    return value if isinstance(value, TranslationModel) else TranslationModel(str(value))
+
+
+def _translation_connection(value: object) -> TranslationConnection:
+    return value if isinstance(value, TranslationConnection) else TranslationConnection(str(value))
+
+
+def _optional_translation_model(value: object) -> TranslationModel | None:
+    if value is None or value == "":
+        return None
+    return _translation_model(value)
+
+
+def _openrouter_selection_alias(value: object) -> OpenRouterSelectionAlias | None:
+    if value is None or value == "":
+        return None
+    return (
+        value
+        if isinstance(value, OpenRouterSelectionAlias)
+        else OpenRouterSelectionAlias(str(value))
+    )
+
+
+def _verified(entry: object) -> bool:
+    return getattr(entry, "status", None) == "verified"
 
 
 def settings_view_surface_snapshots(
@@ -151,102 +200,111 @@ def settings_view_surface_snapshots(
     PromptSettingsSnapshot,
     OverlaySettingsSnapshot,
 ]:
-    translation = settings.translation
+    if not isinstance(settings, AppSettingsVNext):
+        raise TypeError("settings snapshots require AppSettingsVNext")
+    intent = settings.intent
+    translation = intent.translation
+    verification = settings.state.provider_verification
     provider = ProviderSettingsSnapshot(
-        stt_provider=settings.provider.stt,
-        peer_stt_provider=settings.provider.peer_stt,
-        llm_provider=settings.provider.llm,
+        stt_provider=STTProviderName(intent.stt.provider),
+        peer_stt_provider=STTProviderName(intent.peer_stt.provider),
+        llm_provider=LLMProviderName(
+            provider_llm_for_translation(translation.model, translation.connection)
+        ),
         translation=TranslationSelectionSnapshot(
-            model=translation.model,
-            connection=translation.connection,
+            model=_translation_model(translation.model),
+            connection=_translation_connection(translation.connection),
             connection_history=tuple(
-                (model, connection)
-                for model in type(translation.model)
-                if (connection := translation.connection_history.get(model.value)) is not None
+                (_translation_model(model), _translation_connection(connection))
+                for model, connection in translation.connection_history.items()
             ),
             fallback=TranslationFallbackSnapshot(
                 enabled=translation.fallback.enabled,
-                model=translation.fallback.model,
-                connection=translation.fallback.connection,
+                model=_translation_model(translation.fallback.model),
+                connection=_translation_connection(translation.fallback.connection),
             ),
             http_extension_id=translation.http_extension_id,
-            previous_llm_model=translation.previous_llm_model,
+            previous_llm_model=_optional_translation_model(translation.previous_llm_model),
             gpu_device_id=translation.gpu_device_id,
         ),
-        stt_gpu_device_id=settings.stt.gpu_device_id,
-        qwen_region=settings.qwen.region,
-        local_llm_base_url=settings.local_llm.base_url,
-        local_llm_model=settings.local_llm.model,
+        stt_gpu_device_id=intent.stt.gpu_device_id,
+        qwen_region=QwenRegion(intent.translation.qwen.region),
+        local_llm_base_url=intent.local_llm.base_url,
+        local_llm_model=intent.local_llm.model,
         local_llm_extra_body_json=json.dumps(
-            settings.local_llm.extra_body,
+            intent.local_llm.extra_body,
             ensure_ascii=False,
             indent=2,
         ),
-        custom_stt_mode=settings.custom_stt.mode,
-        custom_stt_compatibility=settings.custom_stt.compatibility,
-        custom_stt_endpoint=settings.custom_stt.endpoint,
-        custom_stt_model=settings.custom_stt.model,
+        custom_stt_mode=intent.stt.custom.mode,
+        custom_stt_compatibility=intent.stt.custom.compatibility,
+        custom_stt_endpoint=intent.stt.custom.endpoint,
+        custom_stt_model=intent.stt.custom.model,
         custom_stt_extra_json=json.dumps(
-            settings.custom_stt.extra,
+            intent.stt.custom.extra,
             ensure_ascii=False,
             indent=2,
         ),
-        openrouter_llm_model=settings.openrouter.llm_model,
-        openrouter_selected_source=settings.openrouter.selected_source,
-        openrouter_selection_alias=settings.openrouter.selection_alias,
-        verified=ProviderVerificationSnapshot(
-            deepgram=settings.api_key_verified.deepgram,
-            soniox=settings.api_key_verified.soniox,
-            google=settings.api_key_verified.google,
-            openrouter=settings.api_key_verified.openrouter,
-            deepseek=settings.api_key_verified.deepseek,
-            alibaba_beijing=settings.api_key_verified.alibaba_beijing,
-            alibaba_singapore=settings.api_key_verified.alibaba_singapore,
-            cerebras=settings.api_key_verified.cerebras,
+        openrouter_llm_model=OpenRouterLLMModel(translation.openrouter_model),
+        openrouter_selected_source=OpenRouterCredentialSource(
+            translation.openrouter_selected_source
         ),
-        managed_referral_id=settings.managed_identity.referral_id,
+        openrouter_selection_alias=_openrouter_selection_alias(
+            translation.openrouter_selection_alias
+        ),
+        verified=ProviderVerificationSnapshot(
+            deepgram=_verified(verification.deepgram),
+            soniox=_verified(verification.soniox),
+            google=_verified(verification.google),
+            openrouter=_verified(verification.openrouter),
+            deepseek=_verified(verification.deepseek),
+            alibaba_beijing=_verified(verification.alibaba_beijing),
+            alibaba_singapore=_verified(verification.alibaba_singapore),
+            cerebras=_verified(verification.cerebras),
+        ),
+        managed_referral_id=settings.state.managed_connection.referral_id,
     )
     general = GeneralSettingsSnapshot(
-        locale=settings.ui.locale,
-        effective_peer_source_language=settings.languages.effective_peer_source,
-        input_host_api=settings.audio.input_host_api,
-        input_device=settings.audio.input_device,
-        output_device=settings.desktop_audio.output_device,
-        self_vad_speech_threshold=settings.stt.vad_speech_threshold,
-        peer_vad_speech_threshold=settings.desktop_audio.vad_speech_threshold,
-        peer_vad_hangover_ms=settings.desktop_audio.vad_hangover_ms,
-        peer_vad_pre_roll_ms=settings.desktop_audio.vad_pre_roll_ms,
-        osc_connection_mode=settings.osc.connection_mode,
-        osc_port=settings.osc.port,
-        osc_send_port=settings.osc.send_port,
-        osc_receive_port=settings.osc.receive_port,
-        vrc_mic_intercept=settings.osc.vrc_mic_intercept,
-        chatbox_include_source=settings.osc.chatbox_include_source,
-        clipboard_auto_translate_enabled=settings.ui.clipboard_auto_translate_enabled,
-        telemetry_enabled=settings.telemetry.enabled,
-        peer_expected_languages=tuple(settings.languages.peer_expected_languages),
+        locale=intent.ui.locale,
+        effective_peer_source_language=intent.languages.effective_peer_source,
+        input_host_api=intent.audio.input_host_api,
+        input_device=intent.audio.input_device,
+        output_device=intent.desktop_audio.output_device,
+        self_vad_speech_threshold=intent.stt.vad_speech_threshold,
+        peer_vad_speech_threshold=intent.desktop_audio.vad_speech_threshold,
+        peer_vad_hangover_ms=intent.desktop_audio.vad_hangover_ms,
+        peer_vad_pre_roll_ms=intent.desktop_audio.vad_pre_roll_ms,
+        osc_connection_mode=intent.osc.connection_mode,
+        osc_port=intent.osc.port,
+        osc_send_port=intent.osc.send_port,
+        osc_receive_port=intent.osc.receive_port,
+        vrc_mic_intercept=intent.osc.vrc_mic_intercept,
+        chatbox_include_source=intent.osc.chatbox_include_source,
+        clipboard_auto_translate_enabled=intent.clipboard.auto_translate_enabled,
+        telemetry_enabled=intent.telemetry.enabled,
+        peer_expected_languages=tuple(intent.languages.peer_expected_languages),
     )
-    source_language = settings.languages.source_language
+    source_language = intent.languages.source_language
     prompt = PromptSettingsSnapshot(
         active_provider_key=_active_prompt_key(settings),
         source_language=source_language,
-        system_prompt=settings.system_prompt,
-        custom_vocabulary_enabled=settings.stt.custom_vocabulary_enabled,
-        custom_vocabulary_terms=tuple(settings.stt.custom_terms.get(source_language, ())),
+        system_prompt=intent.prompts.system_prompt,
+        custom_vocabulary_enabled=intent.stt.custom_vocabulary_enabled,
+        custom_vocabulary_terms=tuple(intent.stt.custom_terms.get(source_language, ())),
         custom_vocabulary_other_languages_have_terms=any(
             bool(terms)
-            for language, terms in settings.stt.custom_terms.items()
+            for language, terms in intent.stt.custom_terms.items()
             if language != source_language
         ),
     )
-    calibration = settings.overlay.calibration
+    calibration = intent.overlay.calibration
     overlay = OverlaySettingsSnapshot(
-        target=settings.overlay.target,
-        show_translation=settings.overlay.show_translation,
-        show_peer_original=settings.overlay.show_peer_original,
-        desktop_size_preset=settings.overlay.desktop_flet.size_preset,
-        desktop_background_alpha=settings.overlay.desktop_flet.visual.background_alpha,
-        desktop_swap_caption_languages=settings.overlay.desktop_flet.swap_caption_languages,
+        target=intent.overlay.target,
+        show_translation=intent.overlay.show_translation,
+        show_peer_original=intent.overlay.show_peer_original,
+        desktop_size_preset=intent.overlay.desktop_flet.size_preset,
+        desktop_background_alpha=intent.overlay.desktop_flet.visual.background_alpha,
+        desktop_swap_caption_languages=intent.overlay.desktop_flet.swap_caption_languages,
         calibration=OverlayCalibrationSnapshot(
             anchor=calibration.anchor,
             distance=calibration.distance,
@@ -265,9 +323,12 @@ def osc_control_presentation_state(
     changed_control: OscControlPresentationName,
     self_capture_effective: bool | None = None,
 ) -> OscControlPresentationState:
-    translation = settings.translation
+    if not isinstance(settings, AppSettingsVNext):
+        raise TypeError("OSC presentation requires AppSettingsVNext")
+    intent = settings.intent
+    translation = intent.translation
     fallback = translation.fallback
-    source_language = settings.languages.source_language
+    source_language = intent.languages.source_language
     return OscControlPresentationState(
         changed_control=changed_control,
         self_capture=(
@@ -278,113 +339,229 @@ def osc_control_presentation_state(
         peer_capture=canonical_state.peer_capture,
         translation=canonical_state.translation,
         captions=canonical_state.captions,
-        peer_source_mode=settings.languages.peer_source_mode,
+        peer_source_mode=intent.languages.peer_source_mode,
         mute_sync=canonical_state.mute_sync,
         chatbox_source=canonical_state.chatbox_source,
         self_source_language=canonical_state.self_source_language,
         self_target_language=canonical_state.self_target_language,
+        self_secondary_target_language=canonical_state.self_secondary_target_language,
         peer_source_language=canonical_state.peer_source_language,
         peer_target_language=canonical_state.peer_target_language,
         self_asr=canonical_state.self_asr,
         peer_asr=canonical_state.peer_asr,
-        self_asr_setting=settings.provider.stt.value,
-        peer_asr_setting=settings.provider.peer_stt.value,
-        custom_stt_mode=settings.custom_stt.mode,
-        custom_stt_compatibility=settings.custom_stt.compatibility,
-        custom_vocabulary_enabled=bool(settings.stt.custom_vocabulary_enabled),
-        custom_vocabulary_terms=tuple(settings.stt.custom_terms.get(source_language, ())),
+        self_asr_setting=intent.stt.provider,
+        peer_asr_setting=intent.peer_stt.provider,
+        custom_stt_mode=intent.stt.custom.mode,
+        custom_stt_compatibility=intent.stt.custom.compatibility,
+        custom_vocabulary_enabled=bool(intent.stt.custom_vocabulary_enabled),
+        custom_vocabulary_terms=tuple(intent.stt.custom_terms.get(source_language, ())),
         custom_vocabulary_other_languages_have_terms=any(
             bool(terms)
-            for language, terms in settings.stt.custom_terms.items()
+            for language, terms in intent.stt.custom_terms.items()
             if language != source_language
         ),
-        llm_provider=settings.provider.llm.value,
-        openrouter_llm_model=settings.openrouter.llm_model.value,
-        openrouter_selected_source=settings.openrouter.selected_source.value,
-        openrouter_selection_alias=(
-            None
-            if settings.openrouter.selection_alias is None
-            else settings.openrouter.selection_alias.value
-        ),
-        translation_model=translation.model.value,
-        translation_connection=translation.connection.value,
+        llm_provider=provider_llm_for_translation(translation.model, translation.connection),
+        openrouter_llm_model=translation.openrouter_model,
+        openrouter_selected_source=translation.openrouter_selected_source,
+        openrouter_selection_alias=translation.openrouter_selection_alias,
+        translation_model=translation.model,
+        translation_connection=translation.connection,
         translation_connection_history=tuple(
             sorted(
-                (str(model), connection.value)
+                (str(model), str(connection))
                 for model, connection in translation.connection_history.items()
             )
         ),
         translation_http_extension_id=translation.http_extension_id,
-        translation_previous_model=(
-            None if translation.previous_llm_model is None else translation.previous_llm_model.value
-        ),
+        translation_previous_model=translation.previous_llm_model,
         fallback=canonical_state.fallback,
         fallback_enabled=bool(fallback.enabled),
-        fallback_model=fallback.model.value,
-        fallback_connection=fallback.connection.value,
+        fallback_model=fallback.model,
+        fallback_connection=fallback.connection,
     )
+
+
+def _with_intent(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext:
+    return replace(settings, intent=replace(settings.intent, **changes))
 
 
 def materialize_immediate_settings_intent(
     current: object,
     intent: ImmediateSettingsIntent,
 ) -> object:
-    updated = copy.deepcopy(current)
+    if not isinstance(current, AppSettingsVNext):
+        raise TypeError("immediate settings intents require AppSettingsVNext")
+    updated = current
     if isinstance(intent, LocaleSettingsIntent):
-        updated.ui.locale = intent.locale
+        updated = _with_intent(updated, ui=replace(updated.intent.ui, locale=intent.locale))
     elif isinstance(intent, AudioSettingsIntent):
         for change in intent.changes:
             if isinstance(change, AudioInputSettingsIntent):
-                updated.audio.input_host_api = change.input_host_api
-                updated.audio.input_device = change.input_device
+                updated = _with_intent(
+                    updated,
+                    audio=replace(
+                        updated.intent.audio,
+                        input_host_api=change.input_host_api,
+                        input_device=change.input_device,
+                    ),
+                )
             elif isinstance(change, DesktopAudioOutputSettingsIntent):
-                updated.desktop_audio.output_device = change.output_device
+                updated = _with_intent(
+                    updated,
+                    desktop_audio=replace(
+                        updated.intent.desktop_audio,
+                        output_device=change.output_device,
+                    ),
+                )
     elif isinstance(intent, SelfVadSettingsIntent):
-        updated.stt.vad_speech_threshold = intent.speech_threshold
+        updated = _with_intent(
+            updated,
+            stt=replace(updated.intent.stt, vad_speech_threshold=intent.speech_threshold),
+        )
     elif isinstance(intent, PeerVadSpeechThresholdIntent):
-        updated.desktop_audio.vad_speech_threshold = intent.speech_threshold
+        updated = _with_intent(
+            updated,
+            desktop_audio=replace(
+                updated.intent.desktop_audio,
+                vad_speech_threshold=intent.speech_threshold,
+            ),
+        )
     elif isinstance(intent, PeerVadHangoverIntent):
-        updated.desktop_audio.vad_hangover_ms = intent.hangover_ms
+        updated = _with_intent(
+            updated,
+            desktop_audio=replace(
+                updated.intent.desktop_audio,
+                vad_hangover_ms=intent.hangover_ms,
+            ),
+        )
     elif isinstance(intent, PeerVadPreRollIntent):
-        updated.desktop_audio.vad_pre_roll_ms = intent.pre_roll_ms
+        updated = _with_intent(
+            updated,
+            desktop_audio=replace(
+                updated.intent.desktop_audio,
+                vad_pre_roll_ms=intent.pre_roll_ms,
+            ),
+        )
     elif isinstance(intent, OscConnectionSettingsIntent):
-        updated.osc.connection_mode = intent.connection_mode
-        updated.osc.send_port = intent.send_port
-        updated.osc.receive_port = intent.receive_port
+        updated = _with_intent(
+            updated,
+            osc=replace(
+                updated.intent.osc,
+                connection_mode=intent.connection_mode,
+                send_port=intent.send_port,
+                receive_port=intent.receive_port,
+            ),
+        )
     elif isinstance(intent, VrcMicInterceptSettingsIntent):
-        updated.osc.vrc_mic_intercept = intent.enabled
+        updated = _with_intent(
+            updated,
+            osc=replace(updated.intent.osc, vrc_mic_intercept=intent.enabled),
+        )
     elif isinstance(intent, ChatboxSourceSettingsIntent):
-        updated.osc.chatbox_include_source = intent.enabled
+        updated = _with_intent(
+            updated,
+            osc=replace(updated.intent.osc, chatbox_include_source=intent.enabled),
+        )
     elif isinstance(intent, ClipboardSettingsIntent):
-        updated.ui.clipboard_auto_translate_enabled = intent.enabled
+        updated = _with_intent(
+            updated,
+            clipboard=replace(updated.intent.clipboard, auto_translate_enabled=intent.enabled),
+        )
     elif isinstance(intent, PeerExpectedLanguagesIntent):
-        updated.languages.peer_expected_languages = list(intent.languages)
+        updated = _with_intent(
+            updated,
+            languages=replace(
+                updated.intent.languages,
+                peer_expected_languages=list(intent.languages),
+            ),
+        )
     elif isinstance(intent, CustomVocabularySettingsIntent):
-        updated.stt.custom_terms[intent.source_language] = list(intent.terms)
-        updated.stt.custom_vocabulary_enabled = any(updated.stt.custom_terms.values())
+        custom_terms = dict(updated.intent.stt.custom_terms)
+        custom_terms[intent.source_language] = list(intent.terms)
+        updated = _with_intent(
+            updated,
+            stt=replace(
+                updated.intent.stt,
+                custom_terms=custom_terms,
+                custom_vocabulary_enabled=any(custom_terms.values()),
+            ),
+        )
     elif isinstance(intent, OverlayTargetSettingsIntent):
-        updated.overlay.target = intent.target
+        updated = _with_intent(
+            updated,
+            overlay=replace(updated.intent.overlay, target=intent.target),
+        )
     elif isinstance(intent, OverlayTranslationSettingsIntent):
-        updated.overlay.show_translation = intent.enabled
+        updated = _with_intent(
+            updated,
+            overlay=replace(updated.intent.overlay, show_translation=intent.enabled),
+        )
     elif isinstance(intent, OverlayPeerOriginalSettingsIntent):
-        updated.overlay.show_peer_original = intent.enabled
+        updated = _with_intent(
+            updated,
+            overlay=replace(updated.intent.overlay, show_peer_original=intent.enabled),
+        )
     elif isinstance(intent, DesktopOverlayBackgroundAlphaIntent):
-        updated.overlay.desktop_flet.visual.background_alpha = intent.background_alpha
+        desktop = updated.intent.overlay.desktop_flet
+        updated = _with_intent(
+            updated,
+            overlay=replace(
+                updated.intent.overlay,
+                desktop_flet=replace(
+                    desktop,
+                    visual=replace(desktop.visual, background_alpha=intent.background_alpha),
+                ),
+            ),
+        )
     elif isinstance(intent, DesktopOverlaySwapCaptionLanguagesIntent):
-        updated.overlay.desktop_flet.swap_caption_languages = intent.enabled
+        updated = _with_intent(
+            updated,
+            overlay=replace(
+                updated.intent.overlay,
+                desktop_flet=replace(
+                    updated.intent.overlay.desktop_flet,
+                    swap_caption_languages=intent.enabled,
+                ),
+            ),
+        )
     elif isinstance(intent, DesktopOverlaySizeIntent):
-        updated.overlay.desktop_flet.size_preset = intent.size_preset
+        updated = _with_intent(
+            updated,
+            overlay=replace(
+                updated.intent.overlay,
+                desktop_flet=replace(
+                    updated.intent.overlay.desktop_flet,
+                    size_preset=intent.size_preset,
+                ),
+            ),
+        )
     elif isinstance(intent, DesktopOverlayPositionResetIntent):
-        updated.overlay.desktop_flet.position.x = None
-        updated.overlay.desktop_flet.position.y = None
-        updated.overlay.desktop_flet.locked = False
+        updated = _with_intent(
+            updated,
+            overlay=replace(
+                updated.intent.overlay,
+                desktop_flet=replace(
+                    updated.intent.overlay.desktop_flet,
+                    position=DesktopFletOverlayPositionIntent(x=None, y=None),
+                ),
+            ),
+        )
     elif isinstance(intent, OverlayCalibrationSettingsIntent):
         calibration = intent.calibration
-        updated.overlay.calibration.anchor = calibration.anchor
-        updated.overlay.calibration.distance = calibration.distance
-        updated.overlay.calibration.offset_x = calibration.offset_x
-        updated.overlay.calibration.offset_y = calibration.offset_y
-        updated.overlay.calibration.text_scale = calibration.text_scale
+        updated = _with_intent(
+            updated,
+            overlay=replace(
+                updated.intent.overlay,
+                calibration=OverlayCalibration(
+                    anchor=calibration.anchor,
+                    distance=calibration.distance,
+                    offset_x=calibration.offset_x,
+                    offset_y=calibration.offset_y,
+                    text_scale=calibration.text_scale,
+                    background_alpha=updated.intent.overlay.calibration.background_alpha,
+                ),
+            ),
+        )
     return updated
 
 
@@ -392,10 +569,12 @@ def materialize_prompt_apply_intent(
     current: object,
     intent: PromptApplyIntent,
 ) -> object:
-    updated = copy.deepcopy(current)
-    updated.system_prompt = intent.value
-    updated.system_prompts = {}
-    return updated
+    if not isinstance(current, AppSettingsVNext):
+        raise TypeError("prompt apply intents require AppSettingsVNext")
+    return _with_intent(
+        current,
+        prompts=replace(current.intent.prompts, system_prompt=intent.value),
+    )
 
 
 def materialize_provider_apply_intent(
@@ -404,49 +583,157 @@ def materialize_provider_apply_intent(
     *,
     materialize_translation: Callable[[object], object],
 ) -> object:
-    updated = copy.deepcopy(current)
+    if not isinstance(current, AppSettingsVNext):
+        raise TypeError("provider apply intents require AppSettingsVNext")
+    updated = current
     for edit in intent.edits:
         if isinstance(edit, SelfSttProviderEdit):
-            updated.provider.stt = edit.provider
+            updated = _with_intent(
+                updated,
+                stt=replace(
+                    updated.intent.stt,
+                    provider=str(getattr(edit.provider, "value", edit.provider)),
+                ),
+            )
         elif isinstance(edit, PeerSttProviderEdit):
-            updated.provider.peer_stt = edit.provider
+            updated = _with_intent(
+                updated,
+                peer_stt=replace(
+                    updated.intent.peer_stt,
+                    provider=str(getattr(edit.provider, "value", edit.provider)),
+                ),
+            )
         elif isinstance(edit, SttGpuDeviceEdit):
-            updated.stt.gpu_device_id = edit.device_id
+            updated = _with_intent(
+                updated,
+                stt=replace(updated.intent.stt, gpu_device_id=edit.device_id),
+            )
         elif isinstance(edit, LlmGpuDeviceEdit):
-            updated.translation.gpu_device_id = edit.device_id
+            updated = _with_intent(
+                updated,
+                translation=replace(updated.intent.translation, gpu_device_id=edit.device_id),
+            )
         elif isinstance(edit, TranslationSelectionEdit):
             selection = edit.selection
-            updated.translation.model = selection.model
-            updated.translation.connection = selection.connection
+            history = dict(updated.intent.translation.connection_history)
             for model, connection in edit.history_updates:
-                updated.translation.connection_history[model.value] = connection
-            updated.translation.previous_llm_model = selection.previous_llm_model
-            materialize_translation(updated)
+                history[str(getattr(model, "value", model))] = str(
+                    getattr(connection, "value", connection)
+                )
+            previous = selection.previous_llm_model
+            updated = _with_intent(
+                updated,
+                translation=replace(
+                    updated.intent.translation,
+                    model=str(getattr(selection.model, "value", selection.model)),
+                    connection=str(getattr(selection.connection, "value", selection.connection)),
+                    connection_history=history,
+                    previous_llm_model=(
+                        None if previous is None else str(getattr(previous, "value", previous))
+                    ),
+                ),
+            )
+            materialized = materialize_translation(updated)
+            if isinstance(materialized, AppSettingsVNext):
+                updated = materialized
         elif isinstance(edit, TranslationFallbackEdit):
-            updated.translation.fallback.enabled = edit.fallback.enabled
-            updated.translation.fallback.model = edit.fallback.model
-            updated.translation.fallback.connection = edit.fallback.connection
+            fallback_model = str(getattr(edit.fallback.model, "value", edit.fallback.model))
+            fallback_connection = str(
+                getattr(edit.fallback.connection, "value", edit.fallback.connection)
+            )
+            updated = _with_intent(
+                updated,
+                translation=replace(
+                    updated.intent.translation,
+                    fallback=TranslationFallbackIntent(
+                        selection_alias=_infer_translation_fallback_alias(
+                            enabled=edit.fallback.enabled,
+                            model=fallback_model,
+                            connection=fallback_connection,
+                        )
+                    ),
+                ),
+            )
         elif isinstance(edit, TranslationHttpExtensionEdit):
-            updated.translation.http_extension_id = edit.extension_id
+            updated = _with_intent(
+                updated,
+                translation=replace(
+                    updated.intent.translation,
+                    http_extension_id=edit.extension_id,
+                ),
+            )
         elif isinstance(edit, QwenRegionEdit):
-            updated.qwen.region = edit.region
+            updated = _with_intent(
+                updated,
+                translation=replace(
+                    updated.intent.translation,
+                    qwen=replace(
+                        updated.intent.translation.qwen,
+                        region=str(getattr(edit.region, "value", edit.region)),
+                    ),
+                ),
+            )
         elif isinstance(edit, LocalLlmBaseUrlEdit):
-            updated.local_llm.base_url = edit.base_url
+            updated = _with_intent(
+                updated,
+                local_llm=replace(updated.intent.local_llm, base_url=edit.base_url),
+            )
         elif isinstance(edit, LocalLlmModelEdit):
-            updated.local_llm.model = edit.model
+            updated = _with_intent(
+                updated,
+                local_llm=replace(updated.intent.local_llm, model=edit.model),
+            )
         elif isinstance(edit, LocalLlmExtraBodyEdit):
-            updated.local_llm.extra_body = json.loads(edit.extra_body_json)
+            updated = _with_intent(
+                updated,
+                local_llm=replace(
+                    updated.intent.local_llm,
+                    extra_body=json.loads(edit.extra_body_json),
+                ),
+            )
         elif isinstance(edit, CustomSttEndpointEdit):
-            updated.custom_stt.endpoint = edit.endpoint
+            updated = _with_intent(
+                updated,
+                stt=replace(
+                    updated.intent.stt,
+                    custom=replace(updated.intent.stt.custom, endpoint=edit.endpoint),
+                ),
+            )
         elif isinstance(edit, CustomSttModelEdit):
-            updated.custom_stt.model = edit.model
+            updated = _with_intent(
+                updated,
+                stt=replace(
+                    updated.intent.stt,
+                    custom=replace(updated.intent.stt.custom, model=edit.model),
+                ),
+            )
         elif isinstance(edit, CustomSttExtraEdit):
-            updated.custom_stt.extra = json.loads(edit.extra_json)
+            updated = _with_intent(
+                updated,
+                stt=replace(
+                    updated.intent.stt,
+                    custom=replace(
+                        updated.intent.stt.custom,
+                        extra=json.loads(edit.extra_json),
+                    ),
+                ),
+            )
         elif isinstance(edit, ManagedReferralEdit):
-            updated.managed_identity.referral_id = edit.referral_id
+            updated = replace(
+                updated,
+                state=replace(
+                    updated.state,
+                    managed_connection=replace(
+                        updated.state.managed_connection,
+                        referral_id=edit.referral_id,
+                    ),
+                ),
+            )
         elif isinstance(edit, SystemPromptEdit):
-            updated.system_prompt = edit.value
-            updated.system_prompts = {}
+            updated = _with_intent(
+                updated,
+                prompts=replace(updated.intent.prompts, system_prompt=edit.value),
+            )
     return updated
 
 
@@ -454,7 +741,7 @@ def materialize_provider_apply_intent(
 class SettingsApplicationOwner:
     settings: SettingsOwner
     projection: SettingsProjectionOwner
-    runtime_effects: SettingsRuntimeEffectsPort[object]
+    runtime_effects: SettingsRuntimeEffectsPort[AppSettingsVNext]
     manual_fallback: ManualLocalASRFallbackOwner
     cpu_auto_available: Callable[[], bool]
     inspect_cpu: SettingsAsyncEffect
@@ -462,18 +749,18 @@ class SettingsApplicationOwner:
     sync_ui: Callable[[], None]
     fallback_log_sink: SettingsFallbackLogSink
     mutation_service_provider: SettingsMutationServiceProvider
-    consume_superseded_settings: Callable[[object], bool]
+    consume_superseded_settings: Callable[[AppSettingsVNext], bool]
     active_local_asr_change: SettingsPredicate
     failure_sink: SettingsFailureSink
     results: SettingsTransactionResultOwner = field(default_factory=SettingsTransactionResultOwner)
 
     async def apply(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
         *,
         reload_settings_view: bool = True,
     ) -> bool:
-        current = self.settings.current
+        current = self.settings.canonical
         if current is not None:
             self.settings.normalize_compatibility(current)
         self.settings.normalize_compatibility(next_settings)
@@ -513,12 +800,12 @@ class SettingsApplicationOwner:
                         self_provider=(
                             fallback_plan.self_provider
                             if "self" in fallback_channels
-                            else next_settings.provider.stt.value
+                            else next_settings.intent.stt.provider
                         ),
                         peer_provider=(
                             fallback_plan.peer_provider
                             if "peer" in fallback_channels
-                            else next_settings.provider.peer_stt.value
+                            else next_settings.intent.peer_stt.provider
                         ),
                         fallback_channels=fallback_channels,
                         installation_fallback=bool(
@@ -527,7 +814,7 @@ class SettingsApplicationOwner:
                     ),
                 )
             installation_fallback = bool(fallback_plan.installation_fallback and fallback_channels)
-        if next_settings is not self.settings.current:
+        if next_settings is not self.settings.canonical:
             if await self._route(
                 next_settings,
                 reload_settings_view=reload_settings_view,
@@ -543,7 +830,7 @@ class SettingsApplicationOwner:
 
     async def _route(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
         *,
         reload_settings_view: bool,
     ) -> bool:
@@ -569,7 +856,7 @@ class SettingsApplicationOwner:
         self.fallback_sink(channels, installation_fallback)
 
     def persist_manual_fallback(self, *, channel: str | None = None) -> bool:
-        previous = self.settings.current
+        previous = self.settings.canonical
         if previous is None:
             return False
         plan = self.manual_fallback.plan(
@@ -582,11 +869,11 @@ class SettingsApplicationOwner:
         if not plan.changed:
             return True
         normalized = self.manual_fallback.apply(previous, plan)
-        self.settings.current = normalized
+        self.settings.canonical = normalized
         if not self.settings.save_current(
             failure_sink=lambda exc: self.failure_sink(f"Failed to save settings: {exc}")
         ):
-            self.settings.current = previous
+            self.settings.canonical = previous
             return False
         self.sync_ui()
         self.fallback_sink(
@@ -602,27 +889,27 @@ class SettingsApplicationOwner:
 
     async def apply_direct(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
         *,
         persist: bool = True,
         strict_runtime_errors: bool = False,
         strict_persistence_errors: bool = False,
         reload_settings_view: bool = True,
     ) -> None:
-        await self.runtime_effects.preserve_before_replace(next_settings)
+        next_settings = await self.runtime_effects.preserve_before_replace(next_settings)
         if persist:
-            baseline = self.settings.projection_snapshot or self.settings.current
-            self.settings.begin(legacy_snapshot=baseline)
+            baseline = self.settings.projection_snapshot or self.settings.canonical
+            self.settings.begin(snapshot=baseline)
         committed = not persist
         try:
             if persist:
                 self.runtime_effects.capture_runtime_signatures()
-                self.settings.apply_legacy_delta(baseline, next_settings)
+                self.settings.apply_canonical_delta(baseline, next_settings)
             transition = await self.runtime_effects.prepare(
-                self.settings.current,
+                self.settings.canonical,
                 next_settings,
             )
-            self.settings.current = transition.settings
+            self.settings.canonical = transition.settings
             self.runtime_effects.activate_before_persist(transition)
             if persist:
                 if strict_persistence_errors:
@@ -641,7 +928,7 @@ class SettingsApplicationOwner:
                 strict_runtime_errors=strict_runtime_errors,
                 reload_settings_view=reload_settings_view,
             )
-            self.projection.remember_all(self.settings.current)
+            self.projection.remember_all(self.settings.canonical)
         finally:
             if persist:
                 if committed:
@@ -663,13 +950,13 @@ class SettingsApplicationOwner:
 
     async def apply_ui_prompt_clipboard_state(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
     ) -> bool:
         return await self._apply_ui_prompt_clipboard_state(next_settings)
 
     async def apply_overlay_osc_output(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
     ) -> bool:
         return await self._apply_overlay_osc_output(next_settings)
 
@@ -677,35 +964,41 @@ class SettingsApplicationOwner:
         self,
         change: LanguageSelectionChange,
     ) -> None:
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None:
             return
-        updated = copy.deepcopy(current)
-        updated.languages.source_language = change.source_code
-        updated.languages.target_language = change.target_code
-        updated.languages.peer_source_mode = change.peer_source_mode
-        updated.languages.peer_source_language = change.peer_source_code
-        updated.languages.peer_target_language = change.peer_target_code
-        updated.languages.recent_source_languages = list(change.recent_source_codes)
-        updated.languages.recent_target_languages = list(change.recent_target_codes)
+        updated = _with_intent(
+            current,
+            languages=replace(
+                current.intent.languages,
+                source_language=change.source_code,
+                target_language=change.target_code,
+                secondary_target_language=change.secondary_target_code,
+                peer_source_mode=change.peer_source_mode,
+                peer_source_language=change.peer_source_code,
+                peer_target_language=change.peer_target_code,
+                recent_source_languages=list(change.recent_source_codes),
+                recent_target_languages=list(change.recent_target_codes),
+            ),
+        )
         await self.apply(updated)
-        if self.settings.current is not None:
+        if self.settings.canonical is not None:
             self.projection.render(
-                self.settings.current,
+                self.settings.canonical,
                 preserve_custom_vocab_draft=True,
             )
 
     async def compensate_failed_local_asr_settings_apply(
         self,
         *,
-        base_settings: object,
-        committed_settings: object,
+        base_settings: AppSettingsVNext,
+        committed_settings: AppSettingsVNext,
         reload_settings_view: bool = True,
     ) -> None:
-        self.settings.begin(legacy_snapshot=committed_settings)
+        self.settings.begin(snapshot=committed_settings)
         committed = False
         try:
-            self.settings.apply_legacy_delta(
+            self.settings.apply_canonical_delta(
                 committed_settings,
                 base_settings,
             )
@@ -723,16 +1016,16 @@ class SettingsApplicationOwner:
             strict_runtime_errors=False,
             reload_settings_view=reload_settings_view,
         )
-        self.settings.current = copy.deepcopy(base_settings)
+        self.settings.canonical = copy.deepcopy(base_settings)
         if reload_settings_view:
             self.projection.render(
-                self.settings.current,
+                self.settings.canonical,
                 preserve_custom_vocab_draft=True,
             )
 
     async def _apply_combined(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
         *,
         reload_settings_view: bool,
     ) -> bool:
@@ -752,11 +1045,10 @@ class SettingsApplicationOwner:
             *,
             runtime_source: object | None = None,
         ) -> bool:
-            current = self.settings.current
+            current = self.settings.canonical
             if current is None:
                 return False
-            patch_settings = copy.deepcopy(current)
-            _apply_settings_path_patch(patch_settings, values)
+            patch_settings = apply_settings_path_patch(current, values)
             if runtime_source is not None:
                 _copy_runtime_only_ui_state(runtime_source, patch_settings)
             if not await apply_patch(patch_settings):
@@ -794,11 +1086,11 @@ class SettingsApplicationOwner:
                 return True
 
         committed_before_full_draft = (
-            copy.deepcopy(self.settings.current) if self.settings.current is not None else None
+            copy.deepcopy(self.settings.canonical) if self.settings.canonical is not None else None
         )
-        if self.settings.current is not None and self.settings.legacy_snapshot_values(
-            self.settings.current
-        ) != self.settings.legacy_snapshot_values(next_settings):
+        if self.settings.canonical is not None and self.settings.snapshot_values(
+            self.settings.canonical
+        ) != self.settings.snapshot_values(next_settings):
             try:
                 await self.apply_direct(
                     next_settings,
@@ -821,9 +1113,9 @@ class SettingsApplicationOwner:
             except Exception:
                 self._set_result(_ui_prompt_clipboard_state_runtime_degraded_transaction_result())
 
-        if reload_settings_view and self.settings.current is not None:
+        if reload_settings_view and self.settings.canonical is not None:
             self.projection.render(
-                self.settings.current,
+                self.settings.canonical,
                 preserve_custom_vocab_draft=True,
             )
         if (
@@ -845,7 +1137,7 @@ class SettingsApplicationOwner:
 
     async def _apply_stt_language_audio(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
         *,
         reload_settings_view: bool = True,
     ) -> bool:
@@ -855,11 +1147,10 @@ class SettingsApplicationOwner:
         base_settings, patch_values = base_and_patch
         if not patch_values:
             return False
-        committed_settings = copy.deepcopy(base_settings)
-        _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = self.settings.legacy_snapshot_values(
+        committed_settings = apply_settings_path_patch(base_settings, patch_values)
+        has_out_of_scope_draft = self.settings.snapshot_values(
             committed_settings
-        ) != self.settings.legacy_snapshot_values(next_settings)
+        ) != self.settings.snapshot_values(next_settings)
         runtime_apply = (
             NoopRuntimeApply()
             if has_out_of_scope_draft
@@ -878,11 +1169,11 @@ class SettingsApplicationOwner:
             runtime_apply=runtime_apply,
         )
         if not _settings_mutation_committed(result):
-            self.settings.current = copy.deepcopy(base_settings)
-            self.projection.remember_order22(self.settings.current)
+            self.settings.canonical = copy.deepcopy(base_settings)
+            self.projection.remember_order22(self.settings.canonical)
             return True
         if self.consume_superseded_settings(committed_settings):
-            self.projection.remember_order22(self.settings.current)
+            self.projection.remember_order22(self.settings.canonical)
             return True
         if (
             not has_out_of_scope_draft
@@ -900,7 +1191,7 @@ class SettingsApplicationOwner:
                 )
             except Exception:
                 self.failure_sink("Failed to compensate local ASR settings apply")
-            self.projection.remember_order22(self.settings.current)
+            self.projection.remember_order22(self.settings.canonical)
             return True
         if has_out_of_scope_draft:
             try:
@@ -931,13 +1222,13 @@ class SettingsApplicationOwner:
                 if unavailable is not None:
                     self._set_result(_runtime_apply_result_as_degraded_transaction(unavailable))
         else:
-            self.settings.current = committed_settings
+            self.settings.canonical = committed_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
                 self.runtime_effects.sync_signatures(committed_settings)
-        self.projection.remember_order22(self.settings.current)
+        self.projection.remember_order22(self.settings.canonical)
         return True
 
-    async def _apply_overlay_osc_output(self, next_settings: object) -> bool:
+    async def _apply_overlay_osc_output(self, next_settings: AppSettingsVNext) -> bool:
         base_and_patch = self.projection.order23_patch_base_and_values(next_settings)
         if base_and_patch is None:
             return False
@@ -953,11 +1244,10 @@ class SettingsApplicationOwner:
             base_settings,
             next_settings,
         )
-        committed_settings = copy.deepcopy(base_settings)
-        _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = self.settings.legacy_snapshot_values(
+        committed_settings = apply_settings_path_patch(base_settings, patch_values)
+        has_out_of_scope_draft = self.settings.snapshot_values(
             committed_settings
-        ) != self.settings.legacy_snapshot_values(next_settings)
+        ) != self.settings.snapshot_values(next_settings)
         runtime_apply = (
             NoopRuntimeApply()
             if has_out_of_scope_draft
@@ -974,8 +1264,8 @@ class SettingsApplicationOwner:
             runtime_apply=runtime_apply,
         )
         if not _settings_mutation_committed(result):
-            self.settings.current = copy.deepcopy(base_settings)
-            self.projection.remember_order23(self.settings.current)
+            self.settings.canonical = copy.deepcopy(base_settings)
+            self.projection.remember_order23(self.settings.canonical)
             return True
         if has_out_of_scope_draft:
             try:
@@ -997,14 +1287,14 @@ class SettingsApplicationOwner:
                 )
             except Exception:
                 self._set_result(_overlay_osc_output_runtime_degraded_transaction_result())
-        elif self.settings.current is None or self.settings.current is base_settings:
-            self.settings.current = committed_settings
-        self.projection.remember_order23(self.settings.current)
+        elif self.settings.canonical is None or self.settings.canonical is base_settings:
+            self.settings.canonical = committed_settings
+        self.projection.remember_order23(self.settings.canonical)
         return True
 
     async def _apply_ui_prompt_clipboard_state(
         self,
-        next_settings: object,
+        next_settings: AppSettingsVNext,
     ) -> bool:
         base_and_patch = self.projection.order24_patch_base_and_values(next_settings)
         if base_and_patch is None:
@@ -1012,11 +1302,10 @@ class SettingsApplicationOwner:
         base_settings, patch_values = base_and_patch
         if not patch_values:
             return False
-        committed_settings = copy.deepcopy(base_settings)
-        _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = self.settings.legacy_snapshot_values(
+        committed_settings = apply_settings_path_patch(base_settings, patch_values)
+        has_out_of_scope_draft = self.settings.snapshot_values(
             committed_settings
-        ) != self.settings.legacy_snapshot_values(next_settings)
+        ) != self.settings.snapshot_values(next_settings)
         runtime_settings = copy.deepcopy(next_settings)
         runtime_apply = (
             NoopRuntimeApply()
@@ -1028,14 +1317,14 @@ class SettingsApplicationOwner:
         )
         result = await self._mutate(
             command=UiPromptClipboardStateSettingsMutation(values=patch_values),
-            base_settings=self.settings.current or committed_settings,
+            base_settings=self.settings.canonical or committed_settings,
             committed_settings=committed_settings,
             surface="ui_prompt_clipboard_state",
             runtime_apply=runtime_apply,
         )
         if not _settings_mutation_committed(result):
-            self.settings.current = copy.deepcopy(base_settings)
-            self.projection.remember_order24(self.settings.current)
+            self.settings.canonical = copy.deepcopy(base_settings)
+            self.projection.remember_order24(self.settings.canonical)
             return True
         if has_out_of_scope_draft:
             try:
@@ -1058,22 +1347,22 @@ class SettingsApplicationOwner:
             except Exception:
                 self._set_result(_ui_prompt_clipboard_state_runtime_degraded_transaction_result())
         else:
-            self.settings.current = runtime_settings
+            self.settings.canonical = runtime_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
                 self.runtime_effects.sync_signatures(runtime_settings)
-        self.projection.remember_order24(self.settings.current)
+        self.projection.remember_order24(self.settings.canonical)
         return True
 
     async def _mutate(
         self,
         *,
         command: SettingsMutationCommand,
-        base_settings: object,
-        committed_settings: object,
+        base_settings: AppSettingsVNext,
+        committed_settings: AppSettingsVNext,
         surface: str,
         runtime_apply: RuntimeApplyPort,
     ) -> TransactionResult:
-        repository = self.settings.create_legacy_patch_repository(
+        repository = self.settings.create_canonical_patch_repository(
             base_settings=base_settings,
             committed_settings=committed_settings,
             surface=surface,
@@ -1107,8 +1396,8 @@ class SettingsApplicationOwner:
     async def _resync_committed_runtime(
         self,
         *,
-        base_settings: object,
-        committed_settings: object,
+        base_settings: AppSettingsVNext,
+        committed_settings: AppSettingsVNext,
         failure_message: str,
     ) -> None:
         self.runtime_effects.restore_memory(base_settings)

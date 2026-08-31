@@ -350,6 +350,68 @@ def build_managed_identity_state_port(
     return ManagedIdentityStateAdapter(identity, persist)
 
 
+def managed_identity_state_port_from_vnext(
+    owner: SettingsOwner,
+    settings: AppSettingsVNext,
+) -> ManagedIdentityStatePort:
+    from dataclasses import asdict, fields, replace
+    from types import SimpleNamespace
+
+    from puripuly_heart.config.settings_vnext.schema import ManagedConnectionState
+
+    bag = SimpleNamespace(**asdict(settings.state.managed_connection))
+
+    def persist() -> None:
+        live = owner.canonical or settings
+        values = {field.name: getattr(bag, field.name) for field in fields(ManagedConnectionState)}
+        next_settings = replace(
+            live,
+            state=replace(
+                live.state,
+                managed_connection=ManagedConnectionState(**values),
+            ),
+        )
+        owner.persist_managed_identity(next_settings)
+
+    return ManagedIdentityStateAdapter(bag, persist)
+
+
+def _vnext_with_managed_identity(
+    settings: AppSettingsVNext,
+    managed_state: ManagedIdentityStatePort,
+) -> AppSettingsVNext:
+    from dataclasses import replace
+
+    from puripuly_heart.config.settings_vnext.schema import ManagedConnectionState
+
+    snapshot = managed_state.snapshot()
+    return replace(
+        settings,
+        state=replace(
+            settings.state,
+            managed_connection=ManagedConnectionState(
+                installation_id=snapshot.installation_id,
+                release_token=snapshot.release_token,
+                release_token_expires_at=snapshot.release_token_expires_at,
+                verified_hardware_hash=snapshot.verified_hardware_hash,
+                verified_hardware_hash_salt_version=snapshot.verified_hardware_hash_salt_version,
+                active_managed_credential_ref=snapshot.active_managed_credential_ref,
+                active_managed_expires_at=snapshot.active_managed_expires_at,
+                founder_letter_seen_credential_ref=snapshot.founder_letter_seen_credential_ref,
+                referral_id=snapshot.referral_id,
+                referral_source=snapshot.referral_source,
+                local_managed_claim_sources=snapshot.local_managed_claim_sources,
+                pending_delivery_ack_source=snapshot.pending_delivery_ack_source,
+                pending_delivery_ack_delivery_id=snapshot.pending_delivery_ack_delivery_id,
+                pending_delivery_ack_managed_credential_ref=(
+                    snapshot.pending_delivery_ack_managed_credential_ref
+                ),
+                pending_delivery_ack_expires_at=snapshot.pending_delivery_ack_expires_at,
+            ),
+        ),
+    )
+
+
 @dataclass(slots=True)
 class ManagedIdentityPreflightAdapter:
     managed_state: ManagedIdentityStatePort
@@ -790,17 +852,9 @@ def build_openrouter_credential_runtime_config_from_vnext(
 
 
 def build_openrouter_credential_runtime_config(
-    settings: object,
+    settings: AppSettingsVNext,
 ) -> OpenRouterCredentialRuntimeConfig:
-    """Build a narrow OpenRouter credential runtime DTO from legacy settings."""
-
-    return OpenRouterCredentialRuntimeConfig(
-        selected_source=settings.openrouter.selected_source,
-        installation_id=settings.managed_identity.installation_id,
-        managed_credential_kind=_managed_credential_kind_for_settings(settings),
-        active_managed_credential_ref=settings.managed_identity.active_managed_credential_ref,
-        active_managed_expires_at=settings.managed_identity.active_managed_expires_at,
-    )
+    return build_openrouter_credential_runtime_config_from_vnext(settings)
 
 
 def build_openrouter_release_runtime_config_from_vnext(
@@ -817,16 +871,9 @@ def build_openrouter_release_runtime_config_from_vnext(
 
 
 def build_openrouter_release_runtime_config(
-    settings: object,
+    settings: AppSettingsVNext,
 ) -> OpenRouterReleaseRuntimeConfig:
-    """Build a narrow OpenRouter release runtime DTO from legacy settings."""
-
-    return OpenRouterReleaseRuntimeConfig(
-        llm_model=settings.openrouter.llm_model,
-        selected_source=settings.openrouter.selected_source,
-        selection_alias=settings.openrouter.selection_alias,
-        managed_credential_kind=_managed_credential_kind_for_settings(settings),
-    )
+    return build_openrouter_release_runtime_config_from_vnext(settings)
 
 
 def _managed_credential_kind_from_connection(connection: str) -> str:
@@ -836,7 +883,7 @@ def _managed_credential_kind_from_connection(connection: str) -> str:
 
 
 def _managed_credential_kind_for_settings(settings: object) -> str:
-    return _managed_credential_kind_from_connection(settings.translation.connection.value)
+    return _managed_credential_kind_from_connection(settings.intent.translation.connection)
 
 
 def _managed_release_service_for_alias(
@@ -846,11 +893,14 @@ def _managed_release_service_for_alias(
 ) -> object | None:
     if managed_release_service is None:
         return None
+    from dataclasses import asdict
+    from types import SimpleNamespace
+
     return managed_release_service_for_openrouter_config(
         managed_release_service,
-        openrouter_config=build_openrouter_release_runtime_config(alias_settings),
+        openrouter_config=build_openrouter_release_runtime_config_from_vnext(alias_settings),
         managed_state=ManagedIdentityStateAdapter(
-            alias_settings.managed_identity,
+            SimpleNamespace(**asdict(alias_settings.state.managed_connection)),
             lambda: managed_release_service.managed_state.persist(),
         ),
     )
@@ -914,7 +964,7 @@ class ManagedAuthRuntimeAdapter:
     ingress_provider: ManagedAuthIngressProvider
 
     def state(self) -> ManagedAuthState:
-        current = self.settings.current
+        current = self.settings.canonical
         canonical = self.settings.projected_canonical()
         runtime_owner_available, runtime_available = self.runtime_presence_provider()
         if canonical is None or current is None:
@@ -931,7 +981,9 @@ class ManagedAuthRuntimeAdapter:
         return ManagedAuthState(
             settings_available=True,
             managed_selected=managed_selected,
-            managed_china=(current.translation.connection == TranslationConnection.MANAGED_CHINA),
+            managed_china=(
+                current.intent.translation.connection == TranslationConnection.MANAGED_CHINA.value
+            ),
             local_key_available=(
                 self._local_key_available(canonical) if managed_selected else False
             ),
@@ -946,7 +998,7 @@ class ManagedAuthRuntimeAdapter:
         credential: str,
         referral_id: str | None,
     ) -> ManagedAuthExecutionResult:
-        current = self.settings.current
+        current = self.settings.canonical
         canonical = self.settings.canonical
         release_service = self.release_service_provider()
         broker_client = getattr(release_service, "client", None)
@@ -960,11 +1012,7 @@ class ManagedAuthRuntimeAdapter:
             config_path=self.config_path,
         )
         secret_store_port = SyncSecretStoreAdapter(secret_store)
-        persist = self.settings.managed_identity_persistence_callback(current)
-        managed_state = build_managed_identity_state_port(
-            current.managed_identity,
-            lambda: persist(current),
-        )
+        managed_state = managed_identity_state_port_from_vnext(self.settings, current)
         assertion_results: list[QqManagedAssertionResult] = []
         ack_results: list[ManagedKeyDeliveryAckResult] = []
         result = await QqManagedAuthService(
@@ -1036,7 +1084,7 @@ class ManagedAuthRuntimeAdapter:
         on_callback_received: Callable[[], None] | None,
     ) -> ManagedAuthExecutionResult:
         release_service = self.release_service_provider()
-        current = self.settings.current
+        current = self.settings.canonical
         if release_service is None or current is None:
             return ManagedAuthExecutionResult(succeeded=False)
         if not _supports_transaction_auth(release_service):
@@ -1057,7 +1105,7 @@ class ManagedAuthRuntimeAdapter:
         referral_id: str | None,
         on_callback_received: Callable[[], None] | None,
     ) -> ManagedAuthExecutionResult:
-        current = self.settings.current
+        current = self.settings.canonical
         canonical = self.settings.canonical
         if current is None or canonical is None:
             return ManagedAuthExecutionResult(succeeded=False)
@@ -1067,11 +1115,7 @@ class ManagedAuthRuntimeAdapter:
             config_path=self.config_path,
         )
         secret_store_port = SyncSecretStoreAdapter(secret_store)
-        persist = self.settings.managed_identity_persistence_callback(updated)
-        managed_state = build_managed_identity_state_port(
-            updated.managed_identity,
-            lambda: persist(updated),
-        )
+        managed_state = managed_identity_state_port_from_vnext(self.settings, updated)
         identity = ManagedIdentityPreflightAdapter(
             managed_state=managed_state,
             secrets=secret_store,
@@ -1138,8 +1182,9 @@ class ManagedAuthRuntimeAdapter:
         pass_status = getattr(issue, "pass_status", None)
         if getattr(pass_status, "pass_id", None) != referral_id:
             pass_status = None
+        updated = _vnext_with_managed_identity(updated, managed_state)
         if delivery_ack_pending:
-            self.settings.current = updated
+            self.settings.canonical = updated
         if not _settings_mutation_committed(result):
             message = result.message
             diagnostics = result.diagnostics
@@ -1153,7 +1198,7 @@ class ManagedAuthRuntimeAdapter:
                 message_kwargs=dict(message.params) if message is not None else {},
                 error_class=getattr(diagnostics, "category", None),
             )
-        self.settings.current = updated
+        self.settings.canonical = updated
         return ManagedAuthExecutionResult(
             succeeded=True,
             transaction_result=result,
@@ -1211,7 +1256,7 @@ class ManagedAuthRuntimeAdapter:
         )
 
     def claim_guard(self) -> ManagedAuthClaimGuard:
-        current = self.settings.current
+        current = self.settings.canonical
         canonical = self.settings.canonical
         if current is None or canonical is None:
             raise RuntimeError("Settings are not loaded")
@@ -1220,11 +1265,7 @@ class ManagedAuthRuntimeAdapter:
             config_path=self.config_path,
         )
         secret_store_port = SyncSecretStoreAdapter(secret_store)
-        persist = self.settings.managed_identity_persistence_callback(current)
-        managed_state = build_managed_identity_state_port(
-            current.managed_identity,
-            lambda: persist(current),
-        )
+        managed_state = managed_identity_state_port_from_vnext(self.settings, current)
         return ManagedAuthClaimGuard(
             managed_state=managed_state,
             secret_store=secret_store_port,
@@ -1383,7 +1424,7 @@ class ManagedTranslationRuntimeAdapter:
 
     async def prepare(self) -> ManagedTranslationPreparation:
         canonical = self.settings.canonical
-        current = self.settings.current
+        current = self.settings.canonical
         service = self.release_service_provider()
         if (
             canonical is None
@@ -1430,16 +1471,13 @@ class ManagedTranslationRuntimeAdapter:
         )
 
     def show_founder_letter(self) -> None:
-        current = self.settings.current
+        current = self.settings.canonical
         if current is None or not self.founder_dialog():
             return
-        mark_founder_letter_shown(
-            build_managed_identity_state_port(
-                current.managed_identity,
-                lambda: None,
-            )
-        )
+        managed_state = managed_identity_state_port_from_vnext(self.settings, current)
+        mark_founder_letter_shown(managed_state)
         with contextlib.suppress(Exception):
+            managed_state.persist()
             self.persist_settings()
 
     async def warmup(self) -> None:

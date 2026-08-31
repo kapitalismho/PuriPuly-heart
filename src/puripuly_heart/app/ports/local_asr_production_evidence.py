@@ -12,6 +12,7 @@ from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelRes
 from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineStartCallbacks,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
@@ -26,9 +27,9 @@ class LocalASRProductionEvidencePort(Protocol):
     @property
     def config_path(self) -> Path: ...
 
-    def load_compatibility_settings(self) -> object: ...
+    def load_compatibility_settings(self) -> AppSettingsVNext: ...
 
-    async def initialize(self, settings: object) -> None: ...
+    async def initialize(self, settings: AppSettingsVNext) -> None: ...
 
     @property
     def owner(self) -> LocalASRProviderRuntimeOwner: ...
@@ -54,14 +55,14 @@ class LocalASRProductionEvidencePort(Protocol):
 
     def build_self_provider_request(
         self,
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         warmup: bool,
     ) -> ProviderRuntimeBuildRequest: ...
 
     def build_peer_provider_request(
         self,
-        settings: object,
+        settings: AppSettingsVNext,
         *,
         warmup: bool,
     ) -> ProviderRuntimeBuildRequest: ...
@@ -75,9 +76,9 @@ class LocalASRProductionCompositionAccessPort(Protocol):
     @property
     def config_path(self) -> Path: ...
 
-    def load_compatibility_settings(self) -> object: ...
+    def load_compatibility_settings(self) -> AppSettingsVNext: ...
 
-    async def initialize(self, settings: object) -> None: ...
+    async def initialize(self, settings: AppSettingsVNext) -> None: ...
 
     @property
     def owner(self) -> LocalASRProviderRuntimeOwner: ...

@@ -37,6 +37,7 @@ from puripuly_heart.core.orchestrator.translation_output_projection import (
 )
 from puripuly_heart.core.orchestrator.translation_request import (
     DirectTranslationRequest,
+    PreparedTranslationRequest,
     StaleProviderCompletion,
     TranslationProcessRequest,
     TranslationRequestPort,
@@ -105,6 +106,7 @@ class SelfTranslationChannelOwner:
     _last_promo_time: float | None = field(init=False, default=None)
     _promo_eligible: bool = field(init=False, default=False)
     _accepting_events: bool = field(init=False, default=True)
+    _admitted_requests: dict[UUID, PreparedTranslationRequest] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.runtime.channel != "self":
@@ -133,18 +135,21 @@ class SelfTranslationChannelOwner:
 
     async def close(self) -> None:
         self._accepting_events = False
+        self._admitted_requests.clear()
         await self.runtime.reset_runtime_state()
 
     async def reset_provider_channel(self, channel: str = "self") -> None:
         if channel != "self":
             raise ValueError("Self translation owner cannot reset a non-Self channel")
         await self.translation_turns.cancel_pending(channel="self")
+        self._admitted_requests.clear()
         await self.output_projection.reset_overlay_preview()
         await self.runtime.reset_runtime_state()
         self.diagnostics.clear_latency_state(channel="self")
 
     async def clear_language_runtime_state(self) -> None:
         await self.translation_turns.cancel_pending(channel="self")
+        self._admitted_requests.clear()
         await self.runtime.clear_live_translation_state()
         self.diagnostics.clear_latency_state(channel="self")
         await self.output_projection.reset_overlay_preview()
@@ -312,8 +317,30 @@ class SelfTranslationChannelOwner:
     async def on_child_created(self, child: TranslationTurnChild) -> None:
         if child.channel != "self":
             raise ValueError("Self translation owner received a non-Self child")
+        if child.target_index != 0:
+            self.runtime.get_or_create_bundle(child.utterance_id).with_transcript(child.transcript)
+            self.runtime.remember_source(child.utterance_id, child.source)
+            return
         if child.utterance_id != child.parent_utterance_id:
-            await self._handle_transcript(child.transcript, is_final=True, source=child.source)
+            await self._handle_transcript(
+                child.transcript,
+                is_final=True,
+                source=child.source,
+                parent_utterance_id=child.parent_utterance_id,
+            )
+
+    async def on_parent_admitted(
+        self,
+        children: tuple[TranslationTurnChild, ...],
+    ) -> None:
+        if any(child.channel != "self" for child in children):
+            raise ValueError("Self translation owner received a non-Self parent")
+        if not self.output_projection.admit_self_turn(children):
+            raise RuntimeError("Self translation projection rejected parent admission")
+        admitted = self.translation_requests.admit(
+            tuple(self._process_request_for_child(child) for child in children)
+        )
+        self._admitted_requests.update(admitted)
 
     async def process_child(
         self,
@@ -324,19 +351,19 @@ class SelfTranslationChannelOwner:
             raise ValueError("Self translation owner received a non-Self child")
         if cancellation_requested():
             raise asyncio.CancelledError
-        target_language = (
-            self.translation_requests.target_language_for("self", child.config_snapshot.value)
-            if child.target_language == "und"
-            else child.target_language
-        )
+        request = self._process_request_for_child(child)
+        target_language = request.target_language
+        prepared = self._admitted_requests.pop(child.utterance_id, None)
         if child.precomputed_translation is not None:
-            self.translation_requests.remember_context(
-                child.transcript.text,
-                self.clock.now(),
-                channel="self",
-                config_snapshot=child.config_snapshot,
-                source_language=child.precomputed_translation.source_language,
-            )
+            if prepared is None:
+                self.translation_requests.remember_context(
+                    child.transcript.text,
+                    self.clock.now(),
+                    channel="self",
+                    config_snapshot=child.config_snapshot,
+                    source_language=child.precomputed_translation.source_language,
+                    target_language=target_language,
+                )
             return TranslationTurnProcessResult(
                 "translated",
                 TranslationOutputSubmission(
@@ -351,22 +378,15 @@ class SelfTranslationChannelOwner:
                     outcome="translated",
                     config_snapshot=child.config_snapshot,
                     translation=child.precomputed_translation,
+                    target_index=child.target_index,
+                    turn_generation=child.turn_generation,
+                    turn_order=child.turn_order,
                 ),
             )
         result = await self.translation_requests.process(
-            TranslationProcessRequest(
-                parent_utterance_id=child.parent_utterance_id,
-                utterance_id=child.utterance_id,
-                sequence=child.sequence,
-                text=child.transcript.text,
-                channel="self",
-                source=child.source,
-                target_language=target_language,
-                context_policy=child.context_policy,
-                detected_language=child.detected_language,
-                config_snapshot=child.config_snapshot,
-            ),
+            request,
             cancellation_requested=cancellation_requested,
+            prepared=prepared,
         )
         if cancellation_requested():
             raise asyncio.CancelledError
@@ -380,6 +400,28 @@ class SelfTranslationChannelOwner:
         if child.channel != "self":
             raise ValueError("Self translation owner received a non-Self child")
         self.runtime.translation_tasks[child.utterance_id] = task
+        if len(child.config_snapshot.value.self_target_languages) == 2:
+            presentation_revision = self.output_projection.self_turn_presentation_revision(child)
+            self.diagnostics.emit(
+                RuntimeDiagnostic(
+                    message=(
+                        "[Detailed][Translation] translation_target_started "
+                        "parent_utterance_id=%s turn_generation=%s turn_order=%s "
+                        "target_index=%s target_language=%s presentation_revision=%s "
+                        "precomputed=%s"
+                    ),
+                    args=(
+                        child.parent_utterance_id,
+                        child.turn_generation,
+                        child.turn_order,
+                        child.target_index,
+                        child.target_language,
+                        presentation_revision,
+                        child.precomputed_translation is not None,
+                    ),
+                    detailed=True,
+                )
+            )
 
     async def on_child_terminal(
         self,
@@ -388,15 +430,33 @@ class SelfTranslationChannelOwner:
     ) -> None:
         if child.channel != "self":
             raise ValueError("Self translation owner received a non-Self child")
+        self._admitted_requests.pop(child.utterance_id, None)
         self.runtime.translation_tasks.pop(child.utterance_id, None)
+        await self.output_projection.complete_self_target(child, outcome)
         if outcome != "cancelled":
             return
-        finalized = await self.output_projection.close_overlay_utterance(
-            utterance_id=child.utterance_id,
-            channel="self",
-            is_final=False,
-            finalize_latency=False,
-        )
+        if len(child.config_snapshot.value.self_target_languages) == 2:
+            async with self.output_projection.self_primary_presentation(
+                parent_utterance_id=child.parent_utterance_id,
+                target_index=child.target_index,
+                turn_generation=child.turn_generation,
+                turn_order=child.turn_order,
+            ) as present_self_result:
+                if not present_self_result:
+                    return
+                finalized = await self.output_projection.close_overlay_utterance(
+                    utterance_id=child.utterance_id,
+                    channel="self",
+                    is_final=False,
+                    finalize_latency=False,
+                )
+        else:
+            finalized = await self.output_projection.close_overlay_utterance(
+                utterance_id=child.utterance_id,
+                channel="self",
+                is_final=False,
+                finalize_latency=False,
+            )
         if finalized:
             self._clear_runtime_latency_bookkeeping(child.utterance_id)
 
@@ -404,11 +464,16 @@ class SelfTranslationChannelOwner:
         if submission.channel != "self":
             raise ValueError("Self translation owner received non-Self output")
         translation = submission.translation
-        if translation is not None:
+        dual_target = len(submission.config_snapshot.value.self_target_languages) == 2
+        if translation is not None and not dual_target:
             self.runtime.get_or_create_bundle(submission.child_utterance_id).with_translation(
                 translation
             )
         receipt = await self.output_projection.project_translation_result(submission)
+        if translation is not None and dual_target and receipt.record_runtime_translation:
+            self.runtime.get_or_create_bundle(submission.child_utterance_id).with_translation(
+                translation
+            )
         if receipt.clear_runtime_latency_bookkeeping:
             self._clear_runtime_latency_bookkeeping(submission.child_utterance_id)
 
@@ -421,6 +486,26 @@ class SelfTranslationChannelOwner:
     ) -> None:
         config_snapshot = self.config_snapshot()
         source = self.runtime.get_source(utterance_id) or "Mic"
+        if len(config_snapshot.value.self_target_languages) == 2:
+            if cancellation_requested is not None and cancellation_requested():
+                return
+            await self.translation_turns.submit(
+                TranslationTurnRequest(
+                    transcript=Transcript(
+                        utterance_id=utterance_id,
+                        text=text,
+                        is_final=True,
+                        created_at=self.clock.now(),
+                        channel="self",
+                    ),
+                    source=source,
+                    turn_kind="self",
+                    target_languages=config_snapshot.value.self_target_languages,
+                    config_snapshot=config_snapshot,
+                ),
+                wait_for_parent=True,
+            )
+            return
         result = await self.translation_requests.process(
             TranslationProcessRequest(
                 parent_utterance_id=utterance_id,
@@ -447,37 +532,41 @@ class SelfTranslationChannelOwner:
         *,
         is_final: bool,
         source: str | None,
+        parent_utterance_id: UUID | None = None,
     ) -> None:
         if transcript.channel != "self":
             raise ValueError("Self translation owner received a non-Self transcript")
         self.runtime.get_or_create_bundle(transcript.utterance_id).with_transcript(transcript)
         self.runtime.remember_source(transcript.utterance_id, source)
-        await self.output_projection.publish_ui(
-            TranslationUiMessage(
-                event_type=(
-                    UIEventType.TRANSCRIPT_FINAL if is_final else UIEventType.TRANSCRIPT_PARTIAL
-                ),
-                utterance_id=transcript.utterance_id,
-                payload=transcript,
-                source=source,
-            )
-        )
-        if not is_final:
-            return
         configuration = self.config_snapshot().value
-        finalized = await self.output_projection.project_self_final_transcript(
-            transcript=transcript,
-            source_language=self.translation_requests.source_language_for(
-                "self",
-                configuration,
-            ),
-            target_language=self.translation_requests.target_language_for(
-                "self",
-                configuration,
-            ),
-            translation_will_follow=self._overlay_translation_will_follow(configuration),
-        )
-        if finalized:
+        async with self.output_projection.self_transcript_presentation(
+            parent_utterance_id=parent_utterance_id or transcript.utterance_id,
+        ):
+            await self.output_projection.publish_ui(
+                TranslationUiMessage(
+                    event_type=(
+                        UIEventType.TRANSCRIPT_FINAL if is_final else UIEventType.TRANSCRIPT_PARTIAL
+                    ),
+                    utterance_id=transcript.utterance_id,
+                    payload=transcript,
+                    source=source,
+                )
+            )
+            if not is_final:
+                return
+            finalized = await self.output_projection.project_self_final_transcript(
+                transcript=transcript,
+                source_language=self.translation_requests.source_language_for(
+                    "self",
+                    configuration,
+                ),
+                target_language=self.translation_requests.target_language_for(
+                    "self",
+                    configuration,
+                ),
+                translation_will_follow=self._overlay_translation_will_follow(configuration),
+            )
+        if is_final and finalized:
             self._clear_runtime_latency_bookkeeping(transcript.utterance_id)
 
     async def _ensure_translation(
@@ -496,16 +585,36 @@ class SelfTranslationChannelOwner:
                 transcript=transcript,
                 source=source,
                 turn_kind=turn_kind,
-                target_languages=(
-                    self.translation_requests.target_language_for(
-                        "self",
-                        config_snapshot.value,
-                    ),
-                ),
+                target_languages=config_snapshot.value.self_target_languages,
                 precomputed_translation=precomputed_translation,
                 config_snapshot=config_snapshot,
             ),
             wait_for_parent=wait_for_parent,
+        )
+
+    def _process_request_for_child(
+        self,
+        child: TranslationTurnChild,
+    ) -> TranslationProcessRequest:
+        target_language = (
+            self.translation_requests.target_language_for("self", child.config_snapshot.value)
+            if child.target_language == "und"
+            else child.target_language
+        )
+        return TranslationProcessRequest(
+            parent_utterance_id=child.parent_utterance_id,
+            utterance_id=child.utterance_id,
+            sequence=child.sequence,
+            text=child.transcript.text,
+            channel="self",
+            source=child.source,
+            target_language=target_language,
+            context_policy=child.context_policy,
+            detected_language=child.detected_language,
+            config_snapshot=child.config_snapshot,
+            target_index=child.target_index,
+            turn_generation=child.turn_generation,
+            turn_order=child.turn_order,
         )
 
     def _send_stt_connected_notification(self) -> None:
@@ -1232,7 +1341,7 @@ class SelfTranslationChannelOwner:
             await self._ensure_translation(
                 transcript,
                 turn_kind="self",
-                wait_for_parent=True,
+                wait_for_parent=len(config_snapshot.value.self_target_languages) == 1,
                 config_snapshot=config_snapshot,
             )
             return
@@ -1265,7 +1374,7 @@ class SelfTranslationChannelOwner:
                     transcript,
                     turn_kind="self",
                     precomputed_translation=translation,
-                    wait_for_parent=True,
+                    wait_for_parent=len(config_snapshot.value.self_target_languages) == 1,
                     config_snapshot=config_snapshot,
                 )
                 return
@@ -1280,7 +1389,7 @@ class SelfTranslationChannelOwner:
         await self._ensure_translation(
             transcript,
             turn_kind="self",
-            wait_for_parent=True,
+            wait_for_parent=len(config_snapshot.value.self_target_languages) == 1,
             config_snapshot=config_snapshot,
         )
 
@@ -1391,6 +1500,7 @@ class SelfTranslationChannelOwner:
         return (
             left.source_language,
             left.target_language,
+            left.self_target_languages,
             left.peer_source_language,
             left.peer_target_language,
             left.system_prompt,
@@ -1404,6 +1514,7 @@ class SelfTranslationChannelOwner:
         ) == (
             right.source_language,
             right.target_language,
+            right.self_target_languages,
             right.peer_source_language,
             right.peer_target_language,
             right.system_prompt,

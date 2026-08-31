@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import pytest
 from puripuly_heart.app.services.settings_application import osc_control_presentation_state
@@ -17,17 +16,17 @@ from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationName,
     OscControlPresentationState,
 )
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    materialize_canonical_translation_settings,
+)
 from puripuly_heart.app.services.osc import control_runtime as control_runtime_module
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
 from puripuly_heart.app.services.osc.state_publisher import (
     OscCanonicalState,
     state_from_settings,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    STTProviderName,
-    materialize_translation_settings,
-)
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 class FakeSender:
@@ -232,7 +231,7 @@ async def _wait_automatic_query(integration: OscControlIntegrationOwner) -> None
 
 
 def _integration(
-    settings: AppSettings,
+    settings: AppSettingsVNext,
     receiver_owner: FakeReceiverOwner,
     sender: FakeSender,
     service: FakeService,
@@ -250,7 +249,7 @@ def _integration(
         sender_provider=lambda: sender,
         state_provider=state_provider or (lambda: osc_state or OscCanonicalState()),
         language_state_provider=lambda: ("ko", "en", "en", "ko"),
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
         query_service=service,
         resync_timeout_seconds=resync_timeout_seconds,
     )
@@ -258,14 +257,15 @@ def _integration(
 
 @pytest.mark.asyncio
 async def test_in_process_complete_control_matrix_projects_final_canonical_state() -> None:
-    current = [AppSettings()]
+    current = [AppSettingsVNext()]
     runtime = {
         "self_capture": False,
         "peer_capture": False,
         "translation": False,
+        "captions": False,
     }
     runtime_calls: list[tuple[str, bool]] = []
-    settings_apply_calls: list[AppSettings] = []
+    settings_apply_calls: list[AppSettingsVNext] = []
     projected: list[OscControlPresentationState] = []
 
     class CanonicalDashboardApplication:
@@ -282,11 +282,11 @@ async def test_in_process_complete_control_matrix_projects_final_canonical_state
             runtime_calls.append(("translation", enabled))
 
         async def set_overlay_enabled(self, enabled: bool) -> None:
-            current[0].ui.overlay_enabled = enabled
+            runtime["captions"] = enabled
             runtime_calls.append(("captions", enabled))
 
     async def apply_settings(value: object) -> None:
-        assert isinstance(value, AppSettings)
+        assert isinstance(value, AppSettingsVNext)
         current[0] = value
         settings_apply_calls.append(value)
 
@@ -296,7 +296,7 @@ async def test_in_process_complete_control_matrix_projects_final_canonical_state
             self_capture=runtime["self_capture"],
             peer_capture=runtime["peer_capture"],
             translation=runtime["translation"],
-            captions=current[0].ui.overlay_enabled,
+            captions=runtime["captions"],
         )
 
     def presentation_state(
@@ -319,12 +319,12 @@ async def test_in_process_complete_control_matrix_projects_final_canonical_state
         sender_provider=lambda: sender,
         state_provider=canonical_state,
         language_state_provider=lambda: (
-            current[0].languages.source_language,
-            current[0].languages.target_language,
-            current[0].languages.peer_source_language,
-            current[0].languages.peer_target_language,
+            current[0].intent.languages.source_language,
+            current[0].intent.languages.target_language,
+            current[0].intent.languages.peer_source_language,
+            current[0].intent.languages.peer_target_language,
         ),
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
         ui_state_provider=presentation_state,
         ui_state_sink=projected.append,
         query_service=FakeService(None),
@@ -339,6 +339,7 @@ async def test_in_process_complete_control_matrix_projects_final_canonical_state
         ("PuriPuly_ChatboxSource", True),
         ("PuriPuly_SelfSrcLang", 16),
         ("PuriPuly_SelfDstLang", 11),
+        ("PuriPuly_SelfDstLang2", 16),
         ("PuriPuly_PeerSrcLang", 5),
         ("PuriPuly_PeerDstLang", 7),
         ("PuriPuly_SelfASR", 7),
@@ -358,22 +359,33 @@ async def test_in_process_complete_control_matrix_projects_final_canonical_state
 
     assert [state.changed_control for state in projected] == [name for name, _value in packets]
     assert len(runtime_calls) == 4
-    assert len(settings_apply_calls) == 11
+    assert len(settings_apply_calls) == 12
     assert sender.messages == []
     await integration.close()
 
 
 @pytest.mark.asyncio
 async def test_normalized_asr_rejection_projects_the_committed_canonical_fallback() -> None:
-    current = [AppSettings()]
-    current[0].provider.stt = STTProviderName.DEEPGRAM
+    current = [
+        replace(
+            AppSettingsVNext(),
+            intent=replace(
+                AppSettingsVNext().intent,
+                stt=replace(AppSettingsVNext().intent.stt, provider=STTProviderName.DEEPGRAM.value),
+            ),
+        )
+    ]
     projected: list[OscControlPresentationState] = []
 
     async def apply_settings(value: object) -> None:
-        assert isinstance(value, AppSettings)
-        normalized = copy.deepcopy(value)
-        normalized.provider.stt = STTProviderName.LOCAL_CPU_AUTO
-        current[0] = normalized
+        assert isinstance(value, AppSettingsVNext)
+        current[0] = replace(
+            value,
+            intent=replace(
+                value.intent,
+                stt=replace(value.intent.stt, provider=STTProviderName.LOCAL_CPU_AUTO.value),
+            ),
+        )
 
     def canonical_state() -> OscCanonicalState:
         return state_from_settings(current[0])
@@ -386,7 +398,7 @@ async def test_normalized_asr_rejection_projects_the_committed_canonical_fallbac
         sender_provider=lambda: FakeSender(),
         state_provider=canonical_state,
         language_state_provider=lambda: ("ko", "en", "en", "ko"),
-        translation_model_normalizer=materialize_translation_settings,
+        translation_model_normalizer=materialize_canonical_translation_settings,
         ui_state_provider=lambda control: osc_control_presentation_state(
             current[0],
             canonical_state=canonical_state(),
@@ -403,7 +415,7 @@ async def test_normalized_asr_rejection_projects_the_committed_canonical_fallbac
 
     assert result.applied is False
     assert result.error == "application_rejected"
-    assert current[0].provider.stt is STTProviderName.LOCAL_CPU_AUTO
+    assert current[0].intent.stt.provider == STTProviderName.LOCAL_CPU_AUTO.value
     assert len(projected) == 1
     assert projected[0].changed_control == "PuriPuly_SelfASR"
     assert projected[0].self_asr_setting == STTProviderName.LOCAL_CPU_AUTO.value
@@ -412,7 +424,7 @@ async def test_normalized_asr_rejection_projects_the_committed_canonical_fallbac
 
 @pytest.mark.asyncio
 async def test_integration_shares_dynamic_receiver_and_transitions_modes() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     service = FakeService(
@@ -434,7 +446,7 @@ async def test_integration_shares_dynamic_receiver_and_transitions_modes() -> No
     assert service.advertisements[0].port == 49152
     assert sender.destinations[-1] == ("127.0.0.1", 9010)
     automatic_messages = len(sender.messages)
-    assert automatic_messages >= 15
+    assert automatic_messages >= 16
     diagnostics = integration.avatar_parameter_diagnostics
     assert "PuriPuly_Talk" in diagnostics["present"]
     assert "PuriPuly_SelfASR" in diagnostics["present"]
@@ -449,7 +461,7 @@ async def test_integration_shares_dynamic_receiver_and_transitions_modes() -> No
     assert receiver_owner.control_calls[-1] == (True, "127.0.0.1", 9021, True)
     assert service.stopped == 1
     assert sender.destinations[-1] == ("127.0.0.1", 9020)
-    assert len(sender.messages) == automatic_messages + 15
+    assert len(sender.messages) == automatic_messages + 16
 
     message_count = len(sender.messages)
     await integration.configure_connection(
@@ -465,7 +477,7 @@ async def test_integration_shares_dynamic_receiver_and_transitions_modes() -> No
 
 @pytest.mark.asyncio
 async def test_automatic_configure_returns_before_oscquery_advertise() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     service = DelayedAdvertiseService(None)
@@ -495,7 +507,7 @@ async def test_automatic_configure_returns_before_oscquery_advertise() -> None:
 
 @pytest.mark.asyncio
 async def test_automatic_refresh_uses_vrchat_default_instead_of_saved_manual_port() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     service = FakeService(None)
@@ -526,7 +538,7 @@ async def test_automatic_refresh_uses_vrchat_default_instead_of_saved_manual_por
 
 @pytest.mark.asyncio
 async def test_automatic_discovery_recovers_after_vrchat_disappears_and_reappears() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     service = FakeService(
@@ -564,7 +576,7 @@ async def test_automatic_discovery_recovers_after_vrchat_disappears_and_reappear
 
 @pytest.mark.asyncio
 async def test_avatar_change_requeries_and_republishes_full_state() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     service = FakeService(
@@ -589,14 +601,14 @@ async def test_avatar_change_requeries_and_republishes_full_state() -> None:
     await integration.query_runtime.on_avatar_change()
 
     assert service.avatar_queries > initial_queries
-    assert len(sender.messages) == 15
+    assert len(sender.messages) == 16
     await integration.close()
 
 
 @pytest.mark.asyncio
 async def test_two_integrations_keep_distinct_receivers_and_cleanup_independently() -> None:
-    first_settings = AppSettings()
-    second_settings = AppSettings()
+    first_settings = AppSettingsVNext()
+    second_settings = AppSettingsVNext()
     first_receiver = FakeReceiverOwner()
     second_receiver = FakeReceiverOwner()
     first_sender = FakeSender()
@@ -621,7 +633,7 @@ async def test_two_integrations_keep_distinct_receivers_and_cleanup_independentl
 
 @pytest.mark.asyncio
 async def test_connection_start_fences_parameters_until_each_canonical_value_arrives() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     integration = _integration(
@@ -646,12 +658,20 @@ async def test_connection_start_fences_parameters_until_each_canonical_value_arr
     assert "PuriPuly_SelfSrcLang" in integration._resync_unsettled
     assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang", (11,)) is True
 
+    assert (
+        "/avatar/parameters/PuriPuly_SelfDstLang2",
+        255,
+    ) in sender.messages
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang2", (255,)) is False
+    assert "PuriPuly_SelfDstLang2" not in integration._resync_unsettled
+    assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang2", (16,)) is True
+
     await integration.close()
 
 
 @pytest.mark.asyncio
 async def test_manual_connection_packet_before_snapshot_cannot_settle_parameter() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = PacketInjectingReceiverOwner(
         ("/avatar/parameters/PuriPuly_SelfDstLang", (7,)),
     )
@@ -677,7 +697,7 @@ async def test_manual_connection_packet_before_snapshot_cannot_settle_parameter(
 
 @pytest.mark.asyncio
 async def test_invalid_prepublication_packet_cannot_make_generation_ready() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = PacketInjectingReceiverOwner(
         ("/avatar/parameters/PuriPuly_SelfASR", (99,)),
         ("/avatar/parameters/PuriPuly_SelfDstLang", (7,)),
@@ -704,7 +724,7 @@ async def test_invalid_prepublication_packet_cannot_make_generation_ready() -> N
 
 @pytest.mark.asyncio
 async def test_automatic_connection_packet_before_delayed_snapshot_cannot_settle() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     service = DelayedAvatarService(
@@ -742,7 +762,7 @@ async def test_automatic_connection_packet_before_delayed_snapshot_cannot_settle
 
 @pytest.mark.asyncio
 async def test_avatar_packet_before_delayed_snapshot_cannot_settle_parameter() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     service = DelayedAvatarService(
@@ -787,7 +807,7 @@ async def test_avatar_packet_before_delayed_snapshot_cannot_settle_parameter() -
 
 @pytest.mark.asyncio
 async def test_resync_settlement_uses_live_canonical_state() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     state = [OscCanonicalState(self_target_language="en")]
@@ -821,7 +841,7 @@ async def test_resync_settlement_uses_live_canonical_state() -> None:
 
 @pytest.mark.asyncio
 async def test_resync_deadline_fails_open_for_all_remaining_parameters() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     integration = _integration(
@@ -851,7 +871,7 @@ async def test_avatar_snapshot_completion_does_not_rearm_event_deadline(
 ) -> None:
     now = [100.0]
     monkeypatch.setattr(control_runtime_module.time, "monotonic", lambda: now[0])
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     integration = _integration(settings, receiver_owner, sender, FakeService(None))
@@ -877,7 +897,7 @@ async def test_avatar_snapshot_completion_does_not_rearm_event_deadline(
 
 @pytest.mark.asyncio
 async def test_rapid_avatar_changes_ignore_stale_snapshot_completion() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     integration = _integration(settings, receiver_owner, sender, FakeService(None))
@@ -910,7 +930,7 @@ async def test_discovery_epoch_is_anchored_before_avatar_query_completion(
 ) -> None:
     now = [100.0]
     monkeypatch.setattr(control_runtime_module.time, "monotonic", lambda: now[0])
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     service = DelayedAvatarService(
@@ -960,7 +980,7 @@ async def test_stale_discovery_cannot_supersede_newer_avatar_epoch(
 ) -> None:
     now = [100.0]
     monkeypatch.setattr(control_runtime_module.time, "monotonic", lambda: now[0])
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     service = DelayedDiscoveryService(
@@ -1010,7 +1030,7 @@ async def test_stale_discovery_cannot_supersede_newer_avatar_epoch(
 
 @pytest.mark.asyncio
 async def test_runtime_boolean_command_reaches_existing_path_after_settlement() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     application = DashboardApplication()
@@ -1047,8 +1067,13 @@ async def test_runtime_boolean_command_reaches_existing_path_after_settlement() 
 
 @pytest.mark.asyncio
 async def test_off_mode_settings_apply_does_not_publish_or_start_control_transport() -> None:
-    settings = AppSettings()
-    settings.osc.connection_mode = "off"
+    settings = replace(
+        AppSettingsVNext(),
+        intent=replace(
+            AppSettingsVNext().intent,
+            osc=replace(AppSettingsVNext().intent.osc, connection_mode="off"),
+        ),
+    )
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     integration = _integration(settings, receiver_owner, sender, FakeService(None))
@@ -1065,7 +1090,7 @@ async def test_off_mode_settings_apply_does_not_publish_or_start_control_transpo
 
 @pytest.mark.asyncio
 async def test_invalid_control_republishes_full_canonical_state() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     integration = _integration(
@@ -1086,7 +1111,7 @@ async def test_invalid_control_republishes_full_canonical_state() -> None:
     control_handler = receiver_owner.packet_handlers["control_packet_handler"]
     assert control_handler("/avatar/parameters/PuriPuly_SelfASR", (99,)) is False
 
-    assert len(sender.messages) == 15
+    assert len(sender.messages) == 16
     assert {address for address, _value in sender.messages} == {
         f"/avatar/parameters/{name}"
         for name in (
@@ -1099,6 +1124,7 @@ async def test_invalid_control_republishes_full_canonical_state() -> None:
             "PuriPuly_ChatboxSource",
             "PuriPuly_SelfSrcLang",
             "PuriPuly_SelfDstLang",
+            "PuriPuly_SelfDstLang2",
             "PuriPuly_PeerSrcLang",
             "PuriPuly_PeerDstLang",
             "PuriPuly_SelfASR",
@@ -1112,7 +1138,7 @@ async def test_invalid_control_republishes_full_canonical_state() -> None:
 
 @pytest.mark.asyncio
 async def test_rejected_dashboard_command_republishes_actual_full_canonical_state() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     integration = _integration(
@@ -1138,13 +1164,13 @@ async def test_rejected_dashboard_command_republishes_actual_full_canonical_stat
 
     assert result.applied is False
     assert result.error == "application_rejected"
-    assert len(sender.messages) == 15
+    assert len(sender.messages) == 16
     await integration.close()
 
 
 @pytest.mark.asyncio
 async def test_off_transition_drains_an_admitted_dashboard_command() -> None:
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
     application = BlockingDashboardApplication()
@@ -1189,6 +1215,6 @@ async def test_off_transition_drains_an_admitted_dashboard_command() -> None:
     assert result.error == "router_disabled"
     assert application.completed is True
     assert integration.connection_mode == "off"
-    assert len(sender.messages) == 16
+    assert len(sender.messages) == 17
     assert sender.messages[-1] == ("/avatar/parameters/PuriPuly_Talk", True)
     await integration.close()

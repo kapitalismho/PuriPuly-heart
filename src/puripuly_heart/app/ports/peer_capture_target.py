@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from puripuly_heart.config.process_capture_resolution import ProcessCaptureCandidate
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 class ProcessCaptureInventoryPort(Protocol):
@@ -15,7 +16,7 @@ class LoopbackDeviceInventoryPort(Protocol):
 
 
 class PeerCaptureTargetRuntimeEffectsPort(Protocol):
-    async def apply_capture_target(self, settings: object) -> None: ...
+    async def apply_capture_target(self, settings: AppSettingsVNext) -> None: ...
 
 
 __all__ = [

@@ -516,6 +516,137 @@ async def test_output_runtime_suppresses_duplicate_chatbox_and_overlay_delivery(
 
 
 @pytest.mark.asyncio
+async def test_output_runtime_accepts_distinct_parent_presentation_revisions_once() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = RecordingChatbox()
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+    parent_id = uuid4()
+
+    first = await owner.publish_chatbox(
+        publication_id=parent_id,
+        channel="self",
+        transcript_text="",
+        translation_text="first",
+        include_source=False,
+        presentation_revision=1,
+        turn_generation=2,
+        turn_order=7,
+        target_indexes=(1,),
+        target_languages=("ja",),
+    )
+    complete = await owner.publish_chatbox(
+        publication_id=parent_id,
+        channel="self",
+        transcript_text="",
+        translation_text="first\nsecond",
+        include_source=False,
+        presentation_revision=2,
+        turn_generation=2,
+        turn_order=7,
+        target_indexes=(0, 1),
+        target_languages=("zh-CN", "ja"),
+    )
+    duplicate_complete = await owner.publish_chatbox(
+        publication_id=parent_id,
+        channel="self",
+        transcript_text="",
+        translation_text="first\nsecond",
+        include_source=False,
+        presentation_revision=2,
+        turn_generation=2,
+        turn_order=7,
+        target_indexes=(0, 1),
+        target_languages=("zh-CN", "ja"),
+    )
+
+    assert first.decision.decision == "published"
+    assert complete.decision.decision == "published"
+    assert duplicate_complete.decision.reason == "duplicate_publication"
+    assert duplicate_complete.decision.publication_id == str(parent_id)
+    assert duplicate_complete.decision.metadata["presentation_revision"] == 2
+    assert duplicate_complete.decision.metadata["turn_generation"] == 2
+    assert duplicate_complete.decision.metadata["turn_order"] == 7
+    assert duplicate_complete.decision.metadata["target_indexes"] == "0,1"
+    assert duplicate_complete.decision.metadata["target_languages"] == "zh-CN,ja"
+    assert [message.utterance_id for message in chatbox.messages] == [parent_id, parent_id]
+    assert [message.text for message in chatbox.messages] == ["first", "first\nsecond"]
+    assert [message.self_turn_key for message in chatbox.messages] == [(2, 7), (2, 7)]
+    assert [message.presentation_revision for message in chatbox.messages] == [1, 2]
+    assert [message.target_indexes for message in chatbox.messages] == [(1,), (0, 1)]
+    assert [message.target_languages for message in chatbox.messages] == [
+        ("ja",),
+        ("zh-CN", "ja"),
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("metadata", "error_type"),
+    [
+        ({"presentation_revision": True}, TypeError),
+        ({"presentation_revision": 1.5}, TypeError),
+        ({"presentation_revision": float("nan")}, TypeError),
+        ({"turn_generation": True, "turn_order": 0}, TypeError),
+        ({"turn_generation": 0, "turn_order": 1.5}, TypeError),
+        ({"presentation_revision": 1}, ValueError),
+        ({"turn_generation": 0, "turn_order": 1, "target_indexes": [0]}, TypeError),
+        (
+            {
+                "turn_generation": 0,
+                "turn_order": 1,
+                "target_indexes": (0,),
+            },
+            ValueError,
+        ),
+        (
+            {
+                "turn_generation": 0,
+                "turn_order": 1,
+                "target_indexes": (True,),
+                "target_languages": ("ja",),
+            },
+            TypeError,
+        ),
+        (
+            {
+                "turn_generation": 0,
+                "turn_order": 1,
+                "target_indexes": (1, 0),
+                "target_languages": ("ja", "zh-CN"),
+            },
+            ValueError,
+        ),
+        (
+            {
+                "turn_generation": 0,
+                "turn_order": 1,
+                "target_indexes": (0,),
+                "target_languages": (" ja ",),
+            },
+            ValueError,
+        ),
+        ({"target_indexes": (0,), "target_languages": ("ja",)}, ValueError),
+    ],
+)
+async def test_output_runtime_rejects_malformed_self_turn_identity(
+    metadata: dict[str, object],
+    error_type: type[Exception],
+) -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(chatbox=RecordingChatbox(), clock=FakeClock(_now=10.0))
+
+    with pytest.raises(error_type):
+        await owner.publish_chatbox(
+            publication_id=uuid4(),
+            channel="self",
+            transcript_text="",
+            translation_text="translation",
+            include_source=False,
+            **metadata,
+        )
+
+
+@pytest.mark.asyncio
 async def test_output_runtime_isolates_overlay_failure_with_safe_diagnostics() -> None:
     OutputRuntime = _output_runtime_class()
     owner = OutputRuntime(

@@ -50,6 +50,7 @@ from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
@@ -222,7 +223,7 @@ class UiApplicationBoundary:
     def effective_osc_ports(self) -> tuple[int | None, int | None]:
         return self._runtime_shutdown.effective_osc_ports()
 
-    def compatibility_settings(self) -> Any | None:
+    def compatibility_settings(self) -> AppSettingsVNext | None:
         return self._state_owner.compatibility_settings()
 
     @property
@@ -341,10 +342,10 @@ class UiApplicationBoundary:
     async def on_dashboard_language_change(self, change: LanguageSelectionChange) -> None:
         await self._settings.on_dashboard_language_change(change)
 
-    def capture_settings_view_change(self, settings: Any) -> object:
+    def capture_settings_view_change(self, settings: AppSettingsVNext) -> object:
         return self._settings.capture_settings_view_change(settings)
 
-    def merge_settings_view_change_with_current(self, captured: object) -> Any:
+    def merge_settings_view_change_with_current(self, captured: object) -> AppSettingsVNext:
         return self._settings.merge_settings_view_change_with_current(captured)
 
     def refresh_settings_projection(
@@ -361,17 +362,19 @@ class UiApplicationBoundary:
     def refresh_settings_after_openrouter_pkce_success(self) -> bool:
         return bool(self._settings.refresh_settings_after_openrouter_pkce_success())
 
-    def merge_settings_tab_apply_with_current_languages(self, settings: Any) -> Any:
+    def merge_settings_tab_apply_with_current_languages(
+        self, settings: AppSettingsVNext
+    ) -> AppSettingsVNext:
         return self._settings.merge_settings_tab_apply_with_current_languages(settings)
 
-    async def apply_settings(self, settings: Any) -> object:
+    async def apply_settings(self, settings: AppSettingsVNext) -> object:
         result = await self._settings.apply_settings(settings)
         await self._publish_osc_state()
         return result
 
     async def apply_providers(
         self,
-        settings: Any | None = None,
+        settings: AppSettingsVNext | None = None,
         *,
         force_rebuild_llm: bool = False,
         persist_settings: bool = True,
@@ -506,7 +509,18 @@ class UiApplicationBoundary:
     async def accept_peer_translation_eula_and_enable(self) -> object:
         settings = self.compatibility_settings()
         if settings is not None:
-            settings.ui.peer_translation_eula_accepted = True
+            from dataclasses import replace
+
+            settings = replace(
+                settings,
+                state=replace(
+                    settings.state,
+                    peer_translation=replace(
+                        settings.state.peer_translation,
+                        eula_accepted=True,
+                    ),
+                ),
+            )
             await self.apply_settings(settings)
         return await self.set_peer_translation_enabled(True)
 

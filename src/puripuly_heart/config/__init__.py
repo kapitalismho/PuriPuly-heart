@@ -1,1 +1,1 @@
-__all__ = ["settings"]
+__all__ = ["settings_vnext"]

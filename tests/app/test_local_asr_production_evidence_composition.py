@@ -5,7 +5,7 @@ import pytest
 
 import puripuly_heart.composition.application_runtime as application_runtime_module
 import puripuly_heart.composition.local_asr_production_evidence as composition_module
-from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 class FakeOwner:
@@ -70,7 +70,7 @@ async def test_composition_delegates_the_evidence_specific_access_contract(
     monkeypatch,
 ) -> None:
     events: list[object] = []
-    settings = AppSettings()
+    settings = AppSettingsVNext()
     owner = FakeOwner()
     start_callbacks = SimpleNamespace(
         start_output=lambda auto_flush: _record_async(
@@ -124,14 +124,14 @@ async def test_composition_delegates_the_evidence_specific_access_contract(
     )
     monkeypatch.setattr(
         composition_module,
-        "build_self_stt_provider_request",
+        "build_self_stt_provider_request_from_vnext",
         lambda current, warmup: (
             events.append(("self-request", current, warmup)) or ("self-request", warmup)
         ),
     )
     monkeypatch.setattr(
         composition_module,
-        "build_peer_capture_session_config",
+        "build_peer_capture_session_config_from_vnext",
         lambda current: events.append(("peer-config", current)) or "peer-config",
     )
     monkeypatch.setattr(
@@ -182,7 +182,7 @@ async def test_composition_delegates_the_evidence_specific_access_contract(
         "start-local-asr",
         ("self-request", settings, True),
         ("peer-config", settings),
-        ("peer-request", "peer-config", settings.stt.gpu_device_id, False),
+        ("peer-request", "peer-config", settings.intent.stt.gpu_device_id, False),
         "retry",
         "close",
     ]

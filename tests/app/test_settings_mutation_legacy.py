@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from puripuly_heart.app.services.settings_mutation_legacy import (
     ORDER21_TRANSLATION_PROVIDER_SETTINGS_PATHS,
@@ -8,145 +10,165 @@ from puripuly_heart.app.services.settings_mutation_legacy import (
     ORDER24_UI_PROMPT_CLIPBOARD_STATE_SETTINGS_PATHS,
     SettingsPathMutationValidator,
     SettingsPathPatch,
+    build_stt_language_audio_settings_path_patch,
     build_translation_provider_settings_path_patch,
 )
 
 from puripuly_heart.app.services import settings_mutation
-from puripuly_heart.config.settings import (
-    AppSettings,
-    TranslationConnection,
-    TranslationModel,
-    TranslationSettings,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core import messages
 
 
 def test_order21_translation_provider_patch_records_initial_covered_surface_list() -> None:
     assert set(ORDER21_TRANSLATION_PROVIDER_SETTINGS_PATHS) == {
-        "translation.model",
-        "translation.connection",
-        "translation.connection_history",
-        "translation.fallback",
-        "translation.http_extension_id",
-        "translation.previous_llm_model",
-        "translation.gpu_device_id",
-        "provider.llm",
-        "gemini.llm_model",
-        "openrouter.llm_model",
-        "openrouter.routing_mode",
-        "openrouter.provider_routing",
-        "openrouter.selected_source",
-        "openrouter.selection_alias",
-        "openrouter.broker_base_url",
-        "qwen.llm_model",
-        "qwen.region",
-        "deepseek.llm_model",
-        "local_llm.backend",
-        "local_llm.base_url",
-        "local_llm.model",
-        "local_llm.extra_body",
-        "llm.concurrency_limit",
+        "intent.translation.model",
+        "intent.translation.connection",
+        "intent.translation.connection_history",
+        "intent.translation.fallback",
+        "intent.translation.http_extension_id",
+        "intent.translation.previous_llm_model",
+        "intent.translation.gpu_device_id",
+        "intent.translation.gemini.llm_model",
+        "intent.translation.openrouter_model",
+        "intent.translation.openrouter_routing_mode",
+        "intent.translation.openrouter_provider_routing",
+        "intent.translation.openrouter_selected_source",
+        "intent.translation.openrouter_selection_alias",
+        "intent.translation.openrouter_broker_base_url",
+        "intent.translation.qwen.llm_model",
+        "intent.translation.qwen.region",
+        "intent.translation.deepseek.llm_model",
+        "intent.local_llm.backend",
+        "intent.local_llm.base_url",
+        "intent.local_llm.model",
+        "intent.local_llm.extra_body",
+        "intent.translation.concurrency_limit",
     }
 
 
 def test_order21_patch_carries_custom_http_identity_fields() -> None:
-    previous = AppSettings()
-    next_settings = AppSettings()
-    next_settings.translation = TranslationSettings(
-        model=TranslationModel.CUSTOM_HTTP,
-        connection=TranslationConnection.CUSTOM_HTTP,
-        http_extension_id="demo",
-        previous_llm_model=TranslationModel.GEMMA4_26B_31B,
+    previous = AppSettingsVNext()
+    next_settings = replace(
+        previous,
+        intent=replace(
+            previous.intent,
+            translation=replace(
+                previous.intent.translation,
+                model="custom_http",
+                connection="custom_http",
+                http_extension_id="demo",
+                previous_llm_model="gemma4_26b_31b",
+            ),
+        ),
     )
 
     patch = build_translation_provider_settings_path_patch(previous, next_settings)
 
-    assert patch["translation.http_extension_id"] == "demo"
-    assert patch["translation.previous_llm_model"] == TranslationModel.GEMMA4_26B_31B
+    assert patch["intent.translation.http_extension_id"] == "demo"
+    assert patch["intent.translation.previous_llm_model"] == "gemma4_26b_31b"
+
+
+def test_order22_patch_carries_a_secondary_only_target_change() -> None:
+    previous = AppSettingsVNext()
+    next_settings = replace(
+        previous,
+        intent=replace(
+            previous.intent,
+            languages=replace(previous.intent.languages, secondary_target_language="ja"),
+        ),
+    )
+
+    patch = build_stt_language_audio_settings_path_patch(previous, next_settings)
+
+    assert patch == {"intent.languages.secondary_target_language": "ja"}
 
 
 def test_order22_stt_language_audio_patch_records_initial_covered_surface_list() -> None:
     assert set(ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS) == {
-        "provider.stt",
-        "provider.peer_stt",
-        "languages.source_language",
-        "languages.target_language",
-        "languages.peer_source_language",
-        "languages.peer_target_language",
-        "languages.peer_source_mode",
-        "languages.peer_expected_languages",
-        "languages.recent_source_languages",
-        "languages.recent_target_languages",
-        "audio.internal_sample_rate_hz",
-        "audio.internal_channels",
-        "audio.ring_buffer_ms",
-        "audio.input_host_api",
-        "audio.input_device",
-        "desktop_audio.output_device",
-        "desktop_audio.vad_speech_threshold",
-        "desktop_audio.vad_hangover_ms",
-        "desktop_audio.vad_pre_roll_ms",
-        "stt.drain_timeout_s",
-        "stt.vad_speech_threshold",
-        "stt.low_latency_vad_hangover_ms",
-        "stt.low_latency_merge_gap_ms",
-        "stt.low_latency_spec_retry_max",
-        "stt.custom_vocabulary_enabled",
-        "stt.custom_terms",
-        "stt.gpu_device_id",
-        "deepgram_stt.model",
-        "qwen_asr_stt.model",
-        "soniox_stt.model",
-        "soniox_stt.endpoint",
-        "soniox_stt.keepalive_interval_s",
-        "soniox_stt.trailing_silence_ms",
+        "intent.stt.provider",
+        "intent.peer_stt.provider",
+        "intent.languages.source_language",
+        "intent.languages.target_language",
+        "intent.languages.secondary_target_language",
+        "intent.languages.peer_source_language",
+        "intent.languages.peer_target_language",
+        "intent.languages.peer_source_mode",
+        "intent.languages.peer_expected_languages",
+        "intent.languages.recent_source_languages",
+        "intent.languages.recent_target_languages",
+        "intent.audio.ring_buffer_ms",
+        "intent.audio.input_host_api",
+        "intent.audio.input_device",
+        "intent.desktop_audio.output_device",
+        "intent.desktop_audio.vad_speech_threshold",
+        "intent.desktop_audio.vad_hangover_ms",
+        "intent.desktop_audio.vad_pre_roll_ms",
+        "intent.stt.drain_timeout_s",
+        "intent.stt.vad_speech_threshold",
+        "intent.stt.low_latency_vad_hangover_ms",
+        "intent.stt.low_latency_merge_gap_ms",
+        "intent.stt.low_latency_spec_retry_max",
+        "intent.stt.custom_vocabulary_enabled",
+        "intent.stt.custom_terms",
+        "intent.stt.gpu_device_id",
+        "intent.stt.deepgram.model",
+        "intent.stt.qwen_asr.model",
+        "intent.stt.soniox.model",
+        "intent.stt.soniox.endpoint",
+        "intent.stt.soniox.keepalive_interval_s",
+        "intent.stt.soniox.trailing_silence_ms",
+        "intent.stt.custom.mode",
+        "intent.stt.custom.compatibility",
+        "intent.stt.custom.endpoint",
+        "intent.stt.custom.model",
+        "intent.stt.custom.extra",
     }
 
 
 def test_order23_overlay_osc_output_patch_records_initial_covered_surface_list() -> None:
     assert set(ORDER23_OVERLAY_OSC_OUTPUT_SETTINGS_PATHS) == {
-        "overlay.target",
-        "overlay.show_translation",
-        "overlay.show_peer_original",
-        "overlay.calibration.anchor",
-        "overlay.calibration.offset_x",
-        "overlay.calibration.offset_y",
-        "overlay.calibration.distance",
-        "overlay.calibration.text_scale",
-        "overlay.calibration.background_alpha",
-        "overlay.desktop_flet.size_preset",
-        "overlay.desktop_flet.position.x",
-        "overlay.desktop_flet.position.y",
-        "overlay.desktop_flet.swap_caption_languages",
-        "overlay.desktop_flet.visual.background_alpha",
-        "osc.host",
-        "osc.port",
-        "osc.connection_mode",
-        "osc.send_port",
-        "osc.receive_port",
-        "osc.chatbox_address",
-        "osc.chatbox_send",
-        "osc.chatbox_clear",
-        "osc.chatbox_max_chars",
-        "osc.vrc_mic_intercept",
-        "osc.chatbox_include_source",
+        "intent.overlay.target",
+        "intent.overlay.show_translation",
+        "intent.overlay.show_peer_original",
+        "intent.overlay.calibration.anchor",
+        "intent.overlay.calibration.offset_x",
+        "intent.overlay.calibration.offset_y",
+        "intent.overlay.calibration.distance",
+        "intent.overlay.calibration.text_scale",
+        "intent.overlay.calibration.background_alpha",
+        "intent.overlay.desktop_flet.size_preset",
+        "intent.overlay.desktop_flet.position.x",
+        "intent.overlay.desktop_flet.position.y",
+        "intent.overlay.desktop_flet.swap_caption_languages",
+        "intent.overlay.desktop_flet.visual.background_alpha",
+        "intent.osc.host",
+        "intent.osc.port",
+        "intent.osc.connection_mode",
+        "intent.osc.send_port",
+        "intent.osc.receive_port",
+        "intent.osc.chatbox_address",
+        "intent.osc.chatbox_send",
+        "intent.osc.chatbox_clear",
+        "intent.osc.chatbox_max_chars",
+        "intent.osc.vrc_mic_intercept",
+        "intent.osc.chatbox_include_source",
     }
 
 
 def test_order24_ui_prompt_clipboard_state_patch_records_initial_covered_surface_list() -> None:
     assert set(ORDER24_UI_PROMPT_CLIPBOARD_STATE_SETTINGS_PATHS) == {
-        "secrets.backend",
-        "secrets.encrypted_file_path",
-        "ui.locale",
-        "ui.peer_translation_eula_accepted",
-        "ui.integrated_context_bootstrapped",
-        "ui.clipboard_auto_translate_enabled",
-        "ui.github_star_prompt_clicked",
-        "ui.github_star_prompt_last_shown_at",
-        "ui.github_star_prompt_show_count",
-        "ui.github_star_prompt_translation_success_observed",
-        "ui.github_star_prompt_eligible_launch_count",
-        "system_prompt",
+        "intent.secrets.backend",
+        "intent.secrets.encrypted_file_path",
+        "intent.ui.locale",
+        "state.peer_translation.eula_accepted",
+        "state.integrated_context.bootstrapped",
+        "intent.clipboard.auto_translate_enabled",
+        "state.github_star_prompt.clicked",
+        "state.github_star_prompt.last_shown_at",
+        "state.github_star_prompt.show_count",
+        "state.github_star_prompt.translation_success_observed",
+        "state.github_star_prompt.eligible_launch_count",
+        "intent.prompts.system_prompt",
     }
 
 
@@ -190,8 +212,8 @@ def test_runtime_only_secret_and_legacy_order24_fields_are_not_covered() -> None
 def test_settings_path_patch_builds_typed_mutation_request_for_order21_surface() -> None:
     patch = SettingsPathPatch(
         values_by_path={
-            "translation.model": "gemma4",
-            "openrouter.selection_alias": "gemma4_byok",
+            "intent.translation.model": "gemma4",
+            "intent.translation.openrouter_selection_alias": "gemma4_byok",
         },
         surface=settings_mutation.SETTINGS_MUTATION_SURFACE_TRANSLATION_PROVIDER,
     )
@@ -203,8 +225,8 @@ def test_settings_path_patch_builds_typed_mutation_request_for_order21_surface()
 
     assert request == settings_mutation.SettingsMutationRequest(
         values={
-            "translation.model": "gemma4",
-            "openrouter.selection_alias": "gemma4_byok",
+            "intent.translation.model": "gemma4",
+            "intent.translation.openrouter_selection_alias": "gemma4_byok",
         },
         expected_revision="settings-r1",
         reason=settings_mutation.SETTINGS_MUTATION_SURFACE_TRANSLATION_PROVIDER,
@@ -215,8 +237,8 @@ def test_settings_path_patch_builds_typed_mutation_request_for_order21_surface()
 def test_settings_path_patch_builds_typed_mutation_request_for_order22_surface() -> None:
     patch = SettingsPathPatch(
         values_by_path={
-            "languages.source_language": "ja",
-            "audio.input_device": "Headset Mic",
+            "intent.languages.source_language": "ja",
+            "intent.audio.input_device": "Headset Mic",
         },
         surface=settings_mutation.SETTINGS_MUTATION_SURFACE_STT_LANGUAGE_AUDIO,
     )
@@ -228,8 +250,8 @@ def test_settings_path_patch_builds_typed_mutation_request_for_order22_surface()
 
     assert request == settings_mutation.SettingsMutationRequest(
         values={
-            "languages.source_language": "ja",
-            "audio.input_device": "Headset Mic",
+            "intent.languages.source_language": "ja",
+            "intent.audio.input_device": "Headset Mic",
         },
         expected_revision="settings-r2",
         reason=settings_mutation.SETTINGS_MUTATION_SURFACE_STT_LANGUAGE_AUDIO,
@@ -240,9 +262,9 @@ def test_settings_path_patch_builds_typed_mutation_request_for_order22_surface()
 def test_settings_path_patch_builds_typed_mutation_request_for_order23_surface() -> None:
     patch = SettingsPathPatch(
         values_by_path={
-            "overlay.show_translation": False,
-            "overlay.desktop_flet.size_preset": "large",
-            "osc.chatbox_max_chars": 120,
+            "intent.overlay.show_translation": False,
+            "intent.overlay.desktop_flet.size_preset": "large",
+            "intent.osc.chatbox_max_chars": 120,
         },
         surface=settings_mutation.SETTINGS_MUTATION_SURFACE_OVERLAY_OSC_OUTPUT,
     )
@@ -254,9 +276,9 @@ def test_settings_path_patch_builds_typed_mutation_request_for_order23_surface()
 
     assert request == settings_mutation.SettingsMutationRequest(
         values={
-            "overlay.show_translation": False,
-            "overlay.desktop_flet.size_preset": "large",
-            "osc.chatbox_max_chars": 120,
+            "intent.overlay.show_translation": False,
+            "intent.overlay.desktop_flet.size_preset": "large",
+            "intent.osc.chatbox_max_chars": 120,
         },
         expected_revision="settings-r3",
         reason=settings_mutation.SETTINGS_MUTATION_SURFACE_OVERLAY_OSC_OUTPUT,
@@ -267,9 +289,9 @@ def test_settings_path_patch_builds_typed_mutation_request_for_order23_surface()
 def test_settings_path_patch_builds_typed_mutation_request_for_order24_surface() -> None:
     patch = SettingsPathPatch(
         values_by_path={
-            "ui.locale": "ja",
-            "ui.clipboard_auto_translate_enabled": True,
-            "system_prompt": "custom translation style",
+            "intent.ui.locale": "ja",
+            "intent.clipboard.auto_translate_enabled": True,
+            "intent.prompts.system_prompt": "custom translation style",
         },
         surface=settings_mutation.SETTINGS_MUTATION_SURFACE_UI_PROMPT_CLIPBOARD_STATE,
     )
@@ -281,9 +303,9 @@ def test_settings_path_patch_builds_typed_mutation_request_for_order24_surface()
 
     assert request == settings_mutation.SettingsMutationRequest(
         values={
-            "ui.locale": "ja",
-            "ui.clipboard_auto_translate_enabled": True,
-            "system_prompt": "custom translation style",
+            "intent.ui.locale": "ja",
+            "intent.clipboard.auto_translate_enabled": True,
+            "intent.prompts.system_prompt": "custom translation style",
         },
         expected_revision="settings-r4",
         reason=settings_mutation.SETTINGS_MUTATION_SURFACE_UI_PROMPT_CLIPBOARD_STATE,
@@ -300,14 +322,14 @@ async def test_order21_path_validator_accepts_only_translation_provider_paths() 
     )
     request = settings_mutation.SettingsMutationRequest(
         values={
-            "translation.connection": "openrouter",
-            "translation.fallback": {
+            "intent.translation.connection": "openrouter",
+            "intent.translation.fallback": {
                 "enabled": True,
                 "model": "deepseek_v4_flash",
                 "connection": "openrouter",
             },
-            "local_llm.base_url": "http://127.0.0.1:11434/v1",
-            "llm.concurrency_limit": 3,
+            "intent.local_llm.base_url": "http://127.0.0.1:11434/v1",
+            "intent.translation.concurrency_limit": 3,
         },
         expected_revision=None,
         reason=settings_mutation.SETTINGS_MUTATION_SURFACE_TRANSLATION_PROVIDER,
@@ -369,12 +391,13 @@ async def test_order22_path_validator_accepts_only_stt_language_audio_paths() ->
     )
     request = settings_mutation.SettingsMutationRequest(
         values={
-            "provider.stt": "soniox",
-            "provider.peer_stt": "local_qwen",
-            "languages.source_language": "ja",
-            "audio.input_device": "Headset Mic",
-            "desktop_audio.vad_hangover_ms": 900,
-            "soniox_stt.trailing_silence_ms": 150,
+            "intent.stt.provider": "soniox",
+            "intent.peer_stt.provider": "local_qwen",
+            "intent.languages.source_language": "ja",
+            "intent.languages.secondary_target_language": "fr",
+            "intent.audio.input_device": "Headset Mic",
+            "intent.desktop_audio.vad_hangover_ms": 900,
+            "intent.stt.soniox.trailing_silence_ms": 150,
         },
         expected_revision=None,
         reason=settings_mutation.SETTINGS_MUTATION_SURFACE_STT_LANGUAGE_AUDIO,
@@ -439,14 +462,14 @@ async def test_order23_path_validator_accepts_only_overlay_osc_output_paths() ->
     )
     request = settings_mutation.SettingsMutationRequest(
         values={
-            "overlay.target": "desktop",
-            "overlay.calibration.distance": 1.4,
-            "overlay.desktop_flet.position.x": 24,
-            "overlay.desktop_flet.visual.background_alpha": 0.45,
-            "osc.host": "127.0.0.1",
-            "osc.port": 9001,
-            "osc.chatbox_max_chars": 120,
-            "osc.chatbox_include_source": True,
+            "intent.overlay.target": "desktop",
+            "intent.overlay.calibration.distance": 1.4,
+            "intent.overlay.desktop_flet.position.x": 24,
+            "intent.overlay.desktop_flet.visual.background_alpha": 0.45,
+            "intent.osc.host": "127.0.0.1",
+            "intent.osc.port": 9001,
+            "intent.osc.chatbox_max_chars": 120,
+            "intent.osc.chatbox_include_source": True,
         },
         expected_revision=None,
         reason=settings_mutation.SETTINGS_MUTATION_SURFACE_OVERLAY_OSC_OUTPUT,
@@ -511,18 +534,18 @@ async def test_order24_path_validator_accepts_only_ui_prompt_clipboard_state_pat
     )
     request = settings_mutation.SettingsMutationRequest(
         values={
-            "secrets.backend": "encrypted_file",
-            "secrets.encrypted_file_path": "secure-secrets.json",
-            "ui.locale": "ja",
-            "ui.peer_translation_eula_accepted": True,
-            "ui.integrated_context_bootstrapped": True,
-            "ui.clipboard_auto_translate_enabled": True,
-            "ui.github_star_prompt_clicked": False,
-            "ui.github_star_prompt_last_shown_at": "2026-06-08T00:00:00Z",
-            "ui.github_star_prompt_show_count": 2,
-            "ui.github_star_prompt_translation_success_observed": True,
-            "ui.github_star_prompt_eligible_launch_count": 3,
-            "system_prompt": "custom translation style",
+            "intent.secrets.backend": "encrypted_file",
+            "intent.secrets.encrypted_file_path": "secure-secrets.json",
+            "intent.ui.locale": "ja",
+            "state.peer_translation.eula_accepted": True,
+            "state.integrated_context.bootstrapped": True,
+            "intent.clipboard.auto_translate_enabled": True,
+            "state.github_star_prompt.clicked": False,
+            "state.github_star_prompt.last_shown_at": "2026-06-08T00:00:00Z",
+            "state.github_star_prompt.show_count": 2,
+            "state.github_star_prompt.translation_success_observed": True,
+            "state.github_star_prompt.eligible_launch_count": 3,
+            "intent.prompts.system_prompt": "custom translation style",
         },
         expected_revision=None,
         reason=settings_mutation.SETTINGS_MUTATION_SURFACE_UI_PROMPT_CLIPBOARD_STATE,

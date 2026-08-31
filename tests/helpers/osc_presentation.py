@@ -11,17 +11,17 @@ from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationState,
 )
 from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState, state_from_settings
-from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 def osc_control_presentation_state(
     changed_control: OscControlPresentationName,
     *,
-    settings: AppSettings | None = None,
+    settings: AppSettingsVNext | None = None,
     canonical_state: OscCanonicalState | None = None,
     **canonical_changes: object,
 ) -> OscControlPresentationState:
-    value = settings or AppSettings()
+    value = settings if settings is not None else AppSettingsVNext()
     canonical = canonical_state or state_from_settings(value)
     if canonical_changes:
         canonical = replace(canonical, **canonical_changes)

@@ -5,7 +5,7 @@ import copy
 import logging
 import sys
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, cast
 
@@ -293,15 +293,15 @@ def _require_self_capture_owner(
 @dataclass(frozen=True, slots=True)
 class _LocalASRProductionCompositionAccess:
     config_path: Path
-    settings_loader: Callable[[], object]
-    runtime_initializer: Callable[..., Awaitable[None]]
+    settings_loader: Callable[[], AppSettingsVNext]
+    runtime_initializer: Callable[[AppSettingsVNext], Awaitable[None]]
     components_provider: Callable[[], RuntimePipelineComponents | None]
     gpu_retry: Callable[[], Awaitable[None]]
 
-    def load_compatibility_settings(self) -> object:
+    def load_compatibility_settings(self) -> AppSettingsVNext:
         return self.settings_loader()
 
-    async def initialize(self, settings) -> None:
+    async def initialize(self, settings: AppSettingsVNext) -> None:
         await self.runtime_initializer(settings)
 
     @property
@@ -346,35 +346,38 @@ class _LocalASRProductionCompositionAccess:
         await self.gpu_retry()
 
 
-def _copy_provider_prompt_apply_fields(source: object, target: object) -> None:
-    target.provider.stt = source.provider.stt
-    target.provider.peer_stt = source.provider.peer_stt
-    target.provider.llm = source.provider.llm
-    target.translation = copy.deepcopy(source.translation)
-    target.gemini.llm_model = source.gemini.llm_model
-    target.openrouter.llm_model = source.openrouter.llm_model
-    target.openrouter.routing_mode = source.openrouter.routing_mode
-    target.openrouter.provider_routing = source.openrouter.provider_routing
-    target.openrouter.selected_source = source.openrouter.selected_source
-    target.openrouter.selection_alias = source.openrouter.selection_alias
-    target.openrouter.broker_base_url = source.openrouter.broker_base_url
-    target.qwen.llm_model = source.qwen.llm_model
-    target.qwen.region = source.qwen.region
-    target.deepseek.llm_model = source.deepseek.llm_model
-    target.local_llm = copy.deepcopy(source.local_llm)
-    target.llm.concurrency_limit = source.llm.concurrency_limit
-    if source.openrouter.selected_source == OpenRouterCredentialSource.MANAGED:
-        target.managed_identity.verified_hardware_hash = (
-            source.managed_identity.verified_hardware_hash
-        )
-        target.managed_identity.verified_hardware_hash_salt_version = (
-            source.managed_identity.verified_hardware_hash_salt_version
+def _copy_provider_prompt_apply_fields(
+    source: AppSettingsVNext,
+    target: AppSettingsVNext,
+) -> AppSettingsVNext:
+    source_managed = source.state.managed_connection
+    if source.intent.translation.openrouter_selected_source == "managed":
+        next_managed = replace(
+            target.state.managed_connection,
+            verified_hardware_hash=source_managed.verified_hardware_hash,
+            verified_hardware_hash_salt_version=source_managed.verified_hardware_hash_salt_version,
         )
     else:
-        target.managed_identity.verified_hardware_hash = None
-        target.managed_identity.verified_hardware_hash_salt_version = None
-    target.system_prompt = source.system_prompt
-    target.system_prompts = {}
+        next_managed = replace(
+            target.state.managed_connection,
+            verified_hardware_hash=None,
+            verified_hardware_hash_salt_version=None,
+        )
+    return replace(
+        target,
+        intent=replace(
+            target.intent,
+            stt=replace(target.intent.stt, provider=source.intent.stt.provider),
+            peer_stt=replace(target.intent.peer_stt, provider=source.intent.peer_stt.provider),
+            translation=copy.deepcopy(source.intent.translation),
+            local_llm=copy.deepcopy(source.intent.local_llm),
+            prompts=replace(
+                target.intent.prompts,
+                system_prompt=source.intent.prompts.system_prompt,
+            ),
+        ),
+        state=replace(target.state, managed_connection=next_managed),
+    )
 
 
 def compose_application_runtime(
@@ -423,8 +426,8 @@ def compose_application_runtime(
     managed_account: ManagedAccountComponents | None = None
     runtime_components: RuntimeCompositionComponents | None = None
 
-    def current_settings() -> object | None:
-        return settings.current
+    def current_settings() -> AppSettingsVNext | None:
+        return settings.canonical
 
     def create_settings_secret_store() -> SettingsSecretStorePort:
         canonical = settings.canonical
@@ -432,9 +435,7 @@ def compose_application_runtime(
             raise RuntimeError("Settings are not loaded")
         return create_secret_store(canonical.intent.secrets, config_path=config_path)
 
-    def canonical_settings(value) -> AppSettingsVNext:
-        if isinstance(value, AppSettingsVNext):
-            return value
+    def canonical_settings(value: AppSettingsVNext) -> AppSettingsVNext:
         return settings.project(value, authoritative=True)
 
     def peer_application_settings() -> PeerApplicationSettings | None:
@@ -543,9 +544,7 @@ def compose_application_runtime(
             translation_enabled=bool(
                 config is not None and config.snapshot().value.translation_enabled
             ),
-            peer_translation_enabled=bool(
-                settings_value is not None and settings_value.ui.peer_translation_enabled
-            ),
+            peer_translation_enabled=bool(settings.peer_translation_enabled()),
         )
         return desired, settings_value
 
@@ -747,7 +746,7 @@ def compose_application_runtime(
                 sync_local_notice=lambda: require_local_asr().adapters.notice.sync(),
                 presentation_changed=refresh_overlay_presentation,
                 disclosure_sink=enqueue_peer_disclosure,
-                superseded_sink=lambda: signatures.mark_superseded(settings.current),
+                superseded_sink=lambda: signatures.mark_superseded(settings.canonical),
                 localize=presentation.localize,
                 settings_presentation_sink=(presentation.refresh_settings_loopback_capture_target),
                 log_basic=log_basic,
@@ -763,12 +762,12 @@ def compose_application_runtime(
             selected_provider_requires_model=bool(
                 value is not None
                 and (
-                    value.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-                    or value.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
+                    value.intent.stt.provider == STTProviderName.LOCAL_QWEN_GPU.value
+                    or value.intent.peer_stt.provider == STTProviderName.LOCAL_QWEN_GPU.value
                 )
             ),
-            locale=value.ui.locale if value is not None else None,
-            device_id=value.stt.gpu_device_id if value is not None else "auto",
+            locale=value.intent.ui.locale if value is not None else None,
+            device_id=value.intent.stt.gpu_device_id if value is not None else "auto",
         )
 
     def local_asr_runtime() -> LocalASRProviderRuntimePort | None:
@@ -961,7 +960,7 @@ def compose_application_runtime(
         value = current_settings()
         if value is None:
             return not stt_available
-        return stt_requires_secret(value.provider.stt) and not stt_available
+        return stt_requires_secret(STTProviderName(value.intent.stt.provider)) and not stt_available
 
     def publish_osc_state_from_runtime() -> None:
         if vrc_mic_sync is not None:
@@ -1028,7 +1027,7 @@ def compose_application_runtime(
                 if value is None:
                     if settings.canonical is None:
                         raise RuntimeError("Settings are not loaded")
-                    return state_from_settings(settings.compatibility_projection())
+                    return state_from_settings(settings.require_canonical())
                 self_capture = pipeline.self_capture
                 peer_owner = require_peer().owner
                 return state_from_settings(
@@ -1041,7 +1040,7 @@ def compose_application_runtime(
                         managed_account is not None
                         and managed_account.translation.state_provider().translation_enabled
                     ),
-                    captions=bool(value.ui.overlay_enabled),
+                    captions=settings.overlay_enabled(),
                 )
 
             def language_state() -> tuple[str, str, str, str]:
@@ -1049,10 +1048,10 @@ def compose_application_runtime(
                 if value is None:
                     return ("ko", "en", "en", "ko")
                 return (
-                    value.languages.source_language,
-                    value.languages.target_language,
-                    value.languages.peer_source_language,
-                    value.languages.peer_target_language,
+                    value.intent.languages.source_language,
+                    value.intent.languages.target_language,
+                    value.intent.languages.peer_source_language,
+                    value.intent.languages.peer_target_language,
                 )
 
             def osc_ui_state(
@@ -1062,7 +1061,7 @@ def compose_application_runtime(
                 if value is None:
                     if settings.canonical is None:
                         raise RuntimeError("Settings are not loaded")
-                    value = settings.compatibility_projection()
+                    value = settings.require_canonical()
                 return osc_control_presentation_state(
                     value,
                     canonical_state=osc_state(),
@@ -1180,6 +1179,7 @@ def compose_application_runtime(
         presentation.set_dashboard_languages(
             source_language=languages.source_language,
             target_language=languages.target_language,
+            secondary_target_language=languages.secondary_target_language,
             peer_source_language=languages.peer_source_language,
             peer_target_language=languages.peer_target_language,
             peer_source_mode=languages.peer_source_mode,
@@ -1193,7 +1193,7 @@ def compose_application_runtime(
                 }
             ),
         )
-        loaded = require_projection().render(settings.current)
+        loaded = require_projection().render(settings.canonical)
         if loaded:
             with contextlib.suppress(Exception):
                 presentation.set_settings_overlay_calibration(require_calibration().current)
@@ -1313,24 +1313,43 @@ def compose_application_runtime(
         value = current_settings()
         if value is None:
             return copy.deepcopy(pending)
-        merged = copy.deepcopy(value)
-        _copy_provider_prompt_apply_fields(pending, merged)
+        merged = _copy_provider_prompt_apply_fields(pending, copy.deepcopy(value))
         config_owner = pipeline.translation_runtime_configuration
         if config_owner is not None:
             configuration = config_owner.snapshot().value
-            merged.languages.source_language = configuration.source_language
-            merged.languages.target_language = configuration.target_language
-            merged.languages.peer_source_language = configuration.peer_source_language
-            merged.languages.peer_target_language = configuration.peer_target_language
+            merged = replace(
+                merged,
+                intent=replace(
+                    merged.intent,
+                    languages=replace(
+                        merged.intent.languages,
+                        source_language=configuration.source_language,
+                        target_language=configuration.target_language,
+                        secondary_target_language=(
+                            configuration.self_target_languages[1]
+                            if len(configuration.self_target_languages) > 1
+                            else ""
+                        ),
+                        peer_source_language=configuration.peer_source_language,
+                        peer_target_language=configuration.peer_target_language,
+                    ),
+                ),
+            )
         if (
-            merged.provider.peer_stt
+            merged.intent.peer_stt.provider
             not in {
-                STTProviderName.SONIOX,
-                STTProviderName.LOCAL_QWEN_GPU,
+                STTProviderName.SONIOX.value,
+                STTProviderName.LOCAL_QWEN_GPU.value,
             }
-            and merged.languages.peer_source_mode == "auto"
+            and merged.intent.languages.peer_source_mode == "auto"
         ):
-            merged.languages.peer_source_mode = "manual"
+            merged = replace(
+                merged,
+                intent=replace(
+                    merged.intent,
+                    languages=replace(merged.intent.languages, peer_source_mode="manual"),
+                ),
+            )
         return merged
 
     def capture_runtime_signatures_before_mutation() -> None:
@@ -1353,6 +1372,7 @@ def compose_application_runtime(
             value,
             canonical=canonical_settings(value),
             peer=require_peer().owner,
+            peer_translation_enabled=settings.peer_translation_enabled(),
         )
         sync_non_provider_signatures()
 
@@ -1376,12 +1396,12 @@ def compose_application_runtime(
                 ),
                 secret_store_factory=lambda value: create_sync_secret_store_adapter(
                     create_secret_store(
-                        value.secrets,
+                        value.intent.secrets,
                         config_path=config_path,
                     )
                 ),
                 active_secret_provider=lambda value, secret_key: create_secret_store(
-                    value.secrets,
+                    value.intent.secrets,
                     config_path=config_path,
                 ).get(secret_key),
                 save_failure_sink=log_error,
@@ -1466,7 +1486,7 @@ def compose_application_runtime(
         value = current_settings()
         if value is None:
             return 9000
-        port = getattr(value.osc, "port", 9000)
+        port = getattr(value.intent.osc, "port", 9000)
         return port if isinstance(port, int) and 0 < port <= 65535 else 9000
 
     def require_vrchat_presence() -> VrchatOscPresenceProbeOwner:
@@ -2043,8 +2063,8 @@ def compose_application_runtime(
         ),
     )
 
-    async def initialize_local_asr_evidence(value) -> None:
-        settings.current = value
+    async def initialize_local_asr_evidence(value: AppSettingsVNext) -> None:
+        settings.canonical = value
         canonical = settings.project(value, authoritative=True)
         require_provisioning()
         sync_signature_caches(value)

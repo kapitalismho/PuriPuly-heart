@@ -171,11 +171,12 @@ class OscControlIntegrationOwner:
             return
         settings = self._settings_provider()
         if settings is not None:
+            osc = settings.intent.osc
             key = (
-                settings.osc.host,
-                settings.osc.connection_mode,
-                int(settings.osc.send_port or settings.osc.port),
-                int(settings.osc.receive_port),
+                osc.host,
+                osc.connection_mode,
+                int(osc.send_port or osc.port),
+                int(osc.receive_port),
             )
             if self._configured_connection != key:
                 await self.configure_connection(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -8,17 +9,30 @@ from puripuly_heart.app.ports.managed_gemma_translation import (
     ManagedGemmaTranslationSelection,
 )
 from puripuly_heart.app.wiring.wiring_managed_gemma import (
+    managed_gemma_selection,
     managed_gemma_translation_desired,
     sync_managed_gemma_demand,
 )
-from puripuly_heart.config.prompts import render_translation_prompt_template
-from puripuly_heart.config.settings import (
-    AppSettings,
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import (
     TranslationConnection,
     TranslationModel,
-    materialize_translation_settings,
 )
-from puripuly_heart.core.language import get_llm_language_name
+
+
+def _managed_gemma_settings() -> AppSettingsVNext:
+    settings = AppSettingsVNext()
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model=TranslationModel.MANAGED_GEMMA.value,
+                connection=TranslationConnection.CPU.value,
+            ),
+        ),
+    )
 
 
 def test_demand_is_true_when_either_channel_is_on() -> None:
@@ -39,9 +53,7 @@ def test_demand_is_true_when_either_channel_is_on() -> None:
 @pytest.mark.asyncio
 async def test_sync_prepares_when_demand_is_on() -> None:
     events: list[object] = []
-    settings = materialize_translation_settings(AppSettings())
-    settings.translation.model = TranslationModel.MANAGED_GEMMA
-    settings.translation.connection = TranslationConnection.CPU
+    settings = _managed_gemma_settings()
 
     class Owner:
         async def prepare(self, selection: ManagedGemmaTranslationSelection) -> object:
@@ -57,21 +69,7 @@ async def test_sync_prepares_when_demand_is_on() -> None:
         desired=True,
     )
 
-    assert events == [
-        (
-            "prepare",
-            ManagedGemmaTranslationSelection(
-                backend="cpu",
-                source_language="ko",
-                target_language="en",
-                system_prompt=render_translation_prompt_template(
-                    settings.system_prompt,
-                    source_name=get_llm_language_name("ko"),
-                    target_name=get_llm_language_name("en"),
-                ),
-            ),
-        )
-    ]
+    assert events == [("prepare", managed_gemma_selection(settings))]
 
 
 @pytest.mark.asyncio
