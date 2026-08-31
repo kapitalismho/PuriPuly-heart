@@ -207,6 +207,7 @@ def is_qwen_audio_asr_supported(code: str) -> bool:
         return True
     return code.split("-")[0].lower() in _QWEN_AUDIO_ASR_LANGUAGE_MAP
 
+
 _LOCAL_QWEN_LANGUAGE_HINT_MAP: dict[str, str] = {
     "en": "en",
     "ja": "ja",
@@ -215,8 +216,6 @@ _LOCAL_QWEN_LANGUAGE_HINT_MAP: dict[str, str] = {
     "zh-CN": "zh",
     "zh-TW": "zh",
 }
-
-
 
 
 def get_local_qwen_language_hint(code: str) -> str | None:
@@ -298,8 +297,6 @@ def is_deepgram_supported(code: str) -> bool:
         return True
     base_code = code.split("-")[0].lower()
     return base_code in _DEEPGRAM_SUPPORTED
-
-
 
 
 def is_soniox_supported(code: str) -> bool:

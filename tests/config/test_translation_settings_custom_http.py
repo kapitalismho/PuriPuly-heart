@@ -7,7 +7,7 @@ import pytest
 from puripuly_heart.app.services.canonical_settings_persistence import (
     materialize_canonical_translation_settings,
 )
-from puripuly_heart.config.provider_values import LLMProviderName, QwenLLMModel, QwenRegion
+from puripuly_heart.config.provider_values import LLMProviderName, QwenRegion
 from puripuly_heart.config.runtime_resolution import TranslationFallbackRuntimeIntent
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, TranslationFallbackIntent

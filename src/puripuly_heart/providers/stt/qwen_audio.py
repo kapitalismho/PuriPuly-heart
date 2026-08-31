@@ -74,7 +74,11 @@ def _normalized_vocabulary(
         term = raw_term.strip()
         if not term or term in result:
             continue
-        weight = raw_weight if isinstance(raw_weight, int) and not isinstance(raw_weight, bool) else default_weight
+        weight = (
+            raw_weight
+            if isinstance(raw_weight, int) and not isinstance(raw_weight, bool)
+            else default_weight
+        )
         if weight not in (1, 2, 3, 4, 5, 50):
             weight = default_weight
         result[term] = weight
@@ -92,7 +96,7 @@ def _join_sentences(sentences: Sequence[str]) -> str:
             continue
         previous = output[-1]
         first = text[0]
-        if previous.isspace() or first.isspace() or first in ",.!?;:，。！？；：、)]}」』】》”’\"":
+        if previous.isspace() or first.isspace() or first in ',.!?;:，。！？；：、)]}」』】》”’"':
             output += text
         elif ord(previous) >= 0x3000 or ord(first) >= 0x3000:
             output += text
@@ -300,7 +304,9 @@ class _QwenAudioSession(STTBackendSession):
         self._sentence_ids.clear()
         self._start_future = self._loop.create_future() if self._loop is not None else None
         self._state = (
-            QwenAudioSessionState.CONNECTING if initial else QwenAudioSessionState.STARTING_NEXT_TASK
+            QwenAudioSessionState.CONNECTING
+            if initial
+            else QwenAudioSessionState.STARTING_NEXT_TASK
         )
         parameters: dict[str, object] = {
             "format": "pcm",
@@ -408,7 +414,9 @@ class _QwenAudioSession(STTBackendSession):
                 self._state not in (QwenAudioSessionState.CLOSING, QwenAudioSessionState.FAILED)
                 and self._accept_terminals
             ):
-                await self._fail(QwenAudioProtocolError("Qwen Audio socket closed before task completion"))
+                await self._fail(
+                    QwenAudioProtocolError("Qwen Audio socket closed before task completion")
+                )
             if not self._events_closed and self._state is not QwenAudioSessionState.FAILED:
                 self._put_event(None)
 
@@ -444,7 +452,9 @@ class _QwenAudioSession(STTBackendSession):
         elif event_type == "task-failed":
             await self._handle_task_failed(event_task_id, header)
         else:
-            logger.debug("Qwen Audio ignored provider event=%s task_id=%s", event_type, event_task_id)
+            logger.debug(
+                "Qwen Audio ignored provider event=%s task_id=%s", event_type, event_task_id
+            )
 
     async def inject_event(self, event: Mapping[str, object]) -> None:
         await self._handle_server_message(event)
@@ -784,8 +794,7 @@ class _QwenAudioSession(STTBackendSession):
         if (
             self._active_boundary is None
             and not (
-                self._state is QwenAudioSessionState.STARTING_NEXT_TASK
-                and self._pending_boundaries
+                self._state is QwenAudioSessionState.STARTING_NEXT_TASK and self._pending_boundaries
             )
             and self._state is not QwenAudioSessionState.FINISHING_TASK
         ):
@@ -837,7 +846,11 @@ class _QwenAudioSession(STTBackendSession):
     async def _close_socket(self, *, cancel_receiver: bool = False) -> None:
         current_task = asyncio.current_task()
         deferred_task = self._deferred_finish_task
-        if deferred_task is not None and not deferred_task.done() and deferred_task is not current_task:
+        if (
+            deferred_task is not None
+            and not deferred_task.done()
+            and deferred_task is not current_task
+        ):
             deferred_task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await deferred_task

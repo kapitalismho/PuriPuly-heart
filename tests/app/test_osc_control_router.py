@@ -201,6 +201,7 @@ async def test_router_routes_on_device_translation_model_ids() -> None:
     ]
     await router.close()
 
+
 @pytest.mark.asyncio
 async def test_router_accepts_legacy_gemini_translation_id_6() -> None:
     application = FakeApplication()

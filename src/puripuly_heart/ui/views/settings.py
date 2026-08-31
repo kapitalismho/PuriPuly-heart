@@ -1438,8 +1438,8 @@ class SettingsView(ft.Column):
             controls=[
                 self._api_title,
                 ft.Container(expand=True),
-                self._qwen_asr_model_btn,
                 self._qwen_region_btn,
+                self._qwen_asr_model_btn,
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -3530,7 +3530,12 @@ class SettingsView(ft.Column):
         )
 
     def _qwen_model_label(self, model: str) -> str:
-        return t(f"stt.model.{model}", default=model)
+        label_keys = {
+            QwenASRSTTModel.REALTIME.value: "stt.model.qwen3-asr-flash-realtime",
+            QwenASRSTTModel.AUDIO_STREAMING.value: "stt.model.qwen-audio-3.0-asr-flash-streaming",
+        }
+        key = label_keys.get(model)
+        return t(key, default=model) if key is not None else model
 
     def _stt_provider_display_label(
         self,
@@ -4409,13 +4414,13 @@ class SettingsView(ft.Column):
         ):
             qwen_regions.add(settings.qwen_region)
 
-        qwen_stt_selected = (
-            stt == STTProviderName.QWEN_ASR or peer_stt == STTProviderName.QWEN_ASR
+        qwen_stt_selected = stt == STTProviderName.QWEN_ASR or peer_stt == STTProviderName.QWEN_ASR
+        qwen_asr_model_btn = getattr(self, "_qwen_asr_model_btn", None)
+        self._qwen_region_btn.visible = qwen_stt_selected or (
+            not is_custom_http and llm == LLMProviderName.QWEN
         )
-        self._qwen_region_btn.visible = (
-            qwen_stt_selected or (not is_custom_http and llm == LLMProviderName.QWEN)
-        )
-        self._qwen_asr_model_btn.visible = qwen_stt_selected
+        if qwen_asr_model_btn is not None:
+            qwen_asr_model_btn.visible = qwen_stt_selected
         self._alibaba_key_beijing.visible = QwenRegion.BEIJING in qwen_regions
         self._alibaba_key_singapore.visible = QwenRegion.SINGAPORE in qwen_regions
         api_keys_card = getattr(self, "_api_keys_card", None)
@@ -4430,9 +4435,8 @@ class SettingsView(ft.Column):
                     self._cerebras_key,
                     self._alibaba_key_beijing,
                     self._alibaba_key_singapore,
-                    self._openrouter_key,
                     self._openrouter_pkce_button_row,
-                    self._qwen_asr_model_btn,
+                    qwen_asr_model_btn,
                     self._qwen_region_btn,
                     getattr(self, "_http_extension_credentials", None),
                 )
@@ -5088,9 +5092,7 @@ class SettingsView(ft.Column):
         ]
         settings = self._build_settings_with_provider_draft()
         current = (
-            settings.qwen_asr_model
-            if settings is not None
-            else QwenASRSTTModel.REALTIME.value
+            settings.qwen_asr_model if settings is not None else QwenASRSTTModel.REALTIME.value
         )
         SettingsModal(
             self.page,
@@ -5101,7 +5103,9 @@ class SettingsView(ft.Column):
         ).open(current)
 
     def _on_qwen_asr_model_selected(self, value: str) -> None:
-        if self._provider_snapshot is None or value not in {model.value for model in _QWEN_ASR_MODELS}:
+        if self._provider_snapshot is None or value not in {
+            model.value for model in _QWEN_ASR_MODELS
+        }:
             return
         settings = self._build_settings_with_provider_draft()
         assert settings is not None

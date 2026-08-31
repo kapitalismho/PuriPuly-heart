@@ -78,8 +78,8 @@ async def open_fake(
     opening = asyncio.create_task(backend.open_session())
     while not socket.sent:
         await asyncio.sleep(0)
-    first_id = json.loads(socket.sent[0])['header']['task_id']
-    await socket.push({'header': {'event': 'task-started', 'task_id': first_id}})
+    first_id = json.loads(socket.sent[0])["header"]["task_id"]
+    await socket.push({"header": {"event": "task-started", "task_id": first_id}})
     session = await opening
     return backend, session, socket, first_id
 
@@ -94,28 +94,36 @@ async def test_normal_task_aggregates_only_sentence_finals() -> None:
     await session.send_audio(b"pcm")
     await socket.push(
         {
-            'header': {'event': 'result-generated', 'task_id': task_id},
-            'payload': {'output': {'sentence': {'sentence_end': False, 'sentence_id': 1, 'text': 'partial'}}},
+            "header": {"event": "result-generated", "task_id": task_id},
+            "payload": {
+                "output": {"sentence": {"sentence_end": False, "sentence_id": 1, "text": "partial"}}
+            },
         }
     )
     await session.on_speech_end()
     await socket.push(
         {
-            'header': {'event': 'result-generated', 'task_id': task_id},
-            'payload': {'output': {'sentence': {'sentence_end': True, 'sentence_id': 1, 'text': '첫 문장.'}}},
+            "header": {"event": "result-generated", "task_id": task_id},
+            "payload": {
+                "output": {"sentence": {"sentence_end": True, "sentence_id": 1, "text": "첫 문장."}}
+            },
         }
     )
     await socket.push(
         {
-            'header': {'event': 'result-generated', 'task_id': task_id},
-            'payload': {'output': {'sentence': {'sentence_end': True, 'sentence_id': 2, 'text': '둘째 문장.'}}},
+            "header": {"event": "result-generated", "task_id": task_id},
+            "payload": {
+                "output": {
+                    "sentence": {"sentence_end": True, "sentence_id": 2, "text": "둘째 문장."}
+                }
+            },
         }
     )
-    await socket.push({'header': {'event': 'task-finished', 'task_id': task_id}})
+    await socket.push({"header": {"event": "task-finished", "task_id": task_id}})
     event = await next_event(session)
     assert event.text == "첫 문장.둘째 문장."
     assert event.is_final
-    assert json.loads(socket.sent[0])['payload']['parameters']['vocabulary'] == {'PuriPuly': 4}
+    assert json.loads(socket.sent[0])["payload"]["parameters"]["vocabulary"] == {"PuriPuly": 4}
     await session.abort_for_toggle_off()
 
 
@@ -124,23 +132,25 @@ async def test_queued_audio_flushes_after_next_task_started_and_order_is_preserv
     _, session, socket, first_id = await open_fake()
     await session.on_speech_end()
     await session.send_audio(b"next-utterance")
-    await socket.push({'header': {'event': 'task-finished', 'task_id': first_id}})
+    await socket.push({"header": {"event": "task-finished", "task_id": first_id}})
     while len(socket.sent) < 3:
         await asyncio.sleep(0)
     run = json.loads(socket.sent[2])
-    second_id = run['header']['task_id']
-    assert run['header']['action'] == 'run-task'
-    await socket.push({'header': {'event': 'task-started', 'task_id': second_id}})
+    second_id = run["header"]["task_id"]
+    assert run["header"]["action"] == "run-task"
+    await socket.push({"header": {"event": "task-started", "task_id": second_id}})
     while b"next-utterance" not in socket.sent:
         await asyncio.sleep(0)
     await session.on_speech_end()
     await socket.push(
         {
-            'header': {'event': 'result-generated', 'task_id': second_id},
-            'payload': {'output': {'sentence': {'sentence_end': True, 'sentence_id': 1, 'text': 'second'}}},
+            "header": {"event": "result-generated", "task_id": second_id},
+            "payload": {
+                "output": {"sentence": {"sentence_end": True, "sentence_id": 1, "text": "second"}}
+            },
         }
     )
-    await socket.push({'header': {'event': 'task-finished', 'task_id': second_id}})
+    await socket.push({"header": {"event": "task-finished", "task_id": second_id}})
     first_event = await next_event(session)
     second_event = await next_event(session)
     assert first_event.text == ""
@@ -152,17 +162,17 @@ async def test_queued_audio_flushes_after_next_task_started_and_order_is_preserv
 async def test_empty_and_task_failed_each_resolve_one_boundary() -> None:
     _, session, socket, task_id = await open_fake()
     await session.on_speech_end()
-    await socket.push({'header': {'event': 'task-finished', 'task_id': task_id}})
+    await socket.push({"header": {"event": "task-finished", "task_id": task_id}})
     empty = await next_event(session)
     assert empty.text == ""
     await session.on_speech_end()
     await socket.push(
         {
-            'header': {
-                'event': 'task-failed',
-                'task_id': session.task_id,
-                'error_code': 'CLIENT_ERROR',
-                'error_message': 'failed',
+            "header": {
+                "event": "task-failed",
+                "task_id": session.task_id,
+                "error_code": "CLIENT_ERROR",
+                "error_message": "failed",
             }
         }
     )
@@ -178,9 +188,11 @@ async def test_empty_and_task_failed_each_resolve_one_boundary() -> None:
 async def test_stale_and_duplicate_events_do_not_consume_next_boundary() -> None:
     _, session, socket, task_id = await open_fake()
     await session.on_speech_end()
-    await socket.push({'header': {'event': 'result-generated', 'task_id': 'stale', 'event_id': 'x'}})
-    await socket.push({'header': {'event': 'task-finished', 'task_id': 'stale'}})
-    await socket.push({'header': {'event': 'task-finished', 'task_id': task_id}})
+    await socket.push(
+        {"header": {"event": "result-generated", "task_id": "stale", "event_id": "x"}}
+    )
+    await socket.push({"header": {"event": "task-finished", "task_id": "stale"}})
+    await socket.push({"header": {"event": "task-finished", "task_id": task_id}})
     first = await next_event(session)
     assert first.text == ""
     await session.abort_for_toggle_off()
@@ -191,12 +203,12 @@ async def test_hotword_update_is_applied_on_next_task_and_abort_suppresses_event
     _, session, socket, first_id = await open_fake(hotwords=["old"])
     session.update_hotwords(["new"])
     await session.on_speech_end()
-    await socket.push({'header': {'event': 'task-finished', 'task_id': first_id}})
+    await socket.push({"header": {"event": "task-finished", "task_id": first_id}})
     while len(socket.sent) < 3:
         await asyncio.sleep(0)
-    second_id = json.loads(socket.sent[2])['header']['task_id']
-    assert json.loads(socket.sent[2])['payload']['parameters']['vocabulary'] == {'new': 4}
-    await socket.push({'header': {'event': 'task-started', 'task_id': second_id}})
+    second_id = json.loads(socket.sent[2])["header"]["task_id"]
+    assert json.loads(socket.sent[2])["payload"]["parameters"]["vocabulary"] == {"new": 4}
+    await socket.push({"header": {"event": "task-started", "task_id": second_id}})
     await session.on_speech_end()
     await session.abort_for_toggle_off()
     assert session.state is QwenAudioSessionState.CLOSING
@@ -211,14 +223,16 @@ async def test_stop_drains_last_task_before_closing() -> None:
     await asyncio.sleep(0)
     await socket.push(
         {
-            'header': {'event': 'result-generated', 'task_id': task_id},
-            'payload': {'output': {'sentence': {'sentence_end': True, 'sentence_id': 1, 'text': 'last'}}},
+            "header": {"event": "result-generated", "task_id": task_id},
+            "payload": {
+                "output": {"sentence": {"sentence_end": True, "sentence_id": 1, "text": "last"}}
+            },
         }
     )
-    await socket.push({'header': {'event': 'task-finished', 'task_id': task_id}})
+    await socket.push({"header": {"event": "task-finished", "task_id": task_id}})
     await stopping
     event = await next_event(session)
-    assert event.text == 'last'
+    assert event.text == "last"
     assert socket.closed
 
 
@@ -315,6 +329,7 @@ def test_factory_selects_qwen_audio_protocol_and_source_terms() -> None:
     assert backend.endpoint.endswith("/api-ws/v1/inference")
     assert tuple(backend.hotwords) == ("PuriPuly", "Qwen")
 
+
 async def wait_for_condition(predicate) -> None:
     for _ in range(1000):
         if predicate():
@@ -355,7 +370,9 @@ async def test_delayed_flush_serializes_pcm_before_finish_task() -> None:
     await socket.push(
         {
             "header": {"event": "result-generated", "task_id": second_id},
-            "payload": {"output": {"sentence": {"sentence_end": True, "sentence_id": 1, "text": "done"}}},
+            "payload": {
+                "output": {"sentence": {"sentence_end": True, "sentence_id": 1, "text": "done"}}
+            },
         }
     )
     await socket.push({"header": {"event": "task-finished", "task_id": second_id}})
@@ -397,7 +414,9 @@ async def test_stop_drains_two_ordered_nonempty_boundaries() -> None:
     await socket.push(
         {
             "header": {"event": "result-generated", "task_id": first_id},
-            "payload": {"output": {"sentence": {"sentence_end": True, "sentence_id": 1, "text": "first"}}},
+            "payload": {
+                "output": {"sentence": {"sentence_end": True, "sentence_id": 1, "text": "first"}}
+            },
         }
     )
     await socket.push({"header": {"event": "task-finished", "task_id": first_id}})
@@ -408,7 +427,9 @@ async def test_stop_drains_two_ordered_nonempty_boundaries() -> None:
     await socket.push(
         {
             "header": {"event": "result-generated", "task_id": second_id},
-            "payload": {"output": {"sentence": {"sentence_end": True, "sentence_id": 1, "text": "second"}}},
+            "payload": {
+                "output": {"sentence": {"sentence_end": True, "sentence_id": 1, "text": "second"}}
+            },
         }
     )
     await socket.push({"header": {"event": "task-finished", "task_id": second_id}})
@@ -461,7 +482,9 @@ async def test_heartbeat_result_does_not_create_transcript() -> None:
     await socket.push(
         {
             "header": {"event": "result-generated", "task_id": task_id},
-            "payload": {"output": {"sentence": {"heartbeat": True, "sentence_end": True, "sentence_id": 0}}},
+            "payload": {
+                "output": {"sentence": {"heartbeat": True, "sentence_end": True, "sentence_id": 0}}
+            },
         }
     )
     await session.on_speech_end()

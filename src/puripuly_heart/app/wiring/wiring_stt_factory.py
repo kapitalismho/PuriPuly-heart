@@ -25,8 +25,8 @@ from puripuly_heart.config.resolved import (
 from puripuly_heart.config.runtime_resolution import (
     CREDENTIAL_REF_CUSTOM_STT,
     CREDENTIAL_REF_DEEPGRAM_STT,
-    CREDENTIAL_REF_QWEN_SINGAPORE,
     CREDENTIAL_REF_SONIOX_STT,
+    QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
     SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S,
     SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS,
     SONIOX_STT_MODEL_RT_V5,
@@ -39,7 +39,6 @@ from puripuly_heart.config.runtime_resolution import (
     STT_PROVIDER_LOCAL_QWEN_GPU,
     STT_PROVIDER_QWEN_ASR,
     STT_PROVIDER_SONIOX,
-    QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
     STTRuntimeIntent,
 )
 from puripuly_heart.config.runtime_resolution import (
@@ -299,11 +298,7 @@ def resolve_self_stt_runtime_config(settings: AppSettingsVNext) -> ResolvedSTTCo
 
 
 def _qwen_asr_endpoint_for_region(region: object, model: str | None = None) -> str:
-    suffix = (
-        "/inference"
-        if model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING
-        else "/realtime"
-    )
+    suffix = "/inference" if model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING else "/realtime"
     if region == QwenRegion.SINGAPORE or region == QwenRegion.SINGAPORE.value:
         return f"wss://dashscope-intl.aliyuncs.com/api-ws/v1{suffix}"
     return f"wss://dashscope.aliyuncs.com/api-ws/v1{suffix}"
@@ -315,19 +310,24 @@ def _self_stt_custom_vocabulary_signature_for_provider(
     enabled: bool,
     terms: Mapping[str, list[str]],
     source_language: str,
+    model: str | None = None,
+    provider_identity: bool = False,
 ) -> tuple[bool, tuple[str, ...]]:
     provider_value = provider.value if isinstance(provider, STTProviderName) else str(provider)
-    if provider_value not in {
-        STTProviderName.DEEPGRAM.value,
-        STTProviderName.LOCAL_QWEN.value,
-        STTProviderName.QWEN_ASR.value,
-        STTProviderName.SONIOX.value,
-    }:
-        return False, ()
     config = CustomVocabularyRuntimeConfig(enabled=enabled, terms=terms)
     if provider_value == STTProviderName.LOCAL_QWEN.value:
+        if provider_identity:
+            return False, ()
         return enabled, tuple(get_effective_local_qwen_hotwords(config, source_language))
-    return enabled, tuple(get_effective_custom_terms(config, source_language))
+    if provider_value in {
+        STTProviderName.DEEPGRAM.value,
+        STTProviderName.SONIOX.value,
+    } or (
+        provider_value == STTProviderName.QWEN_ASR.value
+        and (model is None or model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING)
+    ):
+        return enabled, tuple(get_effective_custom_terms(config, source_language))
+    return False, ()
 
 
 def build_self_stt_runtime_signature(settings: AppSettingsVNext) -> tuple[object, ...]:
@@ -528,6 +528,8 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         enabled=intent.stt.custom_vocabulary_enabled,
         terms=intent.stt.custom_terms,
         source_language=intent.languages.source_language,
+        model=intent.stt.qwen_asr.model,
+        provider_identity=True,
     )
     transition = build_self_local_asr_transition_request_from_vnext(settings, trigger="runtime")
     return (
@@ -553,8 +555,6 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         intent.stt.custom.compatibility if is_custom_stt_provider(provider) else None,
         intent.stt.custom.endpoint if is_custom_stt_provider(provider) else None,
         intent.stt.custom.model if is_custom_stt_provider(provider) else None,
-        custom_vocab_enabled,
-        custom_terms,
         custom_stt_secret_generation() if is_custom_stt_provider(provider) else None,
         (
             str(default_local_stt_model_dir())
@@ -562,6 +562,8 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
             else None
         ),
         intent.stt.gpu_device_id if provider == STTProviderName.LOCAL_QWEN_GPU.value else None,
+        custom_vocab_enabled,
+        custom_terms,
     )
 
 

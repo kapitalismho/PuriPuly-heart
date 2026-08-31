@@ -22,6 +22,7 @@ def _normalized_model_id(value: object) -> str:
         return GEMINI_37_FLASH_GA_MODEL
     return normalized
 
+
 def _model_entry_matches(entry: object, requested_model: str) -> bool:
     for attr in ("name", "id", "model", "model_id", "base_model_id", "baseModelId"):
         if _normalized_model_id(getattr(entry, attr, None)) == requested_model:
@@ -94,6 +95,7 @@ class GeminiLLMProvider:
     runtime_logging: ProviderObservationPort | None = None
     client: GeminiClient | None = None
     _internal_client: GeminiClient | None = field(init=False, default=None, repr=False)
+
     def __post_init__(self) -> None:
         self.model = _normalized_model_id(self.model)
 
@@ -169,6 +171,7 @@ class GoogleGenaiGeminiClient:
     model: str
     runtime_logging: ProviderObservationPort | None = None
     _client: Any = field(init=False, default=None, repr=False)
+
     def __post_init__(self) -> None:
         self.model = _normalized_model_id(self.model)
 

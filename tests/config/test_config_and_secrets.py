@@ -5,11 +5,11 @@ import json
 import pytest
 
 from puripuly_heart.config.llm_profiles import (
+    LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
+    OPENROUTER_FALLBACK_SELECTION_ALIASES,
     OPENROUTER_MAIN_SELECTION_ALIASES,
     OPENROUTER_MODEL_GEMINI_37_FLASH,
     OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK,
-    LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
-    OPENROUTER_FALLBACK_SELECTION_ALIASES,
     get_openrouter_llm_profile,
     openrouter_alias_for_fields,
 )
@@ -137,9 +137,7 @@ def test_openrouter_alias_for_fields_does_not_expose_deepseek_v4_pro() -> None:
 
 
 def test_legacy_gemini_byok_alias_is_compatibility_only() -> None:
-    profile = get_openrouter_llm_profile(
-        LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK
-    )
+    profile = get_openrouter_llm_profile(LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK)
 
     assert profile is not None
     assert profile.openrouter_model == OPENROUTER_MODEL_GEMINI_37_FLASH

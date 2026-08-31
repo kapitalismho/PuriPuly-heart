@@ -859,6 +859,7 @@
         {"name": "deepgram", "kind": "submodule"},
         {"name": "local_qwen_sherpa", "kind": "submodule"},
         {"name": "qwen_asr", "kind": "submodule"},
+        {"name": "qwen_audio", "kind": "submodule"},
         {"name": "soniox", "kind": "submodule"}
       ]
     },
@@ -888,6 +889,22 @@
       "runtime_all_matches_exports": false,
       "facade_contract": null,
       "exports": [{"name": "QwenASRRealtimeSTTBackend", "kind": "attribute"}]
+    },
+    {
+      "module": "puripuly_heart.providers.stt.qwen_audio",
+      "source_rule": "__all__",
+      "source_of_truth_refs": ["src/puripuly_heart/providers/stt/qwen_audio.py"],
+      "runtime_all_matches_exports": true,
+      "facade_contract": null,
+      "exports": [
+        {"name": "QWEN_AUDIO_DEFAULT_ENDPOINT", "kind": "attribute"},
+        {"name": "QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT", "kind": "attribute"},
+        {"name": "QWEN_AUDIO_MODEL", "kind": "attribute"},
+        {"name": "QwenAudioProtocolError", "kind": "attribute"},
+        {"name": "QwenAudioSessionState", "kind": "attribute"},
+        {"name": "QwenAudioStreamingSTTBackend", "kind": "attribute"},
+        {"name": "QwenAudioTaskFailedError", "kind": "attribute"}
+      ]
     },
     {
       "module": "puripuly_heart.providers.stt.soniox",

@@ -70,6 +70,7 @@ class ProviderSettingsSnapshot:
     verified: ProviderVerificationSnapshot
     managed_referral_id: str | None
 
+
 @dataclass(frozen=True, slots=True)
 class GeneralSettingsSnapshot:
     locale: str

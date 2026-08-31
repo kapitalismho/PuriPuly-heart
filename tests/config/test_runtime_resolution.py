@@ -1046,6 +1046,7 @@ def test_legacy_current_openrouter_aliases_normalize_to_canonical_intent_and_res
     assert config.fallback is None
     assert config.concurrency_limit == 7
 
+
 def test_legacy_gemini_alias_only_normalizes_to_canonical_runtime_target() -> None:
     runtime_resolution = _runtime_resolution_module()
     profiles = _profiles_module()

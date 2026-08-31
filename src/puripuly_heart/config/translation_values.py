@@ -104,6 +104,8 @@ def provider_llm_for_translation(model: str, connection: str) -> str:
         if connection == "openrouter":
             return "openrouter"
         return "gemini"
+    if model == "deepseek_v4_flash" and connection == "official_byok":
+        return "deepseek"
     if model == "qwen38_flash":
         return "qwen"
     return "openrouter"

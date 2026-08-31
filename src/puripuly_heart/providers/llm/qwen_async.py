@@ -17,6 +17,7 @@ from puripuly_heart.providers.llm.messages import build_translation_user_message
 logger = logging.getLogger(__name__)
 _QWEN_PROBE_MODEL = "qwen3.8-flash"
 
+
 def _normalize_qwen_model(value: object) -> str:
     if not isinstance(value, str):
         return ""

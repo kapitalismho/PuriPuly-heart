@@ -560,6 +560,7 @@ def _migrate_qwen_35_plus_translation(translation: dict[str, Any]) -> None:
                 history.setdefault("qwen38_flash", history[legacy_model])
                 history.pop(legacy_model, None)
 
+
 def _migrate_deepseek_v4_pro_translation(translation: dict[str, Any]) -> None:
     if translation.get("model") == "deepseek_v4_pro":
         translation["model"] = "deepseek_v4_flash"

@@ -263,6 +263,7 @@ class DashScopeQwenClient:
     model: str
     base_url: str = "https://dashscope.aliyuncs.com/api/v1"
     runtime_logging: ProviderObservationPort | None = None
+
     def __post_init__(self) -> None:
         self.model = _normalize_qwen_model(self.model)
 

@@ -44,6 +44,7 @@ def test_osc_abi_registries_are_explicit_and_cover_current_languages() -> None:
     assert TRANSLATION_MODEL_IDS[9] == "custom_http"
     assert FALLBACK_IDS[0] == "none"
 
+
 def test_gemini_osc_id_5_is_canonical_and_id_6_is_inbound_legacy_only() -> None:
     assert TRANSLATION_MODEL_IDS[5] == "gemini37_flash"
     assert TRANSLATION_MODEL_IDS[6] == "gemini37_flash"

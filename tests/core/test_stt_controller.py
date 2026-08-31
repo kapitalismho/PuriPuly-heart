@@ -156,6 +156,7 @@ class FakeBackend:
         self.sessions.append(s)
         return s
 
+
 class QwenAudioBridgeSocket:
     def __init__(self, final_text: str, *, auto_finish: bool = True) -> None:
         self.final_text = final_text
@@ -171,7 +172,9 @@ class QwenAudioBridgeSocket:
         message = json.loads(value)
         header = message["header"]
         if header["action"] == "run-task":
-            await self.incoming.put({"header": {"event": "task-started", "task_id": header["task_id"]}})
+            await self.incoming.put(
+                {"header": {"event": "task-started", "task_id": header["task_id"]}}
+            )
         elif header["action"] == "finish-task" and self.auto_finish:
             await self.incoming.put(
                 {
@@ -187,7 +190,9 @@ class QwenAudioBridgeSocket:
                     },
                 }
             )
-            await self.incoming.put({"header": {"event": "task-finished", "task_id": header["task_id"]}})
+            await self.incoming.put(
+                {"header": {"event": "task-finished", "task_id": header["task_id"]}}
+            )
 
     async def recv(self) -> object:
         return await self.incoming.get()
@@ -195,7 +200,6 @@ class QwenAudioBridgeSocket:
     async def close(self) -> None:
         self.closed = True
         await self.incoming.put(None)
-
 
 
 class HotwordRejectingBackend:
@@ -213,6 +217,7 @@ class HotwordRejectingBackend:
             "vocabulary is not supported",
             hotwords_rejected=True,
         )
+
 
 class ClosableFakeBackend(FakeBackend):
     def __init__(self) -> None:

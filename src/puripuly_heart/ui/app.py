@@ -1421,10 +1421,11 @@ class TranslatorApp:
         warning = None
         if change.source_code != previous_source_code:
             stt_provider = settings.intent.stt.provider
+            stt_qwen_asr = getattr(settings.intent.stt, "qwen_asr", None)
             warning = get_stt_compatibility_warning(
                 change.source_code,
                 stt_provider,
-                settings.intent.stt.qwen_asr.model,
+                getattr(stt_qwen_asr, "model", None),
             )
         if warning:
             snackbar = ft.SnackBar(

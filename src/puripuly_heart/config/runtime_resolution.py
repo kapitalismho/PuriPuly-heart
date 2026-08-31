@@ -711,7 +711,9 @@ class DirectProviderRuntimeIntent:
     )
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "gemini_37_flash_model", _normalize_gemini_model(self.gemini_37_flash_model))
+        object.__setattr__(
+            self, "gemini_37_flash_model", _normalize_gemini_model(self.gemini_37_flash_model)
+        )
         qwen_model = self.qwen_38_flash_model
         if isinstance(qwen_model, str) and qwen_model.strip() == "qwen3.5-plus":
             qwen_model = QWEN_MODEL_38_FLASH
@@ -1470,7 +1472,6 @@ def _resolve_translation_target(
                 CREDENTIAL_REF_GEMINI_BYOK,
             ),
         )
-
 
     if translation.model == TRANSLATION_MODEL_QWEN_38_FLASH:
         return _resolved_direct_provider_target(

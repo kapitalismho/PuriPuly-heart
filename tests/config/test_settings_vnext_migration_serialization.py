@@ -186,6 +186,7 @@ def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
         "selection_alias": "openrouter_gemma4_26b_31b",
     }
 
+
 def test_vnext_dict_migrates_qwen_35_plus_nested_fields() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 
@@ -205,6 +206,7 @@ def test_vnext_dict_migrates_qwen_35_plus_nested_fields() -> None:
     assert result["qwen"] == {"region": "singapore", "llm_model": "qwen3.8-flash"}
     assert result["connection_history"] == {"qwen38_flash": "official_byok"}
 
+
 def test_vnext_dict_migrates_legacy_gemini_byok_alias_only() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 
@@ -221,6 +223,7 @@ def test_vnext_dict_migrates_legacy_gemini_byok_alias_only() -> None:
 
     assert result["model"] == "gemini37_flash"
     assert result["openrouter_selection_alias"] == "gemini37_flash_byok"
+
 
 def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
     from puripuly_heart.config.prompts import load_prompt_for_provider

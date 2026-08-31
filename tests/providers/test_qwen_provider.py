@@ -75,6 +75,7 @@ async def test_qwen_provider_uses_injected_client():
         "context": "",
     }
 
+
 @pytest.mark.asyncio
 async def test_qwen_verify_api_key_empty_key_returns_false_without_network(monkeypatch) -> None:
     def fail_if_constructed(*_args, **_kwargs):

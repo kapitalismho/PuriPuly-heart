@@ -3864,8 +3864,8 @@ def test_hidden_legacy_deepseek_china_fallback_displays_safe_current_value(
 
 def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
+        llm="deepseek",
+        model=TranslationModel.DEEPSEEK_V4_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
@@ -3876,7 +3876,7 @@ def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -
 
     pending = view.build_provider_apply_settings()
 
-    assert _llm(settings) == LLMProviderName.GEMINI.value
+    assert _llm(settings) == LLMProviderName.DEEPSEEK.value
     assert settings.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_37_FLASH.value
     assert pending is not None
     assert pending.intent.translation.model == TranslationModel.GEMINI_37_FLASH.value
