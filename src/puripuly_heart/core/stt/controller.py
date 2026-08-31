@@ -85,6 +85,7 @@ class ManagedSTTProvider:
     _events: asyncio.Queue = field(default_factory=asyncio.Queue)
     _event_enqueued_at: deque[float] = field(default_factory=deque)
     _session_open_lock: asyncio.Lock = field(init=False, repr=False)
+    _bridge_cutover_lock: asyncio.Lock = field(init=False, repr=False)
 
     _active_utterance_id: UUID | None = None
     _pending_final_utterance_ids: deque[UUID] = field(default_factory=deque)
@@ -106,6 +107,11 @@ class ManagedSTTProvider:
         repr=False,
     )
     _publication_generation: int = field(init=False, default=0, repr=False)
+    _hotword_rejection_key: tuple[object, ...] | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
 
     def __post_init__(self) -> None:
         if self.channel not in ("self", "peer"):
@@ -131,6 +137,7 @@ class ManagedSTTProvider:
             raise ValueError("connect_retry_max_s must be > 0")
 
         self._session_open_lock = asyncio.Lock()
+        self._bridge_cutover_lock = asyncio.Lock()
         capacity_samples = int(self.sample_rate_hz * (self.bridging_ms / 1000.0))
         self._audio_ring = RingBufferF32(capacity_samples=capacity_samples)
 
@@ -138,6 +145,29 @@ class ManagedSTTProvider:
         if self.stt_provider_name is None:
             return "stt"
         return self.stt_provider_name.value
+
+    def _hotword_rejection_signature(self) -> tuple[object, ...]:
+        backend = self.backend
+        hotwords = getattr(backend, "hotwords", None)
+        if isinstance(hotwords, (list, tuple)):
+            vocabulary = tuple(str(item) for item in hotwords)
+        else:
+            vocabulary = repr(hotwords)
+        return (
+            id(backend),
+            self._provider_label(),
+            repr(getattr(backend, "model", None)),
+            repr(getattr(backend, "language", None)),
+            repr(getattr(backend, "config_generation", None)),
+            vocabulary,
+            self._publication_generation,
+        )
+
+    def _hotword_rejection_is_latched(self) -> bool:
+        return (
+            self._hotword_rejection_key is not None
+            and self._hotword_rejection_key == self._hotword_rejection_signature()
+        )
 
     @property
     def state(self) -> STTSessionState:
@@ -197,6 +227,7 @@ class ManagedSTTProvider:
 
     async def close(self) -> None:
         self._closing = True
+        self._hotword_rejection_key = None
         try:
             await self._set_state(
                 STTSessionState.DRAINING if self._active_session else STTSessionState.DISCONNECTED
@@ -226,6 +257,7 @@ class ManagedSTTProvider:
 
     async def abort_for_toggle_off(self) -> None:
         self._closing = True
+        self._hotword_rejection_key = None
         self._publication_generation += 1
         discarded_audio_samples = (
             int(self._audio_ring.get_last_samples(self._audio_ring.capacity_samples).size)
@@ -464,6 +496,7 @@ class ManagedSTTProvider:
         await reached.wait()
 
     async def reconfigure_session_options(self, options: LocalASRSessionOptions) -> None:
+        self._hotword_rejection_key = None
         self._pending_session_options = options
 
     async def warmup(self) -> None:
@@ -473,6 +506,8 @@ class ManagedSTTProvider:
 
     async def _on_speech_start(self, event: SpeechStart) -> None:
         await self._apply_pending_session_options()
+        if self._hotword_rejection_is_latched():
+            return
         self._active_utterance_id = event.utterance_id
         self._diagnostic_chunk_count = 0
         self._diagnostic_sample_count = 0
@@ -482,6 +517,8 @@ class ManagedSTTProvider:
         self._stt_fault_logged_for_utterance = False
 
         if not await self._ensure_session():
+            if self._hotword_rejection_is_latched():
+                self._active_utterance_id = None
             return
 
         await self._send_audio(event.pre_roll)
@@ -497,6 +534,8 @@ class ManagedSTTProvider:
         self._pending_session_options = None
 
     async def _on_speech_chunk(self, event: SpeechChunk) -> None:
+        if self._hotword_rejection_is_latched():
+            return
         self._active_utterance_id = event.utterance_id
         if not await self._ensure_session():
             return
@@ -508,7 +547,10 @@ class ManagedSTTProvider:
         self._last_speech_end_time = self.clock.now()
 
         # Delegate end-of-speech handling to the backend (silence + finalize etc.)
-        if self._active_session is not None:
+        async with self._bridge_cutover_lock:
+            session = self._active_session
+            if session is None:
+                return
             ended_at = self.clock.now()
             self._pending_final_utterance_ids.append(event.utterance_id)
             self._pending_final_utterance_times[event.utterance_id] = ended_at
@@ -527,10 +569,11 @@ class ManagedSTTProvider:
                 fallback_level=logging.INFO,
             )
             self._emit_stt_input_diagnostics(event.utterance_id, finalize=True)
-            await self._active_session.on_speech_end(
-                trailing_silence_ms=event.trailing_silence_ms,
-                reason=event.reason,
-            )
+
+        await session.on_speech_end(
+            trailing_silence_ms=event.trailing_silence_ms,
+            reason=event.reason,
+        )
 
     async def _send_audio(self, samples_f32: np.ndarray) -> None:
         samples_f32 = np.asarray(samples_f32, dtype=np.float32).reshape(-1)
@@ -636,10 +679,14 @@ class ManagedSTTProvider:
     async def _ensure_session(self) -> bool:
         if self._active_session is not None:
             return True
+        if self._hotword_rejection_is_latched():
+            return False
 
         async with self._session_open_lock:
             if self._active_session is not None:
                 return True
+            if self._hotword_rejection_is_latched():
+                return False
 
             await self._set_state(STTSessionState.CONNECTING)
             last_exc: Exception | None = None
@@ -671,6 +718,18 @@ class ManagedSTTProvider:
                             level=logging.WARNING,
                             fallback_level=logging.WARNING,
                         )
+                        if getattr(exc, "hotwords_rejected", False):
+                            self._hotword_rejection_key = self._hotword_rejection_signature()
+                            self._emit_basic(
+                                "[STT][HotwordRejected] channel=%s provider=%s "
+                                "vocabulary=%s; awaiting configuration reset",
+                                self.channel,
+                                self._provider_label(),
+                                getattr(self.backend, "hotwords", None),
+                                level=logging.ERROR,
+                                fallback_level=logging.ERROR,
+                            )
+                            break
                         if attempt < self.connect_attempts:
                             delay = min(
                                 self.connect_retry_base_s * (2 ** (attempt - 1)),
@@ -745,19 +804,32 @@ class ManagedSTTProvider:
             fallback_level=logging.INFO,
         )
         new_session = await self.backend.open_session()
-        self._active_session = new_session
-        self._session_started_at = self.clock.now()
-        self._consumer_task = asyncio.create_task(
-            self._consume_session_events(
-                new_session,
-                publication_generation=self._publication_generation,
-            )
-        )
-        self._schedule_reset_timer()
-
-        await self._set_state(STTSessionState.STREAMING)
-
         await self._send_audio_to_session(new_session, bridging_audio)
+
+        async with self._bridge_cutover_lock:
+            old_pending_final_ids = tuple(self._pending_final_utterance_ids)
+            self._publication_generation += 1
+            self._active_session = new_session
+            if old_pending_final_ids:
+                old_pending_set = set(old_pending_final_ids)
+                self._pending_final_utterance_ids = deque(
+                    utterance_id
+                    for utterance_id in self._pending_final_utterance_ids
+                    if utterance_id not in old_pending_set
+                )
+                for utterance_id in old_pending_final_ids:
+                    self._pending_final_utterance_times.pop(utterance_id, None)
+            self._session_started_at = self.clock.now()
+            self._consumer_task = asyncio.create_task(
+                self._consume_session_events(
+                    new_session,
+                    publication_generation=self._publication_generation,
+                )
+            )
+            self._schedule_reset_timer()
+
+            await self._set_state(STTSessionState.STREAMING)
+
         self._emit_basic("[STT] Session reset while speaking; bridged to a new session")
 
         if old_session and old_consumer:
@@ -871,7 +943,16 @@ class ManagedSTTProvider:
             if allow_finalize and self._should_finalize_before_stop():
                 await self._finalize_before_stop(session)
             try:
-                await asyncio.wait_for(session.stop(), timeout=self.drain_timeout_s)
+                if not allow_finalize and getattr(session, "bridge_reset_preserves_vad", False):
+                    abort_for_toggle_off = getattr(session, "abort_for_toggle_off", None)
+                    if callable(abort_for_toggle_off):
+                        result = abort_for_toggle_off()
+                        if inspect.isawaitable(result):
+                            await result
+                    else:
+                        await asyncio.wait_for(session.stop(), timeout=self.drain_timeout_s)
+                else:
+                    await asyncio.wait_for(session.stop(), timeout=self.drain_timeout_s)
             except asyncio.TimeoutError:
                 stop_timed_out = True
                 self._emit_detailed(

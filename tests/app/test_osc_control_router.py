@@ -203,6 +203,18 @@ async def test_router_routes_on_device_translation_model_ids() -> None:
 
 
 @pytest.mark.asyncio
+async def test_router_accepts_legacy_gemini_translation_id_6() -> None:
+    application = FakeApplication()
+    router = OscControlRouter(application)
+
+    result = await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 6)
+
+    assert result.applied is True
+    assert application.calls == [("model", ("gemini37_flash", None))]
+    await router.close()
+
+
+@pytest.mark.asyncio
 async def test_router_coalesces_superseded_expensive_controls() -> None:
     application = FakeApplication()
     projected: list[tuple[str, object]] = []

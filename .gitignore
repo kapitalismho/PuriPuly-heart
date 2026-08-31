@@ -227,6 +227,7 @@ __marimo__/
 Installer_output/
 .references/
 refactoring/
+.tmp/
 /scripts/*
 !/scripts/bench_*.py
 !/scripts/ci/

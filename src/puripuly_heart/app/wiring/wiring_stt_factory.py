@@ -25,8 +25,8 @@ from puripuly_heart.config.resolved import (
 from puripuly_heart.config.runtime_resolution import (
     CREDENTIAL_REF_CUSTOM_STT,
     CREDENTIAL_REF_DEEPGRAM_STT,
-    CREDENTIAL_REF_QWEN_SINGAPORE,
     CREDENTIAL_REF_SONIOX_STT,
+    QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
     SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S,
     SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS,
     SONIOX_STT_MODEL_RT_V5,
@@ -297,10 +297,11 @@ def resolve_self_stt_runtime_config(settings: AppSettingsVNext) -> ResolvedSTTCo
     return resolve_self_stt_runtime_config_from_vnext(settings)
 
 
-def _qwen_asr_endpoint_for_region(region: object) -> str:
+def _qwen_asr_endpoint_for_region(region: object, model: str | None = None) -> str:
+    suffix = "/inference" if model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING else "/realtime"
     if region == QwenRegion.SINGAPORE or region == QwenRegion.SINGAPORE.value:
-        return "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
-    return "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+        return f"wss://dashscope-intl.aliyuncs.com/api-ws/v1{suffix}"
+    return f"wss://dashscope.aliyuncs.com/api-ws/v1{suffix}"
 
 
 def _self_stt_custom_vocabulary_signature_for_provider(
@@ -309,17 +310,24 @@ def _self_stt_custom_vocabulary_signature_for_provider(
     enabled: bool,
     terms: Mapping[str, list[str]],
     source_language: str,
+    model: str | None = None,
+    provider_identity: bool = False,
 ) -> tuple[bool, tuple[str, ...]]:
-    if provider not in {
-        STTProviderName.DEEPGRAM,
-        STTProviderName.LOCAL_QWEN,
-        STTProviderName.SONIOX,
-    }:
-        return False, ()
+    provider_value = provider.value if isinstance(provider, STTProviderName) else str(provider)
     config = CustomVocabularyRuntimeConfig(enabled=enabled, terms=terms)
-    if provider == STTProviderName.LOCAL_QWEN:
+    if provider_value == STTProviderName.LOCAL_QWEN.value:
+        if provider_identity:
+            return False, ()
         return enabled, tuple(get_effective_local_qwen_hotwords(config, source_language))
-    return enabled, tuple(get_effective_custom_terms(config, source_language))
+    if provider_value in {
+        STTProviderName.DEEPGRAM.value,
+        STTProviderName.SONIOX.value,
+    } or (
+        provider_value == STTProviderName.QWEN_ASR.value
+        and (model is None or model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING)
+    ):
+        return enabled, tuple(get_effective_custom_terms(config, source_language))
+    return False, ()
 
 
 def build_self_stt_runtime_signature(settings: AppSettingsVNext) -> tuple[object, ...]:
@@ -484,7 +492,10 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
         intent.translation.qwen.region if provider == STTProviderName.QWEN_ASR.value else None,
         intent.stt.qwen_asr.model if provider == STTProviderName.QWEN_ASR.value else None,
         (
-            _qwen_asr_endpoint_for_region(intent.translation.qwen.region)
+            _qwen_asr_endpoint_for_region(
+                intent.translation.qwen.region,
+                intent.stt.qwen_asr.model,
+            )
             if provider == STTProviderName.QWEN_ASR.value
             else None
         ),
@@ -512,6 +523,14 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
 def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> tuple[object, ...]:
     intent = settings.intent
     provider = intent.stt.provider
+    custom_vocab_enabled, custom_terms = _self_stt_custom_vocabulary_signature_for_provider(
+        provider=provider,
+        enabled=intent.stt.custom_vocabulary_enabled,
+        terms=intent.stt.custom_terms,
+        source_language=intent.languages.source_language,
+        model=intent.stt.qwen_asr.model,
+        provider_identity=True,
+    )
     transition = build_self_local_asr_transition_request_from_vnext(settings, trigger="runtime")
     return (
         provider,
@@ -543,6 +562,8 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
             else None
         ),
         intent.stt.gpu_device_id if provider == STTProviderName.LOCAL_QWEN_GPU.value else None,
+        custom_vocab_enabled,
+        custom_terms,
     )
 
 
@@ -635,11 +656,7 @@ def _soniox_api_key_for_resolved_credential(
 def _qwen_asr_endpoint_for_resolved_config(config: ResolvedSTTConfig) -> str:
     if config.endpoint:
         return config.endpoint
-    if config.region == QwenRegion.SINGAPORE.value or (
-        config.credential.reference == CREDENTIAL_REF_QWEN_SINGAPORE
-    ):
-        return "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
-    return "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+    return _qwen_asr_endpoint_for_region(config.region, config.model)
 
 
 def create_stt_backend_from_resolved_config(
@@ -718,13 +735,26 @@ def create_stt_backend_from_resolved_config(
         )
 
     if config.provider == STT_PROVIDER_QWEN_ASR:
+        model = config.model or "qwen3-asr-flash-realtime"
+        api_key = _qwen_api_key_for_resolved_credential(config.credential, secrets=secrets)
+        if model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING:
+            from puripuly_heart.core.language import get_qwen_audio_asr_language
+            from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
+
+            return QwenAudioStreamingSTTBackend(
+                api_key=api_key,
+                model=model,
+                endpoint=_qwen_asr_endpoint_for_resolved_config(config),
+                language=get_qwen_audio_asr_language(config.source_language),
+                sample_rate_hz=config.sample_rate_hz,
+                hotwords=keyterms,
+            )
         from puripuly_heart.core.language import get_qwen_asr_language
         from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
 
-        api_key = _qwen_api_key_for_resolved_credential(config.credential, secrets=secrets)
         return QwenASRRealtimeSTTBackend(
             api_key=api_key,
-            model=config.model or "qwen3-asr-flash-realtime",
+            model=model,
             endpoint=_qwen_asr_endpoint_for_resolved_config(config),
             language=get_qwen_asr_language(config.source_language),
             sample_rate_hz=config.sample_rate_hz,

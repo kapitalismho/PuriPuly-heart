@@ -187,6 +187,44 @@ def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
     }
 
 
+def test_vnext_dict_migrates_qwen_35_plus_nested_fields() -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    translation = canonical["intent"]["translation"]
+    translation["model"] = "qwen35_plus"
+    translation["previous_llm_model"] = "qwen35_plus"
+    translation["connection"] = "official_byok"
+    translation["connection_history"] = {"qwen35_plus": "official_byok"}
+    translation["qwen"] = {"region": "singapore", "llm_model": "qwen3.5-plus"}
+
+    migrated = migration.from_dict(canonical)
+    result = serialization.to_dict(migrated)["intent"]["translation"]
+
+    assert result["model"] == "qwen38_flash"
+    assert result["previous_llm_model"] == "qwen38_flash"
+    assert result["qwen"] == {"region": "singapore", "llm_model": "qwen3.8-flash"}
+    assert result["connection_history"] == {"qwen38_flash": "official_byok"}
+
+
+def test_vnext_dict_migrates_legacy_gemini_byok_alias_only() -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    translation = canonical["intent"]["translation"]
+    translation["model"] = "gemini37_flash"
+    translation["connection"] = "openrouter"
+    translation["openrouter_selected_source"] = "byok"
+    translation["openrouter_selection_alias"] = "gemini31_flash_lite_byok"
+    translation.pop("openrouter_model", None)
+
+    migrated = migration.from_dict(canonical)
+    result = serialization.to_dict(migrated)["intent"]["translation"]
+
+    assert result["model"] == "gemini37_flash"
+    assert result["openrouter_selection_alias"] == "gemini37_flash_byok"
+
+
 def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
     from puripuly_heart.config.prompts import load_prompt_for_provider
     from puripuly_heart.config.settings_vnext import migration, serialization

@@ -5,7 +5,11 @@ import json
 import pytest
 
 from puripuly_heart.config.llm_profiles import (
+    LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
     OPENROUTER_FALLBACK_SELECTION_ALIASES,
+    OPENROUTER_MAIN_SELECTION_ALIASES,
+    OPENROUTER_MODEL_GEMINI_37_FLASH,
+    OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK,
     get_openrouter_llm_profile,
     openrouter_alias_for_fields,
 )
@@ -39,8 +43,7 @@ def test_translation_model_public_member_names_and_values_match_plan() -> None:
         ("GEMMA4", "gemma4"),
         ("DEEPSEEK_V4_FLASH", "deepseek_v4_flash"),
         ("GEMINI_37_FLASH", "gemini37_flash"),
-        ("GEMINI_31_FLASH_LITE", "gemini31_flash_lite"),
-        ("QWEN_35_PLUS", "qwen35_plus"),
+        ("QWEN_38_FLASH", "qwen38_flash"),
         ("MANAGED_GEMMA", "managed_gemma"),
         ("MANAGED_GEMMA_12B", "managed_gemma_12b"),
         ("LOCAL_LLM", "local_llm"),
@@ -70,11 +73,7 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
         TranslationConnection.OFFICIAL_BYOK,
         TranslationConnection.OPENROUTER,
     )
-    assert supported_translation_connections(TranslationModel.GEMINI_31_FLASH_LITE) == (
-        TranslationConnection.OFFICIAL_BYOK,
-        TranslationConnection.OPENROUTER,
-    )
-    assert supported_translation_connections(TranslationModel.QWEN_35_PLUS) == (
+    assert supported_translation_connections(TranslationModel.QWEN_38_FLASH) == (
         TranslationConnection.OFFICIAL_BYOK,
     )
     assert supported_translation_connections(TranslationModel.LOCAL_LLM) == (
@@ -135,6 +134,20 @@ def test_openrouter_alias_for_fields_does_not_expose_deepseek_v4_pro() -> None:
         is None
     )
     assert get_openrouter_llm_profile("deepseek_v4_pro_byok") is None
+
+
+def test_legacy_gemini_byok_alias_is_compatibility_only() -> None:
+    profile = get_openrouter_llm_profile(LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK)
+
+    assert profile is not None
+    assert profile.openrouter_model == OPENROUTER_MODEL_GEMINI_37_FLASH
+    assert profile.openrouter_source == OpenRouterCredentialSource.BYOK.value
+    assert (
+        LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK
+        not in OPENROUTER_MAIN_SELECTION_ALIASES
+    )
+    assert profile.alias == LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK
+    assert OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK in OPENROUTER_MAIN_SELECTION_ALIASES
 
 
 def test_openrouter_fallback_aliases_include_curated_openrouter_models() -> None:

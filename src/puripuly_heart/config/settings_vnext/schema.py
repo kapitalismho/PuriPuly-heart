@@ -310,12 +310,12 @@ def new_anonymous_telemetry_identifier() -> str:
 @dataclass(frozen=True, slots=True)
 class QwenTranslationIntent:
     region: str = "beijing"
-    llm_model: str = "qwen3.5-plus"
+    llm_model: str = "qwen3.8-flash"
 
 
 @dataclass(frozen=True, slots=True)
 class GeminiTranslationIntent:
-    llm_model: str = "gemini-3.1-flash-lite"
+    llm_model: str = "gemini-3.7-flash"
 
 
 @dataclass(frozen=True, slots=True)

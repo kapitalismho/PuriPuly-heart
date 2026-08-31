@@ -63,6 +63,7 @@ def test_state_publisher_full_snapshot_republishes_after_discovery() -> None:
 @pytest.mark.parametrize(
     ("model", "connection", "expected_id"),
     [
+        (TranslationModel.GEMINI_37_FLASH, TranslationConnection.OFFICIAL_BYOK, 5),
         (TranslationModel.GEMMA4_31B, TranslationConnection.MANAGED, 1),
         (TranslationModel.GEMMA4_31B, TranslationConnection.CEREBRAS, 1),
         (TranslationModel.CUSTOM_HTTP, TranslationConnection.CUSTOM_HTTP, 9),

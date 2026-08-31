@@ -149,8 +149,8 @@ from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 
 _LLM_DEFAULTS: dict[str, tuple[str, str]] = {
-    "gemini": ("gemini31_flash_lite", "official_byok"),
-    "qwen": ("qwen35_plus", "official_byok"),
+    "gemini": ("gemini37_flash", "official_byok"),
+    "qwen": ("qwen38_flash", "official_byok"),
     "deepseek": ("deepseek_v4_flash", "official_byok"),
     "cerebras": ("gemma4_31b", "cerebras"),
     "local_llm": ("local_llm", "ollama"),
@@ -175,10 +175,6 @@ _OPENROUTER_ALIAS_DEFAULTS: dict[str, tuple[str, str]] = {
     OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value: (
         "deepseek_v4_flash",
         "managed",
-    ),
-    OpenRouterSelectionAlias.GEMINI31_FLASH_LITE_BYOK.value: (
-        "gemini31_flash_lite",
-        "openrouter",
     ),
     OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK.value: (
         "gemini37_flash",
@@ -572,19 +568,19 @@ def test_create_llm_provider_gemini_uses_secret_and_concurrency_limit() -> None:
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, GeminiLLMProvider)
     assert provider.inner.api_key == "k"
-    assert provider.inner.model == "gemini-3.1-flash-lite"
+    assert provider.inner.model == "gemini-3.7-flash"
     assert_bounded_concurrency(provider, 3)
 
 
 def test_create_llm_provider_gemini_uses_selected_model() -> None:
-    settings = _vnext(llm="gemini", gemini_model=GeminiLLMModel.GEMINI_31_FLASH_LITE.value)
+    settings = _vnext(llm="gemini", gemini_model=GeminiLLMModel.GEMINI_37_FLASH.value)
     secrets = InMemorySecretStore()
     secrets.set("google_api_key", "k")
 
     provider = create_llm_provider(settings, secrets=secrets)
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, GeminiLLMProvider)
-    assert provider.inner.model == "gemini-3.1-flash-lite"
+    assert provider.inner.model == "gemini-3.7-flash"
 
 
 def test_create_llm_provider_gemini_passes_runtime_logging() -> None:
@@ -611,7 +607,7 @@ def test_create_llm_provider_qwen_uses_secret() -> None:
     assert isinstance(provider.inner, AsyncQwenLLMProvider)
     assert provider.inner.api_key == "k2"
     assert provider.inner.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    assert provider.inner.model == "qwen3.5-plus"
+    assert provider.inner.model == "qwen3.8-flash"
     assert_bounded_concurrency(provider, 5)
 
 
@@ -632,7 +628,7 @@ def test_create_llm_provider_qwen_uses_singapore_region() -> None:
     settings = _vnext(
         llm="qwen",
         qwen_region=QwenRegion.SINGAPORE.value,
-        qwen_model=QwenLLMModel.QWEN_35_PLUS.value,
+        qwen_model=QwenLLMModel.QWEN_38_FLASH.value,
     )
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_singapore", "k3")
@@ -642,7 +638,7 @@ def test_create_llm_provider_qwen_uses_singapore_region() -> None:
     assert isinstance(provider.inner, AsyncQwenLLMProvider)
     assert provider.inner.api_key == "k3"
     assert provider.inner.base_url == "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-    assert provider.inner.model == "qwen3.5-plus"
+    assert provider.inner.model == "qwen3.8-flash"
 
 
 def test_create_llm_provider_qwen_uses_legacy_alibaba_secret_key() -> None:
@@ -662,7 +658,7 @@ def test_create_llm_provider_qwen_historical_false_still_uses_async_provider() -
     settings = _vnext(
         llm="qwen",
         low_latency=False,
-        qwen_model=QwenLLMModel.QWEN_35_PLUS.value,
+        qwen_model=QwenLLMModel.QWEN_38_FLASH.value,
     )
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_beijing", "k2")
@@ -672,7 +668,7 @@ def test_create_llm_provider_qwen_historical_false_still_uses_async_provider() -
     assert isinstance(provider.inner, AsyncQwenLLMProvider)
     assert provider.inner.api_key == "k2"
     assert provider.inner.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    assert provider.inner.model == "qwen3.5-plus"
+    assert provider.inner.model == "qwen3.8-flash"
 
 
 def test_create_llm_provider_qwen_historical_false_passes_runtime_logging() -> None:
@@ -911,7 +907,7 @@ def test_create_llm_provider_from_resolved_openrouter_gemini_byok_uses_google_la
     resolved = ResolvedLLMConfig(
         primary=ResolvedLLMTarget(
             provider="openrouter",
-            model=OpenRouterLLMModel.GEMINI_31_FLASH_LITE.value,
+            model=OpenRouterLLMModel.GEMINI_37_FLASH.value,
             credential=ResolvedCredentialRequirement(
                 source=CREDENTIAL_SOURCE_SECRET_STORE,
                 required=True,
@@ -930,7 +926,7 @@ def test_create_llm_provider_from_resolved_openrouter_gemini_byok_uses_google_la
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, OpenRouterLLMProvider)
     assert provider.inner.api_key == "gemini-byok-key"
-    assert provider.inner.model == OpenRouterLLMModel.GEMINI_31_FLASH_LITE.value
+    assert provider.inner.model == OpenRouterLLMModel.GEMINI_37_FLASH.value
     assert provider.inner.routing_mode == OpenRouterRoutingMode.LATENCY
     assert provider.inner.provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
     assert_bounded_concurrency(provider, 3)

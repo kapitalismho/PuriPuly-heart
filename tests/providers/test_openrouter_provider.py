@@ -341,7 +341,7 @@ async def test_httpx_openrouter_client_google_gemini_latency_denies_data_collect
 
     client = HttpxOpenRouterClient(
         api_key="test-key",
-        model="google/gemini-3.1-flash-lite",
+        model="google/gemini-3.7-flash",
         base_url="https://example",
         provider_routing=OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY,
     )

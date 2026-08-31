@@ -711,7 +711,6 @@
       "qwen35_flash_managed",
       "deepseek_v4_flash_managed",
       "gemini37_flash_byok",
-      "gemini31_flash_lite_byok",
       "gemma4_byok",
       "qwen35_flash_byok",
       "deepseek_v4_flash_byok"
@@ -724,6 +723,7 @@
       "gemma4_31b"
     ],
     "legacy_selection_aliases": [
+      "gemini31_flash_lite_byok",
       "openrouter:byok:google/gemma-4-26b-a4b-it",
       "openrouter:byok:qwen/qwen3.5-flash-02-23",
       "openrouter:managed:google/gemma-4-26b-a4b-it",

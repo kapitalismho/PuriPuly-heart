@@ -67,7 +67,7 @@ def test_byok_target_rejects_absent_settings() -> None:
 
 def test_byok_target_rejects_non_openrouter_settings() -> None:
     settings = _vnext(
-        model=TranslationModel.GEMINI_31_FLASH_LITE.value,
+        model=TranslationModel.GEMINI_37_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
         openrouter_source="managed",
         openrouter_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED.value,

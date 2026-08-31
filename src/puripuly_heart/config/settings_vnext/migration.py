@@ -124,6 +124,7 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
         if migrate_deepseek_v4_pro_retirement:
             _migrate_deepseek_v4_pro_translation(translation)
         _migrate_gemini_3_flash_translation(translation)
+        _migrate_qwen_35_plus_translation(translation)
         fallback = translation.get("fallback")
         if not isinstance(fallback, Mapping):
             translation["fallback"] = _fallback_intent_to_dict(
@@ -490,35 +491,74 @@ def _migrate_cerebras_connection_translation(translation: dict[str, Any]) -> Non
 
 
 def _migrate_gemini_3_flash_translation(translation: dict[str, Any]) -> None:
-    if translation.get("model") == "gemini3_flash":
+    legacy_models = {
+        "gemini3_flash",
+        "gemini31_flash_lite",
+        "gemini-3.1-flash-lite",
+    }
+    if translation.get("model") in legacy_models:
         translation["model"] = "gemini37_flash"
-    if translation.get("previous_llm_model") == "gemini3_flash":
+    if translation.get("previous_llm_model") in legacy_models:
         translation["previous_llm_model"] = "gemini37_flash"
     gemini = translation.get("gemini")
     if isinstance(gemini, dict) and gemini.get("llm_model") in {
         "gemini-3-flash",
         "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite",
     }:
         gemini["llm_model"] = "gemini-3.7-flash"
-    if translation.get("openrouter_model") == "google/gemini-3-flash-preview":
+    if translation.get("openrouter_model") in {
+        "google/gemini-3-flash-preview",
+        "google/gemini-3.1-flash-lite",
+    }:
         translation["openrouter_model"] = "google/gemini-3.7-flash"
-    if translation.get("openrouter_selection_alias") == "gemini3_flash_byok":
+    if translation.get("openrouter_selection_alias") in {
+        "gemini3_flash_byok",
+        "gemini31_flash_lite_byok",
+    }:
         translation["openrouter_selection_alias"] = "gemini37_flash_byok"
     history = translation.get("connection_history")
-    if isinstance(history, dict) and "gemini3_flash" in history:
-        history["gemini37_flash"] = history["gemini3_flash"]
-        history.pop("gemini3_flash", None)
+    if isinstance(history, dict):
+        for legacy_model in legacy_models:
+            if legacy_model in history:
+                history.setdefault("gemini37_flash", history[legacy_model])
+                history.pop(legacy_model, None)
     fallback = translation.get("fallback")
-    if isinstance(fallback, dict) and fallback.get("model") == "gemini3_flash":
+    if not isinstance(fallback, dict):
+        return
+    fallback_model = fallback.get("model")
+    fallback_alias = fallback.get("selection_alias")
+    if fallback_model in legacy_models or fallback_alias in {
+        "gemini25_flash_lite",
+        "gemini31_flash_lite",
+    }:
         if bool(fallback.get("enabled", False)):
             fallback["enabled"] = True
             fallback["model"] = "gemma4_26b_31b"
             fallback["connection"] = "openrouter"
             fallback["selection_alias"] = DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
         else:
+            fallback["enabled"] = False
             fallback["model"] = "deepseek_v4_flash"
             fallback["connection"] = "official_byok"
             fallback["selection_alias"] = "none"
+
+
+def _migrate_qwen_35_plus_translation(translation: dict[str, Any]) -> None:
+    legacy_models = {"qwen35_plus", "qwen3.5-plus"}
+    if translation.get("model") in legacy_models:
+        translation["model"] = "qwen38_flash"
+    if translation.get("previous_llm_model") in legacy_models:
+        translation["previous_llm_model"] = "qwen38_flash"
+    qwen = translation.get("qwen")
+    if isinstance(qwen, dict) and qwen.get("llm_model") in legacy_models:
+        qwen["llm_model"] = "qwen3.8-flash"
+    history = translation.get("connection_history")
+    if isinstance(history, dict):
+        for legacy_model in legacy_models:
+            if legacy_model in history:
+                history.setdefault("qwen38_flash", history[legacy_model])
+                history.pop(legacy_model, None)
 
 
 def _migrate_deepseek_v4_pro_translation(translation: dict[str, Any]) -> None:
