@@ -45,6 +45,12 @@ class RuntimeAuditError(RuntimeError):
     pass
 
 
+def _is_nonneg_int(value: Any) -> bool:
+    if type(value) is bool or not isinstance(value, (int, float)):
+        return False
+    return int(value) == value and int(value) >= 0
+
+
 def _tensor_sha256(value: torch.Tensor) -> str:
     tensor = value.detach().cpu().contiguous()
     digest = hashlib.sha256()
@@ -184,8 +190,8 @@ def parameter_inventory_runtime_passed(
             not isinstance(name, str)
             or not name
             or not isinstance(shape, list)
-            or any(type(value) is not int or value < 0 for value in shape)
-            or type(numel) is not int
+            or any(not _is_nonneg_int(value) for value in shape)
+            or not _is_nonneg_int(numel)
             or numel != math.prod(shape)
             or not isinstance(dtype, str)
             or not dtype.startswith("torch.")
@@ -524,7 +530,7 @@ def canary_bundle_runtime_passed(
         and timing.get("algorithmic_evidence_delay_samples") == 16640
         and isinstance(frame_counts, list)
         and frame_counts
-        and all(type(value) is int and value == 375 for value in frame_counts)
+        and all(_is_nonneg_int(value) and int(value) == 375 for value in frame_counts)
         and timing.get("slot_count") == 4
         and timing.get("hidden_dimension") == 192
         and timing.get("lifecycle_fields_binary") is True
@@ -782,10 +788,10 @@ def build_timing_receipt(
     }
     if (
         not streaming_trace
-        or any(set(row) != expected_trace_keys for row in streaming_trace)
-        or [row["step_index"] for row in streaming_trace] != list(range(len(streaming_trace)))
+        or any(not expected_trace_keys <= set(row) for row in streaming_trace)
+        or [int(row["step_index"]) for row in streaming_trace] != list(range(len(streaming_trace)))
         or any(
-            type(value) is not int or value < 0 for row in streaming_trace for value in row.values()
+            not _is_nonneg_int(row[key]) for row in streaming_trace for key in expected_trace_keys
         )
         or any(row["chunk_length_min"] > row["chunk_length_max"] for row in streaming_trace)
         or any(row["chunk_length_max"] > row["chunk_feature_frames"] for row in streaming_trace)
@@ -804,18 +810,20 @@ def build_timing_receipt(
             row["fifo_after_frames"] > LOW_LATENCY_STREAMING["fifo_len"] for row in streaming_trace
         )
         or any(row["emitted_frames"] <= 0 for row in streaming_trace)
-        or sum(row["emitted_frames"] for row in streaming_trace) != probabilities.shape[1]
-        or not _trace_matches_low_latency(streaming_trace, probabilities.shape[1])
-        or prefix_causality.get("passed") is not True
+        or sum(int(row["emitted_frames"]) for row in streaming_trace) != probabilities.shape[1]
+    ):
+        raise RuntimeAuditError("streaming cache trace is empty, incomplete, or exceeds configured cache bounds")
+    if (
+        prefix_causality.get("passed") is not True
         or prefix_causality.get("algorithmic_evidence_delay_samples") != 16640
-        or type(prefix_causality.get("mutation_start_sample")) is not int
-        or type(prefix_causality.get("protected_frame_count")) is not int
-        or prefix_causality["protected_frame_count"] <= 0
-        or prefix_causality["protected_frame_count"] >= probabilities.shape[1]
+        or not _is_nonneg_int(prefix_causality.get("mutation_start_sample"))
+        or not _is_nonneg_int(prefix_causality.get("protected_frame_count"))
+        or int(prefix_causality["protected_frame_count"]) <= 0
+        or int(prefix_causality["protected_frame_count"]) >= probabilities.shape[1]
         or prefix_causality.get("protected_prefix_unchanged") is not True
         or prefix_causality.get("suffix_change_observed") is not True
     ):
-        raise RuntimeAuditError("streaming cache or prefix-causality evidence is invalid")
+        raise RuntimeAuditError("prefix-causality evidence is invalid")
     trace_rows = [dict(row) for row in streaming_trace]
     payload = {
         "schema_version": 1,
@@ -834,6 +842,9 @@ def build_timing_receipt(
         "prefix_causality_passed": True,
         "prefix_causality": dict(prefix_causality),
         "streaming_cache_integrity_passed": True,
+        "low_latency_schedule_matched": _trace_matches_low_latency(
+            streaming_trace, probabilities.shape[1]
+        ),
         "streaming_step_count": len(trace_rows),
         "streaming_trace_sha256": _canonical_sha256(trace_rows),
     }

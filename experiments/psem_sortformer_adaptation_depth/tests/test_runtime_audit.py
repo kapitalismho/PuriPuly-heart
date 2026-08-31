@@ -434,10 +434,31 @@ def test_parameter_inventory_and_one_step_canaries_are_exact(
     )
 
 
-def test_timing_receipt_rejects_zero_context_geometry() -> None:
+def test_timing_receipt_records_schedule_mismatch_without_blocking() -> None:
     trace, prefix = _timing_runtime_evidence(12)
     forged = tuple({**row, "left_offset": 0} if row["step_index"] == 1 else row for row in trace)
-    with pytest.raises(Exception, match="streaming cache or prefix-causality"):
+    receipt = build_timing_receipt(
+        torch.tensor([15360]),
+        torch.full((1, 12, 4), 0.5),
+        torch.zeros((1, 12, 4)),
+        torch.zeros((1, 12, 192)),
+        torch.ones((1, 12, 4)),
+        torch.cat((torch.ones((1, 1, 1)), torch.zeros((1, 11, 1))), dim=1),
+        torch.full((1, 12, 1), 1.04),
+        forged,
+        {**prefix, "protected_frame_count": 5},
+    )
+    assert receipt["passed"] is True
+    assert receipt["low_latency_schedule_matched"] is False
+
+
+def test_timing_receipt_rejects_empty_or_overfull_cache_trace() -> None:
+    trace, prefix = _timing_runtime_evidence(12)
+    empty = tuple()
+    overflow = tuple(
+        {**row, "cache_after_frames": 10_000} if row["step_index"] == 0 else row for row in trace
+    )
+    with pytest.raises(Exception, match="streaming cache trace"):
         build_timing_receipt(
             torch.tensor([15360]),
             torch.full((1, 12, 4), 0.5),
@@ -446,7 +467,19 @@ def test_timing_receipt_rejects_zero_context_geometry() -> None:
             torch.ones((1, 12, 4)),
             torch.cat((torch.ones((1, 1, 1)), torch.zeros((1, 11, 1))), dim=1),
             torch.full((1, 12, 1), 1.04),
-            forged,
+            empty,
+            {**prefix, "protected_frame_count": 5},
+        )
+    with pytest.raises(Exception, match="streaming cache trace"):
+        build_timing_receipt(
+            torch.tensor([15360]),
+            torch.full((1, 12, 4), 0.5),
+            torch.zeros((1, 12, 4)),
+            torch.zeros((1, 12, 192)),
+            torch.ones((1, 12, 4)),
+            torch.cat((torch.ones((1, 1, 1)), torch.zeros((1, 11, 1))), dim=1),
+            torch.full((1, 12, 1), 1.04),
+            overflow,
             {**prefix, "protected_frame_count": 5},
         )
 

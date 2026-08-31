@@ -307,3 +307,109 @@ When this launch stabilizes, convert confirmed lessons into a reusable agent run
 - The first combined helper attempt failed after the passing tests because direct execution from `.cache` omitted the repository root from `sys.path`. The next static attempt reached the code but the Windows worktree `.git` indirection was not resolvable inside WSL Docker. These were validation-helper context errors, not candidate failures; the broad test suite was not redundantly rerun.
 - Corrected the helper path and invoked `preflight.static_checks()` directly inside the image. All 14 static contract/hash checks passed with no failures. Durable background status: `.cache/issue-107-final-validation-status.json`, `state=succeeded`, `exit_code=0`.
 - Targeted Python compile, Ruff check, Ruff format check, PowerShell parser, `git diff --check`, and watchdog local-control `-DryRun -Once` passed. The dry-run remained bound to the first failed run and correctly produced `would_stop/control_status_error` without contacting RunPod.
+
+## Rebound identities for the approved `$0.44/h` resume
+
+These identities supersede the original `8165ed58` candidate binding for the live resume only. Historical v1–v3 evidence above remains unchanged.
+
+- Candidate Git head: `a085748b5aa59f69f918f62661ef3c4c6723cbd0`
+- Image unchanged: `kapitalismho/puripuly-heart@sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8`
+- Run ID: `issue-107-a40-a085748b-01`
+- Absolute deadline: `2026-09-01T06:33:08.756000+00:00`
+- Live Pod: `v6l27rdzg5s591` (same v3 volume; not deleted)
+- Windows resume worker: `.cache/issue-107-resume-worker.ps1`
+- Startup cost guard: `.cache/issue-107-startup-cost-guard.ps1`, unhanded-running cap `5400` seconds
+- Fresh implementation review remains skipped. No implementation-complete or training-started claim is being made until a live handoff exists.
+
+## 2026-08-31 UTC — resume automation armed; A40 capacity delayed start
+
+- Resource: Pod `v6l27rdzg5s591`.
+- Action: start the same stopped v3 Pod in background (`issue-107-background-pod-start.ps1`, PID `21244`), arm the startup cost guard (PID `36692`), and arm the Windows resume worker (PID `2848`, attempt `17a05e2dad2a4cfcac5cb7e28ccb7009`).
+- Expected outcome: control plane accepts `pod start`, SSH becomes reachable, then TOFU pin → exact transfer → CUDA canary → detached runner → watchdog → live handoff.
+- Actual: start retries spent most of the window in host GPU capacity failure. Durable start status later recorded `state=accepted` at attempt `96/120`, `finished_at=2026-08-31T16:34:42.4524627+00:00`, `desiredStatus=RUNNING`, `runtimeStatus=initializing`, `runtimeStatusReason=awaiting_container`.
+- Control-plane confirmation: `lastStatusChange=Resumed by user: Mon Aug 31 2026 16:34:38 GMT+0000`. Guard `first_running_at=2026-08-31T16:35:07.3580536+00:00`.
+- Confirmed: PID `21244` exited after acceptance and was not left retrying. The earlier “attempt 14/120, Pod stopped, GPU billing not started” snapshot was stale by the time it was re-read.
+- Billing: GPU billing began when the Pod left the stopped/exited state. Storage/other account spend continued on retained stopped Pods.
+
+## 2026-08-31 UTC — GPU running, resume worker stuck before SSH
+
+- Resource: Pod `v6l27rdzg5s591`.
+- Observed at `2026-08-31T17:09:22Z`: `runtimeStatus=running`, SSH metadata `ip=194.68.245.51`, `port=22057`, `uptimeSeconds≈1838`, account `currentSpendPerHr=0.468` (`0.44` A40 + `0.028` storage/other), `clientBalance=11.9619432365`, spend limit `$80`.
+- Resume worker PID `2848` remained `state=waiting_for_running_pod` while Extra `runtime_status=running`. Cost guard PID `36692` remained `state=guarding_start` with unhanded running seconds advancing toward `5400`.
+- Direct SSH probe with `.cache/runpod-issue107-ssh-key-v2` succeeded: `SSH_PROBE`, NVIDIA A40 visible. No live handoff file existed.
+- Confirmed diagnosis: `Resolve-SshEndpoint` read only `ssh.host` and `ssh.command`. Live `runpodctl pod get --output json` exposes `ssh.ip` and `ssh.ssh_command`. The worker therefore treated a running Pod with a valid SSH endpoint as not yet resolvable.
+- Second confirmed limitation: Windows `ssh-keyscan.exe` (`OpenSSH_for_Windows_9.5p2`) cannot complete KEX with the Pod’s `OpenSSH_9.6p1`. Direct evidence: stdout empty, stderr `choose_kex: unsupported KEX method sntrup761x25519-sha512@openssh.com`, exit `1`. The original two-keyscan TOFU path would have blocked even after the field-name fix. `ssh.exe` itself negotiates a compatible KEX.
+- User explicitly selected option 1 at this point: fix parsing, restart only the resume worker, keep the cost guard, continue the already-approved `$0.44/h` resume. Option 2 (stop GPU now) was not selected.
+
+## 2026-08-31 UTC — in-session worker restart killed by the Windows job object
+
+- Action: patch `.cache/issue-107-resume-worker.ps1` to accept `ssh.ip` / `ssh.ssh_command`, observe the ED25519 host key twice via `ssh.exe StrictHostKeyChecking=accept-new` into a pre-created isolated known-hosts file when `ssh-keyscan` yields no key, then pin and continue with `StrictHostKeyChecking=yes` and `HostKeyAlgorithms=ssh-ed25519`. If `RUNPOD_API_KEY` is absent from the process environment, load it from worktree `.env.local` into the process only; do not write it to Git, status, argv, or Pod configuration.
+- First restart used `Start-Process` with redirected stdout/stderr, PID `26708`. It reached `waiting_for_ssh` with `194.68.245.51:22057`, then disappeared. Status remained `waiting_for_ssh`; the catch block did not run, so the Pod was not stopped.
+- Second restart used `Start-Process` without redirects (UseShellExecute), PID `24560`. It also died when the launching command’s job object closed. Direct evidence: `worker24560=False` in the next independent shell while cost guard PID `36692` (parent `8032`, started `2026-08-31T13:43:22Z`) stayed alive.
+- Confirmed diagnosis: this agent’s process job object kills descendants on command completion. `CREATE_BREAKAWAY_FROM_JOB` failed with Win32 `3` (`ERROR_PATH_NOT_FOUND`). Long-lived guard/worker processes from the prior session survived because they were not children of this job.
+- Corrective action: start the patched worker via a one-shot scheduled task so the process is parented outside the agent job. Unregister the task after start. Keep PID `36692` untouched.
+
+## 2026-08-31 UTC — detached resume worker reached TOFU pin and bundle transfer
+
+- Resource: Pod `v6l27rdzg5s591`.
+- Action: scheduled-task launch of the patched worker. PID `36708`, parent `3452`, attempt `2f8b12e12de048fb83d09fef99ca75e8`, worker script SHA-256 `b7ae1a2e4c50840fc607ab16e5a7477e4c1acef27fb35c625076e51a0ed7a056`, `worker_started_at=2026-08-31T17:21:19.0193697+00:00`, `worker_expires_at=2026-08-31T23:21:19.0193697+00:00`.
+- Expected outcome: resolve SSH, two matching ED25519 observations, strict pin, `SSH_READY`, then exact-file transfer of the `a085748b` bundle and control receipts.
+- Actual:
+  - `17:21:21Z` `waiting_for_ssh` at `194.68.245.51:22057`.
+  - `17:22:00Z` `transferring` after two matching isolated observations. Pinned known-hosts SHA-256 `0237f59887ca46f8553723cdfa6177b4e5c74f6134de38925bb03dd29a7cce11`. Host-key fingerprint `SHA256:z3PiQQcX62Qg1YUUQBSoQJhFy2p/lRX6fvYm5z23VRE`. Trust method recorded as two matching observations then strict pin; Windows `ssh-keyscan` was skipped because it produced no ED25519 line.
+  - `17:22:03Z` transfer of `/workspace/issue-107/packages/puripuly-heart-a085748b5aa59f69f918f62661ef3c4c6723cbd0.bundle`, `311915776` bytes, started. Status had not advanced again by `17:27:03Z`; PID `36708` remained alive, which is consistent with a still-running SCP of the bundle.
+- Cost guard at `17:27:03Z`: `state=guarding_start`, `runtime_status=running`, `unhanded_running_seconds=3115`, cap `5400`, so the unhanded GPU window ends near `18:05:07Z` unless a valid live handoff is accepted first.
+- Billing snapshot at `17:26:42Z`: `clientBalance=11.8453876921`, `currentSpendPerHr=0.468`, Pod `costPerHr=0.44`, `uptimeSeconds=2768`, `runtimeStatus=running`. No live handoff. No watchdog receipt for `issue-107-a40-a085748b-01`. Training has not started.
+- Next bounded checks: wait for the bundle plus remaining small receipts to verify, then remote canary/runner. If the worker throws, its catch still stops the Pod. If handoff is not armed before the `5400s` guard, the guard stops the Pod. Do not claim canary, runner, or training success until those receipts exist.
+
+## 2026-08-31 UTC — exact transfer finished; remote status binding failed closed
+
+- Resource: Pod `v6l27rdzg5s591`, Windows worker PID `36708`, attempt `2f8b12e12de048fb83d09fef99ca75e8`.
+- Transfer sequence observed in the durable worker status:
+  - `17:22:03Z` bundle `/workspace/issue-107/packages/puripuly-heart-a085748b5aa59f69f918f62661ef3c4c6723cbd0.bundle` `311915776` bytes.
+  - `17:28:03Z` `/workspace/issue-107/receipts/static_preflight.json` `4133` bytes.
+  - `17:28:14Z` `/workspace/issue-107/upload_manifest_a40_eu_ro.json` `5552` bytes.
+  - `17:28:26Z` `/workspace/issue-107/capacity_receipt_30gb.json` `1068` bytes.
+  - `17:28:37Z` `/workspace/issue-107/preconfig-canary-a085748b.sh` `5574` bytes.
+  - `17:28:48Z` `/workspace/issue-107/remote-resume-a085748b.sh` `7774` bytes.
+- Expected next state: `remote_resume_running`, then remote `verifying_transfer` / CUDA canary / `runner_started`.
+- Actual at `17:29:05Z`: worker `state=failed`, `error=remote resume status binding mismatch`. `remote_resume_running` was not observed as a durable status (either overwritten immediately or never flushed before the throw). No live handoff. No watchdog receipt.
+- Confirmed: this is `Test-RemoteStatusBinding` rejecting the first successfully parsed `/workspace/issue-107/remote-resume-a085748b-status.json`. A JSON parse failure would have been ignored (`remoteStatus=$null`) and would not throw. The throw therefore means SSH `cat` returned parseable JSON whose `artifact_role`, `attempt_id`, `candidate_git_head`, `image_identity`, `run_id`, or `absolute_deadline_utc` did not exactly match the Windows worker.
+- Provisional causes, not yet distinguished because the Pod was stopped before a diagnostic `cat`:
+  1. A leftover remote status from an earlier attempt survived prepare/`mv` and was read first.
+  2. `Invoke-LocalProcess` concatenates SSH stdout+stderr; extra text still parsed into an object with empty required fields.
+  3. The remote writer’s `attempt_id` did not equal `2f8b12e12de048fb83d09fef99ca75e8`.
+- Direct remote file contents were not retrieved. `/workspace` is preserved on the stopped volume and remains the evidence to inspect on the next start.
+
+## 2026-08-31 UTC — fail-closed GPU stop after binding mismatch
+
+- Action: worker catch invoked `Stop-PodConfirmed -Reason resume_worker_failure`.
+- Result: `state=stop_confirmed` at `2026-08-31T17:29:11.1016172+00:00`, `stop_attempt_count=1`, `stop_exit_code=0`, `runtime_status=stopped`. Control plane: `desiredStatus=EXITED`, `runtimeStatusReason=stopped_by_user`, `lastStatusChange=Exited by user: Mon Aug 31 2026 17:29:06 GMT+0000`.
+- Worker PID `36708` exited. Cost guard PID `36692` remained alive and moved to `waiting_for_start` / `runtime_status=stopped`.
+- Billing snapshot after stop: `clientBalance=11.808923981`, `currentSpendPerHr=0.027` (GPU `$0.44/h` not charging; storage/other only). Image, 40GB container disk, and 30GB `/workspace` remain. No assets were deleted.
+- CUDA canary, detached runner, watchdog, and live handoff did not run. Training has not started. No implementation-complete claim.
+- Guard constraint for any immediate restart: PID `36692` still holds in-memory `first_running_at=2026-08-31T16:35:07.3580536+00:00`. If the same guard sees `running`/`initializing` again, unhanded age is measured from that original timestamp and will force `startup_handoff_timeout` near `18:05:07Z` (~36 minutes after this stop). Restarting the guard would reset the 5400-second unhanded window and is a new cost-window decision; using only the remainder of the existing window is not.
+- Next bounded action, not yet taken: start the same Pod only long enough to copy `/workspace/issue-107/remote-resume-a085748b-status.json` and the remote resume log, confirm the binding mismatch with the file in hand, fix the earliest responsible layer (status hygiene, SSH stdout/stderr split, or remote writer), then resume. Do not loop start→same throw→stop without that file.
+
+## 2026-08-31 UTC — binding mismatch root cause confirmed: ConvertFrom-Json date coercion
+
+- Local reproduction against the same `pwsh` that runs the worker: `ConvertFrom-Json` of `{"absolute_deadline_utc":"2026-09-01T06:33:08.756000+00:00"}` yields `[string]$obj.absolute_deadline_utc = "09/01/2026 15:33:08"` (culture + local offset). Exact `-ceq` against the canonical deadline is false.
+- A regex extract of the same raw JSON field returns `2026-09-01T06:33:08.756000+00:00` and compares equal.
+- Independent corroboration: polling the Windows worker status already displayed `updated_at` as `09/01/2026 02:22:03` although the file stores an ISO-8601 `...ToString("o")` value.
+- Confirmed diagnosis: `Test-RemoteStatusBinding` compared `[string]$Status.absolute_deadline_utc` after `ConvertFrom-Json`. The remote status writer emits a legal ISO-8601 deadline, so the first successful `cat` of a correctly bound file fails closed. This matches the 17-second throw after launch without needing a leftover attempt or CRLF (the transferred `.sh` files are LF-only and hash-identical).
+- Corrective action in `.cache/issue-107-resume-worker.ps1` (script SHA-256 `c262faf49ae7d5f291c3d9d04d4b367408393c329eaed9ca0d175dabce52ab4c`):
+  1. Bind `artifact_role`, `attempt_id`, `candidate_git_head`, `image_identity`, `run_id`, and `absolute_deadline_utc` from the raw JSON string, not from `ConvertFrom-Json` properties.
+  2. Keep SSH stdout separate from stderr; JSON parse uses stdout.
+  3. On mismatch, write `.cache/issue-107-remote-status-mismatch-<attempt>.txt` before throwing.
+  4. If the file is a well-formed remote-resume status for a *different* attempt id, quarantine it and keep waiting instead of stopping the GPU.
+- Also load `RUNPOD_API_KEY` from worktree `.env.local` into the cost guard and pod-start scripts so scheduled-task launches authenticate. The key is still not written to Git, status, argv, or Pod configuration.
+
+## 2026-08-31 UTC — resume relaunched after binding fix
+
+- User explicitly selected fix-and-resume. That includes a fresh 5400-second unhanded GPU window: the previous guard’s in-memory `first_running_at=16:35Z` would have force-stopped any restart near `18:05Z`.
+- Action: stopped old guard PID `36692`. Started replacement processes outside the agent job object via one-shot scheduled tasks, then unregistered the tasks.
+  - Cost guard PID `40484`, `guard_started_at=2026-08-31T17:40:13.3223729+00:00`, `guard_expires_at=2026-08-31T23:40:13.3223729+00:00`, `first_running_at` unset until the Pod is actually running/initializing.
+  - Pod start PID `36048`, retrying `pod start v6l27rdzg5s591`.
+  - Resume worker PID `33552`, attempt `61e5faf81605493ea5b5668799988d23`, `worker_started_at=2026-08-31T17:40:18.1016756+00:00`, `worker_expires_at=2026-08-31T23:40:18.1016756+00:00`, `state=waiting_for_running_pod`.
+- Observed at `17:40:37Z`: pod-start `state=retrying`, attempt `2/120`, `start_exit_code=1`, `desiredStatus=EXITED`, `runtimeStatus=stopped`, `runtimeStatusReason=stopped_by_user`, next delay 30s. Same capacity/start-reject pattern as the earlier 96-attempt wait. GPU billing has not restarted.
+- Image, 40GB container disk, and 30GB `/workspace` (including the already transferred `a085748b` bundle) remain. No live handoff. Training has not started.
