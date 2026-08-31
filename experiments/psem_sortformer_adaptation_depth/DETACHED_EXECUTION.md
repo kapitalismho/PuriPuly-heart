@@ -49,7 +49,7 @@ python -m experiments.psem_sortformer_adaptation_depth.issue_107_launch write-co
   --corpus-root /workspace/issue-107/assets/corpus \
   --reference-root /workspace/issue-107/assets/reference \
   --nemo-checkout /opt/nemo \
-  --image-identity sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7 \
+  --image-identity sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8 \
   --hourly-price-usd 0.44 \
   --hourly-price-source "RunPod deployment price recorded by the operator" \
   --billing-started-at "2026-08-31T12:00:00+00:00" \
@@ -98,7 +98,7 @@ The generated topology and phase-specific command prefixes are exact. Each phase
 --corpus-root <absolute-corpus-root>
 --reference-root <absolute-reference-root>
 --nemo-checkout <absolute-nemo-checkout>
---image-identity sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7
+--image-identity sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8
 --hourly-price-usd <positive-usd-per-hour>
 --hourly-price-source <nonempty-price-source>
 --billing-started-at <timezone-aware-ISO-timestamp>
@@ -113,7 +113,7 @@ Every phase summary binds the immutable config hash, exact subprocess argv and a
 
 Before phase work, the launcher snapshots existing authority records. Existing exact content-addressed records are allowed: `register_execution` accepts an identical record at its digest path, and `require_registered_execution` validates the exact receipt. Only authority records newly added or changed relative to the pre-phase snapshot appear in that phase summary. A digest collision or mismatched receipt still fails closed. The dynamic material-input JSON and phase summary are canonical, atomic, and content-bound. Generator, material-input, and summary outputs remain on persistent storage outside the worktree; the scientific CLI retains ownership of its required Git-common authority records.
 
-Every phase receives the fixed environment `PSEM_CONTAINER_IMAGE_IDENTITY=sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7`, `PSEM_SORTFORMER_NEMO_PATH`, `PSEM_CORPUS_ROOT`, `PSEM_REFERENCE_ROOT`, `PSEM_ADAPTATION_OUTPUT_ROOT={run_root}/output`, `PSEM_PROTOCOL_REGISTRY_ROOT={run_root}/protocol-registry`, and `CUDA_VISIBLE_DEVICES=0`. Neither `RUNPOD_API_KEY` nor `PSEM_ALLOW_EVAL` is permitted in the Pod environment.
+Every phase receives the fixed environment `PSEM_CONTAINER_IMAGE_IDENTITY=sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8`, `PSEM_SORTFORMER_NEMO_PATH`, `PSEM_CORPUS_ROOT`, `PSEM_REFERENCE_ROOT`, `PSEM_ADAPTATION_OUTPUT_ROOT={run_root}/output`, `PSEM_PROTOCOL_REGISTRY_ROOT={run_root}/protocol-registry`, and `CUDA_VISIBLE_DEVICES=0`. Neither `RUNPOD_API_KEY` nor `PSEM_ALLOW_EVAL` is permitted in the Pod environment.
 
 ## Detached runner
 
@@ -143,7 +143,7 @@ An interrupted `RUNNING` phase becomes `ERROR` when recovery is attempted. Disca
 
 ## External Windows watchdog
 
-Keep `RUNPOD_API_KEY` only in the local Windows environment. A live watchdog refuses to arm without it. If the key disappears before stop confirmation, the watchdog records `stop_failed` with a sanitized failure code. Before arming, the watchdog uses short `scp` connections to fetch `run_config.json`, `state.json`, and `heartbeat.json`; it hashes the raw durable config and requires matching `config_sha256` and `run_id` values in state and heartbeat. It repeats that binding check on every poll, does not hold a continuous SSH session, and does not transmit the API key to the Pod.
+Keep `RUNPOD_API_KEY` only in the local Windows environment. A live watchdog refuses to arm without it. If the key disappears before stop confirmation, the watchdog records `stop_failed` with a sanitized failure code. Before arming, the watchdog uses short `scp` connections to fetch `run_config.json`, `state.json`, and `heartbeat.json`; it hashes the raw durable config and requires matching `config_sha256` and `run_id` values in state and heartbeat. For direct remote polling, `-KnownHostsFile` supplies the operator-pinned OpenSSH host-key file and forces strict host-key checking for every `scp` fetch. It repeats that binding check on every poll, does not hold a continuous SSH session, and does not transmit the API key to the Pod.
 
 The immutable config is the sole in-Pod deadline authority. `-AbsoluteDeadlineUtc` is a required independent local cross-check for live operation and optional only for dry-run fixtures; it must identify the exact same instant as config `absolute_deadline_utc`. A mismatch never arms: it enters the stop path immediately and records the conservative earlier deadline. The local value also bounds every pre-arm and polling `scp` process so a stalled transport cannot carry the watchdog silently past that deadline. In this matching example both values are `2026-09-01T08:00:00+00:00`:
 
@@ -156,6 +156,7 @@ $env:RUNPOD_API_KEY = "<local secret>"
   -SshTarget "root@<pod-host>" `
   -SshPort <tcp-port> `
   -IdentityFile "$HOME\.ssh\id_ed25519" `
+  -KnownHostsFile ".cache\issue-107-known-hosts" `
   -RemoteRunRoot "/workspace/issue-107/runs/issue-107-a40-20260831-01" `
   -AbsoluteDeadlineUtc "2026-09-01T08:00:00+00:00"
 ```

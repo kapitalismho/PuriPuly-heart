@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import importlib.metadata
 import inspect
 import json
@@ -25,6 +26,7 @@ RUNTIME_CONSTRAINTS = Path("/opt/psem/runtime-constraints.txt")
 EXPECTED_RUNTIME_CONSTRAINT_COUNT = 81
 NEMO_CHECKOUT = Path("/opt/nemo")
 EXPECTED_PACKAGES = {
+    "setuptools": "80.9.0",
     "six": "1.16.0",
     "numpy": "1.26.4",
     "pandas": "2.2.2",
@@ -39,35 +41,12 @@ EXPECTED_PACKAGES = {
     "multiprocess": "0.70.16",
     "torchaudio": "2.6.0a0+d883142",
 }
+SETUPTOOLS_VENDOR_ROOT = Path("/usr/local/lib/python3.12/dist-packages/setuptools/_vendor")
+SETUPTOOLS_VENDOR_METADATA_SUFFIXES = (".dist-info", ".egg-info")
 DISABLED_METADATA_SOURCES = (
     Path("/usr/lib/python3/dist-packages/cryptography.egg-info"),
     Path("/usr/lib/python3/dist-packages/pyparsing-3.1.1.dist-info"),
     Path("/usr/lib/python3/dist-packages/six-1.16.0.egg-info"),
-    Path(
-        "/usr/local/lib/python3.12/dist-packages/setuptools/_vendor/"
-        "importlib_metadata-8.7.1.dist-info"
-    ),
-    Path(
-        "/usr/local/lib/python3.12/dist-packages/setuptools/_vendor/more_itertools-10.8.0.dist-info"
-    ),
-    Path("/usr/local/lib/python3.12/dist-packages/setuptools/_vendor/packaging-26.0.dist-info"),
-    Path("/usr/local/lib/python3.12/dist-packages/setuptools/_vendor/platformdirs-4.4.0.dist-info"),
-    Path("/usr/local/lib/python3.12/dist-packages/setuptools/_vendor/wheel-0.46.3.dist-info"),
-    Path("/usr/local/lib/python3.12/dist-packages/setuptools/_vendor/zipp-3.23.0.dist-info"),
-    Path("/usr/local/lib/python3.12/dist-packages/setuptools/_vendor/autocommand-2.2.2.dist-info"),
-    Path(
-        "/usr/local/lib/python3.12/dist-packages/setuptools/_vendor/"
-        "backports.tarfile-1.2.0.dist-info"
-    ),
-    Path(
-        "/usr/local/lib/python3.12/dist-packages/setuptools/_vendor/jaraco_context-6.1.0.dist-info"
-    ),
-    Path(
-        "/usr/local/lib/python3.12/dist-packages/setuptools/_vendor/"
-        "jaraco_functools-4.4.0.dist-info"
-    ),
-    Path("/usr/local/lib/python3.12/dist-packages/setuptools/_vendor/jaraco.text-4.0.0.dist-info"),
-    Path("/usr/local/lib/python3.12/dist-packages/setuptools/_vendor/tomli-2.4.0.dist-info"),
 )
 
 
@@ -190,6 +169,7 @@ def assert_source_identity() -> dict[str, object]:
     ).stdout.splitlines()
     if head != NEMO_REVISION or dirty:
         raise RuntimeError("NeMo checkout is not the clean pinned revision")
+    pkg_resources = importlib.import_module("pkg_resources")
     from nemo.collections.asr.models.sortformer_diar_models import SortformerEncLabelModel
     from nemo.collections.asr.parts.utils.asr_multispeaker_utils import get_ats_targets
 
@@ -200,7 +180,13 @@ def assert_source_identity() -> dict[str, object]:
     checkout = NEMO_CHECKOUT.resolve()
     if any(not Path(path).is_relative_to(checkout) for path in origins.values()):
         raise RuntimeError("loaded NeMo symbol is outside the pinned checkout")
-    return {"revision": head, "origins": origins}
+    return {
+        "revision": head,
+        "origins": origins,
+        "compatibility_modules": {
+            "pkg_resources": str(Path(inspect.getfile(pkg_resources)).resolve())
+        },
+    }
 
 
 def validate(mode: str, expected_image_identity: str | None) -> dict[str, object]:
@@ -264,7 +250,11 @@ def validate(mode: str, expected_image_identity: str | None) -> dict[str, object
         raise RuntimeError("NGC torch/CUDA protected inventory drifted during image construction")
     if sha256_file(NVIMGCODEC_WHEEL) != NVIMGCODEC_AFTER_SHA256:
         raise RuntimeError("nvimgcodec WHEEL repair is absent or altered")
-    if any(path.exists() for path in DISABLED_METADATA_SOURCES):
+    vendor_metadata_active = SETUPTOOLS_VENDOR_ROOT.is_dir() and any(
+        source.name.endswith(SETUPTOOLS_VENDOR_METADATA_SUFFIXES)
+        for source in SETUPTOOLS_VENDOR_ROOT.iterdir()
+    )
+    if any(path.exists() for path in DISABLED_METADATA_SOURCES) or vendor_metadata_active:
         raise RuntimeError("duplicate distribution metadata remains active")
     import torch
     import torchaudio

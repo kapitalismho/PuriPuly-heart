@@ -44,7 +44,7 @@ Build mode validates package identities, protected NGC inventory, metadata isola
 After the approved registry push, the activated runnable image is:
 
 ```text
-kapitalismho/puripuly-heart@sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7
+kapitalismho/puripuly-heart@sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8
 ```
 
 The runtime contracts bind that immutable derived manifest digest while preserving the NGC digest as base-image provenance. On a one-GPU Pod, validate the activated digest with:

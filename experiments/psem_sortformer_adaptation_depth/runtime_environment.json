@@ -8,9 +8,9 @@
     "pytorch_requirement": ">=2.5"
   },
   "container": {
-    "image": "kapitalismho/puripuly-heart@sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7",
-    "tag": "issue107-runtime-v1.0.0-eac271a6",
-    "manifest_digest": "sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7",
+    "image": "kapitalismho/puripuly-heart@sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
+    "tag": "issue107-pkgresources-r1",
+    "manifest_digest": "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
     "source": "validated Issue 107 runtime derived from the pinned NVIDIA NGC PyTorch base",
     "base_image": "nvcr.io/nvidia/pytorch@sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
     "base_manifest_digest": "sha256:0981807f1a51a156563e28b59dc2e7a9b5c1c7d85d1169d4965c5fd91fa38bcb",
@@ -47,7 +47,7 @@
     "complete_installed_distribution_inventory": true,
     "container_image_identity": true,
     "container_image_identity_environment_variable": "PSEM_CONTAINER_IMAGE_IDENTITY",
-    "container_image_identity_expected": "sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7",
+    "container_image_identity_expected": "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
     "protocol_registry_root_environment_variable": "PSEM_PROTOCOL_REGISTRY_ROOT",
     "protocol_registry_is_distinct_from_output_root": true,
     "nvidia_driver_and_cuda_identity": true,

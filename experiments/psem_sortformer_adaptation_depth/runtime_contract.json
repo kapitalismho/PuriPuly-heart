@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "runtime_contract_version": "issue-107-lean-runtime-v3",
+  "runtime_contract_version": "issue-107-lean-runtime-v4",
   "authority_mode": "cost_bounded_hobby_engineering_probe",
   "material_execution": {
     "status": "ready",
@@ -30,9 +30,9 @@
     "nemo_revision": "1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6",
     "lock_kind": "complete_installed_distribution_inventory",
     "platform_identity_fields": ["system", "release", "machine"],
-    "container_image_identity": "sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7",
+    "container_image_identity": "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
     "accelerator_identity_fields": ["cuda_device_count", "device_name", "device_total_memory_bytes", "nvidia_driver_version", "torch_cuda_version"],
-    "required_exact_packages": ["hydra-core", "lightning", "numpy", "omegaconf", "torch", "torchaudio"],
+    "required_exact_packages": ["hydra-core", "lightning", "numpy", "omegaconf", "setuptools", "torch", "torchaudio"],
     "all_installed_distributions_must_match": true,
     "all_loaded_nemo_modules_must_resolve_under_checkout": true,
     "validated_lock_bytes_are_parsed_and_hashed_once": true

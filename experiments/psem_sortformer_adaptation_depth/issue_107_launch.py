@@ -24,7 +24,7 @@ from experiments.psem_sortformer_adaptation_depth.detached_phase_runner import (
     validate_config,
 )
 
-IMAGE_IDENTITY = "sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7"
+IMAGE_IDENTITY = "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8"
 RUN_MODULE = "experiments.psem_sortformer_adaptation_depth.run"
 LAUNCH_MODULE = "experiments.psem_sortformer_adaptation_depth.issue_107_launch"
 RUNTIME_VALIDATOR = Path("/opt/psem/validate-runtime.py")

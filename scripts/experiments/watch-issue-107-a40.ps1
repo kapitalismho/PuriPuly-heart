@@ -21,6 +21,9 @@ param(
     [Parameter(ParameterSetName = "Remote")]
     [string]$IdentityFile,
 
+    [Parameter(ParameterSetName = "Remote")]
+    [string]$KnownHostsFile,
+
     [Parameter(Mandatory = $true, ParameterSetName = "Local")]
     [string]$LocalControlDirectory,
 
@@ -287,6 +290,9 @@ function Get-ControlSnapshot {
         if (-not [string]::IsNullOrWhiteSpace($IdentityFile)) {
             $arguments += @("-i", $IdentityFile)
         }
+        if (-not [string]::IsNullOrWhiteSpace($KnownHostsFile)) {
+            $arguments += @("-o", "UserKnownHostsFile=$KnownHostsFile", "-o", "StrictHostKeyChecking=yes")
+        }
         $configPath = Join-Path $temporary "run_config.json"
         $configCopy = Invoke-Captured -FilePath $scp -ArgumentList ($arguments + @("${SshTarget}:$RemoteRunRoot/control/run_config.json", $configPath)) -DeadlineUtc $DeadlineUtc
         if ($configCopy.ExitCode -ne 0) {
@@ -461,6 +467,13 @@ if (-not (Test-Path -LiteralPath $RunPodCliPath -PathType Leaf)) {
 }
 if ($script:WatchdogParameterSetName -eq "Local" -and -not (Test-Path -LiteralPath $LocalControlDirectory -PathType Container)) {
     throw "Local control directory not found: $LocalControlDirectory"
+}
+if (
+    $script:WatchdogParameterSetName -eq "Remote" -and
+    -not [string]::IsNullOrWhiteSpace($KnownHostsFile) -and
+    -not (Test-Path -LiteralPath $KnownHostsFile -PathType Leaf)
+) {
+    throw "Pinned known-hosts file not found: $KnownHostsFile"
 }
 if ($StaleHeartbeatSeconds -le $PollSeconds) {
     throw "StaleHeartbeatSeconds must be greater than PollSeconds."

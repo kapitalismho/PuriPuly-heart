@@ -19,20 +19,7 @@ SYSTEM_METADATA = (
     Path("/usr/lib/python3/dist-packages/six-1.16.0.egg-info"),
 )
 SETUPTOOLS_VENDOR_ROOT = Path("/usr/local/lib/python3.12/dist-packages/setuptools/_vendor")
-SETUPTOOLS_VENDOR_METADATA = (
-    "importlib_metadata-8.7.1.dist-info",
-    "more_itertools-10.8.0.dist-info",
-    "packaging-26.0.dist-info",
-    "platformdirs-4.4.0.dist-info",
-    "wheel-0.46.3.dist-info",
-    "zipp-3.23.0.dist-info",
-    "autocommand-2.2.2.dist-info",
-    "backports.tarfile-1.2.0.dist-info",
-    "jaraco_context-6.1.0.dist-info",
-    "jaraco_functools-4.4.0.dist-info",
-    "jaraco.text-4.0.0.dist-info",
-    "tomli-2.4.0.dist-info",
-)
+SETUPTOOLS_VENDOR_METADATA_SUFFIXES = (".dist-info", ".egg-info")
 
 
 def sha256_file(path: Path) -> str:
@@ -195,9 +182,13 @@ def isolate_metadata(receipt: Path) -> None:
     moved = []
     for source in SYSTEM_METADATA:
         moved.append(move_metadata(source, backup_root / "system" / source.name))
-    for name in SETUPTOOLS_VENDOR_METADATA:
-        source = SETUPTOOLS_VENDOR_ROOT / name
-        moved.append(move_metadata(source, backup_root / "setuptools-vendor" / name))
+    vendor_sources = sorted(
+        source
+        for source in SETUPTOOLS_VENDOR_ROOT.iterdir()
+        if source.name.endswith(SETUPTOOLS_VENDOR_METADATA_SUFFIXES)
+    )
+    for source in vendor_sources:
+        moved.append(move_metadata(source, backup_root / "setuptools-vendor" / source.name))
     write_json(
         receipt,
         {

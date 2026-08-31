@@ -39,7 +39,7 @@ from experiments.psem_sortformer_adaptation_depth.runtime_audit import (
 
 NEMO_REVISION = "1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6"
 PINNED_CONTAINER_IMAGE_IDENTITY = (
-    "sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7"
+    "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8"
 )
 FRAME_SAMPLES = 1280
 REQUIRED_LOCK_PACKAGES = {
@@ -47,6 +47,7 @@ REQUIRED_LOCK_PACKAGES = {
     "lightning",
     "numpy",
     "omegaconf",
+    "setuptools",
     "torch",
     "torchaudio",
 }

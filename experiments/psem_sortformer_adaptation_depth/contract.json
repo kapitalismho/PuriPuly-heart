@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "experiment_id": "psem_sortformer_adaptation_depth_lean_v2",
-  "contract_version": "issue-107-lean-v2",
+  "contract_version": "issue-107-lean-v3",
   "authority": {
     "ref": "https://github.com/kapitalismho/PuriPuly-heart/issues/107",
     "sha256": "d56980295d50760d258deeb2ccd319d3c5350aa356ed27896f7a431afdbe61fc",
@@ -60,8 +60,8 @@
   },
   "runtime_environment": {
     "path": "experiments/psem_sortformer_adaptation_depth/runtime_environment.json",
-    "sha256": "5f1b93a4b167e9f94c530978925d647cdd6b2d53a28f5dc814e5c4c661430f58",
-    "container_image_identity": "sha256:14acbef50fa15281bded1d3fbbcd8029091aeba0692d5647255aa5b90eff8ca7",
+    "sha256": "17561c2b593439e8648f60fe25bbdca7acad4ba3a7a23eace63fc4280978edff",
+    "container_image_identity": "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
     "dependency_inventory_status": "must_match_generated_complete_lock"
   },
   "decision": "choose the shallowest clear short-budget engineering direction or stop",
