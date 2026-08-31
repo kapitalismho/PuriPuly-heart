@@ -52,7 +52,7 @@ def test_llm_provider_signature_tracks_all_runtime_inputs() -> None:
 
     managed_fallback = _with_translation(
         baseline,
-        model="gemini31_flash_lite",
+        model="gemini37_flash",
         connection="official_byok",
         fallback=TranslationFallbackIntent(selection_alias="deepseek_v4_flash_china"),
     )

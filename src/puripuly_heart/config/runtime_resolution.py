@@ -7,11 +7,11 @@ from typing import Final, Literal, TypeAlias, cast
 
 from puripuly_heart.config.llm_profiles import (
     LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+    LEGACY_OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
     OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
     OPENROUTER_CREDENTIAL_SOURCE_NONE,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
-    OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
     OPENROUTER_MODEL_GEMINI_37_FLASH,
     OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
     OPENROUTER_MODEL_GEMMA_4_31B_IT,
@@ -42,8 +42,7 @@ TRANSLATION_MODEL_GEMMA4_26B_31B: Final = "gemma4_26b_31b"
 TRANSLATION_MODEL_GEMMA4_31B: Final = "gemma4_31b"
 TRANSLATION_MODEL_DEEPSEEK_V4_FLASH: Final = "deepseek_v4_flash"
 TRANSLATION_MODEL_GEMINI_37_FLASH: Final = "gemini37_flash"
-TRANSLATION_MODEL_GEMINI_31_FLASH_LITE: Final = "gemini31_flash_lite"
-TRANSLATION_MODEL_QWEN_35_PLUS: Final = "qwen35_plus"
+TRANSLATION_MODEL_QWEN_38_FLASH: Final = "qwen38_flash"
 TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH: Final = "openrouter_qwen35_flash"
 TRANSLATION_MODEL_MANAGED_GEMMA: Final = "managed_gemma"
 TRANSLATION_MODEL_MANAGED_GEMMA_12B: Final = "managed_gemma_12b"
@@ -60,8 +59,7 @@ TranslationModelName: TypeAlias = Literal[
     "gemma4",
     "deepseek_v4_flash",
     "gemini37_flash",
-    "gemini31_flash_lite",
-    "qwen35_plus",
+    "qwen38_flash",
     "openrouter_qwen35_flash",
     "managed_gemma",
     "managed_gemma_12b",
@@ -74,8 +72,7 @@ TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
     TRANSLATION_MODEL_GEMMA4,
     TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
     TRANSLATION_MODEL_GEMINI_37_FLASH,
-    TRANSLATION_MODEL_GEMINI_31_FLASH_LITE,
-    TRANSLATION_MODEL_QWEN_35_PLUS,
+    TRANSLATION_MODEL_QWEN_38_FLASH,
     TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH,
     TRANSLATION_MODEL_MANAGED_GEMMA,
     TRANSLATION_MODEL_MANAGED_GEMMA_12B,
@@ -142,11 +139,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
             TRANSLATION_CONNECTION_OFFICIAL_BYOK,
             TRANSLATION_CONNECTION_OPENROUTER,
         ),
-        TRANSLATION_MODEL_GEMINI_31_FLASH_LITE: (
-            TRANSLATION_CONNECTION_OFFICIAL_BYOK,
-            TRANSLATION_CONNECTION_OPENROUTER,
-        ),
-        TRANSLATION_MODEL_QWEN_35_PLUS: (TRANSLATION_CONNECTION_OFFICIAL_BYOK,),
+        TRANSLATION_MODEL_QWEN_38_FLASH: (TRANSLATION_CONNECTION_OFFICIAL_BYOK,),
         TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH: (
             TRANSLATION_CONNECTION_MANAGED,
             TRANSLATION_CONNECTION_OPENROUTER,
@@ -202,10 +195,10 @@ LLM_PROVIDERS: Final[tuple[str, ...]] = (
 )
 
 GEMINI_MODEL_37_FLASH: Final = "gemini-3.7-flash"
-GEMINI_MODEL_31_FLASH_LITE: Final = "gemini-3.1-flash-lite"
+LEGACY_GEMINI_MODEL_31_FLASH_LITE: Final = "gemini-3.1-flash-lite"
 DEEPSEEK_MODEL_V4_FLASH: Final = "deepseek-v4-flash"
 QWEN_MODEL_35_FLASH: Final = "qwen3.5-flash"
-QWEN_MODEL_35_PLUS: Final = "qwen3.5-plus"
+QWEN_MODEL_38_FLASH: Final = "qwen3.8-flash"
 LOCAL_LLM_BACKEND_OLLAMA: Final = "ollama"
 LOCAL_LLM_DEFAULT_BASE_URL: Final = "http://127.0.0.1:11434/v1"
 LOCAL_LLM_DEFAULT_MODEL: Final = "llama3.1:8b"
@@ -288,7 +281,6 @@ _OPENROUTER_MODELS: Final[tuple[str, ...]] = (
     OPENROUTER_MODEL_QWEN_35_FLASH_02_23,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     OPENROUTER_MODEL_GEMINI_37_FLASH,
-    OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
 )
 _OPENROUTER_ROUTING_MODES: Final[tuple[str, ...]] = ("latency",)
 _OPENROUTER_PROVIDER_ROUTINGS: Final[tuple[str, ...]] = (
@@ -372,8 +364,15 @@ def _default_translation_connection(model: TranslationModelName) -> TranslationC
 
 
 def _normalize_translation_model(value: object) -> TranslationModelName:
-    if isinstance(value, str) and value.strip() == "gemini3_flash":
-        value = TRANSLATION_MODEL_GEMINI_37_FLASH
+    if isinstance(value, str):
+        legacy_value = value.strip()
+        value = {
+            "gemini3_flash": TRANSLATION_MODEL_GEMINI_37_FLASH,
+            "gemini31_flash_lite": TRANSLATION_MODEL_GEMINI_37_FLASH,
+            "gemini-3.1-flash-lite": TRANSLATION_MODEL_GEMINI_37_FLASH,
+            "qwen35_plus": TRANSLATION_MODEL_QWEN_38_FLASH,
+            "qwen3.5-plus": TRANSLATION_MODEL_QWEN_38_FLASH,
+        }.get(legacy_value, legacy_value)
     return cast(
         TranslationModelName,
         _normalize_allowed(
@@ -440,10 +439,15 @@ def _explicit_openrouter_source(value: object) -> OpenRouterSource | None:
 
 
 def _normalize_openrouter_model(value: object) -> str:
-    if isinstance(value, str) and value.strip() == LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH:
-        value = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
-    if isinstance(value, str) and value.strip() == "google/gemini-3-flash-preview":
-        value = OPENROUTER_MODEL_GEMINI_37_FLASH
+    if isinstance(value, str):
+        legacy_value = value.strip()
+        if legacy_value == LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH:
+            value = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+        elif legacy_value in {
+            "google/gemini-3-flash-preview",
+            LEGACY_OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
+        }:
+            value = OPENROUTER_MODEL_GEMINI_37_FLASH
     return _normalize_allowed(
         value,
         allowed=_OPENROUTER_MODELS,
@@ -452,12 +456,16 @@ def _normalize_openrouter_model(value: object) -> str:
 
 
 def _normalize_gemini_model(value: object) -> str:
-    if isinstance(value, str) and value.strip() in {"gemini-3-flash", "gemini-3-flash-preview"}:
+    if isinstance(value, str) and value.strip() in {
+        "gemini-3-flash",
+        "gemini-3-flash-preview",
+        LEGACY_GEMINI_MODEL_31_FLASH_LITE,
+    }:
         return GEMINI_MODEL_37_FLASH
     return _normalize_allowed(
         value,
-        allowed=(GEMINI_MODEL_37_FLASH, GEMINI_MODEL_31_FLASH_LITE),
-        default=GEMINI_MODEL_31_FLASH_LITE,
+        allowed=(GEMINI_MODEL_37_FLASH,),
+        default=GEMINI_MODEL_37_FLASH,
     )
 
 
@@ -684,9 +692,8 @@ class OpenRouterRuntimeIntent:
 @dataclass(frozen=True, slots=True)
 class DirectProviderRuntimeIntent:
     gemini_37_flash_model: str = GEMINI_MODEL_37_FLASH
-    gemini_31_flash_lite_model: str = GEMINI_MODEL_31_FLASH_LITE
     deepseek_v4_flash_model: str = DEEPSEEK_MODEL_V4_FLASH
-    qwen_35_plus_model: str = QWEN_MODEL_35_PLUS
+    qwen_38_flash_model: str = QWEN_MODEL_38_FLASH
     qwen_region: str = QWEN_REGION_BEIJING
     local_llm_backend: str = LOCAL_LLM_BACKEND_OLLAMA
     local_llm_base_url: str = LOCAL_LLM_DEFAULT_BASE_URL
@@ -699,6 +706,19 @@ class DirectProviderRuntimeIntent:
     )
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "gemini_37_flash_model", _normalize_gemini_model(self.gemini_37_flash_model))
+        qwen_model = self.qwen_38_flash_model
+        if isinstance(qwen_model, str) and qwen_model.strip() == "qwen3.5-plus":
+            qwen_model = QWEN_MODEL_38_FLASH
+        object.__setattr__(
+            self,
+            "qwen_38_flash_model",
+            _normalize_allowed(
+                qwen_model,
+                allowed=(QWEN_MODEL_35_FLASH, QWEN_MODEL_38_FLASH),
+                default=QWEN_MODEL_38_FLASH,
+            ),
+        )
         qwen_region = _normalize_allowed(
             self.qwen_region,
             allowed=(QWEN_REGION_BEIJING, QWEN_REGION_SINGAPORE),
@@ -1072,16 +1092,6 @@ def derive_translation_runtime_intent_from_compatibility(
                 ),
                 concurrency_limit=concurrency,
             )
-        if openrouter_model_value == OPENROUTER_MODEL_GEMINI_31_FLASH_LITE:
-            return TranslationRuntimeIntent(
-                model=TRANSLATION_MODEL_GEMINI_31_FLASH_LITE,
-                connection=_translation_connection_from_openrouter_source(
-                    openrouter_source,
-                    model=TRANSLATION_MODEL_GEMINI_31_FLASH_LITE,
-                    provider_routing=provider_routing,
-                ),
-                concurrency_limit=concurrency,
-            )
         return TranslationRuntimeIntent(
             model=TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
             connection=_default_translation_connection(TRANSLATION_MODEL_DEEPSEEK_V4_FLASH),
@@ -1120,8 +1130,8 @@ def derive_translation_runtime_intent_from_compatibility(
         if (
             _normalize_allowed(
                 qwen_model,
-                allowed=(QWEN_MODEL_35_FLASH, QWEN_MODEL_35_PLUS),
-                default=QWEN_MODEL_35_PLUS,
+                allowed=(QWEN_MODEL_35_FLASH, QWEN_MODEL_38_FLASH),
+                default=QWEN_MODEL_38_FLASH,
             )
             == QWEN_MODEL_35_FLASH
         ):
@@ -1131,7 +1141,7 @@ def derive_translation_runtime_intent_from_compatibility(
                 concurrency_limit=concurrency,
             )
         return TranslationRuntimeIntent(
-            model=TRANSLATION_MODEL_QWEN_35_PLUS,
+            model=TRANSLATION_MODEL_QWEN_38_FLASH,
             connection=TRANSLATION_CONNECTION_OFFICIAL_BYOK,
             concurrency_limit=concurrency,
         )
@@ -1143,7 +1153,7 @@ def derive_translation_runtime_intent_from_compatibility(
             concurrency_limit=concurrency,
         )
     return TranslationRuntimeIntent(
-        model=TRANSLATION_MODEL_GEMINI_31_FLASH_LITE,
+        model=TRANSLATION_MODEL_GEMINI_37_FLASH,
         connection=TRANSLATION_CONNECTION_OFFICIAL_BYOK,
         concurrency_limit=concurrency,
     )
@@ -1456,31 +1466,11 @@ def _resolve_translation_target(
             ),
         )
 
-    if translation.model == TRANSLATION_MODEL_GEMINI_31_FLASH_LITE:
-        if translation.connection == TRANSLATION_CONNECTION_OPENROUTER:
-            return _resolved_openrouter_target(
-                model=OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
-                source=_openrouter_source_for_translation(translation.connection, openrouter),
-                openrouter=openrouter,
-                provider_routing="google_gemini_latency",
-                managed_credential_kind=_openrouter_managed_credential_kind_for_translation(
-                    translation.connection,
-                    openrouter,
-                ),
-            )
-        return _resolved_direct_provider_target(
-            provider=PROVIDER_GEMINI,
-            model=direct.gemini_31_flash_lite_model,
-            credential=_required_credential(
-                CREDENTIAL_SOURCE_SECRET_STORE,
-                CREDENTIAL_REF_GEMINI_BYOK,
-            ),
-        )
 
-    if translation.model == TRANSLATION_MODEL_QWEN_35_PLUS:
+    if translation.model == TRANSLATION_MODEL_QWEN_38_FLASH:
         return _resolved_direct_provider_target(
             provider=PROVIDER_QWEN,
-            model=direct.qwen_35_plus_model,
+            model=direct.qwen_38_flash_model,
             credential=_required_credential(
                 CREDENTIAL_SOURCE_SECRET_STORE,
                 _qwen_credential_reference(direct.qwen_region),
@@ -1634,7 +1624,7 @@ __all__ = [
     "DirectProviderRuntimeIntent",
     "CEREBRAS_MODEL_GEMMA_4_31B",
     "GEMINI_MODEL_37_FLASH",
-    "GEMINI_MODEL_31_FLASH_LITE",
+    "QWEN_MODEL_38_FLASH",
     "LOCAL_LLM_BACKEND_OLLAMA",
     "LOCAL_LLM_DEFAULT_BASE_URL",
     "LOCAL_LLM_DEFAULT_MODEL",
@@ -1706,7 +1696,7 @@ __all__ = [
     "TRANSLATION_CONNECTIONS_BY_MODEL",
     "TRANSLATION_MODEL_DEEPSEEK_V4_FLASH",
     "TRANSLATION_MODEL_GEMINI_37_FLASH",
-    "TRANSLATION_MODEL_GEMINI_31_FLASH_LITE",
+    "TRANSLATION_MODEL_QWEN_38_FLASH",
     "TRANSLATION_MODEL_GEMMA4",
     "TRANSLATION_MODEL_GEMMA4_26B_31B",
     "TRANSLATION_MODEL_GEMMA4_31B",

@@ -26,16 +26,16 @@ def _custom_settings() -> AppSettingsVNext:
                 connection=TranslationConnection.CUSTOM_HTTP.value,
                 connection_history={
                     TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
-                    TranslationModel.QWEN_35_PLUS.value: TranslationConnection.OFFICIAL_BYOK.value,
+                    TranslationModel.QWEN_38_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
                     TranslationModel.CUSTOM_HTTP.value: TranslationConnection.CUSTOM_HTTP.value,
                 },
                 fallback=TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_a4b"),
                 http_extension_id="libretranslate",
-                previous_llm_model=TranslationModel.QWEN_35_PLUS.value,
+                previous_llm_model=TranslationModel.QWEN_38_FLASH.value,
                 qwen=replace(
                     current.intent.translation.qwen,
                     region=QwenRegion.SINGAPORE.value,
-                    llm_model=QwenLLMModel.QWEN_35_PLUS.value,
+                    llm_model="qwen3.8-flash",
                 ),
             ),
             telemetry=replace(current.intent.telemetry, enabled=True),
@@ -59,16 +59,16 @@ def test_custom_http_settings_roundtrip_preserves_inactive_llm_state() -> None:
     )
     assert persisted["intent"]["translation"]["http_extension_id"] == "libretranslate"
     assert persisted["intent"]["translation"]["previous_llm_model"] == (
-        TranslationModel.QWEN_35_PLUS.value
+        TranslationModel.QWEN_38_FLASH.value
     )
     assert "credential-value" not in repr(persisted)
     assert loaded.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
     assert loaded.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
     assert loaded.intent.translation.http_extension_id == "libretranslate"
-    assert loaded.intent.translation.previous_llm_model == TranslationModel.QWEN_35_PLUS.value
+    assert loaded.intent.translation.previous_llm_model == TranslationModel.QWEN_38_FLASH.value
     assert loaded.intent.translation.fallback == settings.intent.translation.fallback
     assert loaded.intent.translation.qwen.region == QwenRegion.SINGAPORE.value
-    assert loaded.intent.translation.qwen.llm_model == QwenLLMModel.QWEN_35_PLUS.value
+    assert loaded.intent.translation.qwen.llm_model == "qwen3.8-flash"
 
 
 def test_custom_http_cannot_be_used_as_translation_fallback() -> None:
@@ -88,17 +88,17 @@ def test_switching_custom_http_and_llm_preserves_model_connection_and_fallback()
             current.intent,
             translation=replace(
                 current.intent.translation,
-                model=TranslationModel.QWEN_35_PLUS.value,
+                model=TranslationModel.QWEN_38_FLASH.value,
                 connection=TranslationConnection.OFFICIAL_BYOK.value,
                 connection_history={
                     TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
-                    TranslationModel.QWEN_35_PLUS.value: TranslationConnection.OFFICIAL_BYOK.value,
+                    TranslationModel.QWEN_38_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
                 },
                 fallback=TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_a4b"),
                 qwen=replace(
                     current.intent.translation.qwen,
                     region=QwenRegion.SINGAPORE.value,
-                    llm_model=QwenLLMModel.QWEN_35_PLUS.value,
+                    llm_model="qwen3.8-flash",
                 ),
             ),
         ),
@@ -118,7 +118,7 @@ def test_switching_custom_http_and_llm_preserves_model_connection_and_fallback()
                     model=TranslationModel.CUSTOM_HTTP.value,
                     connection=TranslationConnection.CUSTOM_HTTP.value,
                     http_extension_id="libretranslate",
-                    previous_llm_model=TranslationModel.QWEN_35_PLUS.value,
+                    previous_llm_model=TranslationModel.QWEN_38_FLASH.value,
                 ),
             ),
         )
@@ -139,7 +139,7 @@ def test_switching_custom_http_and_llm_preserves_model_connection_and_fallback()
                 custom.intent,
                 translation=replace(
                     custom.intent.translation,
-                    model=TranslationModel.QWEN_35_PLUS.value,
+                    model=TranslationModel.QWEN_38_FLASH.value,
                     connection=TranslationConnection.OFFICIAL_BYOK.value,
                 ),
             ),

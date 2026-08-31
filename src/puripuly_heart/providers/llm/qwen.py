@@ -15,8 +15,8 @@ from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
-_QWEN35_MODELS = {"qwen3.5-flash", "qwen3.5-plus"}
-_QWEN_PROBE_MODEL = "qwen3.5-plus"
+_QWEN_COMPATIBLE_MODELS = frozenset({"qwen3.5-flash", "qwen3.5-plus", "qwen3.8-flash"})
+_QWEN_PROBE_MODEL = "qwen3.8-flash"
 
 
 def _log_basic_request(
@@ -115,8 +115,15 @@ def _extract_message_content(content: object) -> str:
     raise RuntimeError("DashScope response did not contain message content")
 
 
-def _is_qwen35_model(model: str) -> bool:
-    return model.strip().lower() in _QWEN35_MODELS
+def _normalize_qwen_model(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    normalized = value.strip().lower()
+    return "qwen3.8-flash" if normalized == "qwen3.5-plus" else normalized
+
+
+def _is_qwen_compatible_model(model: str) -> bool:
+    return _normalize_qwen_model(model) in _QWEN_COMPATIBLE_MODELS
 
 
 def _to_compatible_base_url(base_url: str) -> str:
@@ -160,9 +167,12 @@ class QwenClient(Protocol):
 class QwenLLMProvider:
     api_key: str
     base_url: str = "https://dashscope.aliyuncs.com/api/v1"
-    model: str = "qwen3.5-plus"
+    model: str = "qwen3.8-flash"
     runtime_logging: ProviderObservationPort | None = None
     client: QwenClient | None = None
+
+    def __post_init__(self) -> None:
+        self.model = _normalize_qwen_model(self.model)
 
     async def translate(
         self,
@@ -193,8 +203,7 @@ class QwenLLMProvider:
         pass
 
     async def warmup(self) -> None:
-        # Warmup probes the default model.
-        await self.verify_api_key(self.api_key, base_url=self.base_url, model=_QWEN_PROBE_MODEL)
+        await self.verify_api_key(self.api_key, base_url=self.base_url, model=self.model)
 
     @staticmethod
     async def verify_api_key(
@@ -204,8 +213,8 @@ class QwenLLMProvider:
     ) -> bool:
         if not api_key:
             return False
-
-        if _is_qwen35_model(model):
+        model = _normalize_qwen_model(model)
+        if _is_qwen_compatible_model(model):
             compatible_base_url = _to_compatible_base_url(base_url)
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
@@ -254,6 +263,8 @@ class DashScopeQwenClient:
     model: str
     base_url: str = "https://dashscope.aliyuncs.com/api/v1"
     runtime_logging: ProviderObservationPort | None = None
+    def __post_init__(self) -> None:
+        self.model = _normalize_qwen_model(self.model)
 
     @staticmethod
     def _normalize_language_code(code: str) -> str:
@@ -314,7 +325,7 @@ class DashScopeQwenClient:
                 target_language=target_language,
                 context=context,
             )
-            if _is_qwen35_model(self.model):
+            if _is_qwen_compatible_model(self.model):
                 compatible_base_url = _to_compatible_base_url(self.base_url)
                 response = httpx.post(
                     f"{compatible_base_url}/chat/completions",

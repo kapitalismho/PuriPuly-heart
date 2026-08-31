@@ -143,12 +143,12 @@ async def test_async_qwen_verify_api_key_uses_model_and_base_url(monkeypatch):
     assert ok is True
     assert seen["url"] == "https://example/compatible-mode/v1/chat/completions"
     body = seen["json"]
-    assert body["model"] == "qwen3.5-plus"
+    assert body["model"] == "qwen3.8-flash"
     assert body["enable_thinking"] is False
 
 
 @pytest.mark.asyncio
-async def test_async_qwen_warmup_always_uses_plus_model(monkeypatch):
+async def test_async_qwen_warmup_uses_canonical_model(monkeypatch):
     seen: dict[str, str] = {}
 
     async def fake_verify(api_key: str, *, base_url: str, model: str) -> bool:
@@ -162,14 +162,14 @@ async def test_async_qwen_warmup_always_uses_plus_model(monkeypatch):
     provider = AsyncQwenLLMProvider(
         api_key="secret",
         base_url="https://example/compatible-mode/v1",
-        model="qwen3.5-plus",
+        model="qwen3.8-flash",
     )
     await provider.warmup()
 
     assert seen == {
         "api_key": "secret",
         "base_url": "https://example/compatible-mode/v1",
-        "model": "qwen3.5-plus",
+        "model": "qwen3.8-flash",
     }
 
 

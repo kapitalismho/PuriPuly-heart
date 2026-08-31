@@ -32,7 +32,7 @@ async def test_qwen_llm_translation_smoke() -> None:
     provider = QwenLLMProvider(
         api_key=api_key,
         base_url=get_qwen_base_url(),
-        model=os.getenv("QWEN_LLM_MODEL", "qwen3.5-plus"),
+        model=os.getenv("QWEN_LLM_MODEL", "qwen3.8-flash"),
     )
 
     translation = await provider.translate(
@@ -54,7 +54,7 @@ async def test_async_qwen_llm_translation_smoke() -> None:
     provider = AsyncQwenLLMProvider(
         api_key=api_key,
         base_url=get_async_qwen_base_url(),
-        model=os.getenv("QWEN_LLM_MODEL", "qwen3.5-plus"),
+        model=os.getenv("QWEN_LLM_MODEL", "qwen3.8-flash"),
         runtime_logging=suppressed_runtime_logger(),
     )
 

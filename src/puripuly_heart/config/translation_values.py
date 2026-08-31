@@ -9,8 +9,7 @@ class TranslationModel(str, Enum):
     GEMMA4 = "gemma4"
     DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
     GEMINI_37_FLASH = "gemini37_flash"
-    GEMINI_31_FLASH_LITE = "gemini31_flash_lite"
-    QWEN_35_PLUS = "qwen35_plus"
+    QWEN_38_FLASH = "qwen38_flash"
     MANAGED_GEMMA = "managed_gemma"
     MANAGED_GEMMA_12B = "managed_gemma_12b"
     LOCAL_LLM = "local_llm"
@@ -56,11 +55,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[
         TranslationConnection.OFFICIAL_BYOK,
         TranslationConnection.OPENROUTER,
     ),
-    TranslationModel.GEMINI_31_FLASH_LITE: (
-        TranslationConnection.OFFICIAL_BYOK,
-        TranslationConnection.OPENROUTER,
-    ),
-    TranslationModel.QWEN_35_PLUS: (TranslationConnection.OFFICIAL_BYOK,),
+    TranslationModel.QWEN_38_FLASH: (TranslationConnection.OFFICIAL_BYOK,),
     TranslationModel.MANAGED_GEMMA: (
         TranslationConnection.CPU,
         TranslationConnection.GPU,
@@ -86,7 +81,7 @@ def supported_translation_connections(
 def default_translation_connection(model: TranslationModel) -> TranslationConnection:
     if model == TranslationModel.CUSTOM_HTTP:
         return TranslationConnection.CUSTOM_HTTP
-    if model in (TranslationModel.GEMINI_37_FLASH, TranslationModel.GEMINI_31_FLASH_LITE):
+    if model == TranslationModel.GEMINI_37_FLASH:
         return TranslationConnection.OFFICIAL_BYOK
     supported_connections = supported_translation_connections(model)
     for connection in TRANSLATION_CONNECTION_PRIORITY:
@@ -105,13 +100,11 @@ def provider_llm_for_translation(model: str, connection: str) -> str:
         return "local_llm"
     if model == "gemma4_31b_cerebras" or (model == "gemma4_31b" and connection == "cerebras"):
         return "cerebras"
-    if model in {"gemini37_flash", "gemini31_flash_lite"}:
+    if model == "gemini37_flash":
         if connection == "openrouter":
             return "openrouter"
         return "gemini"
-    if model in {"deepseek_v4_flash", "deepseek_v4_pro"} and connection == "official_byok":
-        return "deepseek"
-    if model == "qwen35_plus":
+    if model == "qwen38_flash":
         return "qwen"
     return "openrouter"
 

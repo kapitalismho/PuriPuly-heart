@@ -468,11 +468,11 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "google_gemini_latency",
         ),
         (
-            "gemini31_flash_lite",
+            "gemini37_flash",
             "openrouter",
             "byok",
             "openrouter",
-            "google/gemini-3.1-flash-lite",
+            "google/gemini-3.7-flash",
             "secret_store",
             "openrouter:byok",
             None,
@@ -490,22 +490,22 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             None,
         ),
         (
-            "gemini31_flash_lite",
+            "gemini37_flash",
             "official_byok",
             "byok",
             "gemini",
-            "gemini-3.1-flash-lite",
+            "gemini-3.7-flash",
             "secret_store",
             "gemini:byok",
             None,
             None,
         ),
         (
-            "qwen35_plus",
+            "qwen38_flash",
             "official_byok",
             "byok",
             "qwen",
-            "qwen3.5-plus",
+            "qwen3.8-flash",
             "secret_store",
             "qwen:beijing",
             "beijing",
@@ -1046,6 +1046,38 @@ def test_legacy_current_openrouter_aliases_normalize_to_canonical_intent_and_res
     assert config.fallback is None
     assert config.concurrency_limit == 7
 
+def test_legacy_gemini_alias_only_normalizes_to_canonical_runtime_target() -> None:
+    runtime_resolution = _runtime_resolution_module()
+    profiles = _profiles_module()
+
+    intent = runtime_resolution.normalize_openrouter_runtime_intent(
+        provider_llm="openrouter",
+        selection_alias=profiles.LEGACY_OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
+    )
+
+    assert intent.model == profiles.OPENROUTER_MODEL_GEMINI_37_FLASH
+    assert intent.selected_source == profiles.OPENROUTER_CREDENTIAL_SOURCE_BYOK
+    assert intent.selection_alias == profiles.OPENROUTER_SELECTION_ALIAS_GEMINI37_FLASH_BYOK
+
+    translation = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
+        provider_llm="openrouter",
+        openrouter_model=intent.model,
+        openrouter_selected_source=intent.selected_source,
+        openrouter_provider_routing=intent.provider_routing,
+    )
+    resolved = runtime_resolution.resolve_llm_config(
+        _runtime_input(
+            runtime_resolution,
+            model=translation.model,
+            connection=translation.connection,
+            openrouter=intent,
+        )
+    )
+
+    assert translation.model == runtime_resolution.TRANSLATION_MODEL_GEMINI_37_FLASH
+    assert resolved.provider == "openrouter"
+    assert resolved.model == profiles.OPENROUTER_MODEL_GEMINI_37_FLASH
+
 
 @pytest.mark.parametrize(
     (
@@ -1176,8 +1208,8 @@ def test_old_openrouter_credential_source_keys_normalize_through_settings_to_res
         openrouter_model=openrouter_intent.model,
         openrouter_selected_source=openrouter_intent.selected_source,
         openrouter_provider_routing=openrouter_intent.provider_routing,
-        gemini_model="gemini-3.1-flash-lite",
-        qwen_model="qwen3.5-plus",
+        gemini_model="gemini-3.7-flash",
+        qwen_model="qwen3.8-flash",
         concurrency_limit=5,
     )
     config = runtime_resolution.resolve_llm_config(
@@ -1313,11 +1345,11 @@ def test_derive_runtime_from_openrouter_gemini_compatibility_values() -> None:
         )
     )
 
-    assert openrouter_intent.selection_alias == "gemini31_flash_lite_byok"
-    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_GEMINI_31_FLASH_LITE
+    assert openrouter_intent.selection_alias == "gemini37_flash_byok"
+    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_GEMINI_37_FLASH
     assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER
     assert config.provider == "openrouter"
-    assert config.model == "google/gemini-3.1-flash-lite"
+    assert config.model == "google/gemini-3.7-flash"
     assert config.provider_routing == "google_gemini_latency"
     assert config.credential == resolved.ResolvedCredentialRequirement(
         source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
@@ -1367,8 +1399,8 @@ def test_missing_translation_openrouter_compatibility_values_derive_exact_runtim
             "provider_routing": "default",
             "broker_base_url": "https://broker.fixture.test/v1",
         },
-        "gemini": {"llm_model": "gemini-3.1-flash-lite"},
-        "qwen": {"llm_model": "qwen3.5-plus", "region": "beijing"},
+        "gemini": {"llm_model": "gemini-3.7-flash"},
+        "qwen": {"llm_model": "qwen3.8-flash", "region": "beijing"},
         "deepseek": {"llm_model": "deepseek-v4-flash"},
         "local_llm": {
             "base_url": "http://127.0.0.1:11434/v1",
@@ -1527,8 +1559,8 @@ def test_missing_openrouter_source_defaults_to_byok_for_openrouter_provider() ->
             "provider_routing": "default",
             "broker_base_url": "https://broker.fixture.test/v1",
         },
-        "gemini": {"llm_model": "gemini-3.1-flash-lite"},
-        "qwen": {"llm_model": "qwen3.5-plus", "region": "beijing"},
+        "gemini": {"llm_model": "gemini-3.7-flash"},
+        "qwen": {"llm_model": "qwen3.8-flash", "region": "beijing"},
         "deepseek": {"llm_model": "deepseek-v4-flash"},
         "llm": {"concurrency_limit": 3},
     }
@@ -1616,8 +1648,8 @@ def test_missing_translation_direct_provider_compatibility_values_derive_exact_c
             "provider_routing": "default",
             "broker_base_url": "https://broker.fixture.test/v1",
         },
-        "gemini": {"llm_model": "gemini-3.1-flash-lite"},
-        "qwen": {"llm_model": "qwen3.5-plus", "region": "singapore"},
+        "gemini": {"llm_model": "gemini-3.7-flash"},
+        "qwen": {"llm_model": "qwen3.8-flash", "region": "singapore"},
         "deepseek": {"llm_model": "deepseek-v4-flash"},
         "llm": {"concurrency_limit": 6},
     }

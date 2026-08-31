@@ -15,7 +15,13 @@ from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
-_QWEN_PROBE_MODEL = "qwen3.5-plus"
+_QWEN_PROBE_MODEL = "qwen3.8-flash"
+
+def _normalize_qwen_model(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    normalized = value.strip().lower()
+    return "qwen3.8-flash" if normalized == "qwen3.5-plus" else normalized
 
 
 def _log_basic_request(
@@ -152,11 +158,14 @@ class AsyncQwenLLMProvider:
 
     api_key: str
     base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    model: str = "qwen3.5-plus"
+    model: str = "qwen3.8-flash"
     timeout: float = 30.0
     runtime_logging: ProviderObservationPort | None = None
     client: AsyncQwenClient | None = None
     _internal_client: AsyncQwenClient | None = field(init=False, default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        self.model = _normalize_qwen_model(self.model)
 
     def _get_client(self) -> AsyncQwenClient:
         if self.client is not None:
@@ -208,6 +217,7 @@ class AsyncQwenLLMProvider:
     ) -> bool:
         if not api_key:
             return False
+        model = _normalize_qwen_model(model)
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(

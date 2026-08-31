@@ -301,7 +301,7 @@ def test_prompt_intent_preserves_latest_languages_and_provider_selection() -> No
             source_language="ja",
             target_language="ko",
         ),
-        translation=replace(AppSettingsVNext().intent.translation, model="qwen35_plus"),
+        translation=replace(AppSettingsVNext().intent.translation, model="qwen38_flash"),
     )
 
     updated = materialize_prompt_apply_intent(current, PromptApplyIntent("new prompt"))

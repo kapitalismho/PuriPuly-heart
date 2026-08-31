@@ -10,15 +10,17 @@ from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
-
-GEMINI_31_FLASH_LITE_GA_MODEL = "gemini-3.1-flash-lite"
+GEMINI_37_FLASH_GA_MODEL = "gemini-3.7-flash"
+LEGACY_GEMINI_31_FLASH_LITE_MODEL = "gemini-3.1-flash-lite"
 
 
 def _normalized_model_id(value: object) -> str:
     if not isinstance(value, str):
         return ""
-    return value.strip().rsplit("/", 1)[-1]
-
+    normalized = value.strip().rsplit("/", 1)[-1]
+    if normalized == LEGACY_GEMINI_31_FLASH_LITE_MODEL:
+        return GEMINI_37_FLASH_GA_MODEL
+    return normalized
 
 def _model_entry_matches(entry: object, requested_model: str) -> bool:
     for attr in ("name", "id", "model", "model_id", "base_model_id", "baseModelId"):
@@ -88,10 +90,12 @@ class GeminiClient(Protocol):
 @dataclass(slots=True)
 class GeminiLLMProvider:
     api_key: str
-    model: str = GEMINI_31_FLASH_LITE_GA_MODEL
+    model: str = GEMINI_37_FLASH_GA_MODEL
     runtime_logging: ProviderObservationPort | None = None
     client: GeminiClient | None = None
     _internal_client: GeminiClient | None = field(init=False, default=None, repr=False)
+    def __post_init__(self) -> None:
+        self.model = _normalized_model_id(self.model)
 
     def _get_client(self) -> GeminiClient:
         if self.client is not None:
@@ -139,11 +143,10 @@ class GeminiLLMProvider:
             await self._internal_client.close()
             self._internal_client = None
 
-    @staticmethod
     async def verify_api_key(
         api_key: str,
         *,
-        model: str = GEMINI_31_FLASH_LITE_GA_MODEL,
+        model: str = GEMINI_37_FLASH_GA_MODEL,
     ) -> bool:
         if not api_key:
             return False
@@ -166,6 +169,8 @@ class GoogleGenaiGeminiClient:
     model: str
     runtime_logging: ProviderObservationPort | None = None
     _client: Any = field(init=False, default=None, repr=False)
+    def __post_init__(self) -> None:
+        self.model = _normalized_model_id(self.model)
 
     def _get_client(self) -> Any:
         if self._client is None:
@@ -225,11 +230,7 @@ class GoogleGenaiGeminiClient:
         )
 
         client = self._get_client()
-        thinking_level = (
-            types.ThinkingLevel.MINIMAL
-            if _normalized_model_id(self.model) == GEMINI_31_FLASH_LITE_GA_MODEL
-            else types.ThinkingLevel.LOW
-        )
+        thinking_level = types.ThinkingLevel.LOW
         response = await client.aio.models.generate_content(
             model=self.model,
             contents=user_message,

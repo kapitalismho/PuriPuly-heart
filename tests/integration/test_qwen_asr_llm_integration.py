@@ -78,7 +78,7 @@ async def test_qwen_asr_llm_pipeline_smoke() -> None:
     llm_base = QwenLLMProvider(
         api_key=api_key,
         base_url=get_qwen_base_url(),
-        model=os.getenv("QWEN_LLM_MODEL", "qwen3.5-plus"),
+        model=os.getenv("QWEN_LLM_MODEL", "qwen3.8-flash"),
     )
     llm = SemaphoreLLMProvider(inner=llm_base, semaphore=asyncio.Semaphore(1))
 

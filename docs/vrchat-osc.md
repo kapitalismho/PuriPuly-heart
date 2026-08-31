@@ -95,8 +95,8 @@
 | 2 | Gemma 4 26B A4B |
 | 3 | DeepSeek V4 Flash |
 | 5 | Gemini 3.7 Flash |
-| 6 | Gemini 3.1 Flash-Lite |
-| 7 | Qwen 3.5 Plus |
+| 6 | Gemini 3.7 Flash (legacy inbound compatibility; never published) |
+| 7 | Qwen 3.8 Flash |
 | 8 | OpenAI-compatible API |
 | 9 | Custom HTTP API |
 | 10 | Gemma 4 E4B CPU |
@@ -104,6 +104,8 @@
 | 12 | Gemma 4 12B |
 
 - Used by: `PuriPuly_Translator`
+- ID `5` is the canonical Gemini 3.7 Flash value and is used for outbound state publication.
+- ID `6` is accepted only as a legacy inbound value for Gemini 3.7 Flash; PuriPuly never publishes ID `6`.
 - Gemma 4 31B on a Cerebras connection is published as ID `1`; select the connection in PuriPuly.
 - ID `9` selects the currently configured custom HTTP API and does not select an individual extension.
 - IDs `10`, `11`, and `12` select the local models managed by PuriPuly; download them in PuriPuly before use.

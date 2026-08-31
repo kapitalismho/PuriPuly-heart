@@ -76,7 +76,7 @@ def _with_translation(settings: AppSettingsVNext, **changes: object) -> AppSetti
 def _qwen_settings() -> AppSettingsVNext:
     return _with_translation(
         AppSettingsVNext(),
-        model="qwen35_plus",
+        model="qwen38_flash",
         connection="official_byok",
         qwen=replace(AppSettingsVNext().intent.translation.qwen, region="beijing"),
     )

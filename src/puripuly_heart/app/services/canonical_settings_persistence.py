@@ -577,6 +577,12 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
 
     translation = settings.intent.translation
     model = translation.model
+    if model == "gemini31_flash_lite":
+        translation = replace(translation, model="gemini37_flash")
+        model = "gemini37_flash"
+    elif model == "qwen35_plus":
+        translation = replace(translation, model="qwen38_flash")
+        model = "qwen38_flash"
     connection = translation.connection
     if model == "custom_http":
         if connection == "custom_http":
@@ -668,32 +674,15 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
                 "openrouter_provider_routing": "default",
                 "gemini": replace(translation.gemini, llm_model="gemini-3.7-flash"),
             }
-    elif model == "gemini31_flash_lite":
-        if connection == "openrouter":
-            openrouter_model = "google/gemini-3.1-flash-lite"
-            updates = {
-                "openrouter_model": openrouter_model,
-                "openrouter_provider_routing": "google_gemini_latency",
-                "openrouter_selected_source": "byok",
-                "openrouter_selection_alias": openrouter_alias_for_fields(
-                    model=openrouter_model,
-                    source="byok",
-                ),
-            }
-        else:
-            updates = {
-                "openrouter_provider_routing": "default",
-                "gemini": replace(translation.gemini, llm_model="gemini-3.1-flash-lite"),
-            }
-    elif model == "local_llm":
-        updates = {"openrouter_provider_routing": "default"}
+    elif model == "qwen38_flash":
+        updates = {
+            "openrouter_provider_routing": "default",
+            "qwen": replace(translation.qwen, llm_model="qwen3.8-flash"),
+        }
     elif model in {"managed_gemma", "managed_gemma_12b"}:
         updates = {"openrouter_provider_routing": "default"}
     else:
-        updates = {
-            "openrouter_provider_routing": "default",
-            "qwen": replace(translation.qwen, llm_model="qwen3.5-plus"),
-        }
+        updates = {"openrouter_provider_routing": "default"}
     return replace(
         settings,
         intent=replace(settings.intent, translation=replace(translation, **updates)),

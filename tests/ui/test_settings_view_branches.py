@@ -417,10 +417,10 @@ def _vnext(
     translation = current.intent.translation
     apply_llm_defaults = llm is not None and model is None and connection is None
     if apply_llm_defaults and llm == "gemini":
-        model = model or "gemini31_flash_lite"
+        model = model or "gemini37_flash"
         connection = connection or "official_byok"
     elif apply_llm_defaults and llm == "qwen":
-        model = model or "qwen35_plus"
+        model = model or "qwen38_flash"
         connection = connection or "official_byok"
     elif apply_llm_defaults and llm == "deepseek":
         model = model or "deepseek_v4_flash"
@@ -2813,20 +2813,20 @@ def test_on_llm_selected_updates_model_and_prompt_state(monkeypatch: pytest.Monk
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
-    view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
+    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
 
     pending = view.build_provider_apply_settings()
 
     assert _llm(settings) == LLMProviderName.GEMINI.value
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.QWEN_35_PLUS.value
+    assert pending.intent.translation.model == TranslationModel.QWEN_38_FLASH.value
     assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
     assert _llm(pending) == LLMProviderName.QWEN.value
-    assert pending.intent.translation.qwen.llm_model == QwenLLMModel.QWEN_35_PLUS.value
+    assert pending.intent.translation.qwen.llm_model == QwenLLMModel.QWEN_38_FLASH.value
     assert view._prompt_editor.value == "G"
     assert settings.intent.prompts.system_prompt == "G"
 
-    view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
+    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
     assert view.has_provider_changes is True
 
 
@@ -3188,7 +3188,7 @@ def test_on_llm_selected_updates_prompt_helper_copy_live_when_mounted(
         update=lambda: prompt_copy_updates.append(view._prompt_for_text.value),
     )
 
-    view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
+    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
 
     assert view._prompt_for_text.value == t(
         "settings.prompt_for",
@@ -3268,7 +3268,7 @@ def test_on_llm_selected_switching_away_from_openrouter_preserves_saved_selectio
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
-    view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
+    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
 
     pending = view.build_provider_apply_settings()
 
@@ -3292,7 +3292,7 @@ def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_g
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
-    view._on_llm_selected(TranslationModel.GEMINI_31_FLASH_LITE.value)
+    view._on_llm_selected(TranslationModel.GEMINI_37_FLASH.value)
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
@@ -3306,7 +3306,7 @@ def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_g
         == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
     )
 
-    view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
+    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
@@ -3771,12 +3771,12 @@ def test_on_llm_selected_stages_byok_even_when_legacy_openrouter_key_exists(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.GEMINI_31_FLASH_LITE.value
+    assert pending.intent.translation.model == TranslationModel.GEMINI_37_FLASH.value
     assert pending.intent.translation.connection == TranslationConnection.OPENROUTER.value
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
     assert (
         pending.intent.translation.openrouter_selection_alias
-        == OpenRouterSelectionAlias.GEMINI31_FLASH_LITE_BYOK.value
+        == OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK.value
     )
 
 
@@ -3793,7 +3793,7 @@ def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
     view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
     view._on_openrouter_pkce_click(None)
 
-    assert requested[0].selection_alias == OpenRouterSelectionAlias.GEMINI31_FLASH_LITE_BYOK
+    assert requested[0].selection_alias == OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK
     assert requested[0].system_prompt == "G"
     assert any(
         isinstance(edit, TranslationSelectionEdit) for edit in requested[0].provider_intent.edits
@@ -3872,16 +3872,16 @@ def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
-    view._on_llm_selected(TranslationModel.GEMINI_31_FLASH_LITE.value)
+    view._on_llm_selected(TranslationModel.GEMINI_37_FLASH.value)
 
     pending = view.build_provider_apply_settings()
 
     assert _llm(settings) == LLMProviderName.GEMINI.value
     assert settings.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_37_FLASH.value
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.GEMINI_31_FLASH_LITE.value
+    assert pending.intent.translation.model == TranslationModel.GEMINI_37_FLASH.value
     assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
-    assert pending.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_31_FLASH_LITE.value
+    assert pending.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_37_FLASH.value
     assert view._prompt_editor.value == "G"
     assert settings.intent.prompts.system_prompt == "G"
     assert view.has_provider_changes is True
@@ -3893,7 +3893,7 @@ def test_on_llm_selected_logs_only_changed_fields_for_provider_switch(
     settings = AppSettingsVNext()
     settings = _vnext(
         settings,
-        model=TranslationModel.GEMINI_31_FLASH_LITE,
+        model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
@@ -3907,12 +3907,12 @@ def test_on_llm_selected_logs_only_changed_fields_for_provider_switch(
         message
     )
 
-    view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
+    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
 
     assert basic_messages == ["[Settings] LLM provider changed: gemini -> qwen"]
     assert detailed_messages == [
         "[Settings] Translation selection changed: "
-        "model=gemini31_flash_lite->qwen35_plus, provider=gemini->qwen"
+        "model=gemini37_flash->qwen38_flash, provider=gemini->qwen"
     ]
 
 
@@ -3922,7 +3922,7 @@ def test_on_llm_selected_skips_log_when_selection_is_unchanged(
     settings = AppSettingsVNext()
     settings = _vnext(
         settings,
-        model=TranslationModel.QWEN_35_PLUS,
+        model=TranslationModel.QWEN_38_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings = _vnext(settings, llm=LLMProviderName.QWEN)
@@ -3936,7 +3936,7 @@ def test_on_llm_selected_skips_log_when_selection_is_unchanged(
         message
     )
 
-    view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
+    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
 
     assert basic_messages == []
     assert detailed_messages == []

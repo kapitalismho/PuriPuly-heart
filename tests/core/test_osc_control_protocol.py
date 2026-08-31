@@ -21,7 +21,9 @@ from puripuly_heart.core.osc.control_schema import (
     SECONDARY_LANGUAGE_IDS,
     TRANSLATION_CONNECTION_BY_MODEL_ID,
     TRANSLATION_MODEL_ID_BY_SELECTION,
+    TRANSLATION_MODEL_ID_BY_VALUE,
     TRANSLATION_MODEL_IDS,
+    translation_model_id_for_selection,
 )
 
 
@@ -41,6 +43,12 @@ def test_osc_abi_registries_are_explicit_and_cover_current_languages() -> None:
     assert TRANSLATION_MODEL_IDS[0] == "gemma4_26b_31b"
     assert TRANSLATION_MODEL_IDS[9] == "custom_http"
     assert FALLBACK_IDS[0] == "none"
+
+def test_gemini_osc_id_5_is_canonical_and_id_6_is_inbound_legacy_only() -> None:
+    assert TRANSLATION_MODEL_IDS[5] == "gemini37_flash"
+    assert TRANSLATION_MODEL_IDS[6] == "gemini37_flash"
+    assert TRANSLATION_MODEL_ID_BY_VALUE["gemini37_flash"] == 5
+    assert translation_model_id_for_selection("gemini37_flash", "official_byok") == 5
     assert set(LANGUAGE_IDS.values()) == set(SUPPORTED_LANGUAGES)
     assert len(LANGUAGE_IDS) == len(set(LANGUAGE_IDS.values()))
 
@@ -169,8 +177,8 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         2: "gemma4",
         3: "deepseek_v4_flash",
         5: "gemini37_flash",
-        6: "gemini31_flash_lite",
-        7: "qwen35_plus",
+        6: "gemini37_flash",
+        7: "qwen38_flash",
         8: "local_llm",
         9: "custom_http",
         10: "managed_gemma",

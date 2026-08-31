@@ -708,9 +708,8 @@ def _local_llm_runtime_input() -> runtime_resolution.RuntimeResolutionInput:
         ),
         direct=runtime_resolution.DirectProviderRuntimeIntent(
             gemini_37_flash_model="gemini-3.7-flash",
-            gemini_31_flash_lite_model="gemini-3.1-flash-lite",
             deepseek_v4_flash_model="deepseek-v4-flash",
-            qwen_35_plus_model="qwen3.5-plus",
+            qwen_38_flash_model="qwen3.8-flash",
             qwen_region=QwenRegion.BEIJING,
             local_llm_backend="openai",
             local_llm_base_url="http://127.0.0.1:11434/v1",

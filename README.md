@@ -115,8 +115,7 @@ It works in many environments, including VRChat and Discord.
 | **Gemma 4 31B (OpenRouter)** | 10,940 | 3,430 | 2,740 | 1,150 |
 | **Gemma 4 31B (Cerebras)** | 920 | 770 | 730 | 540 |
 | **Gemini 3.7 Flash** | 1,160 | 940 | 880 | 610 |
-| **Gemini 3.1 Flash-Lite** | 3,430 | 2,030 | 1,770 | 940 |
-| **Qwen 3.5 Plus** | 7,460 | — | 2,460 | — |
+| **Qwen 3.8 Flash** | 7,460 | — | 2,460 | — |
 
 ### Cost per Utterance
 
@@ -137,8 +136,7 @@ It works in many environments, including VRChat and Discord.
 | **Gemma 4 31B (OpenRouter)** | ~$0.00009 | ~$0.0003 | ~$0.0003 | ~$0.0009 |
 | **Gemma 4 31B (Cerebras)** | ~$0.0011 | ~$0.0013 | ~$0.0014 | ~$0.0019 |
 | **Gemini 3.7 Flash** | ~$0.0009 | ~$0.0011 | ~$0.0011 | ~$0.0016 |
-| **Gemini 3.1 Flash-Lite** | ~$0.0003 | ~$0.0005 | ~$0.0006 | ~$0.0011 |
-| **Qwen 3.5 Plus** | ~$0.0001 | — | ~$0.0004 | — |
+| **Qwen 3.8 Flash** | ~$0.0001 | — | ~$0.0004 | — |
 
 *   *Based on (Input 900 tokens + Output 12 tokens) × 1.2 avg LLM calls per utterance.*
 *   *Uses per Dollar is derived from the un-rounded values in the Cost per Utterance table.*

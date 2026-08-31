@@ -13,6 +13,7 @@ from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
+from puripuly_heart.config.provider_values import QwenLLMModel
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     TranslationFallbackIntent,
@@ -90,13 +91,13 @@ def _custom_settings() -> AppSettingsVNext:
             settings.intent,
             translation=replace(
                 settings.intent.translation,
-                model="qwen35_plus",
+                model=TranslationModel.QWEN_38_FLASH.value,
                 connection="official_byok",
-                connection_history={"qwen35_plus": "official_byok"},
+                connection_history={TranslationModel.QWEN_38_FLASH.value: "official_byok"},
                 qwen=replace(
                     settings.intent.translation.qwen,
                     region="singapore",
-                    llm_model="qwen3.5-plus",
+                    llm_model=QwenLLMModel.QWEN_38_FLASH.value,
                 ),
                 fallback=TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_a4b"),
             ),
@@ -139,7 +140,7 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     assert pending is not None
     assert pending.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
     assert pending.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
-    assert pending.intent.translation.previous_llm_model == TranslationModel.QWEN_35_PLUS.value
+    assert pending.intent.translation.previous_llm_model == TranslationModel.QWEN_38_FLASH.value
     assert pending.intent.translation.fallback.enabled == fallback.enabled
     assert pending.intent.translation.fallback.model == fallback.model
     assert pending.intent.translation.fallback.connection == fallback.connection
@@ -163,11 +164,11 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     assert view._http_extension_secret_fields["api_key"].password is True
     assert not hasattr(view, "_http_extension_request_editor")
 
-    view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
+    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.QWEN_35_PLUS.value
+    assert pending.intent.translation.model == TranslationModel.QWEN_38_FLASH.value
     assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
     assert pending.intent.translation.previous_llm_model is None
     assert pending.intent.translation.fallback.enabled == fallback.enabled
@@ -246,7 +247,7 @@ def test_custom_http_reload_uses_active_engine_with_unsaved_llm_draft(
     draft = view._ensure_provider_settings_draft()
     view._provider_draft = replace(
         draft,
-        translation=replace(draft.translation, model=TranslationModel.QWEN_35_PLUS),
+        translation=replace(draft.translation, model=TranslationModel.QWEN_38_FLASH),
     )
     changed: list[bool] = []
     view.on_providers_changed = lambda: changed.append(True)
@@ -261,7 +262,7 @@ def test_custom_http_reload_uses_active_engine_with_unsaved_llm_draft(
     assert changed == [True]
     assert view.consume_http_extension_runtime_reload() is True
     assert view._provider_snapshot.translation.model is TranslationModel.CUSTOM_HTTP
-    assert view._provider_draft.translation.model is TranslationModel.QWEN_35_PLUS
+    assert view._provider_draft.translation.model is TranslationModel.QWEN_38_FLASH
 
 
 def test_custom_http_card_surfaces_missing_selected_extension_without_fallback(

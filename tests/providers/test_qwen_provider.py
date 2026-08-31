@@ -75,6 +75,22 @@ async def test_qwen_provider_uses_injected_client():
         "context": "",
     }
 
+@pytest.mark.asyncio
+async def test_qwen_verify_api_key_empty_key_returns_false_without_network(monkeypatch) -> None:
+    def fail_if_constructed(*_args, **_kwargs):
+        raise AssertionError("empty-key verification must not construct an HTTP client")
+
+    monkeypatch.setattr("httpx.AsyncClient", fail_if_constructed)
+
+    assert (
+        await QwenLLMProvider.verify_api_key(
+            "",
+            base_url="https://example/api/v1",
+            model="qwen3.8-flash",
+        )
+        is False
+    )
+
 
 def test_qwen_client_normalizes_language_codes() -> None:
     client = DashScopeQwenClient(api_key="k", model="m")
@@ -153,7 +169,7 @@ async def test_qwen_client_raises_when_missing_content(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_qwen_client_uses_compatible_mode_for_qwen35(monkeypatch):
+async def test_qwen_client_normalizes_legacy_plus_to_qwen38(monkeypatch):
     calls: dict[str, object] = {}
 
     class FakeHttpxResponse:
@@ -172,7 +188,7 @@ async def test_qwen_client_uses_compatible_mode_for_qwen35(monkeypatch):
     class DummyGeneration:
         @staticmethod
         def call(**_kwargs):
-            raise AssertionError("Generation.call must not be used for qwen3.5 models")
+            raise AssertionError("Generation.call must not be used for qwen3.8-flash")
 
     dummy = type(
         "DummyDashScope",
@@ -196,7 +212,7 @@ async def test_qwen_client_uses_compatible_mode_for_qwen35(monkeypatch):
     assert result == "OK35"
     assert calls["url"] == "https://example/compatible-mode/v1/chat/completions"
     body = calls["json"]
-    assert body["model"] == "qwen3.5-plus"
+    assert body["model"] == "qwen3.8-flash"
     assert body["enable_thinking"] is False
     assert body["messages"][0]["role"] == "system"
     assert body["messages"][1]["role"] == "user"
@@ -237,7 +253,7 @@ async def test_qwen_verify_api_key_handles_status_for_legacy_model(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_qwen_verify_api_key_uses_compatible_mode_for_qwen35(monkeypatch):
+async def test_qwen_verify_api_key_uses_compatible_mode_for_qwen38(monkeypatch):
     calls: dict[str, object] = {}
 
     class FakeResponse:
@@ -262,17 +278,17 @@ async def test_qwen_verify_api_key_uses_compatible_mode_for_qwen35(monkeypatch):
 
     assert (
         await QwenLLMProvider.verify_api_key(
-            "secret", base_url="https://example/api/v1", model="qwen3.5-plus"
+            "secret", base_url="https://example/api/v1", model="qwen3.8-flash"
         )
         is True
     )
     assert calls["url"] == "https://example/compatible-mode/v1/chat/completions"
-    assert calls["json"]["model"] == "qwen3.5-plus"
+    assert calls["json"]["model"] == "qwen3.8-flash"
     assert calls["json"]["enable_thinking"] is False
 
 
 @pytest.mark.asyncio
-async def test_qwen_warmup_always_uses_plus_model(monkeypatch):
+async def test_qwen_warmup_uses_canonical_model(monkeypatch):
     seen: dict[str, str] = {}
 
     async def fake_verify(api_key: str, *, base_url: str, model: str) -> bool:
@@ -286,19 +302,19 @@ async def test_qwen_warmup_always_uses_plus_model(monkeypatch):
     provider = QwenLLMProvider(
         api_key="secret",
         base_url="https://example/api/v1",
-        model="qwen3.5-plus",
+        model="qwen3.8-flash",
     )
     await provider.warmup()
 
     assert seen == {
         "api_key": "secret",
         "base_url": "https://example/api/v1",
-        "model": "qwen3.5-plus",
+        "model": "qwen3.8-flash",
     }
 
 
 @pytest.mark.asyncio
-async def test_qwen_client_logs_basic_request_and_response_for_qwen35(
+async def test_qwen_client_logs_basic_request_and_response_for_qwen38(
     monkeypatch, caplog: pytest.LogCaptureFixture
 ):
     class FakeHttpxResponse:
@@ -315,7 +331,7 @@ async def test_qwen_client_logs_basic_request_and_response_for_qwen35(
     class DummyGeneration:
         @staticmethod
         def call(**_kwargs):
-            raise AssertionError("Generation.call must not be used for qwen3.5 models")
+            raise AssertionError("Generation.call must not be used for qwen3.8-flash")
 
     dummy = type(
         "DummyDashScope",
@@ -326,7 +342,7 @@ async def test_qwen_client_logs_basic_request_and_response_for_qwen35(
     monkeypatch.setattr("httpx.post", fake_httpx_post)
 
     client = DashScopeQwenClient(
-        api_key="k", model="qwen3.5-plus", base_url="https://example/api/v1"
+        api_key="k", model="qwen3.8-flash", base_url="https://example/api/v1"
     )
 
     with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.qwen"):
@@ -344,7 +360,7 @@ async def test_qwen_client_logs_basic_request_and_response_for_qwen35(
 
 
 @pytest.mark.asyncio
-async def test_qwen_client_logs_basic_request_failure_for_qwen35(
+async def test_qwen_client_logs_basic_request_failure_for_qwen38(
     monkeypatch, caplog: pytest.LogCaptureFixture
 ):
     class FakeHttpxResponse:
@@ -372,7 +388,7 @@ async def test_qwen_client_logs_basic_request_failure_for_qwen35(
     monkeypatch.setattr("httpx.post", fake_httpx_post)
 
     client = DashScopeQwenClient(
-        api_key="k", model="qwen3.5-plus", base_url="https://example/api/v1"
+        api_key="k", model="qwen3.8-flash", base_url="https://example/api/v1"
     )
 
     with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.qwen"):
@@ -392,7 +408,7 @@ async def test_qwen_client_logs_basic_request_failure_for_qwen35(
 
 
 @pytest.mark.asyncio
-async def test_qwen_client_uses_runtime_logging_for_basic_translate_payloads_for_qwen35(
+async def test_qwen_client_uses_runtime_logging_for_basic_translate_payloads_for_qwen38(
     monkeypatch, caplog: pytest.LogCaptureFixture
 ):
     class FakeHttpxResponse:
@@ -422,7 +438,7 @@ async def test_qwen_client_uses_runtime_logging_for_basic_translate_payloads_for
 
     client = DashScopeQwenClient(
         api_key="k",
-        model="qwen3.5-plus",
+        model="qwen3.8-flash",
         base_url="https://example/api/v1",
         runtime_logging=runtime_logging,
     )
@@ -446,7 +462,7 @@ async def test_qwen_client_uses_runtime_logging_for_basic_translate_payloads_for
 
 
 @pytest.mark.asyncio
-async def test_qwen_client_uses_runtime_logging_for_failure_breadcrumbs_for_qwen35(
+async def test_qwen_client_uses_runtime_logging_for_failure_breadcrumbs_for_qwen38(
     monkeypatch, caplog: pytest.LogCaptureFixture
 ):
     class FakeHttpxResponse:
@@ -463,7 +479,7 @@ async def test_qwen_client_uses_runtime_logging_for_failure_breadcrumbs_for_qwen
     class DummyGeneration:
         @staticmethod
         def call(**_kwargs):
-            raise AssertionError("Generation.call must not be used for qwen3.5 models")
+            raise AssertionError("Generation.call must not be used for qwen3.8-flash")
 
     dummy = type(
         "DummyDashScope",
@@ -476,7 +492,7 @@ async def test_qwen_client_uses_runtime_logging_for_failure_breadcrumbs_for_qwen
 
     client = DashScopeQwenClient(
         api_key="k",
-        model="qwen3.5-plus",
+        model="qwen3.8-flash",
         base_url="https://example/api/v1",
         runtime_logging=runtime_logging,
     )
