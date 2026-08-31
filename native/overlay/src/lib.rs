@@ -42,7 +42,7 @@ pub use renderer::{
 pub use runtime::{
     run_cli, run_with_manifest, NativePresentationOwner, OverlayRuntime, RuntimeFailure,
     StartupError, NATIVE_FRESH_RETRY_CADENCE, NATIVE_FRESH_RETRY_DEADLINE,
-    NATIVE_FRESH_RETRY_MAX_COMPLETED, NATIVE_READINESS_TIMEOUT_RETRY_MAX,
+    NATIVE_FRESH_RETRY_MAX_COMPLETED, NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
 };
 pub use state::{
     NativeFreshRenderGenerations, OverlayCalibration, OverlayPresentationBlock,
