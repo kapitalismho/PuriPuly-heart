@@ -24,7 +24,7 @@ use puripuly_heart_overlay::{
     PresentationStrategy, QuietTailProfile, ReadinessOutcome, RenderedFrame, RuntimeFailure,
     SpatialReanchorOutcome, StartupError, EXPECTED_CONTRACT_VERSION, NATIVE_FRESH_RETRY_CADENCE,
     NATIVE_FRESH_RETRY_DEADLINE, NATIVE_FRESH_RETRY_MAX_COMPLETED,
-    NATIVE_READINESS_TIMEOUT_RETRY_MAX,
+    NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
 };
 
 #[test]
@@ -32,7 +32,7 @@ fn native_fresh_retry_production_policy_matches_dd_002() {
     assert_eq!(NATIVE_FRESH_RETRY_CADENCE, Duration::from_millis(100));
     assert_eq!(NATIVE_FRESH_RETRY_DEADLINE, Duration::from_millis(500));
     assert_eq!(NATIVE_FRESH_RETRY_MAX_COMPLETED, 5);
-    assert_eq!(NATIVE_READINESS_TIMEOUT_RETRY_MAX, 5);
+    assert_eq!(NATIVE_READINESS_NO_PROGRESS_TIMEOUT, Duration::from_secs(2));
     assert_ne!(u64::MAX, 0);
 }
 
@@ -1617,6 +1617,11 @@ async fn forced_readiness_terminal_failures_never_submit_and_are_typed() {
             PresentationOutcome::TimedOut,
         ),
         (
+            ReadinessOutcome::Cancelled,
+            RuntimeFailure::ReadinessCancelled,
+            PresentationOutcome::Cancelled,
+        ),
+        (
             ReadinessOutcome::Failed,
             RuntimeFailure::ReadinessFailed,
             PresentationOutcome::Failure,
@@ -1664,13 +1669,17 @@ fn runtime_accepts_app_version_mismatch_when_contract_version_matches() {
 }
 
 #[test]
-fn readiness_failures_preserve_parent_failure_reason_compatibility() {
-    for failure in [
-        RuntimeFailure::ReadinessTimedOut,
-        RuntimeFailure::ReadinessCancelled,
-        RuntimeFailure::ReadinessFailed,
+fn readiness_failures_expose_typed_parent_failure_reasons() {
+    for (failure, reason) in [
+        (RuntimeFailure::ReadinessTimedOut, "gpu_readiness_late"),
+        (
+            RuntimeFailure::ReadinessCancelled,
+            "gpu_readiness_cancelled",
+        ),
+        (RuntimeFailure::ReadinessFailed, "gpu_query_failed"),
+        (RuntimeFailure::ReadinessStalled, "gpu_stalled"),
     ] {
-        assert_eq!(failure.failure_reason(), "renderer_init_failed");
+        assert_eq!(failure.failure_reason(), reason);
     }
 }
 
@@ -1694,6 +1703,9 @@ fn runtime_returns_standardized_startup_failure_codes_before_ready() {
         StartupError::RendererInit("d3d init failed".into()).exit_code(),
         21
     );
+    assert_eq!(StartupError::ReadinessCancelled.exit_code(), 21);
+    assert_eq!(StartupError::ReadinessFailed.exit_code(), 21);
+    assert_eq!(StartupError::ReadinessStalled.exit_code(), 21);
 }
 
 #[test]
@@ -4394,6 +4406,7 @@ async fn production_owner_active_schedule_readiness_failure_is_terminal() {
         .unwrap_err();
 
     assert_eq!(failure, RuntimeFailure::ReadinessFailed);
+    assert_eq!(failure.failure_reason(), "gpu_query_failed");
     assert_eq!(
         owner
             .fresh_retry_audit_for_test()
@@ -4489,6 +4502,7 @@ async fn production_owner_single_readiness_timeout_retries_without_submit_or_exi
             .count(),
         1
     );
+    assert_eq!(owner.readiness_timeout_count_for_test(), 0);
     assert!(owner.resources_released());
     server.await.unwrap();
 }
@@ -4770,9 +4784,11 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
 }
 
 #[tokio::test]
-async fn production_owner_consecutive_readiness_timeouts_escalate_without_submit() {
+async fn production_owner_readiness_no_progress_escalates_after_legacy_count_without_submit() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
+    let churn_sent = Arc::new(AtomicUsize::new(0));
+    let server_churn_sent = churn_sent.clone();
     let server = tokio::spawn(async move {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
@@ -4788,13 +4804,37 @@ async fn production_owner_consecutive_readiness_timeouts_escalate_without_submit
         ))
         .await
         .unwrap();
-        tokio::time::sleep(Duration::from_millis(800)).await;
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        let churn_deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+        let mut revision = 2_u64;
+        while tokio::time::Instant::now() < churn_deadline {
+            let text = format!("text-{revision}");
+            if ws
+                .send(Message::Text(
+                    json!({"type":"snapshot","payload":{
+                        "revision":revision,
+                        "native_fresh_render_generations":{"peer":revision},
+                        "blocks":[block("peer:timeouts","peer",&text,"",true)]
+                    }})
+                    .to_string()
+                    .into(),
+                ))
+                .await
+                .is_err()
+            {
+                break;
+            }
+            server_churn_sent.fetch_add(1, Ordering::SeqCst);
+            revision += 1;
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
     let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
     let renderer = CaptionRenderer::new_for_test().unwrap();
-    renderer.set_test_readiness_pending_yields(1_000_000);
+    renderer.set_test_readiness_pending_yields(usize::MAX);
+    renderer.set_test_readiness_pending_persists_across_cancellation(true);
     let state = Arc::new(OwnedSubmitterState::default());
     let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
         snapshot,
@@ -4809,17 +4849,20 @@ async fn production_owner_consecutive_readiness_timeouts_escalate_without_submit
         Duration::from_millis(100),
         2,
     );
-    owner.set_max_consecutive_readiness_timeouts_for_test(2);
+    owner.set_readiness_no_progress_timeout_for_test(Duration::from_millis(2200));
 
-    let failure = owner
-        .run(
-            &mut bridge,
-            &test_logger("consecutive-readiness-timeouts").await,
-        )
-        .await
-        .unwrap_err();
+    let failure = tokio::time::timeout(
+        Duration::from_millis(4000),
+        owner.run(&mut bridge, &test_logger("readiness-no-progress").await),
+    )
+    .await
+    .expect("readiness no-progress deadline was starved by snapshot churn")
+    .unwrap_err();
 
-    assert_eq!(failure, RuntimeFailure::ReadinessTimedOut);
+    assert_eq!(failure, RuntimeFailure::ReadinessStalled);
+    assert_eq!(failure.failure_reason(), "gpu_stalled");
+    assert!(owner.readiness_timeout_count_for_test() > 5);
+    assert!(churn_sent.load(Ordering::SeqCst) > 10);
     assert_eq!(
         state
             .operations
@@ -4831,6 +4874,7 @@ async fn production_owner_consecutive_readiness_timeouts_escalate_without_submit
         0
     );
     assert!(owner.resources_released());
+    drop(bridge);
     server.await.unwrap();
 }
 

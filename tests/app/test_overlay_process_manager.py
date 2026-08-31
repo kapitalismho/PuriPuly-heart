@@ -722,17 +722,31 @@ async def test_overlay_process_manager_maps_invalid_manifest_to_failure_reason()
 
 
 @pytest.mark.asyncio
-async def test_overlay_process_manager_prefers_explicit_startup_error_event_over_exit_code() -> (
-    None
-):
+@pytest.mark.parametrize(
+    ("failure_reason", "exit_code"),
+    [
+        ("bridge_auth_failed", 12),
+        ("gpu_readiness_late", 21),
+        ("gpu_readiness_cancelled", 21),
+        ("gpu_query_failed", 21),
+        ("gpu_stalled", 21),
+    ],
+)
+async def test_overlay_process_manager_prefers_explicit_startup_error_event_over_exit_code(
+    failure_reason: str,
+    exit_code: int,
+) -> None:
     manager = OverlayProcessManager(
-        process_runner=FakeProcessRunner(startup_error="bridge_auth_failed", exit_code=21)
+        process_runner=FakeProcessRunner(
+            startup_error=failure_reason,
+            exit_code=exit_code,
+        )
     )
 
     await manager.start()
 
     assert manager.state == "failed"
-    assert manager.failure_reason == "bridge_auth_failed"
+    assert manager.failure_reason == failure_reason
 
 
 @pytest.mark.asyncio
@@ -1454,11 +1468,22 @@ async def test_overlay_process_manager_peer_first_render_visibility_checkpoint_p
 
 
 @pytest.mark.asyncio
-async def test_overlay_process_manager_maps_post_ready_runtime_error_to_failure_reason() -> None:
+@pytest.mark.parametrize(
+    "failure_reason",
+    [
+        "runtime_disconnected",
+        "gpu_readiness_cancelled",
+        "gpu_query_failed",
+        "gpu_stalled",
+    ],
+)
+async def test_overlay_process_manager_maps_post_ready_runtime_error_to_failure_reason(
+    failure_reason: str,
+) -> None:
     manager = OverlayProcessManager(
         process_runner=FakeProcessRunner(
             ready_event_delay_ms=0,
-            runtime_error_after_ready="runtime_disconnected",
+            runtime_error_after_ready=failure_reason,
         )
     )
 
@@ -1466,7 +1491,8 @@ async def test_overlay_process_manager_maps_post_ready_runtime_error_to_failure_
     await asyncio.sleep(0)
 
     assert manager.state == "failed"
-    assert manager.failure_reason == "runtime_disconnected"
+    assert manager.failure_reason == failure_reason
+    assert manager.restart_scheduled is True
     assert manager._manifest_path is None
 
 

@@ -287,14 +287,21 @@ def test_connect_transition_keeps_peer_activation_starting_alive() -> None:
 
 
 def test_failure_transition_cancels_peer_activation_starting() -> None:
-    recorder = Recorder()
-    owner = make_owner(recorder)
+    for failure_reason in (
+        "startup_timeout",
+        "gpu_readiness_late",
+        "gpu_readiness_cancelled",
+        "gpu_query_failed",
+        "gpu_stalled",
+    ):
+        recorder = Recorder()
+        owner = make_owner(recorder)
 
-    owner.on_start_failed("startup_timeout")
+        owner.on_start_failed(failure_reason)
 
-    assert owner.state == "failed"
-    assert recorder.cancel_peer_activation_calls == 1
-    assert recorder.states == [("failed", "startup_timeout")]
+        assert owner.state == "failed"
+        assert recorder.cancel_peer_activation_calls == 1
+        assert recorder.states == [("failed", failure_reason)]
 
 
 def test_disconnect_transitions_cancel_peer_activation_starting() -> None:
