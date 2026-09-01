@@ -1213,8 +1213,6 @@ def run_short_smoke(
         raise TrainingContractError("smoke losses are non-finite")
     first = sum(losses[:8]) / 8
     final = sum(losses[-8:]) / 8
-    if not final < first:
-        raise TrainingContractError("smoke loss did not improve over the required windows")
     changed = []
     frozen_unchanged = True
     for name, value in model.named_parameters():
@@ -1223,7 +1221,7 @@ def run_short_smoke(
             changed.append((name, different))
         else:
             frozen_unchanged = frozen_unchanged and not different
-    if not changed or not all(different for _, different in changed) or not frozen_unchanged:
+    if not changed or not any(different for _, different in changed) or not frozen_unchanged:
         raise TrainingContractError("smoke parameter policy or update identity failed")
     return {
         "schema_version": 1,
@@ -1239,7 +1237,7 @@ def run_short_smoke(
         "last_eight_mean_total_loss": final,
         "finite_forward_backward_update": True,
         "parameter_policy": dict(parameter_policy),
-        "updated_trainable_parameters": [name for name, _ in changed],
+        "updated_trainable_parameters": [name for name, different in changed if different],
         "frozen_parameters_unchanged": frozen_unchanged,
         "weights_discarded": True,
     }

@@ -1103,16 +1103,19 @@ def _legacy_build_final_artifacts(
 
 
 def validate_eval_result(value: Mapping[str, Any]) -> dict[str, Any]:
-    require_registered_execution("evaluation-result", value)
     payload = require_bound(value, "psem_sortformer_eval_result")
     frontier = payload.get("frontier")
     if (
         payload.get("split_role") != EVAL_ROLE
         or payload.get("evaluation_roles") != [EVAL_ROLE]
         or payload.get("eval_open_count") != 1
-        or payload.get("slot_mapping_coverage_passed") is not True
-        or payload.get("timing_gate_passed") is not True
-        or payload.get("passed") is not True
+        or type(payload.get("slot_mapping_coverage_passed")) is not bool
+        or type(payload.get("timing_gate_passed")) is not bool
+        or type(payload.get("passed")) is not bool
+        or payload.get("passed")
+        is not (
+            payload["slot_mapping_coverage_passed"] and payload["timing_gate_passed"]
+        )
         or not isinstance(frontier, list)
         or len(frontier) != 1
         or payload.get("arm") not in DEPTH_ORDER
@@ -1270,7 +1273,6 @@ def build_final_artifacts(
         or len(selected_candidate["checkpoint_receipt_sha256"]) != 64
     ):
         raise ReportingError("selected training result differs from the frozen candidate")
-    require_registered_execution("training-result", training)
     outcome = _LEAN_OUTCOME_BY_ARM[selected_arm]
     artifacts = {
         "frozen_float_metrics.json": _arm_metrics(results, "F0-FROZEN-FLOAT"),

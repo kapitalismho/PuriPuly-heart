@@ -52,6 +52,10 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 $script:WatchdogParameterSetName = $PSCmdlet.ParameterSetName
+$script:ErrorExportState = $null
+$script:ErrorExportPath = $null
+$script:ErrorExportStatusPath = $null
+$script:ErrorExportFailure = $null
 
 function Write-AtomicJson {
     param(
@@ -351,6 +355,103 @@ function Get-PodStatus {
     }
 }
 
+function Export-ErrorEvidence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$ObservedState,
+
+        [Parameter(Mandatory = $true)]
+        [object]$ObservedHeartbeat
+    )
+
+    $cache = Split-Path -Parent $ReceiptPath
+    $exportRoot = Join-Path $cache "issue-107-error-exports"
+    $statusPath = Join-Path $cache "issue-107-error-export-status.json"
+    $stamp = [DateTimeOffset]::UtcNow.ToString("yyyyMMddTHHmmssfff'Z'")
+    $exportPath = Join-Path $exportRoot "$stamp-$($script:RunId)"
+    New-Item -ItemType Directory -Path $exportPath -Force | Out-Null
+    Write-AtomicJson -Path (Join-Path $exportPath "observed-control.json") -Value @{
+        schema_version = 1
+        artifact_role = "issue_107_error_control_snapshot"
+        exported_at = [DateTimeOffset]::UtcNow.ToString("o")
+        pod_id = $PodId
+        run_id = $script:RunId
+        config_sha256 = $script:ConfigSha256
+        state = $ObservedState
+        heartbeat = $ObservedHeartbeat
+    }
+    $controlExitCode = $null
+    $logsExitCode = $null
+    $failure = $null
+    try {
+        if ($script:WatchdogParameterSetName -eq "Local") {
+            Copy-Item -LiteralPath $LocalControlDirectory -Destination (Join-Path $exportPath "control") -Recurse -Force
+            $localLogs = Join-Path (Split-Path -Parent $LocalControlDirectory) "logs"
+            if (Test-Path -LiteralPath $localLogs -PathType Container) {
+                Copy-Item -LiteralPath $localLogs -Destination (Join-Path $exportPath "logs") -Recurse -Force
+            }
+            $controlExitCode = 0
+            $logsExitCode = 0
+        }
+        else {
+            $scp = (Get-Command "scp.exe" -ErrorAction Stop).Source
+            $arguments = @("-q", "-r", "-P", $SshPort.ToString(), "-o", "BatchMode=yes", "-o", "ConnectTimeout=15")
+            if (-not [string]::IsNullOrWhiteSpace($IdentityFile)) {
+                $arguments += @("-i", $IdentityFile)
+            }
+            if (-not [string]::IsNullOrWhiteSpace($KnownHostsFile)) {
+                $arguments += @("-o", "UserKnownHostsFile=$KnownHostsFile", "-o", "StrictHostKeyChecking=yes")
+            }
+            $controlCopy = Invoke-Captured -FilePath $scp -ArgumentList ($arguments + @("${SshTarget}:$RemoteRunRoot/control", $exportPath)) -DeadlineUtc $script:Deadline -TimeoutSeconds 120
+            $controlExitCode = $controlCopy.ExitCode
+            $logsCopy = Invoke-Captured -FilePath $scp -ArgumentList ($arguments + @("${SshTarget}:$RemoteRunRoot/logs", $exportPath)) -DeadlineUtc $script:Deadline -TimeoutSeconds 120
+            $logsExitCode = $logsCopy.ExitCode
+            if ($controlExitCode -ne 0 -or $logsExitCode -ne 0) {
+                $failure = "control_exit=$controlExitCode logs_exit=$logsExitCode"
+            }
+        }
+    }
+    catch {
+        $failure = $_.Exception.Message
+    }
+    $hasCopiedEvidence = (Test-Path -LiteralPath (Join-Path $exportPath "control")) -or (Test-Path -LiteralPath (Join-Path $exportPath "logs"))
+    $state = if ($null -eq $failure) { "exported" } elseif ($hasCopiedEvidence) { "partial" } else { "failed" }
+    $value = @{
+        schema_version = 1
+        artifact_role = "issue_107_error_export_status"
+        state = $state
+        exported_at = [DateTimeOffset]::UtcNow.ToString("o")
+        pod_id = $PodId
+        run_id = $script:RunId
+        config_sha256 = $script:ConfigSha256
+        export_path = $exportPath
+        control_exit_code = $controlExitCode
+        logs_exit_code = $logsExitCode
+        failure = $failure
+    }
+    Write-AtomicJson -Path (Join-Path $exportPath "manifest.json") -Value $value
+    Write-AtomicJson -Path $statusPath -Value $value
+    return @{
+        State = $state
+        Path = $exportPath
+        StatusPath = $statusPath
+        Failure = $failure
+    }
+}
+
+function Add-ErrorExportReceiptFields {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Value
+    )
+
+    $Value.error_export_state = $script:ErrorExportState
+    $Value.error_export_path = $script:ErrorExportPath
+    $Value.error_export_status_path = $script:ErrorExportStatusPath
+    $Value.error_export_failure = $script:ErrorExportFailure
+    return $Value
+}
+
 function Stop-WatchedPod {
     param(
         [Parameter(Mandatory = $true)]
@@ -380,7 +481,7 @@ function Stop-WatchedPod {
             observed_control_status = if ($null -eq $ObservedState) { $null } else { [string]$ObservedState.status }
             observed_heartbeat_at = if ($null -eq $ObservedHeartbeat) { $null } else { ConvertTo-IsoTimestamp -Value $ObservedHeartbeat.updated_at }
         }
-        Write-AtomicJson -Path $ReceiptPath -Value $receipt
+        Write-AtomicJson -Path $ReceiptPath -Value (Add-ErrorExportReceiptFields -Value $receipt)
         return
     }
 
@@ -404,7 +505,7 @@ function Stop-WatchedPod {
                 observed_control_status = if ($null -eq $ObservedState) { $null } else { [string]$ObservedState.status }
                 observed_heartbeat_at = if ($null -eq $ObservedHeartbeat) { $null } else { ConvertTo-IsoTimestamp -Value $ObservedHeartbeat.updated_at }
             }
-            Write-AtomicJson -Path $ReceiptPath -Value $receipt
+            Write-AtomicJson -Path $ReceiptPath -Value (Add-ErrorExportReceiptFields -Value $receipt)
             throw "RUNPOD_API_KEY disappeared from the local watchdog environment before a confirmed live stop."
         }
 
@@ -434,7 +535,7 @@ function Stop-WatchedPod {
                 observed_heartbeat_at = if ($null -eq $ObservedHeartbeat) { $null } else { ConvertTo-IsoTimestamp -Value $ObservedHeartbeat.updated_at }
                 pod_status = $podStatus
             }
-            Write-AtomicJson -Path $ReceiptPath -Value $receipt
+            Write-AtomicJson -Path $ReceiptPath -Value (Add-ErrorExportReceiptFields -Value $receipt)
             return
         }
 
@@ -457,7 +558,7 @@ function Stop-WatchedPod {
             observed_heartbeat_at = if ($null -eq $ObservedHeartbeat) { $null } else { ConvertTo-IsoTimestamp -Value $ObservedHeartbeat.updated_at }
             pod_status = $podStatus
         }
-        Write-AtomicJson -Path $ReceiptPath -Value $receipt
+        Write-AtomicJson -Path $ReceiptPath -Value (Add-ErrorExportReceiptFields -Value $receipt)
         Start-Sleep -Seconds $PollSeconds
     }
 }
@@ -603,6 +704,13 @@ while ($true) {
             break
         }
         $status = [string]$state.status
+        if ($status -eq "ERROR") {
+            $errorExport = Export-ErrorEvidence -ObservedState $state -ObservedHeartbeat $heartbeat
+            $script:ErrorExportState = [string]$errorExport.State
+            $script:ErrorExportPath = [string]$errorExport.Path
+            $script:ErrorExportStatusPath = [string]$errorExport.StatusPath
+            $script:ErrorExportFailure = $errorExport.Failure
+        }
         if ($status -in @("WAITING_FOR_DECISION", "ERROR", "COMPLETED")) {
             Stop-WatchedPod -Reason "control_status_$($status.ToLowerInvariant())" -ObservedState $state -ObservedHeartbeat $heartbeat
             break

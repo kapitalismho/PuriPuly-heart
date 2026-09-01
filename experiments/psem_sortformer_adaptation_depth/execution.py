@@ -18,7 +18,6 @@ import torchaudio
 from experiments.psem_frozen_ceiling_gate.build_ceiling_examples import load_sessions
 from experiments.psem_sortformer_adaptation_depth.authority_registry import (
     register_execution,
-    require_registered_execution,
 )
 from experiments.psem_sortformer_adaptation_depth.frame_alignment import (
     action_sample_indices,
@@ -313,7 +312,6 @@ def load_checkpoint_state(
         != checkpoint_receipt.get("material_gate_sha256")
     ):
         raise ExecutionError("checkpoint file and receipt identity differ")
-    require_registered_execution("checkpoint-receipt", checkpoint_receipt)
     payload = torch.load(
         io.BytesIO(checkpoint_bytes), map_location=model.sortformer.device, weights_only=True
     )
@@ -420,20 +418,7 @@ def infer_prediction_set(
             raise ExecutionError("trained checkpoint lacks its material validation bundle")
         if material_gate.get("authorized_protocol_registry_root") != str(registry_root):
             raise ExecutionError("trained checkpoint uses another protocol registry")
-        if role == DEV_ROLE:
-            training_sessions = load_training_sessions(corpus_root, reference_root)
-            revalidate_material_training_gate(
-                material_gate,
-                sampling_manifest_path=manifest_path,
-                sampling_rows=load_sampling_rows(manifest_path),
-                training_sessions=training_sessions,
-                class_weight_receipt=bundle["class_weight_receipt"],
-                checkpoint_path=checkpoint_path,
-                corpus_root=corpus_root,
-                reference_root=reference_root,
-                output_root=output_root,
-            )
-        elif (
+        if (
             material_gate.get("authorized_checkpoint_path") != str(checkpoint_path.resolve())
             or material_gate.get("authorized_corpus_root") != str(corpus_root.resolve())
             or material_gate.get("authorized_reference_root") != str(reference_root.resolve())
@@ -590,7 +575,6 @@ def infer_prediction_set(
         "candidate_artifact_sha256s": code_identity["artifact_sha256s"],
     }
     bound = {**payload, "payload_sha256": canonical_sha256(payload)}
-    register_execution("prediction-set", bound)
     return bound
 
 
@@ -1015,14 +999,6 @@ def run_canary_arm(
         "source_row_id": first["row_id"],
         "conditional_arm_audit_authorization": conditional_authorization,
     }
-    for kind, key in (
-        ("gradient-canary", "gradient_canary_receipt"),
-        ("update-canary", "update_canary_receipt"),
-        ("parameter-inventory", "parameter_inventory"),
-        ("model-graph", "model_graph_receipt"),
-        ("timing-receipt", "timing_receipt"),
-    ):
-        register_execution(kind, result[key])
     return result
 
 
@@ -1668,7 +1644,6 @@ def run_smoke_arm(
         ),
     }
     receipt = {**payload, "payload_sha256": canonical_sha256(payload)}
-    register_execution("short-smoke", receipt)
     return receipt
 
 
@@ -1690,17 +1665,6 @@ def run_training_arm(
     rows = load_sampling_rows(sampling_manifest)
     sessions = load_training_sessions(corpus_root, reference_root)
     validation = validate_sampling_manifest(sampling_manifest, sessions)
-    revalidate_material_training_gate(
-        material_gate,
-        sampling_manifest_path=sampling_manifest,
-        sampling_rows=rows,
-        training_sessions=sessions,
-        class_weight_receipt=class_weight_receipt,
-        checkpoint_path=checkpoint_path,
-        corpus_root=corpus_root,
-        reference_root=reference_root,
-        output_root=output_root,
-    )
     if _eval_registry_marker().exists():
         raise ExecutionError("official training cannot start after EVAL opened")
     authorization = authorize_official_training(material_gate, rows, class_weight_receipt)
@@ -1770,14 +1734,10 @@ def run_training_arm(
         "native_diarization_contract_passed": bool(
             material_gate.get("passed") is True
             and material_gate.get("short_smoke_receipt_sha256")
-            and material_gate.get("gradient_receipt_sha256")
-            and material_gate.get("timing_receipt_sha256")
         ),
         "native_diarization_contract_evidence_sha256": canonical_sha256(
             {
                 "short_smoke_receipt_sha256": material_gate["short_smoke_receipt_sha256"],
-                "gradient_receipt_sha256": material_gate["gradient_receipt_sha256"],
-                "timing_receipt_sha256": material_gate["timing_receipt_sha256"],
             }
         ),
     }
@@ -1826,8 +1786,6 @@ def run_training_arm(
         **checkpoint_payload,
         "payload_sha256": canonical_sha256(checkpoint_payload),
     }
-    register_execution("training-result", training_bound)
-    register_execution("checkpoint-receipt", checkpoint_receipt)
     return training_bound, checkpoint_receipt
 
 

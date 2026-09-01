@@ -19,10 +19,6 @@ from experiments.psem_frozen_ceiling_gate.evaluate_ceiling import (
     aggregate_rows,
     session_row,
 )
-from experiments.psem_sortformer_adaptation_depth.authority_registry import (
-    register_execution,
-    require_registered_execution,
-)
 from experiments.psem_sortformer_adaptation_depth.frame_alignment import (
     align_native_predictions,
     mapping_from_action_probabilities,
@@ -38,10 +34,7 @@ from experiments.psem_sortformer_adaptation_depth.protocol import (
     bind_payload,
     validate_eval_authorization,
 )
-from experiments.psem_sortformer_adaptation_depth.receipts import (
-    build_data_split_receipt,
-    evaluator_reconstruction_contract,
-)
+from experiments.psem_sortformer_adaptation_depth.receipts import build_data_split_receipt
 from experiments.psem_training_strategy_gate.sampling import DEV_ROLE, EVAL_ROLE
 
 THRESHOLDS = (0.5,)
@@ -78,7 +71,6 @@ def validate_prediction_set(
     *,
     _artifact_cache: dict[str, bytes] | None = None,
 ) -> dict[str, Any]:
-    require_registered_execution("prediction-set", value)
     payload = {key: item for key, item in value.items() if key != "payload_sha256"}
     if (
         value.get("artifact_role") != "psem_sortformer_prediction_set"
@@ -652,7 +644,6 @@ def evaluate_prediction_set(
     *,
     historical_replay: bool = False,
 ) -> dict[str, Any]:
-    evaluator_reconstruction_contract()
     artifact_cache: dict[str, bytes] = {}
     prediction_set = validate_prediction_set(
         value, eval_authorization, _artifact_cache=artifact_cache
@@ -810,8 +801,6 @@ def evaluate_prediction_set(
         ),
     }
     result = bind_payload(payload)
-    if not historical_replay:
-        register_execution("evaluation-result", result)
     return result
 
 

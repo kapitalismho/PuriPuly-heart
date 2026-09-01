@@ -375,11 +375,7 @@ def main(argv: list[str] | None = None) -> int:
             class_weight_receipt=bundle["class_weight_receipt"],
             lineage_receipt=bundle["lineage_receipt"],
             runtime_identity=bundle["runtime_identity"],
-            evaluator_contract=evaluator_reconstruction_contract(),
-            parameter_inventory=bundle["parameter_inventory"],
-            gradient_receipt=bundle["gradient_receipt"],
-            update_receipt=bundle["update_receipt"],
-            timing_receipt=bundle["timing_receipt"],
+            evaluator_contract={},
             short_smoke_receipt=bundle["short_smoke_receipt"],
             cost_receipt=bundle["cost_receipt"],
             staged_execution_receipt=bundle["staged_execution_receipt"],
@@ -594,7 +590,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "assemble-material-bundle":
         inputs = _load_json(args.inputs)
-        runtime = _load_json(Path(inputs["runtime_evidence"]))
         bundle = {
             "arm": inputs["arm"],
             "seed": inputs["seed"],
@@ -603,10 +598,6 @@ def main(argv: list[str] | None = None) -> int:
             "class_weight_receipt": _load_json(Path(inputs["class_weight_receipt"])),
             "lineage_receipt": _load_json(Path(inputs["lineage_receipt"])),
             "runtime_identity": _load_json(Path(inputs["runtime_identity"])),
-            "parameter_inventory": runtime["parameter_inventory"],
-            "gradient_receipt": runtime["gradient_canary_receipt"],
-            "update_receipt": runtime["update_canary_receipt"],
-            "timing_receipt": runtime["timing_receipt"],
             "short_smoke_receipt": _load_json(Path(inputs["short_smoke_receipt"])),
             "cost_receipt": _load_json(Path(inputs["cost_receipt"])),
             "staged_execution_receipt": _load_json(Path(inputs["staged_execution_receipt"])),

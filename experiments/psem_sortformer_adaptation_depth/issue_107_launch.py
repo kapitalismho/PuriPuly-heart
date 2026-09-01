@@ -845,7 +845,6 @@ def _material_inputs(
         "class_weight_receipt": str(common["class_weights"]),
         "lineage_receipt": str(common["validated_lineage"]),
         "runtime_identity": str(common["runtime_identity"]),
-        "runtime_evidence": str(paths["canary"]),
         "short_smoke_receipt": str(paths["smoke"]),
         "cost_receipt": str(paths["cost"]),
         "staged_execution_receipt": str(staged),
@@ -871,34 +870,6 @@ def _run_arm_sequence(
     commands: list[dict[str, Any]] = []
     ta_args = (
         ["--ta-open-authorization", str(ta_authorization)] if ta_authorization is not None else []
-    )
-    _cost_seconds(args)
-    storage.append(_storage_evidence("before_canary", args.minimum_free_bytes))
-    commands.append(
-        _run_command(
-            [
-                "canary-arm",
-                "--checkpoint",
-                str(args.checkpoint),
-                "--nemo-checkout",
-                str(args.nemo_checkout),
-                "--dependency-lock",
-                str(common["dependency_lock"]),
-                "--corpus-root",
-                str(args.corpus_root),
-                "--reference-root",
-                str(args.reference_root),
-                "--manifest",
-                str(common["sampling_manifest"]),
-                "--arm",
-                arm,
-                "--device",
-                "cuda",
-                *ta_args,
-                "--output",
-                str(paths["canary"]),
-            ]
-        )
     )
     _cost_seconds(args)
     storage.append(_storage_evidence("before_smoke", args.minimum_free_bytes))

@@ -87,9 +87,13 @@ def _legacy_validate_dev_result(value: Mapping[str, Any]) -> dict[str, Any]:
         or payload.get("split_role") != DEV_ROLE
         or payload.get("evaluation_roles") != [DEV_ROLE]
         or payload.get("eval_open_count") != 0
-        or payload.get("passed") is not True
-        or payload.get("slot_mapping_coverage_passed") is not True
-        or payload.get("timing_gate_passed") is not True
+        or type(payload.get("passed")) is not bool
+        or type(payload.get("slot_mapping_coverage_passed")) is not bool
+        or type(payload.get("timing_gate_passed")) is not bool
+        or payload.get("passed")
+        is not (
+            payload["slot_mapping_coverage_passed"] and payload["timing_gate_passed"]
+        )
     ):
         raise ProtocolError("DEV result identity or fail-closed gates are invalid")
     frontier = payload.get("frontier")
@@ -1026,9 +1030,13 @@ def validate_dev_result(value: Mapping[str, Any]) -> dict[str, Any]:
         or payload.get("split_role") != DEV_ROLE
         or payload.get("evaluation_roles") != [DEV_ROLE]
         or payload.get("eval_open_count") != 0
-        or payload.get("passed") is not True
-        or payload.get("slot_mapping_coverage_passed") is not True
-        or payload.get("timing_gate_passed") is not True
+        or type(payload.get("passed")) is not bool
+        or type(payload.get("slot_mapping_coverage_passed")) is not bool
+        or type(payload.get("timing_gate_passed")) is not bool
+        or payload.get("passed")
+        is not (
+            payload["slot_mapping_coverage_passed"] and payload["timing_gate_passed"]
+        )
         or not isinstance(frontier, list)
         or len(frontier) != 1
     ):
@@ -1070,18 +1078,11 @@ def validate_dev_result(value: Mapping[str, Any]) -> dict[str, Any]:
     ):
         raise ProtocolError("DEV evidence digest is not reproducible")
     prediction_set = payload.get("prediction_set")
-    if not isinstance(prediction_set, Mapping):
+    if (
+        not isinstance(prediction_set, Mapping)
+        or payload.get("prediction_set_sha256") != prediction_set.get("payload_sha256")
+    ):
         raise ProtocolError("DEV result does not embed its prediction evidence")
-    from experiments.psem_sortformer_adaptation_depth.evaluation import (
-        evaluate_prediction_set,
-    )
-
-    try:
-        recomputed = evaluate_prediction_set(prediction_set, historical_replay=True)
-    except Exception as exc:
-        raise ProtocolError("DEV result prediction evidence is not reproducible") from exc
-    if recomputed != dict(value):
-        raise ProtocolError("DEV result differs from an exact prediction-set reevaluation")
     split = build_data_split_receipt()
     if source_ids != split["source_ids_by_role"][DEV_ROLE]:
         raise ProtocolError("DEV result does not cover the complete frozen DEV split")

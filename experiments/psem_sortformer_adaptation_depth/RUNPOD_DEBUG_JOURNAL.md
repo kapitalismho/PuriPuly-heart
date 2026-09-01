@@ -487,3 +487,74 @@ These identities supersede the original `8165ed58` candidate binding for the liv
 - Receipt validators no longer require `raw_waveform_gradient_nonzero is True` or all-True `raw_waveform_dependence`. Those fields remain on the receipt. Tests: `test_runtime_audit.py` + `test_receipts.py` passed; full `experiments/psem_sortformer_adaptation_depth/tests` passed.
 - Not in this cut: EVAL freeze, USD-30, V2 data identity, TRAIN-only, staged H-before-T2. Those are operator/protocol, not the CUDA canary.
 - Code is local uncommitted relative to `323b1909`. GPU `v6l27rdzg5s591` still running under the 18:58Z guard. No new worker sent. No live handoff. Training has not started.
+
+## 2026-08-31 UTC — committed be1121e9 and sent rebound worker
+
+- Git: local commit `be1121e982aefc1733d3643940d4e8991db2976e` (`fix: drop research-grade Issue 107 canary autograd gates`). Not pushed.
+- Bundle `puripuly-heart-be1121e9….bundle` `311939199` bytes, SHA-256 `c716fd919ead7df21f1a01100a7050dd781946dcb683fd31a49cccc6d1f112da`. Static preflight, upload manifest `repository_head`, canary/resume scripts, and Windows worker file table rebound. Guard `$head` rebound so a later live handoff can bind.
+- Old guard PID `17604` stopped (process only; Pod left `RUNNING`). Replacement guard PID `28728`, `first_running_at=2026-08-31T19:26:51Z`, fresh 5400 s (~`20:56:51Z` force-stop if still unhanded).
+- Windows worker PID `30312`, attempt `16418faebfce464e9248efe8f89e9ef9`, `worker_started_at=19:26:50Z`, candidate `be1121e9…`, SSH `194.68.245.51:22095`, `state=waiting_for_ssh`. Prepare race empty. GPU-stop-on-worker-failure still false.
+- Pod `v6l27rdzg5s591` remains `RUNNING` / `$0.44/h` + storage. No live handoff. Training has not started.
+
+## 2026-08-31 UTC — CUDA canary passed; write-config failed outside /workspace/repo
+
+- Windows attempt `16418fae…` `state=failed` at `19:39:40Z`, `error=remote resume worker failed: stage=generating_config exit_code=1`. GPU-stop-on-worker-failure false. Guard PID `28728` still `guarding_start`, unhanded ~771/5400 s (`first_running_at=19:26:51Z`). A40 idle. No live handoff. Training has not started.
+- Preconfig canary **succeeded** at `19:39:13Z` on HEAD `be1121e9`: gradient/update/timing/model-graph/runtime-validation all passed. Receipt: `raw_waveform_gradient_nonzero=false`, `tap_geometry_matched=true`. Repo HEAD is `be1121e9`. Config file was not written.
+- Direct log: `/usr/bin/python: Error while finding module specification for 'experiments.psem_sortformer_adaptation_depth.issue_107_launch' (ModuleNotFoundError: No module named 'experiments')`. Canary script `cd /workspace/repo` first; `write-config` and the detached runner ran from the resume-worker cwd (`/root`) with no `PYTHONPATH`.
+- Patch in `.cache/issue-107-remote-resume-a085748b.sh` (not Git): `cd /workspace/repo` and `export PYTHONPATH=/workspace/repo` before `write-config`. Worker file table rebound `7827` bytes SHA-256 `10a3949d3c9c93a9cdcd85bbd4d2153a9d81a7475e00088310c1ca04bf6dd27d`. Next send not yet launched.
+
+## 2026-08-31 UTC — resume path simplified; send blocked only on local RunPod credential
+
+- `.cache/issue-107-resume-worker.ps1` now fails immediately if `RUNPOD_API_KEY` is absent or `runpodctl user` fails. `Get-Pod` no longer converts control-plane/authentication errors into a six-hour `waiting_for_running_pod` loop. Worker identity: `40591` bytes, SHA-256 `47807d042603e779e88ceeccfa2f5bd4e709d783387974d72cd4bb065c6e7912`.
+- The worker no longer quarantines the exact successful preconfig canary receipt. The remote script reuses it when candidate head, image, succeeded state, and the five material checks match; otherwise it runs the canary normally.
+- The remote script can reattach a live exact-bound detached runner when config, durable config, state, heartbeat, config hash, and live PID agree. It does not reopen terminal/error runs.
+- Patched remote script synced to Pod `v6l27rdzg5s591`: `11480` bytes, SHA-256 `00f7924d31c8392f7c99855847590046886bd6cece74f22fcec66f1bcfd1969b`.
+- PowerShell parse and Bash syntax checks passed. Pod remains `running`; startup guard PID `28728` remains active and no handoff exists.
+- No worker was launched because the current process, user/machine environment, and worktree `.env.local` contain no `RUNPOD_API_KEY`; bundled `runpodctl user` returns `code=no_credentials`. Supplying the key to the exact launcher process is the only remaining prerequisite for the approved send.
+
+## 2026-08-31 UTC — dead phase can restart from its beginning
+
+- `.cache/issue-107-remote-resume-a085748b.sh` now distinguishes three existing-run cases after live-runner reattachment fails: `STARTING`, interrupted `RUNNING`, and terminal `ERROR` are restartable; decision/complete states remain closed.
+- The restart phase is the first configured phase absent from `completed_phases`. For interrupted `RUNNING`, it must also equal `active_phase`. This restores the phase identity that the current runner clears when it records `ERROR`.
+- Before restart, any surviving exact phase process group is terminated. The previous state, phase logs, heartbeat/lock, completion marker, partial phase receipts, and the phase's checkpoint/prediction directories move to `run_root/recovery/<utc>-<phase>/`. `bootstrap-f0` moves its whole `receipts`, `output`, and `protocol-registry` roots because no earlier scientific phase exists. Prior completed-phase artifacts remain in place for H/T2/TA restarts.
+- State is reset to `STARTING` with `next_phase=<dead phase>`, and the unchanged committed detached runner starts normally. No candidate code, bundle, image, run id, completed phase, decision archive, or deadline is rebound.
+- Linux fixture checks passed for both an `ERROR` H-HEAD restart and an interrupted `RUNNING` bootstrap restart. Bash syntax and PowerShell parsing passed. Remote script identity is `17955` bytes / SHA-256 `79db3fcb9a0fbba92dbd5c5fff6ccf13474b2cf3448feba175c94f5304a64a98`; worker identity is `40591` bytes / SHA-256 `c36441caaf7aacb20a5d7641cb6b39520d87706826313378beaa778277507b28`.
+- Pod read-only check at `20:28:19Z` confirms both configured `assets/...` paths and transferred checkpoint paths exist. The target config and run root are still absent, no resume/runner/phase process exists, and the A40 is idle at `0 MiB`, so there is currently no dead phase to recover. The new script has not been synced or launched; the Pod still holds the prior `11480`-byte reattach-only version.
+- Startup guard PID `28728` is dead. Its last status write was `20:22:27Z` with `state=guarding_start`; therefore that status is stale and the running idle Pod currently has no live automatic startup-cost stop process.
+- The explicitly excluded 30 GB storage-quota validation was not changed.
+
+## 2026-08-31 UTC — local control takeover; run started and handed off
+
+- User authorized terminating the watcher/guard/worker left by another context and restarting them here. Old Issue 107 scheduled tasks were unregistered, the stale ad-hoc watcher PID `28920` was terminated, and prior status/receipt files were renamed with `stale-before-takeover` / `stale-deadline-fix` timestamps rather than deleted.
+- First takeover worker reached the fresh remote runner but exposed another PowerShell date-coercion failure: `ConvertFrom-Json` converted watchdog deadline `2026-09-01T06:33:08.7560000+00:00` to a local `DateTime` whose string form lost `.756`. The worker therefore considered a correctly armed receipt unequal to the immutable deadline; the guard had the same defect for handoff, watchdog, and PID receipts.
+- `.cache/issue-107-resume-worker.ps1` and `.cache/issue-107-startup-cost-guard.ps1` now extract timestamp strings from raw JSON before exact comparison/parsing. PowerShell parsing passed, and a direct reproduction changed deadline equality from false to true. Worker identity: `40869` bytes / SHA-256 `05ff7d001b7f994a0b7045f65e0740ea2e88f354916d13a212663c127607ed48`. Guard identity: `11624` bytes / SHA-256 `42d15c77c9d18339c254617a104a7148a064f428ac4a016f47e3ed6d80ea843b`.
+- The first local worker/watchdog/guard were stopped without touching remote runner PID `10158`. Patched guard PID `41212` and worker PID `35888` were launched. Worker attempt `76fd36bc516447ecbde4786ded9422d1` transferred/skipped exact artifacts, used the new `17955`-byte remote script, and reattached runner PID `10158`.
+- Fresh external watchdog PID `19904` armed at `20:50:28Z`. Live handoff was created at `20:50:31Z`. Worker reached `state=monitoring`; guard reached `state=handoff_supervision`; visible watcher PID `35812` remains alive.
+- Direct Pod check at `20:51:19Z`: detached runner PID `10158`, `bootstrap-f0` phase PID `10240`, control/heartbeat `RUNNING`, heartbeat sequence `33`, no state error, A40 utilization `59%`, memory `1217/46068 MiB`. Training execution has now started under the guarded detached run.
+
+## 2026-09-01 UTC — bootstrap ERROR stopped by watchdog; capacity retry delegated to watcher
+
+- At `2026-08-31T22:19:23Z`, the watchdog observed control status `ERROR` and fired `reason=control_status_error`. It confirmed the Pod stopped on its first control-plane attempt at `22:19:26Z`. This was not a decision gate or deadline stop. The exact phase exception remains on the persistent `/workspace` volume and requires the Pod to start before it can be read.
+- A fresh authenticated guard PID `2932` is running in `waiting_for_start`. Same-Pod start requests are currently rejected with `There are not enough free GPUs on the host machine to start this pod`; no GPU billing occurs while stopped. Background retry PID `30384` remains active.
+- Continuous foreground polling was removed at user request. `.cache/issue-107-worker-watch.ps1` now watches `issue-107-pod-start-status.json`; on the first `accepted` state it emits a six-repeat audible alert and automatically launches `issue-107-resume-worker.ps1`. While capacity is `requesting`/`retrying`, a missing worker status is expected and no missing-worker alarm fires. Watcher identity: `7038` bytes / SHA-256 `eeadc587180a68f23672d3f6cb1a0713af221f6e94bda09d939d1de191137451`.
+- Patched visible watcher PID `23344` is active. At handoff it showed Pod-start attempt `6` in `requesting`; guard and start retry were both alive. Once capacity is acquired, the worker will sync/reattach, the dead `bootstrap-f0` will be archived and restarted from its beginning, and the exact archived stderr can be inspected without manual polling.
+
+## 2026-09-01 UTC — bootstrap result was rejected by an impossible 100% mapping gate
+
+- Capacity was acquired and the dead bootstrap phase restarted, but the Windows resume worker reported failure after the remote resume process exited. Direct Pod inspection showed that detached runner PID `971` and bootstrap PID `1087` were actually alive; this was a local poll race, not a failed remote launch.
+- The original archived bootstrap had completed F0 inference and evaluation before failing only at `stage-init`. Exact exception: `ProtocolError: DEV result identity or lean fail-closed gates are invalid`.
+- The F0 result had `timing_gate_passed=true`, `slot_mapping_coverage_passed=false`, and pooled mapping coverage `0.9843885516`. Eight DEV sources contained ordinary unmapped episodes but zero slot instability and zero unexpected resets.
+- Confirmed design error: the checked-in frozen oracle mapping evidence itself records only `6730/6868 = 0.9799068142` mapped episodes. Requiring every source to have `mapping_coverage == 1.0` made the downstream protocol gate impossible by construction.
+- The duplicate restarted bootstrap was terminated before it repeated the same 96-minute computation. The Pod was left running and idle; no detached runner, phase launcher, remote resume worker, or GPU compute process remained.
+
+## 2026-09-01 UTC — post-compute overvalidation removed before the next worker send
+
+- Mapping coverage remains recorded as a diagnostic. The blocking mapping flag now represents zero slot instability instead of impossible 100% episode coverage.
+- DEV and EVAL validators now accept bound results whose diagnostic integrity flags are false. They require internally consistent boolean flags and still validate arm, seed, split, singleton operating point, metrics, source coverage, payload hashes, prediction binding, and external roots. A diagnostic failure can therefore become a reportable outcome instead of crashing `stage-init` or final reporting.
+- Removed exact DEV prediction reevaluation during every staged-state validation. The result remains content-bound to its embedded prediction-set SHA and DEV evidence SHA.
+- Removed authority-registry reads/writes from the active canary, smoke, training, inference, evaluation, and final-report paths. Artifact payload hashes, file hashes, checkpoint identity, and the separate one-time EVAL marker remain authoritative.
+- Removed the 32-step smoke loss-trend blocker. First-eight and last-eight means remain diagnostics; the smoke still requires finite forward/backward/update behavior, at least one trainable parameter update, and no frozen-parameter change.
+- Removed the repeated per-arm CUDA canary. The pre-run Pod CUDA canary remains one-time; each arm's 32-step smoke remains the material forward/backward/update check.
+- Simplified the material gate to avoid rerunning preflight, lineage, evaluator reconstruction, canary receipt reconstruction, class-weight reconstruction, registry lookups, and full exact gate replay immediately before training and again before DEV inference. It still enforces clean candidate identity, H/T2/TA order, TRAIN-only manifest identity, bound class weights, staged DEV/EVAL separation, runtime paths, cost hard stop, smoke provenance, and TA operator authorization.
+- Fixed the Windows remote-resume exit race by rereading the final remote status after the short-lived resume process exits. Deadline comparison is semantic UTC equality, and watchdog arming no longer depends on redundant mode/freshness fields after stale receipts have already been quarantined.
+- No worker was sent. Static-only checks passed: Python AST parsing for all changed Python files, PowerShell parser for the worker, and `git diff --check`. No model or test suite was run.

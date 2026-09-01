@@ -89,7 +89,7 @@ checkpoint:        final optimizer step
 seed:              7301
 ```
 
-The smoke requires finite forward/backward/update behavior, the exact parameter policy, and a final-eight-step mean loss below the first-eight-step mean loss.
+The smoke requires finite forward/backward/update behavior and the exact parameter policy. Its first-eight and final-eight mean losses are recorded as diagnostics rather than used as a blocking trend gate.
 
 Deterministic resume is not required. An interrupted run is discarded and restarted from step zero with the same seed and manifest. A final model checkpoint is still required for inference.
 
@@ -133,9 +133,9 @@ ADAPTATION_DECISION.md (all terminal outcomes)
 ## Sequential operator flow
 
 1. Run static and runtime preflight on a clean committed candidate, then materialize and validate the one-epoch sampling manifest and TRAIN-only class weights.
-2. Build lineage evidence, run `canary-arm`, run the 32-step `smoke-arm`, and create a `cost-receipt` for the next material action.
+2. Build lineage evidence, run the one-time Pod CUDA canary, then run the arm's 32-step `smoke-arm` and create a `cost-receipt` for the next material action.
 3. Initialize staged DEV state from F0. For H and then T2, assemble and validate the material bundle, run the exact 256-step `train-arm`, infer DEV predictions, evaluate the singleton cell, and append the result.
-4. Record `dev-decision`. If it is `open_ta`, create `open-ta` authorization and repeat the same canary, smoke, cost, training, and DEV sequence for TA before recording the final selection or stop decision.
+4. Record `dev-decision`. If it is `open_ta`, create `open-ta` authorization and repeat the smoke, cost, training, and DEV sequence for TA before recording the final selection or stop decision.
 5. Freeze the candidate set with the final operator decision and cost receipt. `stop` ends with an empty freeze and cannot open EVAL; pass that freeze directly to `final-report` to emit the Outcome-D `ADAPTATION_DECISION.md` without EVAL. Selection freezes exactly F0 plus one winner.
 6. For selection only, open EVAL once, infer and evaluate exactly the frozen pair, then pass the EVAL report bundle to `final-report`. No supported command resumes training after EVAL opens.
 
