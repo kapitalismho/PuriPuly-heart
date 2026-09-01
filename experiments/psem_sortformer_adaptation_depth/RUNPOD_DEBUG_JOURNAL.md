@@ -566,3 +566,9 @@ These identities supersede the original `8165ed58` candidate binding for the liv
 - Root cause: `build_manifest_class_weight_receipt` returned `replacement_counts` and `anchor_counts` with integer keys in memory. JSON persistence converts object keys to strings, so the smoke phase's direct dictionary equality rejected an otherwise identical receipt after reload.
 - The receipt builder now emits JSON-native string keys before hashing and persistence. A focused JSON round-trip regression test passed in the pinned container image. The host test runner could not collect because host Python has no Torch.
 - `bootstrap-f0` remains complete on the persistent Pod volume. Resume should archive and restart only the failed `h-head-material-and-dev` phase from its beginning.
+
+## 2026-09-01 UTC — GPU retention and completed-phase reuse restored
+
+- Immediate Pod stop on `ERROR`, stale heartbeat, control failure, watchdog exit, or binding loss was incorrect for a scarce GPU. Error evidence is still exported immediately, but watchdog and startup-guard termination now require 5400 consecutive unhandled seconds. The immutable billing deadline remains an immediate hard stop.
+- The new candidate is a receipt-serialization repair descended from `f76efc468092b0bb8b9969ffb3342c1ec781af58`. Existing `1334720ab9975b9a68aedf2d291eb9056baf3ff3` bootstrap evidence is accepted only when the Git diff remains limited to the explicit repair, resume compatibility, tests, and journal files and every other candidate artifact hash is unchanged.
+- Resume retains run `issue-107-a40-1334720a-01`, rebinds its durable control config to the repaired clean candidate, preserves `completed_phases=["bootstrap-f0"]`, archives the failed H artifacts, and restarts `h-head-material-and-dev` from its beginning. A new run ID would bypass the completed-phase ledger and is not used.

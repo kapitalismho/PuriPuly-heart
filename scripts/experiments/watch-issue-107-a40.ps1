@@ -40,6 +40,10 @@ param(
     [int]$InitialGraceSeconds = 180,
 
     [Parameter()]
+    [ValidateRange(60, 21600)]
+    [int]$UnhandledSeconds = 5400,
+
+    [Parameter()]
     [string]$AbsoluteDeadlineUtc,
 
     [Parameter()]
@@ -56,6 +60,9 @@ $script:ErrorExportState = $null
 $script:ErrorExportPath = $null
 $script:ErrorExportStatusPath = $null
 $script:ErrorExportFailure = $null
+$script:UnhandledSince = $null
+$script:UnhandledReason = $null
+$script:ErrorExported = $false
 
 function Write-AtomicJson {
     param(
@@ -452,6 +459,55 @@ function Add-ErrorExportReceiptFields {
     return $Value
 }
 
+function Clear-UnhandledState {
+    $script:UnhandledSince = $null
+    $script:UnhandledReason = $null
+    $script:ErrorExported = $false
+}
+
+function Wait-UnhandledState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Reason,
+
+        [Parameter()]
+        [object]$ObservedState,
+
+        [Parameter()]
+        [object]$ObservedHeartbeat
+    )
+
+    $now = [DateTimeOffset]::UtcNow
+    if ($null -eq $script:UnhandledSince -or $script:UnhandledReason -cne $Reason) {
+        $script:UnhandledSince = $now
+        $script:UnhandledReason = $Reason
+    }
+    $ageSeconds = ($now - $script:UnhandledSince).TotalSeconds
+    if ($ageSeconds -ge $UnhandledSeconds) {
+        Stop-WatchedPod -Reason "unhandled_timeout_$Reason" -ObservedState $ObservedState -ObservedHeartbeat $ObservedHeartbeat
+        return $true
+    }
+    $receipt = @{
+        schema_version = 1
+        artifact_role = "issue_107_external_watchdog_receipt"
+        pod_id = $PodId
+        run_id = $script:RunId
+        config_sha256 = $script:ConfigSha256
+        state = "unhandled_waiting"
+        reason = $Reason
+        armed_at = $script:ArmedAt.ToString("o")
+        deadline = $script:Deadline.ToString("o")
+        deadline_source = $script:DeadlineSource
+        unhandled_since = $script:UnhandledSince.ToString("o")
+        unhandled_seconds = [math]::Floor($ageSeconds)
+        maximum_unhandled_seconds = $UnhandledSeconds
+        observed_control_status = if ($null -eq $ObservedState) { $null } else { [string]$ObservedState.status }
+        observed_heartbeat_at = if ($null -eq $ObservedHeartbeat) { $null } else { ConvertTo-IsoTimestamp -Value $ObservedHeartbeat.updated_at }
+    }
+    Write-AtomicJson -Path $ReceiptPath -Value (Add-ErrorExportReceiptFields -Value $receipt)
+    return $false
+}
+
 function Stop-WatchedPod {
     param(
         [Parameter(Mandatory = $true)]
@@ -652,6 +708,7 @@ Write-AtomicJson -Path $ReceiptPath -Value @{
     poll_seconds = $PollSeconds
     stale_heartbeat_seconds = $StaleHeartbeatSeconds
     initial_grace_seconds = $InitialGraceSeconds
+    maximum_unhandled_seconds = $UnhandledSeconds
     mode = if ($script:WatchdogParameterSetName -eq "Local") { "local_control_files" } else { "remote_scp_poll" }
     dry_run = [bool]$DryRun
 }
@@ -678,8 +735,7 @@ while ($true) {
             break
         }
         $graceElapsed = ($now - $script:ArmedAt).TotalSeconds -ge $InitialGraceSeconds
-        if ($graceElapsed) {
-            Stop-WatchedPod -Reason "control_unreachable_after_initial_grace" -ObservedState $null -ObservedHeartbeat $null
+        if ($graceElapsed -and (Wait-UnhandledState -Reason "control_unreachable_after_initial_grace" -ObservedState $null -ObservedHeartbeat $null)) {
             break
         }
     }
@@ -689,13 +745,19 @@ while ($true) {
             $binding = Assert-ControlSnapshot -Snapshot $snapshot
         }
         catch {
-            Stop-WatchedPod -Reason "control_binding_invalid" -ObservedState $snapshot.State -ObservedHeartbeat $snapshot.Heartbeat
-            break
+            if (Wait-UnhandledState -Reason "control_binding_invalid" -ObservedState $snapshot.State -ObservedHeartbeat $snapshot.Heartbeat) {
+                break
+            }
+            $snapshot = $null
         }
-        if ([string]$binding.RunId -cne $script:RunId -or [string]$binding.ConfigSha256 -cne $script:ConfigSha256 -or [DateTimeOffset]$binding.Deadline -ne $script:Deadline) {
-            Stop-WatchedPod -Reason "control_binding_changed" -ObservedState $snapshot.State -ObservedHeartbeat $snapshot.Heartbeat
-            break
+        if ($null -ne $snapshot -and ([string]$binding.RunId -cne $script:RunId -or [string]$binding.ConfigSha256 -cne $script:ConfigSha256 -or [DateTimeOffset]$binding.Deadline -ne $script:Deadline)) {
+            if (Wait-UnhandledState -Reason "control_binding_changed" -ObservedState $snapshot.State -ObservedHeartbeat $snapshot.Heartbeat) {
+                break
+            }
+            $snapshot = $null
         }
+    }
+    if ($null -ne $snapshot) {
         $now = [DateTimeOffset]::UtcNow
         $state = $snapshot.State
         $heartbeat = $snapshot.Heartbeat
@@ -704,32 +766,41 @@ while ($true) {
             break
         }
         $status = [string]$state.status
-        if ($status -eq "ERROR") {
+        if ($status -eq "ERROR" -and -not $script:ErrorExported) {
             $errorExport = Export-ErrorEvidence -ObservedState $state -ObservedHeartbeat $heartbeat
             $script:ErrorExportState = [string]$errorExport.State
             $script:ErrorExportPath = [string]$errorExport.Path
             $script:ErrorExportStatusPath = [string]$errorExport.StatusPath
             $script:ErrorExportFailure = $errorExport.Failure
+            $script:ErrorExported = $true
         }
         if ($status -in @("WAITING_FOR_DECISION", "ERROR", "COMPLETED")) {
-            Stop-WatchedPod -Reason "control_status_$($status.ToLowerInvariant())" -ObservedState $state -ObservedHeartbeat $heartbeat
-            break
+            if (Wait-UnhandledState -Reason "control_status_$($status.ToLowerInvariant())" -ObservedState $state -ObservedHeartbeat $heartbeat) {
+                break
+            }
         }
-        if ($status -notin @("STARTING", "RUNNING")) {
-            Stop-WatchedPod -Reason "unknown_control_status" -ObservedState $state -ObservedHeartbeat $heartbeat
-            break
+        elseif ($status -notin @("STARTING", "RUNNING")) {
+            if (Wait-UnhandledState -Reason "unknown_control_status" -ObservedState $state -ObservedHeartbeat $heartbeat) {
+                break
+            }
         }
-        try {
+        else {
+            try {
             $heartbeatAt = [DateTimeOffset]::Parse([string]$heartbeat.updated_at)
             $heartbeatAge = ($now - $heartbeatAt).TotalSeconds
-        }
-        catch {
-            $heartbeatAge = [double]::PositiveInfinity
-        }
-        $graceElapsed = ($now - $script:ArmedAt).TotalSeconds -ge $InitialGraceSeconds
-        if ($graceElapsed -and $heartbeatAge -gt $StaleHeartbeatSeconds) {
-            Stop-WatchedPod -Reason "stale_heartbeat" -ObservedState $state -ObservedHeartbeat $heartbeat
-            break
+            }
+            catch {
+                $heartbeatAge = [double]::PositiveInfinity
+            }
+            $graceElapsed = ($now - $script:ArmedAt).TotalSeconds -ge $InitialGraceSeconds
+            if ($graceElapsed -and $heartbeatAge -gt $StaleHeartbeatSeconds) {
+                if (Wait-UnhandledState -Reason "stale_heartbeat" -ObservedState $state -ObservedHeartbeat $heartbeat) {
+                    break
+                }
+            }
+            else {
+                Clear-UnhandledState
+            }
         }
     }
 

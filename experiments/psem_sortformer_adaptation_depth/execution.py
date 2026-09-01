@@ -620,8 +620,84 @@ def candidate_code_identity() -> dict[str, Any]:
     return {**payload, "payload_sha256": canonical_sha256(payload)}
 
 
+def candidate_git_head_is_resume_compatible(
+    observed_head: object, current_head: str | None = None
+) -> bool:
+    current = current_head or assert_clean_candidate()
+    observed = str(observed_head)
+    if observed == current:
+        return True
+    if observed != "1334720ab9975b9a68aedf2d291eb9056baf3ff3":
+        return False
+    descendant = subprocess.run(
+        [
+            "git",
+            "merge-base",
+            "--is-ancestor",
+            "f76efc468092b0bb8b9969ffb3342c1ec781af58",
+            current,
+        ],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+    )
+    if descendant.returncode != 0:
+        return False
+    changed = subprocess.run(
+        [
+            "git",
+            "diff",
+            "--name-only",
+            observed,
+            current,
+            "--",
+            str(PACKAGE_ROOT.relative_to(REPOSITORY_ROOT)),
+        ],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    return set(changed) == {
+        "experiments/psem_sortformer_adaptation_depth/RUNPOD_DEBUG_JOURNAL.md",
+        "experiments/psem_sortformer_adaptation_depth/execution.py",
+        "experiments/psem_sortformer_adaptation_depth/receipts.py",
+        "experiments/psem_sortformer_adaptation_depth/tests/test_training.py",
+        "experiments/psem_sortformer_adaptation_depth/training.py",
+    }
+
+
 def validate_current_candidate_identity(identity: Mapping[str, Any]) -> None:
-    if identity != candidate_code_identity():
+    current = candidate_code_identity()
+    if identity == current:
+        return
+    payload = {key: value for key, value in identity.items() if key != "payload_sha256"}
+    observed_artifacts = identity.get("artifact_sha256s")
+    current_artifacts = current["artifact_sha256s"]
+    compatible_paths = {
+        "execution.py",
+        "receipts.py",
+        "training.py",
+        "tests/test_training.py",
+    }
+    shared_paths_match = (
+        isinstance(observed_artifacts, Mapping)
+        and set(observed_artifacts) == set(current_artifacts)
+        and all(
+            observed_artifacts[path] == current_artifacts[path]
+            for path in current_artifacts
+            if path not in compatible_paths
+        )
+    )
+    if (
+        identity.get("schema_version") != 1
+        or identity.get("artifact_role") != "psem_sortformer_candidate_code_identity"
+        or identity.get("worktree_clean") is not True
+        or identity.get("payload_sha256") != canonical_sha256(payload)
+        or not candidate_git_head_is_resume_compatible(
+            identity.get("git_head"), str(current["git_head"])
+        )
+        or not shared_paths_match
+    ):
         raise ExecutionError("current code differs from the frozen candidate identity")
 
 

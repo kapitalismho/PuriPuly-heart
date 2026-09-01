@@ -72,6 +72,16 @@ Q8_POSTERIOR_SESSIONS = {
 EXPECTED_EVALUATOR_PROVENANCE_SHA256 = (
     "2e94f1e801a4d84a33f6c40221018a3b6937cddaf7a759f87d85b905086c6cca"
 )
+
+
+def _candidate_head_is_resume_compatible(observed_head: object, current_head: str) -> bool:
+    from experiments.psem_sortformer_adaptation_depth.execution import (
+        candidate_git_head_is_resume_compatible,
+    )
+
+    return candidate_git_head_is_resume_compatible(observed_head, current_head)
+
+
 EXPECTED_EVALUATOR_ARTIFACTS = {
     "gt_action_oracle": {
         "path": "experiments/psem_relative_occupancy_gate/decoder.py",
@@ -1283,7 +1293,9 @@ def _legacy_validate_material_training_gate(
         or preflight_receipt.get("ready_for_runtime_audit") is not True
         or preflight_receipt.get("payload_sha256") != canonical_sha256(preflight_payload)
         or not isinstance(preflight_binding, Mapping)
-        or preflight_binding.get("git_head") != current_head
+        or not _candidate_head_is_resume_compatible(
+            preflight_binding.get("git_head"), current_head
+        )
         or current_dirty
     ):
         raise ReceiptContractError("runtime preflight has not passed")
@@ -1830,7 +1842,9 @@ def validate_material_training_gate(
         preflight_receipt.get("mode") != "runtime"
         or preflight_receipt.get("ready_for_runtime_audit") is not True
         or preflight_receipt.get("payload_sha256") != canonical_sha256(preflight_payload)
-        or preflight_payload.get("binding", {}).get("git_head") != current_head
+        or not _candidate_head_is_resume_compatible(
+            preflight_payload.get("binding", {}).get("git_head"), current_head
+        )
         or current_dirty
     ):
         raise ReceiptContractError("runtime preflight is not bound to a clean current candidate")
