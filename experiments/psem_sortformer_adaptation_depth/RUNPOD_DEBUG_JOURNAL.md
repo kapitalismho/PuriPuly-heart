@@ -558,3 +558,11 @@ These identities supersede the original `8165ed58` candidate binding for the liv
 - Simplified the material gate to avoid rerunning preflight, lineage, evaluator reconstruction, canary receipt reconstruction, class-weight reconstruction, registry lookups, and full exact gate replay immediately before training and again before DEV inference. It still enforces clean candidate identity, H/T2/TA order, TRAIN-only manifest identity, bound class weights, staged DEV/EVAL separation, runtime paths, cost hard stop, smoke provenance, and TA operator authorization.
 - Fixed the Windows remote-resume exit race by rereading the final remote status after the short-lived resume process exits. Deadline comparison is semantic UTC equality, and watchdog arming no longer depends on redundant mode/freshness fields after stale receipts have already been quarantined.
 - No worker was sent. Static-only checks passed: Python AST parsing for all changed Python files, PowerShell parser for the worker, and `git diff --check`. No model or test suite was run.
+
+## 2026-09-01 UTC — H-HEAD smoke rejected JSON-round-tripped class weights
+
+- Run `issue-107-a40-1334720a-01` completed `bootstrap-f0` at `07:53:37Z`, then `h-head-material-and-dev` failed at `08:01:20Z`. The watchdog exported control and phase logs locally and stopped the Pod at `08:02:01Z`.
+- Exact exception: `ExecutionError: smoke class weights differ from the one-epoch manifest`. This was not OOM, CUDA failure, or a RunPod interruption.
+- Root cause: `build_manifest_class_weight_receipt` returned `replacement_counts` and `anchor_counts` with integer keys in memory. JSON persistence converts object keys to strings, so the smoke phase's direct dictionary equality rejected an otherwise identical receipt after reload.
+- The receipt builder now emits JSON-native string keys before hashing and persistence. A focused JSON round-trip regression test passed in the pinned container image. The host test runner could not collect because host Python has no Torch.
+- `bootstrap-f0` remains complete on the persistent Pod volume. Resume should archive and restart only the failed `h-head-material-and-dev` phase from its beginning.

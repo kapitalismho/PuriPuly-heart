@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import copy
+import json
 import pickle
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -21,6 +23,7 @@ from experiments.psem_sortformer_adaptation_depth.training import (
     _tensor_content_sha256,
     _training_example_content_bound,
     authorize_official_training,
+    build_manifest_class_weight_receipt,
     derive_train_class_weights,
     duration_weighted_average_precision,
     warmup_scheduler,
@@ -47,6 +50,38 @@ def test_class_weights_are_derived_only_from_active_train_targets() -> None:
     weights = derive_train_class_weights([_example()])
     assert weights.replacement_positive == 1
     assert weights.anchor_positive == 1
+
+
+def test_manifest_class_weight_receipt_survives_json_round_trip(
+    tmp_path, monkeypatch
+) -> None:
+    manifest = tmp_path / "sampling.jsonl"
+    row = {
+        "row_id": "epoch-01-window-0000",
+        "split_role": "PSEM-STRATEGY-TRAIN",
+        "source_id": "source",
+        "window_start_sample": 0,
+    }
+    manifest.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    supervision = _example().supervision
+    monkeypatch.setattr(
+        "experiments.psem_sortformer_adaptation_depth.training.validate_sampling_manifest",
+        lambda *_args: {"passed": True},
+    )
+    monkeypatch.setattr(
+        "experiments.psem_sortformer_adaptation_depth.training.anchor_timeline",
+        lambda *_args: (("e",), ("speaker",)),
+    )
+    monkeypatch.setattr(
+        "experiments.psem_sortformer_adaptation_depth.training.build_frame_supervision",
+        lambda *_args: supervision,
+    )
+    receipt = build_manifest_class_weight_receipt(
+        [row],
+        {"source": SimpleNamespace(role="PSEM-STRATEGY-TRAIN", labels=object())},
+        manifest,
+    )
+    assert json.loads(json.dumps(receipt)) == receipt
 
 
 def test_official_example_attestation_rejects_altered_waveform_or_supervision() -> None:

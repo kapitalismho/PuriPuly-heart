@@ -335,8 +335,8 @@ def build_manifest_class_weight_receipt(
         "sampling_validation_sha256": canonical_sha256(validation),
         "row_count": len(rows),
         "unique_window_count": len(cache),
-        "replacement_counts": dict(sorted(replacement.items())),
-        "anchor_counts": dict(sorted(anchor.items())),
+        "replacement_counts": {str(key): value for key, value in sorted(replacement.items())},
+        "anchor_counts": {str(key): value for key, value in sorted(anchor.items())},
         "replacement_positive_weight": weights.replacement_positive,
         "anchor_positive_weight": weights.anchor_positive,
     }
