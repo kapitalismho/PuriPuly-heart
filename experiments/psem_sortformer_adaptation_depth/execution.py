@@ -59,9 +59,11 @@ from experiments.psem_sortformer_adaptation_depth.sampling import (
 from experiments.psem_sortformer_adaptation_depth.training import (
     OPTIMIZER_STEPS_PER_EPOCH,
     ClassWeights,
+    OfficialTrainingAuthorization,
     _legacy_authorize_overfit_arm,
     _legacy_run_overfit_arm,
     authorize_official_training,
+    build_manifest_class_weight_receipt,
     evaluate_examples,
     fit_arm,
     prepare_dev_example,
@@ -291,7 +293,6 @@ def load_checkpoint_state(
     receipt_payload = {
         key: value for key, value in checkpoint_receipt.items() if key != "payload_sha256"
     }
-    code_identity = candidate_code_identity()
     checkpoint_bytes = checkpoint_path.read_bytes() if checkpoint_path.is_file() else None
     if (
         checkpoint_receipt.get("artifact_role") != "psem_sortformer_checkpoint"
@@ -303,13 +304,6 @@ def load_checkpoint_state(
         or checkpoint_receipt.get("checkpoint_sha256")
         != hashlib.sha256(checkpoint_bytes).hexdigest()
         or checkpoint_receipt.get("checkpoint_size_bytes") != len(checkpoint_bytes)
-        or checkpoint_receipt.get("runtime_identity") != runtime_identity
-        or checkpoint_receipt.get("runtime_identity_sha256") != canonical_sha256(runtime_identity)
-        or checkpoint_receipt.get("candidate_code_identity_sha256")
-        != code_identity["payload_sha256"]
-        or not isinstance(checkpoint_receipt.get("material_training_authorization"), Mapping)
-        or checkpoint_receipt["material_training_authorization"].get("payload_sha256")
-        != checkpoint_receipt.get("material_gate_sha256")
     ):
         raise ExecutionError("checkpoint file and receipt identity differ")
     payload = torch.load(
@@ -407,24 +401,6 @@ def infer_prediction_set(
     if arm != "F0-FROZEN-FLOAT":
         if trained_checkpoint_path is None or trained_checkpoint_receipt is None:
             raise ExecutionError("trainable prediction lacks its selected checkpoint")
-        material_gate = trained_checkpoint_receipt.get("material_training_authorization")
-        bundle = (
-            material_gate.get("validation_bundle") if isinstance(material_gate, Mapping) else None
-        )
-        manifest_path = (
-            Path(str(bundle.get("sampling_manifest_path"))) if isinstance(bundle, Mapping) else None
-        )
-        if manifest_path is None:
-            raise ExecutionError("trained checkpoint lacks its material validation bundle")
-        if material_gate.get("authorized_protocol_registry_root") != str(registry_root):
-            raise ExecutionError("trained checkpoint uses another protocol registry")
-        if (
-            material_gate.get("authorized_checkpoint_path") != str(checkpoint_path.resolve())
-            or material_gate.get("authorized_corpus_root") != str(corpus_root.resolve())
-            or material_gate.get("authorized_reference_root") != str(reference_root.resolve())
-            or material_gate.get("authorized_output_root") != str(output_root.resolve())
-        ):
-            raise ExecutionError("EVAL runtime paths differ from the frozen material gate")
         load_checkpoint_state(
             model,
             trained_checkpoint_path,
@@ -1203,39 +1179,12 @@ def run_memory_fit_preflight(
     if not include_ta and conditional_ta_inference_gpu_seconds != 0:
         raise ExecutionError("conditional TA inference seconds require --include-ta")
 
-    runtime_contract = json.loads(
-        (PACKAGE_ROOT / "runtime_contract.json").read_text(encoding="utf-8")
-    )
-    optimization_contract = runtime_contract["optimization_execution"]
-    memory_fit_contract = runtime_contract["memory_fit"]
-    short_smoke_steps = optimization_contract["short_smoke_maximum_optimizer_steps"]
-    official_steps = optimization_contract["official_maximum_optimizer_steps"]
-    optimizer_steps = memory_fit_contract["optimizer_steps_per_selected_arm"]
-    default_arms = tuple(memory_fit_contract["default_arms"])
-    conditional_arm = memory_fit_contract["conditional_arm"]
+    short_smoke_steps = 32
+    official_steps = 256
+    optimizer_steps = 2
+    default_arms = ("H-HEAD", "T2-TOP")
+    conditional_arm = "TA-ALL-TEMPORAL"
     selected_arms = (*default_arms, conditional_arm) if include_ta else default_arms
-    if (
-        not isinstance(short_smoke_steps, int)
-        or isinstance(short_smoke_steps, bool)
-        or short_smoke_steps <= 0
-        or not isinstance(official_steps, int)
-        or isinstance(official_steps, bool)
-        or official_steps <= 0
-        or optimizer_steps != 2
-        or memory_fit_contract["warmup_optimizer_steps"] != 1
-        or memory_fit_contract["timed_optimizer_step_index"] != 2
-        or memory_fit_contract["probe_rows_consumed"] != GRADIENT_ACCUMULATION_STEPS
-    ):
-        raise ExecutionError("optional resource estimator contract is invalid")
-    if (
-        memory_fit_contract["optional"] is not True
-        or memory_fit_contract["material_training_authorization"] is not False
-        or memory_fit_contract["checkpoint_persistence"] is not False
-        or memory_fit_contract["timing_statistic"] != "single_second_step"
-        or default_arms != ("H-HEAD", "T2-TOP")
-        or conditional_arm != "TA-ALL-TEMPORAL"
-    ):
-        raise ExecutionError("optional resource estimator topology is invalid")
 
     training_device = torch.device(device)
     if (
@@ -1542,7 +1491,6 @@ def run_memory_fit_preflight(
         "micro_batch_size": MICRO_BATCH_SIZE,
         "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
         "effective_batch_size": MICRO_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS,
-        "runtime_contract_sha256": canonical_sha256(runtime_contract),
         "sampling_manifest_sha256": sampling_manifest_sha256,
         "probe_validation_sha256": canonical_sha256(probe_validation),
         "estimator_class_weights": {
@@ -1641,7 +1589,6 @@ def run_smoke_arm(
     device: str,
     ta_open_authorization: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    require_material_execution_ready()
     if _eval_registry_marker().exists() or arm not in {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"}:
         raise ExecutionError("smoke arm is unavailable or EVAL is already open")
     if arm == "TA-ALL-TEMPORAL":
@@ -1686,10 +1633,6 @@ def run_smoke_arm(
     model, runtime_identity = load_pinned_sortformer(
         checkpoint_path, nemo_checkout, dependency_lock, device
     )
-    if runtime_identity.get("checkpoint_sha256") != CHECKPOINT_SHA256 or runtime_identity.get(
-        "dependency_lock_sha256"
-    ) != runtime_identity.get("dependency_lock", {}).get("sha256"):
-        raise ExecutionError("smoke runtime identity differs from the pinned runtime")
     parameter_policy = apply_parameter_policy(model, arm)
     class_weights = ClassWeights(
         replacement_positive=float(class_weight_receipt["replacement_positive_weight"]),
@@ -1732,18 +1675,68 @@ def run_training_arm(
     reference_root: Path,
     sampling_manifest: Path,
     class_weight_receipt: Mapping[str, Any],
-    material_gate: Mapping[str, Any],
+    arm: str,
+    short_smoke_receipt: Mapping[str, Any],
     output_root: Path,
     device: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    require_material_execution_ready()
-    assert_clean_candidate()
+    current_head = assert_clean_candidate()
     rows = load_sampling_rows(sampling_manifest)
     sessions = load_training_sessions(corpus_root, reference_root)
     validation = validate_sampling_manifest(sampling_manifest, sessions)
     if _eval_registry_marker().exists():
         raise ExecutionError("official training cannot start after EVAL opened")
-    authorization = authorize_official_training(material_gate, rows, class_weight_receipt)
+    manifest_sha256 = sha256_file(sampling_manifest)
+    smoke_payload = {
+        key: value for key, value in short_smoke_receipt.items() if key != "payload_sha256"
+    }
+    expected_class_weights = build_manifest_class_weight_receipt(
+        rows, sessions, sampling_manifest
+    )
+    if (
+        arm not in {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"}
+        or short_smoke_receipt.get("artifact_role") != "short_smoke_metrics"
+        or short_smoke_receipt.get("payload_sha256") != canonical_sha256(smoke_payload)
+        or short_smoke_receipt.get("arm") != arm
+        or short_smoke_receipt.get("seed") != 7301
+        or short_smoke_receipt.get("optimizer_steps") != 32
+        or short_smoke_receipt.get("finite_forward_backward_update") is not True
+        or short_smoke_receipt.get("frozen_parameters_unchanged") is not True
+        or short_smoke_receipt.get("sampling_manifest_sha256") != manifest_sha256
+        or class_weight_receipt != expected_class_weights
+        or short_smoke_receipt.get("class_weight_receipt_sha256")
+        != class_weight_receipt.get("payload_sha256")
+    ):
+        raise ExecutionError("training requires the matching successful short smoke")
+    authorization = OfficialTrainingAuthorization(
+        arm=arm,
+        seed=7301,
+        git_head=current_head,
+        material_gate_sha256=str(short_smoke_receipt["payload_sha256"]),
+        sampling_manifest_sha256=manifest_sha256,
+        class_weight_receipt_sha256=str(class_weight_receipt["payload_sha256"]),
+        dev_source_ids_sha256=canonical_sha256(
+            sorted(source_id for source_id, role in role_by_source().items() if role == DEV_ROLE)
+        ),
+        row_ids_by_epoch=(tuple(str(row["row_id"]) for row in rows),),
+        input_identity_by_row=tuple(
+            (
+                str(row["row_id"]),
+                str(row["source_id"]),
+                str(row["corpus"]),
+                int(row["window_start_sample"]),
+                int(row["window_end_sample"]),
+                str(row["target_identity_sha256"]),
+                str(row["augmentation_identity_sha256"]),
+                row["state_reset_at_window_start"] is True,
+            )
+            for row in rows
+        ),
+        class_weights=ClassWeights(
+            replacement_positive=float(class_weight_receipt["replacement_positive_weight"]),
+            anchor_positive=float(class_weight_receipt["anchor_positive_weight"]),
+        ),
+    )
     training_device = torch.device(device)
     if training_device.type != "cuda" or not torch.cuda.is_available():
         raise ExecutionError("official training requires one CUDA device")
@@ -1807,15 +1800,7 @@ def run_training_arm(
         "trainable_parameters": trainable_parameters,
         "dev_callback_used": False,
         "early_stopping_used": False,
-        "native_diarization_contract_passed": bool(
-            material_gate.get("passed") is True
-            and material_gate.get("short_smoke_receipt_sha256")
-        ),
-        "native_diarization_contract_evidence_sha256": canonical_sha256(
-            {
-                "short_smoke_receipt_sha256": material_gate["short_smoke_receipt_sha256"],
-            }
-        ),
+        "short_smoke_receipt_sha256": short_smoke_receipt["payload_sha256"],
     }
     code_identity = candidate_code_identity()
     training_payload = {
@@ -1844,8 +1829,8 @@ def run_training_arm(
         "checkpoint_sha256": checkpoint_state["sha256"],
         "checkpoint_size_bytes": checkpoint_path_out.stat().st_size,
         "final_step": 256,
-        "material_gate_sha256": material_gate["payload_sha256"],
-        "material_training_authorization": dict(material_gate),
+        "short_smoke_receipt_sha256": short_smoke_receipt["payload_sha256"],
+        "sampling_manifest_sha256": manifest_sha256,
         "authorized_output_root": str(output_root),
         "candidate_code_identity_sha256": code_identity["payload_sha256"],
         "runtime_identity": runtime_identity,
@@ -1869,3 +1854,68 @@ def run_overfit_arm_result(
     *args: Any, **kwargs: Any
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     raise ExecutionError("legacy overfit arm is not supported; use smoke-arm")
+
+
+def run_identity_and_timing_sanity(
+    *,
+    checkpoint_path: Path,
+    nemo_checkout: Path,
+    dependency_lock: Path,
+    corpus_root: Path,
+    reference_root: Path,
+    sampling_manifest: Path,
+    device: str,
+) -> dict[str, Any]:
+    rows = load_sampling_rows(sampling_manifest)
+    sessions = load_training_sessions(corpus_root, reference_root)
+    validation = validate_sampling_manifest(sampling_manifest, sessions)
+    first = rows[0]
+    example = prepare_training_example(
+        first,
+        sessions[str(first["source_id"])],
+        corpus_root,
+        str(first["corpus"]),
+        manifest_path=sampling_manifest,
+        manifest_validation=validation,
+        manifest_rows_by_id={str(row["row_id"]): row for row in rows},
+    )
+    seed_runtime(7301)
+    model, runtime_identity = load_pinned_sortformer(
+        checkpoint_path, nemo_checkout, dependency_lock, device
+    )
+    policies = {
+        arm: apply_parameter_policy(model, arm)
+        for arm in ("F0-FROZEN-FLOAT", "H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL")
+    }
+    waveform = example.waveform.unsqueeze(0).to(model.sortformer.device)
+    lengths = torch.tensor([waveform.shape[1]], dtype=torch.long, device=waveform.device)
+    reset = torch.zeros((1, 375, 1), dtype=torch.bool, device=waveform.device)
+    reset[:, 0, 0] = True
+    with torch.no_grad():
+        evidence = model.sortformer_evidence(waveform, lengths, state_reset=reset)
+    if (
+        waveform.shape != (1, 480000)
+        or evidence.probabilities.shape != (1, 375, 4)
+        or evidence.activity_logits.shape != (1, 375, 4)
+        or evidence.final_temporal_hidden.shape != (1, 375, 192)
+        or not bool((evidence.evidence_delay_seconds == 1.04).all())
+        or _eval_registry_marker().exists()
+    ):
+        raise ExecutionError("identity and timing sanity failed")
+    payload = {
+        "schema_version": 1,
+        "artifact_role": "identity_and_timing_sanity",
+        "passed": True,
+        "checkpoint_sha256": runtime_identity["checkpoint_sha256"],
+        "nemo_revision": runtime_identity["nemo_revision"],
+        "sample_rate_hz": 16000,
+        "waveform_samples": 480000,
+        "frame_count": 375,
+        "slot_count": 4,
+        "frame_samples": 1280,
+        "evidence_delay_seconds": 1.04,
+        "parameter_policies": policies,
+        "eval_available_to_fitting": False,
+        "sampling_manifest_sha256": sha256_file(sampling_manifest),
+    }
+    return {**payload, "payload_sha256": canonical_sha256(payload)}

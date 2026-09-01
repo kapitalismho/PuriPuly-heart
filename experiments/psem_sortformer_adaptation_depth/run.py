@@ -10,6 +10,7 @@ from experiments.psem_sortformer_adaptation_depth.execution import (
     candidate_code_identity,
     infer_prediction_set,
     run_canary_arm,
+    run_identity_and_timing_sanity,
     run_smoke_arm,
     run_training_arm,
     validate_current_candidate_identity,
@@ -143,7 +144,10 @@ def main(argv: list[str] | None = None) -> int:
     train.add_argument("--reference-root", type=Path, required=True)
     train.add_argument("--manifest", type=Path, required=True)
     train.add_argument("--class-weights", type=Path, required=True)
-    train.add_argument("--material-gate", type=Path, required=True)
+    train.add_argument(
+        "--arm", choices=("H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"), required=True
+    )
+    train.add_argument("--short-smoke-receipt", type=Path, required=True)
     train.add_argument("--output-root", type=Path, required=True)
     train.add_argument("--device", default="cuda")
     train.add_argument("--training-output", type=Path, required=True)
@@ -217,6 +221,15 @@ def main(argv: list[str] | None = None) -> int:
     memory_fit.add_argument("--conditional-ta-inference-gpu-seconds", type=float, default=0.0)
     memory_fit.add_argument("--device", default="cuda")
     memory_fit.add_argument("--output", type=Path, required=True)
+    sanity = commands.add_parser("identity-timing-sanity")
+    sanity.add_argument("--checkpoint", type=Path, required=True)
+    sanity.add_argument("--nemo-checkout", type=Path, required=True)
+    sanity.add_argument("--dependency-lock", type=Path, required=True)
+    sanity.add_argument("--corpus-root", type=Path, required=True)
+    sanity.add_argument("--reference-root", type=Path, required=True)
+    sanity.add_argument("--manifest", type=Path, required=True)
+    sanity.add_argument("--device", default="cuda")
+    sanity.add_argument("--output", type=Path, required=True)
     cost = commands.add_parser("cost-receipt")
     cost.add_argument("--hourly-price-usd", type=float, required=True)
     cost.add_argument("--hourly-price-source", required=True)
@@ -332,6 +345,19 @@ def main(argv: list[str] | None = None) -> int:
         write_json(args.output, receipt)
         print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
         return 0 if receipt["all_selected_arms_fit"] else 2
+    if args.command == "identity-timing-sanity":
+        receipt = run_identity_and_timing_sanity(
+            checkpoint_path=args.checkpoint,
+            nemo_checkout=args.nemo_checkout,
+            dependency_lock=args.dependency_lock,
+            corpus_root=args.corpus_root,
+            reference_root=args.reference_root,
+            sampling_manifest=args.manifest,
+            device=args.device,
+        )
+        write_json(args.output, receipt)
+        print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
+        return 0
     if args.command == "data-split-receipt":
         receipt = build_data_split_receipt()
         if args.output:
@@ -423,7 +449,8 @@ def main(argv: list[str] | None = None) -> int:
             reference_root=args.reference_root,
             sampling_manifest=args.manifest,
             class_weight_receipt=_load_json(args.class_weights),
-            material_gate=_load_json(args.material_gate),
+            arm=args.arm,
+            short_smoke_receipt=_load_json(args.short_smoke_receipt),
             output_root=args.output_root,
             device=args.device,
         )

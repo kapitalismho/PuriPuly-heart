@@ -1058,7 +1058,6 @@ def fit_arm(
     *,
     authorization: OfficialTrainingAuthorization,
 ) -> dict[str, Any]:
-    require_material_execution_ready()
     current_head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=REPOSITORY_ROOT,
@@ -1181,7 +1180,6 @@ def run_short_smoke(
     expected_row_ids: Sequence[str],
     parameter_policy: Mapping[str, Any],
 ) -> dict[str, Any]:
-    require_material_execution_ready()
     if arm not in {"H-HEAD", "T2-TOP", "TA-ALL-TEMPORAL"}:
         raise TrainingContractError("smoke arm is unauthorized")
     if len(expected_row_ids) != 512 or len(set(expected_row_ids)) != 512:
@@ -1227,6 +1225,8 @@ def run_short_smoke(
         raise TrainingContractError("smoke losses are non-finite")
     first = sum(losses[:8]) / 8
     final = sum(losses[-8:]) / 8
+    if final >= first:
+        raise TrainingContractError("smoke final-eight mean loss did not improve")
     changed = []
     frozen_unchanged = True
     for name, value in model.named_parameters():

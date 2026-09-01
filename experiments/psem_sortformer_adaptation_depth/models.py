@@ -194,7 +194,7 @@ def masked_balanced_bce_with_logits(
     active = mask.to(dtype=logits.dtype)
     denominator = active.sum()
     if denominator.item() <= 0:
-        raise ValueError("at least one unmasked target is required")
+        return (losses * active).sum()
     return (losses * active).sum() / denominator
 
 

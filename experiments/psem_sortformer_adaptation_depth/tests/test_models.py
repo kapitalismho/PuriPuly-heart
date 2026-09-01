@@ -159,6 +159,19 @@ def test_masked_loss_rejects_nonbinary_inputs(target: float, mask: float) -> Non
         )
 
 
+def test_masked_loss_returns_differentiable_zero_without_valid_targets() -> None:
+    logits = torch.zeros(1, 2, requires_grad=True)
+    loss = masked_balanced_bce_with_logits(
+        logits,
+        torch.zeros_like(logits),
+        torch.zeros_like(logits),
+        1.0,
+    )
+    loss.backward()
+    assert loss.item() == 0
+    assert torch.equal(logits.grad, torch.zeros_like(logits))
+
+
 def test_native_loss_binding_accepts_dev_but_rejects_eval_or_mixed_roles() -> None:
     bound = bind_native_sortformer_loss(
         torch.tensor(1.0),

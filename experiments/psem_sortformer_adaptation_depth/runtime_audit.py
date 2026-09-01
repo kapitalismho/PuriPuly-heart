@@ -353,7 +353,6 @@ def _optimizer_groups(model: nn.Module, arm: str) -> list[dict[str, Any]]:
 
 
 def build_optimizer(model: nn.Module, arm: str) -> torch.optim.AdamW:
-    _require_material_execution_ready()
     return torch.optim.AdamW(_optimizer_groups(model, arm), weight_decay=WEIGHT_DECAY)
 
 

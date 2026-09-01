@@ -8,7 +8,7 @@ This namespace targets the current issue-107 bounded hobby-engineering probe. Th
 ready
 ```
 
-The supported CLI now enforces the 32/256-step, seed-7301, singleton DEV/EVAL, F0-plus-winner, and USD-30-hard-stop contract. `ready` authorizes the local material path only after runtime preflight, short smoke, runtime canaries, staged DEV state, and cost validation all pass on a clean committed candidate; it does not authorize GPU provisioning, deployment, or remote execution.
+The supported CLI enforces the 32/256-step, seed-7301, singleton DEV/EVAL, F0-plus-winner, and USD-30-hard-stop contract. The active path is sampling manifest and class weights, one identity/timing sanity, one memory-fit pass, per-arm smoke, training, and DEV evaluation. It does not authorize GPU provisioning, deployment, or remote execution.
 
 ## Local contract verification
 
@@ -17,7 +17,7 @@ uv run --project experiments\speaker_representation_scd\environment --frozen pyt
 uv run --project experiments\speaker_representation_scd\environment --frozen pytest experiments\psem_sortformer_adaptation_depth\tests -q
 ```
 
-Static verification binds the current `contract.json`, `config.json`, `runtime_contract.json`, `runtime_environment.json`, immutable V2 data artifacts, and issue-99 predecessor evidence. Runtime preflight authorizes material work only when those controls, a clean committed candidate, the pinned runtime, and all external paths are present and exact.
+The live experiment does not use the older research-grade runtime-preflight, lineage, material-bundle, or material-gate chain. The minimum identity/timing sanity binds the exact checkpoint and NeMo revision and exercises raw 16 kHz waveform input, the native four-slot 80 ms graph, the 1.04 s evidence delay, parameter policies, and EVAL isolation.
 
 ## Compatible single-CUDA-GPU runtime preparation
 
@@ -55,9 +55,9 @@ hard stop:               USD 30
 
 Record the GPU hourly price and source, actual GPU seconds, accrued cost, and projected remaining cost. A new issue amendment is required before exceeding the hard stop.
 
-### Optional memory-fit estimate
+### Memory-fit check
 
-`memory-fit` is an optional, non-authorizing resource estimate. It is not a prerequisite for smoke, training, material authorization, or GPU selection. By default it probes `H-HEAD` and `T2-TOP`; pass `--include-ta` only when a conditional TA estimate is useful.
+`memory-fit` checks that H, T2, and conditional TA fit the selected CUDA device before the arm sequence. It is a resource check, not a training authorization gate.
 
 The command consumes only the first 16 ordered epoch-1 TRAIN rows from the existing sampling manifest and does not run the full manifest validator. Each selected arm runs two optimizer steps on those rows: step 1 initializes optimizer state and warms the graph, and step 2 supplies the rough timing estimate. Peak allocated/reserved VRAM covers both steps. Unit loss weights are sufficient because this command estimates allocation and elapsed time, not scientific quality. No checkpoint or trained model state is persisted.
 
@@ -89,7 +89,7 @@ checkpoint:        final optimizer step
 seed:              7301
 ```
 
-The smoke requires finite forward/backward/update behavior and the exact parameter policy. Its first-eight and final-eight mean losses are recorded as diagnostics rather than used as a blocking trend gate.
+The smoke requires finite forward/backward/update behavior, the exact parameter policy, changed required trainables, unchanged frozen parameters, and a lower final-eight mean loss than the first-eight mean.
 
 Deterministic resume is not required. An interrupted run is discarded and restarted from step zero with the same seed and manifest. A final model checkpoint is still required for inference.
 
@@ -122,21 +122,22 @@ The supported operating surface is one fixed 0.50/500 ms cell, one seed, and poo
 
 ```text
 identity_and_timing_sanity.json
+cloud_memory_fit_preflight.json
 short_smoke_metrics.json
 short_training_metrics.json
 dev_primary_metrics.json
 eval_primary_metrics.json (selection path only)
 cost_receipt.json
-ADAPTATION_DECISION.md (all terminal outcomes)
+LEAN_ADAPTATION_DECISION.md (all terminal outcomes)
 ```
 
 ## Sequential operator flow
 
-1. Run static and runtime preflight on a clean committed candidate, then materialize and validate the one-epoch sampling manifest and TRAIN-only class weights.
-2. Build lineage evidence, run the one-time Pod CUDA canary, then run the arm's 32-step `smoke-arm` and create a `cost-receipt` for the next material action.
-3. Initialize staged DEV state from F0. For H and then T2, assemble and validate the material bundle, run the exact 256-step `train-arm`, infer DEV predictions, evaluate the singleton cell, and append the result.
+1. Materialize the immutable one-epoch sampling manifest and TRAIN-only class weights, then run the minimum identity/timing sanity and memory-fit checks.
+2. Run F0 DEV, initialize staged state, then run each arm's 32-step `smoke-arm` and cost check.
+3. For H and then T2, run the exact 256-step `train-arm`, infer DEV predictions, evaluate the singleton cell, and append the result.
 4. Record `dev-decision`. If it is `open_ta`, create `open-ta` authorization and repeat the smoke, cost, training, and DEV sequence for TA before recording the final selection or stop decision.
-5. Freeze the candidate set with the final operator decision and cost receipt. `stop` ends with an empty freeze and cannot open EVAL; pass that freeze directly to `final-report` to emit the Outcome-D `ADAPTATION_DECISION.md` without EVAL. Selection freezes exactly F0 plus one winner.
+5. Freeze the candidate set with the final operator decision and cost receipt. `stop` ends with an empty freeze and cannot open EVAL; pass that freeze directly to `final-report` to emit the Outcome-D `LEAN_ADAPTATION_DECISION.md` without EVAL. Selection freezes exactly F0 plus one winner.
 6. For selection only, open EVAL once, infer and evaluate exactly the frozen pair, then pass the EVAL report bundle to `final-report`. No supported command resumes training after EVAL opens.
 
 The canonical decision for every outcome explicitly preserves both boundaries: no student KD is performed or authorized, and no NEST/acoustic-encoder parameter is unfrozen or authorized for unfreezing.

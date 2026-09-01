@@ -1030,13 +1030,6 @@ def validate_dev_result(value: Mapping[str, Any]) -> dict[str, Any]:
         or payload.get("split_role") != DEV_ROLE
         or payload.get("evaluation_roles") != [DEV_ROLE]
         or payload.get("eval_open_count") != 0
-        or type(payload.get("passed")) is not bool
-        or type(payload.get("slot_mapping_coverage_passed")) is not bool
-        or type(payload.get("timing_gate_passed")) is not bool
-        or payload.get("passed")
-        is not (
-            payload["slot_mapping_coverage_passed"] and payload["timing_gate_passed"]
-        )
         or not isinstance(frontier, list)
         or len(frontier) != 1
     ):

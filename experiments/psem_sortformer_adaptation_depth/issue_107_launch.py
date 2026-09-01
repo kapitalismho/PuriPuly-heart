@@ -473,16 +473,12 @@ def _runtime_validator_command(receipt: Path) -> list[str]:
 def _common_receipts(run_root: Path) -> dict[str, Path]:
     receipts = run_root / "receipts"
     return {
-        "runtime_validation": receipts / "runtime-validation.json",
-        "preflight": receipts / "runtime-preflight.json",
         "dependency_lock": receipts / "dependency-lock.json",
         "sampling_manifest": receipts / "sampling-manifest.jsonl",
         "sampling_validation": receipts / "sampling-validation.json",
         "class_weights": receipts / "class-weights.json",
-        "lineage_authorization": receipts / "lineage-authorization.json",
-        "lineage": receipts / "lineage.json",
-        "validated_lineage": receipts / "validated-lineage.json",
-        "runtime_identity": receipts / "runtime-identity.json",
+        "identity_sanity": receipts / "identity-and-timing-sanity.json",
+        "memory_fit": receipts / "cloud-memory-fit-preflight.json",
         "f0_prediction": receipts / "f0-dev-prediction-set.json",
         "f0_result": receipts / "f0-dev-result.json",
         "staged_after_f0": receipts / "staged-after-f0.json",
@@ -504,9 +500,6 @@ def _arm_paths(run_root: Path, arm: str) -> dict[str, Path]:
         "canary": receipts / f"{slug}-canary.json",
         "smoke": receipts / f"{slug}-smoke.json",
         "cost": receipts / f"{slug}-cost.json",
-        "material_inputs": receipts / f"{slug}-material-inputs.json",
-        "material_bundle": receipts / f"{slug}-material-bundle.json",
-        "material_gate": receipts / f"{slug}-material-gate.json",
         "training": receipts / f"{slug}-training.json",
         "checkpoint_receipt": receipts / f"{slug}-checkpoint-receipt.json",
         "prediction": receipts / f"{slug}-dev-prediction-set.json",
@@ -637,26 +630,6 @@ def bootstrap_f0(args: argparse.Namespace) -> dict[str, Any]:
     _require_absent([*paths.values(), args.phase_summary])
     before = _snapshot_scientific(run_root)
     commands: list[dict[str, Any]] = []
-    commands.append(_command_record(_runtime_validator_command(paths["runtime_validation"])))
-    commands.append(
-        _run_command(
-            [
-                "preflight",
-                "--checkpoint",
-                str(args.checkpoint),
-                "--corpus-root",
-                str(args.corpus_root),
-                "--reference-root",
-                str(args.reference_root),
-                "--output-root",
-                str(run_root / "output"),
-                "--protocol-registry-root",
-                str(run_root / "protocol-registry"),
-                "--receipt-output",
-                str(paths["preflight"]),
-            ]
-        )
-    )
     commands.append(_run_command(["dependency-lock", "--output", str(paths["dependency_lock"])]))
     commands.append(
         _run_command(
@@ -701,15 +674,12 @@ def bootstrap_f0(args: argparse.Namespace) -> dict[str, Any]:
             ]
         )
     )
-    commands.append(
-        _run_command(["lineage-authorization", "--output", str(paths["lineage_authorization"])])
-    )
     _cost_seconds(args)
-    storage.append(_storage_evidence("before_build_lineage", args.minimum_free_bytes))
+    storage.append(_storage_evidence("before_identity_sanity", args.minimum_free_bytes))
     commands.append(
         _run_command(
             [
-                "build-lineage",
+                "identity-timing-sanity",
                 "--checkpoint",
                 str(args.checkpoint),
                 "--nemo-checkout",
@@ -720,28 +690,44 @@ def bootstrap_f0(args: argparse.Namespace) -> dict[str, Any]:
                 str(args.corpus_root),
                 "--reference-root",
                 str(args.reference_root),
-                "--output-root",
-                str(run_root / "output"),
-                "--authorization",
-                str(paths["lineage_authorization"]),
+                "--manifest",
+                str(paths["sampling_manifest"]),
                 "--device",
                 "cuda",
                 "--output",
-                str(paths["lineage"]),
-                "--runtime-identity-output",
-                str(paths["runtime_identity"]),
+                str(paths["identity_sanity"]),
             ]
         )
     )
     commands.append(
         _run_command(
             [
-                "validate-lineage",
-                str(paths["lineage"]),
-                "--runtime-identity",
-                str(paths["runtime_identity"]),
+                "memory-fit",
+                "--checkpoint",
+                str(args.checkpoint),
+                "--nemo-checkout",
+                str(args.nemo_checkout),
+                "--dependency-lock",
+                str(paths["dependency_lock"]),
+                "--corpus-root",
+                str(args.corpus_root),
+                "--reference-root",
+                str(args.reference_root),
+                "--manifest",
+                str(paths["sampling_manifest"]),
+                "--include-ta",
+                "--hourly-price-usd",
+                _format_float(args.hourly_price_usd),
+                "--hourly-price-source",
+                args.hourly_price_source,
+                "--required-inference-gpu-seconds",
+                "0",
+                "--conditional-ta-inference-gpu-seconds",
+                "0",
+                "--device",
+                "cuda",
                 "--output",
-                str(paths["validated_lineage"]),
+                str(paths["memory_fit"]),
             ]
         )
     )
@@ -814,45 +800,12 @@ def _arm_input_paths(run_root: Path, arm: str) -> list[Path]:
     common = _common_receipts(run_root)
     staged, prior_results = _arm_priors(run_root, arm)
     return [
-        common["preflight"],
         common["dependency_lock"],
         common["sampling_manifest"],
-        common["sampling_validation"],
         common["class_weights"],
-        common["validated_lineage"],
-        common["runtime_identity"],
         staged,
         *prior_results,
     ]
-
-
-def _material_inputs(
-    *,
-    arm: str,
-    common: Mapping[str, Path],
-    paths: Mapping[str, Path],
-    staged: Path,
-    prior_results: Sequence[Path],
-    ta_authorization: Path | None = None,
-) -> dict[str, Any]:
-    value: dict[str, Any] = {
-        "schema_version": 1,
-        "artifact_role": "issue_107_material_inputs",
-        "arm": arm,
-        "seed": 7301,
-        "preflight_receipt": str(common["preflight"]),
-        "sampling_validation": str(common["sampling_validation"]),
-        "class_weight_receipt": str(common["class_weights"]),
-        "lineage_receipt": str(common["validated_lineage"]),
-        "runtime_identity": str(common["runtime_identity"]),
-        "short_smoke_receipt": str(paths["smoke"]),
-        "cost_receipt": str(paths["cost"]),
-        "staged_execution_receipt": str(staged),
-        "staged_dev_results": [str(path) for path in prior_results],
-    }
-    if ta_authorization is not None:
-        value["ta_open_authorization"] = str(ta_authorization)
-    return value
 
 
 def _run_arm_sequence(
@@ -905,46 +858,7 @@ def _run_arm_sequence(
         commands.append(
             _cost_command(args, paths["cost"], f"Issue #107 {arm} authorized billing horizon")
         )
-    _atomic_create_bound_json(
-        paths["material_inputs"],
-        _material_inputs(
-            arm=arm,
-            common=common,
-            paths=paths,
-            staged=staged,
-            prior_results=prior_results,
-            ta_authorization=ta_authorization,
-        ),
-    )
-    commands.append(
-        _run_command(
-            [
-                "assemble-material-bundle",
-                str(paths["material_inputs"]),
-                "--output",
-                str(paths["material_bundle"]),
-            ]
-        )
-    )
-    storage.append(
-        _storage_evidence("before_material_validation_and_training", args.minimum_free_bytes)
-    )
-    commands.append(
-        _run_command(
-            [
-                "validate-material-gate",
-                str(paths["material_bundle"]),
-                "--manifest",
-                str(common["sampling_manifest"]),
-                "--corpus-root",
-                str(args.corpus_root),
-                "--reference-root",
-                str(args.reference_root),
-                "--output",
-                str(paths["material_gate"]),
-            ]
-        )
-    )
+    storage.append(_storage_evidence("before_training", args.minimum_free_bytes))
     _cost_seconds(args)
     commands.append(
         _run_command(
@@ -964,8 +878,10 @@ def _run_arm_sequence(
                 str(common["sampling_manifest"]),
                 "--class-weights",
                 str(common["class_weights"]),
-                "--material-gate",
-                str(paths["material_gate"]),
+                "--arm",
+                arm,
+                "--short-smoke-receipt",
+                str(paths["smoke"]),
                 "--output-root",
                 str(run_root / "output"),
                 "--device",
@@ -1051,9 +967,6 @@ def run_arm(args: argparse.Namespace) -> dict[str, Any]:
             "canary",
             "smoke",
             "cost",
-            "material_inputs",
-            "material_bundle",
-            "material_gate",
             "training",
             "checkpoint_receipt",
             "prediction",
@@ -1149,9 +1062,6 @@ def run_ta(args: argparse.Namespace) -> dict[str, Any]:
                 "canary",
                 "smoke",
                 "cost",
-                "material_inputs",
-                "material_bundle",
-                "material_gate",
                 "training",
                 "checkpoint_receipt",
                 "prediction",
