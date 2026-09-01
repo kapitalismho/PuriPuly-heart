@@ -142,7 +142,7 @@
   "settings.prompt_for": "Prompt for: {provider}",
   "settings.system_prompt": "System Prompt",
   "settings.reset_prompt": "Reset Prompt",
-  "settings.custom_vocabulary.description": "Supports Soniox, Deepgram, and Qwen Audio hotwords",
+  "settings.custom_vocabulary.description": "Only Soniox, Deepgram, and Qwen Audio are supported",
   "settings.custom_vocabulary.add_placeholder": "",
   "settings.custom_vocabulary.add_action": "Add",
   "settings.custom_vocabulary.empty": "No hints yet.",

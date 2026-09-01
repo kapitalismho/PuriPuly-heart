@@ -142,7 +142,7 @@
   "settings.prompt_for": "プロンプト: {provider}",
   "settings.system_prompt": "システムプロンプト",
   "settings.reset_prompt": "プロンプト初期化",
-  "settings.custom_vocabulary.description": "Soniox、Deepgram、Qwen Audioのホットワードに対応しています",
+  "settings.custom_vocabulary.description": "Soniox、Deepgram、Qwen Audioのみ対応しています",
   "settings.custom_vocabulary.add_placeholder": "",
   "settings.custom_vocabulary.add_action": "追加",
   "settings.custom_vocabulary.empty": "追加されたヒントはまだありません。",

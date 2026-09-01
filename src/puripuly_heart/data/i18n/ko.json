@@ -142,7 +142,7 @@
   "settings.prompt_for": "프롬프트: {provider}",
   "settings.system_prompt": "시스템 프롬프트",
   "settings.reset_prompt": "프롬프트 초기화",
-  "settings.custom_vocabulary.description": "Soniox, Deepgram, Qwen Audio 핫워드를 지원해요",
+  "settings.custom_vocabulary.description": "Soniox, Deepgram, Qwen Audio만 지원해요",
   "settings.custom_vocabulary.add_placeholder": "",
   "settings.custom_vocabulary.add_action": "추가",
   "settings.custom_vocabulary.empty": "아직 추가된 힌트가 없어요.",

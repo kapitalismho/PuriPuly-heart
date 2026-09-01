@@ -142,7 +142,7 @@
   "settings.prompt_for": "提示词用于：{provider}",
   "settings.system_prompt": "系统提示词",
   "settings.reset_prompt": "重置提示词",
-  "settings.custom_vocabulary.description": "支持 Soniox、Deepgram 和 Qwen Audio 热词",
+  "settings.custom_vocabulary.description": "仅支持 Soniox、Deepgram、Qwen Audio",
   "settings.custom_vocabulary.add_placeholder": "",
   "settings.custom_vocabulary.add_action": "添加",
   "settings.custom_vocabulary.empty": "还没有添加提示。",

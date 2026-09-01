@@ -142,7 +142,7 @@
   "settings.prompt_for": "Промпт для: {provider}",
   "settings.system_prompt": "Системный промпт",
   "settings.reset_prompt": "Сбросить промпт",
-  "settings.custom_vocabulary.description": "Поддерживаются ключевые слова Soniox, Deepgram и Qwen Audio",
+  "settings.custom_vocabulary.description": "Поддерживается только Soniox, Deepgram и Qwen Audio",
   "settings.custom_vocabulary.add_placeholder": "",
   "settings.custom_vocabulary.add_action": "Добавить",
   "settings.custom_vocabulary.empty": "Подсказок пока нет.",
