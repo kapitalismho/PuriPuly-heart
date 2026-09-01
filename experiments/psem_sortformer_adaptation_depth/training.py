@@ -510,6 +510,7 @@ def _batch_supervision(
     if evidence.probabilities.shape[:2] != (len(examples), FRAME_COUNT):
         raise TrainingContractError("Sortformer output differs from the native 30-second grid")
     anchor_one_hot = []
+    psem_masks = []
     for batch_index, example in enumerate(examples):
         episode_ids = {
             value for value in example.supervision.anchor_episode_ids if value is not None
@@ -525,6 +526,19 @@ def _batch_supervision(
         )
         if not episode_ids and bool(example.supervision.psem_mask.any()):
             raise TrainingContractError("anchor-free windows must not carry PSEM supervision")
+        psem_mask = example.supervision.psem_mask.clone()
+        unmapped_episode_ids = episode_ids - mapping.keys()
+        if unmapped_episode_ids:
+            psem_mask[
+                torch.tensor(
+                    [
+                        episode_id in unmapped_episode_ids
+                        for episode_id in example.supervision.anchor_episode_ids
+                    ],
+                    dtype=torch.bool,
+                )
+            ] = 0
+        psem_masks.append(psem_mask)
         slots = [
             mapping.get(episode_id, 0) if episode_id is not None else 0
             for episode_id in example.supervision.anchor_episode_ids
@@ -544,7 +558,7 @@ def _batch_supervision(
         torch.stack(anchor_one_hot),
         torch.stack([value.supervision.anchor_targets for value in examples]).to(device),
         torch.stack([value.supervision.replacement_targets for value in examples]).to(device),
-        torch.stack([value.supervision.psem_mask for value in examples]).to(device),
+        torch.stack(psem_masks).to(device),
         torch.stack([value.supervision.arrival_order_targets for value in examples]).to(device),
     )
 

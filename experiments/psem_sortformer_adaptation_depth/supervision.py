@@ -208,13 +208,9 @@ def oracle_mapping_from_frames(
         )
         support = episode_mask & supervision.mapping_anchor_active.to(probabilities.device)
         if not bool(support.any()):
-            raise SupervisionError(
-                f"oracle episode has no valid anchor-active support: {episode_id}"
-            )
+            continue
         scores = (probabilities[support] * slot_alive[support].to(probabilities.dtype)).mean(dim=0)
         result[episode_id] = int(torch.argmax(scores))
-    if not result:
-        raise SupervisionError("window has no mappable oracle anchor episode")
     return result
 
 

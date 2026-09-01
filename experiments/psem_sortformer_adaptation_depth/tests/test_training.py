@@ -154,6 +154,39 @@ def test_anchor_free_uniform_window_is_safely_masked_before_oracle_mapping() -> 
     assert bool((anchor_one_hot[..., 0] == 1).all())
 
 
+def test_episode_without_anchor_active_support_is_excluded_from_psem_loss() -> None:
+    split = FRAME_COUNT // 2
+    mapping_support = torch.zeros(FRAME_COUNT, dtype=torch.bool)
+    mapping_support[0] = True
+    supervision = FrameSupervision(
+        anchor_targets=torch.zeros(FRAME_COUNT),
+        replacement_targets=torch.ones(FRAME_COUNT),
+        psem_mask=torch.ones(FRAME_COUNT),
+        arrival_order_targets=torch.zeros((FRAME_COUNT, 4)),
+        native_mask=torch.ones(FRAME_COUNT, dtype=torch.bool),
+        arrival_order_speakers=("speaker",),
+        mapping_anchor_active=mapping_support,
+        anchor_episode_ids=tuple(
+            "mapped" if index < split else "unsupported" for index in range(FRAME_COUNT)
+        ),
+    )
+    example = TrainingExample("source", "AMI", "row", torch.zeros(480000), supervision)
+    probabilities = torch.zeros((1, FRAME_COUNT, 4))
+    probabilities[:, :, 2] = 1
+    evidence = SortformerEvidence(
+        probabilities=probabilities,
+        activity_logits=torch.zeros((1, FRAME_COUNT, 4)),
+        final_temporal_hidden=torch.zeros((1, FRAME_COUNT, 192)),
+        slot_alive=torch.ones((1, FRAME_COUNT, 4), dtype=torch.bool),
+        state_reset=torch.zeros((1, FRAME_COUNT, 1)),
+        evidence_delay_seconds=torch.full((1, FRAME_COUNT, 1), 1.04),
+    )
+    anchor_one_hot, _, _, mask, _ = _batch_supervision((example,), evidence)
+    assert bool(mask[0, :split].all())
+    assert not bool(mask[0, split:].any())
+    assert bool((anchor_one_hot[0, :split, 2] == 1).all())
+
+
 def test_official_authorization_binds_every_source_window_target_and_augmentation() -> None:
     rows = [
         {
