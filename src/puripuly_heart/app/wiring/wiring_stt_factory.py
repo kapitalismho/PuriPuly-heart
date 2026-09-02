@@ -30,7 +30,6 @@ from puripuly_heart.config.runtime_resolution import (
     CREDENTIAL_REF_ELEVENLABS_SCRIBE_STT,
     CREDENTIAL_REF_GEMINI_TRANSCRIBE_STT,
     CREDENTIAL_REF_SONIOX_STT,
-    ELEVENLABS_SCRIBE_STT_MAX_KEYTERMS,
     GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS,
     QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
     SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S,
@@ -860,7 +859,10 @@ def create_stt_backend_from_resolved_config(
         )
 
     if config.provider == STT_PROVIDER_ELEVENLABS_SCRIBE:
-        from puripuly_heart.providers.stt.elevenlabs_scribe import ElevenLabsScribeSTTBackend
+        from puripuly_heart.providers.stt.elevenlabs_scribe import (
+            ElevenLabsScribeSTTBackend,
+            scribe_keyterms,
+        )
 
         api_key = _elevenlabs_scribe_api_key_for_resolved_credential(
             config.credential, secrets=secrets
@@ -875,7 +877,7 @@ def create_stt_backend_from_resolved_config(
             api_key=api_key,
             model=config.model or "scribe_v2_realtime",
             language_code=language_code,
-            keyterms=keyterms[:ELEVENLABS_SCRIBE_STT_MAX_KEYTERMS],
+            keyterms=scribe_keyterms(keyterms),
             sample_rate_hz=config.sample_rate_hz,
         )
 
