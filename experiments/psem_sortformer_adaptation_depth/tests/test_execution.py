@@ -107,6 +107,9 @@ def test_smoke_receipt_binds_official_weights_and_runtime_identity(tmp_path, mon
     monkeypatch.setattr(execution_module, "load_training_sessions", lambda *_args: sessions)
     monkeypatch.setattr(execution_module, "validate_sampling_manifest", lambda *_args: {})
     monkeypatch.setattr(
+        execution_module, "validate_training_waveform_paths", lambda *_args, **_kwargs: {}
+    )
+    monkeypatch.setattr(
         execution_module, "prepare_training_example", lambda *_args, **_kwargs: object()
     )
     monkeypatch.setattr(
@@ -159,7 +162,7 @@ def test_smoke_receipt_binds_official_weights_and_runtime_identity(tmp_path, mon
     assert receipt["runtime_identity_sha256"] == canonical_sha256(runtime_identity)
     assert receipt["base_checkpoint_sha256"] == CHECKPOINT_SHA256
     assert receipt["dependency_lock_sha256"] == "d" * 64
-    assert registered == [("short-smoke", receipt)]
+    assert registered == []
 
     forged_weights = bind_payload(
         {

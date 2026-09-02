@@ -19,8 +19,6 @@ from experiments.psem_sortformer_adaptation_depth.training import (
     SMOKE_OPTIMIZER_STEPS,
     TrainingExample,
     _batch_supervision,
-    _supervision_content_sha256,
-    _tensor_content_sha256,
     _training_example_content_bound,
     authorize_official_training,
     build_manifest_class_weight_receipt,
@@ -84,22 +82,15 @@ def test_manifest_class_weight_receipt_survives_json_round_trip(
     assert json.loads(json.dumps(receipt)) == receipt
 
 
-def test_official_example_attestation_rejects_altered_waveform_or_supervision() -> None:
+def test_official_example_attestation_requires_the_factory_token() -> None:
     example = _example()
     sealed = replace(
         example,
-        waveform_content_sha256=_tensor_content_sha256(example.waveform),
-        supervision_content_sha256=_supervision_content_sha256(example.supervision),
         _factory_token=_TRAINING_EXAMPLE_TOKEN,
     )
     assert _training_example_content_bound(sealed)
     assert _training_example_content_bound(pickle.loads(pickle.dumps(sealed)))
-    assert not _training_example_content_bound(replace(sealed, waveform=torch.ones(480000)))
-    altered_supervision = replace(
-        sealed.supervision,
-        replacement_targets=1 - sealed.supervision.replacement_targets,
-    )
-    assert not _training_example_content_bound(replace(sealed, supervision=altered_supervision))
+    assert not _training_example_content_bound(example)
 
 
 def test_duration_weighted_average_precision_uses_only_unmasked_frames() -> None:

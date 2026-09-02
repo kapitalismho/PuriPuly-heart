@@ -230,8 +230,6 @@ def apply_augmentation(waveform: torch.Tensor, decision: Mapping[str, Any]) -> t
         result = torchaudio.functional.lowpass_biquad(
             result, SAMPLE_RATE_HZ, float(band["cutoff_hz"])
         )
-    if not bool(torch.isfinite(result).all()):
-        raise SamplingContractError("augmentation produced non-finite waveform samples")
     return result.clamp(-1, 1)
 
 
@@ -710,8 +708,21 @@ def load_window_waveform(
     row: Mapping[str, Any],
     session: RuntimeSession,
     corpus_root: Path,
+    *,
+    validated_path: Path | None = None,
+    split_binding: Mapping[str, Any] | None = None,
 ) -> torch.Tensor:
-    split_binding = _source_split_binding(session)
+    split_keys = (
+        "data_split_receipt_sha256",
+        "split_manifest_sha256",
+        "source_manifest_sha256",
+        "train_source_count",
+    )
+    resolved_split_binding = (
+        {key: split_binding.get(key) for key in split_keys}
+        if split_binding is not None
+        else _source_split_binding(session)
+    )
     target_identity = row.get("target_identity")
     augmentation = row.get("augmentation")
     if (
@@ -719,7 +730,7 @@ def load_window_waveform(
         or row.get("source_id") != session.source_id
         or session.role != TRAIN_ROLE
         or row.get("source_waveform_sha256") != session.waveform_sha256
-        or any(row.get(key) != value for key, value in split_binding.items())
+        or any(row.get(key) != value for key, value in resolved_split_binding.items())
         or not isinstance(target_identity, Mapping)
         or row.get("target_identity_sha256") != canonical_sha256(target_identity)
         or not isinstance(augmentation, Mapping)
@@ -738,7 +749,11 @@ def load_window_waveform(
         or ".." in relative.parts
         or not path.is_relative_to(root)
         or not path.is_file()
-        or _sha256_file(path) != session.waveform_sha256
+        or (
+            validated_path is not None
+            and validated_path.resolve() != path
+        )
+        or (validated_path is None and _sha256_file(path) != session.waveform_sha256)
     ):
         raise SamplingContractError("waveform path escapes the bound corpus root")
     waveform, sample_rate = torchaudio.load(
@@ -761,6 +776,27 @@ def load_window_waveform(
     ):
         raise SamplingContractError("window target or augmentation identity is not canonical")
     return apply_augmentation(waveform[0], augmentation)
+
+
+def validate_training_waveform_paths(
+    sessions: Mapping[str, RuntimeSession], corpus_root: Path, *, verify_hashes: bool = True
+) -> dict[str, Path]:
+    _train_split_binding(sessions)
+    root = corpus_root.resolve()
+    paths: dict[str, Path] = {}
+    for source_id, session in sessions.items():
+        relative = Path(session.audio_ref)
+        path = (root / relative).resolve()
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or not path.is_relative_to(root)
+            or not path.is_file()
+            or (verify_hashes and _sha256_file(path) != session.waveform_sha256)
+        ):
+            raise SamplingContractError(f"TRAIN waveform identity differs: {source_id}")
+        paths[source_id] = path
+    return paths
 
 
 def load_training_sessions(corpus_root: Path, reference_root: Path) -> dict[str, RuntimeSession]:

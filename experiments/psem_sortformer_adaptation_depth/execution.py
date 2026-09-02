@@ -8,6 +8,7 @@ import random
 import subprocess
 import time
 from collections.abc import Iterable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,7 @@ from experiments.psem_sortformer_adaptation_depth.sampling import (
     load_sampling_rows,
     load_training_sessions,
     select_overfit_rows,
+    validate_training_waveform_paths,
     validate_sampling_manifest,
 )
 from experiments.psem_sortformer_adaptation_depth.training import (
@@ -689,14 +691,16 @@ def _training_batches(
     corpus_root: Path,
     manifest_path: Path,
     manifest_validation: Mapping[str, Any],
+    manifest_sha256: str | None = None,
+    waveform_paths: Mapping[str, Path] | None = None,
 ) -> Iterable[tuple[Any, ...]]:
     by_id = {str(row["row_id"]): row for row in rows}
     corpus_by_source = _corpus_by_source()
-    for row in rows:
-        if row.get("epoch") != epoch:
-            continue
+    selected_rows = [row for row in rows if row.get("epoch") == epoch]
+
+    def prepare(row: Mapping[str, Any]) -> Any:
         source_id = str(row["source_id"])
-        example = prepare_training_example(
+        return prepare_training_example(
             row,
             sessions[source_id],
             corpus_root,
@@ -704,8 +708,22 @@ def _training_batches(
             manifest_path=manifest_path,
             manifest_validation=manifest_validation,
             manifest_rows_by_id=by_id,
+            manifest_sha256=manifest_sha256,
+            validated_waveform_path=(
+                waveform_paths[source_id] if waveform_paths is not None else None
+            ),
+            split_binding=manifest_validation if waveform_paths is not None else None,
         )
-        yield (example,)
+
+    if not selected_rows:
+        return
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="issue-107-audio") as executor:
+        future = executor.submit(prepare, selected_rows[0])
+        for index in range(len(selected_rows)):
+            example = future.result()
+            if index + 1 < len(selected_rows):
+                future = executor.submit(prepare, selected_rows[index + 1])
+            yield (example,)
 
 
 def _dev_batches(
@@ -1605,24 +1623,23 @@ def run_smoke_arm(
     rows = load_sampling_rows(sampling_manifest)
     sessions = load_training_sessions(corpus_root, reference_root)
     validation = validate_sampling_manifest(sampling_manifest, sessions)
+    manifest_sha256 = sha256_file(sampling_manifest)
+    waveform_paths = validate_training_waveform_paths(
+        sessions, corpus_root, verify_hashes=False
+    )
     first_rows = rows[:512]
     if len(first_rows) != 512 or [row.get("epoch_index") for row in first_rows] != list(range(512)):
         raise ExecutionError("smoke requires the first 512 ordered epoch-1 rows")
-    by_id = {str(row["row_id"]): row for row in rows}
-    examples = [
-        (
-            prepare_training_example(
-                row,
-                sessions[str(row["source_id"])],
-                corpus_root,
-                str(row["corpus"]),
-                manifest_path=sampling_manifest,
-                manifest_validation=validation,
-                manifest_rows_by_id=by_id,
-            ),
-        )
-        for row in first_rows
-    ]
+    examples = _training_batches(
+        epoch=1,
+        rows=first_rows,
+        sessions=sessions,
+        corpus_root=corpus_root,
+        manifest_path=sampling_manifest,
+        manifest_validation=validation,
+        manifest_sha256=manifest_sha256,
+        waveform_paths=waveform_paths,
+    )
     from experiments.psem_sortformer_adaptation_depth.training import (
         build_manifest_class_weight_receipt,
     )
@@ -1648,7 +1665,7 @@ def run_smoke_arm(
     )
     payload = {
         **result,
-        "sampling_manifest_sha256": sha256_file(sampling_manifest),
+        "sampling_manifest_sha256": manifest_sha256,
         "class_weight_receipt_sha256": class_weight_receipt["payload_sha256"],
         "parameter_policy_sha256": canonical_sha256(parameter_policy),
         "runtime_identity_sha256": canonical_sha256(runtime_identity),
@@ -1687,6 +1704,7 @@ def run_training_arm(
     if _eval_registry_marker().exists():
         raise ExecutionError("official training cannot start after EVAL opened")
     manifest_sha256 = sha256_file(sampling_manifest)
+    waveform_paths = validate_training_waveform_paths(sessions, corpus_root)
     smoke_payload = {
         key: value for key, value in short_smoke_receipt.items() if key != "payload_sha256"
     }
@@ -1770,6 +1788,8 @@ def run_training_arm(
             corpus_root=corpus_root,
             manifest_path=sampling_manifest,
             manifest_validation=validation,
+            manifest_sha256=manifest_sha256,
+            waveform_paths=waveform_paths,
         ),
         256,
         None,

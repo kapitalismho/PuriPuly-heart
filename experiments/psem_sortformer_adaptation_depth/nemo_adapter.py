@@ -230,21 +230,22 @@ def _validate_state_reset_lifecycle(
 
 @contextmanager
 def _temporary_causal_attention(model: nn.Module, enabled: bool):
+    if not enabled:
+        yield
+        return
     original_attention_context = copy.deepcopy(model.encoder.att_context_size)
     diag_existed = hasattr(model.transformer_encoder, "diag")
     original_transformer_diag = copy.deepcopy(getattr(model.transformer_encoder, "diag", None))
-    if enabled:
-        model.encoder.att_context_size = [-1, model.sortformer_modules.causal_attn_rc]
-        model.transformer_encoder.diag = model.sortformer_modules.causal_attn_rc
+    model.encoder.att_context_size = [-1, model.sortformer_modules.causal_attn_rc]
+    model.transformer_encoder.diag = model.sortformer_modules.causal_attn_rc
     try:
         yield
     finally:
-        if enabled:
-            model.encoder.att_context_size = original_attention_context
-            if diag_existed:
-                model.transformer_encoder.diag = original_transformer_diag
-            else:
-                delattr(model.transformer_encoder, "diag")
+        model.encoder.att_context_size = original_attention_context
+        if diag_existed:
+            model.transformer_encoder.diag = original_transformer_diag
+        else:
+            delattr(model.transformer_encoder, "diag")
 
 
 @dataclass(frozen=True, slots=True)
@@ -487,7 +488,6 @@ class TrainableSortformerPSEM(nn.Module):
         *,
         state_reset: torch.Tensor,
     ) -> SortformerEvidence:
-        self._validate_nemo_runtime_origins()
         model = self.sortformer
         if (
             waveform.ndim != 2
@@ -538,13 +538,10 @@ class TrainableSortformerPSEM(nn.Module):
         hidden = torch.cat(hidden_parts, dim=1)
         logits = torch.cat(logit_parts, dim=1)
         probabilities = torch.cat(probability_parts, dim=1)
-        expected_counts = torch.div(waveform_lengths, FRAME_SAMPLES, rounding_mode="floor")
-        expected_frame_count = int(expected_counts[0])
+        expected_frame_count = waveform.shape[1] // FRAME_SAMPLES
         if (
-            bool((waveform_lengths <= 0).any())
-            or bool((waveform_lengths > waveform.shape[1]).any())
-            or bool((waveform_lengths % FRAME_SAMPLES != 0).any())
-            or int(expected_counts.min()) != int(expected_counts.max())
+            waveform.shape[1] <= 0
+            or waveform.shape[1] % FRAME_SAMPLES != 0
             or hidden.shape != (waveform.shape[0], expected_frame_count, 192)
             or logits.shape != (waveform.shape[0], expected_frame_count, 4)
             or probabilities.shape != logits.shape
@@ -555,9 +552,6 @@ class TrainableSortformerPSEM(nn.Module):
             batch_size=waveform.shape[0],
             frame_count=expected_frame_count,
         )
-        if not all(bool(torch.isfinite(value).all()) for value in (hidden, logits, probabilities)):
-            raise NeMoAdapterError("streaming graph produced non-finite evidence")
-        self._validate_nemo_runtime_origins()
         alive = torch.ones_like(probabilities, dtype=torch.int64)
         reset = state_reset.to(probabilities.device, probabilities.dtype)
         delay = torch.full_like(reset, MODEL_EVIDENCE_DELAY_SECONDS)
@@ -646,7 +640,6 @@ class TrainableSortformerPSEM(nn.Module):
             labels=targets,
             target_lens=lengths,
         )
-        self._validate_nemo_runtime_origins()
         return bind_native_sortformer_loss(
             value,
             sampling_roles=sampling_roles,

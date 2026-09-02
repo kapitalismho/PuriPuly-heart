@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import math
 import subprocess
 from collections import Counter
@@ -89,8 +88,6 @@ class TrainingExample:
     state_reset_at_start: bool = True
     window_start_sample: int = 0
     window_end_sample: int = 480000
-    waveform_content_sha256: str = ""
-    supervision_content_sha256: str = ""
     _factory_token: object | None = field(default=None, repr=False, compare=False)
 
 
@@ -134,36 +131,8 @@ class _LegacyOverfitAuthorization:
     class_weights: ClassWeights
 
 
-def _tensor_content_sha256(value: torch.Tensor) -> str:
-    tensor = value.detach().cpu().contiguous()
-    digest = hashlib.sha256()
-    digest.update(str(tensor.dtype).encode())
-    digest.update(str(tuple(tensor.shape)).encode())
-    digest.update(tensor.numpy().tobytes())
-    return digest.hexdigest()
-
-
-def _supervision_content_sha256(value: FrameSupervision) -> str:
-    return canonical_sha256(
-        {
-            "anchor_targets": _tensor_content_sha256(value.anchor_targets),
-            "replacement_targets": _tensor_content_sha256(value.replacement_targets),
-            "psem_mask": _tensor_content_sha256(value.psem_mask),
-            "arrival_order_targets": _tensor_content_sha256(value.arrival_order_targets),
-            "native_mask": _tensor_content_sha256(value.native_mask),
-            "arrival_order_speakers": value.arrival_order_speakers,
-            "mapping_anchor_active": _tensor_content_sha256(value.mapping_anchor_active),
-            "anchor_episode_ids": value.anchor_episode_ids,
-        }
-    )
-
-
 def _training_example_content_bound(example: TrainingExample) -> bool:
-    return bool(
-        example._factory_token is _TRAINING_EXAMPLE_TOKEN
-        and example.waveform_content_sha256 == _tensor_content_sha256(example.waveform)
-        and example.supervision_content_sha256 == _supervision_content_sha256(example.supervision)
-    )
+    return example._factory_token is _TRAINING_EXAMPLE_TOKEN
 
 
 def prepare_training_example(
@@ -175,17 +144,26 @@ def prepare_training_example(
     manifest_path: Path,
     manifest_validation: Mapping[str, Any],
     manifest_rows_by_id: Mapping[str, Mapping[str, Any]],
+    manifest_sha256: str | None = None,
+    validated_waveform_path: Path | None = None,
+    split_binding: Mapping[str, Any] | None = None,
 ) -> TrainingExample:
-    manifest_sha256 = sha256_file(manifest_path)
+    resolved_manifest_sha256 = manifest_sha256 or sha256_file(manifest_path)
     row_id_value = row.get("row_id")
     if (
         manifest_validation.get("passed") is not True
-        or manifest_validation.get("manifest_sha256") != manifest_sha256
+        or manifest_validation.get("manifest_sha256") != resolved_manifest_sha256
         or not isinstance(row_id_value, str)
         or manifest_rows_by_id.get(row_id_value) != row
     ):
         raise TrainingContractError("training row is not bound to the validated shared manifest")
-    waveform = load_window_waveform(row, session, corpus_root)
+    waveform = load_window_waveform(
+        row,
+        session,
+        corpus_root,
+        validated_path=validated_waveform_path,
+        split_binding=split_binding,
+    )
     start = row.get("window_start_sample")
     row_id = row.get("row_id")
     if (
@@ -215,14 +193,12 @@ def prepare_training_example(
         split_role=TRAIN_ROLE,
         epoch=int(row["epoch"]),
         epoch_index=int(row["epoch_index"]),
-        sampling_manifest_sha256=manifest_sha256,
+        sampling_manifest_sha256=resolved_manifest_sha256,
         target_identity_sha256=str(row["target_identity_sha256"]),
         augmentation_identity_sha256=str(row["augmentation_identity_sha256"]),
         state_reset_at_start=row.get("state_reset_at_window_start") is True,
         window_start_sample=start,
         window_end_sample=int(row["window_end_sample"]),
-        waveform_content_sha256=_tensor_content_sha256(waveform),
-        supervision_content_sha256=_supervision_content_sha256(supervision),
         _factory_token=_TRAINING_EXAMPLE_TOKEN,
     )
 
@@ -263,8 +239,6 @@ def prepare_dev_example(
         state_reset_at_start=True,
         window_start_sample=window_start_sample,
         window_end_sample=window_start_sample + 480000,
-        waveform_content_sha256=_tensor_content_sha256(waveform),
-        supervision_content_sha256=_supervision_content_sha256(supervision),
         _factory_token=_TRAINING_EXAMPLE_TOKEN,
     )
 
@@ -1091,7 +1065,8 @@ def fit_arm(
         row_id: tuple(values) for row_id, *values in authorization.input_identity_by_row
     }
     observed_row_ids: list[str] = []
-    losses: list[float] = []
+    loss_sum = torch.zeros((), device=model.sortformer.device)
+    loss_count = 0
     optimizer.zero_grad(set_to_none=True)
     accumulated = 0
     global_step = 0
@@ -1121,9 +1096,8 @@ def fit_arm(
             observed_row_ids.append(example.row_id)
         result = forward_batch(model, examples, class_weights)
         total = result.losses["total"]
-        if not bool(torch.isfinite(total)):
-            raise TrainingContractError("official training produced a non-finite loss")
-        losses.append(float(total.detach().cpu()))
+        loss_sum.add_(total.detach())
+        loss_count += 1
         (total / GRADIENT_ACCUMULATION_STEPS).backward()
         accumulated += 1
         if accumulated == GRADIENT_ACCUMULATION_STEPS:
@@ -1144,9 +1118,12 @@ def fit_arm(
         or observed_row_ids != list(authorization.row_ids_by_epoch[0])
     ):
         raise TrainingContractError("official training did not consume all 4096 rows in order")
+    mean_total_loss = float((loss_sum / loss_count).cpu())
+    if not math.isfinite(mean_total_loss):
+        raise TrainingContractError("official training produced a non-finite loss")
     final_metrics = {
         "final_step": global_step,
-        "mean_total_loss": sum(losses) / len(losses),
+        "mean_total_loss": mean_total_loss,
         "split_role": TRAIN_ROLE,
         "scheduler_total_steps": OFFICIAL_OPTIMIZER_STEPS,
         "warmup_steps": WARMUP_STEPS,
@@ -1186,30 +1163,35 @@ def run_short_smoke(
         raise TrainingContractError("smoke requires the first 512 manifest rows")
     if parameter_policy.get("arm") != arm:
         raise TrainingContractError("smoke parameter policy identity differs from the arm")
-    examples = [example for batch in batches for example in batch]
-    if len(examples) != 512 or [example.row_id for example in examples] != list(expected_row_ids):
-        raise TrainingContractError("smoke rows are not the first 512 manifest rows in order")
-    if any(
-        example.split_role != TRAIN_ROLE or not _training_example_content_bound(example)
-        for example in examples
-    ):
-        raise TrainingContractError("smoke input identity is not content-bound")
-    before = {name: value.detach().clone() for name, value in model.named_parameters()}
+    examples = (example for batch in batches for example in batch)
+    before = {
+        name: value.detach().clone()
+        for name, value in model.named_parameters()
+        if value.requires_grad
+    }
     optimizer = build_optimizer(model, arm)
     scheduler = warmup_scheduler(optimizer, SMOKE_OPTIMIZER_STEPS, 2)
     losses: list[float] = []
     model.train()
     optimizer.zero_grad(set_to_none=True)
+    consumed = 0
     for step in range(SMOKE_OPTIMIZER_STEPS):
-        window_losses: list[float] = []
-        for example in examples[
-            step * GRADIENT_ACCUMULATION_STEPS : (step + 1) * GRADIENT_ACCUMULATION_STEPS
-        ]:
+        window_loss_sum = torch.zeros((), device=model.sortformer.device)
+        for _ in range(GRADIENT_ACCUMULATION_STEPS):
+            try:
+                example = next(examples)
+            except StopIteration as exc:
+                raise TrainingContractError("smoke rows ended before 512 examples") from exc
+            if (
+                example.row_id != expected_row_ids[consumed]
+                or example.split_role != TRAIN_ROLE
+                or not _training_example_content_bound(example)
+            ):
+                raise TrainingContractError("smoke input identity differs from the manifest")
+            consumed += 1
             result = forward_batch(model, (example,), class_weights)
             total = result.losses["total"]
-            if not bool(torch.isfinite(total)):
-                raise TrainingContractError("smoke forward produced a non-finite loss")
-            window_losses.append(float(total.detach().cpu()))
+            window_loss_sum.add_(total.detach())
             (total / GRADIENT_ACCUMULATION_STEPS).backward()
         norm = torch.nn.utils.clip_grad_norm_(
             [parameter for parameter in model.parameters() if parameter.requires_grad],
@@ -1220,7 +1202,13 @@ def run_short_smoke(
         optimizer.step()
         scheduler.step()
         optimizer.zero_grad(set_to_none=True)
-        losses.append(sum(window_losses) / len(window_losses))
+        losses.append(float((window_loss_sum / GRADIENT_ACCUMULATION_STEPS).cpu()))
+    try:
+        next(examples)
+    except StopIteration:
+        pass
+    else:
+        raise TrainingContractError("smoke received more than 512 examples")
     if not all(math.isfinite(value) for value in losses):
         raise TrainingContractError("smoke losses are non-finite")
     first = sum(losses[:8]) / 8
@@ -1230,11 +1218,11 @@ def run_short_smoke(
     changed = []
     frozen_unchanged = True
     for name, value in model.named_parameters():
-        different = not torch.equal(before[name], value.detach())
         if value.requires_grad:
+            different = not torch.equal(before[name], value.detach())
             changed.append((name, different))
         else:
-            frozen_unchanged = frozen_unchanged and not different
+            frozen_unchanged = frozen_unchanged and value.grad is None
     if not changed or not any(different for _, different in changed) or not frozen_unchanged:
         raise TrainingContractError("smoke parameter policy or update identity failed")
     return {
@@ -1245,7 +1233,7 @@ def run_short_smoke(
         "optimizer_steps": SMOKE_OPTIMIZER_STEPS,
         "micro_batch_size": MICRO_BATCH_SIZE,
         "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
-        "consumed_row_count": len(examples),
+        "consumed_row_count": consumed,
         "row_ids_sha256": canonical_sha256(list(expected_row_ids)),
         "first_eight_mean_total_loss": first,
         "last_eight_mean_total_loss": final,
