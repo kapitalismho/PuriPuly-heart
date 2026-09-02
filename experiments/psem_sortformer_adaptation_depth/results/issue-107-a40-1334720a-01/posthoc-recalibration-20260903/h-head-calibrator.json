@@ -1,0 +1,15 @@
+{
+  "calibrated_brier": 0.052658220046394116,
+  "calibrated_half_threshold_raw_logit": 2.1646430238216157,
+  "calibrated_half_threshold_raw_probability": 0.897029205748051,
+  "calibrated_nll": 0.1890734609871787,
+  "fit_frame_count": 153475,
+  "fit_split": "PSEM-STRATEGY-TRAIN",
+  "method": "positive-slope Platt scaling",
+  "offset": -1.8382115342815093,
+  "positive_frame_count": 13615,
+  "prevalence": 0.0887115165336374,
+  "raw_brier": 0.09154035774045118,
+  "raw_nll": 0.3035913930571938,
+  "scale": 0.849198465544771
+}
