@@ -54,6 +54,8 @@ class STTProviderName(str, Enum):
     LOCAL_QWEN = "local_qwen"
     LOCAL_QWEN_GPU = "local_qwen_gpu"
     DEEPGRAM = "deepgram"
+    GEMINI_TRANSCRIBE = "gemini_transcribe"
+    ELEVENLABS_SCRIBE = "elevenlabs_scribe"
     QWEN_ASR = "qwen_asr"
     QWEN_AUDIO = "qwen_audio"
     SONIOX = "soniox"

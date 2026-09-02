@@ -256,6 +256,8 @@ def settings_view_surface_snapshots(
         ),
         verified=ProviderVerificationSnapshot(
             deepgram=_verified(verification.deepgram),
+            gemini_transcribe=_verified(verification.gemini_transcribe),
+            elevenlabs_scribe=_verified(verification.elevenlabs_scribe),
             soniox=_verified(verification.soniox),
             google=_verified(verification.google),
             openrouter=_verified(verification.openrouter),

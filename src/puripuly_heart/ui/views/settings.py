@@ -223,6 +223,8 @@ _STT_SECTION_ORDER = (
 )
 _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.DEEPGRAM: "settings.stt.section.recommended_cloud",
+    STTProviderName.GEMINI_TRANSCRIBE: "settings.stt.section.cloud",
+    STTProviderName.ELEVENLABS_SCRIBE: "settings.stt.section.cloud",
     STTProviderName.SONIOX: "settings.stt.section.recommended_cloud",
     STTProviderName.LOCAL_CPU_AUTO: "settings.stt.section.recommended_local",
     STTProviderName.QWEN_ASR: "settings.stt.section.cloud",
@@ -1222,6 +1224,26 @@ class SettingsView(ft.Column):
                 self.show_snackbar(msg, bg) if self.show_snackbar else None
             ),
         )
+        self._gemini_transcribe_key = ApiKeyField(
+            "settings.gemini_transcribe_api_key",
+            "gemini_transcribe_api_key",
+            "gemini_transcribe",
+            on_verify=self._verify_key,
+            on_save=self._on_secret_change,
+            show_snackbar=lambda msg, bg: (
+                self.show_snackbar(msg, bg) if self.show_snackbar else None
+            ),
+        )
+        self._elevenlabs_scribe_key = ApiKeyField(
+            "settings.elevenlabs_scribe_api_key",
+            "elevenlabs_scribe_api_key",
+            "elevenlabs_scribe",
+            on_verify=self._verify_key,
+            on_save=self._on_secret_change,
+            show_snackbar=lambda msg, bg: (
+                self.show_snackbar(msg, bg) if self.show_snackbar else None
+            ),
+        )
         self._soniox_key = ApiKeyField(
             "settings.soniox_api_key",
             "soniox_api_key",
@@ -1402,6 +1424,8 @@ class SettingsView(ft.Column):
             [
                 # self._qwen_region_row removed
                 self._deepgram_key,
+                self._gemini_transcribe_key,
+                self._elevenlabs_scribe_key,
                 self._soniox_key,
                 self._google_key,
                 self._deepseek_key,
@@ -4206,6 +4230,14 @@ class SettingsView(ft.Column):
             self._cerebras_key.value = snapshot.cerebras_api_key
         if snapshot.deepgram_api_key is not None:
             self._deepgram_key.value = snapshot.deepgram_api_key
+        if snapshot.gemini_transcribe_api_key is not None:
+            gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
+            if gemini_transcribe_key is not None:
+                gemini_transcribe_key.value = snapshot.gemini_transcribe_api_key
+        if snapshot.elevenlabs_scribe_api_key is not None:
+            elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
+            if elevenlabs_scribe_key is not None:
+                elevenlabs_scribe_key.value = snapshot.elevenlabs_scribe_api_key
         if snapshot.soniox_api_key is not None:
             self._soniox_key.value = snapshot.soniox_api_key
         if snapshot.local_llm_api_key is not None:
@@ -4240,8 +4272,20 @@ class SettingsView(ft.Column):
         verified = settings.verified
 
         # Map field -> (has_key, is_verified)
+        gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
+        elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
         field_map = [
             (self._deepgram_key, self._deepgram_key.value, verified.deepgram),
+            (
+                gemini_transcribe_key,
+                gemini_transcribe_key.value if gemini_transcribe_key else None,
+                verified.gemini_transcribe,
+            ),
+            (
+                elevenlabs_scribe_key,
+                elevenlabs_scribe_key.value if elevenlabs_scribe_key else None,
+                verified.elevenlabs_scribe,
+            ),
             (self._soniox_key, self._soniox_key.value, verified.soniox),
             (self._google_key, self._google_key.value, verified.google),
             (self._openrouter_key, self._openrouter_key.value, verified.openrouter),
@@ -4253,6 +4297,11 @@ class SettingsView(ft.Column):
                 self._alibaba_key_singapore.value,
                 verified.alibaba_singapore,
             ),
+        ]
+        field_map = [
+            (field, has_key, is_verified)
+            for field, has_key, is_verified in field_map
+            if field is not None
         ]
 
         for field, has_key, is_verified in field_map:
@@ -4323,6 +4372,16 @@ class SettingsView(ft.Column):
         fallback_source = self._openrouter_fallback_source(settings)
         active_stt_providers = {stt, peer_stt}
         self._deepgram_key.visible = STTProviderName.DEEPGRAM in active_stt_providers
+        gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
+        if gemini_transcribe_key is not None:
+            gemini_transcribe_key.visible = (
+                STTProviderName.GEMINI_TRANSCRIBE in active_stt_providers
+            )
+        elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
+        if elevenlabs_scribe_key is not None:
+            elevenlabs_scribe_key.visible = (
+                STTProviderName.ELEVENLABS_SCRIBE in active_stt_providers
+            )
         self._soniox_key.visible = STTProviderName.SONIOX in active_stt_providers
         peer_auto_languages_card = getattr(self, "_peer_auto_languages_card", None)
         if peer_auto_languages_card is not None:
@@ -4419,6 +4478,8 @@ class SettingsView(ft.Column):
                 getattr(control, "visible", False)
                 for control in (
                     self._deepgram_key,
+                    self._gemini_transcribe_key,
+                    self._elevenlabs_scribe_key,
                     self._soniox_key,
                     self._google_key,
                     self._deepseek_key,
@@ -6838,6 +6899,8 @@ class SettingsView(ft.Column):
 
         # Components
         self._deepgram_key.apply_locale()
+        self._gemini_transcribe_key.apply_locale()
+        self._elevenlabs_scribe_key.apply_locale()
         self._soniox_key.apply_locale()
         self._google_key.apply_locale()
         self._managed_trial_usage_bar.apply_locale()

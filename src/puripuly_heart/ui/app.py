@@ -1913,6 +1913,8 @@ class TranslatorApp:
     def _api_key_verification_matches_current_field(self, provider: str, key: str) -> bool:
         field_by_provider = {
             "deepgram": "_deepgram_key",
+            "gemini_transcribe": "_gemini_transcribe_key",
+            "elevenlabs_scribe": "_elevenlabs_scribe_key",
             "soniox": "_soniox_key",
             "google": "_google_key",
             "openrouter": "_openrouter_key",
@@ -1944,7 +1946,7 @@ class TranslatorApp:
         self.application.persist_api_key_verification(provider, key, success)
 
         # Sync verification result with dashboard needs_key flags (UI update on user click)
-        if provider in ("deepgram", "soniox", "qwen_asr"):
+        if provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe", "soniox", "qwen_asr"):
             self.view_dashboard.set_stt_needs_key(not success, update_ui=False)
         elif provider in (
             "google",
@@ -1964,6 +1966,8 @@ class TranslatorApp:
             return False
         provider = {
             "deepgram_api_key": "deepgram",
+            "gemini_transcribe_api_key": "gemini_transcribe",
+            "elevenlabs_scribe_api_key": "elevenlabs_scribe",
             "soniox_api_key": "soniox",
             "google_api_key": "google",
             "openrouter_api_key": "openrouter",
@@ -1972,7 +1976,7 @@ class TranslatorApp:
             "alibaba_api_key_beijing": "alibaba_beijing",
             "alibaba_api_key_singapore": "alibaba_singapore",
         }.get(key)
-        if provider in {"deepgram", "soniox"}:
+        if provider in {"deepgram", "gemini_transcribe", "elevenlabs_scribe", "soniox"}:
             self.view_dashboard.set_stt_needs_key(True, update_ui=False)
         elif provider is not None:
             self.view_dashboard.set_translation_needs_key(True, update_ui=False)
@@ -1983,6 +1987,8 @@ class TranslatorApp:
         # Map secret key name to provider name
         key_to_provider = {
             "deepgram_api_key": "deepgram",
+            "gemini_transcribe_api_key": "gemini_transcribe",
+            "elevenlabs_scribe_api_key": "elevenlabs_scribe",
             "soniox_api_key": "soniox",
             "google_api_key": "google",
             "openrouter_api_key": "openrouter",
@@ -1997,7 +2003,7 @@ class TranslatorApp:
             self.application.clear_provider_verification(provider)
 
             # Update dashboard needs_key flag
-            if provider in ("deepgram", "soniox"):
+            if provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe", "soniox"):
                 self.view_dashboard.set_stt_needs_key(True, update_ui=False)
             elif provider in (
                 "google",

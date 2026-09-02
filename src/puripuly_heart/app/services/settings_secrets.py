@@ -72,6 +72,14 @@ class SettingsSecretsOwner:
             )
             snapshot = replace(
                 snapshot,
+                gemini_transcribe_api_key=store.get("gemini_transcribe_api_key") or "",
+            )
+            snapshot = replace(
+                snapshot,
+                elevenlabs_scribe_api_key=store.get("elevenlabs_scribe_api_key") or "",
+            )
+            snapshot = replace(
+                snapshot,
                 soniox_api_key=store.get("soniox_api_key") or "",
             )
             snapshot = replace(

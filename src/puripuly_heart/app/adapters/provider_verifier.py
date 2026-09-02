@@ -23,6 +23,8 @@ from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+from puripuly_heart.providers.stt.elevenlabs_scribe import ElevenLabsScribeSTTBackend
+from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 
 _ALIBABA_BEIJING_BASE_URL = "https://dashscope.aliyuncs.com/api/v1"
@@ -114,6 +116,10 @@ class ProviderVerifierAdapter(ProviderVerifierPort):
             )
         if normalized_provider == "deepgram":
             return await DeepgramRealtimeSTTBackend.verify_api_key(api_key)
+        if normalized_provider == "gemini_transcribe":
+            return await GeminiTranscribeSTTBackend.verify_api_key(api_key)
+        if normalized_provider == "elevenlabs_scribe":
+            return await ElevenLabsScribeSTTBackend.verify_api_key(api_key)
         if normalized_provider == "soniox":
             return await SonioxRealtimeSTTBackend.verify_api_key(api_key)
         raise ValueError(f"Unknown provider: {provider}")

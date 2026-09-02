@@ -38,6 +38,8 @@ class TranslationSelectionSnapshot:
 @dataclass(frozen=True, slots=True)
 class ProviderVerificationSnapshot:
     deepgram: bool
+    gemini_transcribe: bool
+    elevenlabs_scribe: bool
     soniox: bool
     google: bool
     openrouter: bool

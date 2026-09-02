@@ -952,6 +952,8 @@ def compose_application_runtime(
     def stt_requires_secret(provider: STTProviderName) -> bool:
         return provider in {
             STTProviderName.DEEPGRAM,
+            STTProviderName.GEMINI_TRANSCRIBE,
+            STTProviderName.ELEVENLABS_SCRIBE,
             STTProviderName.QWEN_ASR,
             STTProviderName.QWEN_AUDIO,
             STTProviderName.SONIOX,
@@ -1190,6 +1192,8 @@ def compose_application_runtime(
                 canonical.intent.peer_stt.provider
                 in {
                     STTProviderName.SONIOX.value,
+                    STTProviderName.GEMINI_TRANSCRIBE.value,
+                    STTProviderName.ELEVENLABS_SCRIBE.value,
                     STTProviderName.LOCAL_QWEN_GPU.value,
                 }
             ),
@@ -1340,6 +1344,8 @@ def compose_application_runtime(
             merged.intent.peer_stt.provider
             not in {
                 STTProviderName.SONIOX.value,
+                STTProviderName.GEMINI_TRANSCRIBE.value,
+                STTProviderName.ELEVENLABS_SCRIBE.value,
                 STTProviderName.LOCAL_QWEN_GPU.value,
             }
             and merged.intent.languages.peer_source_mode == "auto"

@@ -27,13 +27,19 @@ from puripuly_heart.config.resolved import (
 from puripuly_heart.config.runtime_resolution import (
     CREDENTIAL_REF_CUSTOM_STT,
     CREDENTIAL_REF_DEEPGRAM_STT,
+    CREDENTIAL_REF_ELEVENLABS_SCRIBE_STT,
+    CREDENTIAL_REF_GEMINI_TRANSCRIBE_STT,
     CREDENTIAL_REF_SONIOX_STT,
+    ELEVENLABS_SCRIBE_STT_MAX_KEYTERMS,
+    GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS,
     QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
     SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S,
     SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS,
     SONIOX_STT_MODEL_RT_V5,
     STT_CUSTOM_PROVIDERS,
     STT_PROVIDER_DEEPGRAM,
+    STT_PROVIDER_ELEVENLABS_SCRIBE,
+    STT_PROVIDER_GEMINI_TRANSCRIBE,
     STT_PROVIDER_LOCAL_CPU_AUTO,
     STT_PROVIDER_LOCAL_PARAKEET_JAPANESE,
     STT_PROVIDER_LOCAL_PARAKEET_V3,
@@ -100,6 +106,8 @@ class ResolvedPeerSTTConfig:
     sample_rate_hz: int
     keyterms: tuple[str, ...]
     deepgram_model: str | None = None
+    gemini_transcribe_model: str | None = None
+    elevenlabs_scribe_model: str | None = None
     qwen_model: str | None = None
     qwen_region: QwenRegion | None = None
     soniox_model: str | None = None
@@ -114,6 +122,10 @@ class ResolvedPeerSTTConfig:
     def model(self) -> str | None:
         if self.provider == STTProviderName.DEEPGRAM:
             return self.deepgram_model
+        if self.provider == STTProviderName.GEMINI_TRANSCRIBE:
+            return self.gemini_transcribe_model
+        if self.provider == STTProviderName.ELEVENLABS_SCRIBE:
+            return self.elevenlabs_scribe_model
         if self.provider in {STTProviderName.QWEN_ASR, STTProviderName.QWEN_AUDIO}:
             return self.qwen_model
         if self.provider == STTProviderName.SONIOX:
@@ -181,11 +193,23 @@ def self_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
     provider, qwen_asr_model = _qwen_runtime_provider_and_model(provider, intent.stt.qwen_asr.model)
     soniox_language_hints = None
     soniox_language_hints_strict = False
+    gemini_transcribe_language_hints: tuple[str, ...] | None = None
+    elevenlabs_scribe_language: str | None = None
     if provider == STT_PROVIDER_SONIOX:
         from puripuly_heart.core.language import get_soniox_language_hints
 
         soniox_language_hints = tuple(get_soniox_language_hints(source_language))
         soniox_language_hints_strict = True
+    if provider == STT_PROVIDER_GEMINI_TRANSCRIBE:
+        from puripuly_heart.providers.stt.gemini_transcribe import (
+            gemini_transcribe_language_codes,
+        )
+
+        gemini_transcribe_language_hints = tuple(gemini_transcribe_language_codes(source_language))
+    if provider == STT_PROVIDER_ELEVENLABS_SCRIBE:
+        from puripuly_heart.providers.stt.elevenlabs_scribe import scribe_language_code
+
+        elevenlabs_scribe_language = scribe_language_code(source_language)
     custom_mode, custom_compatibility = custom_stt_selection_for_provider(
         provider,
         stored_mode=intent.stt.custom.mode,
@@ -222,6 +246,12 @@ def self_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         ),
         custom_terms={source_language: terms} if terms else {},
         deepgram_model=intent.stt.deepgram.model,
+        gemini_transcribe_model=intent.stt.gemini_transcribe.model,
+        gemini_transcribe_language_codes=gemini_transcribe_language_hints,
+        gemini_transcribe_auto_language=False,
+        elevenlabs_scribe_model=intent.stt.elevenlabs_scribe.model,
+        elevenlabs_scribe_language_code=elevenlabs_scribe_language,
+        elevenlabs_scribe_auto_language=False,
         qwen_asr_model=qwen_asr_model,
         qwen_region=intent.translation.qwen.region,
         soniox_model=intent.stt.soniox.model,
@@ -244,9 +274,23 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
     provider, qwen_asr_model = _qwen_runtime_provider_and_model(provider, intent.stt.qwen_asr.model)
     automatic = intent.languages.peer_source_mode == "auto"
     automatic_soniox = provider == STT_PROVIDER_SONIOX and automatic
+    automatic_gemini = provider == STT_PROVIDER_GEMINI_TRANSCRIBE and automatic
+    automatic_scribe = provider == STT_PROVIDER_ELEVENLABS_SCRIBE and automatic
     source_language = intent.languages.peer_source_language or intent.languages.source_language
     language_hints = None
     language_hints_strict = False
+    gemini_transcribe_language_hints: tuple[str, ...] | None = None
+    elevenlabs_scribe_language: str | None = None
+    if provider == STT_PROVIDER_GEMINI_TRANSCRIBE and not automatic_gemini:
+        from puripuly_heart.providers.stt.gemini_transcribe import (
+            gemini_transcribe_language_codes,
+        )
+
+        gemini_transcribe_language_hints = tuple(gemini_transcribe_language_codes(source_language))
+    if provider == STT_PROVIDER_ELEVENLABS_SCRIBE and not automatic_scribe:
+        from puripuly_heart.providers.stt.elevenlabs_scribe import scribe_language_code
+
+        elevenlabs_scribe_language = scribe_language_code(source_language)
     if provider == STT_PROVIDER_SONIOX:
         from puripuly_heart.core.language import get_soniox_language_hints
 
@@ -287,6 +331,12 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         custom_vocabulary_enabled=False,
         custom_terms={},
         deepgram_model=intent.stt.deepgram.model,
+        gemini_transcribe_model=intent.stt.gemini_transcribe.model,
+        gemini_transcribe_language_codes=gemini_transcribe_language_hints,
+        gemini_transcribe_auto_language=automatic_gemini,
+        elevenlabs_scribe_model=intent.stt.elevenlabs_scribe.model,
+        elevenlabs_scribe_language_code=elevenlabs_scribe_language,
+        elevenlabs_scribe_auto_language=automatic_scribe,
         qwen_asr_model=qwen_asr_model,
         qwen_region=intent.translation.qwen.region,
         soniox_model=intent.stt.soniox.model,
@@ -333,6 +383,8 @@ def _self_stt_custom_vocabulary_signature_for_provider(
     if provider_value in {
         STTProviderName.DEEPGRAM.value,
         STTProviderName.SONIOX.value,
+        STTProviderName.GEMINI_TRANSCRIBE.value,
+        STTProviderName.ELEVENLABS_SCRIBE.value,
         STTProviderName.QWEN_AUDIO.value,
     }:
         return enabled, tuple(get_effective_custom_terms(config, source_language))
@@ -498,6 +550,16 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
         1,
         intent.stt.gpu_device_id if provider == STTProviderName.LOCAL_QWEN_GPU.value else None,
         intent.stt.deepgram.model if provider == STTProviderName.DEEPGRAM.value else None,
+        (
+            intent.stt.gemini_transcribe.model
+            if provider == STTProviderName.GEMINI_TRANSCRIBE.value
+            else None
+        ),
+        (
+            intent.stt.elevenlabs_scribe.model
+            if provider == STTProviderName.ELEVENLABS_SCRIBE.value
+            else None
+        ),
         intent.translation.qwen.region if is_qwen_cloud_stt_provider(provider) else None,
         qwen_cloud_stt_model_for_provider(provider),
         (
@@ -546,6 +608,16 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         None if transition is not None else intent.languages.source_language,
         None if transition is None else transition.model_id,
         intent.stt.deepgram.model if provider == STTProviderName.DEEPGRAM.value else None,
+        (
+            intent.stt.gemini_transcribe.model
+            if provider == STTProviderName.GEMINI_TRANSCRIBE.value
+            else None
+        ),
+        (
+            intent.stt.elevenlabs_scribe.model
+            if provider == STTProviderName.ELEVENLABS_SCRIBE.value
+            else None
+        ),
         intent.translation.qwen.region if is_qwen_cloud_stt_provider(provider) else None,
         qwen_cloud_stt_model_for_provider(provider),
         intent.stt.soniox.model if provider == STTProviderName.SONIOX.value else None,
@@ -662,6 +734,26 @@ def _soniox_api_key_for_resolved_credential(
     return require_secret(secrets, key="soniox_api_key", env_var="SONIOX_API_KEY")
 
 
+def _gemini_transcribe_api_key_for_resolved_credential(
+    credential: ResolvedCredentialRequirement,
+    *,
+    secrets: SecretStore,
+) -> str:
+    if credential.reference not in (CREDENTIAL_REF_GEMINI_TRANSCRIBE_STT, None):
+        raise ValueError("Unsupported Gemini Transcribe resolved credential reference")
+    return require_secret(secrets, key="gemini_transcribe_api_key", env_var="GEMINI_API_KEY")
+
+
+def _elevenlabs_scribe_api_key_for_resolved_credential(
+    credential: ResolvedCredentialRequirement,
+    *,
+    secrets: SecretStore,
+) -> str:
+    if credential.reference not in (CREDENTIAL_REF_ELEVENLABS_SCRIBE_STT, None):
+        raise ValueError("Unsupported ElevenLabs Scribe resolved credential reference")
+    return require_secret(secrets, key="elevenlabs_scribe_api_key", env_var="ELEVENLABS_API_KEY")
+
+
 def _qwen_asr_endpoint_for_resolved_config(config: ResolvedSTTConfig) -> str:
     if config.endpoint:
         return config.endpoint
@@ -741,6 +833,47 @@ def create_stt_backend_from_resolved_config(
             sample_rate_hz=config.sample_rate_hz,
             keyterms=keyterms,
             stream_label=stream_label,
+        )
+
+    if config.provider == STT_PROVIDER_GEMINI_TRANSCRIBE:
+        from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
+
+        api_key = _gemini_transcribe_api_key_for_resolved_credential(
+            config.credential, secrets=secrets
+        )
+        language_codes_value = config.provider_options.get("language_codes")
+        language_codes = (
+            tuple(language_codes_value)
+            if isinstance(language_codes_value, tuple)
+            and all(isinstance(code, str) for code in language_codes_value)
+            else ()
+        )
+        return GeminiTranscribeSTTBackend(
+            api_key=api_key,
+            model=config.model or "gemini-3.5-transcribe-live",
+            language_codes=language_codes,
+            custom_vocabulary=keyterms[:GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS],
+            sample_rate_hz=config.sample_rate_hz,
+        )
+
+    if config.provider == STT_PROVIDER_ELEVENLABS_SCRIBE:
+        from puripuly_heart.providers.stt.elevenlabs_scribe import ElevenLabsScribeSTTBackend
+
+        api_key = _elevenlabs_scribe_api_key_for_resolved_credential(
+            config.credential, secrets=secrets
+        )
+        language_code_value = config.provider_options.get("language_code")
+        language_code = (
+            str(language_code_value)
+            if isinstance(language_code_value, str) and language_code_value.strip()
+            else None
+        )
+        return ElevenLabsScribeSTTBackend(
+            api_key=api_key,
+            model=config.model or "scribe_v2_realtime",
+            language_code=language_code,
+            keyterms=keyterms[:ELEVENLABS_SCRIBE_STT_MAX_KEYTERMS],
+            sample_rate_hz=config.sample_rate_hz,
         )
 
     if config.provider == STT_PROVIDER_QWEN_ASR:
@@ -841,6 +974,24 @@ def resolve_peer_stt_config(settings: AppSettingsVNext) -> ResolvedPeerSTTConfig
             deepgram_model=intent.stt.deepgram.model,
         )
 
+    if provider == STTProviderName.GEMINI_TRANSCRIBE:
+        return ResolvedPeerSTTConfig(
+            provider=provider,
+            source_language=peer_source_language,
+            sample_rate_hz=STT_INTERNAL_SAMPLE_RATE_HZ,
+            keyterms=keyterms,
+            gemini_transcribe_model=intent.stt.gemini_transcribe.model,
+        )
+
+    if provider == STTProviderName.ELEVENLABS_SCRIBE:
+        return ResolvedPeerSTTConfig(
+            provider=provider,
+            source_language=peer_source_language,
+            sample_rate_hz=STT_INTERNAL_SAMPLE_RATE_HZ,
+            keyterms=keyterms,
+            elevenlabs_scribe_model=intent.stt.elevenlabs_scribe.model,
+        )
+
     if provider in {STTProviderName.QWEN_ASR, STTProviderName.QWEN_AUDIO}:
         return ResolvedPeerSTTConfig(
             provider=provider,
@@ -929,6 +1080,9 @@ def build_peer_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         resolved.provider_options.get("trailing_silence_ms"),
         resolved.provider_options.get("enable_language_identification", False),
         resolved.provider_options.get("language_hints"),
+        resolved.provider_options.get("language_codes"),
+        resolved.provider_options.get("language_code"),
+        resolved.provider_options.get("auto_language", False),
         (
             settings.intent.stt.gpu_device_id
             if resolved.provider == STT_PROVIDER_LOCAL_QWEN_GPU
