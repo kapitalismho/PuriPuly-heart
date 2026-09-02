@@ -13,6 +13,7 @@ from typing import Any
 
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
+    RecoverableSTTSessionError,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
@@ -36,7 +37,7 @@ class QwenAudioSessionState(str, Enum):
     CLOSING = "closing"
 
 
-class QwenAudioProtocolError(RuntimeError):
+class QwenAudioProtocolError(RecoverableSTTSessionError):
     pass
 
 

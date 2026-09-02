@@ -24,6 +24,7 @@ from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOpti
 from puripuly_heart.core.runtime_logging import SessionLoggingMode, SessionRuntimeLoggingService
 from puripuly_heart.core.stt.backend import (
     LocalASRReconfigurableBackend,
+    RecoverableSTTSessionError,
     STTBackend,
     STTBackendFloat32Session,
     STTBackendSession,
@@ -1219,7 +1220,9 @@ class ManagedSTTProvider:
                 self._reset_timer.cancel()
                 self._reset_timer = None
             await self._set_state(STTSessionState.DISCONNECTED)
-            if self.on_terminal_failure is not None:
+            if self.on_terminal_failure is not None and not isinstance(
+                exc, RecoverableSTTSessionError
+            ):
                 maybe_awaitable = self.on_terminal_failure(exc)
                 if inspect.isawaitable(maybe_awaitable):
                     await maybe_awaitable

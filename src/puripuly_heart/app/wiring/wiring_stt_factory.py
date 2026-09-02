@@ -456,12 +456,12 @@ def build_self_stt_provider_request_from_vnext(
 def build_self_capture_session_config_from_vnext(
     settings: AppSettingsVNext,
 ) -> SelfCaptureSessionConfig:
-    provider = settings.intent.stt.provider
+    runtime_provider = resolve_self_stt_runtime_config_from_vnext(settings).provider
     audio = settings.intent.audio
     stt = settings.intent.stt
     transition = build_self_local_asr_transition_request_from_vnext(settings, trigger="runtime")
     return SelfCaptureSessionConfig(
-        provider_id=provider,
+        provider_id=runtime_provider,
         provider_signature=build_self_stt_provider_signature_from_vnext(settings),
         runtime_signature=build_self_stt_runtime_signature_from_vnext(settings),
         capture_signature=build_self_capture_vad_signature_from_vnext(settings),
@@ -477,12 +477,12 @@ def build_self_capture_session_config_from_vnext(
             else 1100
         ),
         session_options=transition.session_options if transition is not None else None,
-        local_cpu=provider in LOCAL_CPU_PROVIDERS,
-        local_gpu=provider == STTProviderName.LOCAL_QWEN_GPU.value,
+        local_cpu=runtime_provider in LOCAL_CPU_PROVIDERS,
+        local_gpu=runtime_provider == STTProviderName.LOCAL_QWEN_GPU.value,
         release_backend_after=(
-            LOCAL_QWEN_IDLE_RELEASE_SECONDS if provider in LOCAL_CPU_PROVIDERS else None
+            LOCAL_QWEN_IDLE_RELEASE_SECONDS if runtime_provider in LOCAL_CPU_PROVIDERS else None
         ),
-        warmup=provider != STTProviderName.LOCAL_QWEN.value,
+        warmup=runtime_provider != STTProviderName.LOCAL_QWEN.value,
     )
 
 

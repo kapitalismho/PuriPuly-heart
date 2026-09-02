@@ -278,6 +278,16 @@ def test_custom_vocabulary_changes_supported_provider_signature(
     assert build_self_stt_provider_signature(updated) != build_self_stt_provider_signature(initial)
 
 
+def test_qwen_audio_capture_provider_identity_matches_runtime_provider() -> None:
+    settings = _settings(STTProviderName.QWEN_AUDIO, "ko")
+
+    capture = build_self_capture_session_config(settings)
+    request = build_self_stt_provider_request(settings)
+
+    assert capture.provider_id == STTProviderName.QWEN_ASR.value
+    assert capture.provider_id == request.config.provider
+
+
 def test_custom_vocabulary_does_not_change_unsupported_provider_signature() -> None:
     initial = _with_custom_terms(_settings(STTProviderName.LOCAL_QWEN, "ko"), {"ko": ["Puripuly"]})
     updated = _with_custom_terms(initial, {"ko": ["Puripuly", "VRChat"]})

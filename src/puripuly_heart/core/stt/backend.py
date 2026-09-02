@@ -17,6 +17,10 @@ class STTBackendTranscriptEvent:
     final_language_runs: tuple[FinalLanguageRun, ...] = ()
 
 
+class RecoverableSTTSessionError(RuntimeError):
+    pass
+
+
 class STTBackendSession(Protocol):
     async def send_audio(self, pcm16le: bytes) -> None: ...
     async def on_speech_end(
