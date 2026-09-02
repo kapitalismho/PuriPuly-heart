@@ -441,7 +441,7 @@ def test_gemini_estimate_reset_clears_persisted_quota_state() -> None:
     )
 
 
-def test_configuration_loss_resets_persistent_state() -> None:
+def test_configuration_loss_hides_but_persists_exclusion_state() -> None:
     gemini_session = _ScriptedSession()
     gemini, _ = _definition(
         STTProviderName.GEMINI_TRANSCRIBE,
@@ -465,5 +465,5 @@ def test_configuration_loss_resets_persistent_state() -> None:
     )
     object.__setattr__(definition, "is_configured", lambda: True)
     assert rolling.status(STTProviderName.GEMINI_TRANSCRIBE).state is (
-        RollingProviderState.AVAILABLE
+        RollingProviderState.AUTH_FAILED
     )

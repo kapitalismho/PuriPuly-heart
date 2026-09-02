@@ -109,9 +109,7 @@ async def test_session_sends_manual_activity_and_verbatim_config() -> None:
         transcription = raw["input_audio_transcription"]
         assert transcription["mode"] == "VERBATIM"
         assert transcription["language_codes"] == ["ko"]
-        assert (
-            raw["realtime_input_config"]["automatic_activity_detection"]["disabled"] is True
-        )
+        assert raw["realtime_input_config"]["automatic_activity_detection"]["disabled"] is True
     finally:
         await stt.close()
 
@@ -320,9 +318,7 @@ def _final(text: str):
     from google.genai import types
 
     return types.LiveServerMessage(
-        server_content=types.LiveServerContent(
-            input_transcription=types.Transcription(text=text)
-        )
+        server_content=types.LiveServerContent(input_transcription=types.Transcription(text=text))
     )
 
 

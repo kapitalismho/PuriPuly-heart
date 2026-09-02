@@ -296,21 +296,16 @@ class RollingSTTBackend(STTBackend):
         if not definition.is_configured():
             if raw is not None:
                 logger.warning(
-                    "[STT][Rolling] provider=%s configuration lost; resetting runtime state",
+                    "[STT][Rolling] provider=%s configuration lost; runtime state hidden",
                     name.value,
                 )
-                self._states[name] = None
             return RollingProviderState.NOT_CONFIGURED
         if raw is None:
             self._states[name] = RollingProviderState.AVAILABLE
             return RollingProviderState.AVAILABLE
-        if raw is RollingProviderState.FREE_QUOTA_EXHAUSTED:
+        if raw is RollingProviderState.FREE_QUOTA_EXHAUSTED and name in self._quota_day_markers:
             estimator = definition.estimator
-            if (
-                estimator is not None
-                and self._quota_day_markers.get(name) != estimator.current_quota_day()
-                and not estimator.exhausted()
-            ):
+            if estimator is None or estimator.current_quota_day() != self._quota_day_markers[name]:
                 logger.info(
                     "[STT][Rolling] provider=%s quota state cleared by quota-day reset",
                     name.value,
@@ -384,9 +379,10 @@ class RollingSTTBackend(STTBackend):
             return
         if kind in _PERSISTENT_EXHAUSTION_STATES:
             self._mark(definition.name, RollingProviderState.FREE_QUOTA_EXHAUSTED)
-            estimator = definition.estimator
-            if estimator is not None:
-                self._quota_day_markers[definition.name] = estimator.current_quota_day()
+            if kind == _ERROR_KIND_QUOTA_DAY:
+                estimator = definition.estimator
+                if estimator is not None:
+                    self._quota_day_markers[definition.name] = estimator.current_quota_day()
             logger.warning(
                 "[STT][Rolling] provider=%s open failed kind=%s -> excluded until " "quota reset",
                 definition.name.value,
@@ -411,9 +407,10 @@ class RollingSTTBackend(STTBackend):
             return
         if kind in _PERSISTENT_EXHAUSTION_STATES:
             self._mark(definition.name, RollingProviderState.FREE_QUOTA_EXHAUSTED)
-            estimator = definition.estimator
-            if estimator is not None:
-                self._quota_day_markers[definition.name] = estimator.current_quota_day()
+            if kind == _ERROR_KIND_QUOTA_DAY:
+                estimator = definition.estimator
+                if estimator is not None:
+                    self._quota_day_markers[definition.name] = estimator.current_quota_day()
 
 
 @dataclass(slots=True)
