@@ -615,6 +615,49 @@ def test_dashboard_projects_osc_state_without_emitting_intents(
     assert emitted == []
 
 
+def test_dashboard_peer_auto_detect_availability_tracks_qwen_audio_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    baseline = AppSettingsVNext()
+    qwen_audio_settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            peer_stt=replace(
+                baseline.intent.peer_stt,
+                provider=STTProviderName.QWEN_AUDIO.value,
+            ),
+        ),
+    )
+    realtime_settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            peer_stt=replace(
+                baseline.intent.peer_stt,
+                provider=STTProviderName.QWEN_ASR.value,
+            ),
+        ),
+    )
+
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_PeerASR",
+            settings=qwen_audio_settings,
+        )
+    )
+    assert view._peer_auto_detect_available is True
+
+    view.project_osc_control_state(
+        osc_control_presentation_state(
+            "PuriPuly_PeerASR",
+            settings=realtime_settings,
+        )
+    )
+    assert view._peer_auto_detect_available is False
+
+
 def test_dashboard_osc_projection_preserves_rich_peer_and_overlay_states(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

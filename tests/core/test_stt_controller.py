@@ -2838,7 +2838,7 @@ async def test_qwen_audio_bridging_reset_discards_old_active_boundary() -> None:
 
     backend = QwenAudioStreamingSTTBackend(
         api_key="test-key",
-        language="ko",
+        language_hints=("ko",),
         model=QWEN_AUDIO_MODEL,
         websocket_factory=connect,
         connect_timeout_s=1,
@@ -2961,7 +2961,7 @@ async def test_qwen_audio_bridge_retires_pending_old_boundary_before_new_final()
 
     backend = QwenAudioStreamingSTTBackend(
         api_key="test-key",
-        language="ko",
+        language_hints=("ko",),
         model=QWEN_AUDIO_MODEL,
         websocket_factory=connect,
         connect_timeout_s=1,
@@ -3031,7 +3031,7 @@ async def test_qwen_audio_bridge_cutover_captures_boundary_during_delayed_open()
 
     backend = QwenAudioStreamingSTTBackend(
         api_key="test-key",
-        language="ko",
+        language_hints=("ko",),
         model=QWEN_AUDIO_MODEL,
         websocket_factory=connect,
         connect_timeout_s=1,
