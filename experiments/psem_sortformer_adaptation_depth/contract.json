@@ -60,7 +60,7 @@
   },
   "runtime_environment": {
     "path": "experiments/psem_sortformer_adaptation_depth/runtime_environment.json",
-    "sha256": "17561c2b593439e8648f60fe25bbdca7acad4ba3a7a23eace63fc4280978edff",
+    "sha256": "ac893ef0fc3be6f99255bade186108d9ac2306cce8ce3d7455d7fae5efdf3603",
     "container_image_identity": "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
     "dependency_inventory_status": "must_match_generated_complete_lock"
   },

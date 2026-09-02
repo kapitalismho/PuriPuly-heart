@@ -32,6 +32,7 @@ def test_runtime_contract_records_ready_lean_authority() -> None:
     assert contract["material_execution"]["status"] == "ready"
     assert config["material_execution_status"] == "ready"
     assert runtime["material_execution"]["status"] == "ready"
+    assert runtime["runtime_contract_version"] == "issue-107-lean-runtime-v5"
     assert runtime["material_execution"]["required_status_for_material_execution"] == "ready"
     assert runtime["material_execution"]["known_legacy_blockers"] == []
     assert config["optimization"]["seed"] == 7301
@@ -41,6 +42,15 @@ def test_runtime_contract_records_ready_lean_authority() -> None:
     assert runtime["sampling"]["manifest_epochs"] == 1
     assert runtime["sampling"]["windows_per_manifest"] == 4096
     assert runtime["optimization_execution"]["seed"] == 7301
+    assert config["optimization"]["micro_batch_size"] == 2
+    assert config["optimization"]["gradient_accumulation_steps"] == 8
+    assert environment["compute"]["micro_batch_size"] == 2
+    assert environment["compute"]["gradient_accumulation_steps"] == 8
+    assert runtime["optimization_execution"]["precision_mode"] == "float32"
+    assert runtime["optimization_execution"]["mixed_precision"] is False
+    assert runtime["optimization_execution"]["micro_batch_size"] == 2
+    assert runtime["optimization_execution"]["gradient_accumulation_steps"] == 8
+    assert runtime["optimization_execution"]["effective_windows_per_optimizer_step"] == 16
     assert runtime["optimization_execution"]["short_smoke_maximum_optimizer_steps"] == 32
     assert runtime["optimization_execution"]["official_maximum_optimizer_steps"] == 256
     assert runtime["evaluation"]["replacement_thresholds"] == [0.5]

@@ -7,6 +7,7 @@ import os
 import random
 import subprocess
 import time
+from collections import deque
 from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -55,10 +56,13 @@ from experiments.psem_sortformer_adaptation_depth.sampling import (
     load_sampling_rows,
     load_training_sessions,
     select_overfit_rows,
-    validate_training_waveform_paths,
     validate_sampling_manifest,
+    validate_training_waveform_paths,
 )
 from experiments.psem_sortformer_adaptation_depth.training import (
+    EFFECTIVE_BATCH_SIZE,
+    GRADIENT_ACCUMULATION_STEPS,
+    MICRO_BATCH_SIZE,
     OPTIMIZER_STEPS_PER_EPOCH,
     ClassWeights,
     OfficialTrainingAuthorization,
@@ -720,13 +724,25 @@ def _training_batches(
 
     if not selected_rows:
         return
-    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="issue-107-audio") as executor:
-        future = executor.submit(prepare, selected_rows[0])
-        for index in range(len(selected_rows)):
-            example = future.result()
-            if index + 1 < len(selected_rows):
-                future = executor.submit(prepare, selected_rows[index + 1])
-            yield (example,)
+    with ThreadPoolExecutor(
+        max_workers=MICRO_BATCH_SIZE,
+        thread_name_prefix="issue-107-audio",
+    ) as executor:
+        pending = deque(
+            executor.submit(prepare, row)
+            for row in selected_rows[: MICRO_BATCH_SIZE * 2]
+        )
+        next_index = len(pending)
+        while pending:
+            batch = []
+            for _ in range(MICRO_BATCH_SIZE):
+                if not pending:
+                    break
+                batch.append(pending.popleft().result())
+                if next_index < len(selected_rows):
+                    pending.append(executor.submit(prepare, selected_rows[next_index]))
+                    next_index += 1
+            yield tuple(batch)
 
 
 def _dev_batches(
@@ -916,7 +932,7 @@ def _legacy_run_training_arm(
         "optimizer": "AdamW",
         "maximum_epochs": 8,
         "early_stopping_patience_dev_evaluations": 2,
-        "gradient_accumulation_steps": 16,
+        "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
         "optimizer_steps_per_epoch": 256,
         "native_diarization_contract_passed": bool(
             material_gate.get("passed") is True
@@ -1178,8 +1194,6 @@ def run_memory_fit_preflight(
         _build_memory_fit_optimizer,
     )
     from experiments.psem_sortformer_adaptation_depth.training import (
-        GRADIENT_ACCUMULATION_STEPS,
-        MICRO_BATCH_SIZE,
         ClassWeights,
         forward_batch,
     )
@@ -1217,10 +1231,10 @@ def run_memory_fit_preflight(
 
     rows = load_sampling_rows(sampling_manifest)
     sessions = load_training_sessions(corpus_root, reference_root)
-    probe_rows = [row for row in rows if row.get("epoch") == 1][:GRADIENT_ACCUMULATION_STEPS]
-    if len(probe_rows) != GRADIENT_ACCUMULATION_STEPS or [
+    probe_rows = [row for row in rows if row.get("epoch") == 1][:EFFECTIVE_BATCH_SIZE]
+    if len(probe_rows) != EFFECTIVE_BATCH_SIZE or [
         row.get("epoch_index") for row in probe_rows
-    ] != list(range(GRADIENT_ACCUMULATION_STEPS)):
+    ] != list(range(EFFECTIVE_BATCH_SIZE)):
         raise ExecutionError("resource estimate requires 16 ordered epoch-1 probe rows")
     row_ids = [row.get("row_id") for row in probe_rows]
     if any(not isinstance(row_id, str) for row_id in row_ids) or len(set(row_ids)) != len(
@@ -1238,7 +1252,7 @@ def run_memory_fit_preflight(
         "source_manifest_row_count": len(rows),
         "consumed_row_count": len(probe_rows),
         "epoch": 1,
-        "epoch_indices": list(range(GRADIENT_ACCUMULATION_STEPS)),
+        "epoch_indices": list(range(EFFECTIVE_BATCH_SIZE)),
         "material_training_authorization": False,
     }
     class_weights = ClassWeights(replacement_positive=1.0, anchor_positive=1.0)
@@ -1290,8 +1304,9 @@ def run_memory_fit_preflight(
             for _ in range(optimizer_steps):
                 optimizer.zero_grad(set_to_none=True)
                 step_started = time.perf_counter()
-                for example in examples:
-                    result = forward_batch(model, (example,), class_weights)
+                for batch_start in range(0, EFFECTIVE_BATCH_SIZE, MICRO_BATCH_SIZE):
+                    batch = tuple(examples[batch_start : batch_start + MICRO_BATCH_SIZE])
+                    result = forward_batch(model, batch, class_weights)
                     loss = result.losses["total"]
                     if loss.ndim != 0 or not bool(torch.isfinite(loss)):
                         raise ExecutionError("resource estimate forward produced a non-finite loss")
@@ -1819,8 +1834,8 @@ def run_training_arm(
         "optimizer_steps": 256,
         "scheduler_total_steps": 256,
         "warmup_steps": 13,
-        "micro_batch_size": 1,
-        "gradient_accumulation_steps": 16,
+        "micro_batch_size": MICRO_BATCH_SIZE,
+        "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
         "consumed_row_count": 4096,
         "training_wall_clock_seconds": wall_clock,
         "peak_training_memory_bytes": peak_training_memory_bytes,

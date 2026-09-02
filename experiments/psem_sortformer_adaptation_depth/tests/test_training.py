@@ -14,7 +14,9 @@ from experiments.psem_sortformer_adaptation_depth.preflight import canonical_sha
 from experiments.psem_sortformer_adaptation_depth.supervision import FRAME_COUNT, FrameSupervision
 from experiments.psem_sortformer_adaptation_depth.training import (
     _TRAINING_EXAMPLE_TOKEN,
+    EFFECTIVE_BATCH_SIZE,
     GRADIENT_ACCUMULATION_STEPS,
+    MICRO_BATCH_SIZE,
     OFFICIAL_OPTIMIZER_STEPS,
     SMOKE_OPTIMIZER_STEPS,
     TrainingExample,
@@ -117,7 +119,9 @@ def test_warmup_uses_the_exact_thirteen_steps_of_the_256_step_recipe() -> None:
 def test_supported_training_budgets_are_the_lean_recipe() -> None:
     assert SMOKE_OPTIMIZER_STEPS == 32
     assert OFFICIAL_OPTIMIZER_STEPS == 256
-    assert GRADIENT_ACCUMULATION_STEPS == 16
+    assert MICRO_BATCH_SIZE == 2
+    assert GRADIENT_ACCUMULATION_STEPS == 8
+    assert EFFECTIVE_BATCH_SIZE == 16
 
 
 def test_anchor_free_uniform_window_is_safely_masked_before_oracle_mapping() -> None:

@@ -30,7 +30,10 @@ class NativeSortformerLoss:
 
 
 def _require_binary(name: str, value: torch.Tensor) -> None:
-    if not torch.all(torch.logical_or(value == 0, value == 1)):
+    condition = torch.all(torch.logical_or(value == 0, value == 1))
+    if condition.device.type == "cuda":
+        torch._assert_async(condition, f"{name} must be binary")
+    elif not bool(condition):
         raise ValueError(f"{name} must be binary")
 
 
@@ -50,8 +53,13 @@ def bind_native_sortformer_loss(
     checkpoint_sha256: str,
 ) -> NativeSortformerLoss:
     roles = _loss_roles(sampling_roles)
-    if value.ndim != 0 or not torch.isfinite(value):
-        raise ValueError("native Sortformer loss must be one finite scalar")
+    if value.ndim != 0:
+        raise ValueError("native Sortformer loss must be one scalar")
+    finite = torch.isfinite(value)
+    if finite.device.type == "cuda":
+        torch._assert_async(finite, "native Sortformer loss must be finite")
+    elif not bool(finite):
+        raise ValueError("native Sortformer loss must be finite")
     if kind != NATIVE_SORTFORMER_LOSS_KIND:
         raise ValueError("native Sortformer loss kind differs from the frozen contract")
     if origin != NATIVE_SORTFORMER_LOSS_ORIGIN:
@@ -91,17 +99,25 @@ def build_psem_features(
     _require_binary("slot alive indicators", slot_alive)
     _require_binary("oracle anchor slot indicators", oracle_anchor_slot_one_hot)
     _require_binary("state reset indicators", state_reset)
-    if not torch.all(oracle_anchor_slot_one_hot.sum(dim=-1) == 1):
+    one_hot = torch.all(oracle_anchor_slot_one_hot.sum(dim=-1) == 1)
+    if one_hot.device.type == "cuda":
+        torch._assert_async(one_hot, "oracle anchor slot indicators must be one-hot")
+    elif not bool(one_hot):
         raise ValueError("oracle anchor slot indicators must be one-hot")
     if not torch.is_floating_point(model_evidence_delay_seconds):
         raise ValueError("model evidence delay must use a floating-point dtype")
     expected_delay = torch.full_like(model_evidence_delay_seconds, MODEL_EVIDENCE_DELAY_SECONDS)
-    if not torch.allclose(
-        model_evidence_delay_seconds,
-        expected_delay,
-        rtol=0,
-        atol=1e-6,
-    ):
+    delay_matches = torch.all(
+        torch.isclose(
+            model_evidence_delay_seconds,
+            expected_delay,
+            rtol=0,
+            atol=1e-6,
+        )
+    )
+    if delay_matches.device.type == "cuda":
+        torch._assert_async(delay_matches, "model evidence delay differs from the frozen interface")
+    elif not bool(delay_matches):
         raise ValueError("model evidence delay differs from the frozen interface")
     dtype = final_temporal_hidden.dtype
     alive = slot_alive.to(dtype=dtype)
@@ -145,15 +161,31 @@ class PSEMHead(nn.Module):
         self.replacement_evidence = nn.Linear(64, 1)
 
     def forward(
-        self, features: torch.Tensor, state: torch.Tensor | None = None
+        self,
+        features: torch.Tensor,
+        state: torch.Tensor | None = None,
+        *,
+        sequence_start_reset_only: bool = False,
     ) -> tuple[dict[str, torch.Tensor], torch.Tensor]:
         if features.ndim != 3 or features.shape[-1] != PSEM_INPUT_DIMENSION:
             raise ValueError("PSEM head requires [batch, frames, 208] input")
         reset = features[..., -2]
-        if not torch.all(torch.logical_or(reset == 0, reset == 1)):
-            raise ValueError("state reset indicators must be binary")
+        _require_binary("state reset indicators", reset)
         normalized = self.input_norm(features)
-        if not torch.any(reset):
+        if sequence_start_reset_only:
+            start_only = torch.logical_and(
+                reset[:, 0].bool().all(),
+                torch.logical_not(reset[:, 1:].bool().any()),
+            )
+            if start_only.device.type == "cuda":
+                torch._assert_async(
+                    start_only,
+                    "sequence reset indicators must occur only at the first frame",
+                )
+            elif not bool(start_only):
+                raise ValueError("sequence reset indicators must occur only at the first frame")
+            hidden, next_state = self.gru(normalized)
+        elif not torch.any(reset):
             hidden, next_state = self.gru(normalized, state)
         else:
             frame_outputs = []
@@ -192,10 +224,11 @@ def masked_balanced_bce_with_logits(
         reduction="none",
     )
     active = mask.to(dtype=logits.dtype)
-    denominator = active.sum()
-    if denominator.item() <= 0:
-        return (losses * active).sum()
-    return (losses * active).sum() / denominator
+    flattened_losses = (losses * active).flatten(start_dim=1)
+    flattened_active = active.flatten(start_dim=1)
+    numerator = flattened_losses.sum(dim=1)
+    denominator = flattened_active.sum(dim=1).clamp_min(1)
+    return (numerator / denominator).mean()
 
 
 def composite_loss(

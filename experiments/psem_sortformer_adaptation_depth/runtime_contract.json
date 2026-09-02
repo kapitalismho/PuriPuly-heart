@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "runtime_contract_version": "issue-107-lean-runtime-v4",
+  "runtime_contract_version": "issue-107-lean-runtime-v5",
   "authority_mode": "cost_bounded_hobby_engineering_probe",
   "material_execution": {
     "status": "ready",
@@ -60,9 +60,14 @@
   "optimization_execution": {
     "seed": 7301,
     "confirmation_seed_allowed": false,
-    "micro_batch_size": 1,
-    "gradient_accumulation_steps": 16,
+    "precision_mode": "float32",
+    "mixed_precision": false,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 8,
     "effective_windows_per_optimizer_step": 16,
+    "micro_batch_grouping": "two_consecutive_ordered_manifest_windows",
+    "loss_reduction": "mean_of_per_window_losses_before_gradient_accumulation",
+    "causal_attention_randomization_scope": "one_draw_per_micro_batch",
     "short_smoke_maximum_optimizer_steps": 32,
     "official_maximum_optimizer_steps": 256,
     "multi_epoch_early_stopping_required": false,

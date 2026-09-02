@@ -4,13 +4,16 @@ import platform
 from types import SimpleNamespace
 
 import pytest
+import torch
 from torch import nn
+from torch.nn import functional as F
 
 from experiments.psem_sortformer_adaptation_depth import nemo_adapter
 from experiments.psem_sortformer_adaptation_depth.nemo_adapter import (
     NEMO_REVISION,
     PINNED_CONTAINER_IMAGE_IDENTITY,
     REQUIRED_LOCK_PACKAGES,
+    SortformerEvidence,
     TrainableSortformerPSEM,
     _temporary_causal_attention,
     _validate_state_reset_lifecycle,
@@ -108,8 +111,6 @@ def test_random_causal_attention_restores_the_exact_prior_context() -> None:
 
 
 def test_state_reset_evidence_matches_actual_sequence_initialization() -> None:
-    import torch
-
     _validate_state_reset_lifecycle(torch.tensor([[[True], [False]]]), batch_size=1, frame_count=2)
     with pytest.raises(Exception, match="actual sequence initialization"):
         _validate_state_reset_lifecycle(
@@ -119,3 +120,53 @@ def test_state_reset_evidence_matches_actual_sequence_initialization() -> None:
         _validate_state_reset_lifecycle(
             torch.tensor([[[True], [True]]]), batch_size=1, frame_count=2
         )
+
+
+def test_native_loss_keeps_per_window_weighting_for_microbatch_two() -> None:
+    class Sortformer(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.speaker_permutations = None
+
+        def loss(self, *, probs, labels, target_lens):
+            return F.binary_cross_entropy(probs, labels)
+
+    wrapped = TrainableSortformerPSEM(
+        Sortformer(),
+        lambda labels, _probs, **_kwargs: labels,
+    )
+    probabilities = torch.tensor(
+        [
+            [[0.9, 0.1, 0.1, 0.1], [0.5, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]],
+            [[0.2, 0.8, 0.2, 0.8], [0.3, 0.7, 0.3, 0.7], [0.4, 0.6, 0.4, 0.6]],
+        ]
+    )
+    targets = torch.tensor(
+        [
+            [[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]],
+            [[0.0, 1.0, 0.0, 1.0], [0.0, 1.0, 0.0, 1.0], [0.0, 1.0, 0.0, 1.0]],
+        ]
+    )
+    mask = torch.tensor([[True, False, False], [True, True, True]])
+    evidence = SortformerEvidence(
+        probabilities=probabilities,
+        activity_logits=torch.zeros_like(probabilities),
+        final_temporal_hidden=torch.zeros((2, 3, 192)),
+        slot_alive=torch.ones_like(probabilities, dtype=torch.bool),
+        state_reset=torch.zeros((2, 3, 1)),
+        evidence_delay_seconds=torch.full((2, 3, 1), 1.04),
+    )
+    loss = wrapped.native_sortformer_loss(
+        evidence,
+        targets,
+        mask,
+        ("PSEM-STRATEGY-TRAIN", "PSEM-STRATEGY-TRAIN"),
+        valid_lengths=(1, 3),
+    ).value
+    expected = torch.stack(
+        [
+            F.binary_cross_entropy(probabilities[0, :1], targets[0, :1]),
+            F.binary_cross_entropy(probabilities[1, :3], targets[1, :3]),
+        ]
+    ).mean()
+    assert torch.equal(loss, expected)

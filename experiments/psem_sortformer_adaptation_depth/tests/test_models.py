@@ -67,6 +67,18 @@ def test_reset_indicator_clears_prior_gru_state() -> None:
     )
 
 
+def test_sequence_start_reset_fast_path_matches_framewise_recurrence() -> None:
+    torch.manual_seed(107)
+    head = PSEMHead().eval()
+    features = _features(12, reset_frame=0)
+    framewise, _ = head(features)
+    fast, _ = head(features, sequence_start_reset_only=True)
+    assert torch.allclose(framewise["anchor_present"], fast["anchor_present"], atol=1e-6, rtol=0)
+    assert torch.allclose(
+        framewise["replacement_evidence"], fast["replacement_evidence"], atol=1e-6, rtol=0
+    )
+
+
 def test_composite_loss_uses_the_frozen_weights() -> None:
     head = PSEMHead()
     outputs, _ = head(_features(4))
@@ -170,6 +182,25 @@ def test_masked_loss_returns_differentiable_zero_without_valid_targets() -> None
     loss.backward()
     assert loss.item() == 0
     assert torch.equal(logits.grad, torch.zeros_like(logits))
+
+
+def test_masked_loss_is_invariant_to_microbatch_grouping() -> None:
+    logits = torch.tensor([[2.0, -1.0, 0.5], [-2.0, 1.0, 3.0]])
+    targets = torch.tensor([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]])
+    mask = torch.tensor([[1.0, 1.0, 0.0], [1.0, 1.0, 1.0]])
+    batched = masked_balanced_bce_with_logits(logits, targets, mask, 2.0)
+    individual = torch.stack(
+        [
+            masked_balanced_bce_with_logits(
+                logits[index : index + 1],
+                targets[index : index + 1],
+                mask[index : index + 1],
+                2.0,
+            )
+            for index in range(2)
+        ]
+    ).mean()
+    assert torch.allclose(batched, individual, rtol=0, atol=1e-7)
 
 
 def test_native_loss_binding_accepts_dev_but_rejects_eval_or_mixed_roles() -> None:

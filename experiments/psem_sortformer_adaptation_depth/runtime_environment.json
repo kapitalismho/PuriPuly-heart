@@ -31,8 +31,8 @@
     "accelerator_count": 1,
     "accelerator_selection": "operator-selected compatible CUDA GPU; optional memory-fit may estimate headroom",
     "mixed_precision": false,
-    "micro_batch_size": 1,
-    "gradient_accumulation_steps": 16
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 8
   },
   "cost_budget": {
     "currency": "USD",

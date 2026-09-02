@@ -40,7 +40,7 @@ from experiments.psem_sortformer_adaptation_depth.supervision import (
     FrameSupervision,
     anchor_timeline,
     build_frame_supervision,
-    oracle_mapping_from_frames,
+    oracle_anchor_encoding_from_frames,
 )
 from experiments.psem_training_strategy_gate.sampling import DEV_ROLE, TRAIN_ROLE, RuntimeSession
 
@@ -50,8 +50,9 @@ SMOKE_OPTIMIZER_STEPS = 32
 OFFICIAL_OPTIMIZER_STEPS = 256
 EARLY_STOPPING_PATIENCE = 2
 OVERFIT_MAXIMUM_STEPS = 500
-MICRO_BATCH_SIZE = 1
-GRADIENT_ACCUMULATION_STEPS = 16
+MICRO_BATCH_SIZE = 2
+GRADIENT_ACCUMULATION_STEPS = 8
+EFFECTIVE_BATCH_SIZE = MICRO_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS
 OPTIMIZER_STEPS_PER_EPOCH = OFFICIAL_OPTIMIZER_STEPS
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
@@ -486,53 +487,23 @@ def _batch_supervision(
     anchor_one_hot = []
     psem_masks = []
     for batch_index, example in enumerate(examples):
-        episode_ids = {
-            value for value in example.supervision.anchor_episode_ids if value is not None
-        }
-        mapping = (
-            oracle_mapping_from_frames(
-                evidence.probabilities[batch_index].detach(),
-                evidence.slot_alive[batch_index].detach(),
-                example.supervision,
-            )
-            if episode_ids
-            else {}
-        )
-        if not episode_ids and bool(example.supervision.psem_mask.any()):
-            raise TrainingContractError("anchor-free windows must not carry PSEM supervision")
-        psem_mask = example.supervision.psem_mask.clone()
-        unmapped_episode_ids = episode_ids - mapping.keys()
-        if unmapped_episode_ids:
-            psem_mask[
-                torch.tensor(
-                    [
-                        episode_id in unmapped_episode_ids
-                        for episode_id in example.supervision.anchor_episode_ids
-                    ],
-                    dtype=torch.bool,
-                )
-            ] = 0
-        psem_masks.append(psem_mask)
-        slots = [
-            mapping.get(episode_id, 0) if episode_id is not None else 0
-            for episode_id in example.supervision.anchor_episode_ids
-        ]
-        encoded = torch.zeros(
-            (FRAME_COUNT, 4),
+        encoded, mapped = oracle_anchor_encoding_from_frames(
+            evidence.probabilities[batch_index].detach(),
+            evidence.slot_alive[batch_index].detach(),
+            example.supervision,
             dtype=evidence.final_temporal_hidden.dtype,
-            device=evidence.final_temporal_hidden.device,
         )
-        encoded[
-            torch.arange(FRAME_COUNT, device=encoded.device),
-            torch.tensor(slots, device=encoded.device),
-        ] = 1
+        psem_mask = example.supervision.psem_mask.to(mapped.device) * mapped.to(
+            example.supervision.psem_mask.dtype
+        )
+        psem_masks.append(psem_mask)
         anchor_one_hot.append(encoded)
     device = evidence.probabilities.device
     return (
         torch.stack(anchor_one_hot),
         torch.stack([value.supervision.anchor_targets for value in examples]).to(device),
         torch.stack([value.supervision.replacement_targets for value in examples]).to(device),
-        torch.stack(psem_masks).to(device),
+        torch.stack(psem_masks),
         torch.stack([value.supervision.arrival_order_targets for value in examples]).to(device),
     )
 
@@ -544,7 +515,18 @@ def forward_batch(
 ) -> ForwardResult:
     if not examples:
         raise TrainingContractError("training batch must not be empty")
-    waveform = torch.stack([example.waveform for example in examples]).to(model.sortformer.device)
+    source_waveforms = [example.waveform for example in examples]
+    target_device = torch.device(model.sortformer.device)
+    if target_device.type == "cuda" and all(value.device.type == "cpu" for value in source_waveforms):
+        staged = torch.empty(
+            (len(source_waveforms), source_waveforms[0].shape[0]),
+            dtype=source_waveforms[0].dtype,
+            pin_memory=True,
+        )
+        torch.stack(source_waveforms, out=staged)
+        waveform = staged.to(target_device, non_blocking=True)
+    else:
+        waveform = torch.stack(source_waveforms).to(target_device)
     lengths = torch.full(
         (len(examples),),
         waveform.shape[1],
@@ -577,6 +559,9 @@ def forward_batch(
         arrival_targets,
         native_mask,
         roles,
+        valid_lengths=tuple(
+            int(value.supervision.native_mask.sum()) for value in examples
+        ),
     )
     losses = composite_loss(
         outputs,
@@ -1072,7 +1057,7 @@ def fit_arm(
     global_step = 0
     for examples in train_batches(1):
         if len(examples) != MICRO_BATCH_SIZE:
-            raise TrainingContractError("official training requires microbatch size one")
+            raise TrainingContractError("official training requires microbatch size two")
         for example in examples:
             expected = identity_by_row.get(example.row_id)
             actual = (
@@ -1163,7 +1148,7 @@ def run_short_smoke(
         raise TrainingContractError("smoke requires the first 512 manifest rows")
     if parameter_policy.get("arm") != arm:
         raise TrainingContractError("smoke parameter policy identity differs from the arm")
-    examples = (example for batch in batches for example in batch)
+    batch_iterator = iter(batches)
     before = {
         name: value.detach().clone()
         for name, value in model.named_parameters()
@@ -1179,17 +1164,20 @@ def run_short_smoke(
         window_loss_sum = torch.zeros((), device=model.sortformer.device)
         for _ in range(GRADIENT_ACCUMULATION_STEPS):
             try:
-                example = next(examples)
+                batch = next(batch_iterator)
             except StopIteration as exc:
                 raise TrainingContractError("smoke rows ended before 512 examples") from exc
-            if (
-                example.row_id != expected_row_ids[consumed]
-                or example.split_role != TRAIN_ROLE
-                or not _training_example_content_bound(example)
-            ):
-                raise TrainingContractError("smoke input identity differs from the manifest")
-            consumed += 1
-            result = forward_batch(model, (example,), class_weights)
+            if len(batch) != MICRO_BATCH_SIZE:
+                raise TrainingContractError("smoke requires microbatch size two")
+            for example in batch:
+                if (
+                    example.row_id != expected_row_ids[consumed]
+                    or example.split_role != TRAIN_ROLE
+                    or not _training_example_content_bound(example)
+                ):
+                    raise TrainingContractError("smoke input identity differs from the manifest")
+                consumed += 1
+            result = forward_batch(model, batch, class_weights)
             total = result.losses["total"]
             window_loss_sum.add_(total.detach())
             (total / GRADIENT_ACCUMULATION_STEPS).backward()
@@ -1204,7 +1192,7 @@ def run_short_smoke(
         optimizer.zero_grad(set_to_none=True)
         losses.append(float((window_loss_sum / GRADIENT_ACCUMULATION_STEPS).cpu()))
     try:
-        next(examples)
+        next(batch_iterator)
     except StopIteration:
         pass
     else:

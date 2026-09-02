@@ -214,6 +214,53 @@ def oracle_mapping_from_frames(
     return result
 
 
+def oracle_anchor_encoding_from_frames(
+    probabilities: torch.Tensor,
+    slot_alive: torch.Tensor,
+    supervision: FrameSupervision,
+    *,
+    dtype: torch.dtype,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if probabilities.shape != (FRAME_COUNT, SLOT_COUNT) or slot_alive.shape != probabilities.shape:
+        raise SupervisionError("oracle mapping posterior geometry is invalid")
+    episode_ids = sorted(
+        {value for value in supervision.anchor_episode_ids if value is not None}
+    )
+    device = probabilities.device
+    if not episode_ids:
+        slots = torch.zeros(FRAME_COUNT, dtype=torch.long, device=device)
+        mapped = torch.zeros(FRAME_COUNT, dtype=torch.bool, device=device)
+        return torch.nn.functional.one_hot(slots, SLOT_COUNT).to(dtype), mapped
+    episode_index_by_id = {episode_id: index for index, episode_id in enumerate(episode_ids)}
+    frame_episode_indices = torch.tensor(
+        [
+            episode_index_by_id.get(episode_id, -1)
+            if episode_id is not None
+            else -1
+            for episode_id in supervision.anchor_episode_ids
+        ],
+        dtype=torch.long,
+        device=device,
+    )
+    episode_indices = torch.arange(len(episode_ids), device=device).unsqueeze(1)
+    membership = frame_episode_indices.unsqueeze(0) == episode_indices
+    support = membership & supervision.mapping_anchor_active.to(device).unsqueeze(0)
+    counts = support.sum(dim=1)
+    weighted_probabilities = probabilities * slot_alive.to(probabilities.dtype)
+    scores = support.to(probabilities.dtype) @ weighted_probabilities
+    scores = scores / counts.clamp_min(1).to(probabilities.dtype).unsqueeze(1)
+    episode_slots = scores.argmax(dim=1)
+    present = frame_episode_indices >= 0
+    safe_indices = frame_episode_indices.clamp_min(0)
+    frame_slots = torch.where(
+        present,
+        episode_slots[safe_indices],
+        torch.zeros_like(frame_episode_indices),
+    )
+    mapped = present & (counts[safe_indices] > 0)
+    return torch.nn.functional.one_hot(frame_slots, SLOT_COUNT).to(dtype), mapped
+
+
 def oracle_anchor_one_hot(
     anchor_episode_ids: tuple[str, ...],
     slot_by_episode: dict[str, int],

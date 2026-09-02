@@ -13,6 +13,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -219,12 +220,17 @@ def _assert_loaded_nemo_origins(checkout: Path) -> list[dict[str, str]]:
 def _validate_state_reset_lifecycle(
     state_reset: torch.Tensor, *, batch_size: int, frame_count: int
 ) -> None:
-    if (
-        state_reset.dtype != torch.bool
-        or state_reset.shape != (batch_size, frame_count, 1)
-        or not bool(state_reset[:, 0, 0].all())
-        or (frame_count > 1 and bool(state_reset[:, 1:, 0].any()))
-    ):
+    if state_reset.dtype != torch.bool or state_reset.shape != (batch_size, frame_count, 1):
+        raise NeMoAdapterError("state-reset evidence differs from actual sequence initialization")
+    valid = state_reset[:, 0, 0].all()
+    if frame_count > 1:
+        valid = valid & ~state_reset[:, 1:, 0].any()
+    if valid.device.type == "cuda":
+        torch._assert_async(
+            valid,
+            "state-reset evidence differs from actual sequence initialization",
+        )
+    elif not bool(valid):
         raise NeMoAdapterError("state-reset evidence differs from actual sequence initialization")
 
 
@@ -263,6 +269,8 @@ def compact_valid_frames(
     probabilities: torch.Tensor,
     targets: torch.Tensor,
     target_mask: torch.Tensor,
+    *,
+    valid_lengths: Sequence[int] | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     if (
         probabilities.shape != targets.shape
@@ -272,14 +280,21 @@ def compact_valid_frames(
         or target_mask.dtype != torch.bool
     ):
         raise NeMoAdapterError("native target and mask geometry differs from predictions")
-    lengths = target_mask.sum(dim=1)
-    if bool((lengths <= 0).any()):
+    if valid_lengths is None:
+        lengths = target_mask.sum(dim=1).to(device="cpu")
+        length_values = tuple(int(value) for value in lengths)
+    else:
+        length_values = tuple(valid_lengths)
+        lengths = torch.tensor(length_values, dtype=torch.long)
+    if (
+        len(length_values) != probabilities.shape[0]
+        or any(not isinstance(value, int) or value <= 0 or value > probabilities.shape[1] for value in length_values)
+    ):
         raise NeMoAdapterError("native loss requires valid frames in every sequence")
-    maximum = int(lengths.max())
+    maximum = max(length_values)
     compact_probabilities = probabilities.new_zeros((probabilities.shape[0], maximum, 4))
     compact_targets = targets.new_zeros((targets.shape[0], maximum, 4))
-    for batch_index in range(targets.shape[0]):
-        count = int(lengths[batch_index])
+    for batch_index, count in enumerate(length_values):
         compact_probabilities[batch_index, :count] = probabilities[
             batch_index, target_mask[batch_index]
         ]
@@ -578,7 +593,10 @@ class TrainableSortformerPSEM(nn.Module):
             evidence.state_reset,
             evidence.evidence_delay_seconds,
         )
-        outputs, _ = self.psem_head(features)
+        outputs, _ = self.psem_head(
+            features,
+            sequence_start_reset_only=self.training,
+        )
         return outputs
 
     def runtime_canary_loss(
@@ -610,7 +628,10 @@ class TrainableSortformerPSEM(nn.Module):
             evidence.state_reset,
             evidence.evidence_delay_seconds,
         )
-        outputs, _ = self.psem_head(features)
+        outputs, _ = self.psem_head(
+            features,
+            sequence_start_reset_only=self.training,
+        )
         return (
             outputs["anchor_present"].square().mean()
             + outputs["replacement_evidence"].square().mean()
@@ -622,6 +643,8 @@ class TrainableSortformerPSEM(nn.Module):
         arrival_order_targets: torch.Tensor,
         target_mask: torch.Tensor,
         sampling_roles: tuple[str, ...],
+        *,
+        valid_lengths: Sequence[int] | None = None,
     ) -> Any:
         if arrival_order_targets.shape[-1] != 4:
             raise NeMoAdapterError("native supervision must contain four arrival-order slots")
@@ -629,17 +652,22 @@ class TrainableSortformerPSEM(nn.Module):
             evidence.probabilities,
             arrival_order_targets,
             target_mask,
+            valid_lengths=valid_lengths,
         )
         targets = self._get_ats_targets(
             compact_arrival_targets.to(compact_probabilities.dtype),
             compact_probabilities,
             speaker_permutations=self.sortformer.speaker_permutations,
         )
-        value = self.sortformer.loss(
-            probs=compact_probabilities,
-            labels=targets,
-            target_lens=lengths,
-        )
+        values = [
+            self.sortformer.loss(
+                probs=compact_probabilities[index : index + 1, :length],
+                labels=targets[index : index + 1, :length],
+                target_lens=torch.tensor([length], dtype=torch.long),
+            )
+            for index, length in enumerate(int(value) for value in lengths)
+        ]
+        value = torch.stack(values).mean()
         return bind_native_sortformer_loss(
             value,
             sampling_roles=sampling_roles,
