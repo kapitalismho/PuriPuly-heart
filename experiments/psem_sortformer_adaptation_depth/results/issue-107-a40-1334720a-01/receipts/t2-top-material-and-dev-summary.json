@@ -1,0 +1,398 @@
+{
+  "absolute_deadline_enabled": false,
+  "absolute_deadline_utc": "2026-09-03T04:24:00+00:00",
+  "artifact_role": "issue_107_launch_phase_summary",
+  "artifacts": [
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output/checkpoints/T2-TOP/7301/step-256.pt",
+      "relative_path": "output/checkpoints/T2-TOP/7301/step-256.pt",
+      "scope": "run_root",
+      "sha256": "f0f7720609eafc564b7a76dcfcef0929861e7c0fbb9bb6661cbd32522be82325",
+      "size": 471606146
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/alimeeting_R1019_M1928.jsonl",
+      "relative_path": "output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/alimeeting_R1019_M1928.jsonl",
+      "scope": "run_root",
+      "sha256": "e8ffff1772671a3e3c8028e8a5a92acbd1a0a62514a7fc43cec62e93702ec480",
+      "size": 32466062
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/alimeeting_R1021_M4073.jsonl",
+      "relative_path": "output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/alimeeting_R1021_M4073.jsonl",
+      "scope": "run_root",
+      "sha256": "0c66ef0560644d811e02f0a33c8d467ac39d9c4e8e55a9c39c4b1cb663946139",
+      "size": 32134027
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/alimeeting_R8009_M8019.jsonl",
+      "relative_path": "output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/alimeeting_R8009_M8019.jsonl",
+      "scope": "run_root",
+      "sha256": "03d128bfc85e23ac3b435c8f2a38be0bba959566d03524ad88ae4d04e11999e0",
+      "size": 35702913
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_EN2009d.jsonl",
+      "relative_path": "output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_EN2009d.jsonl",
+      "scope": "run_root",
+      "sha256": "d063a2c67c0b458d64aac456c2b984ed2baa911c12294a398908fc16a1da971a",
+      "size": 94759959
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_ES2002b.jsonl",
+      "relative_path": "output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_ES2002b.jsonl",
+      "scope": "run_root",
+      "sha256": "262890c20a73e53bd5ac4cfac614a2eba01e7c1d726d51a31e6218bdaf3fe66a",
+      "size": 40536721
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_ES2009a.jsonl",
+      "relative_path": "output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_ES2009a.jsonl",
+      "scope": "run_root",
+      "sha256": "24a8b5e54cab3fdec91deb78de84c8b8a7c0bd242a22aa29684f6fec9655e78e",
+      "size": 24925000
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_ES2009b.jsonl",
+      "relative_path": "output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_ES2009b.jsonl",
+      "scope": "run_root",
+      "sha256": "329863b6866d5c75033f8eb1d67ad098c2ad689f08b2ea860aa886e9ff366ef4",
+      "size": 25513549
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_ES2009c.jsonl",
+      "relative_path": "output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_ES2009c.jsonl",
+      "scope": "run_root",
+      "sha256": "be62c715494b4632bfda400085de06cd318076e7a6d3957631931b06328ea757",
+      "size": 34816062
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_ES2009d.jsonl",
+      "relative_path": "output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_ES2009d.jsonl",
+      "scope": "run_root",
+      "sha256": "8e0b14be8754997336820a82b6b480e766f1fd4cbfa3115162cf952b9de46c2d",
+      "size": 37625538
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_ES2015d.jsonl",
+      "relative_path": "output/predictions/PSEM-STRATEGY-DEV/T2-TOP/7301/ami_ES2015d.jsonl",
+      "scope": "run_root",
+      "sha256": "2b4ae116a1ba16b70e7de12a7525b4c2a07a6e9fd5ad3b322072c9f94988263b",
+      "size": 34349440
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/staged-after-t2.json",
+      "relative_path": "receipts/staged-after-t2.json",
+      "scope": "run_root",
+      "sha256": "6e5bbc0f8adb000b33584921cf7548e192363bcd5a19bc4cfb325af47fcea51b",
+      "size": 1203
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-checkpoint-receipt.json",
+      "relative_path": "receipts/t2-top-checkpoint-receipt.json",
+      "scope": "run_root",
+      "sha256": "322d95722102eb5ee2cca0b6ac070f3287d09e3754b49379e9a7f80ad74bc16d",
+      "size": 196083
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-cost.json",
+      "relative_path": "receipts/t2-top-cost.json",
+      "scope": "run_root",
+      "sha256": "a627913533f009e8a2434e4682ee5d709b0020ef3b6858958ceb2275d6652472",
+      "size": 626
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-dev-prediction-set.json",
+      "relative_path": "receipts/t2-top-dev-prediction-set.json",
+      "scope": "run_root",
+      "sha256": "ac68c298e6c5e2653e277c8cfa26e2b24373d673383967276ea3cf372c1b9968",
+      "size": 572494
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-dev-result.json",
+      "relative_path": "receipts/t2-top-dev-result.json",
+      "scope": "run_root",
+      "sha256": "d6820e734f2437975dcf065574a5e5e2c49755af7414157733d301d9e24b51b6",
+      "size": 740301
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-smoke.json",
+      "relative_path": "receipts/t2-top-smoke.json",
+      "scope": "run_root",
+      "sha256": "d5b353d4781d12d48fd656ab8e5f9f59a80ef382e67e557a0fda9f2dd528bcd6",
+      "size": 100350
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-training.json",
+      "relative_path": "receipts/t2-top-training.json",
+      "scope": "run_root",
+      "sha256": "51b20df5e9b7625034faf95622a4037dab43d817f675d888532dd6fa0eb8dde0",
+      "size": 98133
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "/usr/bin/python",
+        "-m",
+        "experiments.psem_sortformer_adaptation_depth.run",
+        "smoke-arm",
+        "--checkpoint",
+        "/workspace/issue-107/assets/checkpoints/diar_streaming_sortformer_4spk-v2.1.nemo",
+        "--nemo-checkout",
+        "/opt/nemo",
+        "--dependency-lock",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/dependency-lock.json",
+        "--corpus-root",
+        "/workspace/issue-107/assets/corpus",
+        "--reference-root",
+        "/workspace/issue-107/assets/reference",
+        "--manifest",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/sampling-manifest.jsonl",
+        "--class-weights",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/class-weights.json",
+        "--arm",
+        "T2-TOP",
+        "--device",
+        "cuda",
+        "--output",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-smoke.json"
+      ],
+      "argv_sha256": "80b58def8957af8f7c1a47f7e26e08ed32a68872fddb0f7d7b961188cc9ce0e5",
+      "completed_at": "2026-09-02T10:34:11.968293+00:00",
+      "return_code": 0,
+      "started_at": "2026-09-02T10:05:57.494199+00:00"
+    },
+    {
+      "argv": [
+        "/usr/bin/python",
+        "-m",
+        "experiments.psem_sortformer_adaptation_depth.run",
+        "cost-receipt",
+        "--hourly-price-usd",
+        "0.44",
+        "--hourly-price-source",
+        "RunPod secure A40 deployment price verified before launch",
+        "--actual-gpu-seconds",
+        "7811.9685259999997",
+        "--projected-remaining-gpu-seconds",
+        "64188.031474000003",
+        "--command",
+        "Issue #107 T2-TOP authorized billing horizon",
+        "--output",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-cost.json"
+      ],
+      "argv_sha256": "4c610f170edaa89a3f172994111db4c5c3588ec46fa17f4b6b6431a224775665",
+      "completed_at": "2026-09-02T10:34:15.108568+00:00",
+      "return_code": 0,
+      "started_at": "2026-09-02T10:34:11.968649+00:00"
+    },
+    {
+      "argv": [
+        "/usr/bin/python",
+        "-m",
+        "experiments.psem_sortformer_adaptation_depth.run",
+        "train-arm",
+        "--checkpoint",
+        "/workspace/issue-107/assets/checkpoints/diar_streaming_sortformer_4spk-v2.1.nemo",
+        "--nemo-checkout",
+        "/opt/nemo",
+        "--dependency-lock",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/dependency-lock.json",
+        "--corpus-root",
+        "/workspace/issue-107/assets/corpus",
+        "--reference-root",
+        "/workspace/issue-107/assets/reference",
+        "--manifest",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/sampling-manifest.jsonl",
+        "--class-weights",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/class-weights.json",
+        "--arm",
+        "T2-TOP",
+        "--short-smoke-receipt",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-smoke.json",
+        "--output-root",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output",
+        "--device",
+        "cuda",
+        "--training-output",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-training.json",
+        "--checkpoint-receipt-output",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-checkpoint-receipt.json"
+      ],
+      "argv_sha256": "eeb37c70ab2a1b0e8fd88d663ca361c2cde8abff52a47cdbe719fcc25127cf8e",
+      "completed_at": "2026-09-02T13:57:17.129722+00:00",
+      "return_code": 0,
+      "started_at": "2026-09-02T10:34:15.109580+00:00"
+    },
+    {
+      "argv": [
+        "/usr/bin/python",
+        "-m",
+        "experiments.psem_sortformer_adaptation_depth.run",
+        "infer",
+        "--checkpoint",
+        "/workspace/issue-107/assets/checkpoints/diar_streaming_sortformer_4spk-v2.1.nemo",
+        "--nemo-checkout",
+        "/opt/nemo",
+        "--dependency-lock",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/dependency-lock.json",
+        "--corpus-root",
+        "/workspace/issue-107/assets/corpus",
+        "--reference-root",
+        "/workspace/issue-107/assets/reference",
+        "--output-root",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output",
+        "--protocol-registry-root",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/protocol-registry",
+        "--device",
+        "cuda",
+        "--role",
+        "PSEM-STRATEGY-DEV",
+        "--arm",
+        "T2-TOP",
+        "--seed",
+        "7301",
+        "--trained-checkpoint",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/output/checkpoints/T2-TOP/7301/step-256.pt",
+        "--trained-checkpoint-receipt",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-checkpoint-receipt.json",
+        "--output",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-dev-prediction-set.json"
+      ],
+      "argv_sha256": "8358d5cae60afff9c9a6b25d8c105ae30e4d21358ef8d51f45bdc27d9d3efd81",
+      "completed_at": "2026-09-02T14:36:10.363933+00:00",
+      "return_code": 0,
+      "started_at": "2026-09-02T13:57:17.131125+00:00"
+    },
+    {
+      "argv": [
+        "/usr/bin/python",
+        "-m",
+        "experiments.psem_sortformer_adaptation_depth.run",
+        "evaluate",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-dev-prediction-set.json",
+        "--output",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-dev-result.json"
+      ],
+      "argv_sha256": "413819530cd0d5b7613cf869a53a06b32d215eb173e94e8721a49d462e41114d",
+      "completed_at": "2026-09-02T14:36:28.615597+00:00",
+      "return_code": 0,
+      "started_at": "2026-09-02T14:36:10.364257+00:00"
+    },
+    {
+      "argv": [
+        "/usr/bin/python",
+        "-m",
+        "experiments.psem_sortformer_adaptation_depth.run",
+        "stage-append",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/staged-after-h.json",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/t2-top-dev-result.json",
+        "--prior-result",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/f0-dev-result.json",
+        "--prior-result",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/h-head-dev-result.json",
+        "--output",
+        "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/staged-after-t2.json"
+      ],
+      "argv_sha256": "7c26817584f6572aaf8806da118cf64f99e1c5a2ed382b1b8b74b12e4481d8bd",
+      "completed_at": "2026-09-02T14:36:31.362352+00:00",
+      "return_code": 0,
+      "started_at": "2026-09-02T14:36:28.615937+00:00"
+    }
+  ],
+  "completed_at": "2026-09-02T14:36:34.043749+00:00",
+  "config_sha256": "95af864bddff57825ccf03ddc1c91769bfd5d86a872c713b3e26e43a963f8368",
+  "image_identity": "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
+  "inputs": [
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/dependency-lock.json",
+      "relative_path": "receipts/dependency-lock.json",
+      "scope": "run_root",
+      "sha256": "67d83527e5f4103549ab8bc2fa58962b02996f4ecbf56d3b86b0b9dea2e3a577",
+      "size": 24666
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/sampling-manifest.jsonl",
+      "relative_path": "receipts/sampling-manifest.jsonl",
+      "scope": "run_root",
+      "sha256": "886f7ac236657f5d014f3dd916ea1413c11439407fc3bbe131607e24a5a3ceaf",
+      "size": 7032771
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/class-weights.json",
+      "relative_path": "receipts/class-weights.json",
+      "scope": "run_root",
+      "sha256": "0d2cf5121ab9920c3a277149d98079a00305b41776ac843d2ee5d16c1628345f",
+      "size": 622
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/staged-after-h.json",
+      "relative_path": "receipts/staged-after-h.json",
+      "scope": "run_root",
+      "sha256": "98e1f91c985d701a6dbfcbea16bc3777ba04a379ef9abb143c9a2c74db14fd10",
+      "size": 939
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/f0-dev-result.json",
+      "relative_path": "receipts/f0-dev-result.json",
+      "scope": "run_root",
+      "sha256": "44a45521fc92c2f5ece0b4a500762518a68bad68abf7600ac416d64de4678326",
+      "size": 728775
+    },
+    {
+      "path": "/workspace/issue-107/runs/issue-107-a40-1334720a-01/receipts/h-head-dev-result.json",
+      "relative_path": "receipts/h-head-dev-result.json",
+      "scope": "run_root",
+      "sha256": "6605065bf99ef6c2a18864cf0222e633a4509785df8d72b217ae67988680760d",
+      "size": 734064
+    }
+  ],
+  "payload_sha256": "bb67110d0f099f9b22cc338d12ce9bde95dcd6de6f3d443a4357936ac348b05a",
+  "phase_id": "t2-top-material-and-dev",
+  "run_id": "issue-107-a40-1334720a-01",
+  "schema_version": 1,
+  "started_at": "2026-09-02T10:05:56.473520+00:00",
+  "storage_evidence": [
+    {
+      "captured_at": "2026-09-02T10:05:56.994646+00:00",
+      "free_bytes": 195083590762496,
+      "label": "phase_start",
+      "path": "/workspace",
+      "required_free_bytes": 8589934592,
+      "required_total_bytes": 30000000000,
+      "total_bytes": 830295989747712,
+      "used_bytes": 635212398985216
+    },
+    {
+      "captured_at": "2026-09-02T10:05:57.494111+00:00",
+      "free_bytes": 195081915138048,
+      "label": "before_smoke",
+      "path": "/workspace",
+      "required_free_bytes": 8589934592,
+      "required_total_bytes": 30000000000,
+      "total_bytes": 830295989747712,
+      "used_bytes": 635214074609664
+    },
+    {
+      "captured_at": "2026-09-02T10:34:15.109370+00:00",
+      "free_bytes": 195022662139904,
+      "label": "before_training",
+      "path": "/workspace",
+      "required_free_bytes": 8589934592,
+      "required_total_bytes": 30000000000,
+      "total_bytes": 830295989747712,
+      "used_bytes": 635273327607808
+    },
+    {
+      "captured_at": "2026-09-02T13:57:17.130913+00:00",
+      "free_bytes": 196173595607040,
+      "label": "before_dev_inference",
+      "path": "/workspace",
+      "required_free_bytes": 8589934592,
+      "required_total_bytes": 30000000000,
+      "total_bytes": 830295989747712,
+      "used_bytes": 634122394140672
+    }
+  ]
+}

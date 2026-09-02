@@ -1,0 +1,255 @@
+{
+  "absolute_deadline_enabled": false,
+  "absolute_deadline_utc": "2026-09-03T04:24:00+00:00",
+  "candidate_git_head": "6c768d3ab16b3ddda92550456fcde42f0f54ca66",
+  "first_phase": "bootstrap-f0",
+  "persistent_root": "/workspace",
+  "phases": [
+    {
+      "argv": [
+        "/usr/bin/python",
+        "-m",
+        "experiments.psem_sortformer_adaptation_depth.issue_107_launch",
+        "bootstrap-f0",
+        "--run-id",
+        "issue-107-a40-1334720a-01",
+        "--persistent-root",
+        "/workspace",
+        "--repository-root",
+        "/workspace/repo",
+        "--candidate-git-head",
+        "6c768d3ab16b3ddda92550456fcde42f0f54ca66",
+        "--checkpoint",
+        "/workspace/issue-107/assets/checkpoints/diar_streaming_sortformer_4spk-v2.1.nemo",
+        "--corpus-root",
+        "/workspace/issue-107/assets/corpus",
+        "--reference-root",
+        "/workspace/issue-107/assets/reference",
+        "--nemo-checkout",
+        "/opt/nemo",
+        "--image-identity",
+        "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
+        "--hourly-price-usd",
+        "0.44",
+        "--hourly-price-source",
+        "RunPod secure A40 deployment price verified before launch",
+        "--billing-started-at",
+        "2026-09-02T08:24:00+00:00",
+        "--max-runtime-hours",
+        "20",
+        "--minimum-free-bytes",
+        "8589934592",
+        "--phase-summary",
+        "{run_root}/receipts/bootstrap-f0-summary.json"
+      ],
+      "cwd": "{repository_root}",
+      "environment": {
+        "CUDA_VISIBLE_DEVICES": "0",
+        "PSEM_ADAPTATION_OUTPUT_ROOT": "{run_root}/output",
+        "PSEM_CONTAINER_IMAGE_IDENTITY": "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
+        "PSEM_CORPUS_ROOT": "/workspace/issue-107/assets/corpus",
+        "PSEM_PROTOCOL_REGISTRY_ROOT": "{run_root}/protocol-registry",
+        "PSEM_REFERENCE_ROOT": "/workspace/issue-107/assets/reference",
+        "PSEM_SORTFORMER_NEMO_PATH": "/workspace/issue-107/assets/checkpoints/diar_streaming_sortformer_4spk-v2.1.nemo"
+      },
+      "id": "bootstrap-f0",
+      "next_phase": "h-head-material-and-dev",
+      "required_inputs": [],
+      "required_outputs": [
+        {
+          "path": "receipts/bootstrap-f0-summary.json"
+        }
+      ]
+    },
+    {
+      "argv": [
+        "/usr/bin/python",
+        "-m",
+        "experiments.psem_sortformer_adaptation_depth.issue_107_launch",
+        "run-arm",
+        "--arm",
+        "H-HEAD",
+        "--run-id",
+        "issue-107-a40-1334720a-01",
+        "--persistent-root",
+        "/workspace",
+        "--repository-root",
+        "/workspace/repo",
+        "--candidate-git-head",
+        "6c768d3ab16b3ddda92550456fcde42f0f54ca66",
+        "--checkpoint",
+        "/workspace/issue-107/assets/checkpoints/diar_streaming_sortformer_4spk-v2.1.nemo",
+        "--corpus-root",
+        "/workspace/issue-107/assets/corpus",
+        "--reference-root",
+        "/workspace/issue-107/assets/reference",
+        "--nemo-checkout",
+        "/opt/nemo",
+        "--image-identity",
+        "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
+        "--hourly-price-usd",
+        "0.44",
+        "--hourly-price-source",
+        "RunPod secure A40 deployment price verified before launch",
+        "--billing-started-at",
+        "2026-09-02T08:24:00+00:00",
+        "--max-runtime-hours",
+        "20",
+        "--minimum-free-bytes",
+        "8589934592",
+        "--phase-summary",
+        "{run_root}/receipts/h-head-material-and-dev-summary.json"
+      ],
+      "cwd": "{repository_root}",
+      "environment": {
+        "CUDA_VISIBLE_DEVICES": "0",
+        "PSEM_ADAPTATION_OUTPUT_ROOT": "{run_root}/output",
+        "PSEM_CONTAINER_IMAGE_IDENTITY": "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
+        "PSEM_CORPUS_ROOT": "/workspace/issue-107/assets/corpus",
+        "PSEM_PROTOCOL_REGISTRY_ROOT": "{run_root}/protocol-registry",
+        "PSEM_REFERENCE_ROOT": "/workspace/issue-107/assets/reference",
+        "PSEM_SORTFORMER_NEMO_PATH": "/workspace/issue-107/assets/checkpoints/diar_streaming_sortformer_4spk-v2.1.nemo"
+      },
+      "id": "h-head-material-and-dev",
+      "next_phase": "t2-top-material-and-dev",
+      "required_inputs": [],
+      "required_outputs": [
+        {
+          "path": "receipts/h-head-material-and-dev-summary.json"
+        }
+      ]
+    },
+    {
+      "argv": [
+        "/usr/bin/python",
+        "-m",
+        "experiments.psem_sortformer_adaptation_depth.issue_107_launch",
+        "run-arm",
+        "--arm",
+        "T2-TOP",
+        "--run-id",
+        "issue-107-a40-1334720a-01",
+        "--persistent-root",
+        "/workspace",
+        "--repository-root",
+        "/workspace/repo",
+        "--candidate-git-head",
+        "6c768d3ab16b3ddda92550456fcde42f0f54ca66",
+        "--checkpoint",
+        "/workspace/issue-107/assets/checkpoints/diar_streaming_sortformer_4spk-v2.1.nemo",
+        "--corpus-root",
+        "/workspace/issue-107/assets/corpus",
+        "--reference-root",
+        "/workspace/issue-107/assets/reference",
+        "--nemo-checkout",
+        "/opt/nemo",
+        "--image-identity",
+        "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
+        "--hourly-price-usd",
+        "0.44",
+        "--hourly-price-source",
+        "RunPod secure A40 deployment price verified before launch",
+        "--billing-started-at",
+        "2026-09-02T08:24:00+00:00",
+        "--max-runtime-hours",
+        "20",
+        "--minimum-free-bytes",
+        "8589934592",
+        "--phase-summary",
+        "{run_root}/receipts/t2-top-material-and-dev-summary.json"
+      ],
+      "cwd": "{repository_root}",
+      "decision_gate_after": {
+        "actions": {
+          "open_ta": "ta-all-temporal-material-and-dev",
+          "select_candidate": null,
+          "stop": null
+        },
+        "id": "after-h-t2-dev"
+      },
+      "environment": {
+        "CUDA_VISIBLE_DEVICES": "0",
+        "PSEM_ADAPTATION_OUTPUT_ROOT": "{run_root}/output",
+        "PSEM_CONTAINER_IMAGE_IDENTITY": "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
+        "PSEM_CORPUS_ROOT": "/workspace/issue-107/assets/corpus",
+        "PSEM_PROTOCOL_REGISTRY_ROOT": "{run_root}/protocol-registry",
+        "PSEM_REFERENCE_ROOT": "/workspace/issue-107/assets/reference",
+        "PSEM_SORTFORMER_NEMO_PATH": "/workspace/issue-107/assets/checkpoints/diar_streaming_sortformer_4spk-v2.1.nemo"
+      },
+      "id": "t2-top-material-and-dev",
+      "next_phase": null,
+      "required_inputs": [],
+      "required_outputs": [
+        {
+          "path": "receipts/t2-top-material-and-dev-summary.json"
+        }
+      ]
+    },
+    {
+      "argv": [
+        "/usr/bin/python",
+        "-m",
+        "experiments.psem_sortformer_adaptation_depth.issue_107_launch",
+        "run-ta",
+        "--run-id",
+        "issue-107-a40-1334720a-01",
+        "--persistent-root",
+        "/workspace",
+        "--repository-root",
+        "/workspace/repo",
+        "--candidate-git-head",
+        "6c768d3ab16b3ddda92550456fcde42f0f54ca66",
+        "--checkpoint",
+        "/workspace/issue-107/assets/checkpoints/diar_streaming_sortformer_4spk-v2.1.nemo",
+        "--corpus-root",
+        "/workspace/issue-107/assets/corpus",
+        "--reference-root",
+        "/workspace/issue-107/assets/reference",
+        "--nemo-checkout",
+        "/opt/nemo",
+        "--image-identity",
+        "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
+        "--hourly-price-usd",
+        "0.44",
+        "--hourly-price-source",
+        "RunPod secure A40 deployment price verified before launch",
+        "--billing-started-at",
+        "2026-09-02T08:24:00+00:00",
+        "--max-runtime-hours",
+        "20",
+        "--minimum-free-bytes",
+        "8589934592",
+        "--phase-summary",
+        "{run_root}/receipts/ta-all-temporal-material-and-dev-summary.json"
+      ],
+      "cwd": "{repository_root}",
+      "decision_gate_after": {
+        "actions": {
+          "select_candidate": null,
+          "stop": null
+        },
+        "id": "after-ta-dev"
+      },
+      "environment": {
+        "CUDA_VISIBLE_DEVICES": "0",
+        "PSEM_ADAPTATION_OUTPUT_ROOT": "{run_root}/output",
+        "PSEM_CONTAINER_IMAGE_IDENTITY": "sha256:20f44b72f748cdd755b0ff0dcb74de40fc6ee996e9a9ecd263c41598fdd746b8",
+        "PSEM_CORPUS_ROOT": "/workspace/issue-107/assets/corpus",
+        "PSEM_PROTOCOL_REGISTRY_ROOT": "{run_root}/protocol-registry",
+        "PSEM_REFERENCE_ROOT": "/workspace/issue-107/assets/reference",
+        "PSEM_SORTFORMER_NEMO_PATH": "/workspace/issue-107/assets/checkpoints/diar_streaming_sortformer_4spk-v2.1.nemo"
+      },
+      "id": "ta-all-temporal-material-and-dev",
+      "next_phase": null,
+      "required_inputs": [],
+      "required_outputs": [
+        {
+          "path": "receipts/ta-all-temporal-material-and-dev-summary.json"
+        }
+      ]
+    }
+  ],
+  "repository_root": "/workspace/repo",
+  "run_id": "issue-107-a40-1334720a-01",
+  "schema_version": 2
+}

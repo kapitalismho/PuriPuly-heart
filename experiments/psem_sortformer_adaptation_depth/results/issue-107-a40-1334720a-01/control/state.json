@@ -1,0 +1,27 @@
+{
+  "active_phase": null,
+  "completed_at": null,
+  "completed_phases": [
+    "bootstrap-f0",
+    "h-head-material-and-dev",
+    "t2-top-material-and-dev"
+  ],
+  "config_sha256": "95af864bddff57825ccf03ddc1c91769bfd5d86a872c713b3e26e43a963f8368",
+  "error": null,
+  "next_phase": null,
+  "run_id": "issue-107-a40-1334720a-01",
+  "schema_version": 1,
+  "started_at": "2026-09-01T06:14:15.456470+00:00",
+  "status": "WAITING_FOR_DECISION",
+  "updated_at": "2026-09-02T14:36:34.495824+00:00",
+  "waiting_gate": {
+    "actions": [
+      "open_ta",
+      "select_candidate",
+      "stop"
+    ],
+    "after_phase": "t2-top-material-and-dev",
+    "entered_at": "2026-09-02T14:36:34.495791+00:00",
+    "id": "after-h-t2-dev"
+  }
+}
