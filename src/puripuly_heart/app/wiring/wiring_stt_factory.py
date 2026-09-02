@@ -399,6 +399,7 @@ def _self_stt_custom_vocabulary_signature_for_provider(
         STTProviderName.SONIOX.value,
         STTProviderName.GEMINI_TRANSCRIBE.value,
         STTProviderName.QWEN_AUDIO.value,
+        STT_PROVIDER_ROLLING_FREE,
     }:
         return enabled, tuple(get_effective_custom_terms(config, source_language))
     if provider_value == STTProviderName.ELEVENLABS_SCRIBE.value:
@@ -569,14 +570,16 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
         intent.stt.deepgram.model if provider == STTProviderName.DEEPGRAM.value else None,
         (
             intent.stt.gemini_transcribe.model
-            if provider == STTProviderName.GEMINI_TRANSCRIBE.value
+            if provider in (STTProviderName.GEMINI_TRANSCRIBE.value, STT_PROVIDER_ROLLING_FREE)
             else None
         ),
         (
             intent.stt.elevenlabs_scribe.model
-            if provider == STTProviderName.ELEVENLABS_SCRIBE.value
+            if provider in (STTProviderName.ELEVENLABS_SCRIBE.value, STT_PROVIDER_ROLLING_FREE)
             else None
         ),
+        intent.stt.deepgram.model if provider == STT_PROVIDER_ROLLING_FREE else None,
+        intent.stt.rolling_enabled if provider in _ROLLING_MEMBER_PROVIDERS else None,
         intent.translation.qwen.region if is_qwen_cloud_stt_provider(provider) else None,
         qwen_cloud_stt_model_for_provider(provider),
         (
@@ -611,6 +614,8 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
 def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> tuple[object, ...]:
     intent = settings.intent
     provider = intent.stt.provider
+    if intent.stt.rolling_enabled and provider in _ROLLING_MEMBER_PROVIDERS:
+        provider = STT_PROVIDER_ROLLING_FREE
     custom_vocab_enabled, custom_terms = _self_stt_custom_vocabulary_signature_for_provider(
         provider=provider,
         enabled=intent.stt.custom_vocabulary_enabled,
@@ -627,14 +632,16 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         intent.stt.deepgram.model if provider == STTProviderName.DEEPGRAM.value else None,
         (
             intent.stt.gemini_transcribe.model
-            if provider == STTProviderName.GEMINI_TRANSCRIBE.value
+            if provider in (STTProviderName.GEMINI_TRANSCRIBE.value, STT_PROVIDER_ROLLING_FREE)
             else None
         ),
         (
             intent.stt.elevenlabs_scribe.model
-            if provider == STTProviderName.ELEVENLABS_SCRIBE.value
+            if provider in (STTProviderName.ELEVENLABS_SCRIBE.value, STT_PROVIDER_ROLLING_FREE)
             else None
         ),
+        intent.stt.deepgram.model if provider == STT_PROVIDER_ROLLING_FREE else None,
+        intent.stt.rolling_enabled if provider in _ROLLING_MEMBER_PROVIDERS else None,
         intent.translation.qwen.region if is_qwen_cloud_stt_provider(provider) else None,
         qwen_cloud_stt_model_for_provider(provider),
         intent.stt.soniox.model if provider == STTProviderName.SONIOX.value else None,

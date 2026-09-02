@@ -53,6 +53,12 @@ _PERSISTENT_EXHAUSTION_STATES = frozenset(
     }
 )
 
+_ROLLING_PRIORITY_ORDER: tuple[STTProviderName, ...] = (
+    STTProviderName.GEMINI_TRANSCRIBE,
+    STTProviderName.ELEVENLABS_SCRIBE,
+    STTProviderName.DEEPGRAM,
+)
+
 
 class RollingProviderState(str, Enum):
     NOT_CONFIGURED = "not_configured"
@@ -121,6 +127,10 @@ class GeminiFreeTierEstimator:
         self._roll_quota_day()
         return max(0, self._rpd_baseline - self._sessions_used)
 
+    def current_quota_day(self) -> str:
+        self._roll_quota_day()
+        return self._quota_day
+
     def exhausted(self) -> bool:
         return self.remaining_sessions() <= 0
 
@@ -153,7 +163,7 @@ def classify_scribe_error(exc: BaseException) -> str:
     if "autherror" in compact or "401" in compact or "403" in compact:
         return _ERROR_KIND_AUTH
     if "quotaexceeded" in compact:
-        return _ERROR_KIND_QUOTA_DAY
+        return _ERROR_KIND_QUOTA
     return _ERROR_KIND_TRANSIENT
 
 
@@ -163,7 +173,7 @@ def classify_deepgram_error(exc: BaseException) -> str:
     if "401" in compact or "403" in compact or "unauthorized" in compact:
         return _ERROR_KIND_AUTH
     if "payment" in text or "credit" in text or "balance" in text or "insufficientfunds" in compact:
-        return _ERROR_KIND_QUOTA_DAY
+        return _ERROR_KIND_QUOTA
     return _ERROR_KIND_TRANSIENT
 
 
@@ -196,28 +206,45 @@ class RollingSTTBackend(STTBackend):
     providers: tuple[RollingProviderDefinition, ...]
     clock: Clock = field(default_factory=SystemClock)
 
-    _states: dict[STTProviderName, RollingProviderState] = field(
+    _states: dict[STTProviderName, RollingProviderState | None] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    _quota_day_markers: dict[STTProviderName, str] = field(
         init=False, default_factory=dict, repr=False
     )
 
     def __post_init__(self) -> None:
         if not self.providers:
             raise ValueError("rolling backend requires at least one provider definition")
-        seen = set()
+        seen: set[STTProviderName] = set()
         for definition in self.providers:
+            if definition.name not in _ROLLING_PRIORITY_ORDER:
+                raise ValueError(f"unsupported rolling provider: {definition.name}")
             if definition.name in seen:
                 raise ValueError(f"duplicate rolling provider: {definition.name}")
             seen.add(definition.name)
-            self._states[definition.name] = RollingProviderState.NOT_CONFIGURED
+            if definition.name is STTProviderName.GEMINI_TRANSCRIBE and (
+                definition.estimator is None
+            ):
+                raise ValueError(
+                    "gemini_transcribe rolling provider requires a GeminiFreeTierEstimator"
+                )
+        object.__setattr__(
+            self,
+            "providers",
+            tuple(
+                sorted(
+                    self.providers,
+                    key=lambda definition: _ROLLING_PRIORITY_ORDER.index(definition.name),
+                )
+            ),
+        )
+        self._states = {definition.name: None for definition in self.providers}
 
     def status(self, name: STTProviderName) -> RollingProviderStatus:
         definition = self._definition(name)
-        state = self._states[name]
+        state = self._effective_state(definition)
         estimator = definition.estimator
-        if state is not RollingProviderState.NOT_CONFIGURED and definition.is_configured():
-            if state is RollingProviderState.NOT_CONFIGURED:
-                state = RollingProviderState.AVAILABLE
-                self._states[name] = state
         if estimator is not None and state is RollingProviderState.AVAILABLE:
             return RollingProviderStatus(
                 name=name,
@@ -232,7 +259,7 @@ class RollingSTTBackend(STTBackend):
             observability=(
                 RollingQuotaObservability.ESTIMATED
                 if estimator is not None
-                else (RollingQuotaObservability.UNKNOWN)
+                else RollingQuotaObservability.UNKNOWN
             ),
         )
 
@@ -248,23 +275,50 @@ class RollingSTTBackend(STTBackend):
     def _mark(self, name: STTProviderName, state: RollingProviderState) -> None:
         if self._states.get(name) == state:
             return
+        previous = self._states.get(name)
+        previous_label = (
+            previous.value if previous is not None else RollingProviderState.AVAILABLE.value
+        )
         logger.info(
             "[STT][Rolling] provider=%s state=%s -> %s",
             name.value,
-            self._states.get(name, RollingProviderState.NOT_CONFIGURED).value,
+            previous_label,
             state.value,
         )
         self._states[name] = state
 
     def _provider_state(self, definition: RollingProviderDefinition) -> RollingProviderState:
-        state = self._states.get(definition.name, RollingProviderState.NOT_CONFIGURED)
+        return self._effective_state(definition)
+
+    def _effective_state(self, definition: RollingProviderDefinition) -> RollingProviderState:
+        name = definition.name
+        raw = self._states.get(name)
         if not definition.is_configured():
-            self._mark(definition.name, RollingProviderState.NOT_CONFIGURED)
+            if raw is not None:
+                logger.warning(
+                    "[STT][Rolling] provider=%s configuration lost; resetting runtime state",
+                    name.value,
+                )
+                self._states[name] = None
             return RollingProviderState.NOT_CONFIGURED
-        if state is RollingProviderState.NOT_CONFIGURED:
-            self._mark(definition.name, RollingProviderState.AVAILABLE)
+        if raw is None:
+            self._states[name] = RollingProviderState.AVAILABLE
             return RollingProviderState.AVAILABLE
-        return state
+        if raw is RollingProviderState.FREE_QUOTA_EXHAUSTED:
+            estimator = definition.estimator
+            if (
+                estimator is not None
+                and self._quota_day_markers.get(name) != estimator.current_quota_day()
+                and not estimator.exhausted()
+            ):
+                logger.info(
+                    "[STT][Rolling] provider=%s quota state cleared by quota-day reset",
+                    name.value,
+                )
+                self._quota_day_markers.pop(name, None)
+                self._states[name] = RollingProviderState.AVAILABLE
+                return RollingProviderState.AVAILABLE
+        return raw
 
     def _is_eligible(self, definition: RollingProviderDefinition) -> bool:
         state = self._provider_state(definition)
@@ -330,6 +384,9 @@ class RollingSTTBackend(STTBackend):
             return
         if kind in _PERSISTENT_EXHAUSTION_STATES:
             self._mark(definition.name, RollingProviderState.FREE_QUOTA_EXHAUSTED)
+            estimator = definition.estimator
+            if estimator is not None:
+                self._quota_day_markers[definition.name] = estimator.current_quota_day()
             logger.warning(
                 "[STT][Rolling] provider=%s open failed kind=%s -> excluded until " "quota reset",
                 definition.name.value,
@@ -354,6 +411,9 @@ class RollingSTTBackend(STTBackend):
             return
         if kind in _PERSISTENT_EXHAUSTION_STATES:
             self._mark(definition.name, RollingProviderState.FREE_QUOTA_EXHAUSTED)
+            estimator = definition.estimator
+            if estimator is not None:
+                self._quota_day_markers[definition.name] = estimator.current_quota_day()
 
 
 @dataclass(slots=True)
