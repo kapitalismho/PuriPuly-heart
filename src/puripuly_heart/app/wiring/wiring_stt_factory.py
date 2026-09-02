@@ -590,7 +590,7 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
             else None
         ),
         _rolling_member_models_signature(intent) if provider == STT_PROVIDER_ROLLING_FREE else None,
-        intent.stt.rolling_enabled if provider in _ROLLING_MEMBER_PROVIDERS else None,
+        intent.stt.rolling_enabled if intent.stt.provider in _ROLLING_MEMBER_PROVIDERS else None,
         intent.translation.qwen.region if is_qwen_cloud_stt_provider(provider) else None,
         qwen_cloud_stt_model_for_provider(provider),
         (
@@ -652,7 +652,7 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
             else None
         ),
         _rolling_member_models_signature(intent) if provider == STT_PROVIDER_ROLLING_FREE else None,
-        intent.stt.rolling_enabled if provider in _ROLLING_MEMBER_PROVIDERS else None,
+        intent.stt.rolling_enabled if intent.stt.provider in _ROLLING_MEMBER_PROVIDERS else None,
         intent.translation.qwen.region if is_qwen_cloud_stt_provider(provider) else None,
         qwen_cloud_stt_model_for_provider(provider),
         intent.stt.soniox.model if provider == STTProviderName.SONIOX.value else None,
