@@ -1245,7 +1245,7 @@ def build_peer_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         resolved.provider_options.get("compatibility"),
         resolved.source_mode,
         (
-            _rolling_member_models_signature(settings)
+            _rolling_member_models_signature(settings.intent)
             if resolved.provider == STT_PROVIDER_ROLLING_FREE
             else None
         ),

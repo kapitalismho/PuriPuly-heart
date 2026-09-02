@@ -383,6 +383,8 @@ class RollingSTTBackend(STTBackend):
                 estimator = definition.estimator
                 if estimator is not None:
                     self._quota_day_markers[definition.name] = estimator.current_quota_day()
+            else:
+                self._quota_day_markers.pop(definition.name, None)
             logger.warning(
                 "[STT][Rolling] provider=%s open failed kind=%s -> excluded until " "quota reset",
                 definition.name.value,
@@ -411,6 +413,8 @@ class RollingSTTBackend(STTBackend):
                 estimator = definition.estimator
                 if estimator is not None:
                     self._quota_day_markers[definition.name] = estimator.current_quota_day()
+            else:
+                self._quota_day_markers.pop(definition.name, None)
 
 
 @dataclass(slots=True)
