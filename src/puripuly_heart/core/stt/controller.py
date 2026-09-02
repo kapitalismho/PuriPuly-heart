@@ -1269,6 +1269,13 @@ class ManagedSTTProvider:
         elapsed = self.clock.now() - self._last_speech_end_time
         return elapsed < self.reconnect_window_s
 
+    def _effective_reset_deadline_s(self) -> float:
+        session = self._active_session
+        override = getattr(session, "reset_deadline_s", None) if session is not None else None
+        if isinstance(override, (int, float)) and override > 0:
+            return float(override)
+        return self.reset_deadline_s
+
     def _schedule_reset_timer(self) -> None:
         """Schedule a timer to reset the session after reset_deadline_s."""
         if self._reset_timer:
@@ -1278,11 +1285,12 @@ class ManagedSTTProvider:
     async def _reset_timer_task(self) -> None:
         """Background task that resets the session when the deadline expires."""
         try:
-            await asyncio.sleep(self.reset_deadline_s)
+            deadline_s = self._effective_reset_deadline_s()
+            await asyncio.sleep(deadline_s)
             if self._active_session is None:
                 return
             self._emit_detailed(
-                f"[STT] Timer expired after {self.reset_deadline_s}s",
+                f"[STT] Timer expired after {deadline_s}s",
                 fallback_level=logging.INFO,
             )
             if self._active_utterance_id is not None:

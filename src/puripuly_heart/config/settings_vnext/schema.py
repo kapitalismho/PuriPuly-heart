@@ -431,6 +431,7 @@ class CustomSTTIntent:
 @dataclass(frozen=True, slots=True)
 class STTIntent:
     provider: str = "local_cpu_auto"
+    rolling_enabled: bool = False
     drain_timeout_s: float = 2.0
     vad_speech_threshold: float = 0.4
     low_latency_mode: bool = True
@@ -441,12 +442,8 @@ class STTIntent:
     custom_terms: dict[str, list[str]] = field(default_factory=_default_custom_terms)
     gpu_device_id: str = "auto"
     deepgram: DeepgramSTTIntent = field(default_factory=DeepgramSTTIntent)
-    gemini_transcribe: GeminiTranscribeSTTIntent = field(
-        default_factory=GeminiTranscribeSTTIntent
-    )
-    elevenlabs_scribe: ElevenLabsScribeSTTIntent = field(
-        default_factory=ElevenLabsScribeSTTIntent
-    )
+    gemini_transcribe: GeminiTranscribeSTTIntent = field(default_factory=GeminiTranscribeSTTIntent)
+    elevenlabs_scribe: ElevenLabsScribeSTTIntent = field(default_factory=ElevenLabsScribeSTTIntent)
     qwen_asr: QwenASRSTTIntent = field(default_factory=QwenASRSTTIntent)
     soniox: SonioxSTTIntent = field(default_factory=SonioxSTTIntent)
     custom: CustomSTTIntent = field(default_factory=CustomSTTIntent)
@@ -459,6 +456,7 @@ class STTIntent:
 @dataclass(frozen=True, slots=True)
 class PeerSTTIntent:
     provider: str = "local_cpu_auto"
+    rolling_enabled: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -877,12 +875,8 @@ class ProviderVerificationEntry:
 @dataclass(frozen=True, slots=True)
 class ProviderVerificationState:
     deepgram: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
-    gemini_transcribe: ProviderVerificationEntry = field(
-        default_factory=ProviderVerificationEntry
-    )
-    elevenlabs_scribe: ProviderVerificationEntry = field(
-        default_factory=ProviderVerificationEntry
-    )
+    gemini_transcribe: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
+    elevenlabs_scribe: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     soniox: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     google: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     openrouter: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)

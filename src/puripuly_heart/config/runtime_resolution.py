@@ -233,6 +233,7 @@ STT_PROVIDER_ELEVENLABS_SCRIBE: Final = "elevenlabs_scribe"
 STT_PROVIDER_QWEN_ASR: Final = "qwen_asr"
 STT_PROVIDER_SONIOX: Final = "soniox"
 STT_PROVIDER_CUSTOM: Final = "custom"
+STT_PROVIDER_ROLLING_FREE: Final = "rolling_free"
 STT_PROVIDER_CUSTOM_OFFLINE: Final = "custom_offline"
 STT_PROVIDER_CUSTOM_REALTIME: Final = "custom_realtime"
 STT_CUSTOM_PROVIDERS: Final[tuple[str, ...]] = (
@@ -251,6 +252,7 @@ STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_GEMINI_TRANSCRIBE,
     STT_PROVIDER_QWEN_ASR,
     STT_PROVIDER_SONIOX,
+    STT_PROVIDER_ROLLING_FREE,
     STT_PROVIDER_CUSTOM,
     STT_PROVIDER_CUSTOM_OFFLINE,
     STT_PROVIDER_CUSTOM_REALTIME,
@@ -260,6 +262,7 @@ PEER_AUTO_DETECTION_STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_SONIOX,
     STT_PROVIDER_GEMINI_TRANSCRIBE,
     STT_PROVIDER_ELEVENLABS_SCRIBE,
+    STT_PROVIDER_ROLLING_FREE,
 )
 STT_DEFAULT_SOURCE_LANGUAGE: Final = "ko"
 STT_DEFAULT_PEER_SOURCE_LANGUAGE: Final = "en"
@@ -1257,7 +1260,14 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
     credential = _no_credential()
     provider_options: Mapping[str, object] = {}
 
-    if provider == STT_PROVIDER_DEEPGRAM:
+    if provider == STT_PROVIDER_ROLLING_FREE:
+        provider_options = {
+            "mode": "rolling_free",
+            "gemini_model": intent.gemini_transcribe_model,
+            "scribe_model": intent.elevenlabs_scribe_model,
+            "deepgram_model": intent.deepgram_model,
+        }
+    elif provider == STT_PROVIDER_DEEPGRAM:
         model = intent.deepgram_model
         credential = _required_credential(
             CREDENTIAL_SOURCE_SECRET_STORE, CREDENTIAL_REF_DEEPGRAM_STT
@@ -1267,7 +1277,10 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
         credential = _required_credential(
             CREDENTIAL_SOURCE_SECRET_STORE, CREDENTIAL_REF_GEMINI_TRANSCRIBE_STT
         )
-        if intent.gemini_transcribe_auto_language or intent.gemini_transcribe_language_codes is None:
+        if (
+            intent.gemini_transcribe_auto_language
+            or intent.gemini_transcribe_language_codes is None
+        ):
             provider_options = {
                 "language_codes": (),
                 "auto_language": True,
@@ -1744,6 +1757,7 @@ __all__ = [
     "PEER_AUTO_DETECTION_STT_PROVIDERS",
     "STT_PROVIDER_QWEN_ASR",
     "STT_PROVIDER_SONIOX",
+    "STT_PROVIDER_ROLLING_FREE",
     "STT_PROVIDER_CUSTOM",
     "STT_PROVIDERS",
     "STTRuntimeIntent",

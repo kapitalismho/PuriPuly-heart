@@ -209,6 +209,8 @@ def settings_view_surface_snapshots(
     provider = ProviderSettingsSnapshot(
         stt_provider=STTProviderName(intent.stt.provider),
         peer_stt_provider=STTProviderName(intent.peer_stt.provider),
+        stt_rolling_enabled=intent.stt.rolling_enabled,
+        peer_stt_rolling_enabled=intent.peer_stt.rolling_enabled,
         llm_provider=LLMProviderName(
             provider_llm_for_translation(translation.model, translation.connection)
         ),

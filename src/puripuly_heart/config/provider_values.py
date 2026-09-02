@@ -59,6 +59,7 @@ class STTProviderName(str, Enum):
     QWEN_ASR = "qwen_asr"
     QWEN_AUDIO = "qwen_audio"
     SONIOX = "soniox"
+    ROLLING_FREE = "rolling_free"
     CUSTOM = "custom"
     CUSTOM_OFFLINE = "custom_offline"
     CUSTOM_REALTIME = "custom_realtime"

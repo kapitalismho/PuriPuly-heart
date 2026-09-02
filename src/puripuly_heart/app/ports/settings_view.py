@@ -53,6 +53,8 @@ class ProviderVerificationSnapshot:
 class ProviderSettingsSnapshot:
     stt_provider: STTProviderName
     peer_stt_provider: STTProviderName
+    stt_rolling_enabled: bool
+    peer_stt_rolling_enabled: bool
     llm_provider: LLMProviderName
     translation: TranslationSelectionSnapshot
     stt_gpu_device_id: str
