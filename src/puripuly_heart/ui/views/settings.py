@@ -3578,11 +3578,7 @@ class SettingsView(ft.Column):
         auto_unavailable = (
             provider == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available
         )
-        description = (
-            ""
-            if provider == STTProviderName.QWEN_AUDIO
-            else t(f"provider.{provider.value}.description", default="")
-        )
+        description = t(f"provider.{provider.value}.description", default="")
         return OptionItem(
             value=provider.value,
             label=provider_label(provider.value),

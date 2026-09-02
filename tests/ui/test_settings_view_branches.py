@@ -2590,7 +2590,7 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
         option for option in options if option.value == STTProviderName.QWEN_AUDIO.value
     )
     assert qwen_audio_option.label == t("provider.qwen_audio")
-    assert qwen_audio_option.description == ""
+    assert qwen_audio_option.description == t("provider.qwen_audio.description")
 
 
 def test_qwen_asr_model_button_is_removed_from_api_key_card(
