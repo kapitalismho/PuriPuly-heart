@@ -23,6 +23,7 @@
   "settings.subtab.prompt": "プロンプト",
   "settings.subtab.overlay": "オーバーレイ",
   "settings.section.stt": "音声認識",
+  "settings.stt_rolling": "無料クラウドASR自動選択",
   "settings.stt.section.recommended": "おすすめ",
   "settings.stt.section.cloud": "クラウド",
   "settings.stt.section.custom": "ユーザー設定",

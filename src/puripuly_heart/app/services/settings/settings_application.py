@@ -53,6 +53,7 @@ from puripuly_heart.app.ports.settings_view import (
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
     SttGpuDeviceEdit,
+    SttRollingEnabledEdit,
     SystemPromptEdit,
     TranslationFallbackEdit,
     TranslationFallbackSnapshot,
@@ -600,6 +601,11 @@ def materialize_provider_apply_intent(
                     updated.intent.stt,
                     provider=str(getattr(edit.provider, "value", edit.provider)),
                 ),
+            )
+        elif isinstance(edit, SttRollingEnabledEdit):
+            updated = _with_intent(
+                updated,
+                stt=replace(updated.intent.stt, rolling_enabled=edit.enabled),
             )
         elif isinstance(edit, PeerSttProviderEdit):
             updated = _with_intent(

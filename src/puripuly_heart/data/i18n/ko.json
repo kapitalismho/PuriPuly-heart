@@ -23,6 +23,7 @@
   "settings.subtab.prompt": "프롬프트",
   "settings.subtab.overlay": "오버레이",
   "settings.section.stt": "음성 인식",
+  "settings.stt_rolling": "무료 클라우드 ASR 자동 선택",
   "settings.stt.section.recommended": "권장",
   "settings.stt.section.cloud": "클라우드",
   "settings.stt.section.custom": "사용자 설정",

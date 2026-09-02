@@ -23,6 +23,7 @@
   "settings.subtab.prompt": "Prompt",
   "settings.subtab.overlay": "Overlay",
   "settings.section.stt": "Speech Recognition",
+  "settings.stt_rolling": "Free cloud ASR auto-selection",
   "settings.stt.section.recommended": "Recommended",
   "settings.stt.section.cloud": "Cloud",
   "settings.stt.section.custom": "User Settings",

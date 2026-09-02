@@ -69,6 +69,7 @@ from puripuly_heart.app.ports.settings_view import (
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
     SttGpuDeviceEdit,
+    SttRollingEnabledEdit,
     SystemPromptEdit,
     TranslationFallbackEdit,
     TranslationFallbackSnapshot,
@@ -567,7 +568,17 @@ class SettingsView(ft.Column):
         self._local_cpu_auto_available = bool(available)
 
     def self_stt_control(self) -> ft.Control:
-        return self._self_stt_card
+        return ft.Column(
+            [
+                self._self_stt_card,
+                self._stt_rolling_switch,
+            ],
+            spacing=8,
+            tight=True,
+        )
+
+    def stt_rolling_control(self) -> ft.Control:
+        return self._stt_rolling_switch
 
     def peer_stt_control(self) -> ft.Control:
         return self._peer_stt_card
@@ -1175,6 +1186,12 @@ class SettingsView(ft.Column):
         self._self_stt_card = self._wrap_unit_card(
             title=self._stt_title,
             value=self._stt_text,
+        )
+        self._stt_rolling_switch = ft.Switch(
+            label=t("settings.stt_rolling"),
+            value=False,
+            active_color=COLOR_PRIMARY,
+            on_change=self._on_stt_rolling_toggle,
         )
 
         self._llm_text = self._build_clickable_text(
@@ -3528,6 +3545,26 @@ class SettingsView(ft.Column):
     def _record_provider_edit(self, edit: ProviderSettingsEdit) -> None:
         self._provider_edits[type(edit)] = edit
 
+    def _on_stt_rolling_toggle(self, e) -> None:
+        if self._provider_snapshot is None:
+            self._stt_rolling_switch.value = False
+            return
+        enabled = bool(e.control.value)
+        current_settings = self._build_settings_with_provider_draft()
+        if current_settings is not None and current_settings.stt_rolling_enabled == enabled:
+            return
+        draft = self._ensure_provider_settings_draft()
+        self._provider_draft = replace(draft, stt_rolling_enabled=enabled)
+        self._record_provider_edit(SttRollingEnabledEdit(enabled))
+        self.has_provider_changes = True
+        self._emit_runtime_basic(f"[Settings] STT rolling {'enabled' if enabled else 'disabled'}")
+
+    def sync_stt_rolling_switch(self, settings: ProviderSettingsSnapshot | None) -> None:
+        switch = getattr(self, "_stt_rolling_switch", None)
+        if switch is None or settings is None:
+            return
+        switch.value = settings.stt_rolling_enabled
+
     def _translation_selection_edit(
         self,
         selection: TranslationSelectionSnapshot,
@@ -4670,6 +4707,9 @@ class SettingsView(ft.Column):
                 qwen_asr_model=settings.qwen_asr_model,
             ),
         )
+        stt_rolling_switch = getattr(self, "_stt_rolling_switch", None)
+        if stt_rolling_switch is not None:
+            stt_rolling_switch.value = settings.stt_rolling_enabled
 
     def _show_stt_selection_notice(self, message: str) -> None:
         if self.show_snackbar:
@@ -6717,6 +6757,7 @@ class SettingsView(ft.Column):
 
         # Section titles
         self._stt_title.value = t("settings.section.stt")
+        self._stt_rolling_switch.label = t("settings.stt_rolling")
         self._trans_title.value = t("settings.section.translation")
         self._api_title.value = t("settings.section.api_keys")
         self._managed_key_title.value = t("settings.managed_key.title")

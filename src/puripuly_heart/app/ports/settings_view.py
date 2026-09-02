@@ -274,6 +274,11 @@ class SelfSttProviderEdit:
 
 
 @dataclass(frozen=True, slots=True)
+class SttRollingEnabledEdit:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
 class PeerSttProviderEdit:
     provider: STTProviderName
 
@@ -356,6 +361,7 @@ class SystemPromptEdit:
 
 ProviderSettingsEdit: TypeAlias = (
     SelfSttProviderEdit
+    | SttRollingEnabledEdit
     | PeerSttProviderEdit
     | SttGpuDeviceEdit
     | LlmGpuDeviceEdit
@@ -437,6 +443,7 @@ __all__ = [
     "QwenRegionEdit",
     "QwenAsrModelEdit",
     "SelfSttProviderEdit",
+    "SttRollingEnabledEdit",
     "SelfVadSettingsIntent",
     "SttGpuDeviceEdit",
     "SystemPromptEdit",

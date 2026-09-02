@@ -777,6 +777,11 @@ def _wrapped_card_stack(card: ft.Control) -> ft.Stack:
 
 
 def _card_title(card: ft.Control) -> str | None:
+    if isinstance(card, ft.Switch):
+        return card.label
+    if isinstance(card, ft.Column) and not hasattr(card, "content"):
+        titles = [title for control in card.controls if (title := _card_title(control)) is not None]
+        return titles[0] if titles else None
     column = _wrapped_card_column(card)
     controls = getattr(column, "controls", None)
     if not controls:
@@ -821,6 +826,10 @@ def _api_tab_card(view: settings_view.SettingsView, title: str) -> ft.Control:
     for row in _subtab_controls(view, "api"):
         for card in _layout_cards(row):
             if _card_title(card) == title:
+                if isinstance(card, ft.Column):
+                    return next(
+                        control for control in card.controls if _card_title(control) == title
+                    )
                 return card
     raise AssertionError(f"API tab card not found: {title}")
 

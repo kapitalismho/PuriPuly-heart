@@ -23,6 +23,7 @@
   "settings.subtab.prompt": "Промпт",
   "settings.subtab.overlay": "Оверлей",
   "settings.section.stt": "Распознавание речи",
+  "settings.stt_rolling": "Автовыбор бесплатного облачного ASR",
   "settings.stt.section.recommended": "Рекомендуемые",
   "settings.stt.section.cloud": "Облако",
   "settings.stt.section.custom": "Пользовательские",

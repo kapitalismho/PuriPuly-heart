@@ -23,6 +23,7 @@
   "settings.subtab.prompt": "提示词",
   "settings.subtab.overlay": "叠加层",
   "settings.section.stt": "语音识别",
+  "settings.stt_rolling": "免费云端ASR自动选择",
   "settings.stt.section.recommended": "推荐",
   "settings.stt.section.cloud": "云",
   "settings.stt.section.custom": "用户设置",
