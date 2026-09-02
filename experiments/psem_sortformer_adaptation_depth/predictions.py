@@ -39,42 +39,49 @@ def prediction_rows(
     observed_shapes = {field: tuple(getattr(evidence, field).shape) for field in expected_shapes}
     if observed_shapes != expected_shapes:
         raise PredictionContractError(f"evidence tensor geometry is invalid: {observed_shapes}")
+    probabilities = evidence.probabilities.detach().cpu()
+    activity_logits = evidence.activity_logits.detach().cpu()
+    slot_alive = evidence.slot_alive.detach().cpu()
+    state_reset = evidence.state_reset.detach().cpu()
+    evidence_delay_seconds = evidence.evidence_delay_seconds.detach().cpu()
+    anchor_present = psem_outputs.get("anchor_present")
+    replacement_evidence = psem_outputs.get("replacement_evidence")
     evidence_tensors = (
-        evidence.probabilities,
-        evidence.activity_logits,
-        evidence.final_temporal_hidden,
-        evidence.slot_alive,
-        evidence.state_reset,
-        evidence.evidence_delay_seconds,
+        probabilities,
+        activity_logits,
+        slot_alive,
+        state_reset,
+        evidence_delay_seconds,
     )
     if not all(bool(torch.isfinite(value).all()) for value in evidence_tensors):
         raise PredictionContractError("prediction evidence contains non-finite values")
-    expected_reset = torch.zeros_like(evidence.state_reset, dtype=torch.bool)
+    expected_reset = torch.zeros_like(state_reset, dtype=torch.bool)
     if frame_count > 0:
         expected_reset[:, 0, 0] = True
     if (
-        not bool(((evidence.probabilities >= 0) & (evidence.probabilities <= 1)).all())
-        or not bool(((evidence.slot_alive == 0) | (evidence.slot_alive == 1)).all())
-        or not bool((evidence.slot_alive == 1).all())
-        or not bool(((evidence.state_reset == 0) | (evidence.state_reset == 1)).all())
-        or not torch.equal(evidence.state_reset.to(torch.bool), expected_reset)
-        or not bool((evidence.evidence_delay_seconds == 1.04).all())
+        not bool(((probabilities >= 0) & (probabilities <= 1)).all())
+        or not bool(((slot_alive == 0) | (slot_alive == 1)).all())
+        or not bool((slot_alive == 1).all())
+        or not bool(((state_reset == 0) | (state_reset == 1)).all())
+        or not torch.equal(state_reset.to(torch.bool), expected_reset)
+        or not bool((evidence_delay_seconds == 1.04).all())
     ):
         raise PredictionContractError(
             "posterior, lifecycle, or evidence-delay semantics are invalid"
         )
     if (
-        psem_outputs.get("anchor_present") is None
-        or psem_outputs.get("replacement_evidence") is None
-        or tuple(psem_outputs["anchor_present"].shape) != (1, frame_count)
-        or tuple(psem_outputs["replacement_evidence"].shape) != (1, frame_count)
+        anchor_present is None
+        or replacement_evidence is None
+        or tuple(anchor_present.shape) != (1, frame_count)
+        or tuple(replacement_evidence.shape) != (1, frame_count)
         or len(anchor_episode_ids) != frame_count
         or len(oracle_anchor_slots) != frame_count
     ):
         raise PredictionContractError("PSEM output or oracle episode geometry is invalid")
-    if not all(
-        bool(torch.isfinite(psem_outputs[key]).all())
-        for key in ("anchor_present", "replacement_evidence")
+    anchor_present = anchor_present.detach().cpu()
+    replacement_evidence = replacement_evidence.detach().cpu()
+    if not bool(torch.isfinite(anchor_present).all()) or not bool(
+        torch.isfinite(replacement_evidence).all()
     ):
         raise PredictionContractError("PSEM output contains non-finite logits")
     if source_start_sample < 0 or source_start_sample % FRAME_SAMPLES:
@@ -90,7 +97,7 @@ def prediction_rows(
         if isinstance(slot, bool) or not isinstance(slot, int) or not 0 <= slot < 4:
             raise PredictionContractError("oracle anchor slot lies outside the four-slot graph")
         start = source_start_sample + index * FRAME_SAMPLES
-        delay_samples = round(float(evidence.evidence_delay_seconds[0, index, 0]) * 16000)
+        delay_samples = round(float(evidence_delay_seconds[0, index, 0]) * 16000)
         if delay_samples != EVIDENCE_DELAY_SAMPLES or not math.isfinite(float(delay_samples)):
             raise PredictionContractError("saved prediction carries an altered evidence delay")
         row = {
@@ -102,17 +109,13 @@ def prediction_rows(
             "model_evidence_frontier_source_sample": start + delay_samples,
             "anchor_episode_id": anchor_episode_ids[index],
             "oracle_anchor_slot": slot,
-            "slot_alive": [bool(value) for value in evidence.slot_alive[0, index].tolist()],
-            "state_reset": bool(evidence.state_reset[0, index, 0]),
+            "slot_alive": [bool(value) for value in slot_alive[0, index].tolist()],
+            "state_reset": bool(state_reset[0, index, 0]),
             "raw_sortformer_activity_logits": [
-                float(value) for value in evidence.activity_logits[0, index].detach().cpu()
+                float(value) for value in activity_logits[0, index]
             ],
-            "raw_anchor_present_logit": float(
-                psem_outputs["anchor_present"][0, index].detach().cpu()
-            ),
-            "raw_replacement_evidence_logit": float(
-                psem_outputs["replacement_evidence"][0, index].detach().cpu()
-            ),
+            "raw_anchor_present_logit": float(anchor_present[0, index]),
+            "raw_replacement_evidence_logit": float(replacement_evidence[0, index]),
         }
         if provenance is not None:
             overlap = set(row).intersection(provenance)

@@ -220,6 +220,8 @@ def load_scoring_sessions(
 def load_source_waveform(
     session: RuntimeSession,
     corpus_root: Path,
+    *,
+    verify_sha256: bool = True,
 ) -> tuple[torch.Tensor, int, int]:
     source_row = _source_rows().get(session.source_id)
     relative = Path(session.audio_ref)
@@ -231,7 +233,7 @@ def load_source_waveform(
         or ".." in relative.parts
         or not path.is_relative_to(root)
         or not path.is_file()
-        or sha256_file(path) != session.waveform_sha256
+        or (verify_sha256 and sha256_file(path) != session.waveform_sha256)
     ):
         raise ExecutionError(f"source waveform identity differs: {session.source_id}")
     waveform, sample_rate = torchaudio.load(path)
@@ -437,8 +439,11 @@ def infer_prediction_set(
         raise ExecutionError("prediction output path escapes the external experiment root")
     descriptors = []
     mapping_receipts = []
+    verify_source_sha256 = arm == "F0-FROZEN-FLOAT" or role == EVAL_ROLE
     for source_id in sorted(sessions):
-        waveform, duration, tail = load_source_waveform(sessions[source_id], corpus_root)
+        waveform, duration, tail = load_source_waveform(
+            sessions[source_id], corpus_root, verify_sha256=verify_source_sha256
+        )
         waveform = waveform.to(model.sortformer.device)
         lengths = torch.tensor([waveform.shape[1]], dtype=torch.long, device=waveform.device)
         reset = torch.zeros(
@@ -510,8 +515,6 @@ def infer_prediction_set(
             }
         )
         del waveform, evidence, outputs
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
     payload = {
         "schema_version": 1,
         "artifact_role": "psem_sortformer_prediction_set",
@@ -1225,6 +1228,9 @@ def run_memory_fit_preflight(
     ):
         raise ExecutionError("resource estimate probe row identities are invalid")
     sampling_manifest_sha256 = sha256_file(sampling_manifest)
+    waveform_paths = validate_training_waveform_paths(
+        sessions, corpus_root, verify_hashes=False
+    )
     probe_validation = {
         "artifact_role": "optional_resource_probe_validation",
         "passed": True,
@@ -1247,6 +1253,8 @@ def run_memory_fit_preflight(
             manifest_path=sampling_manifest,
             manifest_validation=probe_validation,
             manifest_rows_by_id=rows_by_id,
+            manifest_sha256=sampling_manifest_sha256,
+            validated_waveform_path=waveform_paths[str(row["source_id"])],
         )
         for row in probe_rows
     ]

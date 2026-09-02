@@ -405,8 +405,8 @@ def _artifact_record(path: Path, run_root: Path) -> dict[str, Any]:
     }
 
 
-def _snapshot_scientific(run_root: Path) -> dict[str, dict[str, Any]]:
-    records: dict[str, dict[str, Any]] = {}
+def _snapshot_scientific(run_root: Path) -> dict[str, tuple[int, int]]:
+    records: dict[str, tuple[int, int]] = {}
     roots = [run_root / name for name in ("receipts", "output", "protocol-registry")]
     roots.append(authority_registry_root().resolve())
     for root in roots:
@@ -416,17 +416,20 @@ def _snapshot_scientific(run_root: Path) -> dict[str, dict[str, Any]]:
             raise LaunchError(f"scientific root is not a directory: {root}")
         for path in sorted(root.rglob("*")):
             if path.is_file():
-                record = _artifact_record(path, run_root)
-                records[record["path"]] = record
+                resolved = path.resolve()
+                stat = resolved.stat()
+                records[str(resolved)] = (stat.st_size, stat.st_mtime_ns)
     return records
 
 
 def _generated_artifacts(
-    before: Mapping[str, Mapping[str, Any]], run_root: Path
+    before: Mapping[str, tuple[int, int]], run_root: Path
 ) -> list[dict[str, Any]]:
     after = _snapshot_scientific(run_root)
     return [
-        after[path] for path in sorted(after) if path not in before or after[path] != before[path]
+        _artifact_record(Path(path), run_root)
+        for path in sorted(after)
+        if path not in before or after[path] != before[path]
     ]
 
 
@@ -572,7 +575,7 @@ def _phase_summary(
     storage: Sequence[Mapping[str, Any]],
     commands: Sequence[Mapping[str, Any]],
     inputs: Sequence[Mapping[str, Any]],
-    before: Mapping[str, Mapping[str, Any]],
+    before: Mapping[str, tuple[int, int]],
 ) -> dict[str, Any]:
     artifacts = _generated_artifacts(before, run_root)
     value = {
