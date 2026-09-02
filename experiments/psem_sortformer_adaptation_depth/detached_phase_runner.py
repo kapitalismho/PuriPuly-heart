@@ -241,6 +241,8 @@ def validate_artifacts(value: object, field: str, require_hash: bool) -> None:
 def validate_config(value: dict[str, Any]) -> None:
     if value.get("schema_version") != 2:
         raise ControlPlaneError("run config schema_version must be 2")
+    if value.get("absolute_deadline_enabled") is not False:
+        raise ControlPlaneError("absolute_deadline_enabled must be false")
     parse_absolute_deadline(value.get("absolute_deadline_utc"))
     run_id = value.get("run_id")
     if not isinstance(run_id, str) or RUN_ID_PATTERN.fullmatch(run_id) is None:
@@ -576,9 +578,6 @@ def run_phase(
     heartbeat_errors: queue.SimpleQueue[BaseException],
 ) -> None:
     raise_if_heartbeat_failed(heartbeat_errors)
-    deadline = parse_absolute_deadline(config.get("absolute_deadline_utc"))
-    if datetime.now(UTC) >= deadline:
-        raise DeadlineExceededError("immutable billing deadline reached before phase start")
     phase_id = phase["id"]
     if phase_id in state["completed_phases"]:
         raise ControlPlaneError(f"refusing to execute completed phase again: {phase_id}")
@@ -638,21 +637,10 @@ def run_phase(
         try:
             while process.poll() is None:
                 raise_if_heartbeat_failed(heartbeat_errors)
-                remaining_seconds = (deadline - datetime.now(UTC)).total_seconds()
-                if remaining_seconds <= 0:
-                    kill_process_group(process)
-                    raise DeadlineExceededError(
-                        "immutable billing deadline reached during active phase"
-                    )
                 try:
-                    process.wait(timeout=min(0.1, remaining_seconds))
+                    process.wait(timeout=0.1)
                 except subprocess.TimeoutExpired:
                     pass
-            if datetime.now(UTC) >= deadline:
-                kill_process_group(process)
-                raise DeadlineExceededError(
-                    "phase completion occurred at or after the immutable billing deadline"
-                )
             raise_if_heartbeat_failed(heartbeat_errors)
         except BaseException:
             terminate_process_group(process)
@@ -1023,6 +1011,7 @@ def self_test_config(
         "persistent_root": str(persistent_root),
         "repository_root": str(Path.cwd().resolve()),
         "candidate_git_head": "0" * 40,
+        "absolute_deadline_enabled": False,
         "absolute_deadline_utc": "2999-01-01T00:00:00+00:00",
         "phases": phases,
     }

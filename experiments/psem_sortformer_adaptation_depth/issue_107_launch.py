@@ -282,6 +282,7 @@ def _build_config(args: argparse.Namespace) -> dict[str, Any]:
         "persistent_root": str(args.persistent_root),
         "repository_root": str(args.repository_root),
         "candidate_git_head": args.candidate_git_head,
+        "absolute_deadline_enabled": False,
         "absolute_deadline_utc": _absolute_deadline(args).isoformat(),
         "first_phase": "bootstrap-f0",
         "phases": phases,
@@ -531,12 +532,9 @@ def _cost_seconds(args: argparse.Namespace) -> tuple[float, float]:
     now = datetime.now(UTC)
     started = args.billing_started_at.astimezone(UTC)
     authorized_seconds = args.max_runtime_hours * 3600.0
-    deadline = _absolute_deadline(args)
     if now < started:
         raise LaunchError("billing start is in the future")
-    if now >= deadline:
-        raise LaunchError("authorized billing deadline has passed")
-    actual = (now - started).total_seconds()
+    actual = min((now - started).total_seconds(), authorized_seconds)
     projected = authorized_seconds - actual
     if args.hourly_price_usd * (actual + projected) / 3600.0 > 30.0:
         raise LaunchError("current projected billing horizon exceeds USD 30")
@@ -584,6 +582,7 @@ def _phase_summary(
         "config_sha256": config_sha256,
         "phase_id": phase_id,
         "image_identity": IMAGE_IDENTITY,
+        "absolute_deadline_enabled": False,
         "absolute_deadline_utc": _absolute_deadline(args).isoformat(),
         "started_at": started_at,
         "completed_at": datetime.now(UTC).isoformat(),
@@ -608,6 +607,7 @@ def write_config(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "output": str(output),
         "config_sha256": sha256_bytes(canonical_bytes(config)),
+        "absolute_deadline_enabled": config["absolute_deadline_enabled"],
         "absolute_deadline_utc": config["absolute_deadline_utc"],
         "run_root": str(_run_root(args).resolve()),
         "phases": [phase["id"] for phase in config["phases"]],

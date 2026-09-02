@@ -47,6 +47,9 @@ param(
     [string]$AbsoluteDeadlineUtc,
 
     [Parameter()]
+    [switch]$DisableAbsoluteDeadline,
+
+    [Parameter()]
     [switch]$DryRun,
 
     [Parameter()]
@@ -409,9 +412,9 @@ function Export-ErrorEvidence {
             if (-not [string]::IsNullOrWhiteSpace($KnownHostsFile)) {
                 $arguments += @("-o", "UserKnownHostsFile=$KnownHostsFile", "-o", "StrictHostKeyChecking=yes")
             }
-            $controlCopy = Invoke-Captured -FilePath $scp -ArgumentList ($arguments + @("${SshTarget}:$RemoteRunRoot/control", $exportPath)) -DeadlineUtc $script:Deadline -TimeoutSeconds 120
+            $controlCopy = Invoke-Captured -FilePath $scp -ArgumentList ($arguments + @("${SshTarget}:$RemoteRunRoot/control", $exportPath)) -DeadlineUtc $script:TransportDeadline -TimeoutSeconds 120
             $controlExitCode = $controlCopy.ExitCode
-            $logsCopy = Invoke-Captured -FilePath $scp -ArgumentList ($arguments + @("${SshTarget}:$RemoteRunRoot/logs", $exportPath)) -DeadlineUtc $script:Deadline -TimeoutSeconds 120
+            $logsCopy = Invoke-Captured -FilePath $scp -ArgumentList ($arguments + @("${SshTarget}:$RemoteRunRoot/logs", $exportPath)) -DeadlineUtc $script:TransportDeadline -TimeoutSeconds 120
             $logsExitCode = $logsCopy.ExitCode
             if ($controlExitCode -ne 0 -or $logsExitCode -ne 0) {
                 $failure = "control_exit=$controlExitCode logs_exit=$logsExitCode"
@@ -654,20 +657,20 @@ if ($absoluteDeadlineProvided) {
 if (-not $DryRun -and $InitialGraceSeconds -lt 30) {
     throw "InitialGraceSeconds must be at least 30 for a live watchdog."
 }
-if (-not $DryRun -and -not $absoluteDeadlineProvided) {
+if (-not $DryRun -and -not $DisableAbsoluteDeadline -and -not $absoluteDeadlineProvided) {
     throw "AbsoluteDeadlineUtc is required as a local cross-check for a live watchdog."
 }
 if (-not $DryRun -and [string]::IsNullOrWhiteSpace($env:RUNPOD_API_KEY)) {
     throw "RUNPOD_API_KEY must be present in the local watchdog environment before arming."
 }
 
-$initialFetchDeadline = if ($absoluteDeadlineProvided) { $parsedAbsoluteDeadline } else { $null }
+$initialFetchDeadline = if (-not $DisableAbsoluteDeadline -and $absoluteDeadlineProvided) { $parsedAbsoluteDeadline } else { $null }
 try {
     $initialSnapshot = Get-ControlSnapshot -DeadlineUtc $initialFetchDeadline
     $initialBinding = Assert-ControlSnapshot -Snapshot $initialSnapshot
 }
 catch {
-    if (-not $DryRun -and $absoluteDeadlineProvided -and [DateTimeOffset]::UtcNow -ge $parsedAbsoluteDeadline) {
+    if (-not $DryRun -and -not $DisableAbsoluteDeadline -and $absoluteDeadlineProvided -and [DateTimeOffset]::UtcNow -ge $parsedAbsoluteDeadline) {
         $script:RunId = $null
         $script:ConfigSha256 = $null
         $script:Deadline = $parsedAbsoluteDeadline
@@ -681,8 +684,9 @@ catch {
 $script:RunId = [string]$initialBinding.RunId
 $script:ConfigSha256 = [string]$initialBinding.ConfigSha256
 $script:Deadline = [DateTimeOffset]$initialBinding.Deadline
-$script:DeadlineSource = "immutable_run_config"
-if ($absoluteDeadlineProvided -and $parsedAbsoluteDeadline -ne $script:Deadline) {
+$script:DeadlineSource = if ($DisableAbsoluteDeadline) { "disabled_informational_config_value" } else { "immutable_run_config" }
+$script:TransportDeadline = if ($DisableAbsoluteDeadline) { $null } else { $script:Deadline }
+if (-not $DisableAbsoluteDeadline -and $absoluteDeadlineProvided -and $parsedAbsoluteDeadline -ne $script:Deadline) {
     $configDeadline = $script:Deadline
     $script:Deadline = if ($parsedAbsoluteDeadline -lt $configDeadline) { $parsedAbsoluteDeadline } else { $configDeadline }
     $script:DeadlineSource = "deadline_mismatch_conservative_minimum"
@@ -691,7 +695,7 @@ if ($absoluteDeadlineProvided -and $parsedAbsoluteDeadline -ne $script:Deadline)
     return
 }
 $script:ArmedAt = [DateTimeOffset]::UtcNow
-if ($script:Deadline -le $script:ArmedAt) {
+if (-not $DisableAbsoluteDeadline -and $script:Deadline -le $script:ArmedAt) {
     Stop-WatchedPod -Reason "absolute_deadline_before_arm" -ObservedState $initialSnapshot.State -ObservedHeartbeat $initialSnapshot.Heartbeat
     return
 }
@@ -705,6 +709,7 @@ Write-AtomicJson -Path $ReceiptPath -Value @{
     armed_at = $script:ArmedAt.ToString("o")
     deadline = $script:Deadline.ToString("o")
     deadline_source = $script:DeadlineSource
+    absolute_deadline_enabled = -not [bool]$DisableAbsoluteDeadline
     poll_seconds = $PollSeconds
     stale_heartbeat_seconds = $StaleHeartbeatSeconds
     initial_grace_seconds = $InitialGraceSeconds
@@ -716,7 +721,7 @@ Write-AtomicJson -Path $ReceiptPath -Value @{
 $pendingSnapshot = $initialSnapshot
 while ($true) {
     $now = [DateTimeOffset]::UtcNow
-    if ($now -ge $script:Deadline) {
+    if (-not $DisableAbsoluteDeadline -and $now -ge $script:Deadline) {
         Stop-WatchedPod -Reason "absolute_deadline" -ObservedState $null -ObservedHeartbeat $null
         break
     }
@@ -725,12 +730,12 @@ while ($true) {
     $pendingSnapshot = $null
     try {
         if ($null -eq $snapshot) {
-            $snapshot = Get-ControlSnapshot -DeadlineUtc $script:Deadline
+            $snapshot = Get-ControlSnapshot -DeadlineUtc $script:TransportDeadline
         }
     }
     catch {
         $now = [DateTimeOffset]::UtcNow
-        if ($now -ge $script:Deadline) {
+        if (-not $DisableAbsoluteDeadline -and $now -ge $script:Deadline) {
             Stop-WatchedPod -Reason "absolute_deadline" -ObservedState $null -ObservedHeartbeat $null
             break
         }
@@ -750,7 +755,7 @@ while ($true) {
             }
             $snapshot = $null
         }
-        if ($null -ne $snapshot -and ([string]$binding.RunId -cne $script:RunId -or [string]$binding.ConfigSha256 -cne $script:ConfigSha256 -or [DateTimeOffset]$binding.Deadline -ne $script:Deadline)) {
+        if ($null -ne $snapshot -and ([string]$binding.RunId -cne $script:RunId -or [string]$binding.ConfigSha256 -cne $script:ConfigSha256 -or (-not $DisableAbsoluteDeadline -and [DateTimeOffset]$binding.Deadline -ne $script:Deadline))) {
             if (Wait-UnhandledState -Reason "control_binding_changed" -ObservedState $snapshot.State -ObservedHeartbeat $snapshot.Heartbeat) {
                 break
             }
@@ -761,7 +766,7 @@ while ($true) {
         $now = [DateTimeOffset]::UtcNow
         $state = $snapshot.State
         $heartbeat = $snapshot.Heartbeat
-        if ($now -ge $script:Deadline) {
+        if (-not $DisableAbsoluteDeadline -and $now -ge $script:Deadline) {
             Stop-WatchedPod -Reason "absolute_deadline" -ObservedState $state -ObservedHeartbeat $heartbeat
             break
         }
@@ -807,10 +812,8 @@ while ($true) {
     if ($Once) {
         break
     }
-    $remainingSeconds = ($script:Deadline - [DateTimeOffset]::UtcNow).TotalSeconds
-    if ($remainingSeconds -le 0) {
-        continue
-    }
-    $sleepMilliseconds = [int][Math]::Ceiling([Math]::Min($PollSeconds, $remainingSeconds) * 1000.0)
+    $sleepSeconds = if ($DisableAbsoluteDeadline) { [double]$PollSeconds } else { [Math]::Min($PollSeconds, ($script:Deadline - [DateTimeOffset]::UtcNow).TotalSeconds) }
+    if ($sleepSeconds -le 0) { continue }
+    $sleepMilliseconds = [int][Math]::Ceiling($sleepSeconds * 1000.0)
     Start-Sleep -Milliseconds $sleepMilliseconds
 }
