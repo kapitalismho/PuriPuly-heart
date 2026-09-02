@@ -207,6 +207,8 @@ _STT_UI_PROVIDERS = (
     STTProviderName.LOCAL_QWEN,
     STTProviderName.LOCAL_QWEN_GPU,
     STTProviderName.DEEPGRAM,
+    STTProviderName.GEMINI_TRANSCRIBE,
+    STTProviderName.ELEVENLABS_SCRIBE,
     STTProviderName.QWEN_ASR,
     STTProviderName.QWEN_AUDIO,
     STTProviderName.SONIOX,
@@ -4478,8 +4480,8 @@ class SettingsView(ft.Column):
                 getattr(control, "visible", False)
                 for control in (
                     self._deepgram_key,
-                    self._gemini_transcribe_key,
-                    self._elevenlabs_scribe_key,
+                    getattr(self, "_gemini_transcribe_key", None),
+                    getattr(self, "_elevenlabs_scribe_key", None),
                     self._soniox_key,
                     self._google_key,
                     self._deepseek_key,

@@ -54,7 +54,7 @@ class _RecordingFactory:
         self._session = session
         self.calls: list[tuple[str, object]] = []
 
-    def __call__(self, model: str, config: object):
+    def __call__(self, *, model: str, config: object):
         self.calls.append((model, config))
         return _FakeLiveContext(self._session)
 
@@ -230,6 +230,22 @@ async def test_many_utterances_in_one_session() -> None:
         activity_ends = [call for call in session.sent if "activity_end" in call]
         assert len(activity_starts) == 2
         assert len(activity_ends) == 2
+    finally:
+        await stt.close()
+
+
+@pytest.mark.asyncio
+async def test_stop_terminates_events_consumer() -> None:
+    session = _FakeLiveSession()
+    backend, _ = _backend(session)
+    stt = await backend.open_session()
+    try:
+        await stt.send_audio(b"\x00\x00" * 16)
+        await stt.stop()
+        collected = []
+        async for event in stt.events():
+            collected.append(event)
+        assert collected == []
     finally:
         await stt.close()
 

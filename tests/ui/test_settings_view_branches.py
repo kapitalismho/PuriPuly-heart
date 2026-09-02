@@ -2579,6 +2579,8 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
         STTProviderName.LOCAL_QWEN.value,
         STTProviderName.LOCAL_QWEN_GPU.value,
         STTProviderName.DEEPGRAM.value,
+        STTProviderName.GEMINI_TRANSCRIBE.value,
+        STTProviderName.ELEVENLABS_SCRIBE.value,
         STTProviderName.QWEN_ASR.value,
         STTProviderName.QWEN_AUDIO.value,
         STTProviderName.SONIOX.value,

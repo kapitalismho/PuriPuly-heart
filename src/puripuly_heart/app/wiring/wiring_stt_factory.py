@@ -384,10 +384,13 @@ def _self_stt_custom_vocabulary_signature_for_provider(
         STTProviderName.DEEPGRAM.value,
         STTProviderName.SONIOX.value,
         STTProviderName.GEMINI_TRANSCRIBE.value,
-        STTProviderName.ELEVENLABS_SCRIBE.value,
         STTProviderName.QWEN_AUDIO.value,
     }:
         return enabled, tuple(get_effective_custom_terms(config, source_language))
+    if provider_value == STTProviderName.ELEVENLABS_SCRIBE.value:
+        from puripuly_heart.providers.stt.elevenlabs_scribe import scribe_keyterms
+
+        return enabled, tuple(scribe_keyterms(get_effective_custom_terms(config, source_language)))
     return False, ()
 
 

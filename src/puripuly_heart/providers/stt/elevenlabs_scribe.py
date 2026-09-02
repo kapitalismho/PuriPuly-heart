@@ -40,10 +40,13 @@ def scribe_keyterms(terms: Sequence[str]) -> tuple[str, ...]:
 
 
 def scribe_language_code(source_language: str | None) -> str | None:
-    if not source_language or source_language == "auto":
+    if not source_language:
         return None
     normalized = source_language.strip()
-    return normalized or None
+    if not normalized or normalized.lower() == "auto":
+        return None
+    base = normalized.split("-")[0].lower()
+    return base or None
 
 
 @dataclass(slots=True)
@@ -68,7 +71,7 @@ class ElevenLabsScribeSTTBackend(STTBackend):
 
         session = _ElevenLabsScribeSession(
             api_key=self.api_key,
-            language_code=self.language_code,
+            language_code=scribe_language_code(self.language_code),
             keyterms=scribe_keyterms(self.keyterms),
             model=self.model,
             sample_rate_hz=self.sample_rate_hz,
@@ -224,8 +227,13 @@ class _ElevenLabsScribeSession(STTBackendSession):
                 if item is _CLOSED:
                     return
                 self._put_event(item)
+                if isinstance(item, BaseException):
+                    self._stopped = True
+                    return
         except asyncio.CancelledError:
             raise
+        finally:
+            self._put_event(None)
 
     async def send_audio(self, pcm16le: bytes) -> None:
         if self._stopped or self._connection is None:
@@ -266,6 +274,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
             self._queue_task.cancel()
             await asyncio.gather(self._queue_task, return_exceptions=True)
             self._queue_task = None
+        self._put_event(None)
         if self._connection is not None:
             with contextlib.suppress(Exception):
                 result = self._connection.close()

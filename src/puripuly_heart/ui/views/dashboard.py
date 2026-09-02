@@ -596,7 +596,15 @@ class DashboardView(ft.Column):
                 state.self_secondary_target_language,
             )
         elif control == "PuriPuly_PeerASR":
-            self.set_peer_auto_detect_available(state.peer_asr in {"soniox", "local_qwen_gpu"})
+            self.set_peer_auto_detect_available(
+                state.peer_asr
+                in {
+                    "soniox",
+                    "gemini_transcribe",
+                    "elevenlabs_scribe",
+                    "local_qwen_gpu",
+                }
+            )
         elif control in {"PuriPuly_Listen", "PuriPuly_Captions"}:
             capture = capture_presentation_from_contract(self._overlay_peer_contract)
             if control == "PuriPuly_Listen":

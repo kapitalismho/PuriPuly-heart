@@ -145,7 +145,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
             "[STT] Gemini Transcribe Live connecting (timeout=%.1fs)", self.connect_timeout_s
         )
         start_at = time.monotonic()
-        live_context = factory(self.model, config)
+        live_context = factory(model=self.model, config=config)
         self._live_session = await asyncio.wait_for(
             live_context.__aenter__(), timeout=self.connect_timeout_s
         )
@@ -219,9 +219,9 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
             wait_ms,
         )
         if self._activity_open:
-            await self._send_realtime(activity_end={})
             self._activity_open = False
             self._pending_finalize_requests += 1
+            await self._send_realtime(activity_end={})
             logger.info("[STT] Gemini Transcribe Live activityEnd sent (finalize)")
 
     async def _send_realtime(self, **kwargs: Any) -> None:
@@ -240,6 +240,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 self._pending_finalize_requests,
             )
             self._pending_finalize_requests = 0
+        self._put_event(None)
 
     async def close(self) -> None:
         await self.stop()
