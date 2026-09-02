@@ -4326,7 +4326,10 @@ class SettingsView(ft.Column):
         self._soniox_key.visible = STTProviderName.SONIOX in active_stt_providers
         peer_auto_languages_card = getattr(self, "_peer_auto_languages_card", None)
         if peer_auto_languages_card is not None:
-            peer_auto_languages_card.visible = peer_stt == STTProviderName.SONIOX
+            peer_auto_languages_card.visible = peer_stt in {
+                STTProviderName.SONIOX,
+                STTProviderName.QWEN_AUDIO,
+            }
             self._sync_peer_auto_languages_editor()
             if is_control_mounted(self):
                 try:

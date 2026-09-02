@@ -2434,6 +2434,166 @@ def test_mixed_qwen_cloud_providers_resolve_independent_models() -> None:
     assert peer_intent.qwen_asr_model == "qwen-audio-3.0-asr-flash-streaming"
 
 
+def test_qwen_audio_auto_mode_survives_peer_runtime_normalization() -> None:
+    settings = _vnext(
+        peer_stt_provider="qwen_audio",
+        peer_source_mode="auto",
+        peer_expected_languages=["ja", "zh-TW"],
+    )
+
+    intent = peer_stt_runtime_intent_from_vnext(settings)
+
+    assert intent.provider == "qwen_asr"
+    assert intent.qwen_asr_model == "qwen-audio-3.0-asr-flash-streaming"
+    assert intent.source_mode == "auto"
+    assert intent.qwen_audio_language_hints == ("ja", "zh")
+
+
+def test_non_audio_qwen_asr_runtime_does_not_inherit_auto_detection() -> None:
+    settings = _vnext(
+        peer_stt_provider="qwen_asr",
+        qwen_asr_model="qwen3-asr-flash-realtime",
+        peer_source_mode="auto",
+        peer_expected_languages=["ja"],
+    )
+
+    intent = peer_stt_runtime_intent_from_vnext(settings)
+
+    assert intent.source_mode == "manual"
+    assert intent.qwen_audio_language_hints is None
+    assert intent.soniox_language_hints is None
+
+
+def test_qwen_audio_manual_mode_keeps_single_hint_contract() -> None:
+    settings = _vnext(
+        peer_stt_provider="qwen_audio",
+        peer_source_mode="manual",
+        peer_source_language="ja",
+        peer_expected_languages=["ko", "ja"],
+    )
+
+    resolved = resolve_peer_stt_runtime_config(settings)
+
+    assert resolved.source_mode == "manual"
+    assert resolved.provider_options == {}
+
+
+def test_qwen_audio_auto_without_expected_languages_omits_hints() -> None:
+    settings = _vnext(
+        peer_stt_provider="qwen_audio",
+        peer_source_mode="auto",
+        peer_expected_languages=[],
+    )
+
+    resolved = resolve_peer_stt_runtime_config(settings)
+
+    assert resolved.source_mode == "auto"
+    assert resolved.provider_options["language_hints"] == ()
+
+
+def test_qwen_audio_auto_sends_ordered_mapped_deduped_hints() -> None:
+    settings = _vnext(
+        peer_stt_provider="qwen_audio",
+        peer_source_mode="auto",
+        peer_expected_languages=["ko", "ja", "zh-CN", "zh-TW", "en"],
+    )
+
+    resolved = resolve_peer_stt_runtime_config(settings)
+
+    assert resolved.source_mode == "auto"
+    assert resolved.provider_options["language_hints"] == ("ko", "ja", "zh", "en")
+
+
+def test_qwen_audio_auto_drops_unsupported_expected_languages() -> None:
+    settings = _vnext(
+        peer_stt_provider="qwen_audio",
+        peer_source_mode="auto",
+        peer_expected_languages=["ko", "xx", "et", "ja"],
+    )
+
+    resolved = resolve_peer_stt_runtime_config(settings)
+
+    assert resolved.provider_options["language_hints"] == ("ko", "ja")
+
+
+def test_qwen_audio_provider_handoff_caps_hints_at_four() -> None:
+    from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
+
+    settings = _vnext(
+        peer_stt_provider="qwen_audio",
+        peer_source_mode="auto",
+        peer_expected_languages=["ko", "ja", "zh-CN", "zh-TW", "en", "fr"],
+    )
+    secrets = InMemorySecretStore()
+    secrets.set("alibaba_api_key_beijing", "k-audio")
+
+    backend = create_peer_stt_backend(settings, secrets=secrets)
+
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
+    assert backend.language_hints == ("ko", "ja", "zh", "en")
+
+
+def test_qwen_audio_manual_handoff_sends_single_mapped_hint() -> None:
+    from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
+
+    settings = _vnext(
+        peer_stt_provider="qwen_audio",
+        peer_source_mode="manual",
+        peer_source_language="ja",
+    )
+    secrets = InMemorySecretStore()
+    secrets.set("alibaba_api_key_beijing", "k-audio")
+
+    backend = create_peer_stt_backend(settings, secrets=secrets)
+
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
+    assert backend.language_hints == ("ja",)
+
+
+def test_peer_expected_languages_remain_untruncated_for_qwen_audio() -> None:
+    settings = _vnext(
+        peer_stt_provider="qwen_audio",
+        peer_source_mode="auto",
+        peer_expected_languages=["ko", "ja", "zh-CN", "zh-TW", "en", "fr"],
+    )
+
+    _ = resolve_peer_stt_runtime_config(settings)
+
+    assert settings.intent.languages.peer_expected_languages == [
+        "ko",
+        "ja",
+        "zh-CN",
+        "zh-TW",
+        "en",
+        "fr",
+    ]
+
+
+def test_peer_stt_provider_signature_tracks_qwen_audio_language_hints() -> None:
+    auto_settings = _vnext(
+        peer_stt_provider="qwen_audio",
+        peer_source_mode="auto",
+        peer_expected_languages=["ko", "ja"],
+    )
+    other_hints = _vnext(
+        peer_stt_provider="qwen_audio",
+        peer_source_mode="auto",
+        peer_expected_languages=["ko", "en"],
+    )
+    manual_settings = _vnext(
+        peer_stt_provider="qwen_audio",
+        peer_source_mode="manual",
+        peer_source_language="ja",
+    )
+
+    assert build_peer_stt_provider_signature_from_vnext(
+        auto_settings
+    ) != build_peer_stt_provider_signature_from_vnext(other_hints)
+    assert build_peer_stt_provider_signature_from_vnext(
+        auto_settings
+    ) != build_peer_stt_provider_signature_from_vnext(manual_settings)
+
+
 def test_create_peer_stt_backend_uses_peer_local_qwen_provider_and_fixed_sample_rate() -> None:
     settings = _vnext(peer_stt_provider="local_qwen")
     secrets = InMemorySecretStore()

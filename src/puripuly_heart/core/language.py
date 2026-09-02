@@ -192,6 +192,31 @@ def get_qwen_audio_asr_language(code: str) -> str:
     return _language_from_map(code, _QWEN_AUDIO_ASR_LANGUAGE_MAP)
 
 
+def qwen_audio_asr_language_hint(code: str) -> str | None:
+    if not is_qwen_audio_asr_supported(code):
+        return None
+    return _language_from_map(code, _QWEN_AUDIO_ASR_LANGUAGE_MAP)
+
+
+def qwen_audio_asr_language_hints(
+    codes: Sequence[str],
+    *,
+    limit: int | None = None,
+) -> tuple[str, ...]:
+    hints: list[str] = []
+    for code in codes:
+        normalized = str(code).strip()
+        if not normalized:
+            continue
+        if limit is not None and len(hints) >= limit:
+            break
+        mapped = qwen_audio_asr_language_hint(normalized)
+        if mapped is None or mapped in hints:
+            continue
+        hints.append(mapped)
+    return tuple(hints)
+
+
 def is_qwen3_asr_supported(code: str) -> bool:
     if code in _QWEN_ASR_LANGUAGE_MAP:
         return True

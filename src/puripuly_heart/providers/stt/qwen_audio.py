@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 QWEN_AUDIO_MODEL = "qwen-audio-3.0-asr-flash-streaming"
 QWEN_AUDIO_DEFAULT_ENDPOINT = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
 QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT = 4
+QWEN_AUDIO_LANGUAGE_HINTS_LIMIT = 4
 
 
 class QwenAudioSessionState(str, Enum):
@@ -108,7 +109,7 @@ def _join_sentences(sentences: Sequence[str]) -> str:
 @dataclass(slots=True)
 class QwenAudioStreamingSTTBackend(STTBackend):
     api_key: str
-    language: str
+    language_hints: tuple[str, ...] = ()
     model: str = QWEN_AUDIO_MODEL
     endpoint: str = QWEN_AUDIO_DEFAULT_ENDPOINT
     sample_rate_hz: int = 16000
@@ -125,8 +126,8 @@ class QwenAudioStreamingSTTBackend(STTBackend):
             raise ValueError("sample_rate_hz must be 8000 or 16000")
         if not self.api_key:
             raise ValueError("api_key must be non-empty")
-        if not self.language:
-            raise ValueError("language must be non-empty")
+        if any(not hint for hint in self.language_hints):
+            raise ValueError("language hints must be non-empty")
         if not self.endpoint:
             raise ValueError("endpoint must be non-empty")
         for name, value in (
@@ -139,7 +140,7 @@ class QwenAudioStreamingSTTBackend(STTBackend):
                 raise ValueError(f"{name} must be > 0")
         session = _QwenAudioSession(
             api_key=self.api_key,
-            language=self.language,
+            language_hints=self.language_hints,
             model=self.model,
             endpoint=self.endpoint,
             sample_rate_hz=self.sample_rate_hz,
@@ -187,7 +188,7 @@ class _QwenAudioBoundary:
 @dataclass(slots=True)
 class _QwenAudioSession(STTBackendSession):
     api_key: str
-    language: str
+    language_hints: tuple[str, ...]
     model: str
     endpoint: str
     sample_rate_hz: int
@@ -311,12 +312,13 @@ class _QwenAudioSession(STTBackendSession):
         parameters: dict[str, object] = {
             "format": "pcm",
             "sample_rate": self.sample_rate_hz,
-            "language_hints": [self.language],
             "semantic_punctuation_enabled": False,
             "max_sentence_silence": 6000,
             "multi_threshold_mode_enabled": False,
             "heartbeat": True,
         }
+        if self.language_hints:
+            parameters["language_hints"] = list(self.language_hints)
         vocabulary = self._vocabulary()
         if vocabulary:
             parameters["vocabulary"] = vocabulary
