@@ -54,7 +54,7 @@
   "settings.peer_auto_languages.title": "언어 자동 감지 힌트",
   "settings.peer_auto_languages.add": "언어 추가",
   "dashboard.peer_source.automatic": "자동 감지",
-  "dashboard.peer_source.automatic.description": "Soniox와 Qwen3 ASR 1.7B에서 사용할 수 있어요",
+  "dashboard.peer_source.automatic.description": "Soniox, Qwen3 ASR 1.7B, Qwen Audio에서 사용할 수 있어요.",
   "settings.audio_host_api": "오디오 호스트 API",
   "settings.audio_host_api.option.windows_mme": "MME",
   "settings.audio_host_api.option.windows_wasapi": "Windows WASAPI",

@@ -54,7 +54,7 @@
   "settings.peer_auto_languages.title": "Language Auto-Detection Hint",
   "settings.peer_auto_languages.add": "Add language",
   "dashboard.peer_source.automatic": "Automatic detection",
-  "dashboard.peer_source.automatic.description": "Available with Soniox and Qwen3 ASR 1.7B",
+  "dashboard.peer_source.automatic.description": "Available with Soniox, Qwen3 ASR 1.7B, and Qwen Audio",
   "settings.audio_host_api": "Audio Host API",
   "settings.audio_host_api.option.windows_mme": "MME",
   "settings.audio_host_api.option.windows_wasapi": "Windows WASAPI",

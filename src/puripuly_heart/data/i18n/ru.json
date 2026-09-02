@@ -54,7 +54,7 @@
   "settings.peer_auto_languages.title": "Подсказка для автоматического определения языка",
   "settings.peer_auto_languages.add": "Добавить язык",
   "dashboard.peer_source.automatic": "Автоопределение",
-  "dashboard.peer_source.automatic.description": "Доступно с Soniox и Qwen3 ASR 1.7B",
+  "dashboard.peer_source.automatic.description": "Доступно с Soniox, Qwen3 ASR 1.7B и Qwen Audio",
   "settings.audio_host_api": "Аудио Host API",
   "settings.audio_host_api.option.windows_mme": "MME",
   "settings.audio_host_api.option.windows_wasapi": "Windows WASAPI",

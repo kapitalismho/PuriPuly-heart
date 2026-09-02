@@ -54,7 +54,7 @@
   "settings.peer_auto_languages.title": "语言自动检测提示",
   "settings.peer_auto_languages.add": "添加语言",
   "dashboard.peer_source.automatic": "自动检测",
-  "dashboard.peer_source.automatic.description": "适用于 Soniox 和 Qwen3 ASR 1.7B",
+  "dashboard.peer_source.automatic.description": "适用于 Soniox、Qwen3 ASR 1.7B 和 Qwen Audio",
   "settings.audio_host_api": "应用音频接口",
   "settings.audio_host_api.option.windows_mme": "MME",
   "settings.audio_host_api.option.windows_wasapi": "Windows WASAPI",
