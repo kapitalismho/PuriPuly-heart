@@ -4432,6 +4432,7 @@ class SettingsView(ft.Column):
             peer_auto_languages_card.visible = peer_stt in {
                 STTProviderName.SONIOX,
                 STTProviderName.QWEN_AUDIO,
+                STTProviderName.GEMINI_TRANSCRIBE,
             }
             self._sync_peer_auto_languages_editor()
             if is_control_mounted(self):

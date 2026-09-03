@@ -2504,6 +2504,34 @@ def test_qwen_audio_auto_sends_ordered_mapped_deduped_hints() -> None:
     assert resolved.provider_options["language_hints"] == ("ko", "ja", "zh", "en")
 
 
+def test_gemini_transcribe_auto_sends_expected_language_codes_up_to_32() -> None:
+    settings = _vnext(
+        peer_stt_provider="gemini_transcribe",
+        peer_source_mode="auto",
+        peer_expected_languages=["ko", "ja", "zh-TW", "en", "xx"],
+    )
+
+    resolved = resolve_peer_stt_runtime_config(settings)
+
+    assert resolved.source_mode == "auto"
+    assert resolved.provider_options["language_codes"] == ("ko", "ja", "zh-TW", "en")
+    assert resolved.provider_options["auto_language"] is True
+
+
+def test_gemini_transcribe_auto_without_expected_languages_omits_codes() -> None:
+    settings = _vnext(
+        peer_stt_provider="gemini_transcribe",
+        peer_source_mode="auto",
+        peer_expected_languages=[],
+    )
+
+    resolved = resolve_peer_stt_runtime_config(settings)
+
+    assert resolved.source_mode == "auto"
+    assert resolved.provider_options["language_codes"] == ()
+    assert resolved.provider_options["auto_language"] is True
+
+
 def test_qwen_audio_auto_drops_unsupported_expected_languages() -> None:
     settings = _vnext(
         peer_stt_provider="qwen_audio",

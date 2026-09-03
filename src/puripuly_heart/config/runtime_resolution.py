@@ -1292,6 +1292,7 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
             "gemini_model": intent.gemini_transcribe_model,
             "scribe_model": intent.elevenlabs_scribe_model,
             "deepgram_model": intent.deepgram_model,
+            "language_codes": intent.gemini_transcribe_language_codes,
         }
     elif provider == STT_PROVIDER_DEEPGRAM:
         model = intent.deepgram_model
@@ -1303,7 +1304,12 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
         credential = _required_credential(
             CREDENTIAL_SOURCE_SECRET_STORE, CREDENTIAL_REF_GEMINI_TRANSCRIBE_STT
         )
-        if (
+        if intent.gemini_transcribe_auto_language and intent.gemini_transcribe_language_codes:
+            provider_options = {
+                "language_codes": tuple(intent.gemini_transcribe_language_codes),
+                "auto_language": True,
+            }
+        elif (
             intent.gemini_transcribe_auto_language
             or intent.gemini_transcribe_language_codes is None
         ):

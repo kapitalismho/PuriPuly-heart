@@ -233,6 +233,68 @@ def is_qwen_audio_asr_supported(code: str) -> bool:
     return code.split("-")[0].lower() in _QWEN_AUDIO_ASR_LANGUAGE_MAP
 
 
+GEMINI_TRANSCRIBE_MAX_LANGUAGE_HINTS = 32
+
+_GEMINI_TRANSCRIBE_LANGUAGE_BASES = frozenset(
+    {
+        "ar",
+        "cs",
+        "da",
+        "de",
+        "el",
+        "en",
+        "es",
+        "fi",
+        "fr",
+        "he",
+        "hi",
+        "id",
+        "it",
+        "ja",
+        "ko",
+        "nl",
+        "no",
+        "pl",
+        "pt",
+        "ru",
+        "sv",
+        "th",
+        "tr",
+        "uk",
+        "vi",
+        "zh",
+    }
+)
+
+
+def gemini_transcribe_language_hint(code: str) -> str | None:
+    normalized = str(code).strip()
+    if not normalized:
+        return None
+    if normalized.split("-")[0].lower() not in _GEMINI_TRANSCRIBE_LANGUAGE_BASES:
+        return None
+    return normalized
+
+
+def gemini_transcribe_language_hints(
+    codes: Sequence[str],
+    *,
+    limit: int | None = None,
+) -> tuple[str, ...]:
+    hints: list[str] = []
+    for code in codes:
+        normalized = str(code).strip()
+        if not normalized:
+            continue
+        if limit is not None and len(hints) >= limit:
+            break
+        mapped = gemini_transcribe_language_hint(normalized)
+        if mapped is None or mapped in hints:
+            continue
+        hints.append(mapped)
+    return tuple(hints)
+
+
 _LOCAL_QWEN_LANGUAGE_HINT_MAP: dict[str, str] = {
     "en": "en",
     "ja": "ja",

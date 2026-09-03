@@ -4416,7 +4416,7 @@ def test_on_peer_stt_selected_refreshes_api_visibility_and_redraws_immediately(
     assert view._peer_auto_languages_card.visible is True
 
 
-def test_peer_auto_detection_languages_card_is_visible_only_for_peer_soniox(
+def test_peer_auto_detection_languages_card_is_visible_for_peer_soniox(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
@@ -4447,6 +4447,21 @@ def test_peer_auto_detection_languages_card_is_visible_for_peer_qwen_audio(
 
     assert view._peer_auto_languages_card.visible is True
     assert view._peer_auto_languages_editor._terms == ["ja", "zh-TW"]
+
+
+def test_peer_auto_detection_languages_card_is_visible_for_peer_gemini_transcribe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettingsVNext()
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.GEMINI_TRANSCRIBE)
+    settings = _vnext(settings, peer_expected_languages=["ko", "en"])
+    view._settings = settings
+    view._update_api_visibility()
+
+    assert view._peer_auto_languages_card.visible is True
+    assert view._peer_auto_languages_editor._terms == ["ko", "en"]
 
 
 def test_peer_auto_languages_add_button_uses_region_tone(

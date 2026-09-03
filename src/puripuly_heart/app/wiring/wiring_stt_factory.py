@@ -319,6 +319,19 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         )
 
         gemini_transcribe_language_hints = tuple(gemini_transcribe_language_codes(source_language))
+    if provider == STT_PROVIDER_GEMINI_TRANSCRIBE and automatic_gemini:
+        from puripuly_heart.core.language import GEMINI_TRANSCRIBE_MAX_LANGUAGE_HINTS
+        from puripuly_heart.core.language import (
+            gemini_transcribe_language_hints as build_gemini_transcribe_language_hints,
+        )
+
+        gemini_transcribe_language_hints = (
+            build_gemini_transcribe_language_hints(
+                intent.languages.peer_expected_languages,
+                limit=GEMINI_TRANSCRIBE_MAX_LANGUAGE_HINTS,
+            )
+            or None
+        )
     if provider == STT_PROVIDER_ELEVENLABS_SCRIBE and not automatic_scribe:
         from puripuly_heart.providers.stt.elevenlabs_scribe import scribe_language_code
 
@@ -858,9 +871,19 @@ def _create_rolling_stt_backend(
     scribe_model = str(config.provider_options.get("scribe_model") or "") or "scribe_v2_realtime"
     deepgram_model = str(config.provider_options.get("deepgram_model") or "") or "nova-3"
 
-    gemini_language_codes = (
-        () if auto_language else (tuple(gemini_transcribe_language_codes(config.source_language)))
-    )
+    rolling_option_codes = config.provider_options.get("language_codes")
+    if (
+        isinstance(rolling_option_codes, tuple)
+        and rolling_option_codes
+        and all(isinstance(code, str) for code in rolling_option_codes)
+    ):
+        gemini_language_codes = rolling_option_codes
+    else:
+        gemini_language_codes = (
+            ()
+            if auto_language
+            else (tuple(gemini_transcribe_language_codes(config.source_language)))
+        )
     scribe_language_code_value = (
         None if auto_language else scribe_language_code(config.source_language)
     )

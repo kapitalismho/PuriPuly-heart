@@ -343,6 +343,44 @@ def test_qwen_audio_auto_resolution_propagates_expected_language_hints() -> None
     assert manual.provider_options == {}
 
 
+def test_gemini_transcribe_auto_resolution_keeps_expected_language_codes() -> None:
+    runtime_resolution = _runtime_resolution_module()
+
+    auto_with_hints = runtime_resolution.resolve_stt_config(
+        runtime_resolution.STTRuntimeIntent(
+            channel="peer",
+            provider=runtime_resolution.STT_PROVIDER_GEMINI_TRANSCRIBE,
+            source_mode="auto",
+            gemini_transcribe_language_codes=("ko", "en"),
+            gemini_transcribe_auto_language=True,
+        )
+    )
+    auto_without_hints = runtime_resolution.resolve_stt_config(
+        runtime_resolution.STTRuntimeIntent(
+            channel="peer",
+            provider=runtime_resolution.STT_PROVIDER_GEMINI_TRANSCRIBE,
+            source_mode="auto",
+            gemini_transcribe_auto_language=True,
+        )
+    )
+    manual = runtime_resolution.resolve_stt_config(
+        runtime_resolution.STTRuntimeIntent(
+            channel="peer",
+            provider=runtime_resolution.STT_PROVIDER_GEMINI_TRANSCRIBE,
+            source_mode="manual",
+            gemini_transcribe_language_codes=("ja",),
+            gemini_transcribe_auto_language=False,
+        )
+    )
+
+    assert auto_with_hints.provider_options["language_codes"] == ("ko", "en")
+    assert auto_with_hints.provider_options["auto_language"] is True
+    assert auto_without_hints.provider_options["language_codes"] == ()
+    assert auto_without_hints.provider_options["auto_language"] is True
+    assert manual.provider_options["language_codes"] == ("ja",)
+    assert manual.provider_options["auto_language"] is False
+
+
 def test_stt_supports_peer_auto_detection_is_model_aware_for_qwen() -> None:
     runtime_resolution = _runtime_resolution_module()
 

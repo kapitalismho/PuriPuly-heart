@@ -71,6 +71,35 @@ def test_qwen_audio_hint_mapping_drops_unsupported_dedupes_and_limits() -> None:
     assert qwen_audio_asr_language_hints(["xx"]) == ()
 
 
+def test_gemini_transcribe_hint_mapping_drops_unsupported_dedupes_and_limits() -> None:
+    from puripuly_heart.core.language import gemini_transcribe_language_hints
+
+    assert gemini_transcribe_language_hints(["ko", "ja", "en-US", "zh-TW", "en"]) == (
+        "ko",
+        "ja",
+        "en-US",
+        "zh-TW",
+        "en",
+    )
+    assert gemini_transcribe_language_hints(["ko", "xx", "et"]) == ("ko",)
+    assert gemini_transcribe_language_hints(["ja", "ja", "  "]) == ("ja",)
+    assert gemini_transcribe_language_hints(["ja", "ko"], limit=0) == ()
+    many = ["ko", "ja", "en", "zh", "fr", "de", "es", "it"] * 5
+    assert gemini_transcribe_language_hints(many, limit=32) == (
+        "ko",
+        "ja",
+        "en",
+        "zh",
+        "fr",
+        "de",
+        "es",
+        "it",
+    )
+    assert len(gemini_transcribe_language_hints(many)) == 8
+    assert gemini_transcribe_language_hints([]) == ()
+    assert gemini_transcribe_language_hints(["xx"]) == ()
+
+
 def test_local_qwen_language_hint_normalization_is_conservative() -> None:
     assert hasattr(language_module, "get_local_qwen_language_hint")
 
