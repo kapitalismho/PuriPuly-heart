@@ -36,6 +36,7 @@ def _backend(
     *,
     language_code: str | None = "ko",
     keyterms: tuple[str, ...] = (),
+    keepalive_interval_s: float = 10.0,
 ) -> tuple[ElevenLabsScribeSTTBackend, list]:
     factories: list = []
 
@@ -47,6 +48,7 @@ def _backend(
         api_key="key",
         language_code=language_code,
         keyterms=keyterms,
+        keepalive_interval_s=keepalive_interval_s,
         scribe_connect_factory=factory,
     )
     return backend, factories
@@ -144,6 +146,30 @@ async def test_partial_and_final_transcripts_are_not_authoritative() -> None:
 
 
 @pytest.mark.asyncio
+async def test_keepalive_sends_empty_audio_when_idle() -> None:
+    connection = _FakeConnection()
+    backend, _ = _backend(connection, keepalive_interval_s=0.01)
+    session = await backend.open_session()
+    try:
+        task = session._keepalive_task
+        assert session.keepalive_interval_s == 0.01
+        assert task is not None
+        session._last_send_at = 0.0
+        deadline = asyncio.get_running_loop().time() + 1.0
+        while asyncio.get_running_loop().time() < deadline:
+            if connection.sent:
+                break
+            if task.done():
+                task.result()
+                break
+            await asyncio.sleep(0.01)
+        assert connection.sent == [{"audio_base_64": ""}]
+    finally:
+        await session.close()
+    assert connection.closed is True
+
+
+@pytest.mark.asyncio
 async def test_speech_end_sends_explicit_commit() -> None:
     connection = _FakeConnection()
     backend, _ = _backend(connection)
@@ -154,6 +180,72 @@ async def test_speech_end_sends_explicit_commit() -> None:
         assert connection.commits == 1
         assert len(connection.sent) == 1
         assert connection.sent[0]["audio_base_64"]
+    finally:
+        await session.close()
+
+
+@pytest.mark.parametrize(
+    "event_name",
+    (
+        "close",
+        "session_time_limit_exceeded",
+        "insufficient_audio_activity",
+    ),
+)
+@pytest.mark.asyncio
+async def test_recoverable_scribe_events_end_stream_without_raising(event_name: str) -> None:
+    connection = _FakeConnection()
+    backend, _ = _backend(connection)
+    session = await backend.open_session()
+    events_task = asyncio.create_task(_collect(session, 1))
+    try:
+        _emit(session, event_name, {"message_type": event_name})
+        events = await asyncio.wait_for(events_task, timeout=1)
+        assert events == []
+        await session.send_audio(b"\x00\x00" * 16)
+        await session.on_speech_end(trailing_silence_ms=100, reason="silence")
+        assert connection.sent == []
+        assert connection.commits == 0
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_send_failure_ends_scribe_session_without_raising() -> None:
+    class RaisingConnection(_FakeConnection):
+        async def send(self, payload: dict) -> None:
+            _ = payload
+            raise RuntimeError("closed")
+
+    connection = RaisingConnection()
+    backend, _ = _backend(connection)
+    session = await backend.open_session()
+    events_task = asyncio.create_task(_collect(session, 1))
+    try:
+        await session.send_audio(b"\x00\x00" * 16)
+        events = await asyncio.wait_for(events_task, timeout=1)
+        assert events == []
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_fatal_error_is_not_hidden_by_later_close_or_send_failure() -> None:
+    class RaisingConnection(_FakeConnection):
+        async def send(self, payload: dict) -> None:
+            _ = payload
+            raise RuntimeError("closed")
+
+    connection = RaisingConnection()
+    backend, _ = _backend(connection)
+    session = await backend.open_session()
+    events_task = asyncio.create_task(_collect_error(session))
+    try:
+        _emit(session, "quota_exceeded", {"message_type": "quota_exceeded", "text": ""})
+        await session.send_audio(b"\x00\x00" * 16)
+        _emit(session, "close", {"message_type": "close"})
+        error = await asyncio.wait_for(events_task, timeout=1)
+        assert "quota_exceeded" in str(error)
     finally:
         await session.close()
 

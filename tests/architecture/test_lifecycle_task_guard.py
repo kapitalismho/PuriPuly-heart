@@ -29,7 +29,7 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
         ("src/puripuly_heart/core/overlay/bridge.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/overlay/presenter.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/providers/stt/custom.py", ASYNCIO_CREATE_TASK): 1,
-        ("src/puripuly_heart/providers/stt/elevenlabs_scribe.py", ASYNCIO_CREATE_TASK): 1,
+        ("src/puripuly_heart/providers/stt/elevenlabs_scribe.py", ASYNCIO_CREATE_TASK): 2,
         ("src/puripuly_heart/providers/stt/gemini_transcribe.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/providers/stt/soniox.py", ASYNCIO_CREATE_TASK): 3,
         ("src/puripuly_heart/ui/components/subtab_shell.py", BARE_RUN_TASK): 1,
@@ -138,7 +138,7 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
     (
         "src/puripuly_heart/providers/stt/elevenlabs_scribe.py",
         ASYNCIO_CREATE_TASK,
-    ): "ElevenLabs Scribe session owns its connection-event drain task under provider session close semantics",
+    ): "ElevenLabs Scribe session owns its connection-event drain and keepalive tasks under provider session close semantics",
     (
         "src/puripuly_heart/providers/stt/qwen_audio.py",
         ASYNCIO_CREATE_TASK,

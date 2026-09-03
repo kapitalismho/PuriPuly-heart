@@ -23,10 +23,17 @@ ELEVENLABS_SCRIBE_STT_MODEL = "scribe_v2_realtime"
 ELEVENLABS_SCRIBE_SAMPLE_RATE_HZ = 16000
 ELEVENLABS_SCRIBE_VERIFY_CONNECT_TIMEOUT_S = 10.0
 ELEVENLABS_SCRIBE_VERIFY_SETTLE_TIMEOUT_S = 10.0
+ELEVENLABS_SCRIBE_KEEPALIVE_INTERVAL_S = 10.0
 MAX_SCRIBE_KEYTERMS = 50
 MAX_SCRIBE_KEYTERM_CHARS = 20
 
 _CLOSED = object()
+_RECOVERABLE_SCRIBE_EVENTS = frozenset(
+    {
+        "session_time_limit_exceeded",
+        "insufficient_audio_activity",
+    }
+)
 
 
 def scribe_keyterms(terms: Sequence[str]) -> tuple[str, ...]:
@@ -181,6 +188,7 @@ class ElevenLabsScribeSTTBackend(STTBackend):
     model: str = ELEVENLABS_SCRIBE_STT_MODEL
     sample_rate_hz: int = ELEVENLABS_SCRIBE_SAMPLE_RATE_HZ
     connect_timeout_s: float = 10.0
+    keepalive_interval_s: float = ELEVENLABS_SCRIBE_KEEPALIVE_INTERVAL_S
     scribe_connect_factory: Callable[[Any], Any] | None = None
 
     async def open_session(self) -> STTBackendSession:
@@ -190,6 +198,8 @@ class ElevenLabsScribeSTTBackend(STTBackend):
             raise ValueError("api_key must be non-empty")
         if self.connect_timeout_s <= 0:
             raise ValueError("connect_timeout_s must be > 0")
+        if self.keepalive_interval_s <= 0:
+            raise ValueError("keepalive_interval_s must be > 0")
 
         session = _ElevenLabsScribeSession(
             api_key=self.api_key,
@@ -198,6 +208,7 @@ class ElevenLabsScribeSTTBackend(STTBackend):
             model=self.model,
             sample_rate_hz=self.sample_rate_hz,
             connect_timeout_s=self.connect_timeout_s,
+            keepalive_interval_s=self.keepalive_interval_s,
             scribe_connect_factory=self.scribe_connect_factory,
         )
         try:
@@ -236,6 +247,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
     model: str
     sample_rate_hz: int
     connect_timeout_s: float
+    keepalive_interval_s: float = ELEVENLABS_SCRIBE_KEEPALIVE_INTERVAL_S
     scribe_connect_factory: Callable[[Any], Any] | None = None
 
     _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
@@ -243,7 +255,9 @@ class _ElevenLabsScribeSession(STTBackendSession):
     )
     _connection: Any = field(init=False, default=None, repr=False)
     _queue_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _keepalive_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
+    _last_send_at: float = field(init=False, default=0.0, repr=False)
     _connection_events: asyncio.Queue[Any] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -300,7 +314,9 @@ class _ElevenLabsScribeSession(STTBackendSession):
         self._connection.on(RealtimeEvents.INSUFFICIENT_AUDIO_ACTIVITY, self._on_error_event)
         self._connection.on(RealtimeEvents.CLOSE, self._on_closed)
 
+        self._last_send_at = time.monotonic()
         self._queue_task = asyncio.create_task(self._drain_connection_events())
+        self._keepalive_task = asyncio.create_task(self._keepalive_loop())
 
     @staticmethod
     def _event_name(data: Any) -> str:
@@ -327,13 +343,26 @@ class _ElevenLabsScribeSession(STTBackendSession):
         self._connection_events.put_nowait(STTBackendTranscriptEvent(text=text, is_final=True))
 
     def _on_error_event(self, data: Any) -> None:
+        if self._stopped:
+            return
         event_name = self._event_name(data)
+        if event_name in _RECOVERABLE_SCRIBE_EVENTS:
+            self._end_connection_stream()
+            return
         logger.warning("[STT] Scribe provider event %s", event_name)
+        self._stopped = True
         self._connection_events.put_nowait(RuntimeError(f"Scribe realtime error: {event_name}"))
 
     def _on_closed(self, data: Any) -> None:
         _ = data
-        logger.debug("[STT] Scribe connection closed")
+        if self._stopped:
+            return
+        self._end_connection_stream()
+
+    def _end_connection_stream(self) -> None:
+        if self._stopped:
+            return
+        self._stopped = True
         self._connection_events.put_nowait(_CLOSED)
 
     async def _drain_connection_events(self) -> None:
@@ -351,10 +380,35 @@ class _ElevenLabsScribeSession(STTBackendSession):
         finally:
             self._put_event(None)
 
+    async def _keepalive_loop(self) -> None:
+        interval_s = self.keepalive_interval_s
+        try:
+            while not self._stopped:
+                await asyncio.sleep(interval_s)
+                if self._stopped or self._connection is None:
+                    return
+                if time.monotonic() - self._last_send_at < interval_s:
+                    continue
+                try:
+                    await self._connection.send({"audio_base_64": ""})
+                except Exception:
+                    self._end_connection_stream()
+                    return
+                self._last_send_at = time.monotonic()
+        except asyncio.CancelledError:
+            raise
+
     async def send_audio(self, pcm16le: bytes) -> None:
         if self._stopped or self._connection is None:
             return
-        await self._connection.send({"audio_base_64": base64.b64encode(pcm16le).decode("ascii")})
+        try:
+            await self._connection.send(
+                {"audio_base_64": base64.b64encode(pcm16le).decode("ascii")}
+            )
+        except Exception:
+            self._end_connection_stream()
+            return
+        self._last_send_at = time.monotonic()
 
     async def on_speech_end(
         self,
@@ -375,7 +429,11 @@ class _ElevenLabsScribeSession(STTBackendSession):
         )
         if self._connection is None:
             return
-        await self._connection.commit()
+        try:
+            await self._connection.commit()
+        except Exception:
+            self._end_connection_stream()
+            return
         logger.info("[STT] Scribe commit sent (finalize)")
 
     async def stop(self) -> None:
@@ -386,10 +444,18 @@ class _ElevenLabsScribeSession(STTBackendSession):
 
     async def close(self) -> None:
         await self.stop()
-        if self._queue_task is not None:
-            self._queue_task.cancel()
-            await asyncio.gather(self._queue_task, return_exceptions=True)
-            self._queue_task = None
+        tasks = tuple(
+            task
+            for task in (self._queue_task, self._keepalive_task)
+            if task is not None
+        )
+        self._queue_task = None
+        self._keepalive_task = None
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
         self._put_event(None)
         if self._connection is not None:
             with contextlib.suppress(Exception):
