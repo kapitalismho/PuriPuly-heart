@@ -23,6 +23,7 @@ G14_SURFACE_INTENT_FIELDS = (
     "show_snackbar",
     "runtime_log_basic",
     "runtime_log_detailed",
+    "open_api_keys_guide",
 )
 G14_PROVIDER_INTENT_FIELDS = (
     "providers_changed",

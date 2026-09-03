@@ -433,6 +433,8 @@ def test_dashboard_process_warning_click_toggles_off_instead_of_retrying() -> No
     toggles: list[bool] = []
     view.on_retry_peer_process_capture = lambda: retries.append(True)
     view.on_toggle_peer_translation = lambda enabled: toggles.append(enabled)
+    view.peer_needs_key = False
+    view._peer_showing_warning = False
     view._toggle_peer_translation()
     assert retries == []
     assert toggles == [False]
@@ -451,6 +453,8 @@ def test_dashboard_normal_peer_toggle_still_inverts_intent() -> None:
     toggles: list[bool] = []
     view.on_retry_peer_process_capture = lambda: None
     view.on_toggle_peer_translation = lambda enabled: toggles.append(enabled)
+    view.peer_needs_key = False
+    view._peer_showing_warning = False
     view._toggle_peer_translation()
     assert toggles == [False]
 

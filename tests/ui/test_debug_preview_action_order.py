@@ -21,6 +21,7 @@ EXTENDED_DIAGNOSTIC_ACTION_KEYS: tuple[str, ...] = (
     "brake_notice",
     "revoked_notice",
     "pkce_failure",
+    "pkce_button_cycle",
     "capture_fault_cycle",
     "stt_fault_cycle",
     "audio_fault_clear",

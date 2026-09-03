@@ -161,6 +161,14 @@ class FletUiPresentationAdapter:
         elif dashboard is not None:
             dashboard.stt_needs_key = needs_key
 
+    def set_dashboard_peer_needs_key(self, needs_key: bool) -> None:
+        dashboard = getattr(self._app, "view_dashboard", None)
+        setter = getattr(dashboard, "set_peer_needs_key", None)
+        if callable(setter):
+            setter(needs_key)
+        elif dashboard is not None:
+            dashboard.peer_needs_key = needs_key
+
     def dashboard_translation_enabled(self) -> bool:
         dashboard = getattr(self._app, "view_dashboard", None)
         return bool(getattr(dashboard, "is_translation_on", True))

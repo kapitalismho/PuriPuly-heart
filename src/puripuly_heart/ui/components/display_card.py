@@ -101,6 +101,7 @@ class DisplayCard(ft.Container):
         self._notice_action: Callable[[], None] | None = None
         self._notice_yields_to_content = False
         self._turn_size_cap: int | None = None
+        self._source_as_message = False
         self._translation_is_visible = False
         self.input_is_focused = False
 
@@ -234,12 +235,14 @@ class DisplayCard(ft.Container):
         transcript_kind: str | None = None,
         should_log: bool = False,
         debug_prefix: str | None = None,
+        as_translation: bool = False,
     ):
         """Show source text and start a new turn, dropping any prior translation."""
         _ = is_error
         self._showing_status = False
         self._source_value = text
         self._source_font_family = font_family
+        self._source_as_message = bool(as_translation)
         self._translation_value = None
         self._translation_font_family = None
         self._debug_prefix = debug_prefix
@@ -281,6 +284,7 @@ class DisplayCard(ft.Container):
     ) -> None:
         """Replace the visible slot with the translation and emit a visual commit marker."""
         self._showing_status = False
+        self._source_as_message = False
         self._translation_value = text or None
         self._translation_font_family = font_family if text else None
         self._debug_prefix = debug_prefix
@@ -306,6 +310,7 @@ class DisplayCard(ft.Container):
         """Update connection status display."""
         self._status = status
         self._showing_status = True
+        self._source_as_message = False
         self._source_value = _status_label(status)
         self._source_font_family = font_family
         self._translation_value = None
@@ -501,9 +506,12 @@ class DisplayCard(ft.Container):
         self._display_text.value = visible_text
         self._display_text.size = new_size
         self._display_text.max_lines = new_max_lines
-        self._display_text.color = DISPLAY_SOURCE_COLOR if showing_source else DISPLAY_MESSAGE_COLOR
+        show_as_message = showing_translation or not showing_source or self._source_as_message
+        self._display_text.color = (
+            DISPLAY_MESSAGE_COLOR if show_as_message else DISPLAY_SOURCE_COLOR
+        )
         self._display_text.weight = (
-            DISPLAY_SOURCE_WEIGHT if showing_source else DISPLAY_MESSAGE_WEIGHT
+            DISPLAY_MESSAGE_WEIGHT if show_as_message else DISPLAY_SOURCE_WEIGHT
         )
         self._display_text.font_family = font_family
 

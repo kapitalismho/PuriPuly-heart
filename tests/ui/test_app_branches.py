@@ -1278,6 +1278,7 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_brake_notice",
         "on_revoked_notice",
         "on_pkce_failure",
+        "on_pkce_button_cycle",
         "on_capture_fault_cycle",
         "on_stt_fault_cycle",
         "on_audio_fault_clear",
@@ -2203,6 +2204,38 @@ def test_debug_preview_pkce_failure_only_shows_failure_snackbar(
     app._preview_pkce_failure()
 
     assert seen == [(app_module.t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)]
+
+
+def test_debug_preview_pkce_button_cycle_only_renders_button_states(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    rendered: list[bool] = []
+    app.view_settings = SimpleNamespace(
+        preview_openrouter_pkce_button_state=lambda authenticated: rendered.append(authenticated),
+    )
+
+    monkeypatch.setattr(
+        app,
+        "_on_request_openrouter_pkce",
+        lambda *_args, **_kwargs: pytest.fail("debug preview must not launch PKCE"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        app,
+        "_show_snackbar",
+        lambda message, bgcolor: pytest.fail("debug preview must not show a snackbar"),
+        raising=False,
+    )
+
+    app._preview_pkce_button_cycle()
+    app._preview_pkce_button_cycle()
+    app._preview_pkce_button_cycle()
+
+    assert rendered == [False, True, False]
+
+    app.view_settings = SimpleNamespace()
+    app._preview_pkce_button_cycle()
 
 
 def test_debug_preview_peer_translation_eula_opens_preview_safe_dialog(

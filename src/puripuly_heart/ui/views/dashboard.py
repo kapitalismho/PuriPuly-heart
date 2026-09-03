@@ -84,12 +84,14 @@ class DashboardView(ft.Column):
         self._translation_is_starting = False
         self.translation_needs_key = False
         self.stt_needs_key = False
+        self.peer_needs_key = False
         self.last_sent_text = t("dashboard.ready")
         self.history_items = []
 
         # Warning state for UI feedback
         self._translation_showing_warning = False
         self._stt_showing_warning = False
+        self._peer_showing_warning = False
         self._managed_auth_pending = False
         self._local_stt_notice_status: str | None = None
         self._local_stt_notice_percent: int | None = None
@@ -244,6 +246,16 @@ class DashboardView(ft.Column):
 
     def _toggle_peer_translation(self) -> None:
         contract = self._overlay_peer_contract
+        if self._peer_showing_warning:
+            self._peer_showing_warning = False
+            self._dismiss_api_key_warning_display()
+            self._sync_overlay_peer_buttons()
+            return
+        if self.peer_needs_key and (contract is None or not contract.peer.intent_enabled):
+            self._peer_showing_warning = True
+            self.set_display_text(t("dashboard.warn_stt_key"), as_translation=True)
+            self._sync_overlay_peer_buttons()
+            return
         enabled = True
         if contract is not None:
             enabled = not contract.peer.intent_enabled
@@ -268,6 +280,8 @@ class DashboardView(ft.Column):
         self._capture_controls.apply_presentation(
             capture_presentation_from_contract(self._overlay_peer_contract)
         )
+        if self._peer_showing_warning:
+            self._capture_controls.apply_peer_capture_state(enabled=False, warning=True)
         self._sync_notice()
 
     def _restore_status_display(self) -> None:
@@ -281,10 +295,13 @@ class DashboardView(ft.Column):
 
     def _dismiss_api_key_warning_display(self) -> None:
         if self._stt_showing_warning:
-            self.set_display_text(t("dashboard.warn_stt_key"))
+            self.set_display_text(t("dashboard.warn_stt_key"), as_translation=True)
+            return
+        if self._peer_showing_warning:
+            self.set_display_text(t("dashboard.warn_stt_key"), as_translation=True)
             return
         if self._translation_showing_warning:
-            self.set_display_text(t("dashboard.warn_llm_key"))
+            self.set_display_text(t("dashboard.warn_llm_key"), as_translation=True)
             return
         if self._process_capture_warning_active and self._process_capture_warning_text:
             self.set_display_text(self._process_capture_warning_text)
@@ -301,7 +318,7 @@ class DashboardView(ft.Column):
             self._dismiss_api_key_warning_display()
         elif self.stt_needs_key:
             self._stt_showing_warning = True
-            self.set_display_text(t("dashboard.warn_stt_key"))
+            self.set_display_text(t("dashboard.warn_stt_key"), as_translation=True)
         else:
             self.is_stt_on = True
             self._stt_is_starting = True
@@ -321,7 +338,7 @@ class DashboardView(ft.Column):
             self._dismiss_api_key_warning_display()
         elif self.translation_needs_key:
             self._translation_showing_warning = True
-            self.set_display_text(t("dashboard.warn_llm_key"))
+            self.set_display_text(t("dashboard.warn_llm_key"), as_translation=True)
         else:
             self.is_translation_on = True
             self._translation_showing_warning = False
@@ -601,11 +618,11 @@ class DashboardView(ft.Column):
         elif control in {"PuriPuly_Listen", "PuriPuly_Captions"}:
             capture = capture_presentation_from_contract(self._overlay_peer_contract)
             if control == "PuriPuly_Listen":
-                if capture.peer.starting or capture.peer.warning:
+                if capture.peer.starting or capture.peer.warning or self._peer_showing_warning:
                     self._capture_controls.apply_peer_capture_state(
-                        enabled=capture.peer.enabled,
+                        enabled=capture.peer.enabled and not self._peer_showing_warning,
                         starting=capture.peer.starting,
-                        warning=capture.peer.warning,
+                        warning=capture.peer.warning or self._peer_showing_warning,
                     )
                 else:
                     self._capture_controls.apply_peer_capture_state(enabled=state.peer_capture)
@@ -689,6 +706,14 @@ class DashboardView(ft.Column):
             self._stt_showing_warning = bool(needs_key)
             self._sync_stt_button_state()
 
+    def set_peer_needs_key(self, needs_key: bool, *, update_ui: bool = True) -> None:
+        self.peer_needs_key = bool(needs_key)
+        contract = self._overlay_peer_contract
+        peer_on = bool(contract is not None and contract.peer.intent_enabled)
+        if update_ui and not peer_on:
+            self._peer_showing_warning = bool(needs_key)
+            self._sync_overlay_peer_buttons()
+
     def set_display_text(
         self,
         text: str,
@@ -703,6 +728,7 @@ class DashboardView(ft.Column):
         transcript_kind: str | None = None,
         should_log: bool = False,
         debug_prefix: str | None = None,
+        as_translation: bool = False,
     ) -> None:
         """Update the display card primary line with new text."""
         self._primary_display_revision += 1
@@ -721,6 +747,7 @@ class DashboardView(ft.Column):
             transcript_kind=transcript_kind,
             should_log=should_log,
             debug_prefix=debug_prefix,
+            as_translation=as_translation,
         )
 
     def set_display_translation_text(
@@ -956,9 +983,11 @@ class DashboardView(ft.Column):
         )
         self._refresh_language_card()
         if not self._process_capture_warning_active and self._stt_showing_warning:
-            self.set_display_text(t("dashboard.warn_stt_key"))
+            self.set_display_text(t("dashboard.warn_stt_key"), as_translation=True)
+        elif not self._process_capture_warning_active and self._peer_showing_warning:
+            self.set_display_text(t("dashboard.warn_stt_key"), as_translation=True)
         elif not self._process_capture_warning_active and self._translation_showing_warning:
-            self.set_display_text(t("dashboard.warn_llm_key"))
+            self.set_display_text(t("dashboard.warn_llm_key"), as_translation=True)
 
     def set_recent_languages(self, source: list[str], target: list[str]) -> None:
         """Set recent languages from settings (for persistence)."""

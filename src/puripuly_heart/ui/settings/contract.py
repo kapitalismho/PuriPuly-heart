@@ -27,6 +27,7 @@ class SettingsSurfaceIntents:
     show_snackbar: Callable[[str, str], None]
     runtime_log_basic: Callable[..., None] | None = None
     runtime_log_detailed: Callable[..., None] | None = None
+    open_api_keys_guide: Callable[[], None] | None = None
 
 
 @dataclass(frozen=True, slots=True)

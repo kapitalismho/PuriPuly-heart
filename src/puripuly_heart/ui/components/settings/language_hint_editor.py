@@ -15,10 +15,10 @@ from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.i18n import get_locale, language_name, t
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
-    COLOR_NEUTRAL_DARK,
     COLOR_ON_PRIMARY_CONTAINER,
     COLOR_PRIMARY,
     COLOR_PRIMARY_CONTAINER,
+    COLOR_SECONDARY,
 )
 
 _CHIP_RADIUS = 999
@@ -64,7 +64,7 @@ class LanguageHintEditor(ft.Column):
             style=ft.ButtonStyle(
                 color={
                     ft.ControlState.HOVERED: COLOR_PRIMARY,
-                    ft.ControlState.DEFAULT: COLOR_NEUTRAL_DARK,
+                    ft.ControlState.DEFAULT: COLOR_SECONDARY,
                 },
                 text_style=ft.TextStyle(
                     size=20,
@@ -91,7 +91,7 @@ class LanguageHintEditor(ft.Column):
         self._add_button.style = ft.ButtonStyle(
             color={
                 ft.ControlState.HOVERED: COLOR_PRIMARY,
-                ft.ControlState.DEFAULT: COLOR_NEUTRAL_DARK,
+                ft.ControlState.DEFAULT: COLOR_SECONDARY,
             },
             text_style=ft.TextStyle(
                 size=20,

@@ -150,6 +150,26 @@ def test_only_the_source_text_uses_the_dimmed_colour(
     assert card._display_text.font_family == "font-target"
 
 
+def test_source_flagged_as_translation_uses_the_message_colour(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    card = DisplayCard(on_submit=lambda _text: None)
+    _mute_display_updates(monkeypatch, card)
+
+    card.set_display("api key warning", as_translation=True)
+    assert _visible_text(card) == "api key warning"
+    assert _visible_color(card) == display_card_module.DISPLAY_MESSAGE_COLOR
+    assert card._display_text.weight == display_card_module.DISPLAY_MESSAGE_WEIGHT
+
+    card.set_display("live source")
+    assert _visible_color(card) == display_card_module.DISPLAY_SOURCE_COLOR
+    assert card._display_text.weight == display_card_module.DISPLAY_SOURCE_WEIGHT
+
+    card.set_display("api key warning", as_translation=True)
+    card.set_status("connected")
+    assert _visible_color(card) == display_card_module.DISPLAY_MESSAGE_COLOR
+
+
 def test_status_and_notice_keep_the_undimmed_message_colour(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -20,6 +20,7 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
         set_stt_enabled=lambda value: events.append(("stt-enabled", value)),
         set_translation_needs_key=lambda value: events.append(("translation-key", value)),
         set_stt_needs_key=lambda value: events.append(("stt-key", value)),
+        set_peer_needs_key=lambda value: events.append(("peer-key", value)),
         set_managed_auth_pending=lambda value: events.append(("managed-auth", value)),
         set_gpu_notice=lambda value: events.append(("gpu-notice", value)),
         set_managed_gemma_notice=lambda value: events.append(("gemma-notice", value)),
@@ -132,6 +133,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
         set_stt_enabled=lambda value: events.append(("stt-enabled", value)),
         set_translation_needs_key=lambda value: events.append(("translation-key", value)),
         set_stt_needs_key=lambda value: events.append(("stt-key", value)),
+        set_peer_needs_key=lambda value: events.append(("peer-key", value)),
         set_managed_auth_pending=lambda value: events.append(("managed-auth", value)),
         set_gpu_notice=lambda value: events.append(("gpu-notice", value)),
         set_managed_gemma_notice=lambda value: events.append(("gemma-notice", value)),
@@ -185,6 +187,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     adapter.set_dashboard_stt_enabled(True)
     adapter.set_dashboard_translation_needs_key(False)
     adapter.set_dashboard_stt_needs_key(False)
+    adapter.set_dashboard_peer_needs_key(True)
     adapter.set_dashboard_managed_auth_pending(True)
     adapter.set_dashboard_gpu_state(
         devices=devices,
@@ -238,6 +241,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     assert adapter.dashboard_translation_enabled() is False
     assert ("log-sink", logs) in events
     assert ("translation-enabled", True) in events
+    assert ("peer-key", True) in events
     assert ("gpu-devices", {"devices": devices}) in events
     assert ("gpu-devices", {"llm_devices": devices}) in events
     assert ("gpu-notice", notice) in events

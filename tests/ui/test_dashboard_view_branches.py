@@ -64,6 +64,7 @@ class FakeDisplayCard:
         self._on_input_activity = on_input_activity
         self.statuses: list[tuple[str, str | None]] = []
         self.display_calls: list[tuple[str, bool, str | None]] = []
+        self.display_metadata_calls: list[dict[str, object]] = []
         self.translation_calls: list[tuple[str | None, str | None]] = []
         self.translation_metadata_calls: list[dict[str, object]] = []
         self.notice_calls: list[tuple[str | None, str | None]] = []
@@ -86,6 +87,7 @@ class FakeDisplayCard:
         **_metadata,
     ) -> None:
         self.display_calls.append((text, is_error, font_family))
+        self.display_metadata_calls.append(dict(_metadata))
 
     def set_display_translation(
         self,
@@ -1647,3 +1649,57 @@ def test_dashboard_drops_a_projected_secondary_that_equals_the_primary(
     view.set_languages_from_codes("ko", "en", "ja", "fr", "manual", "en")
 
     assert view._secondary_target_lang_code == ""
+
+
+def test_dashboard_peer_toggle_blocked_with_warning_when_peer_needs_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    seen: list[bool] = []
+    view.on_toggle_peer_translation = lambda enabled: seen.append(enabled)
+    view.set_peer_needs_key(True, update_ui=False)
+    warn_stt = dashboard_module.t("dashboard.warn_stt_key")
+
+    view._toggle_peer_translation()
+    assert seen == []
+    assert view._current_display_text == warn_stt
+    assert view._peer_showing_warning is True
+    assert view.peer_button.states[-1]["needs_key"] is True
+
+    view._toggle_peer_translation()
+    assert seen == []
+    assert view._peer_showing_warning is False
+    assert view.peer_button.states[-1]["needs_key"] is False
+
+
+def test_dashboard_peer_toggle_passes_through_once_peer_key_verified(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    seen: list[bool] = []
+    view.on_toggle_peer_translation = lambda enabled: seen.append(enabled)
+    view.set_peer_needs_key(True, update_ui=False)
+
+    view.set_peer_needs_key(False, update_ui=False)
+    view._toggle_peer_translation()
+
+    assert seen == [True]
+
+
+def test_dashboard_api_key_warnings_use_translation_tone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    view.set_stt_needs_key(True, update_ui=False)
+    view.set_translation_needs_key(True, update_ui=False)
+    warn_stt = dashboard_module.t("dashboard.warn_stt_key")
+    warn_llm = dashboard_module.t("dashboard.warn_llm_key")
+
+    view._toggle_stt()
+    assert view.display_card.display_metadata_calls[-1].get("as_translation") is True
+    assert view._current_display_text == warn_stt
+
+    view._toggle_translation()
+    assert view.display_card.display_metadata_calls[-1].get("as_translation") is True
+    assert view._current_display_text == warn_llm
+    assert view._peer_showing_warning is False

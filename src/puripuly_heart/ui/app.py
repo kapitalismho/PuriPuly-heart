@@ -30,6 +30,7 @@ from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
+from puripuly_heart.config.provider_values import QwenRegion
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
@@ -260,6 +261,7 @@ class TranslatorApp:
                 runtime_log_detailed=(
                     runtime_log_detailed if callable(runtime_log_detailed) else None
                 ),
+                open_api_keys_guide=self._open_api_keys_guide,
             ),
             provider=SettingsProviderIntents(
                 providers_changed=self._on_providers_changed,
@@ -525,6 +527,7 @@ class TranslatorApp:
             on_brake_notice=self._preview_brake_notice,
             on_revoked_notice=self._preview_revoked_notice,
             on_pkce_failure=self._preview_pkce_failure,
+            on_pkce_button_cycle=self._preview_pkce_button_cycle,
             on_capture_fault_cycle=self._preview_capture_fault_cycle,
             on_stt_fault_cycle=self._preview_stt_fault_cycle,
             on_audio_fault_clear=self._preview_audio_fault_clear,
@@ -844,6 +847,15 @@ class TranslatorApp:
     def _preview_pkce_failure(self) -> None:
         self._show_snackbar(t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)
 
+    def _preview_pkce_button_cycle(self) -> None:
+        preview = getattr(self.view_settings, "preview_openrouter_pkce_button_state", None)
+        if not callable(preview):
+            return
+        index = int(getattr(self, "_debug_preview_pkce_button_index", -1)) + 1
+        index %= 2
+        self._debug_preview_pkce_button_index = index
+        preview(index == 1)
+
     def _preview_discord_auth(self) -> None:
         self.show_discord_managed_auth_dialog(preview=True)
 
@@ -988,6 +1000,9 @@ class TranslatorApp:
         dialog.open()
 
     def _open_local_qwen_guide(self) -> None:
+        webbrowser.open(founder_readme_url_for_locale(get_locale()))
+
+    def _open_api_keys_guide(self) -> None:
         webbrowser.open(founder_readme_url_for_locale(get_locale()))
 
     def _accept_peer_translation_eula_and_enable(self) -> None:
@@ -1937,6 +1952,33 @@ class TranslatorApp:
 
         return current_key == key
 
+    def _peer_api_key_provider_tag(self) -> str | None:
+        """Return the verification provider tag required by the peer STT channel."""
+        try:
+            settings = self.application.compatibility_settings()
+        except Exception:
+            return None
+        if settings is None:
+            return None
+        try:
+            peer_provider = settings.intent.peer_stt.provider
+        except Exception:
+            return None
+        if peer_provider in ("qwen_asr", "qwen_audio"):
+            try:
+                region = settings.intent.translation.qwen.region
+            except Exception:
+                return None
+            return "alibaba_beijing" if region == QwenRegion.BEIJING.value else "alibaba_singapore"
+        if peer_provider in (
+            "deepgram",
+            "gemini_transcribe",
+            "elevenlabs_scribe",
+            "soniox",
+        ):
+            return peer_provider
+        return None
+
     async def _on_verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
         success, msg = await self.application.verify_api_key(provider, key)
 
@@ -1946,9 +1988,16 @@ class TranslatorApp:
         self.application.persist_api_key_verification(provider, key, success)
 
         # Sync verification result with dashboard needs_key flags (UI update on user click)
-        if provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe", "soniox", "qwen_asr"):
+        if provider in (
+            "deepgram",
+            "gemini_transcribe",
+            "elevenlabs_scribe",
+            "soniox",
+            "alibaba_beijing",
+            "alibaba_singapore",
+        ):
             self.view_dashboard.set_stt_needs_key(not success, update_ui=False)
-        elif provider in (
+        if provider in (
             "google",
             "openrouter",
             "deepseek",
@@ -1957,6 +2006,8 @@ class TranslatorApp:
             "alibaba_singapore",
         ):
             self.view_dashboard.set_translation_needs_key(not success, update_ui=False)
+        if provider == self._peer_api_key_provider_tag():
+            self.view_dashboard.set_peer_needs_key(not success, update_ui=False)
 
         return success, msg
 
@@ -1976,10 +2027,26 @@ class TranslatorApp:
             "alibaba_api_key_beijing": "alibaba_beijing",
             "alibaba_api_key_singapore": "alibaba_singapore",
         }.get(key)
-        if provider in {"deepgram", "gemini_transcribe", "elevenlabs_scribe", "soniox"}:
+        if provider in {
+            "deepgram",
+            "gemini_transcribe",
+            "elevenlabs_scribe",
+            "soniox",
+            "alibaba_beijing",
+            "alibaba_singapore",
+        }:
             self.view_dashboard.set_stt_needs_key(True, update_ui=False)
-        elif provider is not None:
+        if provider in {
+            "google",
+            "openrouter",
+            "deepseek",
+            "cerebras",
+            "alibaba_beijing",
+            "alibaba_singapore",
+        }:
             self.view_dashboard.set_translation_needs_key(True, update_ui=False)
+        if provider is not None and provider == self._peer_api_key_provider_tag():
+            self.view_dashboard.set_peer_needs_key(True, update_ui=False)
         return True
 
     def _on_secret_cleared(self, key: str) -> None:
@@ -2003,9 +2070,16 @@ class TranslatorApp:
             self.application.clear_provider_verification(provider)
 
             # Update dashboard needs_key flag
-            if provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe", "soniox"):
+            if provider in (
+                "deepgram",
+                "gemini_transcribe",
+                "elevenlabs_scribe",
+                "soniox",
+                "alibaba_beijing",
+                "alibaba_singapore",
+            ):
                 self.view_dashboard.set_stt_needs_key(True, update_ui=False)
-            elif provider in (
+            if provider in (
                 "google",
                 "openrouter",
                 "deepseek",
@@ -2014,6 +2088,8 @@ class TranslatorApp:
                 "alibaba_singapore",
             ):
                 self.view_dashboard.set_translation_needs_key(True, update_ui=False)
+            if provider == self._peer_api_key_provider_tag():
+                self.view_dashboard.set_peer_needs_key(True, update_ui=False)
 
     def _show_snackbar(self, message: str, bgcolor, duration: int = 4000) -> None:
         """Show a snackbar above the bottom nav."""

@@ -36,6 +36,7 @@ EXTENDED_ACTION_KEYS = [
     "brake_notice",
     "revoked_notice",
     "pkce_failure",
+    "pkce_button_cycle",
     "capture_fault_cycle",
     "stt_fault_cycle",
     "audio_fault_clear",

@@ -3761,7 +3761,18 @@ def test_openrouter_pkce_button_shows_authenticated_state_after_verified_key(
 
     assert view._openrouter_pkce_button.content == t("settings.openrouter_authenticated")
     assert view._openrouter_pkce_button.disabled is True
-    assert view._openrouter_pkce_button.style.color[ft.ControlState.DEFAULT] == COLOR_NEUTRAL_DARK
+    assert (
+        view._openrouter_pkce_button.style.color[ft.ControlState.DEFAULT]
+        == settings_view.COLOR_SECONDARY
+    )
+    assert (
+        view._openrouter_pkce_button.style.color[ft.ControlState.DISABLED]
+        == settings_view.COLOR_SECONDARY
+    )
+    assert (
+        view._openrouter_pkce_button.style.color[ft.ControlState.HOVERED]
+        == settings_view.COLOR_PRIMARY
+    )
 
 
 def test_openrouter_pkce_button_returns_to_authenticate_when_key_is_cleared(
@@ -3782,6 +3793,31 @@ def test_openrouter_pkce_button_returns_to_authenticate_when_key_is_cleared(
     assert view._openrouter_pkce_button.content == t("settings.openrouter_authenticate")
     assert view._openrouter_pkce_button.disabled is False
     assert view._openrouter_pkce_button.style.color[ft.ControlState.DEFAULT] == COLOR_NEUTRAL_DARK
+
+
+def test_openrouter_pkce_button_preview_renders_states_without_side_effects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = DummySecretStore({"openrouter_api_key": "sk-or-v1-pkce"})
+    view, _ = _make_settings_view(monkeypatch, store)
+    view.on_verify_api_key = lambda *_args, **_kwargs: pytest.fail("preview must not verify keys")
+    key_before = view._openrouter_key.value
+
+    view.preview_openrouter_pkce_button_state(True)
+
+    assert view._openrouter_pkce_button.content == t("settings.openrouter_authenticated")
+    assert view._openrouter_pkce_button.disabled is True
+    assert (
+        view._openrouter_pkce_button.style.color[ft.ControlState.DEFAULT]
+        == settings_view.COLOR_SECONDARY
+    )
+
+    view.preview_openrouter_pkce_button_state(False)
+
+    assert view._openrouter_pkce_button.content == t("settings.openrouter_authenticate")
+    assert view._openrouter_pkce_button.disabled is False
+    assert view._openrouter_pkce_button.style.color[ft.ControlState.DEFAULT] == COLOR_NEUTRAL_DARK
+    assert view._openrouter_key.value == key_before
 
 
 @pytest.mark.asyncio
@@ -4411,6 +4447,21 @@ def test_peer_auto_detection_languages_card_is_visible_for_peer_qwen_audio(
 
     assert view._peer_auto_languages_card.visible is True
     assert view._peer_auto_languages_editor._terms == ["ja", "zh-TW"]
+
+
+def test_peer_auto_languages_add_button_uses_region_tone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, _ = _make_settings_view(monkeypatch)
+    add_button = view._peer_auto_languages_editor._add_button
+
+    assert add_button.style.color[ft.ControlState.DEFAULT] == settings_view.COLOR_SECONDARY
+    assert add_button.style.color[ft.ControlState.HOVERED] == settings_view.COLOR_PRIMARY
+
+    view._peer_auto_languages_editor.apply_locale()
+
+    assert add_button.style.color[ft.ControlState.DEFAULT] == settings_view.COLOR_SECONDARY
+    assert add_button.style.color[ft.ControlState.HOVERED] == settings_view.COLOR_PRIMARY
 
 
 def test_overlay_display_toggles_update_persistent_settings(
@@ -6253,7 +6304,8 @@ def test_api_keys_card_omits_helper_copy_and_keeps_qwen_region_button_in_header(
     assert view._qwen_region_btn.visible is True
     assert isinstance(api_header, ft.Row)
     assert api_header.controls[0] is view._api_title
-    assert api_header.controls[2] is view._qwen_region_btn
+    assert api_header.controls[2] is view._api_guide_btn
+    assert api_header.controls[3] is view._qwen_region_btn
     assert view._api_credentials_helper_text not in api_column.controls
     assert t("settings.api_credentials_helper") not in _control_labels(api_card)
 
@@ -6797,28 +6849,13 @@ def _provider_snapshot_with(
     return provider
 
 
-def test_rolling_switch_syncs_value_and_member_gating(monkeypatch: pytest.MonkeyPatch) -> None:
-    from dataclasses import replace as dc_replace
-
-    view, _ = _make_settings_view(monkeypatch)
-    base = _vnext(stt_provider=STTProviderName.GEMINI_TRANSCRIBE.value)
-    provider = _provider_snapshot_with(monkeypatch, base)
-    provider = dc_replace(provider, stt_rolling_enabled=True)
-    view.sync_stt_rolling_switch(provider)
-    assert view._stt_rolling_switch.value is True
-    assert view._stt_rolling_switch.disabled is False
-
-    non_member = dc_replace(provider, stt_provider=STTProviderName.SONIOX, stt_rolling_enabled=True)
-    view.sync_stt_rolling_switch(non_member)
-    assert view._stt_rolling_switch.disabled is True
-
-
-def test_self_stt_control_returns_stable_container(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_self_stt_control_returns_single_unit_card(monkeypatch: pytest.MonkeyPatch) -> None:
     view, _ = _make_settings_view(monkeypatch)
     first = view.self_stt_control()
     second = view.self_stt_control()
     assert first is second
-    assert view._stt_rolling_switch in first.controls
+    assert first is view._self_stt_card
+    assert getattr(first, "expand", None) is True
 
 
 def test_update_api_visibility_shows_all_member_keys_when_rolling_on(
@@ -6839,7 +6876,9 @@ def test_update_api_visibility_shows_all_member_keys_when_rolling_on(
     assert view._elevenlabs_scribe_key.visible is True
 
 
-def test_load_from_settings_syncs_rolling_switch(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_from_settings_keeps_provider_row_as_unit_cards(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     settings = _vnext(stt_provider=STTProviderName.DEEPGRAM.value)
     settings = replace(
         settings,
@@ -6850,5 +6889,5 @@ def test_load_from_settings_syncs_rolling_switch(monkeypatch: pytest.MonkeyPatch
     )
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
-    assert view._stt_rolling_switch.value is True
-    assert view._stt_rolling_switch.disabled is False
+    assert view.self_stt_control() is view._self_stt_card
+    assert not hasattr(view, "_stt_rolling_switch")

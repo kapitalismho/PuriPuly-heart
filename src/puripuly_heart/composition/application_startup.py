@@ -158,6 +158,23 @@ class ApplicationStartupAdapter:
         else:
             stt_needs_key = False
         self.presentation.set_dashboard_stt_needs_key(stt_needs_key)
+        peer_stt_provider = settings.intent.peer_stt.provider
+        if self.stt_requires_secret(STTProviderName(peer_stt_provider)):
+            peer_key_map = {
+                "qwen_asr": self.alibaba_verified_key(),
+                "qwen_audio": self.alibaba_verified_key(),
+            }
+            peer_verified_key = peer_key_map.get(peer_stt_provider, peer_stt_provider)
+            peer_entry = getattr(
+                settings.state.provider_verification,
+                peer_verified_key,
+                None,
+            )
+            peer_verified = getattr(peer_entry, "status", None) == "verified"
+            peer_needs_key = not peer_verified
+        else:
+            peer_needs_key = False
+        self.presentation.set_dashboard_peer_needs_key(peer_needs_key)
         llm_provider = provider_llm_for_translation(
             settings.intent.translation.model,
             settings.intent.translation.connection,
