@@ -41,7 +41,7 @@
   "settings.self_stt_provider": "셀프 STT 프로바이더",
   "settings.shared_translation_provider": "공유 번역 프로바이더",
   "settings.api_credentials_helper": "공유 키, 리전, 라우팅은 여기서 함께 관리해요.",
-  "settings.api_keys_guide": "가이드 보기",
+  "settings.api_keys_guide": "API 가이드",
   "settings.google_api_key": "Gemini API 키",
   "settings.openrouter_api_key": "OpenRouter API 키",
   "settings.deepseek_api_key": "DeepSeek API 키",

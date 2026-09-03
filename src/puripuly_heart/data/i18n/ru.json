@@ -41,7 +41,7 @@
   "settings.self_stt_provider": "Провайдер STT (вы)",
   "settings.shared_translation_provider": "Провайдер перевода",
   "settings.api_credentials_helper": "Общие ключи, регионы и маршрутизация.",
-  "settings.api_keys_guide": "Открыть руководство",
+  "settings.api_keys_guide": "API 가이드",
   "settings.google_api_key": "API-ключ Gemini",
   "settings.openrouter_api_key": "API-ключ OpenRouter",
   "settings.deepseek_api_key": "API-ключ DeepSeek",

@@ -41,7 +41,7 @@
   "settings.self_stt_provider": "Self STT Provider",
   "settings.shared_translation_provider": "Shared Translation Provider",
   "settings.api_credentials_helper": "Keep shared keys, regions, and routing together here.",
-  "settings.api_keys_guide": "View guide",
+  "settings.api_keys_guide": "API 가이드",
   "settings.google_api_key": "Gemini API Key",
   "settings.openrouter_api_key": "OpenRouter API Key",
   "settings.deepseek_api_key": "DeepSeek API Key",
