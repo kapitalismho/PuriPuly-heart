@@ -493,18 +493,28 @@ def test_dashboard_public_setters_update_components(monkeypatch: pytest.MonkeyPa
         "warning",
     )
     assert view.language_card.languages[-1] == ("name-ko", "name-en", "name-ko", "name-en")
+    assert view.translation_needs_key is True
+    assert view.stt_needs_key is True
+    assert view._translation_showing_warning is False
+    assert view._stt_showing_warning is False
     assert view.trans_button.states[-1] == {
         "is_on": False,
-        "needs_key": True,
+        "needs_key": False,
         "status_text": None,
         "helper_text": None,
     }
     assert view.stt_button.states[-1] == {
         "is_on": False,
-        "needs_key": True,
+        "needs_key": False,
         "status_text": None,
         "helper_text": None,
     }
+    view._toggle_translation()
+    view._toggle_stt()
+    assert view._translation_showing_warning is True
+    assert view._stt_showing_warning is True
+    assert view.trans_button.states[-1]["needs_key"] is True
+    assert view.stt_button.states[-1]["needs_key"] is True
     assert view._recent_source_langs == ["a", "b", "c", "d", "e", "f"]
 
 
@@ -1684,6 +1694,44 @@ def test_dashboard_peer_toggle_passes_through_once_peer_key_verified(
     view._toggle_peer_translation()
 
     assert seen == [True]
+
+
+def test_dashboard_needs_key_shows_warning_only_after_press(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    view.set_stt_needs_key(True, update_ui=True)
+    view.set_translation_needs_key(True, update_ui=True)
+    view.set_peer_needs_key(True, update_ui=True)
+
+    assert view._stt_showing_warning is False
+    assert view._translation_showing_warning is False
+    assert view._peer_showing_warning is False
+    assert view.stt_button.states[-1]["needs_key"] is False
+    assert view.trans_button.states[-1]["needs_key"] is False
+    assert view.peer_button.states[-1]["needs_key"] is False
+
+    view._toggle_stt()
+    view._toggle_translation()
+    view._toggle_peer_translation()
+
+    assert view._stt_showing_warning is True
+    assert view._translation_showing_warning is True
+    assert view._peer_showing_warning is True
+    assert view.stt_button.states[-1]["needs_key"] is True
+    assert view.trans_button.states[-1]["needs_key"] is True
+    assert view.peer_button.states[-1]["needs_key"] is True
+
+    view.set_stt_needs_key(False, update_ui=True)
+    view.set_translation_needs_key(False, update_ui=True)
+    view.set_peer_needs_key(False, update_ui=True)
+
+    assert view._stt_showing_warning is False
+    assert view._translation_showing_warning is False
+    assert view._peer_showing_warning is False
+    assert view.stt_button.states[-1]["needs_key"] is False
+    assert view.trans_button.states[-1]["needs_key"] is False
+    assert view.peer_button.states[-1]["needs_key"] is False
 
 
 def test_dashboard_api_key_warnings_use_translation_tone(

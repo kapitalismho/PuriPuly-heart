@@ -697,22 +697,25 @@ class DashboardView(ft.Column):
     def set_translation_needs_key(self, needs_key: bool, *, update_ui: bool = True) -> None:
         self.translation_needs_key = bool(needs_key)
         if update_ui and not self.is_translation_on:
-            self._translation_showing_warning = bool(needs_key)
-            self._sync_translation_button_state()
+            if not needs_key and self._translation_showing_warning:
+                self._translation_showing_warning = False
+                self._sync_translation_button_state()
 
     def set_stt_needs_key(self, needs_key: bool, *, update_ui: bool = True) -> None:
         self.stt_needs_key = bool(needs_key)
         if update_ui and not self.is_stt_on:
-            self._stt_showing_warning = bool(needs_key)
-            self._sync_stt_button_state()
+            if not needs_key and self._stt_showing_warning:
+                self._stt_showing_warning = False
+                self._sync_stt_button_state()
 
     def set_peer_needs_key(self, needs_key: bool, *, update_ui: bool = True) -> None:
         self.peer_needs_key = bool(needs_key)
         contract = self._overlay_peer_contract
         peer_on = bool(contract is not None and contract.peer.intent_enabled)
         if update_ui and not peer_on:
-            self._peer_showing_warning = bool(needs_key)
-            self._sync_overlay_peer_buttons()
+            if not needs_key and self._peer_showing_warning:
+                self._peer_showing_warning = False
+                self._sync_overlay_peer_buttons()
 
     def set_display_text(
         self,
