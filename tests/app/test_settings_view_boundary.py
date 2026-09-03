@@ -376,8 +376,6 @@ def test_rolling_enabled_edits_persist_self_and_peer_flags() -> None:
     assert peer_updated.intent.stt.rolling_enabled is True
     assert peer_updated.intent.peer_stt.rolling_enabled is True
 
-    provider_snapshot, _general, _prompt, _overlay = settings_view_surface_snapshots(
-        peer_updated
-    )
+    provider_snapshot, _general, _prompt, _overlay = settings_view_surface_snapshots(peer_updated)
     assert provider_snapshot.stt_rolling_enabled is True
     assert provider_snapshot.peer_stt_rolling_enabled is True

@@ -6809,8 +6809,6 @@ def test_self_stt_control_returns_stable_container(monkeypatch: pytest.MonkeyPat
 def test_update_api_visibility_shows_all_member_keys_when_rolling_on(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from dataclasses import replace as dc_replace
-
     settings = _vnext(stt_provider=STTProviderName.GEMINI_TRANSCRIBE.value)
     settings = replace(
         settings,

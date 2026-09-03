@@ -83,6 +83,10 @@
 | 7 | Soniox |
 | 8 | Custom Speech Recognition (Offline) |
 | 9 | Custom Speech Recognition (Realtime) |
+| 10 | Gemini Transcribe (Live) |
+| 11 | ElevenLabs Scribe |
+| 12 | Qwen Audio 3.0 ASR Flash Streaming |
+| 13 | Free cloud ASR auto-selection (Gemini → ElevenLabs → Deepgram) |
 
 - Used by: `PuriPuly_SelfASR`, `PuriPuly_PeerASR`
 
