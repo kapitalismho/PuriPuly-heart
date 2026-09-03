@@ -1,0 +1,9 @@
+{
+  "adapter_frames": "REUSED from main/results_repaired/firered_C_main.jsonl (rev2).",
+  "evaluator_revision": 2,
+  "manifest_sha256": "e5956ab0fc451c647f5d6bfbdece87f27816de5c5b45bc0423514511c2c36582",
+  "supersedes_without_overwriting": "vadreplay/results/* VOID, preserved in place.",
+  "vad_spans": "FRESH full-source Silero ONNX replay, same profile as before (thr 0.5, chunk 512, pre-roll/hangover 500ms).",
+  "winner_basis": "sole causal formulation with valid CUTs under repaired MAIN48 (firered-C 2/8; neovad-C 0/8, nothing to retain)",
+  "winner_only": "firered x C"
+}

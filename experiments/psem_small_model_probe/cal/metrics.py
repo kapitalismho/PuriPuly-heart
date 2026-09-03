@@ -3,14 +3,19 @@
 Exactly four headline metrics:
 
 1. ``contamination_s_per_speech_h`` — exclusive non-anchor active seconds per
-   active-speech hour (GT-only episode-difficulty diagnostic, same value for
-   every tau).
-2. ``false_cuts`` — KEEP-expected episodes emitting >= 1 confirmed CUT.
-3. ``missed_rate`` — CUT-expected episodes emitting no CUT.
+   active-speech hour. Decoder-dependent current-segment numerator: per
+   episode over ``[evaluation_start, first valid CUT source_boundary)`` (full
+   window when no valid CUT); denominator is the full-window active-speech
+   hour as before. No new headline metric was added by the V2 speaker-change
+   repair.
+2. ``false_cuts`` — KEEP-expected episodes emitting >= 1 confirmed CUT
+   (unchanged: any CUT counts, no transition gating on KEEP).
+3. ``missed_rate`` — CUT-expected episodes emitting no *valid* CUT
+   (transition-aware: premature-only episodes score missed=true).
 4. ``replacement delay p50/p90`` — SPLIT into source-boundary error
    (``source_boundary_time - transition``) vs decision/emission delay
-   (``decision_time - source_boundary_time``), over first CUT per detected
-   CUT-expected episode.
+   (``decision_time - source_boundary_time``), over first *valid* CUT per
+   detected CUT-expected episode.
 
 Topology views ``A->A+B->A`` (KEEP) vs ``A->A+B->B`` (CUT) are always
 reported separately. Frame AUPRC/F1, unbound fraction, and role-flip
@@ -29,6 +34,10 @@ import statistics
 from typing import Any
 
 from experiments.psem_small_model_probe.adapter.decoder import CommonPersistenceDecoder
+from experiments.psem_small_model_probe.cal.eval_semantics import (
+    current_segment_contam_s,
+    split_cuts,
+)
 
 KEEP_TOPOLOGIES = frozenset({"A", "A->A+B->A", "overlap_return", "A+A+B"})
 CUT_TOPOLOGIES = frozenset({"A->A+B->B"})
@@ -69,19 +78,42 @@ def _percentile(values: list[float], q: float) -> float | None:
 def score_episode(
     record: dict[str, Any], tau: float, frame_ms: int
 ) -> dict[str, Any]:
-    """Per-episode outcome at one tau (KEEP/CUT sets by topology)."""
+    """Per-episode outcome at one tau (KEEP/CUT sets by topology).
+
+    CUT validity is transition-aware: only CUTs with ``source_boundary_time
+    >= authoritative_transition_ms - CUT_TOLERANCE_MS`` count toward
+    detection. Episode success := first valid CUT exists; premature-only
+    episodes score missed=true + premature_cut=true (+ n_premature_cuts
+    diagnostic). KEEP-episode false-cut usage is unchanged (any committed
+    CUT = false cut). All delays are measured on the first *valid* CUT.
+    ``contam_s`` is the decoder-dependent current-segment numerator (full
+    window when no valid CUT); legacy records without ``gt_eval`` fall back
+    to the stored full-window value.
+    """
     cuts, sens = replay_decisions(record["frames"], tau, frame_ms)
     topology = record["topology"]
     transition = record["authoritative_transition_ms"]
-    first = cuts[0] if cuts else None
+    valid, premature = split_cuts(cuts, transition)
+    first = valid[0] if valid else None
+    gt_eval = record.get("gt_eval")
+    if gt_eval is not None:
+        contam = current_segment_contam_s(
+            gt_eval, first["source_boundary_time"] if first else None
+        )
+    else:
+        contam = record.get("contam_s", 0.0)
     return {
         "episode_id": record["episode_id"],
         "topology": topology,
         "tau": tau,
         "n_cuts": len(cuts),
+        "n_valid_cuts": len(valid),
+        "n_premature_cuts": len(premature),
+        "premature_cut": bool(premature),
         "sens_hits": sens,
         "false_cut": topology in KEEP_TOPOLOGIES and bool(cuts),
-        "missed": topology in CUT_TOPOLOGIES and not cuts,
+        "missed": topology in CUT_TOPOLOGIES and first is None,
+        "contam_s": contam,
         "src_err_ms": (first["source_boundary_time"] - transition) if first else None,
         "dec_delay_ms": (first["decision_time"] - first["source_boundary_time"])
         if first
@@ -102,9 +134,9 @@ def aggregate(
     src_err = [e["src_err_ms"] for e in detected if e["src_err_ms"] is not None]
     dec_delay = [e["dec_delay_ms"] for e in detected if e["dec_delay_ms"] is not None]
     total = [e["total_delay_ms"] for e in detected if e["total_delay_ms"] is not None]
-    contam_s = sum(r["contam_s"] for r in records)
+    contam_s = sum(e["contam_s"] for e in episodes)
     speech_h = sum(r["active_speech_s"] for r in records) / 3600.0
-    # Diagnostics only: frame anchor score vs GT anchor-speech label.
+    # Diagnostics only: frame anchor score vs GT any-speech label.
     labels = [1.0 if f["speech_gt"] else 0.0 for r in records for f in r["frames"]]
     scores = [f["anchor"] for r in records for f in r["frames"]]
     return {

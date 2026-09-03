@@ -1,0 +1,26 @@
+[
+  {
+    "evaluator_revision": 2,
+    "model": "firered",
+    "regime": "O",
+    "tau": 0.15
+  },
+  {
+    "evaluator_revision": 2,
+    "model": "firered",
+    "regime": "C",
+    "tau": 0.05
+  },
+  {
+    "evaluator_revision": 2,
+    "model": "neovad",
+    "regime": "O",
+    "tau": 0.15
+  },
+  {
+    "evaluator_revision": 2,
+    "model": "neovad",
+    "regime": "C",
+    "tau": 0.15
+  }
+]

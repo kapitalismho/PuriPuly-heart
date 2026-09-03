@@ -33,10 +33,14 @@ from experiments.psem_small_model_probe.cal.metrics import (
     replay_decisions,
     score_episode,
 )
+from experiments.psem_small_model_probe.cal.eval_semantics import (
+    compact_gt,
+    gt_anchor_speech,
+    gt_any_speech,
+    gt_window_stats,
+)
 from experiments.psem_small_model_probe.cal.run_cal import (
     FailClosed,
-    gt_anchor_speech,
-    gt_window_stats,
     load_adapter,
     load_gt_index,
 )
@@ -292,7 +296,8 @@ def main() -> None:
             pvad_step_ms.append((time.perf_counter() - t0) * 1000.0)
             t = eval_start + (i + 1) * frame_ms
             center = eval_start * SAMPLES_PER_MS + (i * unit) // 2 + unit // 4
-            speech_gt = gt_anchor_speech(gt, row["anchor_speaker"], center)
+            speech_gt = gt_any_speech(gt, center)
+            anchor_speech_gt = gt_anchor_speech(gt, row["anchor_speaker"], center)
             speech_vad = _in_spans(spans, center)
             n_frames_total += 1
             n_agree += speech_gt == speech_vad
@@ -305,6 +310,7 @@ def main() -> None:
                 "adapter_speech": out.speech,
                 "lifecycle": "BOUND",
                 "source_time_ms": t,
+                "anchor_speech_gt": anchor_speech_gt,
             }
             frames_gt.append({**base, "speech_gt": speech_gt})
             frames_prod.append({**base, "speech_gt": speech_vad})
@@ -318,6 +324,7 @@ def main() -> None:
                         "gate": "gt+prod",
                         "source_time_ms": t,
                         "speech_gt": speech_gt,
+                        "anchor_speech_gt": anchor_speech_gt,
                         "speech_vad": speech_vad,
                         "anchor": float(out.anchor),
                         "lifecycle": "BOUND",
@@ -337,6 +344,9 @@ def main() -> None:
             "contam_s": contam,
             "active_speech_s": active,
             "lifecycle": "BOUND",
+            "gt_eval": compact_gt(
+                gt, row["anchor_speaker"], eval_start, eval_end
+            ),
         }
         records_gt.append({**meta, "frames": frames_gt})
         records_prod.append({**meta, "frames": frames_prod})

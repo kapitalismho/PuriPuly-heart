@@ -6,7 +6,7 @@ Adapters x regimes x CAL12 episodes -> single-scalar thresholds
 
 Regimes: O = 5 s native bind span; C = 1 s causal bind span.
 A row with ``causal_bindable=false`` stays UNBOUND in regime C (HOLD,
-no inference). GT speech gates every frame before the decoder; the
+no inference). GT any-speech gates every frame before the decoder; the
 500 ms confirmation decoder emits headline CUTs while a 300 ms
 sensitivity stream is recorded alongside.
 
@@ -24,13 +24,18 @@ import argparse
 import hashlib
 import importlib
 import json
-from bisect import bisect_right
 from pathlib import Path
 
 from experiments.psem_small_model_probe.adapter.protocol import frame_bytes
 from experiments.psem_small_model_probe.adapter.stub import StubAdapter
 from experiments.psem_small_model_probe.cal import audio_resolve
 from experiments.psem_small_model_probe.cal.audio_resolve import SAMPLES_PER_MS
+from experiments.psem_small_model_probe.cal.eval_semantics import (
+    compact_gt,
+    gt_anchor_speech,
+    gt_any_speech,
+    gt_window_stats,
+)
 from experiments.psem_small_model_probe.cal.metrics import (
     TAU_GRID,
     aggregate,
@@ -94,45 +99,6 @@ def load_gt_index() -> dict[tuple[str, str], dict]:
                 "starts": [iv["start_sample"] for iv in intervals],
             }
     return index
-
-
-def gt_anchor_speech(gt: dict, anchor: str, sample: int) -> bool:
-    """GT speech gate: anchor active in an unmasked interval covering sample."""
-    i = bisect_right(gt["starts"], sample) - 1
-    if i < 0:
-        return False
-    interval = gt["intervals"][i]
-    return (
-        sample < interval["end_sample"]
-        and not interval.get("masked", False)
-        and anchor in interval.get("active_speakers", [])
-    )
-
-
-def gt_window_stats(
-    gt: dict, anchor: str, start_ms: int, end_ms: int
-) -> tuple[float, float]:
-    """(exclusive non-anchor seconds, active-speech seconds) in eval window."""
-    start, end = start_ms * SAMPLES_PER_MS, end_ms * SAMPLES_PER_MS
-    contam = active = 0
-    for iv in gt["intervals"]:
-        if iv["end_sample"] <= start:
-            continue
-        if iv["start_sample"] >= end:
-            break
-        if iv.get("masked", False):
-            continue
-        speakers = iv.get("active_speakers", [])
-        if not speakers:
-            continue
-        overlap = min(iv["end_sample"], end) - max(iv["start_sample"], start)
-        if overlap <= 0:
-            continue
-        seconds = overlap / 16000.0
-        active += seconds
-        if anchor not in speakers:
-            contam += seconds
-    return contam, active
 
 
 def load_adapter(name: str):
@@ -249,10 +215,14 @@ def run_cell(
             out = adapter.step(chunk)
             t = eval_start + (i + 1) * frame_ms
             center = eval_start * SAMPLES_PER_MS + (i * unit) // 2 + unit // 4
-            speech_gt = gt_anchor_speech(gt, row["anchor_speaker"], center) if gt else False
+            any_speech = gt_any_speech(gt, center) if gt else False
+            anchor_speech = (
+                gt_anchor_speech(gt, row["anchor_speaker"], center) if gt else False
+            )
             frames.append(
                 {
-                    "speech_gt": speech_gt,
+                    "speech_gt": any_speech,
+                    "anchor_speech_gt": anchor_speech,
                     "anchor": float(out.anchor),
                     "adapter_speech": out.speech,
                     "lifecycle": "BOUND",
@@ -267,7 +237,8 @@ def run_cell(
                         "model": adapter_name,
                         "regime": regime,
                         "source_time_ms": t,
-                        "speech_gt": speech_gt,
+                        "speech_gt": any_speech,
+                        "anchor_speech_gt": anchor_speech,
                         "anchor": frames[-1]["anchor"],
                         "lifecycle": "BOUND",
                     }
@@ -290,6 +261,9 @@ def run_cell(
                 "contam_s": contam,
                 "active_speech_s": active,
                 "lifecycle": "BOUND",
+                "gt_eval": compact_gt(
+                    gt, row["anchor_speaker"], eval_start, eval_end
+                ),
             }
         )
     stats = {"n_episodes": len(rows), "n_unbound": n_unbound,
@@ -315,6 +289,12 @@ def _empty_record(row: dict, lifecycle: str, contam, gt) -> dict:
         "contam_s": contam,
         "active_speech_s": active,
         "lifecycle": lifecycle,
+        "gt_eval": compact_gt(
+            gt,
+            row["anchor_speaker"],
+            int(row["evaluation_start_ms"]),
+            int(row["evaluation_end_ms"]),
+        ),
     }
 
 

@@ -1,0 +1,7 @@
+{
+  "evaluator_revision": 2,
+  "frozen_taus_from": "cal/results_repaired/thresholds.json (applied as-is, no MAIN48 retuning)",
+  "manifest_sha256": "e5956ab0fc451c647f5d6bfbdece87f27816de5c5b45bc0423514511c2c36582",
+  "raw_inference": "REUSED verbatim from main/results/{model}_{regime}_main.jsonl (native weights, stub_fallback=false, all BOUND, 48 eps/cell). Fresh inference NOT needed (frame-complete).",
+  "supersedes_without_overwriting": "main/results/* (tau 0.05) VOID, preserved in place."
+}

@@ -1,0 +1,103 @@
+{
+  "cells": {
+    "firered_C": {
+      "audio_s": 240.0,
+      "bind_ms_p50": null,
+      "bind_ms_p95": null,
+      "evaluator_revision": 2,
+      "frame_ms": 10,
+      "model": "firered",
+      "n_steps": 24000,
+      "regime": "C",
+      "reset_ms_p50": null,
+      "rss_note": "reused archive: no RSS sampling",
+      "rtf": 0.050819989999384536,
+      "step_ms_max": 42.252199998984,
+      "step_ms_p50": 0.49679999938234687,
+      "step_ms_p95": 0.6062999982532347,
+      "step_ms_p99": 0.7124010003280998,
+      "stub_fallback": false,
+      "tau": 0.05,
+      "timing": "reused archived step_ms (live run); bind/reset/RSS not re-timed"
+    },
+    "firered_O": {
+      "audio_s": 240.0,
+      "bind_ms_p50": null,
+      "bind_ms_p95": null,
+      "evaluator_revision": 2,
+      "frame_ms": 10,
+      "model": "firered",
+      "n_steps": 24000,
+      "regime": "O",
+      "reset_ms_p50": null,
+      "rss_note": "reused archive: no RSS sampling",
+      "rtf": 0.052481564166676736,
+      "step_ms_max": 88.96740000091086,
+      "step_ms_p50": 0.49980000039795414,
+      "step_ms_p95": 0.640904999727354,
+      "step_ms_p99": 0.8119040012570615,
+      "stub_fallback": false,
+      "tau": 0.15,
+      "timing": "reused archived step_ms (live run); bind/reset/RSS not re-timed"
+    },
+    "neovad_C": {
+      "audio_s": 240.0,
+      "bind_ms_p50": null,
+      "bind_ms_p95": null,
+      "evaluator_revision": 2,
+      "frame_ms": 10,
+      "model": "neovad",
+      "n_steps": 24000,
+      "regime": "C",
+      "reset_ms_p50": null,
+      "rss_note": "reused archive: no RSS sampling",
+      "rtf": 0.06541338416650433,
+      "step_ms_max": 16.115099999296945,
+      "step_ms_p50": 0.611699999353732,
+      "step_ms_p95": 0.8743099999264813,
+      "step_ms_p99": 1.2417090016060668,
+      "stub_fallback": false,
+      "tau": 0.15,
+      "timing": "reused archived step_ms (live run); bind/reset/RSS not re-timed"
+    },
+    "neovad_O": {
+      "audio_s": 240.0,
+      "bind_ms_p50": null,
+      "bind_ms_p95": null,
+      "evaluator_revision": 2,
+      "frame_ms": 10,
+      "model": "neovad",
+      "n_steps": 24000,
+      "regime": "O",
+      "reset_ms_p50": null,
+      "rss_note": "reused archive: no RSS sampling",
+      "rtf": 0.06490875458362097,
+      "step_ms_max": 91.44159999959811,
+      "step_ms_p50": 0.6138999997347128,
+      "step_ms_p95": 0.8388100004594887,
+      "step_ms_p99": 1.1661019989696793,
+      "stub_fallback": false,
+      "tau": 0.15,
+      "timing": "reused archived step_ms (live run); bind/reset/RSS not re-timed"
+    }
+  },
+  "gate": {
+    "firered_C": {
+      "p99_lt_chunk": true,
+      "rtf_le_025": true
+    },
+    "firered_O": {
+      "p99_lt_chunk": true,
+      "rtf_le_025": true
+    },
+    "neovad_C": {
+      "p99_lt_chunk": true,
+      "rtf_le_025": true
+    },
+    "neovad_O": {
+      "p99_lt_chunk": true,
+      "rtf_le_025": true
+    }
+  },
+  "note": "step timings reused from frozen live-run archives; bind/reset/RSS unavailable under reuse."
+}

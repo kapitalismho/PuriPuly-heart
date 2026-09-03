@@ -36,10 +36,14 @@ from experiments.psem_small_model_probe.cal.metrics import (
     replay_decisions,
     score_episode,
 )
+from experiments.psem_small_model_probe.cal.eval_semantics import (
+    compact_gt,
+    gt_anchor_speech,
+    gt_any_speech,
+    gt_window_stats,
+)
 from experiments.psem_small_model_probe.cal.run_cal import (
     FailClosed,
-    gt_anchor_speech,
-    gt_window_stats,
     load_adapter,
     load_gt_index,
     verify_freeze,
@@ -175,6 +179,9 @@ def run_cell(
                     "contam_s": contam,
                     "active_speech_s": active,
                     "lifecycle": "UNBOUND",
+                    "gt_eval": compact_gt(
+                        gt, row["anchor_speaker"], eval_start, eval_end
+                    ),
                 }
             )
             continue
@@ -214,11 +221,13 @@ def run_cell(
                     "contam_s": contam,
                     "active_speech_s": active,
                     "lifecycle": "BIND_FAILED",
+                    "gt_eval": compact_gt(
+                        gt, row["anchor_speaker"], eval_start, eval_end
+                    ),
                 }
             )
             continue
         bind_ms.append((time.perf_counter() - t0) * 1000.0)
-
         frames: list[dict] = []
         for i in range(n_frames):
             chunk = eval_pcm[i * unit:(i + 1) * unit]
@@ -227,14 +236,14 @@ def run_cell(
             dt_ms = (time.perf_counter() - t0) * 1000.0
             step_ms.append(dt_ms)
             n_steps += 1
-            if rss is not None and n_steps % RSS_EVERY_STEPS == 0:
-                rss_peak = max(rss_peak, rss())
             t = eval_start + (i + 1) * frame_ms
             center = eval_start * SAMPLES_PER_MS + (i * unit) // 2 + unit // 4
-            speech_gt = gt_anchor_speech(gt, row["anchor_speaker"], center)
+            any_speech = gt_any_speech(gt, center)
+            anchor_speech = gt_anchor_speech(gt, row["anchor_speaker"], center)
             frames.append(
                 {
-                    "speech_gt": speech_gt,
+                    "speech_gt": any_speech,
+                    "anchor_speech_gt": anchor_speech,
                     "anchor": float(out.anchor),
                     "adapter_speech": out.speech,
                     "lifecycle": "BOUND",
@@ -249,7 +258,8 @@ def run_cell(
                         "model": adapter_name,
                         "regime": regime,
                         "source_time_ms": t,
-                        "speech_gt": speech_gt,
+                        "speech_gt": any_speech,
+                        "anchor_speech_gt": anchor_speech,
                         "anchor": frames[-1]["anchor"],
                         "lifecycle": "BOUND",
                         "step_ms": dt_ms,
@@ -270,6 +280,9 @@ def run_cell(
                 "contam_s": contam,
                 "active_speech_s": active,
                 "lifecycle": "BOUND",
+                "gt_eval": compact_gt(
+                    gt, row["anchor_speaker"], eval_start, eval_end
+                ),
             }
         )
     rss_end = rss() if rss else None

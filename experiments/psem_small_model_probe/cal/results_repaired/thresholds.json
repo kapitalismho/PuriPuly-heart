@@ -1,0 +1,30 @@
+[
+  {
+    "evaluator_revision": 2,
+    "model": "firered",
+    "regime": "O",
+    "selection_reason": "a) false_cuts=5 (zero attainable: False); b) missed=1/2 (rate=0.5); c) median_total_delay=560ms; tau=0.15 lowest on remaining ties",
+    "tau": 0.15
+  },
+  {
+    "evaluator_revision": 2,
+    "model": "firered",
+    "regime": "C",
+    "selection_reason": "a) false_cuts=4 (zero attainable: False); b) missed=1/2 (rate=0.5); c) median_total_delay=610ms; tau=0.05 lowest on remaining ties",
+    "tau": 0.05
+  },
+  {
+    "evaluator_revision": 2,
+    "model": "neovad",
+    "regime": "O",
+    "selection_reason": "a) false_cuts=0 (zero attainable: True); b) missed=1/2 (rate=0.5); c) median_total_delay=2700ms; tau=0.15 lowest on remaining ties",
+    "tau": 0.15
+  },
+  {
+    "evaluator_revision": 2,
+    "model": "neovad",
+    "regime": "C",
+    "selection_reason": "a) false_cuts=0 (zero attainable: True); b) missed=1/2 (rate=0.5); c) median_total_delay=2700ms; tau=0.15 lowest on remaining ties",
+    "tau": 0.15
+  }
+]

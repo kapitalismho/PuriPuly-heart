@@ -1,0 +1,8 @@
+{
+  "evaluator_revision": 2,
+  "manifest_sha256": "e5956ab0fc451c647f5d6bfbdece87f27816de5c5b45bc0423514511c2c36582",
+  "raw_inference": "REUSED verbatim from cal/results/{model}_{regime}_steps.jsonl (native weights, stub_fallback=false, dry_run=false, all BOUND; anchor scores + source_time grid only; old anchor-gated speech_gt discarded). No adapter inference, no audio reload, no GT reselect.",
+  "regenerated_frozen": "manifest sha verified; CAL12==12 rows; GT index via frozen loader; speech_gt/anchor_speech_gt/gt_eval rebuilt; existing TAU_GRID 0.05..0.95 + existing fixed-priority rule.",
+  "repair": "any-speech decoder gate; transition-aware CUT validity (tolerance 50ms = annotation_boundary_jitter, V2 operational_label_contract.json psem-handoff-v1); decoder-dependent current-segment contamination (source_boundary_time, never decision_time)",
+  "supersedes_without_overwriting": "cal/results/thresholds.json + main/results/summary.md (tau 0.05 everywhere) are VOID, preserved in place."
+}
