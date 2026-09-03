@@ -11,6 +11,12 @@ from puripuly_heart.app.ports.broker_client import (
     ManagedKeyDeliveryAckMetadata,
     ManagedKeyDeliveryAckRequest,
     ManagedKeyDeliveryAckResult,
+    ManagedOperationAttemptSnapshot,
+    ManagedOperationDeliverySnapshot,
+    ManagedOperationReferralSnapshot,
+    ManagedOperationResumeRequest,
+    ManagedOperationStatusRequest,
+    ManagedOperationStatusResult,
     QqManagedAssertionFailureSubcode,
     QqManagedAssertionRequest,
     QqManagedAssertionResult,
@@ -321,7 +327,111 @@ class HttpManagedOpenRouterBrokerClient:
             referral_bonus_applied=_parse_referral_bonus_applied(payload),
             referral_id=_parse_owned_referral_id(payload),
             pass_status=_parse_talk_together_pass_status(payload),
+            referral_status=_parse_referral_status(payload),
+            referral_settlement=_parse_referral_settlement(payload),
         )
+
+    async def get_managed_operation_status(
+        self,
+        request: ManagedOperationStatusRequest,
+    ) -> ManagedOperationStatusResult:
+        return await self._managed_operation_request(
+            path="/v1/providers/openrouter/managed-operation/status",
+            request=request,
+            operation="managed_operation_status",
+        )
+
+    async def resume_managed_operation(
+        self,
+        request: ManagedOperationResumeRequest,
+    ) -> ManagedOperationStatusResult:
+        return await self._managed_operation_request(
+            path="/v1/providers/openrouter/managed-operation/resume",
+            request=request,
+            operation="managed_operation_resume",
+        )
+
+    async def _managed_operation_request(
+        self,
+        *,
+        path: str,
+        request: ManagedOperationStatusRequest | ManagedOperationResumeRequest,
+        operation: str,
+    ) -> ManagedOperationStatusResult:
+        try:
+            payload, status_code = await self._post_operation_json(
+                path=path,
+                request_body=_managed_operation_request_body(request),
+                operation=operation,
+            )
+        except ManagedOpenRouterReleaseError as exc:
+            return _managed_operation_failure_from_error(exc)
+        if status_code == 404:
+            return ManagedOperationStatusResult(
+                succeeded=False,
+                operation_status="UNKNOWN_OPERATION",
+                client_action="wait",
+                message=None,
+                diagnostics=None,
+                failed_reason=None,
+            )
+        if status_code == 410:
+            try:
+                return _parse_managed_operation_status(payload, operation=operation)
+            except ValueError:
+                pass
+            if payload.get("code") == "authorization_expired":
+                return ManagedOperationStatusResult(
+                    succeeded=False,
+                    operation_status="FAILED",
+                    client_action="action_required",
+                    message=None,
+                    diagnostics=None,
+                    failed_reason="authorization_expired",
+                )
+            return _managed_operation_failure(
+                code="managed_operation_gone_malformed",
+                operation=operation,
+                fields={"http_status": status_code},
+            )
+        try:
+            return _parse_managed_operation_status(payload, operation=operation)
+        except ValueError as exc:
+            return _managed_operation_failure(
+                code="managed_operation_malformed",
+                operation=operation,
+                fields={"reason": _safe_field_label(str(exc))},
+            )
+
+    async def _post_operation_json(
+        self,
+        *,
+        path: str,
+        request_body: Mapping[str, object],
+        operation: str,
+    ) -> tuple[Mapping[str, object], int]:
+        client = await self._get_http_client()
+        try:
+            response = await client.post(path, json=dict(request_body))
+        except httpx.TimeoutException as exc:
+            raise _retryable_error(operation, f"broker request timed out: {exc}") from exc
+        except httpx.TransportError as exc:
+            raise _retryable_error(operation, f"broker transport failure: {exc}") from exc
+        except httpx.HTTPError as exc:
+            raise _retryable_error(operation, f"broker request failed: {exc}") from exc
+        if response.status_code == 404:
+            return {}, response.status_code
+        if response.status_code == 410:
+            try:
+                return (
+                    _parse_json_mapping(response, operation=operation),
+                    response.status_code,
+                )
+            except ManagedOpenRouterReleaseError:
+                return {}, response.status_code
+        if response.is_error:
+            raise _parse_error_response(response, operation=operation)
+        return _parse_json_mapping(response, operation=operation), response.status_code
 
     async def get_trial_status(
         self,
@@ -538,6 +648,288 @@ def _ack_diagnostics(
         retry_after_ms=retry_after_ms,
         fields={"ack_status": status, **{k: v for k, v in fields.items() if v is not None}},
     )
+
+
+def _parse_referral_status(payload: Mapping[str, object]) -> str | None:
+    referral = payload.get("referral")
+    if not isinstance(referral, Mapping):
+        return None
+    status = referral.get("status")
+    if status in {"none", "reserved", "credited", "skipped", "failed"}:
+        return status
+    return None
+
+
+def _parse_referral_settlement(payload: Mapping[str, object]) -> str | None:
+    referral = payload.get("referral")
+    if not isinstance(referral, Mapping):
+        return None
+    settlement = referral.get("settlement")
+    if settlement in {"none", "invitee_pending", "referrer_pending", "completed"}:
+        return settlement
+    return None
+
+
+def _managed_operation_request_body(
+    request: ManagedOperationStatusRequest | ManagedOperationResumeRequest,
+) -> dict[str, object]:
+    body: dict[str, object] = {"operation_id": request.operation_id}
+    if request.installation_id:
+        body["installation_id"] = request.installation_id
+    if request.resume_token:
+        body["resume_token"] = request.resume_token
+    return body
+
+
+def _managed_operation_error_is_unknown_operation(error: ManagedOpenRouterReleaseError) -> bool:
+    candidates = (error.code or "", error.subcode or "")
+    for candidate in candidates:
+        normalized = candidate.strip().lower()
+        if not normalized:
+            continue
+        if normalized in {"operation_not_found", "unknown_operation", "unknown_operation_id"}:
+            return True
+        if "not_found" in normalized or "unknown_operation" in normalized:
+            return True
+    return False
+
+
+def _managed_operation_failure_from_error(
+    error: ManagedOpenRouterReleaseError,
+) -> ManagedOperationStatusResult:
+    retryable = error.error_class == RETRYABLE_ERROR_CLASS or error.code == RETRYABLE_ERROR_CODE
+    subcode = error.subcode or error.code
+    if _managed_operation_error_is_unknown_operation(error):
+        return ManagedOperationStatusResult(
+            succeeded=False,
+            operation_status="UNKNOWN_OPERATION",
+            client_action="wait",
+            message=None,
+            diagnostics=None,
+            failed_reason=None,
+        )
+    if error.code == "authorization_expired" or error.subcode == "authorization_expired":
+        return ManagedOperationStatusResult(
+            succeeded=False,
+            operation_status="FAILED",
+            client_action="action_required",
+            message=None,
+            diagnostics=None,
+            failed_reason="authorization_expired",
+        )
+    return ManagedOperationStatusResult(
+        succeeded=False,
+        operation_status="CREATE_UNKNOWN" if retryable else "FAILED",
+        client_action="wait" if retryable else "action_required",
+        message=None,
+        diagnostics=messages.ErrorDiagnostics(
+            component="managed_openrouter_broker_client",
+            operation=error.operation or "managed_operation",
+            code="managed_operation_error",
+            category=messages.DIAGNOSTIC_CATEGORY_SERVICE_UNAVAILABLE,
+            visibility=messages.DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
+            content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
+            status_code=None,
+            retry_after_ms=error.retry_after_ms,
+            fields={
+                "broker_code": error.code,
+                "broker_class": error.error_class,
+                "broker_subcode": subcode,
+            },
+        ),
+        failed_reason=None,
+    )
+
+
+def _managed_operation_failure(
+    *,
+    code: str,
+    operation: str,
+    fields: Mapping[str, messages.DiagnosticFieldValue],
+) -> ManagedOperationStatusResult:
+    return ManagedOperationStatusResult(
+        succeeded=False,
+        operation_status="CREATE_UNKNOWN",
+        client_action="wait",
+        message=None,
+        diagnostics=messages.ErrorDiagnostics(
+            component="managed_openrouter_broker_client",
+            operation=operation,
+            code=code,
+            category=messages.DIAGNOSTIC_CATEGORY_SERVICE_UNAVAILABLE,
+            visibility=messages.DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
+            content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
+            status_code=None,
+            retry_after_ms=None,
+            fields=dict(fields),
+        ),
+        failed_reason=None,
+    )
+
+
+def _parse_managed_operation_status(
+    payload: Mapping[str, object],
+    *,
+    operation: str,
+) -> ManagedOperationStatusResult:
+    try:
+        operation_status = _require_text(payload, "state")
+        client_action = _require_text(payload, "client_action")
+    except ValueError as exc:
+        raise ValueError(
+            f"broker returned malformed managed operation payload: {_safe_field_label(str(exc))}"
+        ) from exc
+    if operation_status not in {
+        "AUTHENTICATED",
+        "ISSUE_READY",
+        "CREATING",
+        "CREATE_UNKNOWN",
+        "RECONCILING",
+        "CLEANUP_REQUIRED",
+        "CLEAN",
+        "RETRY_READY",
+        "DELIVERY_PENDING",
+        "ACTIVE",
+        "FAILED",
+    }:
+        raise ValueError(f"broker returned unknown operation status: {_safe_field_label(operation_status)}")
+    if client_action not in {"wait", "retry_authorized", "acknowledge_delivery", "action_required"}:
+        raise ValueError(f"broker returned unknown client action: {_safe_field_label(client_action)}")
+    attempt = _parse_managed_operation_attempts(payload.get("attempts"))
+    delivery = _parse_managed_operation_delivery(payload.get("delivery"))
+    referral = _parse_managed_operation_referral(payload.get("referral"))
+    failed_reason = payload.get("failure_reason")
+    if failed_reason is not None and failed_reason not in {
+        "authorization_expired",
+        "terminal_provider_failure",
+        "cleanup_failed_terminal",
+    }:
+        failed_reason = None
+    if operation_status != "FAILED":
+        failed_reason = None
+    return ManagedOperationStatusResult(
+        succeeded=True,
+        operation_status=operation_status,
+        client_action=client_action,
+        message=None,
+        diagnostics=None,
+        attempt=attempt,
+        delivery=delivery,
+        referral=referral,
+        failed_reason=failed_reason if isinstance(failed_reason, str) else None,
+        managed_secret_key=_require_optional_text(payload, "openrouter_api_key"),
+        managed_credential_ref=_require_optional_text(payload, "managed_credential_ref"),
+        expires_at=_require_optional_text(payload, "expires_at"),
+        openrouter_user_id=normalize_managed_openrouter_user_identifier(
+            payload.get("openrouter_user_id")
+        ),
+        referral_id=_parse_owned_referral_id(payload),
+        referral_bonus_applied=_parse_referral_bonus_applied(payload),
+        pass_status=_parse_talk_together_pass_status(payload),
+        delivery_ack=_parse_managed_operation_delivery_ack(payload),
+    )
+
+
+def _parse_managed_operation_attempts(value: object) -> ManagedOperationAttemptSnapshot | None:
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ValueError("broker returned malformed managed operation attempts")
+    if not value:
+        return None
+    return _parse_managed_operation_attempt(value[-1])
+
+
+def _parse_managed_operation_attempt(value: object) -> ManagedOperationAttemptSnapshot | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("broker returned malformed managed operation attempt")
+    attempt_index = value.get("attempt_index")
+    if attempt_index is not None and (
+        isinstance(attempt_index, bool) or not isinstance(attempt_index, int)
+    ):
+        raise ValueError("broker returned malformed managed operation attempt index")
+    provider_key_name = value.get("provider_key_name")
+    if provider_key_name is not None and not isinstance(provider_key_name, str):
+        raise ValueError("broker returned malformed managed operation provider key name")
+    managed_credential_ref = value.get("managed_credential_ref")
+    if managed_credential_ref is not None and not isinstance(managed_credential_ref, str):
+        raise ValueError("broker returned malformed managed operation credential reference")
+    outcome = value.get("outcome")
+    if outcome is not None and outcome not in {"created", "unknown", "cleaned"}:
+        raise ValueError("broker returned malformed managed operation attempt outcome")
+    return ManagedOperationAttemptSnapshot(
+        attempt_index=attempt_index,
+        provider_key_name=provider_key_name,
+        managed_credential_ref=managed_credential_ref,
+        outcome=outcome,
+    )
+
+
+def _parse_managed_operation_delivery(value: object) -> ManagedOperationDeliverySnapshot | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("broker returned malformed managed operation delivery")
+    delivery_id = value.get("delivery_id")
+    if delivery_id is not None and not isinstance(delivery_id, str):
+        raise ValueError("broker returned malformed managed operation delivery id")
+    status = value.get("status")
+    if status is not None and status not in {
+        "pending",
+        "acknowledged",
+        "expired",
+        "cleanup_required",
+    }:
+        raise ValueError("broker returned malformed managed operation delivery status")
+    expires_at = value.get("expires_at")
+    if expires_at is not None and not isinstance(expires_at, str):
+        raise ValueError("broker returned malformed managed operation delivery expiry")
+    return ManagedOperationDeliverySnapshot(
+        delivery_id=delivery_id,
+        status=status,
+        expires_at=expires_at,
+    )
+
+
+def _parse_managed_operation_referral(value: object) -> ManagedOperationReferralSnapshot | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("broker returned malformed managed operation referral")
+    status = value.get("status")
+    if status is not None and status not in {"none", "reserved", "credited", "skipped", "failed"}:
+        raise ValueError("broker returned malformed managed operation referral status")
+    settlement = value.get("settlement")
+    if settlement is not None and settlement not in {
+        "none",
+        "invitee_pending",
+        "referrer_pending",
+        "completed",
+    }:
+        raise ValueError("broker returned malformed managed operation referral settlement")
+    return ManagedOperationReferralSnapshot(status=status, settlement=settlement)
+
+
+def _parse_managed_operation_delivery_ack(
+    payload: Mapping[str, object],
+) -> ManagedKeyDeliveryAckMetadata | None:
+    if payload.get("delivery_ack_required") is not True:
+        return None
+    try:
+        return ManagedKeyDeliveryAckMetadata(
+            source="discord",
+            delivery_id=_require_text(payload, "delivery_id"),
+            managed_credential_ref=_require_text(payload, "managed_credential_ref"),
+            expires_at=_require_optional_text(payload, "delivery_ack_expires_at"),
+            delivery_ack_token=_require_text(payload, "delivery_ack_token"),
+        )
+    except ValueError as exc:
+        raise ValueError(
+            f"broker returned malformed delivery ACK metadata: {_safe_field_label(str(exc))}"
+        ) from exc
+
 
 
 def _qq_assertion_failure_from_error(

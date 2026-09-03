@@ -1,3 +1,4 @@
+import * as networkIdentity from '../../src/network-identity';
 import type { TestBrokerEnv } from './sqlite-d1';
 
 export interface StoredAbuseControls {
@@ -471,4 +472,21 @@ function cloneJson<T>(value: T): T {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export async function stableIpHookValue(
+  env: TestBrokerEnv,
+  ip: string,
+): Promise<string> {
+  const { deriveStableNetworkIdentityDigest, normalizeNetworkIdentityIp } = networkIdentity;
+  const normalized = normalizeNetworkIdentityIp(ip);
+  if (!normalized) {
+    throw new Error('test IP normalization failed');
+  }
+  const digests = await deriveStableNetworkIdentityDigest(
+    { current: env.NETWORK_IDENTITY_HMAC_SECRET, previous: null },
+    normalized,
+    'ip',
+  );
+  return digests[0]?.digest ?? '';
 }

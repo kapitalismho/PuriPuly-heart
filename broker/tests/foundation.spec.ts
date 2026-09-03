@@ -41,6 +41,8 @@ describe('broker foundation', () => {
           'DISCORD_DAILY_REPORT_WEBHOOK_URL',
           'QQ_AUTH_HMAC_PSK',
           'TELEMETRY_SUBJECT_HMAC_SECRET',
+          'NETWORK_IDENTITY_HMAC_SECRET',
+          'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS',
         ],
       },
       hosting: {

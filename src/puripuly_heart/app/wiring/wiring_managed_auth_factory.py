@@ -16,6 +16,9 @@ from puripuly_heart.app.ports.broker_client import (
     ManagedKeyDeliveryAckMetadata,
     ManagedKeyDeliveryAckRequest,
     ManagedKeyDeliveryAckResult,
+    ManagedOperationResumeRequest,
+    ManagedOperationStatusRequest,
+    ManagedOperationStatusResult,
     QqManagedAssertionResult,
 )
 from puripuly_heart.app.ports.discord_auth import DiscordAuthRequest, DiscordAuthResult
@@ -139,6 +142,10 @@ class ManagedIdentityRecord(Protocol):
     pending_delivery_ack_delivery_id: str | None
     pending_delivery_ack_managed_credential_ref: str | None
     pending_delivery_ack_expires_at: str | None
+    pending_managed_operation_id: str | None
+    pending_managed_operation_source: str | None
+    pending_managed_operation_installation_id: str | None
+    pending_managed_operation_state: str | None
 
 
 @dataclass(slots=True)
@@ -281,6 +288,38 @@ class ManagedIdentityStateAdapter:
     def pending_delivery_ack_expires_at(self, value: str | None) -> None:
         self._identity.pending_delivery_ack_expires_at = value
 
+    @property
+    def pending_managed_operation_id(self) -> str | None:
+        return getattr(self._identity, "pending_managed_operation_id", None)
+
+    @pending_managed_operation_id.setter
+    def pending_managed_operation_id(self, value: str | None) -> None:
+        self._identity.pending_managed_operation_id = value
+
+    @property
+    def pending_managed_operation_source(self) -> str | None:
+        return getattr(self._identity, "pending_managed_operation_source", None)
+
+    @pending_managed_operation_source.setter
+    def pending_managed_operation_source(self, value: str | None) -> None:
+        self._identity.pending_managed_operation_source = value
+
+    @property
+    def pending_managed_operation_installation_id(self) -> str | None:
+        return getattr(self._identity, "pending_managed_operation_installation_id", None)
+
+    @pending_managed_operation_installation_id.setter
+    def pending_managed_operation_installation_id(self, value: str | None) -> None:
+        self._identity.pending_managed_operation_installation_id = value
+
+    @property
+    def pending_managed_operation_state(self) -> str | None:
+        return getattr(self._identity, "pending_managed_operation_state", None)
+
+    @pending_managed_operation_state.setter
+    def pending_managed_operation_state(self, value: str | None) -> None:
+        self._identity.pending_managed_operation_state = value
+
     def persist(self) -> None:
         if self._settings_bag is not None:
             try:
@@ -318,6 +357,18 @@ class ManagedIdentityStateAdapter:
                 "pending_delivery_ack_expires_at",
                 None,
             ),
+            pending_managed_operation_id=getattr(
+                managed, "pending_managed_operation_id", None
+            ),
+            pending_managed_operation_source=getattr(
+                managed, "pending_managed_operation_source", None
+            ),
+            pending_managed_operation_installation_id=getattr(
+                managed, "pending_managed_operation_installation_id", None
+            ),
+            pending_managed_operation_state=getattr(
+                managed, "pending_managed_operation_state", None
+            ),
         )
 
     def restore(self, snapshot: ManagedIdentitySnapshot) -> None:
@@ -339,6 +390,12 @@ class ManagedIdentityStateAdapter:
             snapshot.pending_delivery_ack_managed_credential_ref
         )
         managed.pending_delivery_ack_expires_at = snapshot.pending_delivery_ack_expires_at
+        managed.pending_managed_operation_id = snapshot.pending_managed_operation_id
+        managed.pending_managed_operation_source = snapshot.pending_managed_operation_source
+        managed.pending_managed_operation_installation_id = (
+            snapshot.pending_managed_operation_installation_id
+        )
+        managed.pending_managed_operation_state = snapshot.pending_managed_operation_state
 
 
 def build_managed_identity_state_port(
@@ -407,6 +464,12 @@ def _vnext_with_managed_identity(
                     snapshot.pending_delivery_ack_managed_credential_ref
                 ),
                 pending_delivery_ack_expires_at=snapshot.pending_delivery_ack_expires_at,
+                pending_managed_operation_id=snapshot.pending_managed_operation_id,
+                pending_managed_operation_source=snapshot.pending_managed_operation_source,
+                pending_managed_operation_installation_id=(
+                    snapshot.pending_managed_operation_installation_id
+                ),
+                pending_managed_operation_state=snapshot.pending_managed_operation_state,
             ),
         ),
     )
@@ -580,11 +643,15 @@ class DiscordManagedBrokerClientAdapter:
                 signed_at=self.signed_at_provider(),
             )
             issue_request["delivery_ack_supported"] = True
+            if request.operation_id:
+                issue_request["operation_id"] = request.operation_id
+            if request.resume_token:
+                issue_request["resume_token"] = request.resume_token
             issue = await getattr(self.client, "issue_discord_managed_key")(issue_request)
         except ManagedOpenRouterReleaseError as exc:
             return _broker_issue_failure_from_release_error(exc)
         except Exception:
-            return _broker_issue_failure("discord_issue_exception")
+            return _broker_issue_failure("discord_issue_exception", unknown_outcome=True)
         self.last_issue_response = issue
         apply_discord_issue_result_to_managed_state(self.identity.managed_state, issue)
         return BrokerIssueResult(
@@ -613,6 +680,32 @@ class DiscordManagedBrokerClientAdapter:
     ) -> object:
         ack = getattr(self.client, "acknowledge_managed_key_delivery")
         return await ack(request)
+
+    async def get_managed_operation_status(
+        self, request: ManagedOperationStatusRequest
+    ) -> ManagedOperationStatusResult:
+        status = getattr(self.client, "get_managed_operation_status", None)
+        if not callable(status):
+            raise ManagedOpenRouterReleaseError(
+                code="managed_operation_status_unsupported",
+                error_class="retryable",
+                message="Broker client does not support managed operation status",
+                operation="managed_operation_status",
+            )
+        return await status(request)
+
+    async def resume_managed_operation(
+        self, request: ManagedOperationResumeRequest
+    ) -> ManagedOperationStatusResult:
+        resume = getattr(self.client, "resume_managed_operation", None)
+        if not callable(resume):
+            raise ManagedOpenRouterReleaseError(
+                code="managed_operation_resume_unsupported",
+                error_class="retryable",
+                message="Broker client does not support managed operation resume",
+                operation="managed_operation_resume",
+            )
+        return await resume(request)
 
 
 def apply_discord_issue_result_to_managed_state(
@@ -745,10 +838,11 @@ def _broker_issue_failure_from_release_error(
             subcode=error.subcode,
             retry_after_ms=error.retry_after_ms,
         ),
+        unknown_outcome=error.error_class == "retryable",
     )
 
 
-def _broker_issue_failure(code: str) -> BrokerIssueResult:
+def _broker_issue_failure(code: str, *, unknown_outcome: bool = False) -> BrokerIssueResult:
     return BrokerIssueResult(
         succeeded=False,
         broker_connection_id=None,
@@ -761,6 +855,7 @@ def _broker_issue_failure(code: str) -> BrokerIssueResult:
             code=code,
             category=DIAGNOSTIC_CATEGORY_TRANSACTION,
         ),
+        unknown_outcome=unknown_outcome,
     )
 
 
@@ -1082,6 +1177,7 @@ class ManagedAuthRuntimeAdapter:
         self,
         referral_id: str | None,
         on_callback_received: Callable[[], None] | None,
+        on_recovery_started: Callable[[], None] | None = None,
     ) -> ManagedAuthExecutionResult:
         release_service = self.release_service_provider()
         current = self.settings.canonical
@@ -1096,6 +1192,7 @@ class ManagedAuthRuntimeAdapter:
             release_service,
             referral_id=referral_id,
             on_callback_received=on_callback_received,
+            on_recovery_started=on_recovery_started,
         )
 
     async def _execute_transaction_discord(
@@ -1104,6 +1201,7 @@ class ManagedAuthRuntimeAdapter:
         *,
         referral_id: str | None,
         on_callback_received: Callable[[], None] | None,
+        on_recovery_started: Callable[[], None] | None = None,
     ) -> ManagedAuthExecutionResult:
         current = self.settings.canonical
         canonical = self.settings.canonical
@@ -1143,6 +1241,13 @@ class ManagedAuthRuntimeAdapter:
             app_version=release_service.app_version,
             signed_at_provider=release_service.signed_at_provider,
         )
+        ack_results: list[ManagedKeyDeliveryAckResult] = []
+
+        def _notify_managed_operation_progress(phase: str) -> None:
+            if phase == "recovering" and on_recovery_started is not None:
+                with contextlib.suppress(Exception):
+                    on_recovery_started()
+
         result = await ManagedConnectionAuthService(
             local_identity=identity,
             discord_auth=discord_auth,
@@ -1162,6 +1267,7 @@ class ManagedAuthRuntimeAdapter:
                 secret_store=secret_store_port,
                 managed_state=managed_state,
             ),
+            managed_state=managed_state,
         ).authorize(
             ManagedConnectionAuthRequest(
                 local_secret_key=OPENROUTER_MANAGED_API_KEY_SECRET,
@@ -1172,16 +1278,34 @@ class ManagedAuthRuntimeAdapter:
                 reason="managed_connection_auth",
                 correlation_id=None,
                 broker_metadata={"flow": "managed_connection_auth"},
+                progress_sink=_notify_managed_operation_progress,
+                ack_result_sink=ack_results.append,
             )
         )
         self.settings.complete()
         delivery_ack_pending = result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
         issue = broker.last_issue_response
+        ack_result = ack_results[-1] if ack_results else None
         issued_referral_id = normalize_owned_referral_id(getattr(issue, "referral_id", None))
-        referral_id = issued_referral_id or normalize_owned_referral_id(managed_state.referral_id)
-        pass_status = getattr(issue, "pass_status", None)
+        acknowledged_referral_id = normalize_owned_referral_id(
+            getattr(ack_result, "referral_id", None)
+        )
+        referral_id = (
+            acknowledged_referral_id
+            or issued_referral_id
+            or normalize_owned_referral_id(managed_state.referral_id)
+        )
+        pass_status = getattr(ack_result, "pass_status", None)
+        if not isinstance(pass_status, TalkTogetherPassStatus):
+            pass_status = getattr(issue, "pass_status", None)
+        if not isinstance(pass_status, TalkTogetherPassStatus):
+            pass_status = None
         if getattr(pass_status, "pass_id", None) != referral_id:
             pass_status = None
+        referral_bonus_applied = (
+            getattr(ack_result, "referral_bonus_applied", False) is True
+            or getattr(issue, "referral_bonus_applied", False) is True
+        )
         updated = _vnext_with_managed_identity(updated, managed_state)
         if delivery_ack_pending:
             self.settings.canonical = updated
@@ -1202,7 +1326,7 @@ class ManagedAuthRuntimeAdapter:
         return ManagedAuthExecutionResult(
             succeeded=True,
             transaction_result=result,
-            referral_bonus_applied=bool(getattr(issue, "referral_bonus_applied", False)),
+            referral_bonus_applied=referral_bonus_applied,
             referral_id=referral_id,
             pass_status=pass_status,
             runtime_rebuild="always",
@@ -1352,6 +1476,12 @@ def _managed_connection_auth_settings_values(
                 "referral_id": managed.referral_id,
                 "referral_source": managed.referral_source,
                 "local_managed_claim_sources": list(managed.local_managed_claim_sources),
+                "pending_managed_operation_id": managed.pending_managed_operation_id,
+                "pending_managed_operation_source": managed.pending_managed_operation_source,
+                "pending_managed_operation_installation_id": (
+                    managed.pending_managed_operation_installation_id
+                ),
+                "pending_managed_operation_state": managed.pending_managed_operation_state,
             }
         },
     }

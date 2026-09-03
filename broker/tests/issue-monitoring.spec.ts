@@ -21,8 +21,13 @@ describe('broker immediate incident monitoring', () => {
     const env = createTestBrokerEnv();
     insertInstallation(env, 'discord-source-aware');
     const network = {
-      ipHash: null,
-      ipPrefixHash: null,
+      legacyIp: null,
+      legacyIpHash: null,
+      legacyIpPrefixHash: null,
+      ipDigest: null,
+      ipPrefixDigest: null,
+      ipKeyVersion: null,
+      ipEpoch: null,
       asn: null,
       country: null,
       httpProtocol: null,

@@ -1,4 +1,5 @@
 import { getBrokerAbuseControlsConfig } from './abuse-controls';
+import { resolveNetworkIdentityWriteMode } from './network-identity';
 import type { TalkTogetherPassStatusResponse } from './managed-state';
 import { resolveEffectiveEntitlementLifecycle } from './managed-state';
 import {
@@ -211,6 +212,38 @@ export function normalizeReferralId(value: unknown): string | null {
   return normalized;
 }
 
+export async function getOperationReferralReward(
+  db: D1Database,
+  operationId: string,
+): Promise<IssueReferralReservationResult | null> {
+  const row = await db
+    .prepare(
+      `SELECT referral_id, referred_bonus_status, referrer_bonus_status, skip_reason
+         FROM referral_rewards
+        WHERE operation_id = ?
+        ORDER BY id DESC
+        LIMIT 1`,
+    )
+    .bind(operationId)
+    .first<{
+      referral_id: string;
+      referred_bonus_status: string;
+      referrer_bonus_status: string;
+      skip_reason: string | null;
+    }>()
+    .catch(() => null);
+  if (!row) {
+    return null;
+  }
+  if (row.referred_bonus_status === 'reserved' || row.referred_bonus_status === 'credited') {
+    return { outcome: 'reserved', referralId: row.referral_id };
+  }
+  if (row.skip_reason && (ISSUE_REFERRAL_SKIP_REASONS as readonly string[]).includes(row.skip_reason)) {
+    return { outcome: 'skipped', reason: row.skip_reason as IssueReferralSkipReason };
+  }
+  return { outcome: 'skipped', reason: 'reservation_conflict' };
+}
+
 export async function reserveIssueReferralReward(
   db: D1Database,
   input: {
@@ -220,7 +253,9 @@ export async function reserveIssueReferralReward(
     referredInstallationId: string | null;
     referredHardwareHash: string | null;
     referredHardwareHashSaltVersion: number | null;
-    clientIp?: string | null;
+    attemptIpDigest?: ReferralAttemptIpDigest | null;
+    attemptIpLegacyHash?: string | null;
+    operationId?: string | null;
     globalCountLimit?: number | null;
     globalCountWindowStartIso?: string | null;
     nowIso: string;
@@ -235,8 +270,16 @@ export async function reserveIssueReferralReward(
     return { outcome: 'not_applicable', reason: 'malformed_referral_input' };
   }
 
+  if (input.operationId) {
+    const reused = await getOperationReferralReward(db, input.operationId);
+    if (reused) {
+      return reused;
+    }
+  }
+
   const controls = await getBrokerAbuseControlsConfig(db);
-  const attemptIpHash = await hashReferralAttemptIp(input.clientIp ?? null);
+  const attemptIpDigest = (input.attemptIpDigest ?? null);
+  const attemptIpLegacyHash = (input.attemptIpLegacyHash ?? null);
   const existingCode = await getReferralCodeByReferralId(db, referralId);
 
   if (
@@ -244,7 +287,7 @@ export async function reserveIssueReferralReward(
       referredSource: input.referredSource,
       referredSubjectRef: input.referredSubjectRef,
       referredInstallationId: input.referredInstallationId,
-      attemptIpHash,
+      attemptIpDigest,
       nowIso: input.nowIso,
       controls,
     })
@@ -261,7 +304,7 @@ export async function reserveIssueReferralReward(
       referredHardwareHash: input.referredHardwareHash,
       referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
       skipReason: 'referral_attempt_rate_limited',
-      attemptIpHash,
+      attemptIpDigest,
       nowIso: input.nowIso,
     });
     return { outcome: 'skipped', reason: 'referral_attempt_rate_limited' };
@@ -274,7 +317,7 @@ export async function reserveIssueReferralReward(
         referredSource: input.referredSource,
         referredSubjectRef: input.referredSubjectRef,
         referredInstallationId: input.referredInstallationId,
-        attemptIpHash,
+        attemptIpDigest,
         nowIso: input.nowIso,
         controls,
       },
@@ -292,7 +335,7 @@ export async function reserveIssueReferralReward(
       referredHardwareHash: input.referredHardwareHash,
       referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
       skipReason: reason,
-      attemptIpHash,
+      attemptIpDigest,
       nowIso: input.nowIso,
     });
     return { outcome: 'skipped', reason };
@@ -309,7 +352,7 @@ export async function reserveIssueReferralReward(
       referredHardwareHash: input.referredHardwareHash,
       referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
       skipReason: 'disabled_referral_id',
-      attemptIpHash,
+      attemptIpDigest,
       nowIso: input.nowIso,
     });
     return { outcome: 'skipped', reason: 'disabled_referral_id' };
@@ -332,7 +375,7 @@ export async function reserveIssueReferralReward(
       referredHardwareHash: input.referredHardwareHash,
       referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
       skipReason: 'referral_velocity_limited',
-      attemptIpHash,
+      attemptIpDigest,
       nowIso: input.nowIso,
     });
     return { outcome: 'skipped', reason: 'referral_velocity_limited' };
@@ -345,7 +388,9 @@ export async function reserveIssueReferralReward(
     referredInstallationId: input.referredInstallationId,
     referredHardwareHash: input.referredHardwareHash,
     referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
-    attemptIpHash,
+    attemptIpDigest,
+    attemptIpLegacyHash,
+    operationId: input.operationId ?? null,
     controls,
     globalCountLimit: input.globalCountLimit ?? null,
     globalCountWindowStartIso: input.globalCountWindowStartIso ?? null,
@@ -385,7 +430,7 @@ export async function reserveIssueReferralReward(
     referredHardwareHash: input.referredHardwareHash,
     referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
     skipReason: skip.reason,
-    attemptIpHash,
+    attemptIpDigest,
     nowIso: input.nowIso,
   });
 
@@ -707,7 +752,8 @@ export async function recordSkippedIssueReferralReward(
     referredHardwareHash: string | null;
     referredHardwareHashSaltVersion: number | null;
     skipReason: IssueReferralSkipReason;
-    clientIp?: string | null;
+    attemptIpDigest?: ReferralAttemptIpDigest | null;
+    attemptIpLegacyHash?: string | null;
     nowIso: string;
   },
 ): Promise<IssueReferralReservationResult> {
@@ -724,7 +770,8 @@ export async function recordSkippedIssueReferralReward(
     referralId,
     fallbackReason: input.skipReason,
   });
-  const attemptIpHash = await hashReferralAttemptIp(input.clientIp ?? null);
+  const attemptIpDigest = (input.attemptIpDigest ?? null);
+  const attemptIpLegacyHash = (input.attemptIpLegacyHash ?? null);
   await insertSkippedIssueReferralReward(db, {
     referralId,
     referrerSource: skip.referrerSource,
@@ -736,7 +783,7 @@ export async function recordSkippedIssueReferralReward(
     referredHardwareHash: input.referredHardwareHash,
     referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
     skipReason: skip.reason,
-    attemptIpHash,
+    attemptIpDigest,
     nowIso: input.nowIso,
   });
 
@@ -948,7 +995,8 @@ async function isValidShapedReferralAttemptRateLimited(
     referredSource: ReferralSource;
     referredSubjectRef: string;
     referredInstallationId: string | null;
-    attemptIpHash: string | null;
+    attemptIpDigest: ReferralAttemptIpDigest | null;
+    attemptIpLegacyHash?: string | null;
     nowIso: string;
     controls: BrokerAbuseControlsConfigValue;
   },
@@ -965,12 +1013,13 @@ async function isValidShapedReferralAttemptRateLimited(
     return true;
   }
 
-  if (!input.attemptIpHash) {
+  if (!input.attemptIpDigest) {
     return false;
   }
 
-  const ipCount = await countReferralAttemptsByIpHash(db, {
-    attemptIpHash: input.attemptIpHash,
+  const ipCount = await countReferralAttemptsByIpDigest(db, {
+    attemptIpDigest: input.attemptIpDigest?.digest ?? null,
+    attemptIpLegacyHash: input.attemptIpLegacyHash,
     windowStartIso: windowStart,
   });
   return ipCount >= config.maxPerIp;
@@ -982,7 +1031,8 @@ async function isUnknownReferralAttemptRateLimited(
     referredSource: ReferralSource;
     referredSubjectRef: string;
     referredInstallationId: string | null;
-    attemptIpHash: string | null;
+    attemptIpDigest: ReferralAttemptIpDigest | null;
+    attemptIpLegacyHash?: string | null;
     nowIso: string;
     controls: BrokerAbuseControlsConfigValue;
   },
@@ -999,12 +1049,13 @@ async function isUnknownReferralAttemptRateLimited(
     return true;
   }
 
-  if (!input.attemptIpHash) {
+  if (!input.attemptIpDigest) {
     return false;
   }
 
-  const ipCount = await countUnknownReferralAttemptsByIpHash(db, {
-    attemptIpHash: input.attemptIpHash,
+  const ipCount = await countUnknownReferralAttemptsByIpDigest(db, {
+    attemptIpDigest: input.attemptIpDigest?.digest ?? null,
+    attemptIpLegacyHash: input.attemptIpLegacyHash,
     windowStartIso: windowStart,
   });
   return ipCount >= config.maxPerIp;
@@ -1074,18 +1125,32 @@ async function countReferralAttemptsByInstallation(
   return Number(row?.count ?? 0);
 }
 
-async function countReferralAttemptsByIpHash(
+async function countReferralAttemptsByIpDigest(
   db: D1Database,
-  input: { attemptIpHash: string; windowStartIso: string },
+  input: { attemptIpDigest: string | null; attemptIpLegacyHash?: string | null; windowStartIso: string },
 ): Promise<number> {
+  const mode = await resolveNetworkIdentityWriteMode(db);
+  const clauses: string[] = [];
+  const binds: string[] = [];
+  if (mode !== 'legacy' && input.attemptIpDigest) {
+    clauses.push('attempt_ip_digest = ?');
+    binds.push(input.attemptIpDigest);
+  }
+  if (mode !== 'keyed' && input.attemptIpLegacyHash) {
+    clauses.push('attempt_ip_hash = ?');
+    binds.push(input.attemptIpLegacyHash);
+  }
+  if (clauses.length === 0) {
+    return 0;
+  }
   const row = await db
     .prepare(
       `SELECT COUNT(*) AS count
          FROM referral_rewards
-        WHERE attempt_ip_hash = ?
+        WHERE (${clauses.join(' OR ')})
           AND created_at >= ?`,
     )
-    .bind(input.attemptIpHash, input.windowStartIso)
+    .bind(...binds, input.windowStartIso)
     .first<{ count: number }>();
   return Number(row?.count ?? 0);
 }
@@ -1121,19 +1186,33 @@ async function countUnknownReferralAttemptsByInstallation(
   return Number(row?.count ?? 0);
 }
 
-async function countUnknownReferralAttemptsByIpHash(
+async function countUnknownReferralAttemptsByIpDigest(
   db: D1Database,
-  input: { attemptIpHash: string; windowStartIso: string },
+  input: { attemptIpDigest: string | null; attemptIpLegacyHash?: string | null; windowStartIso: string },
 ): Promise<number> {
+  const mode = await resolveNetworkIdentityWriteMode(db);
+  const clauses: string[] = [];
+  const binds: string[] = [];
+  if (mode !== 'legacy' && input.attemptIpDigest) {
+    clauses.push('attempt_ip_digest = ?');
+    binds.push(input.attemptIpDigest);
+  }
+  if (mode !== 'keyed' && input.attemptIpLegacyHash) {
+    clauses.push('attempt_ip_hash = ?');
+    binds.push(input.attemptIpLegacyHash);
+  }
+  if (clauses.length === 0) {
+    return 0;
+  }
   const row = await db
     .prepare(
       `SELECT COUNT(*) AS count
          FROM referral_rewards
-        WHERE attempt_ip_hash = ?
+        WHERE (${clauses.join(' OR ')})
           AND skip_reason IN ('unknown_referral_id', 'unknown_referral_id_rate_limited')
           AND created_at >= ?`,
     )
-    .bind(input.attemptIpHash, input.windowStartIso)
+    .bind(...binds, input.windowStartIso)
     .first<{ count: number }>();
   return Number(row?.count ?? 0);
 }
@@ -1185,19 +1264,36 @@ function windowStartIso(nowIso: string, windowMinutes: number): string {
   return new Date(now.getTime() - windowMinutes * 60_000).toISOString();
 }
 
-async function hashReferralAttemptIp(clientIp: string | null): Promise<string | null> {
-  const normalized = clientIp?.trim();
-  if (!normalized) {
-    return null;
-  }
+export interface ReferralAttemptIpDigest {
+  digest: string;
+  keyVersion: number;
+  epoch: string;
+}
 
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(`puripuly-heart:referral-attempt-ip:v1\n${normalized}`),
-  );
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, '0'),
-  ).join('');
+function referralAttemptIdentityColumnSet(
+  mode: 'dual' | 'keyed',
+): { columns: string; placeholders: string } {
+  if (mode === 'dual') {
+    return {
+      columns: 'attempt_ip_hash,\n          attempt_ip_digest,\n          attempt_ip_key_version,\n          attempt_ip_epoch',
+      placeholders: '?,\n               ?,\n               ?,\n               ?'
+    };
+  }
+  return {
+    columns: 'attempt_ip_digest,\n          attempt_ip_key_version,\n          attempt_ip_epoch',
+    placeholders: '?,\n               ?,\n               ?'
+  };
+}
+
+function referralAttemptIdentityBinds(
+  mode: 'dual' | 'keyed',
+  digest: ReferralAttemptIpDigest | null | undefined,
+  legacyHash: string | null | undefined,
+): Array<string | number | null> {
+  if (mode === 'dual') {
+    return [legacyHash ?? null, digest?.digest ?? null, digest?.keyVersion ?? null, digest?.epoch ?? null];
+  }
+  return [digest?.digest ?? null, digest?.keyVersion ?? null, digest?.epoch ?? null];
 }
 
 async function insertReservedIssueReferralReward(
@@ -1209,7 +1305,9 @@ async function insertReservedIssueReferralReward(
     referredInstallationId: string | null;
     referredHardwareHash: string | null;
     referredHardwareHashSaltVersion: number | null;
-    attemptIpHash: string | null;
+    attemptIpDigest: ReferralAttemptIpDigest | null;
+    attemptIpLegacyHash?: string | null;
+    operationId?: string | null;
     controls: BrokerAbuseControlsConfigValue;
     globalCountLimit: number | null;
     globalCountWindowStartIso: string | null;
@@ -1224,6 +1322,8 @@ async function insertReservedIssueReferralReward(
     input.nowIso,
     input.controls.referralAttempts.perReferrerRewardVelocity.windowMinutes,
   );
+  const identityMode = (await resolveNetworkIdentityWriteMode(db)) === 'keyed' ? 'keyed' : 'dual';
+  const identityColumns = referralAttemptIdentityColumnSet(identityMode);
   const result = await db
     .prepare(
       `INSERT OR IGNORE INTO referral_rewards (
@@ -1242,7 +1342,8 @@ async function insertReservedIssueReferralReward(
           failure_reason,
           referred_managed_credential_ref,
           referrer_managed_credential_ref,
-          attempt_ip_hash,
+          ${identityColumns.columns},
+          operation_id,
           created_at,
           updated_at
         )
@@ -1261,6 +1362,7 @@ async function insertReservedIssueReferralReward(
                NULL,
                NULL,
                NULL,
+               ${identityColumns.placeholders},
                ?,
                ?,
                ?
@@ -1371,7 +1473,8 @@ async function insertReservedIssueReferralReward(
       input.referredInstallationId,
       input.referredHardwareHash,
       input.referredHardwareHashSaltVersion,
-      input.attemptIpHash,
+      ...referralAttemptIdentityBinds(identityMode, input.attemptIpDigest, input.attemptIpLegacyHash),
+      input.operationId ?? null,
       input.nowIso,
       input.nowIso,
       input.referralId,
@@ -1776,11 +1879,15 @@ async function insertSkippedIssueReferralReward(
     referredHardwareHash: string | null;
     referredHardwareHashSaltVersion: number | null;
     skipReason: IssueReferralSkipReason;
-    attemptIpHash?: string | null;
+    attemptIpDigest?: ReferralAttemptIpDigest | null;
+    attemptIpLegacyHash?: string | null;
     nowIso: string;
   },
 ): Promise<void> {
   assertIssueReferralSkipReason(input.skipReason);
+  const skippedIdentityMode = (await resolveNetworkIdentityWriteMode(db)) === 'keyed' ? 'keyed' : 'dual';
+  const skippedIdentityColumns = referralAttemptIdentityColumnSet(skippedIdentityMode);
+  const skippedIdentityPlaceholders = referralAttemptIdentityBinds(skippedIdentityMode, input.attemptIpDigest, input.attemptIpLegacyHash).map(() => '?').join(', ');
   await db
     .prepare(
       `INSERT INTO referral_rewards (
@@ -1799,10 +1906,10 @@ async function insertSkippedIssueReferralReward(
           failure_reason,
           referred_managed_credential_ref,
           referrer_managed_credential_ref,
-          attempt_ip_hash,
+          ${skippedIdentityColumns.columns},
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'skipped', 'skipped', ?, NULL, NULL, NULL, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'skipped', 'skipped', ?, NULL, NULL, NULL, ${skippedIdentityPlaceholders}, ?, ?)`,
     )
     .bind(
       input.referralId,
@@ -1815,7 +1922,7 @@ async function insertSkippedIssueReferralReward(
       input.referredHardwareHash,
       input.referredHardwareHashSaltVersion,
       input.skipReason,
-      input.attemptIpHash ?? null,
+      ...referralAttemptIdentityBinds(skippedIdentityMode, input.attemptIpDigest, input.attemptIpLegacyHash),
       input.nowIso,
       input.nowIso,
     )
@@ -2318,7 +2425,9 @@ async function listStaleReservedReferralRewards(
               failure_reason,
               referred_managed_credential_ref,
               referrer_managed_credential_ref,
-              attempt_ip_hash,
+              attempt_ip_digest,
+          attempt_ip_key_version,
+          attempt_ip_epoch,
               created_at,
               updated_at,
               credited_at
@@ -3073,4 +3182,16 @@ async function insertActiveOwnedReferralCode(
     .run();
 
   return Number(result.meta.changes ?? 0) === 1;
+}
+
+export async function getReservedReferralRewardIdForOperation(
+  db: D1Database,
+  operationId: string,
+): Promise<number | null> {
+  const row = await db
+    .prepare(`SELECT id FROM referral_rewards WHERE operation_id = ? ORDER BY id DESC LIMIT 1`)
+    .bind(operationId)
+    .first<{ id: number }>()
+    .catch(() => null);
+  return row ? Number(row.id) : null;
 }

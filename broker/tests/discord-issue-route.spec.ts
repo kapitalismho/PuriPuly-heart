@@ -14,6 +14,7 @@ import {
   createTestBrokerEnv,
   insertEntitlement,
   type TestBrokerEnv,
+  seedRequestEvent,
 } from './test-support/sqlite-d1';
 import { postDiscordIssue, postDiscordStart } from './test-support/trial-api';
 import {
@@ -73,8 +74,8 @@ interface IssueSuccessEventRow {
   installation_id: string;
   subject_ref: string;
   managed_credential_ref: string;
-  ip_hash: string | null;
-  ip_prefix_hash: string | null;
+  ip_digest: string | null;
+  ip_prefix_digest: string | null;
   observed_at: string;
 }
 
@@ -541,11 +542,11 @@ describe('Discord issue gate', () => {
   it.each([
     {
       name: 'installation_id',
-      configure: (env: TestBrokerEnv, started: StartedDiscordSession) => {
+      configure: async (env: TestBrokerEnv, started: StartedDiscordSession) => {
         updateAbuseControls(env, (controls) => {
           controls.discordOpenrouterIssueInstallation.maxRequests = 1;
         });
-        insertRequestEvent(env, {
+        await insertRequestEvent(env, {
           endpoint: 'POST /v1/providers/openrouter/discord/issue',
           installationId: started.installationId,
           ip: null,
@@ -558,11 +559,11 @@ describe('Discord issue gate', () => {
     },
     {
       name: 'ip',
-      configure: (env: TestBrokerEnv) => {
+      configure: async (env: TestBrokerEnv) => {
         updateAbuseControls(env, (controls) => {
           controls.discordOpenrouterIssueIp.maxRequests = 1;
         });
-        insertRequestEvent(env, {
+        await insertRequestEvent(env, {
           endpoint: 'POST /v1/providers/openrouter/discord/issue',
           installationId: null,
           ip: '198.51.100.44',
@@ -582,7 +583,7 @@ describe('Discord issue gate', () => {
       const started = await startDiscordSession(
         `install-discord-rate-limit-${expectedSubcode}`,
       );
-      configure(started.env, started);
+      await configure(started.env, started);
       const discordApi = mockDiscordApi();
       const response = await post(
         started,
@@ -2304,8 +2305,8 @@ function readIssueSuccessEvents(env: TestBrokerEnv): IssueSuccessEventRow[] {
               installation_id,
               subject_ref,
               managed_credential_ref,
-              ip_hash,
-              ip_prefix_hash,
+              ip_digest,
+              ip_prefix_digest,
               observed_at
          FROM broker_issue_success_events
         ORDER BY observed_at ASC`,
@@ -2451,7 +2452,7 @@ function insertDiscordIdentity(
     );
 }
 
-function insertRequestEvent(
+async function insertRequestEvent(
   env: TestBrokerEnv,
   input: {
     endpoint: string;
@@ -2459,17 +2460,13 @@ function insertRequestEvent(
     installationId: string | null;
     observedAt: string;
   },
-): void {
-  env.__db
-    .prepare(
-      `INSERT INTO broker_request_events (
-          endpoint,
-          ip,
-          installation_id,
-          observed_at
-        ) VALUES (?, ?, ?, ?)`,
-    )
-    .run(input.endpoint, input.ip, input.installationId, input.observedAt);
+): Promise<void> {
+  await seedRequestEvent(env, {
+    endpoint: input.endpoint,
+    ip: input.ip,
+    installationId: input.installationId,
+    observedAt: input.observedAt,
+  });
 }
 
 async function postDiscordIssueWithIp(

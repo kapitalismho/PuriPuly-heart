@@ -17,7 +17,10 @@ import type {
   BrokerAbuseControlsConfigValue,
   ManagedKeyDeliveryRecord,
 } from './persistence';
-import { processQqPassSettlementJobs } from './qq-pass-settlement';
+import { processManagedReferralSettlementJobs } from './managed-referral-settlement';
+import { sweepStaleManagedOperations } from './managed-operation';
+import { runNetworkIdentityBackfill } from './network-identity-migration';
+import { resolveNetworkIdentitySecrets } from './network-identity';
 import {
   applyReferralRewardRetention,
   reconcileStaleReferralRewards,
@@ -79,7 +82,15 @@ export async function handleScheduled(
     reconcileStaleManagedKeyDeliveries(env, now),
   );
   await runScheduledPhase(failures, () =>
-    processQqPassSettlementJobs(env, { now }),
+    processManagedReferralSettlementJobs(env, { now }),
+  );
+  await runScheduledPhase(failures, () => sweepStaleManagedOperations(env, now));
+  await runScheduledPhase(failures, () =>
+    runNetworkIdentityBackfill(
+      env.BROKER_DB,
+      resolveNetworkIdentitySecrets(env as unknown as Record<string, unknown>),
+      now,
+    ),
   );
   await runScheduledPhase(failures, () =>
     reconcileStaleReferralRewards(env.BROKER_DB, { nowIso: now.toISOString() }),

@@ -14,10 +14,21 @@ from uuid import UUID
 
 from puripuly_heart.app.ports.broker_client import (
     ManagedKeyDeliveryAckRequest,
+    ManagedOperationResumeRequest,
+    ManagedOperationStatusRequest,
+    ManagedOperationStatusResult,
     QqManagedStatusRequest,
     QqManagedStatusResult,
 )
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
+from puripuly_heart.app.services.managed.managed_operation import (
+    MANAGED_OPERATION_RESUME_TOKEN_SECRET,
+    MANAGED_OPERATION_SOURCE_DISCORD,
+    is_valid_operation_id,
+    is_valid_resume_token,
+    new_managed_operation_id,
+    new_managed_operation_resume_token,
+)
 from puripuly_heart.config.llm_profiles import (
     get_openrouter_llm_profile,
     openrouter_alias_for_fields,
@@ -792,6 +803,22 @@ class ManagedOpenRouterReleaseService:
         self.managed_state.pending_delivery_ack_delivery_id = None
         self.managed_state.pending_delivery_ack_managed_credential_ref = None
         self.managed_state.pending_delivery_ack_expires_at = None
+        previous_operation_id = getattr(
+            self.managed_state, "pending_managed_operation_id", None
+        )
+        previous_operation_source = getattr(
+            self.managed_state, "pending_managed_operation_source", None
+        )
+        previous_operation_installation_id = getattr(
+            self.managed_state, "pending_managed_operation_installation_id", None
+        )
+        previous_operation_state = getattr(
+            self.managed_state, "pending_managed_operation_state", None
+        )
+        self.managed_state.pending_managed_operation_id = None
+        self.managed_state.pending_managed_operation_source = None
+        self.managed_state.pending_managed_operation_installation_id = None
+        self.managed_state.pending_managed_operation_state = None
         try:
             self.managed_state.persist()
         except Exception:
@@ -801,11 +828,19 @@ class ManagedOpenRouterReleaseService:
             self.managed_state.pending_delivery_ack_delivery_id = delivery_id
             self.managed_state.pending_delivery_ack_managed_credential_ref = managed_credential_ref
             self.managed_state.pending_delivery_ack_expires_at = expires_at
+            self.managed_state.pending_managed_operation_id = previous_operation_id
+            self.managed_state.pending_managed_operation_source = previous_operation_source
+            self.managed_state.pending_managed_operation_installation_id = (
+                previous_operation_installation_id
+            )
+            self.managed_state.pending_managed_operation_state = previous_operation_state
             try:
                 self.secrets.set(token_key, token)
             except Exception:
                 return self._delivery_ack_retry_result("pending_delivery_ack_token_restore_failed")
             return self._delivery_ack_retry_result("pending_delivery_ack_clear_persist_failed")
+        with contextlib.suppress(Exception):
+            self.secrets.delete(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
         return None
 
     def _delivery_ack_retry_result(self, code: str) -> ManagedOpenRouterReleaseResult:
@@ -853,6 +888,10 @@ class ManagedOpenRouterReleaseService:
             )
         if self._uses_qq_managed_credentials():
             return self._qq_managed_auth_required_result()
+
+        pending_operation_result = await self._recover_pending_managed_operation()
+        if pending_operation_result is not None:
+            return pending_operation_result
 
         bundle = ensure_managed_identity_bundle(
             self.managed_state,
@@ -952,9 +991,26 @@ class ManagedOpenRouterReleaseService:
                 issue_nonce=start_response.issue_nonce,
                 signed_at=self.signed_at_provider(),
             )
+            issue_request["delivery_ack_supported"] = True
+            assured_operation = self._ensure_pending_managed_operation(bundle.installation_id)
+            if assured_operation is None:
+                self._clear_retry_after()
+                return ManagedOpenRouterReleaseResult(
+                    behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                    message_key="discord_auth.error.retry",
+                )
+            operation_id, resume_token = assured_operation
+            issue_request["operation_id"] = operation_id
+            issue_request["resume_token"] = resume_token
             try:
                 issue_response = await self.client.issue_discord_managed_key(issue_request)
             except ManagedOpenRouterReleaseError as exc:
+                if exc.error_class == "retryable":
+                    return self._managed_operation_recovering_result(
+                        operation="discord_issue",
+                        code="discord_issue_transport_failure",
+                    )
+                self._clear_pending_managed_operation()
                 return self._handle_release_error(exc, operation="discord_issue")
 
             return await self._persist_managed_issue_success(issue_response)
@@ -970,6 +1026,258 @@ class ManagedOpenRouterReleaseService:
             return
         with contextlib.suppress(Exception):
             self.on_discord_callback_received()
+
+    def _ensure_pending_managed_operation(
+        self, installation_id: str
+    ) -> tuple[str, str] | None:
+        pending_id = _normalize_optional_text(
+            getattr(self.managed_state, "pending_managed_operation_id", None)
+        )
+        pending_source = _normalize_optional_text(
+            getattr(self.managed_state, "pending_managed_operation_source", None)
+        )
+        pending_installation = _normalize_optional_text(
+            getattr(self.managed_state, "pending_managed_operation_installation_id", None)
+        )
+        if (
+            pending_id is not None
+            and is_valid_operation_id(pending_id)
+            and pending_source == MANAGED_OPERATION_SOURCE_DISCORD
+            and pending_installation == installation_id
+        ):
+            try:
+                stored_token = self.secrets.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
+            except Exception:
+                stored_token = None
+            if is_valid_resume_token(stored_token):
+                return (pending_id, stored_token)
+        self._clear_pending_managed_operation()
+        operation_id = new_managed_operation_id()
+        resume_token = new_managed_operation_resume_token()
+        try:
+            self.secrets.set(MANAGED_OPERATION_RESUME_TOKEN_SECRET, resume_token)
+        except Exception:
+            self._clear_pending_managed_operation()
+            return None
+        self.managed_state.pending_managed_operation_id = operation_id
+        self.managed_state.pending_managed_operation_source = (
+            MANAGED_OPERATION_SOURCE_DISCORD
+        )
+        self.managed_state.pending_managed_operation_installation_id = installation_id
+        self.managed_state.pending_managed_operation_state = None
+        try:
+            self.managed_state.persist()
+        except Exception:
+            self._clear_pending_managed_operation()
+            return None
+        return (operation_id, resume_token)
+
+    def _clear_pending_managed_operation(self) -> None:
+        try:
+            self.managed_state.pending_managed_operation_id = None
+            self.managed_state.pending_managed_operation_source = None
+            self.managed_state.pending_managed_operation_installation_id = None
+            self.managed_state.pending_managed_operation_state = None
+            self.managed_state.persist()
+        except Exception:
+            pass
+        try:
+            self.secrets.delete(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
+        except Exception:
+            pass
+
+    def _record_operation_state(self, operation_status: str | None) -> None:
+        if operation_status not in {
+            "AUTHENTICATED",
+            "ISSUE_READY",
+            "CREATING",
+            "CREATE_UNKNOWN",
+            "RECONCILING",
+            "CLEANUP_REQUIRED",
+            "CLEAN",
+            "RETRY_READY",
+            "DELIVERY_PENDING",
+            "ACTIVE",
+            "FAILED",
+        }:
+            return
+        try:
+            self.managed_state.pending_managed_operation_state = operation_status
+            self.managed_state.persist()
+        except Exception:
+            pass
+
+    async def _fetch_operation_status(
+        self, operation_id: str, resume_token: str, installation_id: str
+    ) -> ManagedOperationStatusResult | None:
+        status_method = getattr(self.client, "get_managed_operation_status", None)
+        if not callable(status_method):
+            return None
+        try:
+            return await status_method(
+                ManagedOperationStatusRequest(
+                    operation_id=operation_id,
+                    installation_id=installation_id,
+                    resume_token=resume_token,
+                )
+            )
+        except Exception:
+            return None
+
+    async def _resume_managed_operation(
+        self, operation_id: str, resume_token: str, installation_id: str
+    ) -> ManagedOperationStatusResult | None:
+        resume_method = getattr(self.client, "resume_managed_operation", None)
+        if not callable(resume_method):
+            return None
+        try:
+            return await resume_method(
+                ManagedOperationResumeRequest(
+                    operation_id=operation_id,
+                    installation_id=installation_id,
+                    resume_token=resume_token,
+                )
+            )
+        except Exception:
+            return None
+
+    async def _recover_pending_managed_operation(
+        self,
+    ) -> ManagedOpenRouterReleaseResult | None:
+        operation_id = _normalize_optional_text(
+            getattr(self.managed_state, "pending_managed_operation_id", None)
+        )
+        source = _normalize_optional_text(
+            getattr(self.managed_state, "pending_managed_operation_source", None)
+        )
+        installation_id = _normalize_optional_text(
+            getattr(self.managed_state, "pending_managed_operation_installation_id", None)
+        )
+        if (
+            not is_valid_operation_id(operation_id)
+            or source != MANAGED_OPERATION_SOURCE_DISCORD
+            or not installation_id
+        ):
+            return None
+        try:
+            bundle = ensure_managed_identity_bundle(self.managed_state, self.secrets)
+        except Exception:
+            return None
+        if bundle.installation_id != installation_id:
+            self._clear_pending_managed_operation()
+            return None
+        try:
+            resume_token = self.secrets.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
+        except Exception:
+            resume_token = None
+        if not is_valid_resume_token(resume_token):
+            self._clear_pending_managed_operation()
+            return None
+        status = await self._fetch_operation_status(
+            operation_id, resume_token, installation_id
+        )
+        if status is None:
+            return self._managed_operation_recovering_result(
+                operation="managed_operation_status",
+                code="managed_operation_status_unavailable",
+            )
+        if not status.succeeded:
+            if status.operation_status == "UNKNOWN_OPERATION":
+                self._clear_pending_managed_operation()
+                return None
+            return self._managed_operation_recovering_result(
+                operation="managed_operation_status",
+                code="managed_operation_status_failed",
+            )
+        self._record_operation_state(status.operation_status)
+        if status.operation_status == "FAILED":
+            self._clear_pending_managed_operation()
+            if status.failed_reason == "authorization_expired":
+                return self._managed_operation_action_required_result(
+                    code="managed_operation_authorization_expired",
+                    message_key="discord_auth.error.authorization_expired",
+                    operation_status=status.operation_status,
+                )
+            return self._managed_operation_action_required_result(
+                code="managed_operation_action_required",
+                message_key="discord_auth.error.action_required",
+                operation_status=status.operation_status,
+            )
+        if status.operation_status == "ACTIVE":
+            self._clear_pending_managed_operation()
+            return self._managed_operation_action_required_result(
+                code="managed_operation_active_key_missing",
+                message_key="discord_auth.error.action_required",
+                operation_status=status.operation_status,
+            )
+        if status.client_action == "retry_authorized":
+            resumed = await self._resume_managed_operation(
+                operation_id, resume_token, installation_id
+            )
+            if resumed is not None and resumed.succeeded:
+                self._record_operation_state(resumed.operation_status)
+                if resumed.operation_status == "FAILED":
+                    self._clear_pending_managed_operation()
+                    return self._managed_operation_action_required_result(
+                        code="managed_operation_action_required",
+                        message_key="discord_auth.error.action_required",
+                        operation_status=resumed.operation_status,
+                    )
+                issue_success = _operation_status_to_issue_success(resumed)
+                if issue_success is not None:
+                    return await self._persist_managed_issue_success(issue_success)
+            return self._managed_operation_recovering_result(
+                operation="managed_operation_resume",
+                code="managed_operation_resume_pending",
+            )
+        if status.client_action == "acknowledge_delivery":
+            resumed = await self._resume_managed_operation(
+                operation_id, resume_token, installation_id
+            )
+            if resumed is not None and resumed.succeeded:
+                self._record_operation_state(resumed.operation_status)
+                issue_success = _operation_status_to_issue_success(resumed)
+                if issue_success is not None:
+                    return await self._persist_managed_issue_success(issue_success)
+            return self._managed_operation_recovering_result(
+                operation="managed_operation_resume",
+                code="managed_operation_delivery_reconciling",
+            )
+        issue_success = _operation_status_to_issue_success(status)
+        if issue_success is not None:
+            return await self._persist_managed_issue_success(issue_success)
+        return self._managed_operation_recovering_result(
+            operation="managed_operation_status",
+            code="managed_operation_recovery_pending",
+        )
+
+    def _managed_operation_recovering_result(
+        self, *, operation: str, code: str
+    ) -> ManagedOpenRouterReleaseResult:
+        self._clear_retry_after()
+        return ManagedOpenRouterReleaseResult(
+            behavior=ManagedOpenRouterReleaseBehavior.RETRY,
+            message_key="discord_auth.error.recovery_pending",
+            diagnostics=ManagedOpenRouterReleaseDiagnostics(
+                operation=operation,
+                code=code,
+                error_class="retryable",
+            ),
+        )
+
+    def _managed_operation_action_required_result(
+        self, *, code: str, message_key: str, operation_status: str | None
+    ) -> ManagedOpenRouterReleaseResult:
+        self._clear_retry_after()
+        return ManagedOpenRouterReleaseResult(
+            behavior=ManagedOpenRouterReleaseBehavior.STOP,
+            message_key=message_key,
+            diagnostics=ManagedOpenRouterReleaseDiagnostics(
+                operation="managed_operation_recovery",
+                code=code,
+                error_class="terminal",
+            ),
+        )
 
     async def _await_or_start_issue_flow(self) -> ManagedOpenRouterReleaseResult:
         resolution = resolve_openrouter_credentials(
@@ -1133,6 +1441,7 @@ class ManagedOpenRouterReleaseService:
                 )
                 self.managed_state.pending_delivery_ack_expires_at = delivery_ack_expires_at
                 return self._delivery_ack_retry_result("delivery_ack_clear_persist_failed")
+            self._clear_pending_managed_operation()
             self._clear_retry_after()
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.READY,
@@ -1245,6 +1554,7 @@ class ManagedOpenRouterReleaseService:
                 )
                 self.managed_state.pending_delivery_ack_expires_at = delivery_ack_expires_at
                 return self._delivery_ack_retry_result("delivery_ack_clear_persist_failed")
+            self._clear_pending_managed_operation()
             self._clear_retry_after()
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.READY,
@@ -1256,6 +1566,7 @@ class ManagedOpenRouterReleaseService:
                 pass_status=pass_status,
             )
         self.managed_state.persist()
+        self._clear_pending_managed_operation()
         self._clear_retry_after()
         return ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.READY,
@@ -1656,6 +1967,33 @@ def _parse_qq_status_auth_secret(value: object) -> tuple[str, str, str | None] |
     if qq_identity is None or credential is None:
         return None
     return qq_identity, credential, managed_credential_ref
+
+
+def _operation_status_to_issue_success(
+    status: ManagedOperationStatusResult,
+) -> ManagedOpenRouterIssueSuccess | None:
+    if not status.succeeded or not status.managed_secret_key:
+        return None
+    delivery_ack = status.delivery_ack
+    return ManagedOpenRouterIssueSuccess(
+        openrouter_api_key=status.managed_secret_key,
+        managed_credential_ref=status.managed_credential_ref,
+        expires_at=status.expires_at,
+        openrouter_user_id=status.openrouter_user_id,
+        referral_bonus_applied=status.referral_bonus_applied,
+        referral_id=status.referral_id,
+        pass_status=status.pass_status
+        if isinstance(status.pass_status, TalkTogetherPassStatus)
+        else None,
+        delivery_ack_required=delivery_ack is not None,
+        delivery_id=delivery_ack.delivery_id if delivery_ack is not None else None,
+        delivery_ack_token=delivery_ack.delivery_ack_token
+        if delivery_ack is not None
+        else None,
+        delivery_ack_expires_at=delivery_ack.expires_at
+        if delivery_ack is not None
+        else None,
+    )
 
 
 def _delivery_ack_token_secret_key(source: str) -> str:

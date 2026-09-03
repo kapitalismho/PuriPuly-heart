@@ -51,6 +51,7 @@ export type CreateManagedChildKeyInput = {
   limitUsd?: number;
   requireEffectiveLimitVerification?: boolean;
   fetchImpl?: FetchImpl;
+  keyName?: string;
 } & (LegacyManagedChildKeyMetadata | SourceAwareManagedChildKeyMetadata);
 
 export type ManagedChildKeyCleanupStepResult =
@@ -174,16 +175,16 @@ export async function createManagedChildKey(
 
   return childKey;
 }
-
 function buildManagedChildKeyName(input: CreateManagedChildKeyInput): string {
+  if (typeof input.keyName === 'string' && input.keyName.trim().length > 0) {
+    return input.keyName.trim();
+  }
   if (input.issueSource === 'qq') {
     return `${MANAGED_CHILD_KEY_NAME_PREFIX}:qq:${input.issueRef.trim()}`;
   }
-
   if (input.issueSource === 'discord') {
     return `${MANAGED_CHILD_KEY_NAME_PREFIX}:${input.subjectRef.trim()}:${input.issueRef.trim()}`;
   }
-
   return `${MANAGED_CHILD_KEY_NAME_PREFIX}:${input.installationId}:${input.releaseSessionRef}`;
 }
 
@@ -604,6 +605,43 @@ function describeUnknownError(error: unknown): string {
   }
 
   return 'unknown OpenRouter management error';
+}
+export type ManagedChildKeyLookupResult =
+  | { found: true; keyHash: string; keyName: string; limitUsd: number | null }
+  | { found: false };
+
+export async function findManagedChildKeyByName(input: {
+  managementApiKey: string;
+  keyName: string;
+  fetchImpl?: FetchImpl;
+}): Promise<ManagedChildKeyLookupResult> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  let offset = 0;
+  for (let page = 0; page < 20; page += 1) {
+    const response = await requestOpenRouter({
+      operation: 'read_key',
+      path: `/keys?limit=100&offset=${offset}`,
+      managementApiKey: input.managementApiKey,
+      fetchImpl,
+      method: 'GET',
+    });
+    const payload = await readSuccessJson(response, 'read_key');
+    const entries = Array.isArray((payload as Record<string, unknown>).data)
+      ? ((payload as Record<string, unknown>).data as unknown[])
+      : [];
+    for (const entry of entries) {
+      if (!isRecord(entry) || entry.name !== input.keyName || typeof entry.hash !== 'string') {
+        continue;
+      }
+      const limitUsd = typeof entry.limit === 'number' && Number.isFinite(entry.limit) ? entry.limit : null;
+      return { found: true, keyHash: entry.hash, keyName: input.keyName, limitUsd };
+    }
+    if (entries.length < 100) {
+      return { found: false };
+    }
+    offset += entries.length;
+  }
+  return { found: false };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

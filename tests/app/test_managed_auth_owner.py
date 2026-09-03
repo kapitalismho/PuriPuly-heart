@@ -66,9 +66,10 @@ def _owner(
 
     async def execute_discord(
         _referral_id: str | None,
-        callback,
+        callback: object,
+        _on_recovery_started: object = None,
     ) -> ManagedAuthExecutionResult:
-        if callback is not None:
+        if callable(callback):
             callback()
         return discord_result or ManagedAuthExecutionResult(succeeded=True)
 

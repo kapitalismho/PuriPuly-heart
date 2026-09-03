@@ -7,6 +7,7 @@ import {
   reserveIssueReferralReward as reserveSourceAwareIssueReferralReward,
 } from '../src/referral';
 import { updateAbuseControls } from './test-support/abuse-controls';
+import { attemptIpInputFor } from './test-support/hash';
 import {
   createTestBrokerEnv,
   insertEntitlement,
@@ -28,6 +29,10 @@ const REFERRED_INSTALLATION_ID = 'install-referral-ops-referred';
 const REFERRED_HARDWARE_HASH = 'raw-hardware-hash-never-in-referral-logs';
 
 let infoSpy: ReturnType<typeof vi.spyOn>;
+
+async function attemptIpInput(env: TestBrokerEnv, ip: string) {
+  return attemptIpInputFor(env, ip, NOW_ISO);
+}
 
 function reserveIssueReferralReward(
   db: D1Database,
@@ -60,7 +65,7 @@ describe('referral reward operational hardening', () => {
       referredInstallationId: REFERRED_INSTALLATION_ID,
       referredHardwareHash: REFERRED_HARDWARE_HASH,
       referredHardwareHashSaltVersion: 7,
-      clientIp: '203.0.113.88',
+      ...(await attemptIpInput(env, '203.0.113.88')),
       nowIso: NOW_ISO,
     });
 
@@ -296,7 +301,7 @@ describe('referral reward operational hardening', () => {
         referredInstallationId: REFERRED_INSTALLATION_ID,
         referredHardwareHash: REFERRED_HARDWARE_HASH,
         referredHardwareHashSaltVersion: 7,
-        clientIp: '203.0.113.90',
+        ...(await attemptIpInput(env, '203.0.113.90')),
         nowIso: NOW_ISO,
       }),
     ).resolves.toEqual({ outcome: 'skipped', reason: 'unknown_referral_id' });
@@ -307,7 +312,7 @@ describe('referral reward operational hardening', () => {
         referredInstallationId: REFERRED_INSTALLATION_ID,
         referredHardwareHash: 'hardware-second-valid-shaped-rate-limit',
         referredHardwareHashSaltVersion: 7,
-        clientIp: '203.0.113.90',
+        ...(await attemptIpInput(env, '203.0.113.90')),
         nowIso: NOW_ISO,
       }),
     ).resolves.toEqual({ outcome: 'skipped', reason: 'referral_attempt_rate_limited' });
@@ -323,7 +328,7 @@ describe('referral reward operational hardening', () => {
         referredInstallationId: REFERRED_INSTALLATION_ID,
         referredHardwareHash: 'hardware-repeated-unknown-throttle',
         referredHardwareHashSaltVersion: 7,
-        clientIp: '203.0.113.90',
+        ...(await attemptIpInput(env, '203.0.113.90')),
         nowIso: NOW_ISO,
       }),
     ).resolves.toEqual({

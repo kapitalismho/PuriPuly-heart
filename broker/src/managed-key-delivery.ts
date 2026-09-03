@@ -28,6 +28,8 @@ export interface CreateManagedKeyDeliveryInput {
   managedCredentialRef: string;
   createdAt: Date;
   expiresAt: Date;
+  operationId?: string | null;
+  attemptIndex?: number | null;
 }
 
 export interface CreateManagedKeyDeliveryResult {
@@ -63,8 +65,10 @@ export async function createManagedKeyDelivery(
           ack_token_hash,
           status,
           created_at,
-          expires_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+          expires_at,
+          operation_id,
+          attempt_index
+        ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
     )
     .bind(
       deliveryId,
@@ -75,6 +79,8 @@ export async function createManagedKeyDelivery(
       ackTokenHash,
       input.createdAt.toISOString(),
       input.expiresAt.toISOString(),
+      input.operationId ?? null,
+      input.attemptIndex ?? null,
     )
     .run();
 

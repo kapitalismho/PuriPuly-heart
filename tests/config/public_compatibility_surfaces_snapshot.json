@@ -127,6 +127,8 @@
       "/v1/providers/openrouter/discord/issue",
       "/v1/providers/openrouter/issue",
       "/v1/providers/openrouter/managed-key-delivery/ack",
+      "/v1/providers/openrouter/managed-operation/resume",
+      "/v1/providers/openrouter/managed-operation/status",
       "/v1/trial/challenge",
       "/v1/trial/challenge/verify",
       "/v1/trial/status"
@@ -175,6 +177,14 @@
       {
         "method": "POST",
         "path": "/v1/providers/openrouter/managed-key-delivery/ack"
+      },
+      {
+        "method": "POST",
+        "path": "/v1/providers/openrouter/managed-operation/status"
+      },
+      {
+        "method": "POST",
+        "path": "/v1/providers/openrouter/managed-operation/resume"
       }
     ],
     "operations": {
@@ -268,7 +278,9 @@
           "asserted_at",
           "delivery_ack_supported",
           "referral_id",
-          "installation_id"
+          "installation_id",
+          "operation_id",
+          "resume_token"
         ],
         "success_response_fields": [
           "ok",
@@ -488,6 +500,110 @@
           "file": "telemetry.ts",
           "function": "handleAppActiveDay",
           "kind": "c_json_object"
+        }
+      },
+      "managed_operation_status": {
+        "method": "POST",
+        "path": "/v1/providers/openrouter/managed-operation/status",
+        "request_body_fields": [
+          "operation_id",
+          "installation_id",
+          "resume_token"
+        ],
+        "success_response_fields": [
+          "ok",
+          "operation_id",
+          "issue_source",
+          "state",
+          "client_action",
+          "failure_reason",
+          "attempt_count",
+          "current_attempt_index",
+          "auth_expires_at",
+          "referral",
+          "attempts"
+        ],
+        "success_response_source": {
+          "file": "managed-operation.ts",
+          "kind": "return_object",
+          "function": "buildManagedOperationStatusBody"
+        },
+        "client_success_fields": [
+          "succeeded",
+          "operation_status",
+          "client_action",
+          "message",
+          "diagnostics",
+          "attempt",
+          "delivery",
+          "referral",
+          "failed_reason",
+          "managed_secret_key",
+          "managed_credential_ref",
+          "expires_at",
+          "openrouter_user_id",
+          "referral_id",
+          "referral_bonus_applied",
+          "pass_status",
+          "delivery_ack"
+        ],
+        "handler": {
+          "file": "managed-operation.ts",
+          "function": "handleManagedOperationStatus",
+          "method": "POST",
+          "path": "/v1/providers/openrouter/managed-operation/status"
+        }
+      },
+      "managed_operation_resume": {
+        "method": "POST",
+        "path": "/v1/providers/openrouter/managed-operation/resume",
+        "request_body_fields": [
+          "operation_id",
+          "installation_id",
+          "resume_token"
+        ],
+        "success_response_fields": [
+          "ok",
+          "operation_id",
+          "issue_source",
+          "state",
+          "client_action",
+          "failure_reason",
+          "attempt_count",
+          "current_attempt_index",
+          "auth_expires_at",
+          "referral",
+          "attempts"
+        ],
+        "success_response_source": {
+          "file": "managed-operation.ts",
+          "kind": "return_object",
+          "function": "buildManagedOperationStatusBody"
+        },
+        "client_success_fields": [
+          "succeeded",
+          "operation_status",
+          "client_action",
+          "message",
+          "diagnostics",
+          "attempt",
+          "delivery",
+          "referral",
+          "failed_reason",
+          "managed_secret_key",
+          "managed_credential_ref",
+          "expires_at",
+          "openrouter_user_id",
+          "referral_id",
+          "referral_bonus_applied",
+          "pass_status",
+          "delivery_ack"
+        ],
+        "handler": {
+          "file": "managed-operation-resume.ts",
+          "function": "handleManagedOperationResume",
+          "method": "POST",
+          "path": "/v1/providers/openrouter/managed-operation/resume"
         }
       }
     },

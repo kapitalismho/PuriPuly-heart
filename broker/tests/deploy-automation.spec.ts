@@ -205,6 +205,8 @@ describe('broker direct deploy automation', () => {
       'DISCORD_CLIENT_SECRET_PRODUCTION',
       'DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION',
       'DISCORD_USER_REF_SECRET_PRODUCTION',
+      'NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION',
+      'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION',
       'DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION',
     ];
     const liveInputValidationIndex = smokeSpec.indexOf(
@@ -271,6 +273,34 @@ describe('broker direct deploy automation', () => {
     const telemetrySubjectHmacSecretSyncIndex = workflow.indexOf(
       'wrangler secret put TELEMETRY_SUBJECT_HMAC_SECRET',
     );
+    const networkIdentityHmacBlankCheckIndex = workflow.indexOf(
+      'NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION is required and must not be blank.',
+    );
+    const networkIdentityHmacSyncIndex = workflow.indexOf(
+      'wrangler secret put NETWORK_IDENTITY_HMAC_SECRET ',
+    );
+    const networkIdentityPreviousSyncIndex = workflow.indexOf(
+      'wrangler secret put NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS',
+    );
+    const networkIdentityPreviousDeleteIndex = workflow.indexOf(
+      'wrangler secret delete NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS',
+    );
+    const stagedMigrationRenderIndex = workflow.indexOf(
+      'staged-migrations-through-0020',
+    );
+    const stagedMigrationApplyIndex = workflow.indexOf(
+      'Apply remote D1 migrations through 0020',
+    );
+    const networkIdentityBackfillAwaitIndex = workflow.indexOf(
+      'Await network identity backfill until keyed_only',
+    );
+    const networkIdentityPurgeApplyIndex = workflow.indexOf(
+      'wrangler d1 migrations apply',
+      remoteD1MigrationIndex + 1,
+    );
+    const networkIdentityPurgeVerifyIndex = workflow.indexOf(
+      'Verify legacy network identity columns are gone',
+    );
 
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).not.toContain('\npush:');
@@ -300,6 +330,31 @@ describe('broker direct deploy automation', () => {
     expect(workflow).toContain('QQ_AUTH_HMAC_PSK');
     expect(workflow).toContain('TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION');
     expect(workflow).toContain('TELEMETRY_SUBJECT_HMAC_SECRET');
+    expect(workflow).toContain('NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION');
+    expect(workflow).toContain('NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION');
+    expect(workflow).toContain('NETWORK_IDENTITY_HMAC_SECRET');
+    expect(workflow).toContain('staged-migrations-through-0020');
+    expect(workflow).toContain('0020_network_identity_hmac.sql');
+    expect(workflow).toContain('0021_network_identity_purge.sql');
+    expect(workflow).toContain('staged_config_path');
+    expect(workflow).toContain('migrations_dir');
+    expect(workflow).toContain('network_identity_migration');
+    expect(workflow).toContain('keyed_only');
+    expect(workflow).toContain('pragma_table_info');
+    expect(workflow).toContain('attempt_ip_hash');
+    expect(workflow).toContain('Apply remote D1 migrations through 0020');
+    expect(workflow).toContain('Await network identity backfill until keyed_only');
+    expect(workflow).toContain('Apply network identity purge migration 0021');
+    expect(workflow).toContain('Verify legacy network identity columns are gone');
+    expect(workflow).toMatch(
+      /wrangler secret put NETWORK_IDENTITY_HMAC_SECRET --config/u,
+    );
+    expect(workflow).toMatch(
+      /wrangler secret put NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS --config/u,
+    );
+    expect(workflow).toMatch(
+      /wrangler secret delete NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS --config/u,
+    );
     expect(workflow).toContain('DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION');
     expect(workflow).toContain('BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION');
     expect(workflow).toContain('BROKER_CANONICAL_WORKERS_DEV_URL');
@@ -398,6 +453,33 @@ describe('broker direct deploy automation', () => {
     expect(discordDailyWebhookSyncIndex).toBeGreaterThanOrEqual(0);
     expect(discordWebhookBlankCheckIndex).toBeLessThan(discordImmediateWebhookSyncIndex);
     expect(discordWebhookBlankCheckIndex).toBeLessThan(discordDailyWebhookSyncIndex);
+    expect(networkIdentityHmacBlankCheckIndex).toBeGreaterThanOrEqual(0);
+    expect(networkIdentityHmacBlankCheckIndex).toBeLessThan(remoteD1MigrationIndex);
+    expect(networkIdentityHmacSyncIndex).toBeGreaterThanOrEqual(0);
+    expect(networkIdentityHmacBlankCheckIndex).toBeLessThan(networkIdentityHmacSyncIndex);
+    expect(networkIdentityPreviousSyncIndex).toBeGreaterThanOrEqual(0);
+    expect(networkIdentityPreviousDeleteIndex).toBeGreaterThanOrEqual(0);
+    expect(stagedMigrationRenderIndex).toBeGreaterThanOrEqual(0);
+    expect(stagedMigrationRenderIndex).toBeLessThan(remoteD1MigrationIndex);
+    expect(stagedMigrationApplyIndex).toBeGreaterThanOrEqual(0);
+    expect(stagedMigrationApplyIndex).toBeLessThan(firstSecretSyncIndex);
+    expect(networkIdentityHmacSyncIndex).toBeLessThan(
+      workflow.indexOf('pnpm exec wrangler deploy'),
+    );
+    expect(networkIdentityBackfillAwaitIndex).toBeGreaterThanOrEqual(0);
+    expect(workflow.indexOf('pnpm exec wrangler deploy')).toBeLessThan(
+      networkIdentityBackfillAwaitIndex,
+    );
+    expect(networkIdentityPurgeApplyIndex).toBeGreaterThanOrEqual(0);
+    expect(networkIdentityBackfillAwaitIndex).toBeLessThan(networkIdentityPurgeApplyIndex);
+    expect(networkIdentityPurgeVerifyIndex).toBeGreaterThanOrEqual(0);
+    expect(networkIdentityPurgeApplyIndex).toBeLessThan(networkIdentityPurgeVerifyIndex);
+    expect(networkIdentityPurgeVerifyIndex).toBeLessThan(
+      workflow.indexOf('deploy/finalize-daily-summary-v2.sql'),
+    );
+    expect(networkIdentityPurgeVerifyIndex).toBeLessThan(
+      workflow.indexOf('broker/tests/deploy-smoke/canonical-production.spec.ts'),
+    );
     expect(workflow).toMatch(/wrangler deploy --config/u);
     expect(workflow).toContain(
       'broker/tests/deploy-smoke/canonical-production.spec.ts',

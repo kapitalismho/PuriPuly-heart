@@ -14,6 +14,8 @@ REQUIRED_DISCORD_AUTH_KEYS = [
     "discord_auth.cancel",
     "discord_auth.waiting_body",
     "discord_auth.callback_received_body",
+    "discord_auth.recovering_body",
+    "discord_auth.action_required_body",
     "discord_auth.success",
     "discord_auth.referral_id.label",
     "discord_auth.referral_id.expand",
@@ -28,6 +30,9 @@ REQUIRED_DISCORD_AUTH_KEYS = [
     "discord_auth.error.expired",
     "discord_auth.error.loopback_unavailable",
     "discord_auth.error.retry",
+    "discord_auth.error.recovery_pending",
+    "discord_auth.error.action_required",
+    "discord_auth.error.authorization_expired",
     "debug_preview.discord_auth",
 ]
 

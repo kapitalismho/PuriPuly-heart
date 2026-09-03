@@ -40,6 +40,10 @@ class ManagedIdentityBag:
     pending_delivery_ack_delivery_id: str | None = None
     pending_delivery_ack_managed_credential_ref: str | None = None
     pending_delivery_ack_expires_at: str | None = None
+    pending_managed_operation_id: str | None = None
+    pending_managed_operation_source: str | None = None
+    pending_managed_operation_installation_id: str | None = None
+    pending_managed_operation_state: str | None = None
 
 
 @dataclass

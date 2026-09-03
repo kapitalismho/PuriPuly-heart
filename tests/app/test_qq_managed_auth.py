@@ -186,6 +186,10 @@ class RecordingManagedState:
     pending_delivery_ack_delivery_id: str | None = None
     pending_delivery_ack_managed_credential_ref: str | None = None
     pending_delivery_ack_expires_at: str | None = None
+    pending_managed_operation_id: str | None = None
+    pending_managed_operation_source: str | None = None
+    pending_managed_operation_installation_id: str | None = None
+    pending_managed_operation_state: str | None = None
     fail_persist_calls: int = 0
     persist_calls: int = 0
     restore_calls: int = 0
@@ -215,6 +219,12 @@ class RecordingManagedState:
                 self.pending_delivery_ack_managed_credential_ref
             ),
             pending_delivery_ack_expires_at=self.pending_delivery_ack_expires_at,
+            pending_managed_operation_id=self.pending_managed_operation_id,
+            pending_managed_operation_source=self.pending_managed_operation_source,
+            pending_managed_operation_installation_id=(
+                self.pending_managed_operation_installation_id
+            ),
+            pending_managed_operation_state=self.pending_managed_operation_state,
         )
 
     def restore(self, snapshot: managed_identity_state.ManagedIdentitySnapshot) -> None:
@@ -236,6 +246,12 @@ class RecordingManagedState:
             snapshot.pending_delivery_ack_managed_credential_ref
         )
         self.pending_delivery_ack_expires_at = snapshot.pending_delivery_ack_expires_at
+        self.pending_managed_operation_id = snapshot.pending_managed_operation_id
+        self.pending_managed_operation_source = snapshot.pending_managed_operation_source
+        self.pending_managed_operation_installation_id = (
+            snapshot.pending_managed_operation_installation_id
+        )
+        self.pending_managed_operation_state = snapshot.pending_managed_operation_state
 
 
 def _success_result(

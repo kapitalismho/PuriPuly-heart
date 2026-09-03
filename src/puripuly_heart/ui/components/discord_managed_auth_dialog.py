@@ -212,6 +212,26 @@ class DiscordManagedAuthDialog:
         )
         self._update_page_if_possible()
 
+    def set_recovering(self) -> None:
+        if not self._is_open or not self._is_waiting:
+            return
+        if self._dialog_result is None or self._body_text is None:
+            return
+        self._body_text.value = join_body_paragraphs(
+            split_body_paragraphs(t("discord_auth.recovering_body"))
+        )
+        self._update_page_if_possible()
+
+    def set_action_required(self) -> None:
+        if not self._is_open or not self._is_waiting:
+            return
+        if self._dialog_result is None or self._body_text is None:
+            return
+        self._body_text.value = join_body_paragraphs(
+            split_body_paragraphs(t("discord_auth.action_required_body"))
+        )
+        self._update_page_if_possible()
+
     def close(self) -> None:
         if self._dialog is None or not self._is_open:
             return

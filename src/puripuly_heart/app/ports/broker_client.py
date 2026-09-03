@@ -30,6 +30,8 @@ class BrokerIssueRequest:
     issue_nonce: str | None = field(default=None, repr=False)
     hardware_hash: str | None = field(default=None, repr=False)
     hardware_hash_salt_version: int | None = None
+    operation_id: str | None = None
+    resume_token: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metadata", _freeze_fields(self.metadata))
@@ -50,6 +52,7 @@ class BrokerIssueResult:
     referral_bonus_applied: bool = False
     pass_status: object | None = field(default=None, repr=False)
     delivery_ack: ManagedKeyDeliveryAckMetadata | None = field(default=None, repr=False)
+    unknown_outcome: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +80,8 @@ class ManagedKeyDeliveryAckResult:
     referral_bonus_applied: bool = False
     referral_id: str | None = None
     pass_status: object | None = field(default=None, repr=False)
+    referral_status: str | None = None
+    referral_settlement: str | None = None
 
 
 QqManagedAssertionFailureSubcode = Literal[
@@ -138,6 +143,63 @@ class QqManagedStatusResult:
     pass_status: object | None = field(default=None, repr=False)
 
 
+@dataclass(frozen=True, slots=True)
+class ManagedOperationAttemptSnapshot:
+    attempt_index: int | None = None
+    provider_key_name: str | None = None
+    managed_credential_ref: str | None = None
+    outcome: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedOperationDeliverySnapshot:
+    delivery_id: str | None = None
+    status: str | None = None
+    expires_at: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedOperationReferralSnapshot:
+    status: str | None = None
+    settlement: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedOperationStatusRequest:
+    operation_id: str
+    installation_id: str | None = None
+    resume_token: str | None = field(default=None, repr=False)
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedOperationResumeRequest:
+    operation_id: str
+    installation_id: str | None = None
+    resume_token: str | None = field(default=None, repr=False)
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedOperationStatusResult:
+    succeeded: bool
+    operation_status: str
+    client_action: str
+    message: UserMessageRef | None = None
+    diagnostics: ErrorDiagnostics | None = None
+    attempt: ManagedOperationAttemptSnapshot | None = None
+    delivery: ManagedOperationDeliverySnapshot | None = None
+    referral: ManagedOperationReferralSnapshot | None = None
+    failed_reason: str | None = None
+    managed_secret_key: str | None = field(default=None, repr=False)
+    managed_credential_ref: str | None = None
+    expires_at: str | None = None
+    openrouter_user_id: str | None = None
+    referral_id: str | None = None
+    referral_bonus_applied: bool = False
+    pass_status: object | None = field(default=None, repr=False)
+    delivery_ack: ManagedKeyDeliveryAckMetadata | None = field(default=None, repr=False)
+
+
+
 class BrokerClientPort(Protocol):
     async def issue_managed_connection(
         self,
@@ -159,6 +221,16 @@ class BrokerClientPort(Protocol):
         request: ManagedKeyDeliveryAckRequest,
     ) -> ManagedKeyDeliveryAckResult: ...
 
+    async def get_managed_operation_status(
+        self,
+        request: ManagedOperationStatusRequest,
+    ) -> ManagedOperationStatusResult: ...
+
+    async def resume_managed_operation(
+        self,
+        request: ManagedOperationResumeRequest,
+    ) -> ManagedOperationStatusResult: ...
+
 
 __all__ = [
     "BrokerClientPort",
@@ -167,6 +239,12 @@ __all__ = [
     "ManagedKeyDeliveryAckMetadata",
     "ManagedKeyDeliveryAckRequest",
     "ManagedKeyDeliveryAckResult",
+    "ManagedOperationAttemptSnapshot",
+    "ManagedOperationDeliverySnapshot",
+    "ManagedOperationReferralSnapshot",
+    "ManagedOperationResumeRequest",
+    "ManagedOperationStatusRequest",
+    "ManagedOperationStatusResult",
     "QqManagedAssertionFailureSubcode",
     "QqManagedAssertionRequest",
     "QqManagedAssertionResult",

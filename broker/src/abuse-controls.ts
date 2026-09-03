@@ -4,6 +4,17 @@ import type { PublicErrorClass, PublicErrorCode } from './broker-error';
 import type { BrokerEnv } from './contract';
 import type { ManagedIssueMetadata } from './managed-issuance';
 import {
+  deriveStableNetworkIdentityDigest,
+  normalizeNetworkIdentityIp,
+  resolveNetworkIdentitySecrets,
+  resolveNetworkIdentityWriteMode,
+  resolveRequestNetworkIdentity,
+  resolveRequestNetworkIdentityCandidates,
+  type NetworkIdentitySecrets,
+  type NetworkIdentityWriteMode,
+  type RequestNetworkIdentity,
+} from './network-identity';
+import {
   BROKER_RUNTIME_CONFIG_KEYS,
   DEFAULT_BROKER_ABUSE_CONTROLS,
   DEFAULT_BROKER_ABUSE_RUNTIME_STATE,
@@ -20,6 +31,7 @@ export interface RequestAbuseContext {
   ip: string | null;
   installationId: string | null;
   hardwareHash: string | null;
+  networkIdentitySecrets?: NetworkIdentitySecrets | null;
 }
 
 export interface AbuseDecision {
@@ -46,10 +58,14 @@ export interface ManagedDailyIssuanceCapState {
 export interface ManagedDailyIssuanceCapOptions {
   excludeCurrent?: ManagedIssueMetadata;
 }
-
 export interface RequestNetworkMetadata {
-  ipHash: string | null;
-  ipPrefixHash: string | null;
+  legacyIp: string | null;
+  legacyIpHash: string | null;
+  legacyIpPrefixHash: string | null;
+  ipDigest: string | null;
+  ipPrefixDigest: string | null;
+  ipKeyVersion: number | null;
+  ipEpoch: string | null;
   asn: number | null;
   country: string | null;
   httpProtocol: string | null;
@@ -290,15 +306,21 @@ export async function checkActiveIssuanceBrake(
 
 export async function extractRequestNetworkMetadata(
   c: Context<BrokerEnv>,
-  db: D1Database,
+  input: { secrets: NetworkIdentitySecrets | null; now: Date },
 ): Promise<RequestNetworkMetadata> {
   const ip = resolveClientIp(c);
   const cf = getCloudflareMetadata(c);
   const asn = normalizePositiveInteger(cf.asn);
-
+  const mode = await resolveNetworkIdentityWriteMode(c.env.BROKER_DB);
+  const identity = mode === 'legacy' ? null : await resolveRequestNetworkIdentity(ip, input.secrets, input.now);
   return {
-    ipHash: ip ? await hashNetworkValue(ip) : null,
-    ipPrefixHash: ip ? await hashNetworkValue(deriveIpPrefix(ip)) : null,
+    legacyIp: mode === 'keyed' ? null : (ip ?? null),
+    legacyIpHash: mode === 'keyed' || !ip ? null : await legacyNetworkValueHash(ip),
+    legacyIpPrefixHash: mode === 'keyed' || !ip ? null : await legacyNetworkValueHash(legacyIpPrefix(ip)),
+    ipDigest: identity?.digest ?? null,
+    ipPrefixDigest: identity?.prefixDigest ?? null,
+    ipKeyVersion: identity?.keyVersion ?? null,
+    ipEpoch: identity?.epoch ?? null,
     asn,
     country: nonEmptyString(cf.country),
     httpProtocol: nonEmptyString(cf.httpProtocol),
@@ -308,6 +330,10 @@ export async function extractRequestNetworkMetadata(
   };
 }
 
+export function resolveRequestNetworkIdentitySecrets(c: Context<BrokerEnv>): NetworkIdentitySecrets | null {
+  return resolveNetworkIdentitySecrets(c.env as unknown as Record<string, unknown>);
+}
+
 export async function recordRequestEvent(
   db: D1Database,
   context: RequestAbuseContext,
@@ -315,23 +341,126 @@ export async function recordRequestEvent(
   if (!context.ip && !context.installationId) {
     return;
   }
-
+  const mode = await resolveNetworkIdentityWriteMode(db);
+  const identity =
+    mode === 'legacy'
+      ? null
+      : await resolveRequestNetworkIdentity(
+          context.ip,
+          context.networkIdentitySecrets ?? null,
+          context.now,
+        );
+  if (!identity && !context.installationId) {
+    return;
+  }
+  if (mode === 'legacy') {
+    await db
+      .prepare(
+        `INSERT INTO broker_request_events (
+            endpoint,
+            ip,
+            installation_id,
+            observed_at
+          ) VALUES (?, ?, ?, ?)`,
+      )
+      .bind(context.endpoint, context.ip, context.installationId, context.now.toISOString())
+      .run();
+    return;
+  }
+  if (mode === 'keyed') {
+    await db
+      .prepare(
+        `INSERT INTO broker_request_events (
+            endpoint,
+            ip_digest,
+            ip_key_version,
+            ip_epoch,
+            installation_id,
+            observed_at
+          ) VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        context.endpoint,
+        identity?.digest ?? null,
+        identity?.keyVersion ?? null,
+        identity?.epoch ?? null,
+        context.installationId,
+        context.now.toISOString(),
+      )
+      .run();
+    return;
+  }
   await db
     .prepare(
       `INSERT INTO broker_request_events (
           endpoint,
           ip,
+          ip_digest,
+          ip_key_version,
+          ip_epoch,
           installation_id,
           observed_at
-        ) VALUES (?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       context.endpoint,
       context.ip,
+      identity?.digest ?? null,
+      identity?.keyVersion ?? null,
+      identity?.epoch ?? null,
       context.installationId,
       context.now.toISOString(),
     )
     .run();
+}
+
+export async function resolveBrokerRequestEventIpMatch(
+  db: D1Database,
+  context: RequestAbuseContext,
+  windowStart: Date,
+  hookSubjectValue?: string,
+): Promise<{ predicate: string; binds: string[] } | null> {
+  return resolveRequestEventIpMatch(db, context, windowStart, hookSubjectValue);
+}
+
+async function resolveRequestEventIpMatch(
+  db: D1Database,
+  context: RequestAbuseContext,
+  windowStart: Date,
+  hookSubjectValue?: string,
+): Promise<{ predicate: string; binds: string[] } | null> {
+  const mode: NetworkIdentityWriteMode = await resolveNetworkIdentityWriteMode(db);
+  const candidates =
+    mode === 'legacy'
+      ? []
+      : await resolveRequestNetworkIdentityCandidates(
+          context.ip,
+          context.networkIdentitySecrets ?? null,
+          context.now,
+          windowStart,
+        );
+  const digests = candidates.map((candidate) => candidate.digest);
+  if (hookSubjectValue !== undefined) {
+    digests.push(...(await resolveHookSubjectDigests(hookSubjectValue, context.networkIdentitySecrets ?? null)));
+  }
+  const clauses: string[] = [];
+  const binds: string[] = [];
+  if (digests.length > 0) {
+    clauses.push(`ip_digest IN (${digests.map(() => '?').join(', ')})`);
+    binds.push(...digests);
+  }
+  if (mode !== 'keyed' && context.ip) {
+    clauses.push('ip = ?');
+    binds.push(context.ip);
+  }
+  if (hookSubjectValue !== undefined && mode !== 'keyed') {
+    clauses.push('ip = ?');
+    binds.push(hookSubjectValue);
+  }
+  if (clauses.length === 0) {
+    return null;
+  }
+  return { predicate: clauses.join(' OR '), binds };
 }
 
 export async function checkEndpointRateLimit(
@@ -343,34 +472,48 @@ export async function checkEndpointRateLimit(
   if (endpointConfigs.length === 0) {
     return null;
   }
-
   for (const endpointConfig of endpointConfigs) {
-    const scopeValue =
-      endpointConfig.scope === 'ip' ? context.ip : context.installationId;
-    if (!scopeValue) {
-      continue;
+    const windowStart = new Date(context.now.getTime() - endpointConfig.windowMinutes * 60_000);
+    const windowStartIso = windowStart.toISOString();
+    let row: { count: number; oldest: string | null } | null = null;
+    if (endpointConfig.scope === 'ip') {
+      const match = await resolveRequestEventIpMatch(
+        db,
+        context,
+        windowStart,
+      );
+      if (!match) {
+        continue;
+      }
+      row = await db
+        .prepare(
+          `SELECT COUNT(*) AS count, MIN(observed_at) AS oldest
+             FROM broker_request_events
+            WHERE endpoint = ?
+              AND (${match.predicate})
+              AND observed_at >= ?`,
+        )
+        .bind(context.endpoint, ...match.binds, windowStartIso)
+        .first<{ count: number; oldest: string | null }>();
+    } else {
+      if (!context.installationId) {
+        continue;
+      }
+      row = await db
+        .prepare(
+          `SELECT COUNT(*) AS count, MIN(observed_at) AS oldest
+             FROM broker_request_events
+            WHERE endpoint = ?
+              AND installation_id = ?
+              AND observed_at >= ?`,
+        )
+        .bind(context.endpoint, context.installationId, windowStartIso)
+        .first<{ count: number; oldest: string | null }>();
     }
-
-    const windowStartIso = new Date(
-      context.now.getTime() - endpointConfig.windowMinutes * 60_000,
-    ).toISOString();
-    const scopeColumn = endpointConfig.scope === 'ip' ? 'ip' : 'installation_id';
-    const row = await db
-      .prepare(
-        `SELECT COUNT(*) AS count, MIN(observed_at) AS oldest
-           FROM broker_request_events
-          WHERE endpoint = ?
-            AND ${scopeColumn} = ?
-            AND observed_at >= ?`,
-      )
-      .bind(context.endpoint, scopeValue, windowStartIso)
-      .first<{ count: number; oldest: string | null }>();
-
     const count = Number(row?.count ?? 0);
     if (count <= endpointConfig.maxRequests) {
       continue;
     }
-
     return {
       status: 429,
       code: 'rate_limited',
@@ -387,10 +530,8 @@ export async function checkEndpointRateLimit(
       ),
     };
   }
-
   return null;
 }
-
 export async function checkVelocityCapHook(
   db: D1Database,
   context: RequestAbuseContext,
@@ -400,33 +541,46 @@ export async function checkVelocityCapHook(
     'POST /v1/trial/challenge/verify/success',
     'POST /v1/trial/challenge/verify/fail',
   ] as const;
-
   for (const hook of matchingHooks) {
-    const windowStartIso = new Date(
-      context.now.getTime() - hook.window_minutes * 60_000,
-    ).toISOString();
-    const column = hook.subject_type === 'ip' ? 'ip' : 'installation_id';
-    const row = await db
-      .prepare(
-        `SELECT COUNT(*) AS count, MIN(observed_at) AS oldest
-           FROM broker_request_events
-           WHERE ${column} = ?
-             AND observed_at >= ?
-             AND endpoint NOT IN (?, ?)`,
-      )
-      .bind(
+    const windowStart = new Date(context.now.getTime() - hook.window_minutes * 60_000);
+    const windowStartIso = windowStart.toISOString();
+    let row: { count: number; oldest: string | null } | null = null;
+    if (hook.subject_type === 'ip') {
+      const match = await resolveRequestEventIpMatch(
+        db,
+        context,
+        windowStart,
         hook.subject_value,
-        windowStartIso,
-        excludedEndpoints[0],
-        excludedEndpoints[1],
-      )
-      .first<{ count: number; oldest: string | null }>();
-
+      );
+      if (!match) {
+        continue;
+      }
+      row = await db
+        .prepare(
+          `SELECT COUNT(*) AS count, MIN(observed_at) AS oldest
+             FROM broker_request_events
+            WHERE (${match.predicate})
+              AND observed_at >= ?
+              AND endpoint NOT IN (?, ?)`,
+        )
+        .bind(...match.binds, windowStartIso, excludedEndpoints[0], excludedEndpoints[1])
+        .first<{ count: number; oldest: string | null }>();
+    } else {
+      row = await db
+        .prepare(
+          `SELECT COUNT(*) AS count, MIN(observed_at) AS oldest
+             FROM broker_request_events
+            WHERE installation_id = ?
+              AND observed_at >= ?
+              AND endpoint NOT IN (?, ?)`,
+        )
+        .bind(hook.subject_value, windowStartIso, excludedEndpoints[0], excludedEndpoints[1])
+        .first<{ count: number; oldest: string | null }>();
+    }
     const count = Number(row?.count ?? 0);
     if (count <= hook.max_requests) {
       continue;
     }
-
     return {
       status: mapPublicErrorCodeToStatus(hook.outcome_code),
       code: hook.outcome_code,
@@ -436,14 +590,9 @@ export async function checkVelocityCapHook(
         code: hook.outcome_code,
         subjectType: hook.subject_type,
       }),
-      retryAfterMs: retryAfterFromIso(
-        row?.oldest,
-        hook.window_minutes * 60_000,
-        context.now,
-      ),
+      retryAfterMs: retryAfterFromIso(row?.oldest, hook.window_minutes * 60_000, context.now),
     };
   }
-
   return null;
 }
 
@@ -703,19 +852,18 @@ async function listMatchingVelocityCapHooks(
 ): Promise<VelocityCapHookRow[]> {
   const filters: string[] = [];
   const params: Array<string | number | null> = [];
-  if (context.ip) {
-    filters.push('(subject_type = ? AND subject_value = ?)');
-    params.push('ip', context.ip);
+  const ipMatchValues = await resolveHookMatchValues(db, context);
+  if (ipMatchValues.length > 0) {
+    filters.push(`(subject_type = 'ip' AND subject_value IN (${ipMatchValues.map(() => '?').join(', ')}))`);
+    params.push(...ipMatchValues);
   }
   if (context.installationId) {
     filters.push('(subject_type = ? AND subject_value = ?)');
     params.push('installation_id', context.installationId);
   }
-
   if (filters.length === 0) {
     return [];
   }
-
   const result = await db
     .prepare(
       `SELECT id, subject_type, subject_value, max_requests, window_minutes,
@@ -728,7 +876,6 @@ async function listMatchingVelocityCapHooks(
     )
     .bind(context.now.toISOString(), ...params)
     .all<VelocityCapHookRow>();
-
   return result.results;
 }
 
@@ -738,9 +885,10 @@ async function listMatchingSubjectHooks(
 ): Promise<SubjectHookRow[]> {
   const filters: string[] = [];
   const params: Array<string | number | null> = [];
-  if (context.ip) {
-    filters.push('(subject_type = ? AND subject_value = ?)');
-    params.push('ip', context.ip);
+  const ipMatchValues = await resolveHookMatchValues(db, context);
+  if (ipMatchValues.length > 0) {
+    filters.push(`(subject_type = 'ip' AND subject_value IN (${ipMatchValues.map(() => '?').join(', ')}))`);
+    params.push(...ipMatchValues);
   }
   if (context.installationId) {
     filters.push('(subject_type = ? AND subject_value = ?)');
@@ -750,11 +898,9 @@ async function listMatchingSubjectHooks(
     filters.push('(subject_type = ? AND subject_value = ?)');
     params.push('hardware_hash', context.hardwareHash);
   }
-
   if (filters.length === 0) {
     return [];
   }
-
   const result = await db
     .prepare(
       `SELECT id, hook_kind, subject_type, subject_value, outcome_code,
@@ -772,8 +918,51 @@ async function listMatchingSubjectHooks(
     )
     .bind(context.now.toISOString(), ...params)
     .all<SubjectHookRow>();
-
   return result.results;
+}
+
+async function resolveHookMatchValues(db: D1Database, context: RequestAbuseContext): Promise<string[]> {
+  if (!context.ip) {
+    return [];
+  }
+  const mode: NetworkIdentityWriteMode = await resolveNetworkIdentityWriteMode(db);
+  const values: string[] = [];
+  if (mode !== 'keyed') {
+    values.push(context.ip);
+  }
+  if (mode !== 'legacy') {
+    values.push(...(await resolveHookMatchDigests(context)));
+  }
+  return values;
+}
+
+async function resolveHookMatchDigests(context: RequestAbuseContext): Promise<string[]> {
+
+  if (!context.ip) {
+    return [];
+  }
+  const normalized = normalizeNetworkIdentityIp(context.ip);
+  if (!normalized) {
+    return [];
+  }
+  const secrets = context.networkIdentitySecrets ?? null;
+  if (!secrets) {
+    return [];
+  }
+  const digests = await deriveStableNetworkIdentityDigest(secrets, normalized, 'ip');
+  return digests.map((entry) => entry.digest);
+}
+
+async function resolveHookSubjectDigests(subjectValue: string, secrets: NetworkIdentitySecrets | null): Promise<string[]> {
+  if (!secrets) {
+    return [subjectValue];
+  }
+  const normalized = normalizeNetworkIdentityIp(subjectValue);
+  if (!normalized) {
+    return [subjectValue];
+  }
+  const digests = await deriveStableNetworkIdentityDigest(secrets, normalized, 'ip');
+  return [...digests.map((entry) => entry.digest), subjectValue];
 }
 
 async function applyRevocationHook(
@@ -1313,26 +1502,6 @@ function normalizePositiveInteger(value: unknown): number | null {
   return null;
 }
 
-async function hashNetworkValue(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(value),
-  );
-
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function deriveIpPrefix(ip: string): string {
-  if (ip.includes(':')) {
-    return ip
-      .split(':')
-      .filter((part) => part.length > 0)
-      .slice(0, 4)
-      .join(':');
-  }
-
-  return ip.split('.').slice(0, 3).join('.');
-}
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -1348,6 +1517,18 @@ function isBoolean(value: unknown): value is boolean {
 
 function isIntegerInRange(value: unknown, min: number, max: number): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
+}
+
+async function legacyNetworkValueHash(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function legacyIpPrefix(ip: string): string {
+  if (ip.includes(':')) {
+    return ip.split(':').filter((part) => part.length > 0).slice(0, 4).join(':');
+  }
+  return ip.split('.').slice(0, 3).join('.');
 }
 
 function nonEmptyString(value: unknown): string | null {

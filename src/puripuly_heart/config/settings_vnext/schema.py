@@ -911,6 +911,10 @@ class ManagedConnectionState:
     pending_delivery_ack_delivery_id: str | None = None
     pending_delivery_ack_managed_credential_ref: str | None = None
     pending_delivery_ack_expires_at: str | None = None
+    pending_managed_operation_id: str | None = None
+    pending_managed_operation_source: str | None = None
+    pending_managed_operation_installation_id: str | None = None
+    pending_managed_operation_state: str | None = None
 
     def __post_init__(self) -> None:
         referral_source = _normalize_optional_state_text(self.referral_source)
@@ -945,6 +949,42 @@ class ManagedConnectionState:
             managed_credential_ref,
         )
         object.__setattr__(self, "pending_delivery_ack_expires_at", expires_at)
+        operation_id = _normalize_optional_state_text(self.pending_managed_operation_id)
+        operation_source = _normalize_optional_state_text(self.pending_managed_operation_source)
+        operation_installation_id = _normalize_optional_state_text(
+            self.pending_managed_operation_installation_id
+        )
+        operation_state = _normalize_optional_state_text(self.pending_managed_operation_state)
+        if (
+            operation_id is None
+            or not operation_id.startswith("ph-mop-v1_")
+            or operation_source != "discord"
+            or operation_installation_id is None
+        ):
+            operation_id = None
+            operation_source = None
+            operation_installation_id = None
+            operation_state = None
+        if operation_state not in {
+            "AUTHENTICATED",
+            "ISSUE_READY",
+            "CREATING",
+            "CREATE_UNKNOWN",
+            "RECONCILING",
+            "CLEANUP_REQUIRED",
+            "CLEAN",
+            "RETRY_READY",
+            "DELIVERY_PENDING",
+            "ACTIVE",
+            "FAILED",
+        }:
+            operation_state = None
+        object.__setattr__(self, "pending_managed_operation_id", operation_id)
+        object.__setattr__(self, "pending_managed_operation_source", operation_source)
+        object.__setattr__(
+            self, "pending_managed_operation_installation_id", operation_installation_id
+        )
+        object.__setattr__(self, "pending_managed_operation_state", operation_state)
 
 
 @dataclass(frozen=True, slots=True)
