@@ -201,7 +201,12 @@ class RollingProviderDefinition:
 
 @dataclass(slots=True)
 class RollingSTTBackend(STTBackend):
-    """STTBackend composing free-tier cloud ASR providers in fixed priority."""
+    """STTBackend composing free-tier cloud ASR providers in fixed priority.
+
+    Auth failures and account-level quota exclusions persist until this
+    backend is rebuilt (application restart). Rotate credentials or refill
+    balance, then restart to re-enable the provider.
+    """
 
     providers: tuple[RollingProviderDefinition, ...]
     clock: Clock = field(default_factory=SystemClock)
@@ -330,6 +335,7 @@ class RollingSTTBackend(STTBackend):
         return True
 
     async def open_session(self) -> STTBackendSession:
+        attempt_start = self.clock.now()
         last_error: BaseException | None = None
         for definition in self.providers:
             if not self._is_eligible(definition):
@@ -348,7 +354,7 @@ class RollingSTTBackend(STTBackend):
             logger.info(
                 "[STT][Rolling] session selected provider=%s elapsed_s=%.3f",
                 definition.name.value,
-                self.clock.now(),
+                self.clock.now() - attempt_start,
             )
             return _RollingSession(
                 definition=definition,
@@ -357,6 +363,15 @@ class RollingSTTBackend(STTBackend):
             )
         if last_error is not None:
             raise last_error
+        if any(definition.is_configured() for definition in self.providers):
+            logger.warning(
+                "[STT][Rolling] all configured providers excluded; statuses=%s",
+                [(status.name.value, status.state.value) for status in self.statuses()],
+            )
+            raise RuntimeError(
+                "All rolling ASR providers are excluded (quota/auth/estimate); "
+                "see statuses() for per-provider state"
+            )
         raise RuntimeError(
             "No rolling ASR provider is configured; configure a Gemini, ElevenLabs, "
             "or Deepgram API key"

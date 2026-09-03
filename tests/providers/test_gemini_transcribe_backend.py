@@ -310,8 +310,11 @@ def test_gemini_transcribe_language_codes() -> None:
     assert gemini_transcribe_language_codes("ko") == ["ko"]
     assert gemini_transcribe_language_codes("en-US") == ["en-US"]
     assert gemini_transcribe_language_codes("auto") == []
+    assert gemini_transcribe_language_codes(" AUTO ") == []
+    assert gemini_transcribe_language_codes("Auto") == []
     assert gemini_transcribe_language_codes(None) == []
     assert gemini_transcribe_language_codes("") == []
+    assert gemini_transcribe_language_codes("   ") == []
 
 
 def _final(text: str):

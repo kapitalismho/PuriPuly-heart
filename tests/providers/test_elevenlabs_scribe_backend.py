@@ -103,7 +103,10 @@ async def test_session_omits_language_code_for_auto_language() -> None:
     session = await backend.open_session()
     try:
         options = factories[0]
-        assert options["language_code"] is None
+        if hasattr(options, "model_dump"):
+            assert getattr(options, "language_code", None) is None
+        else:
+            assert options["language_code"] is None
     finally:
         await session.close()
 

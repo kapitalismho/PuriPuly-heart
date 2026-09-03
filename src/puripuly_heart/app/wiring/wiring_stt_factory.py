@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -89,6 +90,17 @@ from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 from .wiring_llm_factory import _qwen_api_key_for_resolved_credential
 from .wiring_secrets_factory import require_secret
+
+logger = logging.getLogger(__name__)
+
+
+def _log_gemini_vocabulary_truncation(input_count: int, kept_count: int) -> None:
+    if input_count > kept_count:
+        logger.debug(
+            "Gemini custom vocabulary truncated input=%s kept=%s",
+            input_count,
+            kept_count,
+        )
 
 
 def build_custom_vocabulary_runtime_config(
@@ -843,11 +855,13 @@ def _create_rolling_stt_backend(
     def build_gemini() -> STTBackend:
         from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
 
+        vocabulary = keyterms[:GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS]
+        _log_gemini_vocabulary_truncation(len(keyterms), len(vocabulary))
         return GeminiTranscribeSTTBackend(
             api_key=_rolling_member_api_key(STTProviderName.GEMINI_TRANSCRIBE.value, secrets),
             model=gemini_model,
             language_codes=gemini_language_codes,
-            custom_vocabulary=keyterms[:GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS],
+            custom_vocabulary=vocabulary,
         )
 
     def build_scribe() -> STTBackend:
@@ -997,11 +1011,13 @@ def create_stt_backend_from_resolved_config(
             and all(isinstance(code, str) for code in language_codes_value)
             else ()
         )
+        vocabulary = keyterms[:GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS]
+        _log_gemini_vocabulary_truncation(len(keyterms), len(vocabulary))
         return GeminiTranscribeSTTBackend(
             api_key=api_key,
             model=config.model or "gemini-3.5-transcribe-live",
             language_codes=language_codes,
-            custom_vocabulary=keyterms[:GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS],
+            custom_vocabulary=vocabulary,
             sample_rate_hz=config.sample_rate_hz,
         )
 

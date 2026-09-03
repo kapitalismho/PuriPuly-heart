@@ -323,12 +323,14 @@ def test_scribe_error_classification() -> None:
     assert classify_scribe_error(RuntimeError("auth_error: invalid key")) == "auth"
     assert classify_scribe_error(RuntimeError("quota_exceeded: credits exhausted")) == "quota"
     assert classify_scribe_error(RuntimeError("rate_limited")) == "transient"
+    assert classify_scribe_error(RuntimeError("429 Too Many Requests")) == "transient"
 
 
 def test_deepgram_error_classification() -> None:
     assert classify_deepgram_error(RuntimeError("HTTP 401 Unauthorized")) == "auth"
     assert classify_deepgram_error(RuntimeError("payment required: no balance")) == "quota"
     assert classify_deepgram_error(RuntimeError("connection reset")) == "transient"
+    assert classify_deepgram_error(RuntimeError("429 Too Many Requests")) == "transient"
 
 
 def test_gemini_estimator_resets_on_quota_day_boundary() -> None:
@@ -466,4 +468,119 @@ def test_configuration_loss_hides_but_persists_exclusion_state() -> None:
     object.__setattr__(definition, "is_configured", lambda: True)
     assert rolling.status(STTProviderName.GEMINI_TRANSCRIBE).state is (
         RollingProviderState.AUTH_FAILED
+    )
+
+
+@pytest.mark.asyncio
+async def test_scribe_quota_falls_through_to_deepgram() -> None:
+    gemini, gemini_backend = _definition(
+        STTProviderName.GEMINI_TRANSCRIBE, _ScriptedSession(), configured=False
+    )
+    scribe, scribe_backend = _definition(
+        STTProviderName.ELEVENLABS_SCRIBE,
+        _ScriptedSession(),
+        fail_times=99,
+        classifier=lambda exc: "quota",
+    )
+    deepgram, deepgram_backend = _definition(STTProviderName.DEEPGRAM, _ScriptedSession())
+    rolling = _make(gemini, scribe, deepgram)
+
+    session = await rolling.open_session()
+    assert gemini_backend.open_count == 0
+    assert scribe_backend.open_count == 1
+    assert deepgram_backend.open_count == 1
+    assert session.provider_name is STTProviderName.DEEPGRAM
+    await session.close()
+    assert rolling.status(STTProviderName.ELEVENLABS_SCRIBE).state is (
+        RollingProviderState.FREE_QUOTA_EXHAUSTED
+    )
+
+
+@pytest.mark.asyncio
+async def test_three_provider_chain_gemini_transient_then_scribe_quota_to_deepgram() -> None:
+    gemini, gemini_backend = _definition(
+        STTProviderName.GEMINI_TRANSCRIBE,
+        _ScriptedSession(),
+        fail_times=1,
+        classifier=lambda exc: "transient",
+    )
+    scribe, scribe_backend = _definition(
+        STTProviderName.ELEVENLABS_SCRIBE,
+        _ScriptedSession(),
+        fail_times=99,
+        classifier=lambda exc: "quota",
+    )
+    deepgram, deepgram_backend = _definition(STTProviderName.DEEPGRAM, _ScriptedSession())
+    rolling = _make(gemini, scribe, deepgram)
+
+    first = await rolling.open_session()
+    assert first.provider_name is STTProviderName.DEEPGRAM
+    assert gemini_backend.open_count == 1
+    assert scribe_backend.open_count == 1
+    assert deepgram_backend.open_count == 1
+    await first.close()
+
+    second = await rolling.open_session()
+    assert second.provider_name is STTProviderName.GEMINI_TRANSCRIBE
+    assert gemini_backend.open_count == 2
+    await second.close()
+
+
+@pytest.mark.asyncio
+async def test_all_configured_but_excluded_reports_distinct_error() -> None:
+    gemini, gemini_backend = _definition(
+        STTProviderName.GEMINI_TRANSCRIBE,
+        _ScriptedSession(),
+        fail_times=99,
+        classifier=lambda exc: "quota_day",
+    )
+    scribe, scribe_backend = _definition(
+        STTProviderName.ELEVENLABS_SCRIBE,
+        _ScriptedSession(),
+        fail_times=99,
+        classifier=lambda exc: "quota",
+    )
+    deepgram, deepgram_backend = _definition(
+        STTProviderName.DEEPGRAM,
+        _ScriptedSession(),
+        fail_times=99,
+        classifier=lambda exc: "quota",
+    )
+    rolling = _make(gemini, scribe, deepgram)
+
+    with pytest.raises(RuntimeError):
+        await rolling.open_session()
+    assert rolling.status(STTProviderName.GEMINI_TRANSCRIBE).state is (
+        RollingProviderState.FREE_QUOTA_EXHAUSTED
+    )
+    opens_after_first = (
+        gemini_backend.open_count + scribe_backend.open_count + deepgram_backend.open_count
+    )
+
+    with pytest.raises(RuntimeError, match="All rolling ASR providers are excluded"):
+        await rolling.open_session()
+    assert (
+        gemini_backend.open_count + scribe_backend.open_count + deepgram_backend.open_count
+    ) == opens_after_first
+
+
+@pytest.mark.asyncio
+async def test_healthy_rollover_keeps_provider_available() -> None:
+    estimator = GeminiFreeTierEstimator(rpd_baseline=25, wall_time=lambda: time.time())
+    gemini, _ = _definition(
+        STTProviderName.GEMINI_TRANSCRIBE,
+        _ScriptedSession(),
+        estimator=estimator,
+        session_deadline_s=GEMINI_ROLLING_SESSION_TARGET_S,
+    )
+    scribe, _ = _definition(STTProviderName.ELEVENLABS_SCRIBE, _ScriptedSession())
+    rolling = _make(gemini, scribe)
+
+    first = await rolling.open_session()
+    await first.close()
+    second = await rolling.open_session()
+    assert second.provider_name is STTProviderName.GEMINI_TRANSCRIBE
+    await second.close()
+    assert rolling.status(STTProviderName.GEMINI_TRANSCRIBE).state is (
+        RollingProviderState.AVAILABLE
     )

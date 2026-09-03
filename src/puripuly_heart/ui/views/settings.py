@@ -224,6 +224,13 @@ _STT_SECTION_ORDER = (
     "settings.stt.section.cpu_inference",
     "settings.stt.section.custom",
 )
+_ROLLING_MEMBER_STT_PROVIDERS = frozenset(
+    {
+        STTProviderName.DEEPGRAM,
+        STTProviderName.GEMINI_TRANSCRIBE,
+        STTProviderName.ELEVENLABS_SCRIBE,
+    }
+)
 _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.DEEPGRAM: "settings.stt.section.recommended_cloud",
     STTProviderName.GEMINI_TRANSCRIBE: "settings.stt.section.cloud",
@@ -568,14 +575,18 @@ class SettingsView(ft.Column):
         self._local_cpu_auto_available = bool(available)
 
     def self_stt_control(self) -> ft.Control:
-        return ft.Column(
-            [
-                self._self_stt_card,
-                self._stt_rolling_switch,
-            ],
-            spacing=8,
-            tight=True,
-        )
+        container = getattr(self, "_self_stt_container", None)
+        if container is None:
+            container = ft.Column(
+                [
+                    self._self_stt_card,
+                    self._stt_rolling_switch,
+                ],
+                spacing=8,
+                tight=True,
+            )
+            self._self_stt_container = container
+        return container
 
     def stt_rolling_control(self) -> ft.Control:
         return self._stt_rolling_switch
@@ -3553,10 +3564,17 @@ class SettingsView(ft.Column):
         current_settings = self._build_settings_with_provider_draft()
         if current_settings is not None and current_settings.stt_rolling_enabled == enabled:
             return
+        snapshot_enabled = self._provider_snapshot.stt_rolling_enabled
         draft = self._ensure_provider_settings_draft()
         self._provider_draft = replace(draft, stt_rolling_enabled=enabled)
-        self._record_provider_edit(SttRollingEnabledEdit(enabled))
-        self.has_provider_changes = True
+        if enabled == snapshot_enabled:
+            self._provider_edits.pop(SttRollingEnabledEdit, None)
+            self.has_provider_changes = bool(self._provider_edits)
+        else:
+            self._record_provider_edit(SttRollingEnabledEdit(enabled))
+            self.has_provider_changes = True
+        self._update_api_visibility()
+        _update_control_if_mounted(self._stt_rolling_switch)
         self._emit_runtime_basic(f"[Settings] STT rolling {'enabled' if enabled else 'disabled'}")
 
     def sync_stt_rolling_switch(self, settings: ProviderSettingsSnapshot | None) -> None:
@@ -3564,6 +3582,8 @@ class SettingsView(ft.Column):
         if switch is None or settings is None:
             return
         switch.value = settings.stt_rolling_enabled
+        switch.disabled = settings.stt_provider not in _ROLLING_MEMBER_STT_PROVIDERS
+        _update_control_if_mounted(switch)
 
     def _translation_selection_edit(
         self,
@@ -3922,6 +3942,7 @@ class SettingsView(ft.Column):
                 qwen_asr_model=provider.qwen_asr_model,
             ),
         )
+        self.sync_stt_rolling_switch(provider)
         self._update_api_visibility()
         self._sync_gpu_device_card()
 
@@ -4410,6 +4431,10 @@ class SettingsView(ft.Column):
         fallback = settings.translation.fallback
         fallback_source = self._openrouter_fallback_source(settings)
         active_stt_providers = {stt, peer_stt}
+        if settings.stt_rolling_enabled and stt in _ROLLING_MEMBER_STT_PROVIDERS:
+            active_stt_providers |= set(_ROLLING_MEMBER_STT_PROVIDERS)
+        if settings.peer_stt_rolling_enabled and peer_stt in _ROLLING_MEMBER_STT_PROVIDERS:
+            active_stt_providers |= set(_ROLLING_MEMBER_STT_PROVIDERS)
         self._deepgram_key.visible = STTProviderName.DEEPGRAM in active_stt_providers
         gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
         if gemini_transcribe_key is not None:
@@ -4707,9 +4732,7 @@ class SettingsView(ft.Column):
                 qwen_asr_model=settings.qwen_asr_model,
             ),
         )
-        stt_rolling_switch = getattr(self, "_stt_rolling_switch", None)
-        if stt_rolling_switch is not None:
-            stt_rolling_switch.value = settings.stt_rolling_enabled
+        self.sync_stt_rolling_switch(settings)
 
     def _show_stt_selection_notice(self, message: str) -> None:
         if self.show_snackbar:

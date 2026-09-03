@@ -23,10 +23,10 @@ GEMINI_TRANSCRIBE_SAMPLE_RATE_HZ = 16000
 
 
 def gemini_transcribe_language_codes(source_language: str | None) -> list[str]:
-    if not source_language or source_language == "auto":
+    if not source_language:
         return []
     normalized = source_language.strip()
-    if not normalized:
+    if not normalized or normalized.lower() == "auto":
         return []
     return [normalized]
 

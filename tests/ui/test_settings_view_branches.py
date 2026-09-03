@@ -6770,3 +6770,72 @@ def test_text_subtab_shell_can_render_without_title_and_pin_subtab_bar_to_bottom
     assert isinstance(shell.body_region, ft.Container)
     assert shell.body_region.content is shell.body_host
     assert shell.controls == [shell.body_region, shell.subtab_bar]
+
+
+def _provider_snapshot_with(
+    monkeypatch: pytest.MonkeyPatch,
+    settings: AppSettingsVNext,
+):
+    from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
+
+    provider, _general, _prompt, _overlay = settings_view_surface_snapshots(settings)
+    return provider
+
+
+def test_rolling_switch_syncs_value_and_member_gating(monkeypatch: pytest.MonkeyPatch) -> None:
+    from dataclasses import replace as dc_replace
+
+    view, _ = _make_settings_view(monkeypatch)
+    base = _vnext(stt_provider=STTProviderName.GEMINI_TRANSCRIBE.value)
+    provider = _provider_snapshot_with(monkeypatch, base)
+    provider = dc_replace(provider, stt_rolling_enabled=True)
+    view.sync_stt_rolling_switch(provider)
+    assert view._stt_rolling_switch.value is True
+    assert view._stt_rolling_switch.disabled is False
+
+    non_member = dc_replace(provider, stt_provider=STTProviderName.SONIOX, stt_rolling_enabled=True)
+    view.sync_stt_rolling_switch(non_member)
+    assert view._stt_rolling_switch.disabled is True
+
+
+def test_self_stt_control_returns_stable_container(monkeypatch: pytest.MonkeyPatch) -> None:
+    view, _ = _make_settings_view(monkeypatch)
+    first = view.self_stt_control()
+    second = view.self_stt_control()
+    assert first is second
+    assert view._stt_rolling_switch in first.controls
+
+
+def test_update_api_visibility_shows_all_member_keys_when_rolling_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dataclasses import replace as dc_replace
+
+    settings = _vnext(stt_provider=STTProviderName.GEMINI_TRANSCRIBE.value)
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            stt=replace(settings.intent.stt, rolling_enabled=True),
+        ),
+    )
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view._update_api_visibility()
+    assert view._deepgram_key.visible is True
+    assert view._gemini_transcribe_key.visible is True
+    assert view._elevenlabs_scribe_key.visible is True
+
+
+def test_load_from_settings_syncs_rolling_switch(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = _vnext(stt_provider=STTProviderName.DEEPGRAM.value)
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            stt=replace(settings.intent.stt, rolling_enabled=True),
+        ),
+    )
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    assert view._stt_rolling_switch.value is True
+    assert view._stt_rolling_switch.disabled is False

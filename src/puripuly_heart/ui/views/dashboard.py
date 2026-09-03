@@ -603,6 +603,7 @@ class DashboardView(ft.Column):
                     "gemini_transcribe",
                     "elevenlabs_scribe",
                     "local_qwen_gpu",
+                    "rolling_free",
                 }
             )
         elif control in {"PuriPuly_Listen", "PuriPuly_Captions"}:

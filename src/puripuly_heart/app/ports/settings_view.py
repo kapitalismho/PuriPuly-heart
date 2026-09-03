@@ -279,6 +279,11 @@ class SttRollingEnabledEdit:
 
 
 @dataclass(frozen=True, slots=True)
+class PeerSttRollingEnabledEdit:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
 class PeerSttProviderEdit:
     provider: STTProviderName
 
@@ -362,6 +367,7 @@ class SystemPromptEdit:
 ProviderSettingsEdit: TypeAlias = (
     SelfSttProviderEdit
     | SttRollingEnabledEdit
+    | PeerSttRollingEnabledEdit
     | PeerSttProviderEdit
     | SttGpuDeviceEdit
     | LlmGpuDeviceEdit
@@ -444,6 +450,7 @@ __all__ = [
     "QwenAsrModelEdit",
     "SelfSttProviderEdit",
     "SttRollingEnabledEdit",
+    "PeerSttRollingEnabledEdit",
     "SelfVadSettingsIntent",
     "SttGpuDeviceEdit",
     "SystemPromptEdit",

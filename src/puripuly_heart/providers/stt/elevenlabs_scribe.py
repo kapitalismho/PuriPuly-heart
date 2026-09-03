@@ -28,14 +28,26 @@ _CLOSED = object()
 
 
 def scribe_keyterms(terms: Sequence[str]) -> tuple[str, ...]:
+    input_terms = list(terms)
     normalized: list[str] = []
-    for term in terms:
-        candidate = str(term).strip()[:MAX_SCRIBE_KEYTERM_CHARS]
+    truncated_count = 0
+    for term in input_terms:
+        raw = str(term).strip()
+        if len(raw) > MAX_SCRIBE_KEYTERM_CHARS:
+            truncated_count += 1
+        candidate = raw[:MAX_SCRIBE_KEYTERM_CHARS]
         if not candidate or candidate in normalized:
             continue
         normalized.append(candidate)
         if len(normalized) >= MAX_SCRIBE_KEYTERMS:
             break
+    if len(normalized) < len({str(term).strip()[:MAX_SCRIBE_KEYTERM_CHARS] for term in input_terms if str(term).strip()}) or truncated_count:
+        logger.debug(
+            "Scribe keyterms normalized input=%s kept=%s truncated_chars=%s",
+            len(input_terms),
+            len(normalized),
+            truncated_count,
+        )
     return tuple(normalized)
 
 

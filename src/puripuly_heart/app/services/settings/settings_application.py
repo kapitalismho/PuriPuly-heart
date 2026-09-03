@@ -50,6 +50,7 @@ from puripuly_heart.app.ports.settings_view import (
     ProviderVerificationSnapshot,
     QwenAsrModelEdit,
     QwenRegionEdit,
+    PeerSttRollingEnabledEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
     SttGpuDeviceEdit,
@@ -606,6 +607,11 @@ def materialize_provider_apply_intent(
             updated = _with_intent(
                 updated,
                 stt=replace(updated.intent.stt, rolling_enabled=edit.enabled),
+            )
+        elif isinstance(edit, PeerSttRollingEnabledEdit):
+            updated = _with_intent(
+                updated,
+                peer_stt=replace(updated.intent.peer_stt, rolling_enabled=edit.enabled),
             )
         elif isinstance(edit, PeerSttProviderEdit):
             updated = _with_intent(

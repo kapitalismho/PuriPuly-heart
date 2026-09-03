@@ -25,6 +25,7 @@ from puripuly_heart.app.ports.settings_view import (
     LocaleSettingsIntent,
     LocalLlmBaseUrlEdit,
     OverlayTargetSettingsIntent,
+    PeerSttRollingEnabledEdit,
     PeerVadHangoverIntent,
     PromptApplyIntent,
     ProviderApplyIntent,
@@ -32,6 +33,7 @@ from puripuly_heart.app.ports.settings_view import (
     QwenRegionEdit,
     SelfSttProviderEdit,
     SttGpuDeviceEdit,
+    SttRollingEnabledEdit,
     SystemPromptEdit,
     TranslationSelectionEdit,
     VrcMicInterceptSettingsIntent,
@@ -351,3 +353,31 @@ def test_managed_byok_pkce_target_carries_focused_translation_change() -> None:
     )
     assert updated.intent.translation.connection == TranslationConnection.OPENROUTER.value
     assert current.intent.translation.connection == "managed"
+
+
+def test_rolling_enabled_edits_persist_self_and_peer_flags() -> None:
+    current = AppSettingsVNext()
+    assert current.intent.stt.rolling_enabled is False
+    assert current.intent.peer_stt.rolling_enabled is False
+
+    updated = materialize_provider_apply_intent(
+        current,
+        ProviderApplyIntent((SttRollingEnabledEdit(True),)),
+        materialize_translation=materialize_canonical_translation_settings,
+    )
+    assert updated.intent.stt.rolling_enabled is True
+    assert updated.intent.peer_stt.rolling_enabled is False
+
+    peer_updated = materialize_provider_apply_intent(
+        updated,
+        ProviderApplyIntent((PeerSttRollingEnabledEdit(True),)),
+        materialize_translation=materialize_canonical_translation_settings,
+    )
+    assert peer_updated.intent.stt.rolling_enabled is True
+    assert peer_updated.intent.peer_stt.rolling_enabled is True
+
+    provider_snapshot, _general, _prompt, _overlay = settings_view_surface_snapshots(
+        peer_updated
+    )
+    assert provider_snapshot.stt_rolling_enabled is True
+    assert provider_snapshot.peer_stt_rolling_enabled is True
