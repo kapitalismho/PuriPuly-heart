@@ -36,16 +36,20 @@ class _FakeLiveSession:
 
 
 _DONE = object()
+_TURN_COMPLETE = object()
 
 
 class _FakeLiveContext:
     def __init__(self, session: _FakeLiveSession) -> None:
         self._session = session
+        self.exited = False
 
     async def __aenter__(self):
         return self._session
 
     async def __aexit__(self, exc_type, exc, tb):
+        self.exited = True
+        await self._session.close()
         return False
 
 
@@ -53,16 +57,18 @@ class _RecordingFactory:
     def __init__(self, session: _FakeLiveSession) -> None:
         self._session = session
         self.calls: list[tuple[str, object]] = []
+        self.context: _FakeLiveContext | None = None
 
     def __call__(self, *, model: str, config: object):
         self.calls.append((model, config))
-        return _FakeLiveContext(self._session)
+        self.context = _FakeLiveContext(self._session)
+        return self.context
 
 
 def _backend(
     session: _FakeLiveSession,
     *,
-    language_codes: tuple[str, ...] = ("ko",),
+    language_codes: tuple[str, ...] = ("ko-KR",),
     custom_vocabulary: tuple[str, ...] = (),
 ) -> tuple[GeminiTranscribeSTTBackend, _RecordingFactory]:
     factory = _RecordingFactory(session)
@@ -99,7 +105,7 @@ async def test_open_session_rejects_empty_api_key() -> None:
 @pytest.mark.asyncio
 async def test_session_sends_manual_activity_and_verbatim_config() -> None:
     session = _FakeLiveSession()
-    backend, factory = _backend(session, language_codes=("ko",))
+    backend, factory = _backend(session)
     stt = await backend.open_session()
     try:
         model, config = factory.calls[0]
@@ -108,7 +114,7 @@ async def test_session_sends_manual_activity_and_verbatim_config() -> None:
         assert raw["response_modalities"] == ["TEXT"]
         transcription = raw["input_audio_transcription"]
         assert transcription["mode"] == "VERBATIM"
-        assert transcription["language_codes"] == ["ko"]
+        assert transcription["language_codes"] == ["ko-KR"]
         assert raw["realtime_input_config"]["automatic_activity_detection"]["disabled"] is True
     finally:
         await stt.close()
@@ -251,13 +257,15 @@ async def test_stop_terminates_events_consumer() -> None:
 @pytest.mark.asyncio
 async def test_close_reports_unresolved_finalizes_and_closes_session() -> None:
     session = _FakeLiveSession()
-    backend, _ = _backend(session)
+    backend, factory = _backend(session)
     stt = await backend.open_session()
     try:
         await stt.send_audio(b"\x00\x00" * 16)
         await stt.on_speech_end(trailing_silence_ms=100, reason="silence")
     finally:
         await stt.close()
+    assert factory.context is not None
+    assert factory.context.exited is True
     assert session.closed is True
 
 
@@ -306,8 +314,88 @@ async def test_verify_api_key_raises_on_http_error(monkeypatch: pytest.MonkeyPat
         await GeminiTranscribeSTTBackend.verify_api_key("secret")
 
 
+class _TurnScopedLiveSession(_FakeLiveSession):
+    def __init__(self) -> None:
+        super().__init__()
+        self.receive_calls = 0
+
+    async def receive(self):
+        self.receive_calls += 1
+        while True:
+            item = await self._queue.get()
+            if item is _DONE or item is _TURN_COMPLETE:
+                return
+            yield item
+
+
+class _FailingReceiveSession(_FakeLiveSession):
+    def __init__(self, exc: BaseException) -> None:
+        super().__init__()
+        self._exc = exc
+
+    async def receive(self):
+        raise self._exc
+        yield
+
+
+class _ApiFailure(Exception):
+    def __init__(self, *, code: int, status: str) -> None:
+        super().__init__(status)
+        self.code = code
+        self.status = status
+
+
+@pytest.mark.asyncio
+async def test_receive_loop_continues_after_turn_complete() -> None:
+    session = _TurnScopedLiveSession()
+    backend, _ = _backend(session)
+    stt = await backend.open_session()
+    events_task = asyncio.create_task(_collect(stt, 2))
+    try:
+        await stt.send_audio(b"\x00\x00" * 16)
+        await stt.on_speech_end(trailing_silence_ms=100, reason="silence")
+        session.push(_final("one"))
+        session.push(_TURN_COMPLETE)
+        await asyncio.sleep(0)
+
+        await stt.send_audio(b"\x00\x00" * 16)
+        await stt.on_speech_end(trailing_silence_ms=100, reason="silence")
+        session.push(_final("two"))
+        session.push(_TURN_COMPLETE)
+
+        events = await asyncio.wait_for(events_task, timeout=1)
+        assert [event.text for event in events] == ["one", "two"]
+        assert session.receive_calls >= 2
+    finally:
+        await stt.close()
+
+
+@pytest.mark.asyncio
+async def test_recv_failure_logs_exception_class_and_closes_session(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    session = _FailingReceiveSession(_ApiFailure(code=400, status="INVALID_ARGUMENT"))
+    backend, factory = _backend(session)
+    with caplog.at_level("ERROR"):
+        stt = await backend.open_session()
+        try:
+            with pytest.raises(_ApiFailure):
+                async for _event in stt.events():
+                    pass
+        finally:
+            await stt.close()
+    assert factory.context is not None
+    assert factory.context.exited is True
+    assert session.closed is True
+    combined = "\n".join(record.getMessage() for record in caplog.records)
+    assert "exception_class=_ApiFailure" in combined
+    assert "api_code=400" in combined
+    assert "api_status=INVALID_ARGUMENT" in combined
+    assert "message_kind=validation" in combined
+
+
 def test_gemini_transcribe_language_codes() -> None:
-    assert gemini_transcribe_language_codes("ko") == ["ko"]
+    assert gemini_transcribe_language_codes("ko") == ["ko-KR"]
     assert gemini_transcribe_language_codes("en-US") == ["en-US"]
     assert gemini_transcribe_language_codes("auto") == []
     assert gemini_transcribe_language_codes(" AUTO ") == []
@@ -315,6 +403,7 @@ def test_gemini_transcribe_language_codes() -> None:
     assert gemini_transcribe_language_codes(None) == []
     assert gemini_transcribe_language_codes("") == []
     assert gemini_transcribe_language_codes("   ") == []
+    assert gemini_transcribe_language_codes("xx") == []
 
 
 def _final(text: str):

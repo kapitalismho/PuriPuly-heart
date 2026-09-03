@@ -266,14 +266,46 @@ _GEMINI_TRANSCRIBE_LANGUAGE_BASES = frozenset(
     }
 )
 
+_GEMINI_TRANSCRIBE_PRIMARY_LOCALES: dict[str, str] = {
+    "ar": "ar",
+    "cs": "cs-CZ",
+    "da": "da-DK",
+    "de": "de-DE",
+    "el": "el-GR",
+    "en": "en-US",
+    "es": "es-ES",
+    "fi": "fi-FI",
+    "fr": "fr-FR",
+    "he": "he-IL",
+    "hi": "hi-IN",
+    "id": "id-ID",
+    "it": "it-IT",
+    "ja": "ja-JP",
+    "ko": "ko-KR",
+    "nl": "nl-NL",
+    "no": "nb-NO",
+    "pl": "pl-PL",
+    "pt": "pt-BR",
+    "ru": "ru-RU",
+    "sv": "sv-SE",
+    "th": "th-TH",
+    "tr": "tr-TR",
+    "uk": "uk-UA",
+    "vi": "vi-VN",
+    "zh": "zh-CN",
+}
+
 
 def gemini_transcribe_language_hint(code: str) -> str | None:
     normalized = str(code).strip()
-    if not normalized:
+    if not normalized or normalized.lower() == "auto":
         return None
-    if normalized.split("-")[0].lower() not in _GEMINI_TRANSCRIBE_LANGUAGE_BASES:
+    base = normalized.split("-")[0].lower()
+    if base not in _GEMINI_TRANSCRIBE_LANGUAGE_BASES:
         return None
-    return normalized
+    if "-" in normalized:
+        return normalized
+    return _GEMINI_TRANSCRIBE_PRIMARY_LOCALES.get(base, normalized)
 
 
 def gemini_transcribe_language_hints(

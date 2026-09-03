@@ -2514,7 +2514,7 @@ def test_gemini_transcribe_auto_sends_expected_language_codes_up_to_32() -> None
     resolved = resolve_peer_stt_runtime_config(settings)
 
     assert resolved.source_mode == "auto"
-    assert resolved.provider_options["language_codes"] == ("ko", "ja", "zh-TW", "en")
+    assert resolved.provider_options["language_codes"] == ("ko-KR", "ja-JP", "zh-TW", "en-US")
     assert resolved.provider_options["auto_language"] is True
 
 

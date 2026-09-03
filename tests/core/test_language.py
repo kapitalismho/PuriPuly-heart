@@ -71,29 +71,49 @@ def test_qwen_audio_hint_mapping_drops_unsupported_dedupes_and_limits() -> None:
     assert qwen_audio_asr_language_hints(["xx"]) == ()
 
 
+def test_gemini_transcribe_language_hint_maps_primary_locales() -> None:
+    from puripuly_heart.core.language import gemini_transcribe_language_hint
+
+    assert gemini_transcribe_language_hint("ko") == "ko-KR"
+    assert gemini_transcribe_language_hint("ja") == "ja-JP"
+    assert gemini_transcribe_language_hint("en") == "en-US"
+    assert gemini_transcribe_language_hint("zh") == "zh-CN"
+    assert gemini_transcribe_language_hint("en-US") == "en-US"
+    assert gemini_transcribe_language_hint("zh-CN") == "zh-CN"
+    assert gemini_transcribe_language_hint("zh-TW") == "zh-TW"
+    assert gemini_transcribe_language_hint("pt") == "pt-BR"
+    assert gemini_transcribe_language_hint("no") == "nb-NO"
+    assert gemini_transcribe_language_hint("ar") == "ar"
+    assert gemini_transcribe_language_hint("auto") is None
+    assert gemini_transcribe_language_hint(" AUTO ") is None
+    assert gemini_transcribe_language_hint("") is None
+    assert gemini_transcribe_language_hint("   ") is None
+    assert gemini_transcribe_language_hint("xx") is None
+    assert gemini_transcribe_language_hint("et") is None
+
+
 def test_gemini_transcribe_hint_mapping_drops_unsupported_dedupes_and_limits() -> None:
     from puripuly_heart.core.language import gemini_transcribe_language_hints
 
     assert gemini_transcribe_language_hints(["ko", "ja", "en-US", "zh-TW", "en"]) == (
-        "ko",
-        "ja",
+        "ko-KR",
+        "ja-JP",
         "en-US",
         "zh-TW",
-        "en",
     )
-    assert gemini_transcribe_language_hints(["ko", "xx", "et"]) == ("ko",)
-    assert gemini_transcribe_language_hints(["ja", "ja", "  "]) == ("ja",)
+    assert gemini_transcribe_language_hints(["ko", "xx", "et"]) == ("ko-KR",)
+    assert gemini_transcribe_language_hints(["ja", "ja", "  "]) == ("ja-JP",)
     assert gemini_transcribe_language_hints(["ja", "ko"], limit=0) == ()
     many = ["ko", "ja", "en", "zh", "fr", "de", "es", "it"] * 5
     assert gemini_transcribe_language_hints(many, limit=32) == (
-        "ko",
-        "ja",
-        "en",
-        "zh",
-        "fr",
-        "de",
-        "es",
-        "it",
+        "ko-KR",
+        "ja-JP",
+        "en-US",
+        "zh-CN",
+        "fr-FR",
+        "de-DE",
+        "es-ES",
+        "it-IT",
     )
     assert len(gemini_transcribe_language_hints(many)) == 8
     assert gemini_transcribe_language_hints([]) == ()

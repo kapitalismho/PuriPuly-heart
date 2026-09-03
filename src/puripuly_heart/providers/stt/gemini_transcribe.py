@@ -25,10 +25,39 @@ GEMINI_TRANSCRIBE_SAMPLE_RATE_HZ = 16000
 def gemini_transcribe_language_codes(source_language: str | None) -> list[str]:
     if not source_language:
         return []
-    normalized = source_language.strip()
-    if not normalized or normalized.lower() == "auto":
-        return []
-    return [normalized]
+    from puripuly_heart.core.language import gemini_transcribe_language_hint
+
+    mapped = gemini_transcribe_language_hint(source_language)
+    return [mapped] if mapped else []
+
+
+def _recv_failure_fields(exc: BaseException) -> tuple[str, object, object, str]:
+    exception_class = type(exc).__name__
+    api_code = getattr(exc, "code", None)
+    api_status = getattr(exc, "status", None)
+    return exception_class, api_code, api_status, _recv_message_kind(exc, api_code, api_status)
+
+
+def _recv_message_kind(exc: BaseException, api_code: object, api_status: object) -> str:
+    class_name = type(exc).__name__.lower().replace("_", "")
+    status_text = str(api_status or "").lower()
+    if "goaway" in class_name or "go_away" in status_text:
+        return "go_away"
+    if (
+        "connection" in class_name
+        or "closed" in class_name
+        or "websocket" in class_name
+        or "unavailable" in status_text
+    ):
+        return "connection_closed"
+    if (
+        api_code in {400, 422}
+        or "invalid" in status_text
+        or "validation" in class_name
+        or "invalidargument" in class_name
+    ):
+        return "validation"
+    return "other"
 
 
 @dataclass(slots=True)
@@ -109,6 +138,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
     _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
         init=False, repr=False
     )
+    _live_context: Any = field(init=False, default=None, repr=False)
     _live_session: Any = field(init=False, default=None, repr=False)
     _recv_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
@@ -146,6 +176,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         )
         start_at = time.monotonic()
         live_context = factory(model=self.model, config=config)
+        self._live_context = live_context
         self._live_session = await asyncio.wait_for(
             live_context.__aenter__(), timeout=self.connect_timeout_s
         )
@@ -156,15 +187,24 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
 
     async def _recv_loop(self) -> None:
         try:
-            live_session = self._live_session
-            if live_session is None:
-                return
-            async for message in live_session.receive():
-                self._handle_message(message)
+            while not self._stopped:
+                live_session = self._live_session
+                if live_session is None:
+                    return
+                async for message in live_session.receive():
+                    self._handle_message(message)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.exception("Gemini Transcribe Live recv loop error")
+            exception_class, api_code, api_status, message_kind = _recv_failure_fields(exc)
+            logger.exception(
+                "Gemini Transcribe Live recv loop error exception_class=%s "
+                "api_code=%s api_status=%s message_kind=%s",
+                exception_class,
+                api_code,
+                api_status,
+                message_kind,
+            )
             self._put_event(exc)
         finally:
             self._put_event(None)
@@ -191,10 +231,12 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         self._put_event(STTBackendTranscriptEvent(text=text, is_final=True))
 
     async def send_audio(self, pcm16le: bytes) -> None:
+        from google.genai import types
+
         if self._stopped:
             return
         if not self._activity_open:
-            await self._send_realtime(activity_start={})
+            await self._send_realtime(activity_start=types.ActivityStart())
             self._activity_open = True
             logger.info("[STT] Gemini Transcribe Live activityStart sent")
         await self._send_realtime(
@@ -219,9 +261,11 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
             wait_ms,
         )
         if self._activity_open:
+            from google.genai import types
+
             self._activity_open = False
             self._pending_finalize_requests += 1
-            await self._send_realtime(activity_end={})
+            await self._send_realtime(activity_end=types.ActivityEnd())
             logger.info("[STT] Gemini Transcribe Live activityEnd sent (finalize)")
 
     async def _send_realtime(self, **kwargs: Any) -> None:
@@ -248,8 +292,14 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
             self._recv_task.cancel()
             await asyncio.gather(self._recv_task, return_exceptions=True)
             self._recv_task = None
+        live_context = self._live_context
         live_session = self._live_session
+        self._live_context = None
         self._live_session = None
+        if live_context is not None:
+            with contextlib.suppress(Exception):
+                await live_context.__aexit__(None, None, None)
+            return
         if live_session is not None:
             with contextlib.suppress(Exception):
                 await live_session.close()
