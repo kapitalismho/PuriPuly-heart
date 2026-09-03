@@ -376,10 +376,10 @@ describe('broker direct deploy automation', () => {
       'wrangler secret delete NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS',
     );
     const stagedMigrationRenderIndex = workflow.indexOf(
-      'staged-migrations-through-0020',
+      'staged-migrations-pre-backfill',
     );
     const stagedMigrationApplyIndex = workflow.indexOf(
-      'Apply remote D1 migrations through 0020',
+      'Apply remote D1 migrations except deferred 0021',
     );
     const networkIdentityBackfillAwaitIndex = workflow.indexOf(
       'Await network identity backfill until keyed_only',
@@ -390,6 +390,9 @@ describe('broker direct deploy automation', () => {
     );
     const networkIdentityPurgeVerifyIndex = workflow.indexOf(
       'Verify legacy network identity columns are gone',
+    );
+    const migrationJournalGateIndex = workflow.indexOf(
+      'Verify 0022 applied and 0021 still pending',
     );
 
     expect(workflow).toContain('workflow_dispatch:');
@@ -450,17 +453,20 @@ describe('broker direct deploy automation', () => {
     );
     expect(workflow).not.toContain('NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION:-');
     expect(workflow).not.toContain('NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION:-');
-    expect(workflow).toContain('staged-migrations-through-0020');
+    expect(workflow).toContain('staged-migrations-pre-backfill');
     expect(workflow).toContain('0020_network_identity_hmac.sql');
-    expect(workflow).toContain('0021_network_identity_purge.sql');
+    expect(workflow).toContain('0022_managed_operation_issuance_context.sql');
+    expect(workflow).toContain("deferred_migration='0021_network_identity_purge.sql'");
     expect(workflow).toContain('staged_config_path');
     expect(workflow).toContain('migrations_dir');
     expect(workflow).toContain('network_identity_migration');
     expect(workflow).toContain('keyed_only');
     expect(workflow).toContain('pragma_table_info');
     expect(workflow).toContain('attempt_ip_hash');
-    expect(workflow).toContain('Apply remote D1 migrations through 0020');
+    expect(workflow).toContain('Apply remote D1 migrations except deferred 0021');
     expect(workflow).toContain('Await network identity backfill until keyed_only');
+    expect(workflow).toContain('Verify 0022 applied and 0021 still pending');
+    expect(workflow).toContain('SELECT name FROM d1_migrations;');
     expect(workflow).toContain('Apply network identity purge migration 0021');
     expect(workflow).toContain('Verify legacy network identity columns are gone');
     expect(workflow).toMatch(
@@ -584,11 +590,11 @@ describe('broker direct deploy automation', () => {
       workflow.indexOf('pnpm exec wrangler deploy'),
     );
     expect(networkIdentityBackfillAwaitIndex).toBeGreaterThanOrEqual(0);
-    expect(workflow.indexOf('pnpm exec wrangler deploy')).toBeLessThan(
-      networkIdentityBackfillAwaitIndex,
-    );
     expect(networkIdentityPurgeApplyIndex).toBeGreaterThanOrEqual(0);
     expect(networkIdentityBackfillAwaitIndex).toBeLessThan(networkIdentityPurgeApplyIndex);
+    expect(migrationJournalGateIndex).toBeGreaterThanOrEqual(0);
+    expect(networkIdentityBackfillAwaitIndex).toBeLessThan(migrationJournalGateIndex);
+    expect(migrationJournalGateIndex).toBeLessThan(networkIdentityPurgeApplyIndex);
     expect(networkIdentityPurgeVerifyIndex).toBeGreaterThanOrEqual(0);
     expect(networkIdentityPurgeApplyIndex).toBeLessThan(networkIdentityPurgeVerifyIndex);
     expect(networkIdentityPurgeVerifyIndex).toBeLessThan(

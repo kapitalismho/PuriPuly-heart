@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 
+import { instrumentPublicPostRoute } from './abuse-controls';
 import { errorResponse as publicErrorResponse } from './broker-error';
 import type { BrokerEnv } from './contract';
 import { finalizeDiscordManagedKeyDeliveryAck } from './discord-managed-issue';
@@ -367,6 +368,13 @@ export async function handleManagedKeyDeliveryAck(
       'delivery_id, managed_credential_ref, and delivery_ack_token are required',
     );
   }
+  const ackRateLimit = await instrumentPublicPostRoute(c.env.BROKER_DB, c, {
+    endpoint: 'POST /v1/providers/openrouter/managed-key-delivery/ack',
+    installationId: null,
+  });
+  if (ackRateLimit) {
+    return ackErrorResponse(c, 429, 'rate_limited', ackRateLimit.message);
+  }
 
   const acknowledgedAt = new Date();
   const validation = await validateManagedKeyDeliveryAck(c.env.BROKER_DB, {
@@ -468,13 +476,13 @@ async function readJsonBody<T>(
 
 function ackErrorResponse(
   c: Context<BrokerEnv>,
-  status: 400 | 404 | 409 | 410,
-  subcode: 'malformed' | 'invalid' | 'expired' | 'mismatched' | 'failed',
+  status: 400 | 404 | 409 | 410 | 429,
+  subcode: 'malformed' | 'invalid' | 'expired' | 'mismatched' | 'failed' | 'rate_limited',
   message: string,
 ): Response {
   return publicErrorResponse(c, status, {
-    code: 'invalid_request',
-    class: subcode === 'failed' ? 'retryable' : 'terminal',
+    code: subcode === 'rate_limited' ? 'rate_limited' : 'invalid_request',
+    class: subcode === 'failed' || subcode === 'rate_limited' ? 'retryable' : 'terminal',
     subcode: `delivery_ack_${subcode}`,
     message,
   });

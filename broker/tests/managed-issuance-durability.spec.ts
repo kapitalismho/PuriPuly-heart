@@ -47,7 +47,12 @@ function mockProviderKeyApi(limits: Map<string, number>) {
       if (typeof parsed.limit === 'number') {
         limits.set(hash, parsed.limit);
       }
-      return Response.json({ data: { hash, limit: limits.get(hash) ?? 0.07 } });
+      return Response.json({ data: { hash, limit: limits.get(hash) ?? 0.07, disabled: true } });
+    }
+    if (match && method === 'DELETE') {
+      const hash = match[1] ?? '';
+      limits.delete(hash);
+      return new Response(null, { status: 204 });
     }
     throw new Error(`unexpected provider request: ${method} ${url}`);
   });
@@ -552,6 +557,290 @@ describe('managed issuance durability', () => {
       outcome: 'reserved',
       referralId: '9ABCDX',
     });
+  });
+
+  it('keeps operation-bound referrals settleable through stale delivery cleanup', async () => {
+    const env = createTestBrokerEnv();
+    const { createManagedOperation, getManagedOperation, hashManagedOperationResumeToken } =
+      await import('../src/managed-operation');
+    const { createManagedKeyDelivery } = await import('../src/managed-key-delivery');
+    const { reconcileStaleManagedKeyDeliveries } = await import('../src/scheduled');
+    const subjectRef = 'ph-discord-user-v1_stale_survive';
+    const installationId = 'install-stale-survive';
+    env.__db
+      .prepare(
+        `INSERT INTO installations (installation_id, device_public_key, app_version, created_at, last_seen_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(installationId, 'device-stale-survive', '1.2.3', NOW_ISO, NOW_ISO);
+    env.__db
+      .prepare(
+        `INSERT INTO discord_identities (discord_user_ref, entitlement_installation_id, status, created_at, updated_at)
+         VALUES (?, ?, 'issuing', ?, ?)`,
+      )
+      .run(subjectRef, installationId, NOW_ISO, NOW_ISO);
+    const operationId = 'ph-mop-v1_stale_survive_operation_1';
+    await createManagedOperation(env.BROKER_DB, {
+      operationId,
+      resumeTokenHash: await hashManagedOperationResumeToken('resume-stale-survive'),
+      issueSource: 'discord',
+      subjectRef,
+      installationId,
+      devicePublicKey: 'device-stale-survive',
+      now: NOW,
+    });
+    const { startManagedOperationAttempt, recordAttemptCredential, transitionManagedOperation } =
+      await import('../src/managed-operation');
+    const operation = (await getManagedOperation(env.BROKER_DB, operationId))!;
+    const started = await startManagedOperationAttempt(env.BROKER_DB, operation, NOW);
+    expect(started.ok).toBe(true);
+    if (!started.ok) {
+      return;
+    }
+    await recordAttemptCredential(env.BROKER_DB, operationId, 1, 'hash_stale_survive_1', NOW);
+    await transitionManagedOperation(env.BROKER_DB, operationId, 'DELIVERY_PENDING', NOW);
+    const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef,
+      installationId,
+      managedCredentialRef: 'hash_stale_survive_1',
+      createdAt: new Date(NOW.getTime() - 30 * 60_000),
+      expiresAt: new Date(NOW.getTime() - 15 * 60_000),
+      operationId,
+      attemptIndex: 1,
+    });
+    env.__db
+      .prepare(
+        `INSERT INTO referral_rewards (
+          referral_id, referrer_source, referrer_subject_ref, referred_source, referred_subject_ref,
+          referred_installation_id, referred_hardware_hash, referred_hardware_hash_salt_version,
+          referred_bonus_status, referrer_bonus_status, operation_id, created_at, updated_at
+        ) VALUES (?, 'discord', ?, 'discord', ?, ?, ?, 7, 'reserved', 'pending', ?, ?, ?)`,
+      )
+      .run(
+        '9ABCDX',
+        'ph-discord-user-v1_owner_stale',
+        subjectRef,
+        installationId,
+        'hardware-stale-survive',
+        operationId,
+        NOW_ISO,
+        NOW_ISO,
+      );
+    const legacySubjectRef = 'ph-discord-user-v1_stale_legacy';
+    const legacyInstallationId = 'install-stale-legacy';
+    env.__db
+      .prepare(
+        `INSERT INTO installations (installation_id, device_public_key, app_version, created_at, last_seen_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(legacyInstallationId, 'device-stale-legacy', '1.2.3', NOW_ISO, NOW_ISO);
+    env.__db
+      .prepare(
+        `INSERT INTO referral_rewards (
+          referral_id, referrer_source, referrer_subject_ref, referred_source, referred_subject_ref,
+          referred_installation_id, referred_hardware_hash, referred_hardware_hash_salt_version,
+          referred_bonus_status, referrer_bonus_status, operation_id, created_at, updated_at
+        ) VALUES (?, 'discord', ?, 'discord', ?, ?, ?, 7, 'reserved', 'pending', NULL, ?, ?)`,
+      )
+      .run(
+        '9ABCDX',
+        'ph-discord-user-v1_owner_stale',
+        legacySubjectRef,
+        legacyInstallationId,
+        'hardware-stale-legacy',
+        NOW_ISO,
+        NOW_ISO,
+      );
+    const legacyDelivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef: legacySubjectRef,
+      installationId: legacyInstallationId,
+      managedCredentialRef: 'hash_stale_legacy_1',
+      createdAt: new Date(NOW.getTime() - 30 * 60_000),
+      expiresAt: new Date(NOW.getTime() - 15 * 60_000),
+      operationId: null,
+      attemptIndex: null,
+    });
+    const liveOperationId = 'ph-mop-v1_liveB_survive_operation_2';
+    await createManagedOperation(env.BROKER_DB, {
+      operationId: liveOperationId,
+      resumeTokenHash: await hashManagedOperationResumeToken('resume-stale-survive-2'),
+      issueSource: 'discord',
+      subjectRef,
+      installationId,
+      devicePublicKey: 'device-stale-survive',
+      now: NOW,
+    });
+    const liveOperation = (await getManagedOperation(env.BROKER_DB, liveOperationId))!;
+    const liveStarted = await startManagedOperationAttempt(env.BROKER_DB, liveOperation, NOW);
+    expect(liveStarted.ok).toBe(true);
+    if (!liveStarted.ok) {
+      return;
+    }
+    await recordAttemptCredential(env.BROKER_DB, liveOperationId, 1, 'hash_stale_live_1', NOW);
+    await transitionManagedOperation(env.BROKER_DB, liveOperationId, 'DELIVERY_PENDING', NOW);
+    await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef,
+      installationId,
+      managedCredentialRef: 'hash_stale_live_1',
+      createdAt: NOW,
+      expiresAt: new Date(NOW.getTime() + 15 * 60_000),
+      operationId: liveOperationId,
+      attemptIndex: 1,
+    });
+    env.__db
+      .prepare(`UPDATE managed_operations SET referral_reward_id = ?, referral_status = 'reserved', updated_at = ? WHERE operation_id = ?`)
+      .run(1, NOW_ISO, operationId);
+    mockProviderKeyApi(new Map([['hash_stale_survive_1', 0.07], ['hash_stale_legacy_1', 0.07]]));
+
+    const result = await reconcileStaleManagedKeyDeliveries(env, NOW);
+    expect(result).toMatchObject({ expired: 2 });
+    const survivor = env.__db
+      .prepare(`SELECT referred_bonus_status, referrer_bonus_status FROM referral_rewards WHERE operation_id = ?`)
+      .get(operationId) as Record<string, string>;
+    expect(survivor).toMatchObject({ referred_bonus_status: 'reserved', referrer_bonus_status: 'pending' });
+    const legacy = env.__db
+      .prepare(`SELECT referred_bonus_status FROM referral_rewards WHERE operation_id IS NULL`)
+      .get() as Record<string, string>;
+    expect(legacy).toMatchObject({ referred_bonus_status: 'failed' });
+    expect((await getManagedOperation(env.BROKER_DB, operationId))?.state).toBe('DELIVERY_PENDING');
+    expect((await getManagedOperation(env.BROKER_DB, liveOperationId))?.state).toBe('DELIVERY_PENDING');
+    expect(
+      env.__db
+        .prepare(`SELECT status FROM discord_identities WHERE discord_user_ref = ?`)
+        .get(subjectRef) as Record<string, string>,
+    ).toMatchObject({ status: 'issuing' });
+    const cleaned = env.__db
+      .prepare(`SELECT status, failure_reason FROM managed_key_deliveries WHERE delivery_id = ?`)
+      .get(delivery.deliveryId) as Record<string, string>;
+    expect(cleaned).toMatchObject({ status: 'expired', failure_reason: 'ack_expired_child_key_cleaned' });
+    const legacyCleaned = env.__db
+      .prepare(`SELECT status, failure_reason FROM managed_key_deliveries WHERE delivery_id = ?`)
+      .get(legacyDelivery.deliveryId) as Record<string, string>;
+    expect(legacyCleaned).toMatchObject({ status: 'expired', failure_reason: 'ack_expired_child_key_cleaned' });
+  });
+  it('never credits referrer settlement when the owner entitlement died mid-batch', async () => {
+    const armed = { expired: false };
+    let env: ReturnType<typeof createTestBrokerEnv>;
+    env = createTestBrokerEnv({
+      beforeRun: ({ sql }) => {
+        if (
+          !armed.expired &&
+          sql.includes('UPDATE openrouter_entitlements') &&
+          sql.includes('SET budget_usd')
+        ) {
+          armed.expired = true;
+          env.__db
+            .prepare(
+              `UPDATE openrouter_entitlements SET expires_at = ? WHERE managed_credential_ref = ?`,
+            )
+            .run('2026-01-01T00:00:00.000Z', 'hash_referrer_race_owner');
+        }
+      },
+    });
+    env.__db
+      .prepare(
+        `INSERT INTO installations (installation_id, device_public_key, app_version, created_at, last_seen_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run('install-referrer-race', 'device-referrer-race', '1.2.3', NOW_ISO, NOW_ISO);
+    env.__db
+      .prepare(
+        `INSERT INTO discord_identities (discord_user_ref, entitlement_installation_id, status, created_at, updated_at)
+         VALUES (?, ?, 'active', ?, ?)`,
+      )
+      .run('ph-discord-user-v1_referrer_race', 'install-referrer-race', NOW_ISO, NOW_ISO);
+    env.__db
+      .prepare(
+        `INSERT INTO openrouter_entitlements (
+          installation_id, status, budget_usd, managed_credential_ref, issued_at, expires_at,
+          discord_user_ref, discord_issue_status, discord_issue_delivered_at
+        ) VALUES (?, 'active', 10, ?, ?, ?, ?, 'active', ?)`,
+      )
+      .run(
+        'install-referrer-race',
+        'hash_referrer_race_owner',
+        NOW_ISO,
+        '2026-12-01T00:00:00.000Z',
+        'ph-discord-user-v1_referrer_race',
+        NOW_ISO,
+      );
+    env.__db
+      .prepare(
+        `INSERT INTO installations (installation_id, device_public_key, app_version, created_at, last_seen_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run('install-referred-race', 'device-referred-race', '1.2.3', NOW_ISO, NOW_ISO);
+    env.__db
+      .prepare(
+        `INSERT INTO discord_identities (discord_user_ref, entitlement_installation_id, status, created_at, updated_at)
+         VALUES (?, ?, 'active', ?, ?)`,
+      )
+      .run('ph-discord-user-v1_referred_race', 'install-referred-race', NOW_ISO, NOW_ISO);
+    env.__db
+      .prepare(
+        `INSERT INTO openrouter_entitlements (
+          installation_id, status, budget_usd, managed_credential_ref, issued_at, expires_at,
+          discord_user_ref, discord_issue_status, discord_issue_delivered_at
+        ) VALUES (?, 'active', 0.09, ?, ?, ?, ?, 'active', ?)`,
+      )
+      .run(
+        'install-referred-race',
+        'hash_referred_race_1',
+        NOW_ISO,
+        '2026-12-01T00:00:00.000Z',
+        'ph-discord-user-v1_referred_race',
+        NOW_ISO,
+      );
+    env.__db
+      .prepare(
+        `INSERT INTO referral_rewards (
+          referral_id, referrer_source, referrer_subject_ref, referred_source, referred_subject_ref,
+          referred_installation_id, referred_hardware_hash, referred_hardware_hash_salt_version,
+          referred_bonus_status, referrer_bonus_status, referred_managed_credential_ref, created_at, updated_at
+        ) VALUES (?, 'discord', ?, 'discord', ?, ?, ?, 7, 'credited', 'pending', ?, ?, ?)`,
+      )
+      .run(
+        '9ABCDX',
+        'ph-discord-user-v1_referrer_race',
+        'ph-discord-user-v1_referred_race',
+        'install-referred-race',
+        'hardware-referrer-race',
+        'hash_referred_race_1',
+        NOW_ISO,
+        NOW_ISO,
+      );
+    const rewardId = Number((env.__db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id);
+    env.__db
+      .prepare(
+        `INSERT INTO managed_referral_settlement_jobs (
+          source, referral_reward_id, delivery_id, operation_id, phase,
+          attempt_count, last_attempt_at, next_attempt_at,
+          fencing_token, lease_expires_at, last_error_code, created_at, updated_at, completed_at
+        ) VALUES ('discord', ?, ?, NULL, 'referrer_pending', 1, ?, ?, NULL, NULL, NULL, ?, ?, NULL)`,
+      )
+      .run(rewardId, 'ph-delivery-v1_referrer_race', NOW_ISO, NOW_ISO, NOW_ISO, NOW_ISO);
+
+    const limits = new Map([
+      ['hash_referrer_race_owner', 10],
+      ['hash_referred_race_1', 0.09],
+    ]);
+    const { calls } = mockProviderKeyApi(limits);
+    await expect(
+      processManagedReferralSettlementJobs(env, { now: NOW }),
+    ).resolves.toMatchObject({ completed: 0 });
+    expect(armed.expired).toBe(true);
+    expect(
+      env.__db
+        .prepare(`SELECT referrer_bonus_status FROM referral_rewards WHERE id = ?`)
+        .get(rewardId) as Record<string, string>,
+    ).toMatchObject({ referrer_bonus_status: 'pending' });
+    expect(
+      env.__db.prepare(`SELECT phase FROM managed_referral_settlement_jobs WHERE id = ?`).get(1) as Record<string, string>,
+    ).toMatchObject({ phase: 'referrer_pending' });
+    expect(calls.filter((call) => call.method === 'PATCH')).toHaveLength(0);
   });
 
   it('converges a crash-after-mutation settlement without duplicating provider effects', async () => {

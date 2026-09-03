@@ -17,6 +17,7 @@ import {
   type ManagedOperationAttemptRecord,
   type ManagedOperationRecord,
 } from './managed-operation';
+import { instrumentPublicPostRoute } from './abuse-controls';
 import type { ManagedKeyDeliveryRecord } from './persistence';
 import { executeQqResumeIssuance } from './qq-managed-issue';
 
@@ -87,6 +88,21 @@ export async function handleManagedOperationResume(c: Context<BrokerEnv>): Promi
   const installationId = typeof body.value.installation_id === 'string' ? body.value.installation_id : null;
   if (!operationId || !isManagedOperationId(operationId) || !resumeToken || !installationId) {
     return c.json({ ok: false, code: 'invalid_request', message: 'operation_id, resume_token, and installation_id are required' }, 400);
+  }
+  const resumeRateLimit = await instrumentPublicPostRoute(c.env.BROKER_DB, c, {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/resume',
+    installationId,
+  });
+  if (resumeRateLimit) {
+    return c.json(
+      {
+        ok: false,
+        code: 'rate_limited',
+        message: resumeRateLimit.message,
+        retry_after_ms: resumeRateLimit.retryAfterMs,
+      },
+      429,
+    );
   }
   const db = c.env.BROKER_DB;
   const now = new Date();

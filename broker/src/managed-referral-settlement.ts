@@ -398,19 +398,57 @@ async function processInviteePhase(env: SettlementEnv, job: ClaimedJob, now: Dat
         WHERE id = ?
           AND referred_subject_ref = ?
           AND (referred_bonus_status = 'reserved' OR (referred_bonus_status = 'credited' AND referred_managed_credential_ref = ?))
-          AND EXISTS (SELECT 1 FROM managed_referral_settlement_jobs job WHERE job.id = ? AND job.fencing_token = ? AND job.phase = 'invitee_pending')`,
-    ).bind(context.entitlementManagedCredentialRef, nowIso, nowIso, job.referral_reward_id, context.referredSubjectRef, context.entitlementManagedCredentialRef, job.id, job.fencing_token),
+          AND EXISTS (SELECT 1 FROM managed_referral_settlement_jobs job WHERE job.id = ? AND job.fencing_token = ? AND job.phase = 'invitee_pending')
+          AND (
+            EXISTS (
+              SELECT 1 FROM openrouter_entitlements entitlement
+               WHERE entitlement.discord_user_ref = ?
+                 AND entitlement.status = 'active'
+                 AND entitlement.discord_issue_status = 'active'
+                 AND entitlement.managed_credential_ref = ?
+                 AND entitlement.discord_issue_delivered_at IS NOT NULL
+            )
+            OR EXISTS (
+              SELECT 1 FROM qq_managed_entitlements entitlement
+               WHERE entitlement.qq_subject_ref = ?
+                 AND entitlement.status = 'active'
+                 AND entitlement.managed_credential_ref = ?
+                 AND entitlement.delivered_at IS NOT NULL
+            )
+          )`,
+    ).bind(context.entitlementManagedCredentialRef, nowIso, nowIso, job.referral_reward_id, context.referredSubjectRef, context.entitlementManagedCredentialRef, job.id, job.fencing_token, context.referredSubjectRef, context.entitlementManagedCredentialRef, context.referredSubjectRef, context.entitlementManagedCredentialRef),
     env.BROKER_DB.prepare(
       `UPDATE managed_referral_settlement_jobs
           SET phase = 'referrer_pending', next_attempt_at = ?, fencing_token = NULL, lease_expires_at = NULL, last_error_code = NULL, updated_at = ?
         WHERE id = ? AND fencing_token = ? AND phase = 'invitee_pending'
-          AND EXISTS (SELECT 1 FROM referral_rewards reward WHERE reward.id = managed_referral_settlement_jobs.referral_reward_id AND reward.referred_bonus_status = 'credited' AND reward.referred_managed_credential_ref = ?)`,
-    ).bind(nowIso, nowIso, job.id, job.fencing_token, context.entitlementManagedCredentialRef),
+          AND EXISTS (SELECT 1 FROM referral_rewards reward WHERE reward.id = managed_referral_settlement_jobs.referral_reward_id AND reward.referred_bonus_status = 'credited' AND reward.referred_managed_credential_ref = ?)
+          AND (
+            EXISTS (
+              SELECT 1 FROM openrouter_entitlements entitlement
+               WHERE entitlement.discord_user_ref = ?
+                 AND entitlement.status = 'active'
+                 AND entitlement.discord_issue_status = 'active'
+                 AND entitlement.managed_credential_ref = ?
+                 AND entitlement.discord_issue_delivered_at IS NOT NULL
+            )
+            OR EXISTS (
+              SELECT 1 FROM qq_managed_entitlements entitlement
+               WHERE entitlement.qq_subject_ref = ?
+                 AND entitlement.status = 'active'
+                 AND entitlement.managed_credential_ref = ?
+                 AND entitlement.delivered_at IS NOT NULL
+            )
+          )`,
+    ).bind(nowIso, nowIso, job.id, job.fencing_token, context.entitlementManagedCredentialRef, context.referredSubjectRef, context.entitlementManagedCredentialRef, context.referredSubjectRef, context.entitlementManagedCredentialRef),
   ]);
-  if (Number(results[2]?.meta.changes ?? 0) === 1) {
+  const ownerPersisted = Number(results[0]?.meta.changes ?? 0) === 1;
+  if (Number(results[2]?.meta.changes ?? 0) === 1 && ownerPersisted) {
     logSettlementEvent('managed_referral_settlement_invitee_settled', job, { to_phase: 'referrer_pending' });
     await markOperationSettlementStatus(env.BROKER_DB, job.operation_id, { referral: 'credited', settlement: 'referrer_pending' }, now);
     return 'advanced';
+  }
+  if (ownerPersisted) {
+    return retryClaim(env.BROKER_DB, job, now, 'invitee_commit_incomplete');
   }
   if (await hasInviteeConverged(env.BROKER_DB, job, persistedBudgetUsd, context.entitlementManagedCredentialRef)) {
     return 'advanced';
@@ -506,19 +544,67 @@ async function processReferrerPhase(env: SettlementEnv, job: ClaimedJob, now: Da
           AND referrer_source = ?
           AND referrer_subject_ref = ?
           AND (referrer_bonus_status IN ('pending', 'applying', 'failed') OR (referrer_bonus_status = 'credited' AND referrer_managed_credential_ref = ?))
-          AND EXISTS (SELECT 1 FROM managed_referral_settlement_jobs job WHERE job.id = ? AND job.fencing_token = ? AND job.phase = 'referrer_pending')`,
-    ).bind(owner.managedCredentialRef, nowIso, job.referral_reward_id, owner.source, owner.subjectRef, owner.managedCredentialRef, job.id, job.fencing_token),
+          AND EXISTS (SELECT 1 FROM managed_referral_settlement_jobs job WHERE job.id = ? AND job.fencing_token = ? AND job.phase = 'referrer_pending')
+          AND (
+            EXISTS (
+              SELECT 1 FROM openrouter_entitlements entitlement
+               WHERE entitlement.installation_id = ?
+                 AND entitlement.discord_user_ref = ?
+                 AND entitlement.status = 'active'
+                 AND entitlement.discord_issue_status = 'active'
+                 AND entitlement.managed_credential_ref = ?
+                 AND entitlement.expires_at IS NOT NULL
+                 AND datetime(entitlement.expires_at) >= datetime(?)
+            )
+            OR EXISTS (
+              SELECT 1 FROM qq_managed_entitlements entitlement
+               WHERE entitlement.qq_subject_ref = ?
+                 AND entitlement.issue_ref = ?
+                 AND entitlement.status = 'active'
+                 AND entitlement.managed_credential_ref = ?
+                 AND entitlement.delivered_at IS NOT NULL
+                 AND entitlement.expires_at IS NOT NULL
+                 AND datetime(entitlement.expires_at) >= datetime(?)
+            )
+          )`,
+    ).bind(owner.managedCredentialRef, nowIso, job.referral_reward_id, owner.source, owner.subjectRef, owner.managedCredentialRef, job.id, job.fencing_token, owner.installationId, owner.subjectRef, owner.managedCredentialRef, nowIso, owner.subjectRef, owner.entitlementRef, owner.managedCredentialRef, nowIso),
     env.BROKER_DB.prepare(
       `UPDATE managed_referral_settlement_jobs
           SET phase = 'completed', next_attempt_at = ?, fencing_token = NULL, lease_expires_at = NULL, last_error_code = NULL, updated_at = ?, completed_at = ?
         WHERE id = ? AND fencing_token = ? AND phase = 'referrer_pending'
-          AND EXISTS (SELECT 1 FROM referral_rewards reward WHERE reward.id = managed_referral_settlement_jobs.referral_reward_id AND reward.referrer_bonus_status = 'credited' AND reward.referrer_managed_credential_ref = ?)`,
-    ).bind(nowIso, nowIso, nowIso, job.id, job.fencing_token, owner.managedCredentialRef),
+          AND EXISTS (SELECT 1 FROM referral_rewards reward WHERE reward.id = managed_referral_settlement_jobs.referral_reward_id AND reward.referrer_bonus_status = 'credited' AND reward.referrer_managed_credential_ref = ?)
+          AND (
+            EXISTS (
+              SELECT 1 FROM openrouter_entitlements entitlement
+               WHERE entitlement.installation_id = ?
+                 AND entitlement.discord_user_ref = ?
+                 AND entitlement.status = 'active'
+                 AND entitlement.discord_issue_status = 'active'
+                 AND entitlement.managed_credential_ref = ?
+                 AND entitlement.expires_at IS NOT NULL
+                 AND datetime(entitlement.expires_at) >= datetime(?)
+            )
+            OR EXISTS (
+              SELECT 1 FROM qq_managed_entitlements entitlement
+               WHERE entitlement.qq_subject_ref = ?
+                 AND entitlement.issue_ref = ?
+                 AND entitlement.status = 'active'
+                 AND entitlement.managed_credential_ref = ?
+                 AND entitlement.delivered_at IS NOT NULL
+                 AND entitlement.expires_at IS NOT NULL
+                 AND datetime(entitlement.expires_at) >= datetime(?)
+            )
+          )`,
+    ).bind(nowIso, nowIso, nowIso, job.id, job.fencing_token, owner.managedCredentialRef, owner.installationId, owner.subjectRef, owner.managedCredentialRef, nowIso, owner.subjectRef, owner.entitlementRef, owner.managedCredentialRef, nowIso),
   ]);
-  if (Number(results[2]?.meta.changes ?? 0) === 1) {
+  const ownerPersisted = Number(results[0]?.meta.changes ?? 0) === 1;
+  if (Number(results[2]?.meta.changes ?? 0) === 1 && ownerPersisted) {
     logSettlementEvent('managed_referral_settlement_completed', job);
     await markOperationSettlementStatus(env.BROKER_DB, job.operation_id, { settlement: 'completed' }, now);
     return 'completed';
+  }
+  if (ownerPersisted) {
+    return retryClaim(env.BROKER_DB, job, now, 'referrer_commit_incomplete');
   }
   if (await hasReferrerConverged(env.BROKER_DB, job, owner.managedCredentialRef, persistedBudgetUsd, owner)) {
     return 'completed';
@@ -836,8 +922,43 @@ async function hasReferrerConverged(db: D1Database, job: ClaimedJob, managedCred
   if (reward?.referrer_bonus_status !== 'credited' || reward.referrer_managed_credential_ref !== managedCredentialRef) {
     return false;
   }
-  void budgetUsd;
-  void owner;
+  const liveOwnerBudget =
+    owner.source === 'discord'
+      ? (
+          await db
+            .prepare(
+              `SELECT budget_usd FROM openrouter_entitlements
+                WHERE installation_id = ?
+                  AND discord_user_ref = ?
+                  AND status = 'active'
+                  AND discord_issue_status = 'active'
+                  AND managed_credential_ref = ?
+                  AND expires_at IS NOT NULL
+                  AND datetime(expires_at) >= datetime('now')`,
+            )
+            .bind(owner.installationId, owner.subjectRef, owner.managedCredentialRef)
+            .first<{ budget_usd: number }>()
+            .catch(() => null)
+        )?.budget_usd ?? null
+      : (
+          await db
+            .prepare(
+              `SELECT budget_usd FROM qq_managed_entitlements
+                WHERE qq_subject_ref = ?
+                  AND issue_ref = ?
+                  AND status = 'active'
+                  AND managed_credential_ref = ?
+                  AND delivered_at IS NOT NULL
+                  AND expires_at IS NOT NULL
+                  AND datetime(expires_at) >= datetime('now')`,
+            )
+            .bind(owner.subjectRef, owner.entitlementRef, owner.managedCredentialRef)
+            .first<{ budget_usd: number }>()
+            .catch(() => null)
+        )?.budget_usd ?? null;
+  if (liveOwnerBudget === null || currencyCents(liveOwnerBudget) < currencyCents(budgetUsd)) {
+    return false;
+  }
   const settled = await db.prepare(`SELECT phase FROM managed_referral_settlement_jobs WHERE id = ?`).bind(job.id).first<{ phase: string }>();
   if (settled?.phase === 'completed') {
     return true;

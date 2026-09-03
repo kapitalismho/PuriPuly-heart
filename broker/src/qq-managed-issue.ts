@@ -27,6 +27,7 @@ import {
   transitionOperationToPostCreateState,
   hasOtherLiveOperation,
   findConflictingOperationDelivery,
+  releaseUnstartedOperationAttempt,
 } from './managed-operation';
 import {
   deliverManagedCleanupIncident,
@@ -529,6 +530,7 @@ export async function executeQqResumeIssuance(
       });
       if (blocked) {
         await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
+        await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
         const attempts = await listManagedOperationAttempts(db, operation.operation_id);
         const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
         return c.json(await buildManagedOperationStatusBodyWithDelivery(db, current ?? operation, attempts));
@@ -574,6 +576,7 @@ export async function executeQqResumeIssuance(
     const brakeDecision = await checkActiveIssuanceBrake(db, currentEntitlement);
     if (brakeDecision) {
       await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
+      await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
       return abuseDecisionResponse(c, brakeDecision);
     }
     const reservation = await reserveQqManagedEntitlement(c.env, {
@@ -592,8 +595,10 @@ export async function executeQqResumeIssuance(
         return c.json(await buildManagedOperationStatusBodyWithDelivery(db, terminal ?? operation, attempts));
       }
       if (reservation.reason === 'already_issuing') {
+        await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
         return qqReservationErrorResponse(c, reservation);
       }
+      await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
       const attempts = await listManagedOperationAttempts(db, operation.operation_id);
       const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
       return c.json(await buildManagedOperationStatusBodyWithDelivery(db, current ?? operation, attempts));
@@ -606,6 +611,7 @@ export async function executeQqResumeIssuance(
       await releaseQqReservationBeforeChildKey(db, { qqSubjectRef, issueRef });
       reservationCreated = false;
       await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
+      await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
       return publicErrorResponse(c, 503, {
         code: 'issuance_suspended',
         class: 'retryable',

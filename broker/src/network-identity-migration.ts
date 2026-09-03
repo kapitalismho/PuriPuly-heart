@@ -20,6 +20,11 @@ export const NETWORK_IDENTITY_WINDOW_CONFIG_PATHS = [
   'referralAttempts.unknown',
   'referralAttempts.perReferralIdVelocity',
   'referralAttempts.perReferrerRewardVelocity',
+  'managedOperationStatusIp',
+  'managedOperationStatusInstallation',
+  'managedOperationResumeIp',
+  'managedOperationResumeInstallation',
+  'managedKeyDeliveryAckIp',
 ] as const;
 
 function readWindowMinutesAtPath(controls: unknown, path: string): number | null {

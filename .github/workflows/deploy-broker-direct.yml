@@ -261,7 +261,7 @@ jobs:
         run: |
           deploy_dir='.deploy-direct'
           config_path='wrangler.production.jsonc'
-          staged_migrations_dir="$deploy_dir/staged-migrations-through-0020"
+          staged_migrations_dir="$deploy_dir/staged-migrations-pre-backfill"
           staged_config_path="$deploy_dir/wrangler.production.staged.jsonc"
           bootstrap_sql_path="$deploy_dir/fingerprint-bootstrap.sql"
           mkdir -p "$deploy_dir"
@@ -286,6 +286,8 @@ jobs:
             --salt "$fingerprint_salt" \
             --out "$bootstrap_sql_path"
 
+          deferred_migration='0021_network_identity_purge.sql'
+          test -f "migrations/$deferred_migration"
           mkdir -p "$staged_migrations_dir"
           rm -f "$staged_migrations_dir"/*.sql
           for migration_path in migrations/*.sql; do
@@ -297,13 +299,14 @@ jobs:
                 exit 1
                 ;;
             esac
-            if [[ "$migration_number" < '0021' ]]; then
+            if [[ "$migration_name" != "$deferred_migration" ]]; then
               cp "$migration_path" "$staged_migrations_dir/$migration_name"
             fi
           done
           test -f "$staged_migrations_dir/0020_network_identity_hmac.sql"
-          if [[ -e "$staged_migrations_dir/0021_network_identity_purge.sql" ]]; then
-            echo 'staged migrations must exclude 0021_network_identity_purge.sql' >&2
+          test -f "$staged_migrations_dir/0022_managed_operation_issuance_context.sql"
+          if [[ -e "$staged_migrations_dir/$deferred_migration" ]]; then
+            echo "staged migrations must exclude $deferred_migration" >&2
             exit 1
           fi
 
@@ -339,7 +342,7 @@ jobs:
           pnpm exec wrangler types --config
           "${{ steps.render.outputs.config_path }}"
 
-      - name: Validate staged through-0020 Wrangler config
+      - name: Validate staged pre-backfill Wrangler config
         working-directory: broker
         run: >-
           pnpm exec wrangler types --config
@@ -368,7 +371,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Apply remote D1 migrations through 0020
+      - name: Apply remote D1 migrations except deferred 0021
         working-directory: broker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -705,6 +708,29 @@ jobs:
             attempt=$((attempt + 1))
             sleep 60
           done
+
+      - name: Verify 0022 applied and 0021 still pending
+        shell: bash
+        working-directory: broker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          journal_json="$(pnpm exec wrangler d1 execute \
+            puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
+            --command "SELECT name FROM d1_migrations;" \
+            --json)"
+
+          python3 - "$journal_json" <<'PY'
+          import json
+          import sys
+          payload = json.loads(sys.argv[1])
+          applied = {str(row.get('name')) for row in payload[0].get('results', [])}
+          if '0022_managed_operation_issuance_context.sql' not in applied:
+              raise SystemExit('0022 issuance-context migration must be applied before the deferred 0021 purge')
+          if '0021_network_identity_purge.sql' in applied:
+              raise SystemExit('0021 purge migration must remain pending until the keyed-only backfill gate')
+          PY
 
       - name: Apply network identity purge migration 0021
         working-directory: broker

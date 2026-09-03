@@ -1093,6 +1093,175 @@ describe('managed operation resume issuance', () => {
     expect(readOperation(env, operationId)).toMatchObject({ state: 'ACTIVE' });
   });
 
+  it('releases a conflicted resume attempt instead of leaving it creating', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW_ISO));
+
+    const env = createTestBrokerEnv();
+    const installationId = 'install-discord-resume-release';
+    const devicePublicKey = 'device-public-key-resume-release';
+    env.__db
+      .prepare(
+        `INSERT INTO installations (
+          installation_id, device_public_key, hardware_hash, hardware_hash_salt_version,
+          app_version, created_at, last_seen_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(installationId, devicePublicKey, 'hardware-hash-resume-release', 1, APP_VERSION, NOW_ISO, NOW_ISO);
+    const subjectRef = 'ph-discord-user-v1_resume_release_subject';
+    env.__db
+      .prepare(
+        `INSERT INTO discord_identities (discord_user_ref, entitlement_installation_id, status, created_at, updated_at)
+         VALUES (?, ?, 'issuing', ?, ?)`,
+      )
+      .run(subjectRef, installationId, NOW_ISO, NOW_ISO);
+    insertEntitlement(env, {
+      installation_id: installationId,
+      status: 'pending_release',
+      budget_usd: 0.07,
+      managed_credential_ref: 'hash_resume_release_1',
+      discord_user_ref: subjectRef,
+      discord_issue_status: 'delivery_pending',
+      discord_issue_reserved_at: NOW_ISO,
+    });
+    const operationId = buildManagedOperationId();
+    const resumeToken = buildManagedOperationResumeToken();
+    env.__db
+      .prepare(
+        `INSERT INTO managed_operations (
+          operation_id, issue_source, subject_ref, installation_id, device_public_key,
+          state, attempt_count, current_attempt_index, resume_token_hash, auth_expires_at,
+          failure_reason, client_action, referral_reward_id, referral_status, settlement_status,
+          hardware_hash, hardware_hash_salt_version, app_version,
+          created_at, updated_at, last_reconciled_at, cleanup_attempts
+        ) VALUES (?, 'discord', ?, ?, ?, 'RETRY_READY', 1, 1, ?, ?, NULL, 'retry_authorized',
+          NULL, 'none', 'none', ?, 1, ?, ?, ?, NULL, 0)`,
+      )
+      .run(
+        operationId,
+        subjectRef,
+        installationId,
+        devicePublicKey,
+        await hashManagedOperationResumeToken(resumeToken),
+        new Date(Date.parse(NOW_ISO) + 60 * 60_000).toISOString(),
+        'hardware-hash-resume-release',
+        APP_VERSION,
+        NOW_ISO,
+        NOW_ISO,
+      );
+    env.__db
+      .prepare(
+        `INSERT INTO managed_operation_attempts (
+          operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at
+        ) VALUES (?, 1, ?, NULL, 'cleaned', ?, ?)`,
+      )
+      .run(operationId, `puripuly-heart:mop:discord:resume_release:a1`, NOW_ISO, NOW_ISO);
+    await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef,
+      installationId,
+      managedCredentialRef: 'hash_resume_release_1',
+      createdAt: new Date(NOW_ISO),
+      expiresAt: new Date(Date.parse(NOW_ISO) + 15 * 60_000),
+      operationId,
+      attemptIndex: 1,
+    });
+
+    const provider = mockProviderPlane();
+    stubFetch([(input, init) => provider.fetchMock(input, init)]);
+    const response = await postResume(env, {
+      operation_id: operationId,
+      resume_token: resumeToken,
+      installation_id: installationId,
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      state: 'RETRY_READY',
+      client_action: 'retry_authorized',
+    });
+    expect(provider.createCalls).toBe(0);
+    const attempts = readAttempts(env, operationId);
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1]).toMatchObject({ attempt_index: 2, outcome: 'cleaned' });
+    expect(readOperation(env, operationId)).toMatchObject({ state: 'RETRY_READY', attempt_count: 2 });
+
+    const statusResponse = await postStatus(env, {
+      operation_id: operationId,
+      resume_token: resumeToken,
+      installation_id: installationId,
+    });
+    expect(statusResponse.status).toBe(200);
+    await expect(statusResponse.json()).resolves.toMatchObject({
+      ok: true,
+      state: 'RETRY_READY',
+      client_action: 'retry_authorized',
+    });
+  });
+
+  it('rate-limits resume by installation and records request events', async () => {
+    const env = createTestBrokerEnv();
+    const { updateAbuseControls } = await import('./test-support/abuse-controls');
+    updateAbuseControls(env, (controls) => {
+      controls.managedOperationResumeInstallation.maxRequests = 1;
+    });
+    const body = {
+      operation_id: buildManagedOperationId(),
+      resume_token: buildManagedOperationResumeToken(),
+      installation_id: 'install-resume-ratelimit',
+    };
+    const first = await postResume(env, body);
+    expect(first.status).toBe(404);
+    const second = await postResume(env, body);
+    expect(second.status).toBe(429);
+    await expect(second.json()).resolves.toMatchObject({
+      ok: false,
+      code: 'rate_limited',
+      retry_after_ms: expect.any(Number),
+    });
+    const events = env.__db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM broker_request_events
+          WHERE endpoint = 'POST /v1/providers/openrouter/managed-operation/resume'
+            AND installation_id = ?`,
+      )
+      .get('install-resume-ratelimit') as { count: number };
+    expect(events.count).toBe(2);
+  });
+
+  it('rate-limits status by installation after recording the request', async () => {
+    const env = createTestBrokerEnv();
+    const { updateAbuseControls } = await import('./test-support/abuse-controls');
+    updateAbuseControls(env, (controls) => {
+      controls.managedOperationStatusInstallation.maxRequests = 1;
+    });
+    const operationId = buildManagedOperationId();
+    const resumeToken = buildManagedOperationResumeToken();
+    const installationId = 'install-status-ratelimit';
+    await createManagedOperation(env.BROKER_DB, {
+      operationId,
+      resumeTokenHash: await hashManagedOperationResumeToken(resumeToken),
+      issueSource: 'discord',
+      subjectRef: 'ph-discord-user-v1_status_ratelimit',
+      installationId,
+      devicePublicKey: 'device-status-ratelimit',
+      now: new Date(),
+    });
+    const body = {
+      operation_id: operationId,
+      resume_token: resumeToken,
+      installation_id: installationId,
+    };
+    const first = await postStatus(env, body);
+    expect(first.status).toBe(200);
+    const second = await postStatus(env, body);
+    expect(second.status).toBe(429);
+    await expect(second.json()).resolves.toMatchObject({
+      ok: false,
+      code: 'rate_limited',
+      retry_after_ms: expect.any(Number),
+    });
+  });
   it('leaves another operation credential untouched when refusing a conflicting resume', async () => {
     const env = createTestBrokerEnv();
     const provider = mockProviderPlane();

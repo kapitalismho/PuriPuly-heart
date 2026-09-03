@@ -81,6 +81,11 @@ export interface BrokerAbuseControlsConfigValue {
   discordOpenrouterIssueInstallation: BrokerEndpointRateLimitConfig;
   qqAuthAssertIp: BrokerEndpointRateLimitConfig;
   qqAuthStatusIp: BrokerEndpointRateLimitConfig;
+  managedOperationStatusIp: BrokerEndpointRateLimitConfig;
+  managedOperationStatusInstallation: BrokerEndpointRateLimitConfig;
+  managedOperationResumeIp: BrokerEndpointRateLimitConfig;
+  managedOperationResumeInstallation: BrokerEndpointRateLimitConfig;
+  managedKeyDeliveryAckIp: BrokerEndpointRateLimitConfig;
   pendingDiscordOAuthSessions: BrokerPendingDiscordOAuthSessionsConfig;
   newActiveEntitlementsPerDay: BrokerDailyIssuanceCapConfig;
   immediateAlerts: BrokerImmediateAlertsConfig;
@@ -146,6 +151,36 @@ export const DEFAULT_BROKER_ABUSE_CONTROLS: BrokerAbuseControlsConfigValue = {
   },
   qqAuthStatusIp: {
     endpoint: 'POST /v1/auth/qq/status',
+    scope: 'ip',
+    maxRequests: 30,
+    windowMinutes: 15,
+  },
+  managedOperationStatusIp: {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/status',
+    scope: 'ip',
+    maxRequests: 30,
+    windowMinutes: 15,
+  },
+  managedOperationStatusInstallation: {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/status',
+    scope: 'installation_id',
+    maxRequests: 30,
+    windowMinutes: 15,
+  },
+  managedOperationResumeIp: {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/resume',
+    scope: 'ip',
+    maxRequests: 20,
+    windowMinutes: 15,
+  },
+  managedOperationResumeInstallation: {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/resume',
+    scope: 'installation_id',
+    maxRequests: 10,
+    windowMinutes: 15,
+  },
+  managedKeyDeliveryAckIp: {
+    endpoint: 'POST /v1/providers/openrouter/managed-key-delivery/ack',
     scope: 'ip',
     maxRequests: 30,
     windowMinutes: 15,

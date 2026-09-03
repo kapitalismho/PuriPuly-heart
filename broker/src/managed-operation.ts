@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 
+import { instrumentPublicPostRoute } from './abuse-controls';
 import type { BrokerBindings, BrokerEnv } from './contract';
 import {
   cleanupManagedChildKey,
@@ -489,6 +490,33 @@ export async function markAttemptUnknown(db: D1Database, operationId: string, at
   await transitionManagedOperation(db, operationId, 'CREATE_UNKNOWN', now, { from: ['CREATING'] });
 }
 
+export async function releaseUnstartedOperationAttempt(
+  db: D1Database,
+  operationId: string,
+  attemptIndex: number,
+  now: Date,
+): Promise<boolean> {
+  const cleaned = await db
+    .prepare(
+      `UPDATE managed_operation_attempts
+          SET outcome = 'cleaned', updated_at = ?
+        WHERE operation_id = ?
+          AND attempt_index = ?
+          AND outcome = 'unknown'
+          AND managed_credential_ref IS NULL`,
+    )
+    .bind(now.toISOString(), operationId, attemptIndex)
+    .run()
+    .catch(() => null);
+  if (Number(cleaned?.meta.changes ?? 0) !== 1) {
+    return false;
+  }
+  const released = await transitionManagedOperation(db, operationId, 'RETRY_READY', now, {
+    from: ['CREATING', 'CREATE_UNKNOWN'],
+  });
+  return released?.state === 'RETRY_READY';
+}
+
 export async function markAttemptCleaned(db: D1Database, operationId: string, attemptIndex: number, now: Date): Promise<void> {
   await db
     .prepare(`UPDATE managed_operation_attempts SET outcome = 'cleaned', updated_at = ? WHERE operation_id = ? AND attempt_index = ?`)
@@ -817,6 +845,21 @@ export async function handleManagedOperationStatus(c: Context<BrokerEnv>): Promi
   const installationId = typeof body.value.installation_id === 'string' ? body.value.installation_id : null;
   if (!operationId || !isManagedOperationId(operationId) || !resumeToken || !installationId) {
     return c.json({ ok: false, code: 'invalid_request', message: 'operation_id, resume_token, and installation_id are required' }, 400);
+  }
+  const statusRateLimit = await instrumentPublicPostRoute(c.env.BROKER_DB, c, {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/status',
+    installationId,
+  });
+  if (statusRateLimit) {
+    return c.json(
+      {
+        ok: false,
+        code: 'rate_limited',
+        message: statusRateLimit.message,
+        retry_after_ms: statusRateLimit.retryAfterMs,
+      },
+      429,
+    );
   }
   const authenticated = await authenticateManagedOperationRequest(c.env.BROKER_DB, { operationId, resumeToken, installationId });
   if (!authenticated.ok) {

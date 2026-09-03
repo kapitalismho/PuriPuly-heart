@@ -334,6 +334,23 @@ export function resolveRequestNetworkIdentitySecrets(c: Context<BrokerEnv>): Net
   return resolveNetworkIdentitySecrets(c.env as unknown as Record<string, unknown>);
 }
 
+export async function instrumentPublicPostRoute(
+  db: D1Database,
+  c: Context<BrokerEnv>,
+  input: { endpoint: string; installationId: string | null },
+): Promise<AbuseDecision | null> {
+  const context: RequestAbuseContext = {
+    endpoint: input.endpoint,
+    now: new Date(),
+    ip: resolveClientIp(c),
+    installationId: input.installationId,
+    hardwareHash: null,
+    networkIdentitySecrets: resolveRequestNetworkIdentitySecrets(c),
+  };
+  await recordRequestEvent(db, context);
+  return checkEndpointRateLimit(db, context);
+}
+
 export async function recordRequestEvent(
   db: D1Database,
   context: RequestAbuseContext,
@@ -841,6 +858,12 @@ function getEndpointRateLimitConfigs(
       return [controls.qqAuthAssertIp];
     case 'POST /v1/auth/qq/status':
       return [controls.qqAuthStatusIp];
+    case 'POST /v1/providers/openrouter/managed-operation/status':
+      return [controls.managedOperationStatusIp, controls.managedOperationStatusInstallation];
+    case 'POST /v1/providers/openrouter/managed-operation/resume':
+      return [controls.managedOperationResumeIp, controls.managedOperationResumeInstallation];
+    case 'POST /v1/providers/openrouter/managed-key-delivery/ack':
+      return [controls.managedKeyDeliveryAckIp];
     default:
       return [];
   }
@@ -1119,6 +1142,33 @@ function validateBrokerAbuseControlsConfig(
     'POST /v1/auth/qq/status',
     'ip',
   );
+  const managedOperationStatusIp = validateEndpointRateLimitConfig(
+    value.managedOperationStatusIp ?? DEFAULT_BROKER_ABUSE_CONTROLS.managedOperationStatusIp,
+    'POST /v1/providers/openrouter/managed-operation/status',
+    'ip',
+  );
+  const managedOperationStatusInstallation = validateEndpointRateLimitConfig(
+    value.managedOperationStatusInstallation ??
+      DEFAULT_BROKER_ABUSE_CONTROLS.managedOperationStatusInstallation,
+    'POST /v1/providers/openrouter/managed-operation/status',
+    'installation_id',
+  );
+  const managedOperationResumeIp = validateEndpointRateLimitConfig(
+    value.managedOperationResumeIp ?? DEFAULT_BROKER_ABUSE_CONTROLS.managedOperationResumeIp,
+    'POST /v1/providers/openrouter/managed-operation/resume',
+    'ip',
+  );
+  const managedOperationResumeInstallation = validateEndpointRateLimitConfig(
+    value.managedOperationResumeInstallation ??
+      DEFAULT_BROKER_ABUSE_CONTROLS.managedOperationResumeInstallation,
+    'POST /v1/providers/openrouter/managed-operation/resume',
+    'installation_id',
+  );
+  const managedKeyDeliveryAckIp = validateEndpointRateLimitConfig(
+    value.managedKeyDeliveryAckIp ?? DEFAULT_BROKER_ABUSE_CONTROLS.managedKeyDeliveryAckIp,
+    'POST /v1/providers/openrouter/managed-key-delivery/ack',
+    'ip',
+  );
   const pendingDiscordOAuthSessions = validatePendingDiscordOAuthSessionsConfig(
     value.pendingDiscordOAuthSessions,
   );
@@ -1141,6 +1191,11 @@ function validateBrokerAbuseControlsConfig(
     !discordOpenrouterIssueInstallation ||
     !qqAuthAssertIp ||
     !qqAuthStatusIp ||
+    !managedOperationStatusIp ||
+    !managedOperationStatusInstallation ||
+    !managedOperationResumeIp ||
+    !managedOperationResumeInstallation ||
+    !managedKeyDeliveryAckIp ||
     !pendingDiscordOAuthSessions ||
     !newActiveEntitlementsPerDay ||
     !immediateAlerts ||
@@ -1162,6 +1217,11 @@ function validateBrokerAbuseControlsConfig(
     discordOpenrouterIssueInstallation,
     qqAuthAssertIp,
     qqAuthStatusIp,
+    managedOperationStatusIp,
+    managedOperationStatusInstallation,
+    managedOperationResumeIp,
+    managedOperationResumeInstallation,
+    managedKeyDeliveryAckIp,
     pendingDiscordOAuthSessions,
     newActiveEntitlementsPerDay,
     immediateAlerts,

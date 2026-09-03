@@ -36,6 +36,11 @@ SELECT 0
             COALESCE((SELECT json_extract(value, '$.referralAttempts.unknown.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
             COALESCE((SELECT json_extract(value, '$.referralAttempts.perReferralIdVelocity.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
             COALESCE((SELECT json_extract(value, '$.referralAttempts.perReferrerRewardVelocity.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.managedOperationStatusIp.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.managedOperationStatusInstallation.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.managedOperationResumeIp.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.managedOperationResumeInstallation.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.managedKeyDeliveryAckIp.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
             COALESCE((SELECT MAX(window_minutes) FROM broker_velocity_cap_hooks WHERE active = 1), 0))
         ) || ' minutes')
     )
@@ -56,6 +61,11 @@ SELECT 0
             COALESCE((SELECT json_extract(value, '$.referralAttempts.unknown.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
             COALESCE((SELECT json_extract(value, '$.referralAttempts.perReferralIdVelocity.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
             COALESCE((SELECT json_extract(value, '$.referralAttempts.perReferrerRewardVelocity.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.managedOperationStatusIp.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.managedOperationStatusInstallation.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.managedOperationResumeIp.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.managedOperationResumeInstallation.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.managedKeyDeliveryAckIp.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
             COALESCE((SELECT MAX(window_minutes) FROM broker_velocity_cap_hooks WHERE active = 1), 0))
         ) || ' minutes')
     )

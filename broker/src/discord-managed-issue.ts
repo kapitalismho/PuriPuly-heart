@@ -15,7 +15,7 @@ import {
 import { ensureReferralSettlementJobsForDelivery, hasUnsettledReservedRewardWithoutJob } from './managed-referral-settlement';
 import { resolveNetworkIdentityWriteMode, resolveReferralAttemptIdentity, resolveRequestNetworkIdentity, type NetworkIdentitySecrets } from './network-identity';
 import { resolveBrokerRequestEventIpMatch } from './abuse-controls';
-import { attachReferralToOperation, bindOperationForIssue, buildManagedOperationStatusBodyWithDelivery, failManagedOperationTerminal, getManagedOperationStatusSnapshot, markOperationActiveOnAck, type ManagedOperationRecord as StrictManagedOperationRecord, isManagedOperationId, listManagedOperationAttempts, markAttemptUnknown, operationBindingResponseBody, providerKeyNameForOperationAttempt, reconcileUnknownAttempt, recordAttemptCredential, saveOperationIssuanceContext, startManagedOperationAttempt, transitionManagedOperation, transitionOperationToPostCreateState, hasOtherLiveOperation, findConflictingOperationDelivery } from './managed-operation';
+import { attachReferralToOperation, bindOperationForIssue, buildManagedOperationStatusBodyWithDelivery, failManagedOperationTerminal, getManagedOperationStatusSnapshot, markOperationActiveOnAck, type ManagedOperationRecord as StrictManagedOperationRecord, isManagedOperationId, listManagedOperationAttempts, markAttemptUnknown, operationBindingResponseBody, providerKeyNameForOperationAttempt, reconcileUnknownAttempt, recordAttemptCredential, saveOperationIssuanceContext, startManagedOperationAttempt, transitionManagedOperation, transitionOperationToPostCreateState, hasOtherLiveOperation, findConflictingOperationDelivery, releaseUnstartedOperationAttempt } from './managed-operation';
 import {
   deliverManagedCleanupIncident,
   deliverImmediateMonitoringSideEffects,
@@ -3067,6 +3067,7 @@ export async function executeDiscordResumeIssuance(
   const entitlement = await getEntitlement(db, installationId);
   const brakeDecision = await checkActiveIssuanceBrake(db, entitlement);
   if (brakeDecision) {
+    await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
     return publicErrorResponse(c, brakeDecision.status, {
       code: brakeDecision.code,
       class: brakeDecision.class,
@@ -3092,12 +3093,14 @@ export async function executeDiscordResumeIssuance(
   });
   if (!ensured.ok) {
     if (ensured.subcode === 'retry_conflict' || ensured.subcode === 'discord_installation_already_issuing') {
+      await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
       const attempts = await listManagedOperationAttempts(db, operation.operation_id);
       const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
       return c.json(await buildManagedOperationStatusBodyWithDelivery(db, current ?? operation, attempts));
     }
     if (ensured.subcode === 'global_cap_reached') {
       await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
+      await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
       return discordReservationErrorResponse(c, ensured);
     }
     await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);

@@ -18,7 +18,7 @@ import type {
   ManagedKeyDeliveryRecord,
 } from './persistence';
 import { processManagedReferralSettlementJobs } from './managed-referral-settlement';
-import { sweepStaleManagedOperations } from './managed-operation';
+import { hasOtherLiveOperation, sweepStaleManagedOperations } from './managed-operation';
 import { runNetworkIdentityBackfill } from './network-identity-migration';
 import { resolveNetworkIdentitySecrets } from './network-identity';
 import {
@@ -258,7 +258,13 @@ async function completeDeliveryCleanup(
   nowIso: string,
 ): Promise<boolean> {
   if (delivery.issue_source === 'discord') {
-    const results = await db.batch([
+    const sharedIdentity = await hasOtherLiveOperation(db, {
+      issueSource: 'discord',
+      subjectRef: delivery.subject_ref ?? '',
+      installationId: delivery.installation_id ?? null,
+      excludeOperationId: delivery.operation_id ?? null,
+    });
+    const statements = [
       db.prepare(
         `DELETE FROM openrouter_entitlements
           WHERE managed_credential_ref = ?
@@ -277,31 +283,46 @@ async function completeDeliveryCleanup(
         STALE_DELIVERY_CLEANUP_CLAIM_REASON,
         nowIso,
       ),
-      db.prepare(
-        `DELETE FROM discord_identities
-          WHERE discord_user_ref = ?
-            AND entitlement_installation_id = ?
-            AND status IN ('issuing', 'active')
-            AND EXISTS (
-              SELECT 1 FROM managed_key_deliveries
-               WHERE delivery_id = ?
-                 AND status = 'expired'
-                 AND failure_reason = ?
-                 AND failed_at = ?
-            )`,
-      ).bind(
-        delivery.subject_ref ?? '',
-        delivery.installation_id ?? '',
-        delivery.delivery_id,
-        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
-        nowIso,
-      ),
+    ];
+    if (!sharedIdentity) {
+      statements.push(
+        db.prepare(
+          `DELETE FROM discord_identities
+            WHERE discord_user_ref = ?
+              AND entitlement_installation_id = ?
+              AND status IN ('issuing', 'active')
+              AND EXISTS (
+                SELECT 1 FROM managed_key_deliveries
+                 WHERE delivery_id = ?
+                   AND status = 'expired'
+                   AND failure_reason = ?
+                   AND failed_at = ?
+              )`,
+        ).bind(
+          delivery.subject_ref ?? '',
+          delivery.installation_id ?? '',
+          delivery.delivery_id,
+          STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+          nowIso,
+        ),
+      );
+    }
+    const results = await db.batch([
+      ...statements,
       db.prepare(
         `UPDATE referral_rewards
             SET referred_bonus_status = 'failed', referrer_bonus_status = 'failed', failure_reason = 'issue_delivery_failed', updated_at = ?
           WHERE referred_managed_credential_ref IS NULL
             AND referred_bonus_status = 'reserved'
             AND referred_installation_id = ?
+            AND (
+              operation_id IS NULL
+              OR EXISTS (
+                SELECT 1 FROM managed_operations
+                 WHERE operation_id = referral_rewards.operation_id
+                   AND state = 'FAILED'
+              )
+            )
             AND EXISTS (
               SELECT 1 FROM managed_key_deliveries
                WHERE delivery_id = ?
@@ -361,6 +382,14 @@ async function completeDeliveryCleanup(
             AND referred_subject_ref = ?
             AND referred_installation_id IS ?
             AND referred_bonus_status = 'reserved'
+            AND (
+              operation_id IS NULL
+              OR EXISTS (
+                SELECT 1 FROM managed_operations
+                 WHERE operation_id = referral_rewards.operation_id
+                   AND state = 'FAILED'
+              )
+            )
             AND EXISTS (
               SELECT 1 FROM managed_key_deliveries
                WHERE delivery_id = ?
