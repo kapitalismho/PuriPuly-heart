@@ -346,6 +346,49 @@ describe('managed key delivery ACK foundation', () => {
         .get() as { count: number },
     ).toEqual({ count: 2 });
   });
+  it('still rate-limits ACK by IP when identity secrets are unavailable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
+    const env = createTestBrokerEnv();
+    env.NETWORK_IDENTITY_HMAC_SECRET = '';
+    const { updateAbuseControls } = await import('./test-support/abuse-controls');
+    updateAbuseControls(env, (controls) => {
+      controls.managedKeyDeliveryAckIp.maxRequests = 1;
+    });
+    const headers = {
+      'content-type': 'application/json',
+      'cf-connecting-ip': '203.0.113.99',
+    };
+    const payload = {
+      delivery_id: 'ph-delivery-v1_ratelimit_nosecret',
+      managed_credential_ref: 'managed-credential-ratelimit',
+      delivery_ack_token: 'wrong-token',
+    };
+    const first = await app.request(
+      'http://broker.test/v1/providers/openrouter/managed-key-delivery/ack',
+      { method: 'POST', headers, body: JSON.stringify(payload) },
+      env,
+    );
+    expect(first.status).toBe(404);
+    const second = await app.request(
+      'http://broker.test/v1/providers/openrouter/managed-key-delivery/ack',
+      { method: 'POST', headers, body: JSON.stringify(payload) },
+      env,
+    );
+    expect(second.status).toBe(429);
+    await expect(second.json()).resolves.toMatchObject({
+      error: { code: 'rate_limited', class: 'retryable', subcode: 'delivery_ack_rate_limited' },
+    });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT COUNT(*) AS count FROM broker_request_events
+            WHERE endpoint = 'POST /v1/providers/openrouter/managed-key-delivery/ack'
+              AND ip_digest IS NULL`,
+        )
+        .get() as { count: number },
+    ).toEqual({ count: 2 });
+  });
 
   it('rejects expired ACK route attempts while leaving delivery pending for cleanup', async () => {
     vi.useFakeTimers();

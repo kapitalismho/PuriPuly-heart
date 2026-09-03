@@ -286,8 +286,10 @@ jobs:
             --salt "$fingerprint_salt" \
             --out "$bootstrap_sql_path"
 
-          deferred_migration='0021_network_identity_purge.sql'
-          test -f "migrations/$deferred_migration"
+          deferred_migrations='0021_network_identity_purge.sql 0024_allow_unattributed_request_events.sql'
+          for deferred_migration in $deferred_migrations; do
+            test -f "migrations/$deferred_migration"
+          done
           mkdir -p "$staged_migrations_dir"
           rm -f "$staged_migrations_dir"/*.sql
           for migration_path in migrations/*.sql; do
@@ -299,16 +301,26 @@ jobs:
                 exit 1
                 ;;
             esac
-            if [[ "$migration_name" != "$deferred_migration" ]]; then
+            deferred_match=0
+            for deferred_migration in $deferred_migrations; do
+              if [[ "$migration_name" == "$deferred_migration" ]]; then
+                deferred_match=1
+                break
+              fi
+            done
+            if [[ "$deferred_match" != '1' ]]; then
               cp "$migration_path" "$staged_migrations_dir/$migration_name"
             fi
           done
           test -f "$staged_migrations_dir/0020_network_identity_hmac.sql"
           test -f "$staged_migrations_dir/0022_managed_operation_issuance_context.sql"
-          if [[ -e "$staged_migrations_dir/$deferred_migration" ]]; then
-            echo "staged migrations must exclude $deferred_migration" >&2
-            exit 1
-          fi
+          test -f "$staged_migrations_dir/0023_backfill_operation_route_rate_limits.sql"
+          for deferred_migration in $deferred_migrations; do
+            if [[ -e "$staged_migrations_dir/$deferred_migration" ]]; then
+              echo "staged migrations must exclude $deferred_migration" >&2
+              exit 1
+            fi
+          done
 
           python3 - "$config_path" "$staged_config_path" "$(basename "$staged_migrations_dir")" <<'PY'
           import re
@@ -371,7 +383,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Apply remote D1 migrations except deferred 0021
+      - name: Apply remote D1 migrations except deferred 0021 and 0024
         working-directory: broker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -709,7 +721,7 @@ jobs:
             sleep 60
           done
 
-      - name: Verify 0022 applied and 0021 still pending
+      - name: Verify 0022 and 0023 applied with 0021 and 0024 still pending
         shell: bash
         working-directory: broker
         env:
@@ -728,11 +740,15 @@ jobs:
           applied = {str(row.get('name')) for row in payload[0].get('results', [])}
           if '0022_managed_operation_issuance_context.sql' not in applied:
               raise SystemExit('0022 issuance-context migration must be applied before the deferred 0021 purge')
+          if '0023_backfill_operation_route_rate_limits.sql' not in applied:
+              raise SystemExit('0023 route rate-limit migration must be applied before the deferred 0021 purge')
           if '0021_network_identity_purge.sql' in applied:
               raise SystemExit('0021 purge migration must remain pending until the keyed-only backfill gate')
+          if '0024_allow_unattributed_request_events.sql' in applied:
+              raise SystemExit('0024 unattributed-schema rebuild must remain pending until the keyed-only backfill gate')
           PY
 
-      - name: Apply network identity purge migration 0021
+      - name: Apply deferred 0021 purge followed by 0024 rebuild
         working-directory: broker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

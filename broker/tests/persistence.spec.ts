@@ -811,6 +811,7 @@ describe('broker persistent state model', () => {
       '0021_network_identity_purge.sql',
       '0022_managed_operation_issuance_context.sql',
       '0023_backfill_operation_route_rate_limits.sql',
+      '0024_allow_unattributed_request_events.sql',
     ]);
     expect(existsSync(FIRST_BROKER_MIGRATION)).toBe(true);
     expect(existsSync(LATEST_BROKER_MIGRATION)).toBe(true);

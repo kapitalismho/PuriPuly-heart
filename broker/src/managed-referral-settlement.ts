@@ -872,8 +872,8 @@ async function releaseManagedReferralSettlementJob(db: D1Database, job: ClaimedJ
 }
 
 async function hasConvergedAfterFailure(db: D1Database, job: ClaimedJob): Promise<boolean> {
-  const reward = await db.prepare(`SELECT referred_bonus_status, referred_managed_credential_ref, referrer_bonus_status, referrer_managed_credential_ref FROM referral_rewards WHERE id = ?`).bind(job.referral_reward_id).first<{
-    referred_bonus_status: string; referred_managed_credential_ref: string | null; referrer_bonus_status: string; referrer_managed_credential_ref: string | null;
+  const reward = await db.prepare(`SELECT referred_bonus_status, referred_managed_credential_ref, referrer_bonus_status, referrer_managed_credential_ref, referrer_source, referrer_subject_ref FROM referral_rewards WHERE id = ?`).bind(job.referral_reward_id).first<{
+    referred_bonus_status: string; referred_managed_credential_ref: string | null; referrer_bonus_status: string; referrer_managed_credential_ref: string | null; referrer_source: string | null; referrer_subject_ref: string | null;
   }>();
   if (!reward) {
     return false;
@@ -887,9 +887,66 @@ async function hasConvergedAfterFailure(db: D1Database, job: ClaimedJob): Promis
   if (reward.referrer_bonus_status !== 'credited' || !reward.referrer_managed_credential_ref) {
     return false;
   }
-  const owner = await db.prepare(`SELECT 1 AS ok`).bind().first<{ ok: number }>();
-  void owner;
-  return true;
+  const owner = await readConvergedReferrerOwner(db, reward.referrer_source, reward.referrer_subject_ref, reward.referrer_managed_credential_ref);
+  if (!owner) {
+    return false;
+  }
+  const reflected = await countReferrerRewardsForTarget(db, job.referral_reward_id, owner);
+  const expectedUsd = Number((MANAGED_TRIAL_BUDGET_POLICY.hardLimit + reflected * REFERRER_REWARD_USD).toFixed(2));
+  return hasReferrerConverged(db, job, reward.referrer_managed_credential_ref, expectedUsd, owner);
+}
+
+async function readConvergedReferrerOwner(
+  db: D1Database,
+  source: string | null,
+  subjectRef: string | null,
+  managedCredentialRef: string,
+): Promise<ActiveReferrerOwner | null> {
+  if (!subjectRef) {
+    return null;
+  }
+  if (source === 'discord') {
+    const row = await db
+      .prepare(
+        `SELECT installation_id, discord_user_ref, managed_credential_ref, budget_usd, expires_at
+           FROM openrouter_entitlements
+          WHERE discord_user_ref = ?
+            AND managed_credential_ref = ?
+            AND status = 'active'
+            AND discord_issue_status = 'active'
+            AND discord_issue_delivered_at IS NOT NULL
+            AND expires_at IS NOT NULL
+            AND datetime(expires_at) >= datetime('now')`,
+      )
+      .bind(subjectRef, managedCredentialRef)
+      .first<{ installation_id: string; discord_user_ref: string; managed_credential_ref: string; budget_usd: number; expires_at: string }>()
+      .catch(() => null);
+    if (!row) {
+      return null;
+    }
+    return { source: 'discord', subjectRef: row.discord_user_ref, installationId: row.installation_id, entitlementRef: row.installation_id, managedCredentialRef: row.managed_credential_ref, budgetUsd: row.budget_usd };
+  }
+  if (source === 'qq') {
+    const row = await db
+      .prepare(
+        `SELECT qq_subject_ref, issue_ref, managed_credential_ref, budget_usd, expires_at
+           FROM qq_managed_entitlements
+          WHERE qq_subject_ref = ?
+            AND managed_credential_ref = ?
+            AND status = 'active'
+            AND delivered_at IS NOT NULL
+            AND expires_at IS NOT NULL
+            AND datetime(expires_at) >= datetime('now')`,
+      )
+      .bind(subjectRef, managedCredentialRef)
+      .first<{ qq_subject_ref: string; issue_ref: string; managed_credential_ref: string; budget_usd: number; expires_at: string }>()
+      .catch(() => null);
+    if (!row) {
+      return null;
+    }
+    return { source: 'qq', subjectRef: row.qq_subject_ref, installationId: null, entitlementRef: row.issue_ref, managedCredentialRef: row.managed_credential_ref, budgetUsd: row.budget_usd };
+  }
+  return null;
 }
 
 async function hasInviteeConverged(db: D1Database, job: ClaimedJob, budgetUsd: number, managedCredentialRef: string): Promise<boolean> {

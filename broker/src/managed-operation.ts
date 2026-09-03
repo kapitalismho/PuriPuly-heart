@@ -732,14 +732,25 @@ export async function sweepStaleManagedOperations(
       continue;
     }
     const cleanup = await cleanupManagedChildKey({ managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY, keyHash: current.managed_credential_ref, fetchImpl });
-    if (cleanup.ok) {
-      await markAttemptCleaned(db, operation.operation_id, current.attempt_index, now);
-      await transitionManagedOperation(db, operation.operation_id, 'CLEAN', now, { from: ['DELIVERY_PENDING'] });
-      await transitionManagedOperation(db, operation.operation_id, 'RETRY_READY', now, { from: ['CLEAN'] });
-      retryReady += 1;
-    } else {
+    if (!cleanup.ok) {
       await transitionManagedOperation(db, operation.operation_id, 'CLEANUP_REQUIRED', now, { from: ['DELIVERY_PENDING'] });
+      continue;
     }
+    const verify = await findManagedChildKeyByName({ managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY, keyName: current.provider_key_name, fetchImpl }).catch(() => null);
+    if (!verify || verify.found) {
+      await transitionManagedOperation(db, operation.operation_id, 'CLEANUP_REQUIRED', now, { from: ['DELIVERY_PENDING'] });
+      const after = await reconcileUnknownAttempt(db, env.OPENROUTER_MANAGEMENT_API_KEY, operation, now, fetchImpl);
+      if (after && after.state === 'RETRY_READY') {
+        retryReady += 1;
+      } else {
+        reconciled += 1;
+      }
+      continue;
+    }
+    await markAttemptCleaned(db, operation.operation_id, current.attempt_index, now);
+    await transitionManagedOperation(db, operation.operation_id, 'CLEAN', now, { from: ['DELIVERY_PENDING'] });
+    await transitionManagedOperation(db, operation.operation_id, 'RETRY_READY', now, { from: ['CLEAN'] });
+    retryReady += 1;
   }
   logManagedOperationEvent('managed_operation_sweep_completed', {
     expired,

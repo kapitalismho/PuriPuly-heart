@@ -612,6 +612,60 @@ describe('managed operation lifecycle', () => {
     );
     expect(second.ok).toBe(true);
   });
+  it('holds a stale delivery-pending operation in cleanup-required when the key survives cleanup', async () => {
+    const env = createTestBrokerEnv();
+    const { operationId, operation } = await createBoundOperation(env);
+    const started = await startManagedOperationAttempt(env.BROKER_DB, operation, NOW);
+    expect(started.ok).toBe(true);
+    if (!started.ok) {
+      return;
+    }
+    await recordAttemptCredential(env.BROKER_DB, operationId, 1, 'hash_sweep_sticky_1', NOW);
+    const { createManagedKeyDelivery } = await import('../src/managed-key-delivery');
+    await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef: SUBJECT,
+      installationId: INSTALLATION,
+      managedCredentialRef: 'hash_sweep_sticky_1',
+      createdAt: NOW,
+      expiresAt: new Date(NOW.getTime() + 15 * 60_000),
+      operationId,
+      attemptIndex: 1,
+    });
+    await transitionManagedOperation(env.BROKER_DB, operationId, 'DELIVERY_PENDING', NOW);
+
+    const keyName = providerKeyNameForOperationAttempt(operationId, 'discord', 1);
+    const stickyKeys = new Map([[keyName, 'hash_sweep_sticky_1']]);
+    const stickyFetch = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/keys?limit=') && method === 'GET') {
+        return Response.json({
+          data: [...stickyKeys.entries()].map(([name, hash]) => ({ name, hash, limit: 0.07 })),
+        });
+      }
+      if (method === 'PATCH') {
+        return Response.json({ data: { disabled: true } });
+      }
+      if (method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`unexpected provider request: ${method} ${url}`);
+    });
+    vi.stubGlobal('fetch', stickyFetch as typeof fetch);
+    const result = await sweepStaleManagedOperations(env, new Date(NOW.getTime() + 16 * 60_000));
+    expect(result.retryReady).toBe(0);
+    expect((await getManagedOperation(env.BROKER_DB, operationId))?.state).toBe('CLEANUP_REQUIRED');
+    const attempts = await listManagedOperationAttempts(env.BROKER_DB, operationId);
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]?.outcome).not.toBe('cleaned');
+    const retry = await startManagedOperationAttempt(
+      env.BROKER_DB,
+      (await getManagedOperation(env.BROKER_DB, operationId))!,
+      new Date(NOW.getTime() + 16 * 60_000),
+    );
+    expect(retry).toEqual({ ok: false, reason: 'not_retry_ready' });
+  });
 
   it('recovers a lost post-create transition with verified provider cleanup and no false success', async () => {
     const env = createTestBrokerEnv();

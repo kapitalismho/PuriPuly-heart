@@ -526,11 +526,30 @@ async function markDeliveryCleanupRequired(
           WHERE referred_source = 'qq'
             AND referred_subject_ref = ?
             AND referred_installation_id IS ?
-            AND referred_bonus_status = 'reserved'`,
+            AND referred_bonus_status = 'reserved'
+            AND referred_managed_credential_ref IS NULL
+            AND (
+              operation_id IS NULL
+              OR EXISTS (
+                SELECT 1 FROM managed_operations
+                 WHERE operation_id = referral_rewards.operation_id
+                   AND state = 'FAILED'
+              )
+            )
+            AND EXISTS (
+              SELECT 1 FROM managed_key_deliveries
+               WHERE delivery_id = ?
+                 AND status = 'expired'
+                 AND failure_reason = ?
+                 AND failed_at = ?
+            )`,
       ).bind(
         nowIso,
         delivery.subject_ref ?? '',
         delivery.installation_id,
+        delivery.delivery_id,
+        STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+        nowIso,
       ),
       db.prepare(
         `UPDATE managed_key_deliveries

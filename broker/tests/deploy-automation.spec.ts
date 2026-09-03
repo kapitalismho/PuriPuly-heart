@@ -379,7 +379,7 @@ describe('broker direct deploy automation', () => {
       'staged-migrations-pre-backfill',
     );
     const stagedMigrationApplyIndex = workflow.indexOf(
-      'Apply remote D1 migrations except deferred 0021',
+      'Apply remote D1 migrations except deferred 0021 and 0024',
     );
     const networkIdentityBackfillAwaitIndex = workflow.indexOf(
       'Await network identity backfill until keyed_only',
@@ -392,7 +392,7 @@ describe('broker direct deploy automation', () => {
       'Verify legacy network identity columns are gone',
     );
     const migrationJournalGateIndex = workflow.indexOf(
-      'Verify 0022 applied and 0021 still pending',
+      'Verify 0022 and 0023 applied with 0021 and 0024 still pending',
     );
 
     expect(workflow).toContain('workflow_dispatch:');
@@ -456,18 +456,26 @@ describe('broker direct deploy automation', () => {
     expect(workflow).toContain('staged-migrations-pre-backfill');
     expect(workflow).toContain('0020_network_identity_hmac.sql');
     expect(workflow).toContain('0022_managed_operation_issuance_context.sql');
-    expect(workflow).toContain("deferred_migration='0021_network_identity_purge.sql'");
+    expect(workflow).toContain('0023_backfill_operation_route_rate_limits.sql');
+    expect(workflow).toContain('0024_allow_unattributed_request_events.sql');
+    expect(workflow).toContain(
+      "deferred_migrations='0021_network_identity_purge.sql 0024_allow_unattributed_request_events.sql'",
+    );
+    expect(workflow).toContain('for deferred_migration in $deferred_migrations');
+    expect(workflow).toContain('staged migrations must exclude $deferred_migration');
     expect(workflow).toContain('staged_config_path');
     expect(workflow).toContain('migrations_dir');
     expect(workflow).toContain('network_identity_migration');
     expect(workflow).toContain('keyed_only');
     expect(workflow).toContain('pragma_table_info');
     expect(workflow).toContain('attempt_ip_hash');
-    expect(workflow).toContain('Apply remote D1 migrations except deferred 0021');
+    expect(workflow).toContain('Apply remote D1 migrations except deferred 0021 and 0024');
     expect(workflow).toContain('Await network identity backfill until keyed_only');
-    expect(workflow).toContain('Verify 0022 applied and 0021 still pending');
+    expect(workflow).toContain('Verify 0022 and 0023 applied with 0021 and 0024 still pending');
     expect(workflow).toContain('SELECT name FROM d1_migrations;');
-    expect(workflow).toContain('Apply network identity purge migration 0021');
+    expect(workflow).toContain("'0023_backfill_operation_route_rate_limits.sql' not in applied");
+    expect(workflow).toContain("'0024_allow_unattributed_request_events.sql' in applied");
+    expect(workflow).toContain('Apply deferred 0021 purge followed by 0024 rebuild');
     expect(workflow).toContain('Verify legacy network identity columns are gone');
     expect(workflow).toMatch(
       /wrangler secret put NETWORK_IDENTITY_HMAC_SECRET --config/u,
@@ -858,7 +866,7 @@ describe('broker direct deploy automation', () => {
       expect(result.stderr, scenario.name).not.toContain('guard-scenario-current-secret');
       expect(result.stderr, scenario.name).not.toContain('guard-scenario-previous-secret');
     }
-  });
+  }, 15000);
 
   it('ships a manual production workflow that updates only the broker daily auth cap runtime config', () => {
     const workflow = readFileSync(abuseControlsWorkflow, 'utf8');

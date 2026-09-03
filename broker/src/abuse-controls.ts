@@ -367,9 +367,6 @@ export async function recordRequestEvent(
           context.networkIdentitySecrets ?? null,
           context.now,
         );
-  if (!identity && !context.installationId) {
-    return;
-  }
   if (mode === 'legacy') {
     await db
       .prepare(
@@ -499,19 +496,35 @@ export async function checkEndpointRateLimit(
         context,
         windowStart,
       );
-      if (!match) {
-        continue;
+      if (match) {
+        row = await db
+          .prepare(
+            `SELECT COUNT(*) AS count, MIN(observed_at) AS oldest
+               FROM broker_request_events
+              WHERE endpoint = ?
+                AND (${match.predicate})
+                AND observed_at >= ?`,
+          )
+          .bind(context.endpoint, ...match.binds, windowStartIso)
+          .first<{ count: number; oldest: string | null }>();
+      } else {
+        if (context.ip) {
+          console.warn('broker_rate_limit_identity_unavailable', {
+            endpoint: context.endpoint,
+            scope: endpointConfig.scope,
+            broker_timestamp: context.now.toISOString(),
+          });
+        }
+        row = await db
+          .prepare(
+            `SELECT COUNT(*) AS count, MIN(observed_at) AS oldest
+               FROM broker_request_events
+              WHERE endpoint = ?
+                AND observed_at >= ?`,
+          )
+          .bind(context.endpoint, windowStartIso)
+          .first<{ count: number; oldest: string | null }>();
       }
-      row = await db
-        .prepare(
-          `SELECT COUNT(*) AS count, MIN(observed_at) AS oldest
-             FROM broker_request_events
-            WHERE endpoint = ?
-              AND (${match.predicate})
-              AND observed_at >= ?`,
-        )
-        .bind(context.endpoint, ...match.binds, windowStartIso)
-        .first<{ count: number; oldest: string | null }>();
     } else {
       if (!context.installationId) {
         continue;

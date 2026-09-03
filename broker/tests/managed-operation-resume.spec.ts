@@ -1262,6 +1262,42 @@ describe('managed operation resume issuance', () => {
       retry_after_ms: expect.any(Number),
     });
   });
+  it('still rate-limits status by IP when identity secrets are unavailable', async () => {
+    const env = createTestBrokerEnv();
+    env.NETWORK_IDENTITY_HMAC_SECRET = '';
+    const { updateAbuseControls } = await import('./test-support/abuse-controls');
+    updateAbuseControls(env, (controls) => {
+      controls.managedOperationStatusIp.maxRequests = 1;
+      controls.managedOperationStatusInstallation.maxRequests = 100;
+    });
+    const operationId = buildManagedOperationId();
+    const resumeToken = buildManagedOperationResumeToken();
+    const installationId = 'install-status-nosecret';
+    await createManagedOperation(env.BROKER_DB, {
+      operationId,
+      resumeTokenHash: await hashManagedOperationResumeToken(resumeToken),
+      issueSource: 'discord',
+      subjectRef: 'ph-discord-user-v1_status_nosecret',
+      installationId,
+      devicePublicKey: 'device-status-nosecret',
+      now: new Date(),
+    });
+    const headers = { 'content-type': 'application/json' };
+    const body = JSON.stringify({
+      operation_id: operationId,
+      resume_token: resumeToken,
+      installation_id: installationId,
+    });
+    const first = await app.request(STATUS_URL, { method: 'POST', headers, body }, env);
+    expect(first.status).toBe(200);
+    const second = await app.request(STATUS_URL, { method: 'POST', headers, body }, env);
+    expect(second.status).toBe(429);
+    await expect(second.json()).resolves.toMatchObject({
+      ok: false,
+      code: 'rate_limited',
+      retry_after_ms: expect.any(Number),
+    });
+  });
   it('leaves another operation credential untouched when refusing a conflicting resume', async () => {
     const env = createTestBrokerEnv();
     const provider = mockProviderPlane();
