@@ -212,6 +212,10 @@ class HttpManagedOpenRouterBrokerClient:
             request_body["referral_id"] = normalized_referral_id
         if request.installation_id:
             request_body["installation_id"] = request.installation_id
+        if request.operation_id:
+            request_body["operation_id"] = request.operation_id
+        if request.resume_token:
+            request_body["resume_token"] = request.resume_token
         try:
             payload = await self._post_json(
                 path="/v1/auth/qq/assert",
@@ -767,11 +771,53 @@ def _managed_operation_failure(
     )
 
 
+def _parse_managed_operation_credential(
+    payload: Mapping[str, object],
+    *,
+    operation: str,
+) -> ManagedOperationStatusResult:
+    try:
+        managed_secret_key = _require_text(payload, "openrouter_api_key")
+        delivery_ack = _parse_managed_operation_delivery_ack(payload)
+    except ValueError as exc:
+        raise ValueError(
+            f"broker returned malformed managed operation payload: {_safe_field_label(str(exc))}"
+        ) from exc
+    if delivery_ack is None:
+        raise ValueError(
+            "broker returned managed operation credential without delivery metadata"
+        )
+    return ManagedOperationStatusResult(
+        succeeded=True,
+        operation_status="DELIVERY_PENDING",
+        client_action="acknowledge_delivery",
+        message=None,
+        diagnostics=None,
+        attempt=None,
+        delivery=None,
+        referral=_parse_managed_operation_referral(payload.get("referral")),
+        failed_reason=None,
+        qq_subject_ref=_require_optional_text(payload, "qq_subject_ref"),
+        managed_secret_key=managed_secret_key,
+        managed_credential_ref=_require_optional_text(payload, "managed_credential_ref"),
+        expires_at=_require_optional_text(payload, "expires_at"),
+        openrouter_user_id=normalize_managed_openrouter_user_identifier(
+            payload.get("openrouter_user_id")
+        ),
+        referral_id=_parse_owned_referral_id(payload),
+        referral_bonus_applied=_parse_referral_bonus_applied(payload),
+        pass_status=_parse_talk_together_pass_status(payload),
+        delivery_ack=delivery_ack,
+    )
+
+
 def _parse_managed_operation_status(
     payload: Mapping[str, object],
     *,
     operation: str,
 ) -> ManagedOperationStatusResult:
+    if "state" not in payload or "client_action" not in payload:
+        return _parse_managed_operation_credential(payload, operation=operation)
     try:
         operation_status = _require_text(payload, "state")
         client_action = _require_text(payload, "client_action")

@@ -258,6 +258,53 @@ describe('managed key delivery ACK foundation', () => {
     expect(JSON.stringify(invalidBody)).not.toContain('wrong-token');
   });
 
+  it('treats undecodable ACK tokens as invalid without raising', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
+    const env = createTestBrokerEnv();
+    const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      managedCredentialRef: 'managed-credential-undecodable',
+      createdAt: new Date('2026-07-05T00:00:00.000Z'),
+      expiresAt: new Date('2026-07-05T00:10:00.000Z'),
+    });
+    const payload = {
+      delivery_id: delivery.deliveryId,
+      managed_credential_ref: 'managed-credential-undecodable',
+    };
+
+    for (const candidate of [
+      '!!!not-base64!!!',
+      'a'.repeat(4096),
+      'null',
+      'undefined',
+      delivery.deliveryAckToken.slice(0, -2),
+    ]) {
+      const response = await postAck(env, { ...payload, delivery_ack_token: candidate });
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { subcode: 'delivery_ack_invalid' },
+      });
+    }
+    expect(
+      env.__db
+        .prepare('SELECT status FROM managed_key_deliveries WHERE delivery_id = ?')
+        .get(delivery.deliveryId),
+    ).toEqual({ status: 'pending' });
+  });
+
+  it('compares ACK token hashes in constant time for equal lengths', async () => {
+    const { timingSafeEqualHex } = await import('../src/network-identity');
+    const { hashDeliveryAckToken } = await import('../src/managed-key-delivery');
+    const first = await hashDeliveryAckToken('token-a');
+    const second = await hashDeliveryAckToken('token-a');
+    const third = await hashDeliveryAckToken('token-b');
+    await expect(timingSafeEqualHex(first, second)).resolves.toBe(true);
+    await expect(timingSafeEqualHex(first, third)).resolves.toBe(false);
+    await expect(timingSafeEqualHex(first, `${first}x`)).resolves.toBe(false);
+    await expect(timingSafeEqualHex('', '')).resolves.toBe(true);
+  });
+
   it('rejects expired ACK route attempts while leaving delivery pending for cleanup', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-05T00:11:00.000Z'));

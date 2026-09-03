@@ -10,6 +10,7 @@ from puripuly_heart.app.ports.secret_store import SecretStorePort
 
 MANAGED_OPERATION_ID_PREFIX = "ph-mop-v1_"
 MANAGED_OPERATION_SOURCE_DISCORD = "discord"
+MANAGED_OPERATION_SOURCE_QQ = "qq"
 MANAGED_OPERATION_RESUME_TOKEN_SECRET = "openrouter_managed_operation_resume_token"
 
 MANAGED_OPERATION_STATUSES = frozenset(
@@ -93,13 +94,17 @@ def is_valid_resume_token(value: object) -> bool:
     return all(character.isalnum() or character in "-_" for character in value)
 
 
-def read_pending_operation(managed_state: ManagedIdentityStatePort) -> ManagedOperationIdentity | None:
+def read_pending_operation(
+    managed_state: ManagedIdentityStatePort,
+    *,
+    source: str = MANAGED_OPERATION_SOURCE_DISCORD,
+) -> ManagedOperationIdentity | None:
     operation_id = getattr(managed_state, "pending_managed_operation_id", None)
-    source = getattr(managed_state, "pending_managed_operation_source", None)
+    pending_source = getattr(managed_state, "pending_managed_operation_source", None)
     installation_id = getattr(managed_state, "pending_managed_operation_installation_id", None)
     if (
         not is_valid_operation_id(operation_id)
-        or source != MANAGED_OPERATION_SOURCE_DISCORD
+        or pending_source != source
         or not isinstance(installation_id, str)
         or not installation_id.strip()
     ):
@@ -183,7 +188,11 @@ def managed_operation_ui_phase(
     operation_status: str | None,
     client_action: str | None,
 ) -> str:
-    if client_action == "action_required" or operation_status == "FAILED":
+    if operation_status == "FAILED":
+        return "action_required"
+    if operation_status == "ACTIVE":
+        return "ready"
+    if client_action == "action_required":
         return "action_required"
     if operation_status in OPERATION_ACTIVE_STATUSES:
         return "ready"
@@ -216,6 +225,7 @@ __all__ = [
     "MANAGED_OPERATION_MAX_CONSECUTIVE_PROBE_FAILURES",
     "MANAGED_OPERATION_RESUME_TOKEN_SECRET",
     "MANAGED_OPERATION_SOURCE_DISCORD",
+    "MANAGED_OPERATION_SOURCE_QQ",
     "MANAGED_OPERATION_STATUSES",
     "MANAGED_OPERATION_UNKNOWN_OPERATION_STATUS",
     "OPERATION_ACTIVE_STATUSES",

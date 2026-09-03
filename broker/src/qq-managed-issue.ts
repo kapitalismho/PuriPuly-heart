@@ -18,6 +18,7 @@ import {
   listManagedOperationAttempts,
   markAttemptUnknown,
   operationBindingResponseBody,
+  reconcileUnknownAttempt,
   providerKeyNameForOperationAttempt,
   recordAttemptCredential,
   startManagedOperationAttempt,
@@ -401,11 +402,18 @@ export async function issueQqManagedEntitlement(
       childKey = error.createdChildKey;
     }
 
-    if (boundOperation && boundAttemptIndex !== null && !childKey) {
+    if (boundOperation && boundAttemptIndex !== null) {
+      if (childKey) {
+        await recordAttemptCredential(c.env.BROKER_DB, boundOperation.operation_id, boundAttemptIndex, childKey.hash, input.now);
+      }
       await markAttemptUnknown(c.env.BROKER_DB, boundOperation.operation_id, boundAttemptIndex, input.now);
     }
+    let boundProviderCleanupVerified = false;
     if (boundOperation && isDefinitiveManagedChildKeyCreateRejection(error)) {
       await failManagedOperationTerminal(c.env.BROKER_DB, boundOperation, input.now, 'terminal_provider_failure');
+    } else if (boundOperation && boundAttemptIndex !== null) {
+      const reconciled = await reconcileUnknownAttempt(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, boundOperation, input.now);
+      boundProviderCleanupVerified = reconciled?.state === 'RETRY_READY' || reconciled?.state === 'CLEAN';
     }
     if (!boundOperation) {
       await bestEffortMarkQqIssueReferralFailed(c.env.BROKER_DB, {
@@ -449,6 +457,7 @@ export async function issueQqManagedEntitlement(
           childKeyAttached,
           nowIso,
           error,
+          providerCleanupHandled: boundProviderCleanupVerified,
         });
       }
     }
@@ -1407,7 +1416,10 @@ export async function finalizeQqManagedKeyDeliveryAck(
   if (Number(finalized?.finalized ?? 0) !== 1) {
     throw new Error('QQ delivery ACK finalization failed');
   }
-  await markOperationActiveOnAck(c.env.BROKER_DB, input.deliveryId, input.acknowledgedAt);
+  const operationActivated = await markOperationActiveOnAck(c.env.BROKER_DB, input.deliveryId, input.acknowledgedAt);
+  if (!operationActivated) {
+    throw new Error('Managed operation ACK activation failed');
+  }
 
   try {
     await runQqIssueSuccessMonitoring(c, {
@@ -1635,7 +1647,6 @@ async function markStaleQqIssuingCleanupRequired(
     .run();
   return Number(result.meta.changes ?? 0) === 1;
 }
-
 async function handleQqManagedChildKeyFailure(
   c: Context<BrokerEnv>,
   input: {
@@ -1645,12 +1656,15 @@ async function handleQqManagedChildKeyFailure(
     childKeyAttached: boolean;
     nowIso: string;
     error: unknown;
+    providerCleanupHandled?: boolean;
   },
 ): Promise<void> {
-  const cleanup = await cleanupManagedChildKey({
-    managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
-    keyHash: input.childKey.hash,
-  });
+  const cleanup = input.providerCleanupHandled
+    ? { ok: true as const }
+    : await cleanupManagedChildKey({
+        managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
+        keyHash: input.childKey.hash,
+      });
 
   if (cleanup.ok) {
     try {

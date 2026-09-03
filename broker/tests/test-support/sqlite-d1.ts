@@ -1,7 +1,10 @@
 import { DatabaseSync } from 'node:sqlite';
 
 import { applyBrokerMigrations } from './migrations';
-import { resolveRequestNetworkIdentity } from '../../src/network-identity';
+import {
+  resolveNetworkIdentitySecrets,
+  resolveRequestNetworkIdentity,
+} from '../../src/network-identity';
 
 type BindValue = string | number | bigint | null;
 
@@ -237,7 +240,7 @@ export async function seedRequestEvent(
   const identity = input.ip
     ? await resolveRequestNetworkIdentity(
         input.ip,
-        { current: env.NETWORK_IDENTITY_HMAC_SECRET, previous: null },
+        { current: env.NETWORK_IDENTITY_HMAC_SECRET, previous: null, currentVersion: 1 },
         new Date(input.observedAt),
       )
     : null;
@@ -260,9 +263,13 @@ export async function seedRequestEvent(
 export function testNetworkIdentitySecrets(env: TestBrokerEnv): {
   current: string;
   previous: string | null;
+  currentVersion: number;
 } {
-  return {
-    current: env.NETWORK_IDENTITY_HMAC_SECRET,
-    previous: env.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS || null,
-  };
+  return (
+    resolveNetworkIdentitySecrets(env as unknown as Record<string, unknown>) ?? {
+      current: '',
+      previous: null,
+      currentVersion: 1,
+    }
+  );
 }

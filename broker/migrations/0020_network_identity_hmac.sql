@@ -114,6 +114,16 @@ SELECT 'network_identity_migration',
        CASE
          WHEN EXISTS (SELECT 1 FROM broker_request_events WHERE ip IS NOT NULL)
            OR EXISTS (SELECT 1 FROM referral_rewards WHERE attempt_ip_hash IS NOT NULL)
+           OR EXISTS (
+             SELECT 1 FROM broker_velocity_cap_hooks
+              WHERE subject_type = 'ip' AND active = 1
+                AND (length(subject_value) != 64 OR subject_value GLOB '*[^0-9a-f]*')
+           )
+           OR EXISTS (
+             SELECT 1 FROM broker_abuse_subject_hooks
+              WHERE subject_type = 'ip' AND active = 1
+                AND (length(subject_value) != 64 OR subject_value GLOB '*[^0-9a-f]*')
+           )
            THEN '{"phase":"dual_write","purge_after":null}'
          ELSE '{"phase":"keyed_only","purge_after":null}'
        END,

@@ -10,6 +10,7 @@ export const MANAGED_OPERATION_ID_PREFIX = 'ph-mop-v1_';
 export const MANAGED_OPERATION_RESUME_HASH_PREFIX = 'ph-mop-resume-v1_';
 export const MANAGED_OPERATION_AUTH_TTL_MS = 60 * 60_000;
 export const MANAGED_OPERATION_DELIVERY_TTL_MS = 15 * 60_000;
+export const STALE_CREATING_THRESHOLD_MS = 5 * 60_000;
 
 export const MANAGED_OPERATION_STATES = [
   'AUTHENTICATED',
@@ -140,8 +141,8 @@ export function clientActionForState(state: ManagedOperationState): ManagedOpera
     case 'DELIVERY_PENDING':
       return 'acknowledge_delivery';
     case 'FAILED':
-    case 'ACTIVE':
       return 'action_required';
+    case 'ACTIVE':
     default:
       return 'wait';
   }
@@ -335,16 +336,29 @@ export async function startManagedOperationAttempt(
   const providerKeyName = providerKeyNameForOperationAttempt(operation.operation_id, operation.issue_source, nextIndex);
   const nowIso = now.toISOString();
   const nextState: ManagedOperationState = 'CREATING';
-  await db
-    .prepare(`UPDATE managed_operations SET state = ?, client_action = ?, attempt_count = ?, current_attempt_index = ?, updated_at = ? WHERE operation_id = ? AND state IN ('AUTHENTICATED', 'ISSUE_READY', 'RETRY_READY')`)
-    .bind(nextState, clientActionForState(nextState), nextIndex, nextIndex, nowIso, operation.operation_id)
-    .run();
-  await db
-    .prepare(
-      `INSERT OR IGNORE INTO managed_operation_attempts (operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at) VALUES (?, ?, ?, NULL, 'unknown', ?, ?)`,
-    )
-    .bind(operation.operation_id, nextIndex, providerKeyName, nowIso, nowIso)
-    .run();
+  let claimed = false;
+  try {
+    const claimedResult = await db
+      .prepare(`UPDATE managed_operations SET state = ?, client_action = ?, attempt_count = ?, current_attempt_index = ?, updated_at = ? WHERE operation_id = ? AND state IN ('AUTHENTICATED', 'ISSUE_READY', 'RETRY_READY') AND attempt_count = ?`)
+      .bind(nextState, clientActionForState(nextState), nextIndex, nextIndex, nowIso, operation.operation_id, operation.attempt_count)
+      .run();
+    claimed = Number(claimedResult.meta?.changes ?? 0) === 1;
+  } catch {
+    claimed = false;
+  }
+  if (!claimed) {
+    return { ok: false, reason: 'not_retry_ready' };
+  }
+  try {
+    await db
+      .prepare(
+        `INSERT INTO managed_operation_attempts (operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at) VALUES (?, ?, ?, NULL, 'unknown', ?, ?)`,
+      )
+      .bind(operation.operation_id, nextIndex, providerKeyName, nowIso, nowIso)
+      .run();
+  } catch {
+    return { ok: false, reason: 'not_retry_ready' };
+  }
   const attempt = await db
     .prepare(`SELECT * FROM managed_operation_attempts WHERE operation_id = ? AND attempt_index = ?`)
     .bind(operation.operation_id, nextIndex)
@@ -413,11 +427,32 @@ export async function reconcileUnknownAttempt(
   now: Date,
   fetchImpl?: typeof fetch,
 ): Promise<ManagedOperationRecord | null> {
+  const current = (await getManagedOperation(db, operation.operation_id)) ?? operation;
   const attempts = await listManagedOperationAttempts(db, operation.operation_id);
-  const target = attempts.find((entry) => entry.attempt_index === operation.current_attempt_index) ?? attempts[attempts.length - 1] ?? null;
-  if (!target) {
+  const storedTarget = attempts.find((entry) => entry.attempt_index === current.current_attempt_index) ?? null;
+  if (!storedTarget && attempts.length === 0 && current.current_attempt_index === 0) {
     return getManagedOperation(db, operation.operation_id);
   }
+  const target = storedTarget ?? {
+    attempt_index: current.current_attempt_index,
+    provider_key_name: providerKeyNameForOperationAttempt(
+      operation.operation_id,
+      current.issue_source,
+      current.current_attempt_index,
+    ),
+    managed_credential_ref: null as string | null,
+  };
+  return reconcileAttemptTarget(db, managementApiKey, current, target, now, fetchImpl);
+}
+
+async function reconcileAttemptTarget(
+  db: D1Database,
+  managementApiKey: string,
+  operation: ManagedOperationRecord,
+  target: Pick<ManagedOperationAttemptRecord, 'attempt_index' | 'provider_key_name' | 'managed_credential_ref'>,
+  now: Date,
+  fetchImpl?: typeof fetch,
+): Promise<ManagedOperationRecord | null> {
   await transitionManagedOperation(db, operation.operation_id, 'RECONCILING', now, { from: ['CREATE_UNKNOWN', 'RECONCILING', 'CLEANUP_REQUIRED', 'CLEAN'] });
   const found = await findManagedChildKeyByName({ managementApiKey, keyName: target.provider_key_name, fetchImpl });
   if (!found.found) {
@@ -503,6 +538,14 @@ export async function sweepStaleManagedOperations(
     await expireManagedOperation(db, operation, now);
     expired += 1;
   }
+  const creatingStale = await db
+    .prepare(`SELECT * FROM managed_operations WHERE state = 'CREATING' AND updated_at <= ? LIMIT 25`)
+    .bind(new Date(now.getTime() - STALE_CREATING_THRESHOLD_MS).toISOString())
+    .all<ManagedOperationRecord>();
+  for (const operation of creatingStale.results ?? []) {
+    await transitionManagedOperation(db, operation.operation_id, 'CREATE_UNKNOWN', now, { from: ['CREATING'] });
+    reconciled += 1;
+  }
   const unknown = await db
     .prepare(`SELECT * FROM managed_operations WHERE state IN ('CREATE_UNKNOWN', 'RECONCILING', 'CLEANUP_REQUIRED', 'CLEAN') LIMIT 25`)
     .all<ManagedOperationRecord>();
@@ -521,6 +564,21 @@ export async function sweepStaleManagedOperations(
     .bind(new Date(now.getTime() - MANAGED_OPERATION_DELIVERY_TTL_MS).toISOString())
     .all<ManagedOperationRecord>();
   for (const operation of deliveryStale.results ?? []) {
+    const acknowledged = await db
+      .prepare(
+        `SELECT delivery_id FROM managed_key_deliveries
+          WHERE operation_id = ? AND status = 'acknowledged'
+          ORDER BY created_at DESC, delivery_id DESC
+          LIMIT 1`,
+      )
+      .bind(operation.operation_id)
+      .first<{ delivery_id: string }>()
+      .catch(() => null);
+    if (acknowledged) {
+      await transitionManagedOperation(db, operation.operation_id, 'ACTIVE', now, { from: ['DELIVERY_PENDING'] });
+      reconciled += 1;
+      continue;
+    }
     const attempts = await listManagedOperationAttempts(db, operation.operation_id);
     const current = attempts.find((entry) => entry.attempt_index === operation.current_attempt_index) ?? null;
     if (!current || !current.managed_credential_ref) {
@@ -770,24 +828,31 @@ export async function markOperationActiveOnAck(
   db: D1Database,
   deliveryId: string,
   now: Date,
-): Promise<void> {
+): Promise<boolean> {
   const nowIso = now.toISOString();
+  const linked = await db
+    .prepare(`SELECT operation_id FROM managed_key_deliveries WHERE delivery_id = ?`)
+    .bind(deliveryId)
+    .first<{ operation_id: string | null }>()
+    .catch(() => null);
+  if (!linked || !linked.operation_id) {
+    return true;
+  }
   await db
     .prepare(
       `UPDATE managed_operations
-          SET state = 'ACTIVE', client_action = 'action_required', updated_at = ?
-        WHERE operation_id = (SELECT operation_id FROM managed_key_deliveries WHERE delivery_id = ?)
+          SET state = 'ACTIVE', client_action = 'wait', updated_at = ?
+        WHERE operation_id = (SELECT operation_id FROM managed_key_deliveries WHERE delivery_id = ? AND status = 'acknowledged')
           AND operation_id IS NOT NULL
           AND state = 'DELIVERY_PENDING'`,
     )
     .bind(nowIso, deliveryId)
-    .run()
-    .catch(() => null);
+    .run();
   await db
     .prepare(
       `UPDATE managed_operations
           SET settlement_status = 'invitee_pending', updated_at = ?
-        WHERE operation_id = (SELECT operation_id FROM managed_key_deliveries WHERE delivery_id = ?)
+        WHERE operation_id = (SELECT operation_id FROM managed_key_deliveries WHERE delivery_id = ? AND status = 'acknowledged')
           AND operation_id IS NOT NULL
           AND EXISTS (
             SELECT 1 FROM managed_referral_settlement_jobs job
@@ -796,8 +861,16 @@ export async function markOperationActiveOnAck(
           )`,
     )
     .bind(nowIso, deliveryId, deliveryId)
-    .run()
+    .run();
+  const operation = await db
+    .prepare(
+      `SELECT state FROM managed_operations
+        WHERE operation_id = (SELECT operation_id FROM managed_key_deliveries WHERE delivery_id = ?)`,
+    )
+    .bind(deliveryId)
+    .first<{ state: string }>()
     .catch(() => null);
+  return operation?.state === 'ACTIVE';
 }
 
 export async function markOperationSettlementStatus(

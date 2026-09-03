@@ -297,7 +297,7 @@ describe('managed operation resume issuance', () => {
 
     const attemptsAfterFailure = readAttempts(env, operationId);
     expect(attemptsAfterFailure).toHaveLength(1);
-    expect(attemptsAfterFailure[0]).toMatchObject({ attempt_index: 1, outcome: 'unknown' });
+    expect(attemptsAfterFailure[0]).toMatchObject({ attempt_index: 1, outcome: 'cleaned' });
 
     const statusResponse = await postStatus(env, {
       operation_id: operationId,
@@ -307,8 +307,8 @@ describe('managed operation resume issuance', () => {
     expect(statusResponse.status).toBe(200);
     await expect(statusResponse.json()).resolves.toMatchObject({
       ok: true,
-      state: 'CREATE_UNKNOWN',
-      client_action: 'wait',
+      state: 'RETRY_READY',
+      client_action: 'retry_authorized',
     });
 
     const discordCallsBeforeResume = discord.calls.length;
@@ -692,7 +692,7 @@ describe('managed operation resume issuance', () => {
     });
     await expect(statusResponse.json()).resolves.toMatchObject({
       ok: true,
-      state: 'CREATE_UNKNOWN',
+      state: 'RETRY_READY',
       issue_source: 'qq',
     });
 

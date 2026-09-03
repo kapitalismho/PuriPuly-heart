@@ -2,7 +2,12 @@ import type { Context } from 'hono';
 import { describe, expect, it } from 'vitest';
 
 import { extractRequestNetworkMetadata, resolveRequestNetworkIdentitySecrets } from '../src/abuse-controls';
-import { resolveNetworkIdentitySecrets } from '../src/network-identity';
+import {
+  deriveStableNetworkIdentityDigest,
+  normalizeNetworkIdentityIp,
+  resolveNetworkIdentitySecrets,
+  resolveRequestNetworkIdentity,
+} from '../src/network-identity';
 import type { BrokerEnv } from '../src/contract';
 import { createTestBrokerEnv, type TestBrokerEnv } from './test-support/sqlite-d1';
 
@@ -101,6 +106,64 @@ describe('request network metadata extraction', () => {
     ).join('');
     expect(first.ipDigest).not.toBe(unkeyedHex);
     expect(first.legacyIp).toBeNull();
+  });
+
+  it('canonicalizes IPv4 and IPv6 spellings to one normalized form', () => {
+    expect(normalizeNetworkIdentityIp('203.0.113.42')).toBe('203.0.113.42');
+    expect(normalizeNetworkIdentityIp('203.000.113.042')).toBe('203.0.113.42');
+    expect(normalizeNetworkIdentityIp('2001:DB8::1')).toBe('2001:db8:0:0:0:0:0:1');
+    expect(normalizeNetworkIdentityIp('2001:0db8:0000:0000:0000:0000:0000:0001')).toBe(
+      '2001:db8:0:0:0:0:0:1',
+    );
+    expect(normalizeNetworkIdentityIp('::ffff:203.0.113.42')).toBe('203.0.113.42');
+    expect(normalizeNetworkIdentityIp(' ::FFFF:203.0.113.42 ')).toBe('203.0.113.42');
+    expect(normalizeNetworkIdentityIp('not-an-ip')).toBeNull();
+    expect(normalizeNetworkIdentityIp('999.0.113.42')).toBeNull();
+    expect(normalizeNetworkIdentityIp('2001:db8:::1')).toBeNull();
+  });
+
+  it('derives identical digests for equivalent IP spellings', async () => {
+    const env = createTestBrokerEnv();
+    const secrets = resolveNetworkIdentitySecrets(env)!;
+    const now = new Date('2026-04-08T06:00:00.000Z');
+    const lower = await resolveRequestNetworkIdentity('2001:db8::1', secrets, now);
+    const upper = await resolveRequestNetworkIdentity('2001:DB8::1', secrets, now);
+    expect(upper?.digest).toBe(lower?.digest);
+    const padded = await resolveRequestNetworkIdentity('203.000.113.042', secrets, now);
+    const plain = await resolveRequestNetworkIdentity('203.0.113.42', secrets, now);
+    expect(padded?.digest).toBe(plain?.digest);
+    const mapped = await resolveRequestNetworkIdentity('::ffff:203.0.113.42', secrets, now);
+    expect(mapped?.digest).toBe(plain?.digest);
+  });
+
+  it('stamps previous-secret digests with the previous version and drops them after removal', async () => {
+    const env = createTestBrokerEnv();
+    env.NETWORK_IDENTITY_HMAC_SECRET = 'new-secret';
+    env.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS = 'old-secret';
+    (env as unknown as Record<string, unknown>).NETWORK_IDENTITY_HMAC_KEY_VERSION = '2';
+    const secrets = resolveNetworkIdentitySecrets(env)!;
+    expect(secrets).toMatchObject({ currentVersion: 2 });
+
+    const digests = await deriveStableNetworkIdentityDigest(secrets, '203.0.113.42', 'ip');
+    expect(digests).toEqual([
+      expect.objectContaining({ keyVersion: 2 }),
+      expect.objectContaining({ keyVersion: 1 }),
+    ]);
+    expect(digests[0]?.digest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(digests[1]?.digest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(digests[0]?.digest).not.toBe(digests[1]?.digest);
+
+    const identity = await resolveRequestNetworkIdentity(
+      '203.0.113.42',
+      secrets,
+      new Date('2026-04-08T06:00:00.000Z'),
+    );
+    expect(identity?.keyVersion).toBe(2);
+
+    delete (env as unknown as Record<string, unknown>).NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS;
+    const rotated = resolveNetworkIdentitySecrets(env)!;
+    const after = await deriveStableNetworkIdentityDigest(rotated, '203.0.113.42', 'ip');
+    expect(after).toEqual([expect.objectContaining({ keyVersion: 2 })]);
   });
 
   it('omits digests when the worker secret is unavailable', async () => {

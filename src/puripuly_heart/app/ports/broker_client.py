@@ -102,6 +102,8 @@ class QqManagedAssertionRequest:
     metadata: Mapping[str, DiagnosticFieldValue]
     referral_id: str | None = None
     installation_id: str | None = None
+    operation_id: str | None = None
+    resume_token: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metadata", _freeze_fields(self.metadata))
@@ -189,6 +191,7 @@ class ManagedOperationStatusResult:
     delivery: ManagedOperationDeliverySnapshot | None = None
     referral: ManagedOperationReferralSnapshot | None = None
     failed_reason: str | None = None
+    qq_subject_ref: str | None = None
     managed_secret_key: str | None = field(default=None, repr=False)
     managed_credential_ref: str | None = None
     expires_at: str | None = None

@@ -1,5 +1,7 @@
 import { getBrokerAbuseControlsConfig } from './abuse-controls';
 import {
+  deriveStableNetworkIdentityDigest,
+  normalizeNetworkIdentityIp,
   resolveNetworkIdentityWriteMode,
   resolveRequestNetworkIdentity,
   type NetworkIdentitySecrets,
@@ -40,11 +42,21 @@ export async function resolveNetworkIdentityMaxWindowMinutes(
 
 const BACKFILL_BATCH_LIMIT = 200;
 
+export const UNPARSEABLE_IP_EPOCH_SENTINEL = '0000-00-00';
+
+export interface NetworkIdentityHookBackfillResult {
+  converted: number;
+  pending: number;
+  unparseable: number;
+}
+
 export interface NetworkIdentityBackfillResult {
   mode: NetworkIdentityWriteMode;
   requestEventsBackfilled: number;
   pendingRequestEvents: number;
   pendingReferralEvents: number;
+  hooksConverted: number;
+  pendingHooks: number;
   finalized: boolean;
 }
 
@@ -53,25 +65,38 @@ export async function runNetworkIdentityBackfill(
   secrets: NetworkIdentitySecrets | null,
   now: Date,
 ): Promise<NetworkIdentityBackfillResult> {
+  const hooks = secrets
+    ? await runNetworkIdentityHookBackfill(db, secrets)
+    : { converted: 0, pending: 0, unparseable: 0 };
   const mode = await resolveNetworkIdentityWriteMode(db);
   if (mode !== 'dual' || !secrets) {
-    return { mode, requestEventsBackfilled: 0, pendingRequestEvents: 0, pendingReferralEvents: 0, finalized: mode === 'keyed' };
+    return { mode, requestEventsBackfilled: 0, pendingRequestEvents: 0, pendingReferralEvents: 0, hooksConverted: hooks.converted, pendingHooks: hooks.pending, finalized: mode === 'keyed' };
   }
   const maxWindowMinutes = await resolveNetworkIdentityMaxWindowMinutes(db);
   const windowStartIso = new Date(now.getTime() - maxWindowMinutes * 60_000).toISOString();
   let backfilled = 0;
   const candidates = await db
     .prepare(
-      `SELECT id, ip, observed_at FROM broker_request_events
+      `SELECT id, ip, installation_id, observed_at FROM broker_request_events
         WHERE ip IS NOT NULL AND ip_digest IS NULL AND observed_at >= ?
         ORDER BY observed_at ASC LIMIT ?`,
     )
     .bind(windowStartIso, BACKFILL_BATCH_LIMIT)
-    .all<{ id: number; ip: string; observed_at: string }>();
+    .all<{ id: number; ip: string; installation_id: string | null; observed_at: string }>();
   for (const candidate of candidates.results ?? []) {
     const observedAt = new Date(candidate.observed_at);
     const identity = await resolveRequestNetworkIdentity(candidate.ip, secrets, Number.isNaN(observedAt.getTime()) ? now : observedAt);
     if (!identity) {
+      if (!candidate.installation_id) {
+        await db
+          .prepare(
+            `UPDATE broker_request_events
+                SET ip_epoch = ?
+              WHERE id = ? AND ip_digest IS NULL`,
+          )
+          .bind(UNPARSEABLE_IP_EPOCH_SENTINEL, candidate.id)
+          .run();
+      }
       continue;
     }
     const updated = await db
@@ -87,24 +112,87 @@ export async function runNetworkIdentityBackfill(
   const pendingRequestEvents = await countPendingLegacyRequestEvents(db, windowStartIso);
   const pendingReferralEvents = await countPendingLegacyReferralEvents(db, windowStartIso);
   let finalized = false;
-  if (pendingRequestEvents === 0 && pendingReferralEvents === 0) {
+  if (pendingRequestEvents === 0 && pendingReferralEvents === 0 && hooks.pending === 0) {
     finalized = await finalizeNetworkIdentityMigration(db, now);
   }
-  return { mode, requestEventsBackfilled: backfilled, pendingRequestEvents, pendingReferralEvents, finalized };
+  return { mode, requestEventsBackfilled: backfilled, pendingRequestEvents, pendingReferralEvents, hooksConverted: hooks.converted, pendingHooks: hooks.pending, finalized };
+}
+
+export async function runNetworkIdentityHookBackfill(
+  db: D1Database,
+  secrets: NetworkIdentitySecrets,
+): Promise<NetworkIdentityHookBackfillResult> {
+  let converted = 0;
+  let pending = 0;
+  let unparseable = 0;
+  for (const table of ['broker_velocity_cap_hooks', 'broker_abuse_subject_hooks'] as const) {
+    const rows = await db
+      .prepare(
+        `SELECT id, subject_value FROM ${table}
+          WHERE subject_type = 'ip' AND active = 1
+          AND (length(subject_value) != 64 OR subject_value GLOB '*[^0-9a-f]*')
+          ORDER BY id ASC LIMIT ?`,
+      )
+      .bind(BACKFILL_BATCH_LIMIT)
+      .all<{ id: number; subject_value: string }>()
+      .catch(() => ({ results: [] as Array<{ id: number; subject_value: string }> }));
+    for (const row of rows.results ?? []) {
+      const normalized = normalizeNetworkIdentityIp(row.subject_value);
+      if (!normalized) {
+        unparseable += 1;
+        continue;
+      }
+      const digests = await deriveStableNetworkIdentityDigest(secrets, normalized, 'ip');
+      const digest = digests[0]?.digest;
+      if (!digest) {
+        unparseable += 1;
+        continue;
+      }
+      const updated = await db
+        .prepare(`UPDATE ${table} SET subject_value = ? WHERE id = ? AND subject_value = ?`)
+        .bind(digest, row.id, row.subject_value)
+        .run()
+        .catch(() => null);
+      if (Number(updated?.meta?.changes ?? 0) === 1) {
+        converted += 1;
+      }
+    }
+  }
+  const remaining = await db
+    .prepare(
+      `SELECT subject_value FROM broker_velocity_cap_hooks
+          WHERE subject_type = 'ip' AND active = 1
+          AND (length(subject_value) != 64 OR subject_value GLOB '*[^0-9a-f]*')
+        UNION ALL
+        SELECT subject_value FROM broker_abuse_subject_hooks
+          WHERE subject_type = 'ip' AND active = 1
+          AND (length(subject_value) != 64 OR subject_value GLOB '*[^0-9a-f]*')
+        LIMIT ?`,
+    )
+    .bind(BACKFILL_BATCH_LIMIT)
+    .all<{ subject_value: string }>()
+    .catch(() => ({ results: [] as Array<{ subject_value: string }> }));
+  for (const row of remaining.results ?? []) {
+    if (normalizeNetworkIdentityIp(row.subject_value)) {
+      pending += 1;
+    }
+  }
+  return { converted, pending, unparseable };
 }
 
 async function countPendingLegacyRequestEvents(db: D1Database, windowStartIso: string): Promise<number> {
   const row = await db
     .prepare(
       `SELECT COUNT(*) AS count FROM broker_request_events
-        WHERE ip IS NOT NULL AND ip_digest IS NULL AND observed_at >= ?`,
+        WHERE ip IS NOT NULL AND ip_digest IS NULL
+          AND (ip_epoch IS NULL OR ip_epoch != ?)
+          AND observed_at >= ?`,
     )
-    .bind(windowStartIso)
+    .bind(UNPARSEABLE_IP_EPOCH_SENTINEL, windowStartIso)
     .first<{ count: number }>()
     .catch(() => ({ count: 0 }));
   return Number(row?.count ?? 0);
 }
-
 async function countPendingLegacyReferralEvents(db: D1Database, windowStartIso: string): Promise<number> {
   const row = await db
     .prepare(
@@ -116,11 +204,25 @@ async function countPendingLegacyReferralEvents(db: D1Database, windowStartIso: 
     .catch(() => ({ count: 0 }));
   return Number(row?.count ?? 0);
 }
-
 async function finalizeNetworkIdentityMigration(db: D1Database, now: Date): Promise<boolean> {
   const nowIso = now.toISOString();
   await db
+    .prepare(
+      `DELETE FROM broker_request_events
+        WHERE ip_digest IS NULL AND installation_id IS NULL AND ip IS NOT NULL`,
+    )
+    .run()
+    .catch(() => null);
+  await db
     .prepare(`UPDATE broker_request_events SET ip = NULL WHERE ip IS NOT NULL`)
+    .run()
+    .catch(() => null);
+  await db
+    .prepare(
+      `UPDATE broker_request_events SET ip_epoch = NULL
+        WHERE ip_digest IS NULL AND ip_epoch = ?`,
+    )
+    .bind(UNPARSEABLE_IP_EPOCH_SENTINEL)
     .run()
     .catch(() => null);
   await db

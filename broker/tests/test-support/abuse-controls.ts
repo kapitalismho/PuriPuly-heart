@@ -484,7 +484,7 @@ export async function stableIpHookValue(
     throw new Error('test IP normalization failed');
   }
   const digests = await deriveStableNetworkIdentityDigest(
-    { current: env.NETWORK_IDENTITY_HMAC_SECRET, previous: null },
+    { current: env.NETWORK_IDENTITY_HMAC_SECRET, previous: null, currentVersion: 1 },
     normalized,
     'ip',
   );

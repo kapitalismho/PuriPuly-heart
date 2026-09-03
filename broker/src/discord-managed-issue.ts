@@ -14,7 +14,7 @@ import {
 } from './abuse-controls';
 import { resolveNetworkIdentityWriteMode, resolveReferralAttemptIdentity, resolveRequestNetworkIdentity, type NetworkIdentitySecrets } from './network-identity';
 import { resolveBrokerRequestEventIpMatch } from './abuse-controls';
-import { attachReferralToOperation, bindOperationForIssue, buildManagedOperationStatusBodyWithDelivery, failManagedOperationTerminal, getManagedOperationStatusSnapshot, markOperationActiveOnAck, type ManagedOperationRecord as StrictManagedOperationRecord, isManagedOperationId, listManagedOperationAttempts, markAttemptUnknown, operationBindingResponseBody, providerKeyNameForOperationAttempt, recordAttemptCredential, saveOperationIssuanceContext, startManagedOperationAttempt, transitionManagedOperation } from './managed-operation';
+import { attachReferralToOperation, bindOperationForIssue, buildManagedOperationStatusBodyWithDelivery, failManagedOperationTerminal, getManagedOperationStatusSnapshot, markOperationActiveOnAck, type ManagedOperationRecord as StrictManagedOperationRecord, isManagedOperationId, listManagedOperationAttempts, markAttemptUnknown, operationBindingResponseBody, providerKeyNameForOperationAttempt, reconcileUnknownAttempt, recordAttemptCredential, saveOperationIssuanceContext, startManagedOperationAttempt, transitionManagedOperation } from './managed-operation';
 import {
   deliverManagedCleanupIncident,
   deliverImmediateMonitoringSideEffects,
@@ -836,16 +836,23 @@ export async function handleDiscordOpenRouterIssue(
         nowIso,
       });
     }
-    if (boundOperation && boundAttemptIndex !== null && !childKey) {
+    if (boundOperation && boundAttemptIndex !== null) {
+      if (childKey) {
+        await recordAttemptCredential(c.env.BROKER_DB, boundOperation.operation_id, boundAttemptIndex, childKey.hash, now);
+      }
       await markAttemptUnknown(c.env.BROKER_DB, boundOperation.operation_id, boundAttemptIndex, now);
     }
+    let boundProviderCleanupVerified = false;
     if (boundOperation && isDefinitiveManagedChildKeyCreateRejection(error)) {
       await failManagedOperationTerminal(c.env.BROKER_DB, boundOperation, now, 'terminal_provider_failure');
+    } else if (boundOperation && boundAttemptIndex !== null) {
+      const reconciled = await reconcileUnknownAttempt(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, boundOperation, now);
+      boundProviderCleanupVerified = reconciled?.state === 'RETRY_READY' || reconciled?.state === 'CLEAN';
     }
     if (!childKey) {
       const definitiveCreateRejection =
         isDefinitiveManagedChildKeyCreateRejection(error);
-      if (childKeyCreationAttempted && !definitiveCreateRejection) {
+      if (childKeyCreationAttempted && !definitiveCreateRejection && !boundProviderCleanupVerified) {
         let cleanupRequiredRecorded = false;
         try {
           cleanupRequiredRecorded = await markDiscordIndeterminateChildKeyCreation(
@@ -893,6 +900,7 @@ export async function handleDiscordOpenRouterIssue(
         nowIso,
         error,
         sensitiveValues,
+        providerCleanupHandled: boundProviderCleanupVerified,
       });
     }
     return internalErrorResponseWithEntitlement(
@@ -1926,7 +1934,6 @@ async function releaseDiscordReservation(
     ).bind(input.discordUserRef, input.installationId),
   ]);
 }
-
 async function handleDiscordManagedChildKeyFailure(
   c: Context<BrokerEnv>,
   input: {
@@ -1940,12 +1947,15 @@ async function handleDiscordManagedChildKeyFailure(
     nowIso: string;
     error: unknown;
     sensitiveValues: string[];
+    providerCleanupHandled?: boolean;
   },
 ): Promise<void> {
-  const cleanup = await cleanupManagedChildKey({
-    managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
-    keyHash: input.childKey.hash,
-  });
+  const cleanup = input.providerCleanupHandled
+    ? { ok: true as const }
+    : await cleanupManagedChildKey({
+        managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
+        keyHash: input.childKey.hash,
+      });
 
   if (cleanup.ok) {
     try {
@@ -2521,7 +2531,10 @@ export async function finalizeDiscordManagedKeyDeliveryAck(
   if (Number(finalized?.finalized ?? 0) !== 1) {
     throw new Error('Discord delivery ACK finalization failed');
   }
-  await markOperationActiveOnAck(c.env.BROKER_DB, input.deliveryId, input.acknowledgedAt);
+  const operationActivated = await markOperationActiveOnAck(c.env.BROKER_DB, input.deliveryId, input.acknowledgedAt);
+  if (!operationActivated) {
+    throw new Error('Managed operation ACK activation failed');
+  }
   await runDiscordIssueSuccessMonitoring(c, {
     installationId: entitlement.installation_id,
     managedCredentialRef: input.managedCredentialRef,

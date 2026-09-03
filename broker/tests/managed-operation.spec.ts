@@ -12,6 +12,7 @@ import {
   listManagedOperationAttempts,
   markAttemptUnknown,
   providerKeyNameForOperationAttempt,
+  reconcileUnknownAttempt,
   recordAttemptCredential,
   startManagedOperationAttempt,
   sweepStaleManagedOperations,
@@ -453,6 +454,158 @@ describe('managed operation lifecycle', () => {
     const mirrored = await getManagedOperation(env.BROKER_DB, operationId);
     expect(mirrored?.referral_status).toBe('credited');
     expect(mirrored?.settlement_status).toBe('referrer_pending');
+  });
+
+  it('reconciles with a stale caller snapshot by re-reading the current attempt', async () => {
+    const env = createTestBrokerEnv();
+    const { operationId, operation } = await createBoundOperation(env);
+    const started = await startManagedOperationAttempt(env.BROKER_DB, operation, NOW);
+    expect(started.ok).toBe(true);
+    if (!started.ok) {
+      return;
+    }
+    const keyName = providerKeyNameForOperationAttempt(operationId, 'discord', 1);
+    await recordAttemptCredential(env.BROKER_DB, operationId, 1, 'hash_stale_snapshot_1', NOW);
+    await markAttemptUnknown(env.BROKER_DB, operationId, 1, NOW);
+
+    mockProviderList({ [keyName]: 'hash_stale_snapshot_1' });
+    const reconciled = await reconcileUnknownAttempt(
+      env.BROKER_DB,
+      env.OPENROUTER_MANAGEMENT_API_KEY,
+      operation,
+      NOW,
+    );
+    expect(reconciled?.state).toBe('RETRY_READY');
+    const attempts = await listManagedOperationAttempts(env.BROKER_DB, operationId);
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).toEqual(
+      expect.objectContaining({ attempt_index: 1, outcome: 'cleaned' }),
+    );
+  });
+
+  it('fences concurrent attempt claims so only one attempt row exists', async () => {
+    const env = createTestBrokerEnv();
+    const { operationId, operation } = await createBoundOperation(env);
+    const [first, second] = await Promise.all([
+      startManagedOperationAttempt(env.BROKER_DB, operation, NOW),
+      startManagedOperationAttempt(env.BROKER_DB, operation, NOW),
+    ]);
+    const winners = [first, second].filter((result) => result.ok);
+    expect(winners).toHaveLength(1);
+    expect([first, second]).toContainEqual({ ok: false, reason: 'not_retry_ready' });
+    expect(await listManagedOperationAttempts(env.BROKER_DB, operationId)).toHaveLength(1);
+  });
+
+  it('activates a delivery-pending operation from an acknowledged delivery and stays converged on retry', async () => {
+    const env = createTestBrokerEnv();
+    const { operationId, operation } = await createBoundOperation(env);
+    const started = await startManagedOperationAttempt(env.BROKER_DB, operation, NOW);
+    expect(started.ok).toBe(true);
+    if (!started.ok) {
+      return;
+    }
+    await recordAttemptCredential(env.BROKER_DB, operationId, 1, 'hash_ack_converge_1', NOW);
+    const { createManagedKeyDelivery, markManagedKeyDeliveryAcknowledged } = await import(
+      '../src/managed-key-delivery'
+    );
+    const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef: SUBJECT,
+      installationId: INSTALLATION,
+      managedCredentialRef: 'hash_ack_converge_1',
+      createdAt: NOW,
+      expiresAt: new Date(NOW.getTime() + 15 * 60_000),
+      operationId,
+      attemptIndex: 1,
+    });
+    await transitionManagedOperation(env.BROKER_DB, operationId, 'DELIVERY_PENDING', NOW);
+    await markManagedKeyDeliveryAcknowledged(env.BROKER_DB, {
+      deliveryId: delivery.deliveryId,
+      acknowledgedAt: NOW,
+    });
+
+    const { markOperationActiveOnAck, buildManagedOperationStatusBodyWithDelivery } = await import(
+      '../src/managed-operation'
+    );
+    expect(await markOperationActiveOnAck(env.BROKER_DB, delivery.deliveryId, NOW)).toBe(true);
+    expect(await markOperationActiveOnAck(env.BROKER_DB, delivery.deliveryId, NOW)).toBe(true);
+    const active = (await getManagedOperation(env.BROKER_DB, operationId))!;
+    expect(active.state).toBe('ACTIVE');
+    const body = await buildManagedOperationStatusBodyWithDelivery(
+      env.BROKER_DB,
+      active,
+      await listManagedOperationAttempts(env.BROKER_DB, operationId),
+    );
+    expect(body).toEqual(expect.objectContaining({ state: 'ACTIVE', client_action: 'wait' }));
+  });
+
+  it('sweeps a stale delivery-pending operation to active when its delivery was acknowledged', async () => {
+    const env = createTestBrokerEnv();
+    const { operationId, operation } = await createBoundOperation(env);
+    const started = await startManagedOperationAttempt(env.BROKER_DB, operation, NOW);
+    expect(started.ok).toBe(true);
+    if (!started.ok) {
+      return;
+    }
+    const { markManagedKeyDeliveryAcknowledged } = await import('../src/managed-key-delivery');
+    const { createManagedKeyDelivery } = await import('../src/managed-key-delivery');
+    const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef: SUBJECT,
+      installationId: INSTALLATION,
+      managedCredentialRef: 'hash_sweep_ack_1',
+      createdAt: NOW,
+      expiresAt: new Date(NOW.getTime() + 15 * 60_000),
+      operationId,
+      attemptIndex: 1,
+    });
+    await transitionManagedOperation(env.BROKER_DB, operationId, 'DELIVERY_PENDING', NOW);
+    await markManagedKeyDeliveryAcknowledged(env.BROKER_DB, {
+      deliveryId: delivery.deliveryId,
+      acknowledgedAt: NOW,
+    });
+
+    mockProviderList({});
+    const result = await sweepStaleManagedOperations(env, new Date(NOW.getTime() + 16 * 60_000));
+    expect(result.reconciled).toBe(1);
+    const swept = (await getManagedOperation(env.BROKER_DB, operationId))!;
+    expect(swept.state).toBe('ACTIVE');
+    expect(swept.client_action).toBe('wait');
+  });
+
+  it('sweeps a stale delivery-pending operation with no acknowledgement back to retry-ready', async () => {
+    const env = createTestBrokerEnv();
+    const { operationId, operation } = await createBoundOperation(env);
+    const started = await startManagedOperationAttempt(env.BROKER_DB, operation, NOW);
+    expect(started.ok).toBe(true);
+    if (!started.ok) {
+      return;
+    }
+    await recordAttemptCredential(env.BROKER_DB, operationId, 1, 'hash_sweep_retry_1', NOW);
+    const { createManagedKeyDelivery } = await import('../src/managed-key-delivery');
+    await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef: SUBJECT,
+      installationId: INSTALLATION,
+      managedCredentialRef: 'hash_sweep_retry_1',
+      createdAt: NOW,
+      expiresAt: new Date(NOW.getTime() + 15 * 60_000),
+      operationId,
+      attemptIndex: 1,
+    });
+    await transitionManagedOperation(env.BROKER_DB, operationId, 'DELIVERY_PENDING', NOW);
+
+    const { calls } = mockProviderList({});
+    const result = await sweepStaleManagedOperations(env, new Date(NOW.getTime() + 16 * 60_000));
+    expect(result.retryReady).toBe(1);
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+    expect((await getManagedOperation(env.BROKER_DB, operationId))?.state).toBe('RETRY_READY');
+    const second = await startManagedOperationAttempt(
+      env.BROKER_DB,
+      (await getManagedOperation(env.BROKER_DB, operationId))!,
+      new Date(NOW.getTime() + 16 * 60_000),
+    );
+    expect(second.ok).toBe(true);
   });
 
   it('sweeps expired operations without touching active ones', async () => {

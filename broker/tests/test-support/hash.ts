@@ -21,7 +21,7 @@ export async function attemptIpDigestFor(
 ): Promise<{ digest: string; keyVersion: number; epoch: string }> {
   const identity = await resolveRequestNetworkIdentity(
     ip,
-    { current: env.NETWORK_IDENTITY_HMAC_SECRET, previous: null },
+    { current: env.NETWORK_IDENTITY_HMAC_SECRET, previous: null, currentVersion: 1 },
     new Date(nowIso),
   );
   if (!identity) {

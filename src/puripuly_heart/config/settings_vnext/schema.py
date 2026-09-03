@@ -33,6 +33,21 @@ MANAGED_AUTH_CLAIM_SOURCES: Final = (
     MANAGED_AUTH_CLAIM_SOURCE_QQ,
 )
 MANAGED_KEY_DELIVERY_ACK_SOURCES: Final = ("discord", "qq")
+MANAGED_OPERATION_RECOGNIZED_STATES: Final = frozenset(
+    {
+        "AUTHENTICATED",
+        "ISSUE_READY",
+        "CREATING",
+        "CREATE_UNKNOWN",
+        "RECONCILING",
+        "CLEANUP_REQUIRED",
+        "CLEAN",
+        "RETRY_READY",
+        "DELIVERY_PENDING",
+        "ACTIVE",
+        "FAILED",
+    }
+)
 
 RUNTIME_ONLY_LEGACY_SETTINGS_PATHS: Final = frozenset(
     {"ui.overlay_enabled", "ui.peer_translation_enabled"}
@@ -958,26 +973,18 @@ class ManagedConnectionState:
         if (
             operation_id is None
             or not operation_id.startswith("ph-mop-v1_")
-            or operation_source != "discord"
+            or operation_source not in {"discord", "qq"}
             or operation_installation_id is None
+            or (
+                operation_state is not None
+                and operation_state not in MANAGED_OPERATION_RECOGNIZED_STATES
+            )
         ):
             operation_id = None
             operation_source = None
             operation_installation_id = None
             operation_state = None
-        if operation_state not in {
-            "AUTHENTICATED",
-            "ISSUE_READY",
-            "CREATING",
-            "CREATE_UNKNOWN",
-            "RECONCILING",
-            "CLEANUP_REQUIRED",
-            "CLEAN",
-            "RETRY_READY",
-            "DELIVERY_PENDING",
-            "ACTIVE",
-            "FAILED",
-        }:
+        if operation_state not in MANAGED_OPERATION_RECOGNIZED_STATES:
             operation_state = None
         object.__setattr__(self, "pending_managed_operation_id", operation_id)
         object.__setattr__(self, "pending_managed_operation_source", operation_source)
@@ -1148,6 +1155,7 @@ __all__ = [
     "MANAGED_AUTH_CLAIM_SOURCE_QQ",
     "MANAGED_AUTH_CLAIM_SOURCES",
     "MANAGED_KEY_DELIVERY_ACK_SOURCES",
+    "MANAGED_OPERATION_RECOGNIZED_STATES",
     "OscIntent",
     "OverlayIntent",
     "PeerSTTIntent",

@@ -1,5 +1,7 @@
 PRAGMA defer_foreign_keys = on;
 
+DROP TABLE IF EXISTS network_identity_sequence_backup_0021;
+DROP TABLE IF EXISTS network_identity_finalize_gate;
 CREATE TABLE network_identity_sequence_backup_0021 (
   name TEXT PRIMARY KEY,
   seq INTEGER NOT NULL
@@ -20,13 +22,50 @@ SELECT 0
       SELECT 1 FROM broker_request_events
        WHERE ip IS NOT NULL
          AND ip_digest IS NULL
-         AND observed_at >= datetime('now', '-1 day')
+        AND (ip_epoch IS NULL OR ip_epoch != '0000-00-00')
+        AND observed_at >= datetime('now', '-' || (
+          SELECT max(1440,
+            COALESCE((SELECT json_extract(value, '$.trialChallenge.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.trialChallengeVerify.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.openrouterIssue.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.qqAuthAssertIp.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.qqAuthStatusIp.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.pendingDiscordOAuthSessions.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.referralAttempts.validShaped.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.referralAttempts.unknown.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.referralAttempts.perReferralIdVelocity.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.referralAttempts.perReferrerRewardVelocity.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT MAX(window_minutes) FROM broker_velocity_cap_hooks WHERE active = 1), 0))
+        ) || ' minutes')
     )
     OR EXISTS (
       SELECT 1 FROM referral_rewards
        WHERE attempt_ip_hash IS NOT NULL
          AND attempt_ip_digest IS NULL
-         AND created_at >= datetime('now', '-1 day')
+        AND created_at >= datetime('now', '-' || (
+          SELECT max(1440,
+            COALESCE((SELECT json_extract(value, '$.trialChallenge.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.trialChallengeVerify.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.openrouterIssue.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.trialStatus.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.qqAuthStatusIp.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.pendingDiscordOAuthSessions.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.referralAttempts.validShaped.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.referralAttempts.unknown.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.referralAttempts.perReferralIdVelocity.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT json_extract(value, '$.referralAttempts.perReferrerRewardVelocity.windowMinutes') FROM broker_config WHERE key = 'abuse_controls'), 0),
+            COALESCE((SELECT MAX(window_minutes) FROM broker_velocity_cap_hooks WHERE active = 1), 0))
+        ) || ' minutes')
+    )
+    OR EXISTS (
+      SELECT 1 FROM broker_velocity_cap_hooks
+       WHERE subject_type = 'ip' AND active = 1
+         AND (length(subject_value) != 64 OR subject_value GLOB '*[^0-9a-f]*')
+    )
+    OR EXISTS (
+      SELECT 1 FROM broker_abuse_subject_hooks
+       WHERE subject_type = 'ip' AND active = 1
+         AND (length(subject_value) != 64 OR subject_value GLOB '*[^0-9a-f]*')
     );
 
 DROP TABLE network_identity_finalize_gate;

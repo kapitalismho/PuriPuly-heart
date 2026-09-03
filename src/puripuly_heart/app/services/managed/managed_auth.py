@@ -18,6 +18,9 @@ QQ_AUTH_DIALOG_MESSAGE_KEY_BY_SERVICE_KEY = {
     "qq_managed_auth.settings_commit_failed": "qq_auth.error.settings_commit_failed",
     "qq_managed_auth.secret_write_failed": "qq_auth.error.secret_write_failed",
     "qq_managed_auth.error.retry": "qq_auth.error.retry",
+    "qq_managed_auth.error.recovery_pending": "qq_auth.error.recovery_pending",
+    "qq_managed_auth.error.action_required": "qq_auth.error.action_required",
+    "qq_managed_auth.error.authorization_expired": "qq_auth.error.authorization_expired",
 }
 
 

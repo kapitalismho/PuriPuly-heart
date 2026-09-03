@@ -1491,3 +1491,263 @@ async def test_broker_success_then_settings_commit_failure_reports_remote_active
     assert result.diagnostics.fields["settings_commit_succeeded"] is False
     assert result.diagnostics.fields["broker_connection_id"] == "broker-conn-1"
     assert result.diagnostics.fields["remote_key_revision"] == "remote-r1"
+
+
+def _operation_status_result(
+    operation_status: str,
+    client_action: str,
+    *,
+    managed_secret_key: str | None = None,
+    managed_credential_ref: str | None = None,
+    failed_reason: str | None = None,
+    delivery_ack: broker_client.ManagedKeyDeliveryAckMetadata | None = None,
+    referral_id: str | None = None,
+    referral_settlement: str | None = None,
+) -> broker_client.ManagedOperationStatusResult:
+    return broker_client.ManagedOperationStatusResult(
+        succeeded=True,
+        operation_status=operation_status,
+        client_action=client_action,
+        managed_secret_key=managed_secret_key,
+        managed_credential_ref=managed_credential_ref,
+        failed_reason=failed_reason,
+        delivery_ack=delivery_ack,
+        referral_id=referral_id,
+        referral=(
+            broker_client.ManagedOperationReferralSnapshot(
+                status="reserved",
+                settlement=referral_settlement,
+            )
+            if referral_settlement is not None
+            else None
+        ),
+    )
+
+
+DISCORD_SEEDED_OPERATION_ID = "ph-mop-v1_abcdef0123456789abcdef0123456789"
+DISCORD_SEEDED_RESUME_TOKEN = "abcdef0123456789abcdef0123456789abcdef01234"
+
+
+def _seeded_operation_state() -> RecordingManagedState:
+    return RecordingManagedState(
+        pending_managed_operation_id=DISCORD_SEEDED_OPERATION_ID,
+        pending_managed_operation_source="discord",
+        pending_managed_operation_installation_id="identity-r1",
+    )
+
+
+def _seeded_operation_store(*, local_key: bool = False) -> RecordingSecretStore:
+    store = RecordingSecretStore()
+    store.values["openrouter_managed_operation_resume_token"] = DISCORD_SEEDED_RESUME_TOKEN
+    if local_key:
+        store.values[LOCAL_SECRET_KEY] = RAW_MANAGED_CREDENTIAL
+    return store
+
+
+@pytest.mark.asyncio
+async def test_discord_auth_restart_resumes_active_operation_without_fresh_issue() -> None:
+    managed_state = _seeded_operation_state()
+    identity = RecordingLocalIdentity(_identity_success())
+    discord = RecordingDiscordAuth(_discord_success())
+    broker = RecordingBrokerClient(
+        None,
+        status_results=[
+            _operation_status_result(
+                "ACTIVE",
+                "wait",
+                referral_id="8H3J4N",
+                referral_settlement="referrer_pending",
+            )
+        ],
+    )
+    store = _seeded_operation_store(local_key=True)
+    repository = RecordingSettingsRepository(_commit_success())
+
+    result = await _service(
+        identity=identity,
+        discord=discord,
+        broker=broker,
+        store=store,
+        repository=repository,
+        managed_state=managed_state,
+    ).authorize(_request())
+
+    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+    assert result.diagnostics is not None
+    assert result.diagnostics.code == "managed_operation_active_recovered"
+    assert discord.requests == []
+    assert broker.requests == []
+    assert broker.resume_requests == []
+    assert len(broker.status_requests) == 1
+    assert broker.status_requests[0].operation_id == DISCORD_SEEDED_OPERATION_ID
+    assert broker.status_requests[0].resume_token == DISCORD_SEEDED_RESUME_TOKEN
+    assert managed_state.pending_managed_operation_id is None
+    assert "openrouter_managed_operation_resume_token" not in store.values
+    assert managed_state.referral_source == "discord"
+    assert managed_state.referral_id == "8H3J4N"
+    assert store.values[LOCAL_SECRET_KEY] == RAW_MANAGED_CREDENTIAL
+    _assert_no_raw_values(result, label="managed operation restart result")
+
+
+@pytest.mark.asyncio
+async def test_discord_auth_retry_authorized_resumes_without_fresh_issue() -> None:
+    managed_state = _seeded_operation_state()
+    identity = RecordingLocalIdentity(_identity_success())
+    discord = RecordingDiscordAuth(_discord_success())
+    broker = RecordingBrokerClient(
+        None,
+        status_results=[_operation_status_result("RETRY_READY", "retry_authorized")],
+        resume_results=[
+            _operation_status_result(
+                "ISSUE_READY",
+                "acknowledge_delivery",
+                managed_secret_key=RAW_MANAGED_CREDENTIAL,
+                managed_credential_ref="managed-ref-discord-1",
+                delivery_ack=_delivery_ack_metadata(),
+            )
+        ],
+    )
+    store = _seeded_operation_store(local_key=True)
+    repository = RecordingSettingsRepository(_commit_success())
+
+    result = await _service(
+        identity=identity,
+        discord=discord,
+        broker=broker,
+        store=store,
+        repository=repository,
+        managed_state=managed_state,
+    ).authorize(_request())
+
+    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+    assert discord.requests == []
+    assert broker.requests == []
+    assert len(broker.resume_requests) == 1
+    assert broker.resume_requests[0].operation_id == DISCORD_SEEDED_OPERATION_ID
+    assert broker.resume_requests[0].resume_token == DISCORD_SEEDED_RESUME_TOKEN
+    assert store.values[LOCAL_SECRET_KEY] == RAW_MANAGED_CREDENTIAL
+    assert managed_state.pending_managed_operation_id is None
+    assert "openrouter_managed_operation_resume_token" not in store.values
+    _assert_no_raw_values(result, label="managed operation resume result")
+
+
+@pytest.mark.asyncio
+async def test_discord_auth_expired_operation_requires_action_and_clears_terminal_state() -> None:
+    managed_state = _seeded_operation_state()
+    identity = RecordingLocalIdentity(_identity_success())
+    discord = RecordingDiscordAuth(_discord_success())
+    broker = RecordingBrokerClient(
+        None,
+        status_results=[
+            _operation_status_result(
+                "FAILED",
+                "action_required",
+                failed_reason="authorization_expired",
+            )
+        ],
+    )
+    store = _seeded_operation_store()
+    repository = RecordingSettingsRepository(_commit_success())
+
+    result = await _service(
+        identity=identity,
+        discord=discord,
+        broker=broker,
+        store=store,
+        repository=repository,
+        managed_state=managed_state,
+    ).authorize(_request())
+
+    assert result.status == messages.TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING
+    assert result.message is not None
+    assert result.message.key == "discord_auth.error.authorization_expired"
+    assert result.diagnostics is not None
+    assert result.diagnostics.code == "managed_operation_authorization_expired"
+    assert discord.requests == []
+    assert broker.requests == []
+    assert broker.resume_requests == []
+    assert managed_state.pending_managed_operation_id is None
+    assert "openrouter_managed_operation_resume_token" not in store.values
+    _assert_no_raw_values(result, label="managed operation expired result")
+
+
+@pytest.mark.asyncio
+async def test_discord_auth_wait_keeps_recovering_without_fresh_issue() -> None:
+    managed_state = _seeded_operation_state()
+    identity = RecordingLocalIdentity(_identity_success())
+    discord = RecordingDiscordAuth(_discord_success())
+    broker = RecordingBrokerClient(
+        None,
+        status_results=[_operation_status_result("CREATING", "wait") for _ in range(5)],
+    )
+    store = _seeded_operation_store()
+    repository = RecordingSettingsRepository(_commit_success())
+
+    result = await _service(
+        identity=identity,
+        discord=discord,
+        broker=broker,
+        store=store,
+        repository=repository,
+        managed_state=managed_state,
+    ).authorize(_request())
+
+    assert result.status == messages.TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
+    assert discord.requests == []
+    assert broker.requests == []
+    assert broker.resume_requests == []
+    assert len(broker.status_requests) == 5
+    assert managed_state.pending_managed_operation_id == DISCORD_SEEDED_OPERATION_ID
+    assert (
+        store.values["openrouter_managed_operation_resume_token"]
+        == DISCORD_SEEDED_RESUME_TOKEN
+    )
+    _assert_no_raw_values(result, label="managed operation wait result")
+
+
+@pytest.mark.asyncio
+async def test_discord_ack_recovery_consumes_referral_result() -> None:
+    metadata = _delivery_ack_metadata()
+    managed_state = RecordingManagedState(
+        active_managed_credential_ref=metadata.managed_credential_ref,
+        pending_delivery_ack_source="discord",
+        pending_delivery_ack_delivery_id=metadata.delivery_id,
+        pending_delivery_ack_managed_credential_ref=metadata.managed_credential_ref,
+        pending_delivery_ack_expires_at=metadata.expires_at,
+    )
+    identity = RecordingLocalIdentity(_identity_success())
+    discord = RecordingDiscordAuth(_discord_success())
+    broker = RecordingBrokerClient(
+        None,
+        ack_result=broker_client.ManagedKeyDeliveryAckResult(
+            succeeded=True,
+            status="acknowledged",
+            referral_id="8H3J4N",
+            referral_settlement="invitee_pending",
+        ),
+    )
+    store = RecordingSecretStore()
+    store.values[LOCAL_SECRET_KEY] = RAW_MANAGED_CREDENTIAL
+    store.values["openrouter_managed_delivery_ack_token"] = metadata.delivery_ack_token
+    repository = RecordingSettingsRepository(None)
+
+    result = await _service(
+        identity=identity,
+        discord=discord,
+        broker=broker,
+        store=store,
+        repository=repository,
+        delivery_ack_service=ManagedKeyDeliveryAckService(
+            broker,
+            store,
+            managed_state,
+        ),
+    ).authorize(_request())
+
+    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+    assert broker.requests == []
+    assert broker.status_requests == []
+    assert broker.resume_requests == []
+    assert managed_state.referral_source == "discord"
+    assert managed_state.referral_id == "8H3J4N"
+    _assert_no_raw_values(result, label="managed ACK referral result")

@@ -105,15 +105,17 @@ describe('managed issuance durability', () => {
     const env = createTestBrokerEnv();
     env.NETWORK_IDENTITY_HMAC_SECRET = 'new-secret';
     env.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS = 'old-secret';
+    (env as unknown as Record<string, unknown>).NETWORK_IDENTITY_HMAC_KEY_VERSION = '2';
 
     const secrets = resolveNetworkIdentitySecrets(env);
-    expect(secrets).toMatchObject({ current: 'new-secret', previous: 'old-secret' });
+    expect(secrets).toMatchObject({ current: 'new-secret', previous: 'old-secret', currentVersion: 2 });
 
     const oldIdentity = await resolveRequestNetworkIdentity(
       '203.0.113.90',
-      { current: 'old-secret', previous: null },
+      { current: 'old-secret', previous: null, currentVersion: 1 },
       NOW,
     );
+    expect(oldIdentity?.keyVersion).toBe(1);
     env.__db
       .prepare(
         `INSERT INTO broker_request_events (
@@ -500,6 +502,224 @@ describe('managed issuance durability', () => {
     } finally {
       infoSpy.mockRestore();
       errorSpy.mockRestore();
+    }
+  });
+});
+
+describe('network identity windows and hooks', () => {
+  it('counts requests across every UTC-day epoch inside a multi-day window', async () => {
+    const env = createTestBrokerEnv();
+    const secrets = resolveNetworkIdentitySecrets(env)!;
+    for (const iso of [
+      '2026-08-30T12:00:00.000Z',
+      '2026-08-31T12:00:00.000Z',
+      '2026-09-01T11:50:00.000Z',
+    ]) {
+      const identity = await resolveRequestNetworkIdentity('203.0.113.92', secrets, new Date(iso));
+      env.__db
+        .prepare(
+          `INSERT INTO broker_request_events (
+            endpoint, ip_digest, ip_key_version, ip_epoch, installation_id, observed_at
+          ) VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          'POST /v1/auth/qq/assert',
+          identity?.digest ?? '',
+          identity?.keyVersion ?? 1,
+          identity?.epoch ?? '',
+          null,
+          iso,
+        );
+    }
+
+    const { updateAbuseControls } = await import('./test-support/abuse-controls');
+    updateAbuseControls(env, (controls) => {
+      controls.qqAuthAssertIp.maxRequests = 2;
+      controls.qqAuthAssertIp.windowMinutes = 2880;
+    });
+    await expect(
+      checkEndpointRateLimit(env.BROKER_DB, {
+        endpoint: 'POST /v1/auth/qq/assert',
+        now: new Date('2026-09-01T12:00:00.000Z'),
+        ip: '203.0.113.92',
+        installationId: null,
+        hardwareHash: null,
+        networkIdentitySecrets: testNetworkIdentitySecrets(env),
+      }),
+    ).resolves.toMatchObject({ status: 429, subcode: 'ip_rate_limited' });
+
+    await expect(
+      checkEndpointRateLimit(env.BROKER_DB, {
+        endpoint: 'POST /v1/auth/qq/assert',
+        now: new Date('2026-09-01T12:00:00.000Z'),
+        ip: '203.0.113.93',
+        installationId: null,
+        hardwareHash: null,
+        networkIdentitySecrets: testNetworkIdentitySecrets(env),
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it('converts raw-IP operator hooks to stable digests without losing enforcement', async () => {
+    const provision = createTestBrokerEnv();
+    const secrets = resolveNetworkIdentitySecrets(provision)!;
+    const db = new DatabaseSync(':memory:');
+    try {
+      const { BROKER_MIGRATION_FILENAMES, readBrokerMigrationSql } = await import(
+        './test-support/migrations'
+      );
+      for (const file of BROKER_MIGRATION_FILENAMES) {
+        if (file <= '0019_managed_referral_settlement.sql') {
+          db.exec(readBrokerMigrationSql(file));
+        }
+      }
+      db.prepare(
+        `INSERT INTO broker_abuse_subject_hooks (
+          hook_kind, subject_type, subject_value, outcome_code, outcome_class
+        ) VALUES ('denylist', 'ip', ?, 'trial_unavailable', 'terminal')`,
+      ).run('203.0.113.99');
+      for (const file of BROKER_MIGRATION_FILENAMES) {
+        if (file === '0020_network_identity_hmac.sql') {
+          db.exec(readBrokerMigrationSql(file));
+        }
+      }
+      const phase = db
+        .prepare(`SELECT value FROM broker_config WHERE key = 'network_identity_migration'`)
+        .get() as { value: string };
+      expect(JSON.parse(phase.value)).toMatchObject({ phase: 'dual_write' });
+
+      const { matchSubjectHook } = await import('../src/abuse-controls');
+      const wrapped = wrapDatabaseSync(db);
+      const context = {
+        endpoint: 'POST /v1/trial/challenge',
+        now: NOW,
+        ip: '203.0.113.99',
+        installationId: null,
+        hardwareHash: null,
+        networkIdentitySecrets: secrets,
+      };
+      await expect(matchSubjectHook(wrapped, context)).resolves.toMatchObject({
+        hookKind: 'denylist',
+      });
+
+      const converted = await runNetworkIdentityBackfill(wrapped, secrets, NOW);
+      expect(converted.hooksConverted).toBe(1);
+      expect(converted.pendingHooks).toBe(0);
+      const stored = db
+        .prepare(`SELECT subject_value FROM broker_abuse_subject_hooks WHERE subject_type = 'ip'`)
+        .get() as { subject_value: string };
+      expect(stored.subject_value).toMatch(/^[a-f0-9]{64}$/u);
+      expect(stored.subject_value).not.toBe('203.0.113.99');
+      await expect(matchSubjectHook(wrapped, context)).resolves.toMatchObject({
+        hookKind: 'denylist',
+      });
+
+      const later = new Date(NOW.getTime() + 25 * 60 * 60_000);
+      const converged = await runNetworkIdentityBackfill(wrapped, secrets, later);
+      expect(converged.finalized).toBe(true);
+      db.exec(readBrokerMigrationSql('0021_network_identity_purge.sql'));
+      await expect(matchSubjectHook(wrapped, context)).resolves.toMatchObject({
+        hookKind: 'denylist',
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('marks unparseable request rows with a sentinel so migration still converges', async () => {
+    const provision = createTestBrokerEnv();
+    const secrets = resolveNetworkIdentitySecrets(provision)!;
+    const db = new DatabaseSync(':memory:');
+    try {
+      const { BROKER_MIGRATION_FILENAMES, readBrokerMigrationSql } = await import(
+        './test-support/migrations'
+      );
+      for (const file of BROKER_MIGRATION_FILENAMES) {
+        if (file <= '0019_managed_referral_settlement.sql') {
+          db.exec(readBrokerMigrationSql(file));
+        }
+      }
+      db.prepare(
+        `INSERT INTO broker_request_events (endpoint, ip, installation_id, observed_at)
+         VALUES (?, ?, ?, ?)`,
+      ).run('POST /v1/auth/qq/assert', 'not-an-ip', null, NOW_ISO);
+      for (const file of BROKER_MIGRATION_FILENAMES) {
+        if (file === '0020_network_identity_hmac.sql') {
+          db.exec(readBrokerMigrationSql(file));
+        }
+      }
+      const wrapped = wrapDatabaseSync(db);
+      const result = await runNetworkIdentityBackfill(wrapped, secrets, NOW);
+      expect(result.requestEventsBackfilled).toBe(0);
+      expect(result.pendingRequestEvents).toBe(0);
+      expect(result.finalized).toBe(true);
+      const wedge = db
+        .prepare(`SELECT COUNT(*) AS count FROM broker_request_events WHERE ip IS NOT NULL`)
+        .get() as { count: number };
+      expect(wedge.count).toBe(0);
+      const phase = db
+        .prepare(`SELECT value FROM broker_config WHERE key = 'network_identity_migration'`)
+        .get() as { value: string };
+      expect(JSON.parse(phase.value)).toMatchObject({ phase: 'keyed_only' });
+      db.exec(readBrokerMigrationSql('0021_network_identity_purge.sql'));
+    } finally {
+      db.close();
+    }
+  });
+});
+
+describe('network identity purge gate', () => {
+  it('holds the purge gate open for the longest operator hook window until backfill converges', async () => {
+    const provision = createTestBrokerEnv();
+    const secrets = resolveNetworkIdentitySecrets(provision)!;
+    const db = new DatabaseSync(':memory:');
+    try {
+      const { BROKER_MIGRATION_FILENAMES, readBrokerMigrationSql } = await import(
+        './test-support/migrations'
+      );
+      for (const file of BROKER_MIGRATION_FILENAMES) {
+        if (file <= '0019_managed_referral_settlement.sql') {
+          db.exec(readBrokerMigrationSql(file));
+        }
+      }
+      db.prepare(
+        `INSERT INTO broker_velocity_cap_hooks (
+          subject_type, subject_value, max_requests, window_minutes,
+          outcome_code, outcome_class, active
+        ) VALUES ('ip', ?, 1, 10080, 'rate_limited', 'retryable', 1)`,
+      ).run('203.0.113.102');
+      const threeDaysAgo = new Date(NOW.getTime() - 3 * 24 * 60 * 60_000).toISOString();
+      db.prepare(
+        `INSERT INTO broker_request_events (endpoint, ip, installation_id, observed_at)
+         VALUES (?, ?, ?, ?)`,
+      ).run('POST /v1/auth/qq/assert', '203.0.113.102', null, threeDaysAgo);
+      for (const file of BROKER_MIGRATION_FILENAMES) {
+        if (file === '0020_network_identity_hmac.sql') {
+          db.exec(readBrokerMigrationSql(file));
+        }
+      }
+      const phase = db
+        .prepare(`SELECT value FROM broker_config WHERE key = 'network_identity_migration'`)
+        .get() as { value: string };
+      expect(JSON.parse(phase.value)).toMatchObject({ phase: 'dual_write' });
+
+      expect(() => db.exec(readBrokerMigrationSql('0021_network_identity_purge.sql'))).toThrow(
+        /constraint/i,
+      );
+
+      const wrapped = wrapDatabaseSync(db);
+      const backfilled = await runNetworkIdentityBackfill(wrapped, secrets, NOW);
+      expect(backfilled.requestEventsBackfilled).toBe(1);
+      expect(backfilled.hooksConverted).toBe(1);
+      expect(backfilled.finalized).toBe(true);
+
+      db.exec(readBrokerMigrationSql('0021_network_identity_purge.sql'));
+      const columns = db.prepare(`PRAGMA table_info(broker_request_events)`).all() as Array<{
+        name: string;
+      }>;
+      expect(columns.map((column) => column.name)).not.toContain('ip');
+    } finally {
+      db.close();
     }
   });
 });

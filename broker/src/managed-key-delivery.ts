@@ -5,6 +5,7 @@ import type { BrokerEnv } from './contract';
 import { finalizeDiscordManagedKeyDeliveryAck } from './discord-managed-issue';
 import type { BrokerIssueSuccessSource, ManagedKeyDeliveryRecord } from './persistence';
 import { finalizeQqManagedKeyDeliveryAck } from './qq-managed-issue';
+import { timingSafeEqualHex } from './network-identity';
 
 const DELIVERY_ID_PREFIX = 'ph-delivery-v1_';
 const ACK_TOKEN_HASH_PREFIX = 'ph-delivery-ack-token-v1_';
@@ -108,9 +109,8 @@ export async function acknowledgeManagedKeyDelivery(
   if (!row) {
     return { ok: false, reason: 'invalid' };
   }
-
   const candidateHash = await hashDeliveryAckToken(input.deliveryAckToken);
-  if (candidateHash !== row.ack_token_hash) {
+  if (!(await timingSafeEqualHex(candidateHash, row.ack_token_hash))) {
     return { ok: false, reason: 'invalid' };
   }
 
@@ -171,7 +171,7 @@ export async function validateManagedKeyDeliveryAck(
   }
 
   const candidateHash = await hashDeliveryAckToken(input.deliveryAckToken);
-  if (candidateHash !== row.ack_token_hash) {
+  if (!(await timingSafeEqualHex(candidateHash, row.ack_token_hash))) {
     return { ok: false, reason: 'invalid' };
   }
 
