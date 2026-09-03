@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import urllib.error
 
 import pytest
 
@@ -189,48 +188,130 @@ async def test_close_terminates_event_stream() -> None:
 
 
 @pytest.mark.asyncio
-async def test_verify_api_key_uses_subscription_metadata_endpoint(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    seen_urls: list[str] = []
+async def test_verify_api_key_succeeds_on_session_started() -> None:
+    from elevenlabs.realtime import RealtimeEvents
 
-    class FakeResponse:
-        status = 200
+    connection = _FakeConnection()
+    seen_options: list = []
 
-        def __enter__(self):
-            return self
+    async def factory(options):
+        seen_options.append(options)
+        return connection
 
-        def __exit__(self, exc_type, exc, tb):
-            return False
+    async def emit_started() -> None:
+        for _ in range(200):
+            handler = connection.handlers.get(RealtimeEvents.SESSION_STARTED)
+            if handler is not None:
+                handler({"message_type": "session_started"})
+                return
+            await asyncio.sleep(0.01)
+        raise AssertionError("session_started handler was never registered")
 
-    def fake_urlopen(request, timeout=0):
-        seen_urls.append(request.full_url)
-        assert request.get_header("Xi-api-key") == "secret"
-        return FakeResponse()
+    task = asyncio.create_task(
+        ElevenLabsScribeSTTBackend.verify_api_key("secret", scribe_connect_factory=factory)
+    )
+    emitter = asyncio.create_task(emit_started())
+    try:
+        assert await asyncio.wait_for(task, timeout=5) is True
+    finally:
+        emitter.cancel()
+        await asyncio.gather(emitter, return_exceptions=True)
 
-    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-
-    assert await ElevenLabsScribeSTTBackend.verify_api_key("") is False
-    assert await ElevenLabsScribeSTTBackend.verify_api_key("secret") is True
-    assert seen_urls == ["https://api.elevenlabs.io/v1/user/subscription"]
+    assert connection.closed is True
+    assert seen_options and seen_options[0]["model_id"] == "scribe_v2_realtime"
 
 
 @pytest.mark.asyncio
-async def test_verify_api_key_raises_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_urlopen(_request, timeout=0):
-        _ = timeout
-        raise urllib.error.HTTPError(
-            url="https://api.elevenlabs.io/v1/user/subscription",
-            code=401,
-            msg="Unauthorized",
-            hdrs=None,
-            fp=None,
+async def test_verify_api_key_reports_auth_rejection_as_unauthorized() -> None:
+    from elevenlabs.realtime import RealtimeEvents
+
+    connection = _FakeConnection()
+
+    async def factory(options):
+        _ = options
+        return connection
+
+    async def emit_auth_error() -> None:
+        for _ in range(200):
+            handler = connection.handlers.get(RealtimeEvents.ERROR)
+            if handler is not None:
+                handler({"message_type": "auth_error"})
+                return
+            await asyncio.sleep(0.01)
+        raise AssertionError("error handler was never registered")
+
+    task = asyncio.create_task(
+        ElevenLabsScribeSTTBackend.verify_api_key("bad-secret", scribe_connect_factory=factory)
+    )
+    emitter = asyncio.create_task(emit_auth_error())
+    try:
+        with pytest.raises(Exception, match="unauthorized"):
+            await asyncio.wait_for(task, timeout=5)
+    finally:
+        emitter.cancel()
+        await asyncio.gather(emitter, return_exceptions=True)
+
+    assert connection.closed is True
+
+
+@pytest.mark.asyncio
+async def test_verify_api_key_reports_close_before_session_start() -> None:
+    from elevenlabs.realtime import RealtimeEvents
+
+    connection = _FakeConnection()
+
+    async def factory(options):
+        _ = options
+        return connection
+
+    async def emit_close() -> None:
+        for _ in range(200):
+            handler = connection.handlers.get(RealtimeEvents.CLOSE)
+            if handler is not None:
+                handler({"message_type": "close"})
+                return
+            await asyncio.sleep(0.01)
+        raise AssertionError("close handler was never registered")
+
+    task = asyncio.create_task(
+        ElevenLabsScribeSTTBackend.verify_api_key("secret", scribe_connect_factory=factory)
+    )
+    emitter = asyncio.create_task(emit_close())
+    try:
+        with pytest.raises(Exception, match="closed before session start"):
+            await asyncio.wait_for(task, timeout=5)
+    finally:
+        emitter.cancel()
+        await asyncio.gather(emitter, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_verify_api_key_times_out_without_server_signal() -> None:
+    connection = _FakeConnection()
+
+    async def factory(options):
+        _ = options
+        return connection
+
+    with pytest.raises(TimeoutError, match="timed out waiting for session start"):
+        await ElevenLabsScribeSTTBackend.verify_api_key(
+            "secret",
+            scribe_connect_factory=factory,
+            settle_timeout_s=0.05,
         )
 
-    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    assert connection.closed is True
 
-    with pytest.raises(Exception, match="HTTP 401"):
-        await ElevenLabsScribeSTTBackend.verify_api_key("secret")
+
+@pytest.mark.asyncio
+async def test_verify_api_key_rejects_empty_key_without_connecting() -> None:
+    async def factory(options):  # pragma: no cover - must not be called
+        _ = options
+        raise AssertionError("factory must not be called for an empty key")
+
+    assert (
+        await ElevenLabsScribeSTTBackend.verify_api_key("", scribe_connect_factory=factory) is False
+    )
 
 
 def test_scribe_keyterms_normalization() -> None:

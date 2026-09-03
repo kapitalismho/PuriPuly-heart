@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 ELEVENLABS_SCRIBE_STT_MODEL = "scribe_v2_realtime"
 ELEVENLABS_SCRIBE_SAMPLE_RATE_HZ = 16000
+ELEVENLABS_SCRIBE_VERIFY_CONNECT_TIMEOUT_S = 10.0
+ELEVENLABS_SCRIBE_VERIFY_SETTLE_TIMEOUT_S = 10.0
 MAX_SCRIBE_KEYTERMS = 50
 MAX_SCRIBE_KEYTERM_CHARS = 20
 
@@ -59,6 +61,104 @@ def scribe_keyterms(terms: Sequence[str]) -> tuple[str, ...]:
             truncated_count,
         )
     return tuple(normalized)
+
+
+def _scribe_verify_event_detail(data: Any) -> str:
+    if isinstance(data, dict):
+        name = str(data.get("message_type") or data.get("type") or "error")
+        extra = data.get("error") or data.get("message") or ""
+    else:
+        name = str(getattr(data, "type", "") or "error")
+        extra = str(getattr(data, "error", "") or getattr(data, "message", "") or "")
+    extra_text = str(extra).strip()
+    return name if not extra_text else f"{name}: {extra_text}"
+
+
+async def verify_scribe_realtime_connection(
+    api_key: str,
+    *,
+    scribe_connect_factory: Callable[[Any], Any] | None = None,
+    connect_timeout_s: float = ELEVENLABS_SCRIBE_VERIFY_CONNECT_TIMEOUT_S,
+    settle_timeout_s: float = ELEVENLABS_SCRIBE_VERIFY_SETTLE_TIMEOUT_S,
+) -> bool:
+    """Verify an API key by opening a Scribe realtime session.
+
+    Account-level probes (for example ``GET /v1/user/subscription``) reject
+    scope-restricted keys that are still valid for transcription, so
+    verification performs the same realtime handshake production sessions use.
+    Returns True once the server starts a session. Raises with the server
+    reason on auth/permission failures and on connection problems.
+    """
+    from elevenlabs.realtime import (
+        AudioFormat,
+        CommitStrategy,
+        RealtimeAudioOptions,
+        RealtimeEvents,
+        ScribeRealtime,
+    )
+
+    if not api_key:
+        return False
+    outcomes: asyncio.Queue[Any] = asyncio.Queue()
+
+    def _on_started(data: Any) -> None:
+        _ = data
+        outcomes.put_nowait("started")
+
+    def _on_error(data: Any) -> None:
+        outcomes.put_nowait(("error", _scribe_verify_event_detail(data)))
+
+    def _on_closed(data: Any) -> None:
+        _ = data
+        outcomes.put_nowait(("closed",))
+
+    options = RealtimeAudioOptions(
+        model_id=ELEVENLABS_SCRIBE_STT_MODEL,
+        audio_format=AudioFormat.PCM_16000,
+        sample_rate=ELEVENLABS_SCRIBE_SAMPLE_RATE_HZ,
+        commit_strategy=CommitStrategy.MANUAL,
+    )
+    try:
+        if scribe_connect_factory is not None:
+            connection = await asyncio.wait_for(
+                scribe_connect_factory(options), timeout=connect_timeout_s
+            )
+        else:
+            scribe = ScribeRealtime(api_key=api_key)
+            connection = await asyncio.wait_for(scribe.connect(options), timeout=connect_timeout_s)
+    except (asyncio.TimeoutError, TimeoutError) as exc:
+        raise TimeoutError(
+            "Scribe realtime verification timed out while connecting "
+            f"after {connect_timeout_s:.0f}s"
+        ) from exc
+    except Exception as exc:
+        raise Exception(f"Scribe realtime verification connection failed: {exc}") from exc
+    try:
+        connection.on(RealtimeEvents.SESSION_STARTED, _on_started)
+        connection.on(RealtimeEvents.ERROR, _on_error)
+        connection.on(RealtimeEvents.CLOSE, _on_closed)
+        try:
+            outcome = await asyncio.wait_for(outcomes.get(), timeout=settle_timeout_s)
+        except (asyncio.TimeoutError, TimeoutError) as exc:
+            raise TimeoutError(
+                "Scribe realtime verification timed out waiting for session start "
+                f"after {settle_timeout_s:.0f}s"
+            ) from exc
+        if outcome == "started":
+            return True
+        if outcome[0] == "closed":
+            raise Exception(
+                "Scribe realtime verification failed: connection closed before session start"
+            )
+        detail = str(outcome[1])
+        if "auth" in detail.lower():
+            raise Exception(f"unauthorized: Scribe rejected the API key ({detail})")
+        raise Exception(f"Scribe realtime verification failed ({detail})")
+    finally:
+        with contextlib.suppress(Exception):
+            result = connection.close()
+            if asyncio.iscoroutine(result):
+                await result
 
 
 def scribe_language_code(source_language: str | None) -> str | None:
@@ -109,27 +209,21 @@ class ElevenLabsScribeSTTBackend(STTBackend):
         return session
 
     @staticmethod
-    async def verify_api_key(api_key: str) -> bool:
+    async def verify_api_key(
+        api_key: str,
+        *,
+        scribe_connect_factory: Callable[[Any], Any] | None = None,
+        connect_timeout_s: float = ELEVENLABS_SCRIBE_VERIFY_CONNECT_TIMEOUT_S,
+        settle_timeout_s: float = ELEVENLABS_SCRIBE_VERIFY_SETTLE_TIMEOUT_S,
+    ) -> bool:
         if not api_key:
             return False
-
-        def _check() -> bool:
-            import urllib.error
-            import urllib.request
-
-            req = urllib.request.Request(
-                "https://api.elevenlabs.io/v1/user/subscription",
-                headers={"xi-api-key": api_key},
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=5) as response:
-                    return response.status == 200
-            except urllib.error.HTTPError as e:
-                raise Exception(f"HTTP {e.code}: {e.reason}")
-            except Exception as e:
-                raise Exception(f"Connection failed: {e}")
-
-        return await asyncio.to_thread(_check)
+        return await verify_scribe_realtime_connection(
+            api_key,
+            scribe_connect_factory=scribe_connect_factory,
+            connect_timeout_s=connect_timeout_s,
+            settle_timeout_s=settle_timeout_s,
+        )
 
 
 @dataclass(slots=True)
