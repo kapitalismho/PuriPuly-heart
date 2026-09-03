@@ -31,6 +31,7 @@ from puripuly_heart.domain.models import FinalLanguageRun
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
 from puripuly_heart.providers.stt.qwen_audio import (
     QWEN_AUDIO_MODEL,
+    QwenAudioProtocolError,
     QwenAudioStreamingSTTBackend,
     QwenAudioTaskFailedError,
 )
@@ -2723,6 +2724,34 @@ async def test_managed_stt_provider_invokes_terminal_failure_callback_after_cons
     assert errors == ["closed"]
 
 
+async def test_qwen_session_failure_does_not_escalate_and_reopens_on_next_speech() -> None:
+    errors: list[str] = []
+    stt = ManagedSTTProvider(
+        backend=FailingBackend(QwenAudioProtocolError("task-finished timeout")),
+        sample_rate_hz=16000,
+        channel="peer",
+        connect_attempts=1,
+        on_terminal_failure=lambda exc: errors.append(str(exc)),
+    )
+
+    await stt.handle_vad_event(SpeechStart(uuid4(), pre_roll=samples(0.0), chunk=samples(1.0)))
+    await asyncio.sleep(0)
+
+    assert stt.state == STTSessionState.DISCONNECTED
+    assert stt._active_session is None
+    assert errors == []
+
+    healthy_backend = FakeBackend()
+    stt.backend = healthy_backend
+    await stt.handle_vad_event(SpeechStart(uuid4(), pre_roll=samples(0.0), chunk=samples(1.0)))
+
+    assert len(healthy_backend.sessions) == 1
+    assert stt.state == STTSessionState.STREAMING
+    assert stt._active_session is healthy_backend.sessions[0]
+
+    await stt.close()
+
+
 async def test_stt_controller_closes_failed_session_after_consumer_error() -> None:
     backend = TerminalFailureBackend()
     stt = ManagedSTTProvider(
@@ -2838,7 +2867,7 @@ async def test_qwen_audio_bridging_reset_discards_old_active_boundary() -> None:
 
     backend = QwenAudioStreamingSTTBackend(
         api_key="test-key",
-        language="ko",
+        language_hints=("ko",),
         model=QWEN_AUDIO_MODEL,
         websocket_factory=connect,
         connect_timeout_s=1,
@@ -2961,7 +2990,7 @@ async def test_qwen_audio_bridge_retires_pending_old_boundary_before_new_final()
 
     backend = QwenAudioStreamingSTTBackend(
         api_key="test-key",
-        language="ko",
+        language_hints=("ko",),
         model=QWEN_AUDIO_MODEL,
         websocket_factory=connect,
         connect_timeout_s=1,
@@ -3031,7 +3060,7 @@ async def test_qwen_audio_bridge_cutover_captures_boundary_during_delayed_open()
 
     backend = QwenAudioStreamingSTTBackend(
         api_key="test-key",
-        language="ko",
+        language_hints=("ko",),
         model=QWEN_AUDIO_MODEL,
         websocket_factory=connect,
         connect_timeout_s=1,

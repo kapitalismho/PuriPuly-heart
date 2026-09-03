@@ -49,6 +49,28 @@ def test_qwen_asr_language_normalization() -> None:
     assert get_qwen_asr_language("ko-KR") == "ko"
 
 
+def test_qwen_audio_hint_mapping_drops_unsupported_dedupes_and_limits() -> None:
+    from puripuly_heart.core.language import qwen_audio_asr_language_hints
+
+    assert qwen_audio_asr_language_hints(["ko", "ja", "zh-CN", "zh-TW", "en"]) == (
+        "ko",
+        "ja",
+        "zh",
+        "en",
+    )
+    assert qwen_audio_asr_language_hints(["ko", "xx", "et"]) == ("ko",)
+    assert qwen_audio_asr_language_hints(["ja", "ja", "ja-JP"]) == ("ja",)
+    assert qwen_audio_asr_language_hints(["ja", "ko"], limit=0) == ()
+    assert qwen_audio_asr_language_hints(["ko", "ja", "zh-CN", "zh-TW", "en", "fr"], limit=4) == (
+        "ko",
+        "ja",
+        "zh",
+        "en",
+    )
+    assert qwen_audio_asr_language_hints([]) == ()
+    assert qwen_audio_asr_language_hints(["xx"]) == ()
+
+
 def test_local_qwen_language_hint_normalization_is_conservative() -> None:
     assert hasattr(language_module, "get_local_qwen_language_hint")
 

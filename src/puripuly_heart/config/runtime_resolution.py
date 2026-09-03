@@ -231,6 +231,7 @@ STT_PROVIDER_DEEPGRAM: Final = "deepgram"
 STT_PROVIDER_GEMINI_TRANSCRIBE: Final = "gemini_transcribe"
 STT_PROVIDER_ELEVENLABS_SCRIBE: Final = "elevenlabs_scribe"
 STT_PROVIDER_QWEN_ASR: Final = "qwen_asr"
+STT_PROVIDER_QWEN_AUDIO: Final = "qwen_audio"
 STT_PROVIDER_SONIOX: Final = "soniox"
 STT_PROVIDER_CUSTOM: Final = "custom"
 STT_PROVIDER_ROLLING_FREE: Final = "rolling_free"
@@ -792,6 +793,7 @@ class STTRuntimeIntent:
     soniox_enable_language_identification: bool = False
     soniox_language_hints: tuple[str, ...] | None = None
     soniox_language_hints_strict: bool = False
+    qwen_audio_language_hints: tuple[str, ...] | None = None
     custom_stt_mode: str = "offline"
     custom_stt_compatibility: str = "openai_transcription"
     custom_stt_endpoint: str = ""
@@ -822,7 +824,9 @@ class STTRuntimeIntent:
             allowed=("manual", "auto"),
             default="manual",
         )
-        if channel != RUNTIME_CHANNEL_PEER or provider not in PEER_AUTO_DETECTION_STT_PROVIDERS:
+        if channel != RUNTIME_CHANNEL_PEER or not stt_supports_peer_auto_detection(
+            provider, qwen_asr_model=self.qwen_asr_model
+        ):
             source_mode = "manual"
         qwen_region = _normalize_allowed(
             self.qwen_region,
@@ -885,6 +889,19 @@ class STTRuntimeIntent:
                     if str(language).strip()
                 )
                 if self.soniox_language_hints is not None
+                else None
+            ),
+        )
+        object.__setattr__(
+            self,
+            "qwen_audio_language_hints",
+            (
+                tuple(
+                    str(hint).strip()
+                    for hint in self.qwen_audio_language_hints
+                    if str(hint).strip()
+                )
+                if self.qwen_audio_language_hints is not None
                 else None
             ),
         )
@@ -1252,6 +1269,16 @@ def _resolved_direct_provider_target(
     )
 
 
+def stt_supports_peer_auto_detection(provider: str, *, qwen_asr_model: str | None = None) -> bool:
+    if provider in PEER_AUTO_DETECTION_STT_PROVIDERS:
+        return True
+    if provider == STT_PROVIDER_QWEN_AUDIO:
+        return True
+    if provider == STT_PROVIDER_QWEN_ASR:
+        return qwen_asr_model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING
+    return False
+
+
 def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
     provider = intent.provider
     model: str | None = None
@@ -1313,6 +1340,9 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
             CREDENTIAL_SOURCE_SECRET_STORE,
             _qwen_credential_reference(intent.qwen_region),
         )
+        if model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING and intent.source_mode == "auto":
+            hints = intent.qwen_audio_language_hints
+            provider_options = {"language_hints": hints if hints is not None else ()}
     elif provider == STT_PROVIDER_SONIOX:
         model = intent.soniox_model
         endpoint = intent.soniox_endpoint
@@ -1794,4 +1824,5 @@ __all__ = [
     "resolve_overlay_config",
     "resolve_llm_config",
     "resolve_stt_config",
+    "stt_supports_peer_auto_detection",
 ]

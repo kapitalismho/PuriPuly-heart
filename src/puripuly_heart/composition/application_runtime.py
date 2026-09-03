@@ -219,8 +219,10 @@ from puripuly_heart.config.provider_values import (
     QwenLLMModel,
     QwenRegion,
     STTProviderName,
+    qwen_cloud_stt_model_for_provider,
 )
 from puripuly_heart.config.resolved import OVERLAY_TARGET_STEAMVR
+from puripuly_heart.config.runtime_resolution import stt_supports_peer_auto_detection
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationModel
 from puripuly_heart.core.clipboard.watcher import create_clipboard_watcher
@@ -1189,13 +1191,12 @@ def compose_application_runtime(
             recent_source_languages=languages.recent_source_languages,
             recent_target_languages=languages.recent_target_languages,
             peer_auto_detect_available=(
-                canonical.intent.peer_stt.provider
-                in {
-                    STTProviderName.SONIOX.value,
-                    STTProviderName.GEMINI_TRANSCRIBE.value,
-                    STTProviderName.ELEVENLABS_SCRIBE.value,
-                    STTProviderName.LOCAL_QWEN_GPU.value,
-                }
+                stt_supports_peer_auto_detection(
+                    canonical.intent.peer_stt.provider,
+                    qwen_asr_model=qwen_cloud_stt_model_for_provider(
+                        canonical.intent.peer_stt.provider
+                    ),
+                )
             ),
         )
         loaded = require_projection().render(settings.canonical)
@@ -1341,13 +1342,7 @@ def compose_application_runtime(
                 ),
             )
         if (
-            merged.intent.peer_stt.provider
-            not in {
-                STTProviderName.SONIOX.value,
-                STTProviderName.GEMINI_TRANSCRIBE.value,
-                STTProviderName.ELEVENLABS_SCRIBE.value,
-                STTProviderName.LOCAL_QWEN_GPU.value,
-            }
+            not stt_supports_peer_auto_detection(merged.intent.peer_stt.provider)
             and merged.intent.languages.peer_source_mode == "auto"
         ):
             merged = replace(

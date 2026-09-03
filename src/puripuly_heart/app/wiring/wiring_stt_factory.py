@@ -302,11 +302,17 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
     automatic_soniox = provider == STT_PROVIDER_SONIOX and automatic
     automatic_gemini = provider == STT_PROVIDER_GEMINI_TRANSCRIBE and automatic
     automatic_scribe = provider == STT_PROVIDER_ELEVENLABS_SCRIBE and automatic
+    automatic_qwen_audio = (
+        provider == STT_PROVIDER_QWEN_ASR
+        and qwen_asr_model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING
+        and automatic
+    )
     source_language = intent.languages.peer_source_language or intent.languages.source_language
     language_hints = None
     language_hints_strict = False
     gemini_transcribe_language_hints: tuple[str, ...] | None = None
     elevenlabs_scribe_language: str | None = None
+    qwen_audio_language_hints = None
     if provider == STT_PROVIDER_GEMINI_TRANSCRIBE and not automatic_gemini:
         from puripuly_heart.providers.stt.gemini_transcribe import (
             gemini_transcribe_language_codes,
@@ -331,6 +337,12 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
             language_hints = mapped_language_hints or None
         else:
             language_hints = tuple(get_soniox_language_hints(source_language))
+    if automatic_qwen_audio:
+        from puripuly_heart.core.language import qwen_audio_asr_language_hints
+
+        qwen_audio_language_hints = qwen_audio_asr_language_hints(
+            intent.languages.peer_expected_languages
+        )
     custom_mode, custom_compatibility = custom_stt_selection_for_provider(
         provider,
         stored_mode=intent.stt.custom.mode,
@@ -372,6 +384,7 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         soniox_enable_language_identification=automatic_soniox,
         soniox_language_hints=language_hints,
         soniox_language_hints_strict=language_hints_strict,
+        qwen_audio_language_hints=qwen_audio_language_hints,
         custom_stt_mode=custom_mode,
         custom_stt_compatibility=custom_compatibility,
         custom_stt_endpoint=intent.stt.custom.endpoint,
@@ -525,12 +538,12 @@ def build_self_stt_provider_request_from_vnext(
 def build_self_capture_session_config_from_vnext(
     settings: AppSettingsVNext,
 ) -> SelfCaptureSessionConfig:
-    provider = settings.intent.stt.provider
+    runtime_provider = resolve_self_stt_runtime_config_from_vnext(settings).provider
     audio = settings.intent.audio
     stt = settings.intent.stt
     transition = build_self_local_asr_transition_request_from_vnext(settings, trigger="runtime")
     return SelfCaptureSessionConfig(
-        provider_id=provider,
+        provider_id=runtime_provider,
         provider_signature=build_self_stt_provider_signature_from_vnext(settings),
         runtime_signature=build_self_stt_runtime_signature_from_vnext(settings),
         capture_signature=build_self_capture_vad_signature_from_vnext(settings),
@@ -546,12 +559,12 @@ def build_self_capture_session_config_from_vnext(
             else 1100
         ),
         session_options=transition.session_options if transition is not None else None,
-        local_cpu=provider in LOCAL_CPU_PROVIDERS,
-        local_gpu=provider == STTProviderName.LOCAL_QWEN_GPU.value,
+        local_cpu=runtime_provider in LOCAL_CPU_PROVIDERS,
+        local_gpu=runtime_provider == STTProviderName.LOCAL_QWEN_GPU.value,
         release_backend_after=(
-            LOCAL_QWEN_IDLE_RELEASE_SECONDS if provider in LOCAL_CPU_PROVIDERS else None
+            LOCAL_QWEN_IDLE_RELEASE_SECONDS if runtime_provider in LOCAL_CPU_PROVIDERS else None
         ),
-        warmup=provider != STTProviderName.LOCAL_QWEN.value,
+        warmup=runtime_provider != STTProviderName.LOCAL_QWEN.value,
     )
 
 
@@ -920,6 +933,18 @@ def _create_rolling_stt_backend(
     return RollingSTTBackend(providers=tuple(definitions))
 
 
+def _resolved_qwen_audio_language_hints(config: ResolvedSTTConfig) -> tuple[str, ...]:
+    from puripuly_heart.core.language import get_qwen_audio_asr_language
+    from puripuly_heart.providers.stt.qwen_audio import QWEN_AUDIO_LANGUAGE_HINTS_LIMIT
+
+    if config.source_mode == "auto":
+        value = config.provider_options.get("language_hints")
+        if isinstance(value, tuple) and all(isinstance(hint, str) for hint in value):
+            return value[:QWEN_AUDIO_LANGUAGE_HINTS_LIMIT]
+        return ()
+    return (get_qwen_audio_asr_language(config.source_language),)
+
+
 def create_stt_backend_from_resolved_config(
     config: ResolvedSTTConfig,
     *,
@@ -1048,14 +1073,13 @@ def create_stt_backend_from_resolved_config(
         model = config.model or "qwen3-asr-flash-realtime"
         api_key = _qwen_api_key_for_resolved_credential(config.credential, secrets=secrets)
         if model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING:
-            from puripuly_heart.core.language import get_qwen_audio_asr_language
             from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
 
             return QwenAudioStreamingSTTBackend(
                 api_key=api_key,
                 model=model,
                 endpoint=_qwen_asr_endpoint_for_resolved_config(config),
-                language=get_qwen_audio_asr_language(config.source_language),
+                language_hints=_resolved_qwen_audio_language_hints(config),
                 sample_rate_hz=config.sample_rate_hz,
                 hotwords=keyterms,
             )

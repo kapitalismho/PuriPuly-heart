@@ -9,6 +9,7 @@ from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaNoticeAction,
     OscControlPresentationState,
 )
+from puripuly_heart.config.runtime_resolution import stt_supports_peer_auto_detection
 from puripuly_heart.core.language import get_all_language_options
 from puripuly_heart.ui.components.display_card import DisplayCard
 from puripuly_heart.ui.components.language_card import LanguageCard
@@ -596,16 +597,7 @@ class DashboardView(ft.Column):
                 state.self_secondary_target_language,
             )
         elif control == "PuriPuly_PeerASR":
-            self.set_peer_auto_detect_available(
-                state.peer_asr
-                in {
-                    "soniox",
-                    "gemini_transcribe",
-                    "elevenlabs_scribe",
-                    "local_qwen_gpu",
-                    "rolling_free",
-                }
-            )
+            self.set_peer_auto_detect_available(stt_supports_peer_auto_detection(state.peer_asr))
         elif control in {"PuriPuly_Listen", "PuriPuly_Captions"}:
             capture = capture_presentation_from_contract(self._overlay_peer_contract)
             if control == "PuriPuly_Listen":

@@ -4398,6 +4398,21 @@ def test_peer_auto_detection_languages_card_is_visible_only_for_peer_soniox(
     assert view._peer_auto_languages_editor._terms == ["ja"]
 
 
+def test_peer_auto_detection_languages_card_is_visible_for_peer_qwen_audio(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettingsVNext()
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
+    settings = _vnext(settings, peer_expected_languages=["ja", "zh-TW"])
+    view._settings = settings
+    view._update_api_visibility()
+
+    assert view._peer_auto_languages_card.visible is True
+    assert view._peer_auto_languages_editor._terms == ["ja", "zh-TW"]
+
+
 def test_overlay_display_toggles_update_persistent_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

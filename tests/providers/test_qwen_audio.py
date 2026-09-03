@@ -59,6 +59,7 @@ async def open_fake(
     task_start_timeout_s: float = 1,
     task_finish_timeout_s: float = 0.2,
     send_timeout_s: float = 5,
+    language_hints: tuple[str, ...] = ("ko",),
 ) -> tuple[QwenAudioStreamingSTTBackend, object, FakeWebSocket, str]:
     socket = FakeWebSocket()
 
@@ -67,7 +68,7 @@ async def open_fake(
 
     backend = QwenAudioStreamingSTTBackend(
         api_key="test-key",
-        language="ko",
+        language_hints=language_hints,
         hotwords=hotwords,
         websocket_factory=connect,
         connect_timeout_s=1,
@@ -269,6 +270,45 @@ def test_qwen_audio_backend_contract_constants() -> None:
     assert resolved.region == "singapore"
 
 
+def _run_task_parameters(socket: FakeWebSocket, index: int = 0) -> dict:
+    payload = json.loads(socket.sent[index])
+    assert payload["header"]["action"] == "run-task"
+    return payload["payload"]["parameters"]
+
+
+@pytest.mark.asyncio
+async def test_auto_detect_without_hints_omits_language_hints_key() -> None:
+    _, session, socket, _ = await open_fake(language_hints=())
+    parameters = _run_task_parameters(socket)
+    assert "language_hints" not in parameters
+    await session.abort_for_toggle_off()
+
+
+@pytest.mark.asyncio
+async def test_manual_language_sends_single_mapped_hint_in_payload() -> None:
+    _, session, socket, _ = await open_fake(language_hints=("ja",))
+    assert _run_task_parameters(socket)["language_hints"] == ["ja"]
+    await session.abort_for_toggle_off()
+
+
+@pytest.mark.asyncio
+async def test_constrained_auto_detect_sends_ordered_hints_in_payload() -> None:
+    _, session, socket, _ = await open_fake(language_hints=("ko", "ja", "zh", "en"))
+    assert _run_task_parameters(socket)["language_hints"] == ["ko", "ja", "zh", "en"]
+    await session.abort_for_toggle_off()
+
+
+@pytest.mark.asyncio
+async def test_repeated_tasks_reuse_the_same_language_hints() -> None:
+    _, session, socket, first_id = await open_fake(language_hints=("ko", "ja"))
+    await session.on_speech_end()
+    await socket.push({"header": {"event": "task-finished", "task_id": first_id}})
+    await wait_for_condition(lambda: len(socket.sent) >= 3)
+    assert _run_task_parameters(socket, 0)["language_hints"] == ["ko", "ja"]
+    assert _run_task_parameters(socket, 2)["language_hints"] == ["ko", "ja"]
+    await session.abort_for_toggle_off()
+
+
 @pytest.mark.asyncio
 async def test_task_finish_timeout_emits_empty_boundary_then_failure() -> None:
     _, session, socket, _ = await open_fake()
@@ -325,7 +365,7 @@ def test_factory_selects_qwen_audio_protocol_and_source_terms() -> None:
     secrets.set("alibaba_api_key_singapore", "test-key")
     backend = create_stt_backend_from_resolved_config(resolved, secrets=secrets)
     assert isinstance(backend, QwenAudioStreamingSTTBackend)
-    assert backend.language == "tl"
+    assert backend.language_hints == ("tl",)
     assert backend.endpoint.endswith("/api-ws/v1/inference")
     assert tuple(backend.hotwords) == ("PuriPuly", "Qwen")
 
@@ -448,7 +488,7 @@ async def test_task_start_timeout_is_terminal() -> None:
 
     backend = QwenAudioStreamingSTTBackend(
         api_key="test-key",
-        language="ko",
+        language_hints=("ko",),
         websocket_factory=connect,
         connect_timeout_s=1,
         task_start_timeout_s=0.01,
@@ -466,7 +506,7 @@ async def test_initial_connection_failure_is_terminal() -> None:
 
     backend = QwenAudioStreamingSTTBackend(
         api_key="test-key",
-        language="ko",
+        language_hints=("ko",),
         websocket_factory=connect,
         connect_timeout_s=1,
         task_start_timeout_s=1,

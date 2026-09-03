@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.settings_view import (
@@ -509,8 +508,16 @@ class UiEngagementRuntimeAdapter:
             current = self.settings.canonical
             if current is None:
                 return False
-            next_settings = copy.deepcopy(current)
-            next_settings.telemetry_state.last_sent_date_utc = updated.last_sent_date_utc
+            next_settings = replace(
+                current,
+                state=replace(
+                    current.state,
+                    telemetry=replace(
+                        current.state.telemetry,
+                        last_sent_date_utc=updated.last_sent_date_utc,
+                    ),
+                ),
+            )
             await self.settings_application.apply(next_settings)
             return self.settings_application.results.committed()
 
