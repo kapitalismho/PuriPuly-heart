@@ -6,8 +6,18 @@ import {
   buildManagedOperationId,
   buildManagedOperationResumeToken,
   createManagedOperation,
+  getManagedOperation,
   hashManagedOperationResumeToken,
+  listManagedOperationAttempts,
+  recordAttemptCredential,
+  saveOperationIssuanceContext,
+  startManagedOperationAttempt,
+  transitionManagedOperation,
 } from '../src/managed-operation';
+import {
+  createManagedKeyDelivery,
+  markManagedKeyDeliveryAcknowledged,
+} from '../src/managed-key-delivery';
 import {
   createDeviceKeyPair,
   signCanonicalDiscordIssueRequest,
@@ -19,6 +29,7 @@ import {
   insertEntitlement,
   type TestBrokerEnv,
 } from './test-support/sqlite-d1';
+import { saveOperationIssuanceContext as saveIssuanceContext } from '../src/managed-operation';
 
 const NOW_ISO = '2026-04-30T06:00:00.000Z';
 const SIGNED_AT_ISO = '2026-04-30T06:00:30.000Z';
@@ -933,5 +944,310 @@ describe('managed operation resume issuance', () => {
     await expect(first.json()).resolves.toEqual(await second.json());
     expect(readOperation(env, operationId)).toEqual(before);
     expect(readAttempts(env, operationId)).toHaveLength(0);
+  });
+
+  it('converges an acknowledged delivery to ACTIVE on resume instead of expiring it', async () => {
+    const env = createTestBrokerEnv();
+    const operationId = buildManagedOperationId();
+    const resumeToken = buildManagedOperationResumeToken();
+    const installationId = 'install-resume-acked-converge';
+    await createManagedOperation(env.BROKER_DB, {
+      operationId,
+      resumeTokenHash: await hashManagedOperationResumeToken(resumeToken),
+      issueSource: 'discord',
+      subjectRef: 'ph-discord-user-v1_resume_acked_converge',
+      installationId,
+      devicePublicKey: 'device-resume-acked-converge',
+      now: new Date(),
+    });
+    await saveOperationIssuanceContext(
+      env.BROKER_DB,
+      operationId,
+      { hardwareHash: 'hardware-resume-acked', hardwareHashSaltVersion: 7, appVersion: APP_VERSION },
+      new Date(),
+    );
+    const operation = (await getManagedOperation(env.BROKER_DB, operationId))!;
+    const started = await startManagedOperationAttempt(env.BROKER_DB, operation, new Date());
+    expect(started.ok).toBe(true);
+    if (!started.ok) {
+      return;
+    }
+    await recordAttemptCredential(env.BROKER_DB, operationId, 1, 'hash_resume_acked_1', new Date());
+    const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef: 'ph-discord-user-v1_resume_acked_converge',
+      installationId,
+      managedCredentialRef: 'hash_resume_acked_1',
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+      operationId,
+      attemptIndex: 1,
+    });
+    await transitionManagedOperation(env.BROKER_DB, operationId, 'DELIVERY_PENDING', new Date());
+    await markManagedKeyDeliveryAcknowledged(env.BROKER_DB, {
+      deliveryId: delivery.deliveryId,
+      acknowledgedAt: new Date(),
+    });
+
+    const response = await postResume(env, {
+      operation_id: operationId,
+      resume_token: resumeToken,
+      installation_id: installationId,
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      state: 'ACTIVE',
+      client_action: 'wait',
+    });
+    expect(readOperation(env, operationId)).toMatchObject({ state: 'ACTIVE', attempt_count: 1 });
+    expect(readAttempts(env, operationId)).toHaveLength(1);
+  });
+
+  it('refuses resume side effects while another operation owns the live delivery', async () => {
+    const env = createTestBrokerEnv();
+    const subjectRef = 'ph-discord-user-v1_resume_conflict';
+    const installationId = 'install-resume-conflict';
+    const ownerId = buildManagedOperationId();
+    const ownerToken = buildManagedOperationResumeToken();
+    await createManagedOperation(env.BROKER_DB, {
+      operationId: ownerId,
+      resumeTokenHash: await hashManagedOperationResumeToken(ownerToken),
+      issueSource: 'discord',
+      subjectRef,
+      installationId,
+      devicePublicKey: 'device-resume-conflict',
+      now: new Date(),
+    });
+    const owner = (await getManagedOperation(env.BROKER_DB, ownerId))!;
+    const ownerStarted = await startManagedOperationAttempt(env.BROKER_DB, owner, new Date());
+    expect(ownerStarted.ok).toBe(true);
+    if (!ownerStarted.ok) {
+      return;
+    }
+    await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef,
+      installationId,
+      managedCredentialRef: 'hash_resume_conflict_1',
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+      operationId: ownerId,
+      attemptIndex: 1,
+    });
+    await transitionManagedOperation(env.BROKER_DB, ownerId, 'DELIVERY_PENDING', new Date());
+
+    const waiterId = buildManagedOperationId();
+    const waiterToken = buildManagedOperationResumeToken();
+    await createManagedOperation(env.BROKER_DB, {
+      operationId: waiterId,
+      resumeTokenHash: await hashManagedOperationResumeToken(waiterToken),
+      issueSource: 'discord',
+      subjectRef,
+      installationId,
+      devicePublicKey: 'device-resume-conflict',
+      now: new Date(),
+    });
+
+    const response = await postResume(env, {
+      operation_id: waiterId,
+      resume_token: waiterToken,
+      installation_id: installationId,
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({ operation_id: waiterId });
+    expect(readAttempts(env, waiterId)).toHaveLength(0);
+    expect(readOperation(env, waiterId)).toMatchObject({ attempt_count: 0 });
+    expect(readOperation(env, ownerId)).toMatchObject({ state: 'DELIVERY_PENDING' });
+  });
+
+  it('rejects status and resume queries after the recovery authorization expires', async () => {
+    const env = createTestBrokerEnv();
+    const operationId = buildManagedOperationId();
+    const resumeToken = buildManagedOperationResumeToken();
+    const installationId = 'install-resume-expired';
+    await createManagedOperation(env.BROKER_DB, {
+      operationId,
+      resumeTokenHash: await hashManagedOperationResumeToken(resumeToken),
+      issueSource: 'discord',
+      subjectRef: 'ph-discord-user-v1_resume_expired',
+      installationId,
+      devicePublicKey: 'device-resume-expired',
+      now: new Date(Date.now() - 61 * 60_000),
+    });
+    await transitionManagedOperation(env.BROKER_DB, operationId, 'ACTIVE', new Date());
+
+    const statusResponse = await postStatus(env, {
+      operation_id: operationId,
+      resume_token: resumeToken,
+      installation_id: installationId,
+    });
+    expect(statusResponse.status).toBe(410);
+    const resumeResponse = await postResume(env, {
+      operation_id: operationId,
+      resume_token: resumeToken,
+      installation_id: installationId,
+    });
+    expect(resumeResponse.status).toBe(410);
+    expect(readOperation(env, operationId)).toMatchObject({ state: 'ACTIVE' });
+  });
+
+  it('leaves another operation credential untouched when refusing a conflicting resume', async () => {
+    const env = createTestBrokerEnv();
+    const provider = mockProviderPlane();
+    stubFetch([(input, init) => provider.fetchMock(input, init)]);
+    const subjectRef = 'ph-discord-user-v1_resume_foreign_key';
+    const installationId = 'install-resume-foreign-key';
+
+    const ownerId = buildManagedOperationId();
+    const ownerToken = buildManagedOperationResumeToken();
+    await createManagedOperation(env.BROKER_DB, {
+      operationId: ownerId,
+      resumeTokenHash: await hashManagedOperationResumeToken(ownerToken),
+      issueSource: 'discord',
+      subjectRef,
+      installationId,
+      devicePublicKey: 'device-resume-foreign-key',
+      now: new Date(),
+    });
+    const owner = (await getManagedOperation(env.BROKER_DB, ownerId))!;
+    const ownerStarted = await startManagedOperationAttempt(env.BROKER_DB, owner, new Date());
+    expect(ownerStarted.ok).toBe(true);
+    if (!ownerStarted.ok) {
+      return;
+    }
+    await recordAttemptCredential(env.BROKER_DB, ownerId, 1, 'hash_foreign_live_1', new Date());
+    await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef,
+      installationId,
+      managedCredentialRef: 'hash_foreign_live_1',
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+      operationId: ownerId,
+      attemptIndex: 1,
+    });
+    await transitionManagedOperation(env.BROKER_DB, ownerId, 'DELIVERY_PENDING', new Date());
+    env.__db
+      .prepare(
+        `INSERT INTO installations (installation_id, device_public_key, app_version, created_at, last_seen_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(installationId, 'device-resume-foreign-key', APP_VERSION, new Date().toISOString(), new Date().toISOString());
+    env.__db
+      .prepare(
+        `INSERT INTO discord_identities (discord_user_ref, entitlement_installation_id, status, created_at, updated_at)
+         VALUES (?, ?, 'issuing', ?, ?)`,
+      )
+      .run(subjectRef, installationId, new Date().toISOString(), new Date().toISOString());
+    insertEntitlement(env, {
+      installation_id: installationId,
+      status: 'pending_release',
+      budget_usd: 0.07,
+      managed_credential_ref: 'hash_foreign_live_1',
+      discord_user_ref: subjectRef,
+      discord_issue_status: 'delivery_pending',
+    });
+
+    const waiterId = buildManagedOperationId();
+    const waiterToken = buildManagedOperationResumeToken();
+    await createManagedOperation(env.BROKER_DB, {
+      operationId: waiterId,
+      resumeTokenHash: await hashManagedOperationResumeToken(waiterToken),
+      issueSource: 'discord',
+      subjectRef,
+      installationId,
+      devicePublicKey: 'device-resume-foreign-key',
+      now: new Date(),
+    });
+    await saveIssuanceContext(
+      env.BROKER_DB,
+      waiterId,
+      { hardwareHash: 'hardware-foreign-key', hardwareHashSaltVersion: 7, appVersion: APP_VERSION },
+      new Date(),
+    );
+
+    const providerCallsBefore = provider.calls.length;
+    const response = await postResume(env, {
+      operation_id: waiterId,
+      resume_token: waiterToken,
+      installation_id: installationId,
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      operation_id: waiterId,
+      state: 'AUTHENTICATED',
+      client_action: 'wait',
+    });
+    expect(provider.calls.length).toBe(providerCallsBefore);
+    expect(
+      provider.calls.some((call) => call.includes('hash_foreign_live_1')),
+    ).toBe(false);
+    const entitlement = env.__db
+      .prepare(`SELECT managed_credential_ref, discord_issue_status FROM openrouter_entitlements WHERE installation_id = ?`)
+      .get(installationId) as Record<string, string>;
+    expect(entitlement).toMatchObject({
+      managed_credential_ref: 'hash_foreign_live_1',
+      discord_issue_status: 'delivery_pending',
+    });
+  });
+
+  it('rejects operation-bearing QQ assertions without an installation', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW_ISO));
+
+    const env = createTestBrokerEnv();
+    const qqIdentity = 'qq-openid-op-binding-required';
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(env.QQ_AUTH_HMAC_PSK),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    );
+    const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(qqIdentity));
+    const credential = Array.from(new Uint8Array(signature), (value) =>
+      value.toString(16).padStart(2, '0'),
+    ).join('');
+    const response = await app.request(
+      QQ_AUTH_ASSERT_URL,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          qq_identity: qqIdentity,
+          credential,
+          asserted_at: NOW_ISO,
+          delivery_ack_supported: true,
+          operation_id: buildManagedOperationId(),
+          resume_token: buildManagedOperationResumeToken(),
+        }),
+      },
+      env,
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects status queries bound to a different installation', async () => {
+    const env = createTestBrokerEnv();
+    const operationId = buildManagedOperationId();
+    const resumeToken = buildManagedOperationResumeToken();
+    await createManagedOperation(env.BROKER_DB, {
+      operationId,
+      resumeTokenHash: await hashManagedOperationResumeToken(resumeToken),
+      issueSource: 'discord',
+      subjectRef: 'ph-discord-user-v1_resume_binding',
+      installationId: 'install-resume-binding',
+      devicePublicKey: 'device-resume-binding',
+      now: new Date(),
+    });
+
+    const response = await postStatus(env, {
+      operation_id: operationId,
+      resume_token: resumeToken,
+      installation_id: 'install-resume-binding-other',
+    });
+    expect(response.status).toBe(404);
   });
 });

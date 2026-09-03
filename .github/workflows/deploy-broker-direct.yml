@@ -46,6 +46,8 @@ jobs:
           DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION: ${{ secrets.DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION }}
           NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION: ${{ secrets.NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION }}
           NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: ${{ secrets.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}
           DISCORD_USER_REF_SECRET_PRODUCTION: ${{ secrets.DISCORD_USER_REF_SECRET_PRODUCTION }}
           DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION: ${{ secrets.DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION }}
         run: |
@@ -159,6 +161,29 @@ jobs:
             exit 1
           fi
 
+          if [[ ! "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION" =~ ^[1-9][0-9]*$ ]]; then
+            echo 'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.' >&2
+            exit 1
+          fi
+
+          if [[ -n "${NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
+            if [[ ! "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION" =~ ^[1-9][0-9]*$ ]]; then
+              echo 'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must be a positive integer when set.' >&2
+              exit 1
+            fi
+            if [[ -z "${NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
+              echo 'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is set.' >&2
+              exit 1
+            fi
+            if [[ "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION" == "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION" ]]; then
+              echo 'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must differ from NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION.' >&2
+              exit 1
+            fi
+          elif [[ -n "${NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
+            echo 'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is set.' >&2
+            exit 1
+          fi
+
           if [[ -z "${DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION//[[:space:]]/}" ]]; then
             echo 'DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION is required and must not be blank.' >&2
             exit 1
@@ -231,6 +256,8 @@ jobs:
         working-directory: broker
         env:
           BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}
         run: |
           deploy_dir='.deploy-direct'
           config_path='wrangler.production.jsonc'
@@ -245,8 +272,14 @@ jobs:
           )"
           echo "::add-mask::$fingerprint_salt"
 
+          network_identity_version_args=(--network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION")
+          if [[ -n "${NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
+            network_identity_version_args+=(--network-identity-hmac-key-version-previous "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION")
+          fi
+
           node scripts/render-production-wrangler-config.mjs \
             --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION" \
+            "${network_identity_version_args[@]}" \
             --out "$config_path"
 
           node scripts/render-fingerprint-bootstrap-sql.mjs \

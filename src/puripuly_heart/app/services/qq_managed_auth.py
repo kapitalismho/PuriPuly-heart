@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from types import MappingProxyType
 
 from puripuly_heart.app.ports.broker_client import (
@@ -31,6 +31,8 @@ from puripuly_heart.app.services.managed_key_delivery_ack import (
     ACK_SOURCE_QQ,
     ManagedKeyDeliveryAckService,
     ManagedKeyDeliveryAckTokenStoreError,
+    other_source_pending_delivery_ack,
+    read_any_pending_delivery_ack,
 )
 from puripuly_heart.app.services.managed.managed_operation import (
     DEFAULT_MAX_STATUS_POLLS,
@@ -42,11 +44,12 @@ from puripuly_heart.app.services.managed.managed_operation import (
     ManagedOperationIdentity,
     ManagedOperationTokenStoreError,
     ProgressSink,
-    clear_pending_operation,
+    clear_pending_operation_if_source,
     clear_resume_token,
     emit_progress,
     new_managed_operation_id,
     new_managed_operation_resume_token,
+    other_source_pending_operation,
     read_pending_operation,
     read_resume_token,
     status_poll_delay_ms,
@@ -134,6 +137,9 @@ class QqManagedAuthService:
     )
 
     async def authenticate(self, request: QqManagedAuthRequest) -> TransactionResult:
+        other_source_refusal = _refuse_other_source_pending(self.managed_state)
+        if other_source_refusal is not None:
+            return other_source_refusal
         recovery_result = await self._recover_pending_delivery_ack()
         if recovery_result is not None:
             return recovery_result
@@ -409,11 +415,17 @@ class QqManagedAuthService:
         return stored is not None and bool(stored.value)
 
     async def _clear_qq_operation(self) -> None:
+        cleared = False
         try:
-            clear_pending_operation(self.managed_state)
-            self.managed_state.persist()
+            cleared = clear_pending_operation_if_source(
+                self.managed_state, MANAGED_OPERATION_SOURCE_QQ
+            )
+            if cleared:
+                self.managed_state.persist()
         except Exception:
             pass
+        if not cleared:
+            return
         try:
             await clear_resume_token(self.secret_store)
         except Exception:
@@ -556,6 +568,7 @@ class QqManagedAuthService:
                     operation_id=operation_id,
                     installation_id=installation_id,
                     resume_token=resume_token,
+                    source=MANAGED_OPERATION_SOURCE_QQ,
                 )
             )
         except Exception:
@@ -572,6 +585,7 @@ class QqManagedAuthService:
                     operation_id=operation.operation_id,
                     installation_id=operation.installation_id,
                     resume_token=resume_token,
+                    source=MANAGED_OPERATION_SOURCE_QQ,
                 )
             )
         except Exception:
@@ -814,7 +828,7 @@ class QqManagedAuthService:
         if isinstance(secret_snapshot, TransactionResult):
             return secret_snapshot
         state_snapshot = self.managed_state.snapshot()
-        delivery_ack = replace(credential.delivery_ack, source=ACK_SOURCE_QQ)
+        delivery_ack = credential.delivery_ack
         try:
             await self._delivery_ack_service().store_pending(delivery_ack)
         except ManagedKeyDeliveryAckTokenStoreError:
@@ -1157,6 +1171,55 @@ def _local_failure_result(
             },
         ),
     )
+
+
+def _other_source_refusal_result(
+    *,
+    other_source: str,
+    pending_kind: str,
+) -> TransactionResult:
+    return TransactionResult(
+        status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
+        message=_message(
+            "qq_managed_auth.error.other_source_pending", severity=SEVERITY_ERROR
+        ),
+        diagnostics=_diagnostics(
+            operation="authenticate_qq_managed_identity",
+            code=f"qq_other_source_pending_{pending_kind}",
+            category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+            fields={
+                "phase": "other_source_pending",
+                "secret_key": OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+                "other_source": other_source,
+                "pending_kind": pending_kind,
+                "secret_write_succeeded": False,
+                "settings_commit_succeeded": False,
+            },
+        ),
+    )
+
+
+def _refuse_other_source_pending(
+    managed_state: ManagedIdentityStatePort,
+) -> TransactionResult | None:
+    other_ack = other_source_pending_delivery_ack(
+        managed_state, source=ACK_SOURCE_QQ
+    )
+    if other_ack is not None:
+        return _other_source_refusal_result(
+            other_source=other_ack.source, pending_kind="delivery_ack"
+        )
+    other_operation = other_source_pending_operation(
+        managed_state, source=MANAGED_OPERATION_SOURCE_QQ
+    )
+    if other_operation is not None:
+        own_ack = read_any_pending_delivery_ack(managed_state)
+        if own_ack is not None and own_ack.source == ACK_SOURCE_QQ:
+            return None
+        return _other_source_refusal_result(
+            other_source=other_operation.source, pending_kind="operation"
+        )
+    return None
 
 
 def _qq_operation_message(key: str) -> UserMessageRef:

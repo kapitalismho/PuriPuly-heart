@@ -1751,3 +1751,169 @@ async def test_discord_ack_recovery_consumes_referral_result() -> None:
     assert managed_state.referral_source == "discord"
     assert managed_state.referral_id == "8H3J4N"
     _assert_no_raw_values(result, label="managed ACK referral result")
+
+
+QQ_SEEDED_OPERATION_ID = "ph-mop-v1_0123456789abcdef0123456789abcdef"
+QQ_SEEDED_RESUME_TOKEN = "0123456789abcdef0123456789abcdef0123456789A"
+
+
+def _qq_seeded_operation_state() -> RecordingManagedState:
+    return RecordingManagedState(
+        pending_managed_operation_id=QQ_SEEDED_OPERATION_ID,
+        pending_managed_operation_source="qq",
+        pending_managed_operation_installation_id="identity-r1",
+    )
+
+
+def _qq_delivery_ack_metadata() -> broker_client.ManagedKeyDeliveryAckMetadata:
+    return broker_client.ManagedKeyDeliveryAckMetadata(
+        source="qq",
+        delivery_id="delivery-qq-1",
+        managed_credential_ref="managed-ref-qq",
+        expires_at="2026-07-07T00:15:00.000Z",
+        delivery_ack_token="delivery-token-qq-1",
+    )
+
+
+@pytest.mark.asyncio
+async def test_discord_auth_refuses_qq_operation_without_mutation() -> None:
+    managed_state = _qq_seeded_operation_state()
+    identity = RecordingLocalIdentity(_identity_success())
+    discord = RecordingDiscordAuth(_discord_success())
+    broker = RecordingBrokerClient(_broker_success())
+    store = RecordingSecretStore()
+    store.values["openrouter_managed_operation_resume_token"] = QQ_SEEDED_RESUME_TOKEN
+    repository = RecordingSettingsRepository(_commit_success())
+
+    result = await _service(
+        identity=identity,
+        discord=discord,
+        broker=broker,
+        store=store,
+        repository=repository,
+        managed_state=managed_state,
+    ).authorize(_request())
+
+    assert result.status == messages.TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED
+    assert result.message is not None
+    assert result.message.key == "discord_auth.error.other_source_pending"
+    assert result.diagnostics is not None
+    assert result.diagnostics.code == "managed_operation_other_source_pending_operation"
+    assert result.diagnostics.fields["other_source"] == "qq"
+    assert identity.requests == []
+    assert discord.requests == []
+    assert broker.requests == []
+    assert broker.status_requests == []
+    assert broker.resume_requests == []
+    assert broker.ack_requests == []
+    assert repository.saved_requests == []
+    assert store.set_calls == []
+    assert managed_state.persist_calls == 0
+    assert managed_state.pending_managed_operation_id == QQ_SEEDED_OPERATION_ID
+    assert managed_state.pending_managed_operation_source == "qq"
+    assert managed_state.pending_managed_operation_installation_id == "identity-r1"
+    assert store.values["openrouter_managed_operation_resume_token"] == QQ_SEEDED_RESUME_TOKEN
+    _assert_no_raw_values(result, label="managed operation cross-source refusal result")
+
+
+@pytest.mark.asyncio
+async def test_discord_auth_refuses_qq_pending_ack_without_mutation() -> None:
+    metadata = _qq_delivery_ack_metadata()
+    managed_state = RecordingManagedState(
+        pending_delivery_ack_source="qq",
+        pending_delivery_ack_delivery_id=metadata.delivery_id,
+        pending_delivery_ack_managed_credential_ref=metadata.managed_credential_ref,
+        pending_delivery_ack_expires_at=metadata.expires_at,
+    )
+    identity = RecordingLocalIdentity(_identity_success())
+    discord = RecordingDiscordAuth(_discord_success())
+    broker = RecordingBrokerClient(_broker_success())
+    store = RecordingSecretStore()
+    store.values["openrouter_managed_qq_delivery_ack_token"] = metadata.delivery_ack_token
+    repository = RecordingSettingsRepository(_commit_success())
+
+    result = await _service(
+        identity=identity,
+        discord=discord,
+        broker=broker,
+        store=store,
+        repository=repository,
+        managed_state=managed_state,
+    ).authorize(_request())
+
+    assert result.status == messages.TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED
+    assert result.message is not None
+    assert result.message.key == "discord_auth.error.other_source_pending"
+    assert result.diagnostics is not None
+    assert result.diagnostics.code == "managed_operation_other_source_pending_delivery_ack"
+    assert identity.requests == []
+    assert discord.requests == []
+    assert broker.requests == []
+    assert broker.status_requests == []
+    assert broker.resume_requests == []
+    assert broker.ack_requests == []
+    assert repository.saved_requests == []
+    assert store.set_calls == []
+    assert managed_state.persist_calls == 0
+    assert managed_state.pending_delivery_ack_source == "qq"
+    assert managed_state.pending_delivery_ack_delivery_id == metadata.delivery_id
+    assert (
+        store.values["openrouter_managed_qq_delivery_ack_token"]
+        == metadata.delivery_ack_token
+    )
+    _assert_no_raw_values(result, label="managed ACK cross-source refusal result")
+
+
+@pytest.mark.asyncio
+async def test_discord_auth_own_ack_recovers_while_qq_operation_preserved() -> None:
+    metadata = _delivery_ack_metadata()
+    managed_state = _qq_seeded_operation_state()
+    managed_state.pending_delivery_ack_source = "discord"
+    managed_state.pending_delivery_ack_delivery_id = metadata.delivery_id
+    managed_state.pending_delivery_ack_managed_credential_ref = (
+        metadata.managed_credential_ref
+    )
+    managed_state.pending_delivery_ack_expires_at = metadata.expires_at
+    identity = RecordingLocalIdentity(_identity_success())
+    discord = RecordingDiscordAuth(_discord_success())
+    broker = RecordingBrokerClient(
+        None,
+        ack_result=broker_client.ManagedKeyDeliveryAckResult(
+            succeeded=True,
+            status="already_acknowledged",
+        ),
+    )
+    store = RecordingSecretStore()
+    store.values["openrouter_managed_operation_resume_token"] = QQ_SEEDED_RESUME_TOKEN
+    store.values[LOCAL_SECRET_KEY] = RAW_MANAGED_CREDENTIAL
+    store.values["openrouter_managed_delivery_ack_token"] = metadata.delivery_ack_token
+    repository = RecordingSettingsRepository(_commit_success())
+
+    result = await _service(
+        identity=identity,
+        discord=discord,
+        broker=broker,
+        store=store,
+        repository=repository,
+        delivery_ack_service=ManagedKeyDeliveryAckService(
+            broker,
+            store,
+            managed_state,
+        ),
+    ).authorize(_request())
+
+    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+    assert result.diagnostics is not None
+    assert result.diagnostics.code == "delivery_ack_recovered"
+    assert discord.requests == []
+    assert broker.requests == []
+    assert broker.status_requests == []
+    assert broker.resume_requests == []
+    assert broker.ack_requests[0].delivery_id == metadata.delivery_id
+    assert managed_state.pending_managed_operation_id == QQ_SEEDED_OPERATION_ID
+    assert managed_state.pending_managed_operation_source == "qq"
+    assert managed_state.pending_managed_operation_installation_id == "identity-r1"
+    assert store.values["openrouter_managed_operation_resume_token"] == QQ_SEEDED_RESUME_TOKEN
+    assert managed_state.pending_delivery_ack_source is None
+    assert "openrouter_managed_delivery_ack_token" not in store.values
+    _assert_no_raw_values(result, label="managed ACK cross-source preservation result")

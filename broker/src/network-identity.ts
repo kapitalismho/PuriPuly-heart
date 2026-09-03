@@ -1,5 +1,4 @@
 const NETWORK_IDENTITY_DOMAIN = 'puripuly-heart:network-identity:v1';
-export const NETWORK_IDENTITY_KEY_VERSION = 1;
 export const NETWORK_IDENTITY_EPOCH_MS = 24 * 60 * 60_000;
 
 export interface NetworkIdentityDigest {
@@ -132,8 +131,18 @@ async function hmacHex(secret: string, message: string): Promise<string> {
 
 export interface NetworkIdentitySecrets {
   current: string;
-  previous: string | null;
   currentVersion: number;
+  previous: string | null;
+  previousVersion: number | null;
+}
+
+function parseNetworkIdentityKeyVersion(value: unknown): number | null {
+  const text = typeof value === 'number' ? String(value) : typeof value === 'string' ? value.trim() : '';
+  if (!/^[1-9][0-9]*$/u.test(text)) {
+    return null;
+  }
+  const parsed = Number(text);
+  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 export function resolveNetworkIdentitySecrets(env: Record<string, unknown>): NetworkIdentitySecrets | null {
@@ -141,15 +150,21 @@ export function resolveNetworkIdentitySecrets(env: Record<string, unknown>): Net
   if (!current) {
     return null;
   }
+  const currentVersion = parseNetworkIdentityKeyVersion(env.NETWORK_IDENTITY_HMAC_KEY_VERSION);
+  if (currentVersion === null) {
+    return null;
+  }
   const previousRaw = typeof env.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS === 'string' ? env.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS.trim() : '';
-  const versionRaw = env.NETWORK_IDENTITY_HMAC_KEY_VERSION;
-  const parsedVersion = typeof versionRaw === 'string' && versionRaw.trim().length > 0
-    ? Number(versionRaw)
-    : typeof versionRaw === 'number'
-      ? versionRaw
-      : Number.NaN;
-  const currentVersion = Number.isInteger(parsedVersion) && parsedVersion >= 1 ? parsedVersion : 1;
-  return { current, previous: previousRaw ? previousRaw : null, currentVersion };
+  const previousVersionRaw = env.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS;
+  const previousVersionUnset = previousVersionRaw === undefined || previousVersionRaw === null || (typeof previousVersionRaw === 'string' && previousVersionRaw.trim() === '');
+  if (!previousRaw && previousVersionUnset) {
+    return { current, currentVersion, previous: null, previousVersion: null };
+  }
+  const previousVersion = parseNetworkIdentityKeyVersion(previousVersionRaw);
+  if (!previousRaw || previousVersion === null || previousVersion === currentVersion) {
+    return null;
+  }
+  return { current, currentVersion, previous: previousRaw, previousVersion };
 }
 
 export async function deriveNetworkIdentityDigestsForWindow(
@@ -167,10 +182,10 @@ export async function deriveNetworkIdentityDigestsForWindow(
       keyVersion: secrets.currentVersion,
       epoch,
     });
-    if (secrets.previous) {
+    if (secrets.previous && secrets.previousVersion !== null) {
       out.push({
-        digest: await hmacHex(secrets.previous, `${NETWORK_IDENTITY_DOMAIN}\n${secrets.currentVersion - 1}\n${epoch}\n${scope}\n${normalizedIp}`),
-        keyVersion: secrets.currentVersion - 1,
+        digest: await hmacHex(secrets.previous, `${NETWORK_IDENTITY_DOMAIN}\n${secrets.previousVersion}\n${epoch}\n${scope}\n${normalizedIp}`),
+        keyVersion: secrets.previousVersion,
         epoch,
       });
     }
@@ -207,8 +222,8 @@ export async function deriveStableNetworkIdentityDigest(
   const out: Array<{ digest: string; keyVersion: number }> = [
     { digest: await hmacHex(secrets.current, `${NETWORK_IDENTITY_DOMAIN}\n${secrets.currentVersion}\nstable\n${scope}\n${normalizedIp}`), keyVersion: secrets.currentVersion },
   ];
-  if (secrets.previous) {
-    out.push({ digest: await hmacHex(secrets.previous, `${NETWORK_IDENTITY_DOMAIN}\n${secrets.currentVersion - 1}\nstable\n${scope}\n${normalizedIp}`), keyVersion: secrets.currentVersion - 1 });
+  if (secrets.previous && secrets.previousVersion !== null) {
+    out.push({ digest: await hmacHex(secrets.previous, `${NETWORK_IDENTITY_DOMAIN}\n${secrets.previousVersion}\nstable\n${scope}\n${normalizedIp}`), keyVersion: secrets.previousVersion });
   }
   return out;
 }

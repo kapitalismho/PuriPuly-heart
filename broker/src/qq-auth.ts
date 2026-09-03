@@ -166,6 +166,9 @@ export async function handleQqAuthAssert(
   ) {
     return invalidQqOperationBindingResponse(c);
   }
+  if (input.value.operationId !== null && input.value.installationId === null) {
+    return invalidQqOperationBindingResponse(c);
+  }
   return issueQqManagedEntitlement(c, {
     qqSubjectRef,
     now,

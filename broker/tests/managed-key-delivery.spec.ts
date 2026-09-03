@@ -395,6 +395,57 @@ describe('managed key delivery ACK foundation', () => {
     expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_discord_ack'")).toBe(1);
   });
 
+  it('accepts a redelivered acknowledgement while the shared reward settlement is pending', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
+    const env = createTestBrokerEnv();
+    insertQqDeliveryPendingOwner(env, {
+      qqSubjectRef: 'ph-qq-subject-v1_ack_conflict',
+      issueRef: 'qq-issue-ack-conflict-1',
+      managedCredentialRef: 'hash_qq_ack_conflict_1',
+      budgetUsd: 0.07,
+    });
+    insertQqReservedReferralReward(env, {
+      qqSubjectRef: 'ph-qq-subject-v1_ack_conflict',
+      referrerSubjectRef: 'ph-discord-user-v1_ack-conflict-referrer',
+    });
+    const first = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'qq',
+      subjectRef: 'ph-qq-subject-v1_ack_conflict',
+      managedCredentialRef: 'hash_qq_ack_conflict_1',
+      createdAt: new Date('2026-07-05T00:00:00.000Z'),
+      expiresAt: new Date('2026-07-05T00:15:00.000Z'),
+    });
+    const redelivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'qq',
+      subjectRef: 'ph-qq-subject-v1_ack_conflict',
+      managedCredentialRef: 'hash_qq_ack_conflict_1',
+      createdAt: new Date('2026-07-05T00:02:00.000Z'),
+      expiresAt: new Date('2026-07-05T00:17:00.000Z'),
+    });
+
+    const firstAck = await postAck(env, {
+      delivery_id: first.deliveryId,
+      managed_credential_ref: 'hash_qq_ack_conflict_1',
+      delivery_ack_token: first.deliveryAckToken,
+    });
+    expect(firstAck.status).toBe(200);
+    expect(
+      selectScalar(env, 'SELECT COUNT(*) FROM managed_referral_settlement_jobs'),
+    ).toBe(1);
+
+    const redeliveredAck = await postAck(env, {
+      delivery_id: redelivery.deliveryId,
+      managed_credential_ref: 'hash_qq_ack_conflict_1',
+      delivery_ack_token: redelivery.deliveryAckToken,
+    });
+    expect(redeliveredAck.status).toBe(200);
+    await expect(redeliveredAck.json()).resolves.toEqual({ ok: true, status: 'acknowledged' });
+    expect(
+      selectScalar(env, 'SELECT COUNT(*) FROM managed_referral_settlement_jobs'),
+    ).toBe(1);
+  });
+
   it('serializes concurrent Discord ACK finalization into one delivery event', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));

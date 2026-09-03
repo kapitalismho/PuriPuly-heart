@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
@@ -60,6 +60,8 @@ describe('broker direct deploy automation', () => {
       outputPath,
       '--database-id',
       'production-d1-database-id',
+      '--network-identity-hmac-key-version',
+      '1',
     ]);
 
     const renderedConfig = readFileSync(outputPath, 'utf8');
@@ -90,8 +92,96 @@ describe('broker direct deploy automation', () => {
         outputPath,
         '--database-id',
         'production-d1-database-id',
+        '--network-identity-hmac-key-version',
+        '1',
       ]),
     ).toThrow(/canonical worker name/i);
+  });
+
+  it('renders versioned network identity vars for first deploy and rotation while rejecting mismatched pairs', () => {
+    const firstDeployDir = createTempDir();
+    const firstDeployPath = join(firstDeployDir, 'wrangler.production.jsonc');
+    runNodeScript(renderWranglerConfigScript, [
+      '--source',
+      fileURLToPath(checkedInWranglerConfig),
+      '--out',
+      firstDeployPath,
+      '--database-id',
+      'production-d1-database-id',
+      '--network-identity-hmac-key-version',
+      '1',
+    ]);
+    const firstDeployConfig = readFileSync(firstDeployPath, 'utf8');
+    expect(firstDeployConfig).toContain('"NETWORK_IDENTITY_HMAC_KEY_VERSION"');
+    expect(firstDeployConfig).not.toContain('NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS');
+
+    const rotationDir = createTempDir();
+    const rotationPath = join(rotationDir, 'wrangler.production.jsonc');
+    runNodeScript(renderWranglerConfigScript, [
+      '--source',
+      fileURLToPath(checkedInWranglerConfig),
+      '--out',
+      rotationPath,
+      '--database-id',
+      'production-d1-database-id',
+      '--network-identity-hmac-key-version',
+      '2',
+      '--network-identity-hmac-key-version-previous',
+      '1',
+    ]);
+    const rotationConfig = readFileSync(rotationPath, 'utf8');
+    expect(rotationConfig).toContain('"NETWORK_IDENTITY_HMAC_KEY_VERSION"');
+    expect(rotationConfig).toContain('"NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS"');
+
+    const rejectionDir = createTempDir();
+    const rejectionCases: string[][] = [
+      ['--database-id', 'production-d1-database-id'],
+      [
+        '--database-id',
+        'production-d1-database-id',
+        '--network-identity-hmac-key-version',
+        '0',
+      ],
+      [
+        '--database-id',
+        'production-d1-database-id',
+        '--network-identity-hmac-key-version',
+        'v1',
+      ],
+      [
+        '--database-id',
+        'production-d1-database-id',
+        '--network-identity-hmac-key-version-previous',
+        '1',
+      ],
+      [
+        '--database-id',
+        'production-d1-database-id',
+        '--network-identity-hmac-key-version',
+        '2',
+        '--network-identity-hmac-key-version-previous',
+        '2',
+      ],
+      [
+        '--database-id',
+        'production-d1-database-id',
+        '--network-identity-hmac-key-version',
+        '2',
+        '--network-identity-hmac-key-version-previous',
+        '0',
+      ],
+    ];
+    for (const [caseIndex, rejectionArgs] of rejectionCases.entries()) {
+      expect(() =>
+        runNodeScript(renderWranglerConfigScript, [
+          '--source',
+          fileURLToPath(checkedInWranglerConfig),
+          '--out',
+          join(rejectionDir, `wrangler.rejected.${caseIndex}.jsonc`),
+          ...rejectionArgs,
+        ]),
+      ).toThrow();
+    }
   });
 
   it('renders guarded fingerprint bootstrap SQL that replaces only the placeholder salt', () => {
@@ -333,6 +423,33 @@ describe('broker direct deploy automation', () => {
     expect(workflow).toContain('NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION');
     expect(workflow).toContain('NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION');
     expect(workflow).toContain('NETWORK_IDENTITY_HMAC_SECRET');
+    expect(workflow).toContain(
+      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}',
+    );
+    expect(workflow).toContain(
+      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}',
+    );
+    expect(workflow).toContain('--network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION"');
+    expect(workflow).toContain(
+      '--network-identity-hmac-key-version-previous "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION"',
+    );
+    expect(workflow).toContain(
+      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.',
+    );
+    expect(workflow).toContain(
+      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must be a positive integer when set.',
+    );
+    expect(workflow).toContain(
+      'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is set.',
+    );
+    expect(workflow).toContain(
+      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is set.',
+    );
+    expect(workflow).toContain(
+      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must differ from NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION.',
+    );
+    expect(workflow).not.toContain('NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION:-');
+    expect(workflow).not.toContain('NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION:-');
     expect(workflow).toContain('staged-migrations-through-0020');
     expect(workflow).toContain('0020_network_identity_hmac.sql');
     expect(workflow).toContain('0021_network_identity_purge.sql');
@@ -607,6 +724,136 @@ describe('broker direct deploy automation', () => {
     expect(readme).toContain('deepseek/deepseek-v4-flash');
   });
 
+  it.skipIf(!bashAvailable)('guards network identity key versions and the previous pair before migrations', () => {
+    const workflow = readFileSync(deployWorkflow, 'utf8');
+    const guardScript = extractWorkflowRunBlock(
+      workflow,
+      'Guard production deploy ref and confirmation',
+    );
+    const scenarios: Array<{
+      name: string;
+      env: Record<string, string | undefined>;
+      expectStatus: number;
+      expectStderrContains?: string;
+    }> = [
+      {
+        name: 'first deploy v1 without previous',
+        env: {
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '1',
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: undefined,
+          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: undefined,
+        },
+        expectStatus: 0,
+      },
+      {
+        name: 'rotation v2 with previous v1',
+        env: {
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '2',
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: '1',
+          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: 'guard-scenario-previous-secret',
+        },
+        expectStatus: 0,
+      },
+      {
+        name: 'missing current version is rejected without an implicit default',
+        env: {
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: undefined,
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: undefined,
+          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: undefined,
+        },
+        expectStatus: 1,
+        expectStderrContains:
+          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.',
+      },
+      {
+        name: 'zero current version is rejected',
+        env: { NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '0' },
+        expectStatus: 1,
+        expectStderrContains:
+          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.',
+      },
+      {
+        name: 'non-numeric current version is rejected',
+        env: { NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: 'v1' },
+        expectStatus: 1,
+        expectStderrContains:
+          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.',
+      },
+      {
+        name: 'zero-padded current version is rejected',
+        env: { NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '01' },
+        expectStatus: 1,
+        expectStderrContains:
+          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.',
+      },
+      {
+        name: 'previous version without previous secret is rejected',
+        env: {
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '2',
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: '1',
+          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: undefined,
+        },
+        expectStatus: 1,
+        expectStderrContains:
+          'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is set.',
+      },
+      {
+        name: 'whitespace-only previous secret does not satisfy the pair',
+        env: {
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '2',
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: '1',
+          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: '   ',
+        },
+        expectStatus: 1,
+        expectStderrContains:
+          'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is set.',
+      },
+      {
+        name: 'previous secret without previous version is rejected',
+        env: {
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '2',
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: undefined,
+          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: 'guard-scenario-previous-secret',
+        },
+        expectStatus: 1,
+        expectStderrContains:
+          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is set.',
+      },
+      {
+        name: 'non-numeric previous version is rejected',
+        env: {
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '2',
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: 'v1',
+          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: 'guard-scenario-previous-secret',
+        },
+        expectStatus: 1,
+        expectStderrContains:
+          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must be a positive integer when set.',
+      },
+      {
+        name: 'previous version equal to current is rejected',
+        env: {
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '2',
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: '2',
+          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: 'guard-scenario-previous-secret',
+        },
+        expectStatus: 1,
+        expectStderrContains:
+          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must differ from NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION.',
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      const result = runGuardScript(guardScript, scenario.env);
+      expect(result.status, scenario.name).toBe(scenario.expectStatus);
+      if (scenario.expectStderrContains !== undefined) {
+        expect(result.stderr, scenario.name).toContain(scenario.expectStderrContains);
+      }
+      expect(result.stderr, scenario.name).not.toContain('guard-scenario-current-secret');
+      expect(result.stderr, scenario.name).not.toContain('guard-scenario-previous-secret');
+    }
+  });
+
   it('ships a manual production workflow that updates only the broker daily auth cap runtime config', () => {
     const workflow = readFileSync(abuseControlsWorkflow, 'utf8');
 
@@ -632,6 +879,104 @@ describe('broker direct deploy automation', () => {
     expect(workflow).not.toContain('wrangler secret put');
   });
 });
+
+const bashAvailable = (() => {
+  try {
+    return spawnSync('bash', ['--version']).status === 0;
+  } catch {
+    return false;
+  }
+})();
+
+function extractWorkflowRunBlock(workflow: string, stepName: string): string {
+  const stepIndex = workflow.indexOf(`- name: ${stepName}`);
+  expect(stepIndex).toBeGreaterThanOrEqual(0);
+
+  const runMarker = '\n        run: |\n';
+  const runIndex = workflow.indexOf(runMarker, stepIndex);
+  expect(runIndex).toBeGreaterThanOrEqual(0);
+
+  const body: string[] = [];
+  for (const line of workflow.slice(runIndex + runMarker.length).split('\n')) {
+    if (line !== '' && !line.startsWith('          ')) {
+      break;
+    }
+    body.push(line.startsWith('          ') ? line.slice(10) : line);
+  }
+  while (body.length > 0 && body[body.length - 1] === '') {
+    body.pop();
+  }
+  return `${body.join('\n')}\n`;
+}
+function guardScenarioEnv(overrides: Record<string, string | undefined>): Record<string, string> {
+  const env: Record<string, string> = {
+    GITHUB_REF: 'refs/heads/dev',
+    CONFIRM_PRODUCTION_DEPLOY: 'deploy puripuly-heart-broker from dev',
+    BROKER_CANONICAL_WORKERS_DEV_URL: 'https://puripuly-heart-broker.example.workers.dev',
+    BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION: 'guard-scenario-disallowed-model',
+    CLOUDFLARE_API_TOKEN: 'guard-scenario-api-token',
+    CLOUDFLARE_ACCOUNT_ID: 'guard-scenario-account-id',
+    BROKER_D1_DATABASE_ID_PRODUCTION: 'guard-scenario-database-id',
+    OPENROUTER_MANAGED_API_KEY_PRODUCTION: 'guard-scenario-managed-key',
+    OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION: 'guard-scenario-management-key',
+    OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION: 'guard-scenario-guardrail-id',
+    OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION: 'guard-scenario-user-hmac-secret',
+    QQ_AUTH_HMAC_PSK_PRODUCTION: 'guard-scenario-qq-psk',
+    TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION: 'guard-scenario-telemetry-secret',
+    DISCORD_CLIENT_ID_PRODUCTION: 'guard-scenario-discord-client-id',
+    DISCORD_CLIENT_SECRET_PRODUCTION: 'guard-scenario-discord-client-secret',
+    DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION:
+      'http://127.0.0.1:62187/discord/callback, http://127.0.0.1:62188/discord/callback, http://127.0.0.1:62189/discord/callback',
+    DISCORD_USER_REF_SECRET_PRODUCTION: 'guard-scenario-discord-user-ref-secret',
+    NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION: 'guard-scenario-current-secret',
+    NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '1',
+    DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION: 'https://discord.example/webhook',
+  };
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) {
+      delete env[key];
+    } else {
+      env[key] = value;
+    }
+  }
+  return env;
+}
+function runGuardScript(
+  guardScript: string,
+  envOverrides: Record<string, string | undefined>,
+): { status: number; stderr: string } {
+  const tempDir = createRepoTempDir();
+  const scriptPath = join(tempDir, 'guard-scenario.sh');
+  const assignments = Object.entries(guardScenarioEnv(envOverrides)).map(
+    ([key, value]) => `${key}='${value.replace(/'/g, `'"'"'`)}'`,
+  );
+  writeFileSync(scriptPath, `${assignments.join('\n')}\n${guardScript}`, 'utf8');
+  const bashPath = relative(process.cwd(), scriptPath).split(sep).join('/');
+  try {
+    execFileSync('bash', [bashPath], {
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    return { status: 0, stderr: '' };
+  } catch (error) {
+    const execError = error as { status?: number; stderr?: string | Buffer };
+    if (execError.status === undefined) {
+      throw error;
+    }
+    return { status: execError.status, stderr: String(execError.stderr ?? '') };
+  }
+}
+
+function createRepoTempDir(): string {
+  const tempDir = new URL(
+    `./.tmp-deploy-guard-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffffff).toString(36)}/`,
+    import.meta.url,
+  );
+  rmSync(tempDir, { force: true, recursive: true });
+  mkdirSync(fileURLToPath(tempDir), { recursive: true });
+  tempDirs.push(fileURLToPath(tempDir));
+  return fileURLToPath(tempDir);
+}
+
 
 function createTempDir(): string {
   const tempDir = mkdtempSync(join(tmpdir(), 'broker-direct-deploy-'));

@@ -206,7 +206,7 @@ export async function authenticateManagedOperationRequest(
   if (!(await timingSafeEqual(operation.resume_token_hash, candidateHash))) {
     return { ok: false, reason: 'invalid' };
   }
-  if (input.installationId !== null && operation.installation_id !== null && input.installationId !== operation.installation_id) {
+  if (operation.installation_id !== null && input.installationId !== operation.installation_id) {
     return { ok: false, reason: 'invalid' };
   }
   return { ok: true, operation };
@@ -224,11 +224,22 @@ export async function authorizeManagedOperationRequest(
   if (operation.state === 'FAILED') {
     return operation.failure_reason === 'authorization_expired' ? { ok: false, reason: 'expired' } : { ok: false, reason: 'invalid' };
   }
-  if (input.now.toISOString() >= operation.auth_expires_at && operation.state !== 'ACTIVE') {
-    await expireManagedOperation(db, operation, input.now);
+  if (input.now.toISOString() >= operation.auth_expires_at) {
+    if (operation.state !== 'ACTIVE') {
+      await expireManagedOperation(db, operation, input.now);
+    }
     return { ok: false, reason: 'expired' };
   }
   return { ok: true, operation: (await getManagedOperation(db, input.operationId)) ?? operation };
+}
+
+async function hasAcknowledgedOperationDelivery(db: D1Database, operationId: string): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT 1 AS found FROM managed_key_deliveries WHERE operation_id = ? AND status = 'acknowledged' LIMIT 1`)
+    .bind(operationId)
+    .first<{ found: number }>()
+    .catch(() => null);
+  return Number(row?.found ?? 0) === 1;
 }
 
 export async function failManagedOperationTerminal(
@@ -240,7 +251,8 @@ export async function failManagedOperationTerminal(
   const nowIso = now.toISOString();
   await transitionManagedOperation(db, operation.operation_id, 'FAILED', now, { failureReason: reason });
   const current = await getManagedOperation(db, operation.operation_id);
-  if (current && current.referral_status === 'reserved') {
+  const onboardingComplete = await hasAcknowledgedOperationDelivery(db, operation.operation_id);
+  if (current && current.referral_status === 'reserved' && !onboardingComplete) {
     await db
       .prepare(
         `UPDATE referral_rewards
@@ -278,7 +290,8 @@ export async function expireManagedOperation(db: D1Database, operation: ManagedO
     .bind(nowIso, operation.operation_id)
     .run();
   const current = await getManagedOperation(db, operation.operation_id);
-  if (current && current.referral_status === 'reserved') {
+  const acknowledged = await hasAcknowledgedOperationDelivery(db, operation.operation_id);
+  if (current && current.referral_status === 'reserved' && !acknowledged) {
     await db
       .prepare(
         `UPDATE referral_rewards
@@ -319,7 +332,80 @@ export async function transitionManagedOperation(
   await db.prepare(sql).bind(...(binds as string[])).run();
   return getManagedOperation(db, operationId);
 }
+export async function transitionOperationToPostCreateState(
+  db: D1Database,
+  managementApiKey: string,
+  operationId: string,
+  to: 'DELIVERY_PENDING' | 'ACTIVE',
+  now: Date,
+  fetchImpl?: typeof fetch,
+): Promise<ManagedOperationRecord | null> {
+  await transitionManagedOperation(db, operationId, to, now, { from: ['CREATING'] });
+  const settled = await getManagedOperation(db, operationId);
+  if (settled && settled.state === to) {
+    return settled;
+  }
+  const anchor = (await getManagedOperation(db, operationId)) ?? settled;
+  if (anchor) {
+    await reconcileUnknownAttempt(db, managementApiKey, anchor, now, fetchImpl);
+  }
+  return getManagedOperation(db, operationId);
+}
+export interface ConflictingOperationDelivery {
+  operationId: string;
+  deliveryId: string;
+  deliveryStatus: string;
+  operationState: ManagedOperationState;
+}
 
+export async function findConflictingOperationDelivery(
+  db: D1Database,
+  input: {
+    issueSource: 'discord' | 'qq';
+    subjectRef: string;
+    installationId: string | null;
+    excludeOperationId: string | null;
+  },
+): Promise<ConflictingOperationDelivery | null> {
+  const row = await db
+    .prepare(
+      `SELECT delivery.operation_id AS operationId, delivery.delivery_id AS deliveryId,
+              delivery.status AS deliveryStatus, operation.state AS operationState
+         FROM managed_key_deliveries AS delivery
+         JOIN managed_operations AS operation ON operation.operation_id = delivery.operation_id
+        WHERE operation.issue_source = ?
+          AND operation.subject_ref = ?
+          AND (? IS NULL OR operation.installation_id IS NULL OR operation.installation_id = ?)
+          AND delivery.status IN ('pending', 'acknowledged')
+          AND operation.state <> 'FAILED'
+          AND (? IS NULL OR delivery.operation_id <> ?)
+        ORDER BY delivery.created_at DESC, delivery.delivery_id DESC
+        LIMIT 1`,
+    )
+    .bind(
+      input.issueSource,
+      input.subjectRef,
+      input.installationId,
+      input.installationId,
+      input.excludeOperationId,
+      input.excludeOperationId,
+    )
+    .first<ConflictingOperationDelivery>()
+    .catch(() => null);
+  return row;
+}
+
+export async function hasOtherLiveOperation(
+  db: D1Database,
+  input: {
+    issueSource: 'discord' | 'qq';
+    subjectRef: string;
+    installationId: string | null;
+    excludeOperationId: string | null;
+  },
+): Promise<boolean> {
+  return (await findConflictingOperationDelivery(db, input)) !== null;
+}
 export async function startManagedOperationAttempt(
   db: D1Database,
   operation: ManagedOperationRecord,
@@ -338,25 +424,37 @@ export async function startManagedOperationAttempt(
   const nextState: ManagedOperationState = 'CREATING';
   let claimed = false;
   try {
-    const claimedResult = await db
-      .prepare(`UPDATE managed_operations SET state = ?, client_action = ?, attempt_count = ?, current_attempt_index = ?, updated_at = ? WHERE operation_id = ? AND state IN ('AUTHENTICATED', 'ISSUE_READY', 'RETRY_READY') AND attempt_count = ?`)
-      .bind(nextState, clientActionForState(nextState), nextIndex, nextIndex, nowIso, operation.operation_id, operation.attempt_count)
-      .run();
-    claimed = Number(claimedResult.meta?.changes ?? 0) === 1;
+    const batchResult = await db.batch([
+      db
+        .prepare(`UPDATE managed_operations SET state = ?, client_action = ?, attempt_count = ?, current_attempt_index = ?, updated_at = ? WHERE operation_id = ? AND state IN ('AUTHENTICATED', 'ISSUE_READY', 'RETRY_READY') AND attempt_count = ?`)
+        .bind(nextState, clientActionForState(nextState), nextIndex, nextIndex, nowIso, operation.operation_id, operation.attempt_count),
+      db
+        .prepare(
+          `INSERT INTO managed_operation_attempts (operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at)
+           SELECT ?, ?, ?, NULL, 'unknown', ?, ?
+            WHERE EXISTS (
+              SELECT 1 FROM managed_operations
+               WHERE operation_id = ?
+                 AND state = 'CREATING'
+                 AND attempt_count = ?
+                 AND current_attempt_index = ?
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM managed_operation_attempts WHERE operation_id = ? AND attempt_index = ?
+            )`,
+        )
+        .bind(
+          operation.operation_id, nextIndex, providerKeyName, nowIso, nowIso,
+          operation.operation_id, nextIndex, nextIndex,
+          operation.operation_id, nextIndex,
+        ),
+    ]);
+    const claimedChanges = Number(batchResult[0]?.meta?.changes ?? 0);
+    claimed = claimedChanges === 1;
   } catch {
     claimed = false;
   }
   if (!claimed) {
-    return { ok: false, reason: 'not_retry_ready' };
-  }
-  try {
-    await db
-      .prepare(
-        `INSERT INTO managed_operation_attempts (operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at) VALUES (?, ?, ?, NULL, 'unknown', ?, ?)`,
-      )
-      .bind(operation.operation_id, nextIndex, providerKeyName, nowIso, nowIso)
-      .run();
-  } catch {
     return { ok: false, reason: 'not_retry_ready' };
   }
   const attempt = await db
@@ -433,7 +531,7 @@ export async function reconcileUnknownAttempt(
   if (!storedTarget && attempts.length === 0 && current.current_attempt_index === 0) {
     return getManagedOperation(db, operation.operation_id);
   }
-  const target = storedTarget ?? {
+  let target = storedTarget ?? {
     attempt_index: current.current_attempt_index,
     provider_key_name: providerKeyNameForOperationAttempt(
       operation.operation_id,
@@ -442,6 +540,25 @@ export async function reconcileUnknownAttempt(
     ),
     managed_credential_ref: null as string | null,
   };
+  if (!storedTarget) {
+    const repaired = await db
+      .prepare(
+        `INSERT OR IGNORE INTO managed_operation_attempts (operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at) VALUES (?, ?, ?, NULL, 'unknown', ?, ?)`,
+      )
+      .bind(operation.operation_id, target.attempt_index, target.provider_key_name, now.toISOString(), now.toISOString())
+      .run()
+      .catch(() => null);
+    if (repaired && Number(repaired.meta?.changes ?? 0) === 1) {
+      const reread = await db
+        .prepare(`SELECT * FROM managed_operation_attempts WHERE operation_id = ? AND attempt_index = ?`)
+        .bind(operation.operation_id, target.attempt_index)
+        .first<ManagedOperationAttemptRecord>()
+        .catch(() => null);
+      if (reread) {
+        target = reread;
+      }
+    }
+  }
   return reconcileAttemptTarget(db, managementApiKey, current, target, now, fetchImpl);
 }
 
@@ -779,8 +896,8 @@ export async function bindOperationForIssue(
   if (
     existing.issue_source !== input.issueSource ||
     existing.subject_ref !== input.subjectRef ||
-    (existing.installation_id !== null && input.installationId !== null && existing.installation_id !== input.installationId) ||
-    (existing.device_public_key !== null && input.devicePublicKey !== null && existing.device_public_key !== input.devicePublicKey)
+    (existing.installation_id !== null && input.installationId !== existing.installation_id) ||
+    (existing.device_public_key !== null && input.devicePublicKey !== existing.device_public_key)
   ) {
     return { status: 'invalid', reason: 'binding_mismatch' };
   }
@@ -841,10 +958,10 @@ export async function markOperationActiveOnAck(
   await db
     .prepare(
       `UPDATE managed_operations
-          SET state = 'ACTIVE', client_action = 'wait', updated_at = ?
+          SET state = 'ACTIVE', client_action = 'wait', failure_reason = NULL, updated_at = ?
         WHERE operation_id = (SELECT operation_id FROM managed_key_deliveries WHERE delivery_id = ? AND status = 'acknowledged')
           AND operation_id IS NOT NULL
-          AND state = 'DELIVERY_PENDING'`,
+          AND state IN ('DELIVERY_PENDING', 'FAILED')`,
     )
     .bind(nowIso, deliveryId)
     .run();

@@ -2203,7 +2203,12 @@ async function countQqRequestEvents(env: TestBrokerEnv, ip: string, nowIso = '20
   const { resolveRequestNetworkIdentity } = await import('../src/network-identity');
   const identity = await resolveRequestNetworkIdentity(
     ip,
-    { current: env.NETWORK_IDENTITY_HMAC_SECRET, previous: null, currentVersion: 1 },
+    {
+      current: env.NETWORK_IDENTITY_HMAC_SECRET,
+      previous: null,
+      previousVersion: null,
+      currentVersion: 1,
+    },
     new Date(nowIso),
   );
   const row = env.__db

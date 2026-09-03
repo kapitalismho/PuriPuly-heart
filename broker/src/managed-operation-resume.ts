@@ -9,6 +9,8 @@ import {
   getManagedOperation,
   isManagedOperationId,
   listManagedOperationAttempts,
+  markOperationActiveOnAck,
+  findConflictingOperationDelivery,
   reconcileUnknownAttempt,
   startManagedOperationAttempt,
   transitionManagedOperation,
@@ -107,7 +109,13 @@ export async function handleManagedOperationResume(c: Context<BrokerEnv>): Promi
     return c.json({ ok: false, code: 'invalid_request', message: 'unknown operation' }, 404);
   }
   let operation = auth.operation;
-  if (operation.state === 'ACTIVE') {
+  const deliveryConflict = await findConflictingOperationDelivery(db, {
+    issueSource: operation.issue_source,
+    subjectRef: operation.subject_ref,
+    installationId: operation.installation_id,
+    excludeOperationId: operation.operation_id,
+  });
+  if (deliveryConflict) {
     return c.json(await resumeStateBody(db, operation));
   }
   if (
@@ -127,6 +135,11 @@ export async function handleManagedOperationResume(c: Context<BrokerEnv>): Promi
   let hasLiveDelivery = false;
   if (operation.state === 'DELIVERY_PENDING') {
     const delivery = await getLatestOperationDelivery(db, operation.operation_id);
+    if (delivery && delivery.status === 'acknowledged') {
+      await markOperationActiveOnAck(db, delivery.delivery_id, now);
+      const live = (await getManagedOperation(db, operation.operation_id)) ?? operation;
+      return c.json(await resumeStateBody(db, live));
+    }
     if (delivery && delivery.status === 'pending' && delivery.expires_at > now.toISOString()) {
       hasLiveDelivery = true;
       const live = (await getManagedOperation(db, operation.operation_id)) ?? operation;

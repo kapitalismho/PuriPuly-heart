@@ -1472,6 +1472,63 @@ describe('Discord issue gate', () => {
     expect(retryResponse.status).toBe(200);
   });
 
+  it('returns the live delivery owner instead of issuing while another operation owns it', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW_ISO));
+
+    const env = createTestBrokerEnv();
+    const rawDiscordUserId = discordSnowflakeForAgeDays(31);
+    const first = await startDiscordSession('install-discord-delivery-owner', env);
+    mockDiscordApi({
+      user: {
+        id: rawDiscordUserId,
+        verified: true,
+      },
+    });
+
+    const operationId = buildManagedOperationId();
+    const resumeToken = buildManagedOperationResumeToken();
+    const firstResponse = await postDiscordIssue(env, {
+      ...(await signedIssueRequest(first, {
+        code: 'discord-oauth-code-delivery-owner',
+        hardware_hash: 'hardware-hash-delivery-owner',
+      })),
+      delivery_ack_supported: true,
+      operation_id: operationId,
+      resume_token: resumeToken,
+    });
+    expect(firstResponse.status).toBe(200);
+    const firstPayload = (await firstResponse.json()) as Record<string, unknown>;
+    expect(firstPayload).toMatchObject({ delivery_ack_required: true });
+
+    const second = await startDiscordSession('install-discord-delivery-owner', env, first.keyPair);
+    mockDiscordApi({
+      user: {
+        id: rawDiscordUserId,
+        verified: true,
+      },
+    });
+    const blockingOperationId = buildManagedOperationId();
+    const blockingResumeToken = buildManagedOperationResumeToken();
+    const secondResponse = await postDiscordIssue(env, {
+      ...(await signedIssueRequest(second, {
+        code: 'discord-oauth-code-delivery-blocked',
+        hardware_hash: 'hardware-hash-delivery-blocked',
+      })),
+      delivery_ack_supported: true,
+      operation_id: blockingOperationId,
+      resume_token: blockingResumeToken,
+    });
+    expect(secondResponse.status).toBe(200);
+    const secondPayload = (await secondResponse.json()) as Record<string, unknown>;
+    expect(secondPayload).toMatchObject({
+      operation_id: operationId,
+      state: 'DELIVERY_PENDING',
+      client_action: 'acknowledge_delivery',
+    });
+    expect(secondPayload).not.toMatchObject({ openrouter_api_key: expect.anything() });
+  });
+
   it('reconciles a bound operation to retry-ready when guardrail assignment fails after child-key creation', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW_ISO));

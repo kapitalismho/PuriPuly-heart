@@ -7,6 +7,7 @@ import {
   resolveRequestNetworkIdentitySecrets,
   type AbuseDecision,
 } from './abuse-controls';
+import { ensureReferralSettlementJobsForDelivery, hasUnsettledReservedRewardWithoutJob } from './managed-referral-settlement';
 import {
   attachReferralToOperation,
   bindOperationForIssue,
@@ -23,6 +24,9 @@ import {
   recordAttemptCredential,
   startManagedOperationAttempt,
   transitionManagedOperation,
+  transitionOperationToPostCreateState,
+  hasOtherLiveOperation,
+  findConflictingOperationDelivery,
 } from './managed-operation';
 import {
   deliverManagedCleanupIncident,
@@ -164,6 +168,19 @@ export async function issueQqManagedEntitlement(
     }
     boundOperation = operationBinding && operationBinding.status === 'proceed' ? operationBinding.operation : null;
     if (boundOperation) {
+      const deliveryConflict = await findConflictingOperationDelivery(c.env.BROKER_DB, {
+        issueSource: 'qq',
+        subjectRef: input.qqSubjectRef,
+        installationId: input.referredInstallationId,
+        excludeOperationId: boundOperation.operation_id,
+      });
+      if (deliveryConflict) {
+        const blocking = await getManagedOperationStatusSnapshot(c.env.BROKER_DB, deliveryConflict.operationId);
+        if (blocking) {
+          const blockingAttempts = await listManagedOperationAttempts(c.env.BROKER_DB, deliveryConflict.operationId);
+          return c.json(operationBindingResponseBody(blocking, blockingAttempts));
+        }
+      }
       const started = await startManagedOperationAttempt(c.env.BROKER_DB, boundOperation, input.now);
       if (!started.ok) {
         const attempts = await listManagedOperationAttempts(c.env.BROKER_DB, boundOperation.operation_id);
@@ -211,6 +228,7 @@ export async function issueQqManagedEntitlement(
           qqSubjectRef: input.qqSubjectRef,
           referredInstallationId: input.referredInstallationId,
           attemptIpDigest: input.attemptIpDigest ?? null,
+          operationId: boundOperation?.operation_id ?? null,
           passConfig: input.passConfig,
           now: input.now,
           nowIso,
@@ -320,7 +338,10 @@ export async function issueQqManagedEntitlement(
         attemptIndex: boundAttemptIndex,
       });
       if (boundOperation) {
-        await transitionManagedOperation(c.env.BROKER_DB, boundOperation.operation_id, 'DELIVERY_PENDING', input.now);
+        const settled = await transitionOperationToPostCreateState(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, boundOperation.operation_id, 'DELIVERY_PENDING', input.now);
+        if (!settled || settled.state !== 'DELIVERY_PENDING') {
+          throw new Error('QQ managed operation delivery-pending transition failed');
+        }
       }
       const openRouterUserId = await deriveOptionalOpenRouterUserId({
         subjectRef: input.qqSubjectRef,
@@ -354,7 +375,10 @@ export async function issueQqManagedEntitlement(
       throw new Error('QQ managed entitlement activation failed');
     }
     if (boundOperation) {
-      await transitionManagedOperation(c.env.BROKER_DB, boundOperation.operation_id, 'ACTIVE', input.now);
+      const settled = await transitionOperationToPostCreateState(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, boundOperation.operation_id, 'ACTIVE', input.now);
+      if (!settled || settled.state !== 'ACTIVE') {
+        throw new Error('QQ managed operation activation transition failed');
+      }
     }
 
     await runQqIssueSuccessMonitoring(c, {
@@ -494,6 +518,22 @@ export async function executeQqResumeIssuance(
     staleEntitlement.managed_credential_ref &&
     !input.hasLiveDelivery
   ) {
+    const issuedAttempts = await listManagedOperationAttempts(db, operation.operation_id);
+    const ownsStaleCredential = issuedAttempts.some((attempt) => attempt.managed_credential_ref === staleEntitlement?.managed_credential_ref);
+    if (!ownsStaleCredential) {
+      const blocked = await hasOtherLiveOperation(db, {
+        issueSource: 'qq',
+        subjectRef: qqSubjectRef,
+        installationId: referredInstallationId,
+        excludeOperationId: operation.operation_id,
+      });
+      if (blocked) {
+        await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
+        const attempts = await listManagedOperationAttempts(db, operation.operation_id);
+        const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
+        return c.json(await buildManagedOperationStatusBodyWithDelivery(db, current ?? operation, attempts));
+      }
+    }
     await recordAttemptCredential(
       db,
       operation.operation_id,
@@ -642,15 +682,8 @@ export async function executeQqResumeIssuance(
       operationId: operation.operation_id,
       attemptIndex: input.attemptIndex,
     });
-    await transitionManagedOperation(db, operation.operation_id, 'DELIVERY_PENDING', input.now, {
-      from: ['CREATING'],
-    });
-    const settled = await getManagedOperationStatusSnapshot(db, operation.operation_id);
+    const settled = await transitionOperationToPostCreateState(db, c.env.OPENROUTER_MANAGEMENT_API_KEY, operation.operation_id, 'DELIVERY_PENDING', input.now);
     if (!settled || settled.state !== 'DELIVERY_PENDING') {
-      await cleanupManagedChildKey({
-        managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
-        keyHash: childKey.hash,
-      }).catch(() => null);
       const attempts = await listManagedOperationAttempts(db, operation.operation_id);
       const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
       return c.json(await buildManagedOperationStatusBodyWithDelivery(db, current ?? operation, attempts));
@@ -782,6 +815,7 @@ async function bestEffortReserveQqIssueReferralReward(
         skipReason: 'invalid_installation',
         attemptIpDigest: input.attemptIpDigest ?? null,
         attemptIpLegacyHash: input.attemptIpLegacyHash ?? null,
+        operationId: input.operationId ?? null,
         nowIso: input.nowIso,
       });
     }
@@ -1413,7 +1447,56 @@ export async function finalizeQqManagedKeyDeliveryAck(
   )
     .bind(input.deliveryId)
     .first<{ finalized: number }>();
-  if (Number(finalized?.finalized ?? 0) !== 1) {
+  let finalizedAck = Number(finalized?.finalized ?? 0) === 1;
+  if (!finalizedAck) {
+    await ensureReferralSettlementJobsForDelivery(c.env.BROKER_DB, {
+      source: 'qq',
+      deliveryId: input.deliveryId,
+      now: input.acknowledgedAt,
+    });
+    const rechecked = await c.env.BROKER_DB.prepare(
+      `SELECT 1 AS finalized
+         FROM managed_key_deliveries AS delivery
+         JOIN qq_managed_entitlements AS entitlement
+           ON entitlement.managed_credential_ref = delivery.managed_credential_ref
+        WHERE delivery.delivery_id = ?
+          AND delivery.status = 'acknowledged'
+          AND entitlement.status = 'active'
+          AND entitlement.delivered_at IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM broker_issue_success_events
+             WHERE issue_source = 'qq'
+               AND managed_credential_ref = delivery.managed_credential_ref
+          )
+          AND NOT EXISTS (
+            SELECT 1
+              FROM referral_rewards reward
+             WHERE reward.referred_source = 'qq'
+               AND reward.referred_subject_ref = entitlement.qq_subject_ref
+               AND reward.referred_installation_id IS delivery.installation_id
+               AND reward.referred_bonus_status = 'reserved'
+               AND NOT EXISTS (
+                 SELECT 1
+                   FROM managed_referral_settlement_jobs job
+                  WHERE job.referral_reward_id = reward.id
+                    AND job.delivery_id = delivery.delivery_id
+               )
+          )`,
+    )
+      .bind(input.deliveryId)
+      .first<{ finalized: number }>()
+      .catch(() => null);
+    finalizedAck = Number(rechecked?.finalized ?? 0) === 1;
+  }
+  if (
+    !finalizedAck &&
+    (await hasUnsettledReservedRewardWithoutJob(c.env.BROKER_DB, {
+      source: 'qq',
+      subjectRef: entitlement.qq_subject_ref,
+      installationId: delivery.installation_id,
+      deliveryId: input.deliveryId,
+    }))
+  ) {
     throw new Error('QQ delivery ACK finalization failed');
   }
   const operationActivated = await markOperationActiveOnAck(c.env.BROKER_DB, input.deliveryId, input.acknowledgedAt);

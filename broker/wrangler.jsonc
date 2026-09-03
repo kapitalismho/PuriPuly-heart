@@ -12,5 +12,8 @@
   ],
   "triggers": {
     "crons": ["* * * * *"]
+  },
+  "vars": {
+    "NETWORK_IDENTITY_HMAC_KEY_VERSION": "1"
   }
 }

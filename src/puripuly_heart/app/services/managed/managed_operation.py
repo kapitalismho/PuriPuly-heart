@@ -122,6 +122,54 @@ def read_pending_operation(
     )
 
 
+def read_any_pending_operation(
+    managed_state: ManagedIdentityStatePort,
+) -> ManagedOperationIdentity | None:
+    operation_id = getattr(managed_state, "pending_managed_operation_id", None)
+    pending_source = getattr(managed_state, "pending_managed_operation_source", None)
+    installation_id = getattr(managed_state, "pending_managed_operation_installation_id", None)
+    if (
+        not is_valid_operation_id(operation_id)
+        or pending_source not in (MANAGED_OPERATION_SOURCE_DISCORD, MANAGED_OPERATION_SOURCE_QQ)
+        or not isinstance(installation_id, str)
+        or not installation_id.strip()
+    ):
+        return None
+    last_known_state = getattr(managed_state, "pending_managed_operation_state", None)
+    if last_known_state not in MANAGED_OPERATION_STATUSES and (
+        last_known_state != MANAGED_OPERATION_UNKNOWN_OPERATION_STATUS
+    ):
+        last_known_state = None
+    return ManagedOperationIdentity(
+        operation_id=operation_id,
+        source=pending_source,
+        installation_id=installation_id,
+        last_known_state=last_known_state,
+    )
+
+
+def other_source_pending_operation(
+    managed_state: ManagedIdentityStatePort,
+    *,
+    source: str,
+) -> ManagedOperationIdentity | None:
+    pending = read_any_pending_operation(managed_state)
+    if pending is None or pending.source == source:
+        return None
+    return pending
+
+
+def clear_pending_operation_if_source(
+    managed_state: ManagedIdentityStatePort,
+    source: str,
+) -> bool:
+    pending_source = getattr(managed_state, "pending_managed_operation_source", None)
+    if pending_source is not None and pending_source != source:
+        return False
+    clear_pending_operation(managed_state)
+    return True
+
+
 def write_pending_operation(
     managed_state: ManagedIdentityStatePort,
     identity: ManagedOperationIdentity,
@@ -235,6 +283,7 @@ __all__ = [
     "ManagedOperationTokenStoreError",
     "ProgressSink",
     "clear_pending_operation",
+    "clear_pending_operation_if_source",
     "clear_resume_token",
     "emit_progress",
     "is_valid_operation_id",
@@ -242,6 +291,8 @@ __all__ = [
     "managed_operation_ui_phase",
     "new_managed_operation_id",
     "new_managed_operation_resume_token",
+    "other_source_pending_operation",
+    "read_any_pending_operation",
     "read_pending_operation",
     "read_resume_token",
     "status_poll_delay_ms",

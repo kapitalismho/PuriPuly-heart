@@ -61,6 +61,8 @@ from .managed_key_delivery_ack import (
     ManagedKeyDeliveryAckTokenStoreError,
     apply_ack_referral_to_managed_state,
     clear_pending_ack_in_settings_values,
+    other_source_pending_delivery_ack,
+    read_any_pending_delivery_ack,
     secret_key_for_ack_source,
     store_pending_ack_in_settings_values,
 )
@@ -74,11 +76,12 @@ from .managed_operation import (
     ManagedOperationIdentity,
     ManagedOperationTokenStoreError,
     ProgressSink,
-    clear_pending_operation,
+    clear_pending_operation_if_source,
     clear_resume_token,
     emit_progress,
     new_managed_operation_id,
     new_managed_operation_resume_token,
+    other_source_pending_operation,
     read_pending_operation,
     read_resume_token,
     status_poll_delay_ms,
@@ -143,6 +146,11 @@ class ManagedConnectionAuthService:
     async def authorize(self, request: ManagedConnectionAuthRequest) -> TransactionResult:
         if _caller_settings_values_are_unsafe(request.settings_values):
             return _unsafe_settings_values_result(request)
+        other_source_refusal = _refuse_other_source_pending(
+            request, self._managed_state()
+        )
+        if other_source_refusal is not None:
+            return other_source_refusal
 
         recovery_result = await self._recover_pending_delivery_ack(request)
         if recovery_result is not None:
@@ -427,11 +435,17 @@ class ManagedConnectionAuthService:
         return stored is not None and bool(stored.value)
 
     async def _clear_terminal_operation(self, state: ManagedIdentityStatePort) -> None:
+        cleared = False
         try:
-            clear_pending_operation(state)
-            state.persist()
+            cleared = clear_pending_operation_if_source(
+                state, MANAGED_OPERATION_SOURCE_DISCORD
+            )
+            if cleared:
+                state.persist()
         except Exception:
             pass
+        if not cleared:
+            return
         try:
             await clear_resume_token(self.secret_store)
         except Exception:
@@ -615,6 +629,7 @@ class ManagedConnectionAuthService:
                     operation_id=operation_id,
                     installation_id=installation_id,
                     resume_token=resume_token,
+                    source=MANAGED_OPERATION_SOURCE_DISCORD,
                 )
             )
         except Exception:
@@ -631,6 +646,7 @@ class ManagedConnectionAuthService:
                     operation_id=operation.operation_id,
                     installation_id=operation.installation_id,
                     resume_token=resume_token,
+                    source=MANAGED_OPERATION_SOURCE_DISCORD,
                 )
             )
         except Exception:
@@ -1388,6 +1404,53 @@ def _pre_issue_failed_result(
             },
         ),
     )
+
+
+def _other_source_refusal_result(
+    request: ManagedConnectionAuthRequest,
+    *,
+    other_source: str,
+    pending_kind: str,
+) -> TransactionResult:
+    return TransactionResult(
+        status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
+        message=_operation_message("discord_auth.error.other_source_pending"),
+        diagnostics=_metadata_diagnostics(
+            operation="authorize_managed_connection",
+            code=f"managed_operation_other_source_pending_{pending_kind}",
+            fields={
+                "phase": "other_source_pending",
+                "local_secret_key": request.local_secret_key,
+                "other_source": other_source,
+                "pending_kind": pending_kind,
+                "remote_active": False,
+            },
+        ),
+    )
+
+
+def _refuse_other_source_pending(
+    request: ManagedConnectionAuthRequest,
+    state: ManagedIdentityStatePort | None,
+) -> TransactionResult | None:
+    if state is None:
+        return None
+    other_ack = other_source_pending_delivery_ack(state, source=ACK_SOURCE_DISCORD)
+    if other_ack is not None:
+        return _other_source_refusal_result(
+            request, other_source=other_ack.source, pending_kind="delivery_ack"
+        )
+    other_operation = other_source_pending_operation(
+        state, source=MANAGED_OPERATION_SOURCE_DISCORD
+    )
+    if other_operation is not None:
+        own_ack = read_any_pending_delivery_ack(state)
+        if own_ack is not None and own_ack.source == ACK_SOURCE_DISCORD:
+            return None
+        return _other_source_refusal_result(
+            request, other_source=other_operation.source, pending_kind="operation"
+        )
+    return None
 
 
 def _unsafe_settings_values_result(

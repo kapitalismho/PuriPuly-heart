@@ -171,6 +171,7 @@ class ManagedOperationStatusRequest:
     operation_id: str
     installation_id: str | None = None
     resume_token: str | None = field(default=None, repr=False)
+    source: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,6 +179,7 @@ class ManagedOperationResumeRequest:
     operation_id: str
     installation_id: str | None = None
     resume_token: str | None = field(default=None, repr=False)
+    source: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

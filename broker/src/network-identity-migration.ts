@@ -8,25 +8,40 @@ import {
   type NetworkIdentityWriteMode,
 } from './network-identity';
 
+export const NETWORK_IDENTITY_WINDOW_CONFIG_PATHS = [
+  'trialChallenge',
+  'trialChallengeVerify',
+  'openrouterIssue',
+  'trialStatus',
+  'qqAuthAssertIp',
+  'qqAuthStatusIp',
+  'pendingDiscordOAuthSessions',
+  'referralAttempts.validShaped',
+  'referralAttempts.unknown',
+  'referralAttempts.perReferralIdVelocity',
+  'referralAttempts.perReferrerRewardVelocity',
+] as const;
+
+function readWindowMinutesAtPath(controls: unknown, path: string): number | null {
+  let current: unknown = controls;
+  for (const segment of path.split('.')) {
+    if (typeof current !== 'object' || current === null || !(segment in current)) {
+      return null;
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+  const windowMinutes = (current as { windowMinutes?: unknown } | null)?.windowMinutes;
+  return typeof windowMinutes === 'number' ? windowMinutes : null;
+}
+
 export async function resolveNetworkIdentityMaxWindowMinutes(
   db: D1Database,
 ): Promise<number> {
   const controls = await getBrokerAbuseControlsConfig(db);
   let maxMinutes = 1440;
-  const endpointWindows = [
-    controls.trialChallenge.windowMinutes,
-    controls.trialChallengeVerify.windowMinutes,
-    controls.openrouterIssue.windowMinutes,
-    controls.trialStatus.windowMinutes,
-    controls.qqAuthStatusIp.windowMinutes,
-    controls.pendingDiscordOAuthSessions.windowMinutes,
-    controls.referralAttempts.validShaped.windowMinutes,
-    controls.referralAttempts.unknown.windowMinutes,
-    controls.referralAttempts.perReferralIdVelocity.windowMinutes,
-    controls.referralAttempts.perReferrerRewardVelocity.windowMinutes,
-  ];
+  const endpointWindows = NETWORK_IDENTITY_WINDOW_CONFIG_PATHS.map((path) => readWindowMinutesAtPath(controls, path));
   for (const windowMinutes of endpointWindows) {
-    if (Number.isFinite(windowMinutes) && windowMinutes > maxMinutes) {
+    if (typeof windowMinutes === 'number' && Number.isFinite(windowMinutes) && windowMinutes > maxMinutes) {
       maxMinutes = windowMinutes;
     }
   }
@@ -57,7 +72,46 @@ export interface NetworkIdentityBackfillResult {
   pendingReferralEvents: number;
   hooksConverted: number;
   pendingHooks: number;
+  unparseableHooks: number;
+  rawHooks: number;
+  rawHookSampleIds: Array<{ table: string; id: number }>;
   finalized: boolean;
+}
+
+const RAW_HOOK_SAMPLE_LIMIT = 25;
+
+async function countActiveRawHooks(
+  db: D1Database,
+): Promise<{ count: number; sampleIds: Array<{ table: string; id: number }> }> {
+  let count = 0;
+  const sampleIds: Array<{ table: string; id: number }> = [];
+  for (const table of ['broker_velocity_cap_hooks', 'broker_abuse_subject_hooks'] as const) {
+    const total = await db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM ${table}
+          WHERE subject_type = 'ip' AND active = 1
+          AND (length(subject_value) != 64 OR subject_value GLOB '*[^0-9a-f]*')`,
+      )
+      .first<{ count: number }>()
+      .catch(() => ({ count: 0 }));
+    count += Number(total?.count ?? 0);
+    if (sampleIds.length < RAW_HOOK_SAMPLE_LIMIT) {
+      const sample = await db
+        .prepare(
+          `SELECT id FROM ${table}
+            WHERE subject_type = 'ip' AND active = 1
+            AND (length(subject_value) != 64 OR subject_value GLOB '*[^0-9a-f]*')
+            ORDER BY id ASC LIMIT ?`,
+        )
+        .bind(RAW_HOOK_SAMPLE_LIMIT - sampleIds.length)
+        .all<{ id: number }>()
+        .catch(() => ({ results: [] as Array<{ id: number }> }));
+      for (const row of sample.results ?? []) {
+        sampleIds.push({ table, id: row.id });
+      }
+    }
+  }
+  return { count, sampleIds };
 }
 
 export async function runNetworkIdentityBackfill(
@@ -67,10 +121,11 @@ export async function runNetworkIdentityBackfill(
 ): Promise<NetworkIdentityBackfillResult> {
   const hooks = secrets
     ? await runNetworkIdentityHookBackfill(db, secrets)
-    : { converted: 0, pending: 0, unparseable: 0 };
+    : { converted: 0, pending: 0, unparseable: 0, rawHooks: 0, rawHookSampleIds: [] as Array<{ table: string; id: number }> };
+  const rawHooks = await countActiveRawHooks(db);
   const mode = await resolveNetworkIdentityWriteMode(db);
   if (mode !== 'dual' || !secrets) {
-    return { mode, requestEventsBackfilled: 0, pendingRequestEvents: 0, pendingReferralEvents: 0, hooksConverted: hooks.converted, pendingHooks: hooks.pending, finalized: mode === 'keyed' };
+    return { mode, requestEventsBackfilled: 0, pendingRequestEvents: 0, pendingReferralEvents: 0, hooksConverted: hooks.converted, pendingHooks: hooks.pending, unparseableHooks: hooks.unparseable, rawHooks: rawHooks.count, rawHookSampleIds: rawHooks.sampleIds, finalized: mode === 'keyed' && rawHooks.count === 0 };
   }
   const maxWindowMinutes = await resolveNetworkIdentityMaxWindowMinutes(db);
   const windowStartIso = new Date(now.getTime() - maxWindowMinutes * 60_000).toISOString();
@@ -112,10 +167,10 @@ export async function runNetworkIdentityBackfill(
   const pendingRequestEvents = await countPendingLegacyRequestEvents(db, windowStartIso);
   const pendingReferralEvents = await countPendingLegacyReferralEvents(db, windowStartIso);
   let finalized = false;
-  if (pendingRequestEvents === 0 && pendingReferralEvents === 0 && hooks.pending === 0) {
+  if (pendingRequestEvents === 0 && pendingReferralEvents === 0 && hooks.pending === 0 && rawHooks.count === 0) {
     finalized = await finalizeNetworkIdentityMigration(db, now);
   }
-  return { mode, requestEventsBackfilled: backfilled, pendingRequestEvents, pendingReferralEvents, hooksConverted: hooks.converted, pendingHooks: hooks.pending, finalized };
+  return { mode, requestEventsBackfilled: backfilled, pendingRequestEvents, pendingReferralEvents, hooksConverted: hooks.converted, pendingHooks: hooks.pending, unparseableHooks: hooks.unparseable, rawHooks: rawHooks.count, rawHookSampleIds: rawHooks.sampleIds, finalized };
 }
 
 export async function runNetworkIdentityHookBackfill(
@@ -204,35 +259,59 @@ async function countPendingLegacyReferralEvents(db: D1Database, windowStartIso: 
     .catch(() => ({ count: 0 }));
   return Number(row?.count ?? 0);
 }
-async function finalizeNetworkIdentityMigration(db: D1Database, now: Date): Promise<boolean> {
+async function countForbiddenLegacyValues(db: D1Database): Promise<number> {
+  const queries = [
+    `SELECT COUNT(*) AS count FROM broker_request_events WHERE ip IS NOT NULL`,
+    `SELECT COUNT(*) AS count FROM broker_request_events WHERE ip_digest IS NULL AND ip_epoch = '${UNPARSEABLE_IP_EPOCH_SENTINEL}'`,
+    `SELECT COUNT(*) AS count FROM broker_issue_success_events WHERE ip_hash IS NOT NULL OR ip_prefix_hash IS NOT NULL`,
+    `SELECT COUNT(*) AS count FROM referral_rewards WHERE attempt_ip_hash IS NOT NULL`,
+  ];
+  let total = 0;
+  for (const sql of queries) {
+    const row = await db
+      .prepare(sql)
+      .first<{ count: number }>()
+      .catch(() => null);
+    if (!row) {
+      return Number.POSITIVE_INFINITY;
+    }
+    total += Number(row.count ?? 0);
+  }
+  const rawHooks = await countActiveRawHooks(db);
+  return total + rawHooks.count;
+}
+
+export async function finalizeNetworkIdentityMigration(db: D1Database, now: Date): Promise<boolean> {
   const nowIso = now.toISOString();
-  await db
-    .prepare(
-      `DELETE FROM broker_request_events
-        WHERE ip_digest IS NULL AND installation_id IS NULL AND ip IS NOT NULL`,
-    )
-    .run()
-    .catch(() => null);
-  await db
-    .prepare(`UPDATE broker_request_events SET ip = NULL WHERE ip IS NOT NULL`)
-    .run()
-    .catch(() => null);
-  await db
-    .prepare(
-      `UPDATE broker_request_events SET ip_epoch = NULL
-        WHERE ip_digest IS NULL AND ip_epoch = ?`,
-    )
-    .bind(UNPARSEABLE_IP_EPOCH_SENTINEL)
-    .run()
-    .catch(() => null);
-  await db
-    .prepare(`UPDATE broker_issue_success_events SET ip_hash = NULL, ip_prefix_hash = NULL WHERE ip_hash IS NOT NULL OR ip_prefix_hash IS NOT NULL`)
-    .run()
-    .catch(() => null);
-  await db
-    .prepare(`UPDATE referral_rewards SET attempt_ip_hash = NULL WHERE attempt_ip_hash IS NOT NULL`)
-    .run()
-    .catch(() => null);
+  try {
+    await db
+      .prepare(
+        `DELETE FROM broker_request_events
+          WHERE ip_digest IS NULL AND installation_id IS NULL AND ip IS NOT NULL`,
+      )
+      .run();
+    await db
+      .prepare(`UPDATE broker_request_events SET ip = NULL WHERE ip IS NOT NULL`)
+      .run();
+    await db
+      .prepare(
+        `UPDATE broker_request_events SET ip_epoch = NULL
+          WHERE ip_digest IS NULL AND ip_epoch = ?`,
+      )
+      .bind(UNPARSEABLE_IP_EPOCH_SENTINEL)
+      .run();
+    await db
+      .prepare(`UPDATE broker_issue_success_events SET ip_hash = NULL, ip_prefix_hash = NULL WHERE ip_hash IS NOT NULL OR ip_prefix_hash IS NOT NULL`)
+      .run();
+    await db
+      .prepare(`UPDATE referral_rewards SET attempt_ip_hash = NULL WHERE attempt_ip_hash IS NOT NULL`)
+      .run();
+  } catch {
+    return false;
+  }
+  if ((await countForbiddenLegacyValues(db)) !== 0) {
+    return false;
+  }
   const result = await db
     .prepare(`UPDATE broker_config SET value = ?, updated_at = ? WHERE key = 'network_identity_migration'`)
     .bind(JSON.stringify({ phase: 'keyed_only', purge_after: nowIso }), nowIso)

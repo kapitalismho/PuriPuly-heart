@@ -381,7 +381,9 @@ class HttpManagedOpenRouterBrokerClient:
             )
         if status_code == 410:
             try:
-                return _parse_managed_operation_status(payload, operation=operation)
+                return _parse_managed_operation_status(
+                    payload, operation=operation, expected_source=request.source
+                )
             except ValueError:
                 pass
             if payload.get("code") == "authorization_expired":
@@ -399,7 +401,9 @@ class HttpManagedOpenRouterBrokerClient:
                 fields={"http_status": status_code},
             )
         try:
-            return _parse_managed_operation_status(payload, operation=operation)
+            return _parse_managed_operation_status(
+                payload, operation=operation, expected_source=request.source
+            )
         except ValueError as exc:
             return _managed_operation_failure(
                 code="managed_operation_malformed",
@@ -775,10 +779,13 @@ def _parse_managed_operation_credential(
     payload: Mapping[str, object],
     *,
     operation: str,
+    expected_source: str | None,
 ) -> ManagedOperationStatusResult:
     try:
         managed_secret_key = _require_text(payload, "openrouter_api_key")
-        delivery_ack = _parse_managed_operation_delivery_ack(payload)
+        delivery_ack = _parse_managed_operation_delivery_ack(
+            payload, expected_source=expected_source
+        )
     except ValueError as exc:
         raise ValueError(
             f"broker returned malformed managed operation payload: {_safe_field_label(str(exc))}"
@@ -815,9 +822,12 @@ def _parse_managed_operation_status(
     payload: Mapping[str, object],
     *,
     operation: str,
+    expected_source: str | None,
 ) -> ManagedOperationStatusResult:
     if "state" not in payload or "client_action" not in payload:
-        return _parse_managed_operation_credential(payload, operation=operation)
+        return _parse_managed_operation_credential(
+            payload, operation=operation, expected_source=expected_source
+        )
     try:
         operation_status = _require_text(payload, "state")
         client_action = _require_text(payload, "client_action")
@@ -870,9 +880,11 @@ def _parse_managed_operation_status(
             payload.get("openrouter_user_id")
         ),
         referral_id=_parse_owned_referral_id(payload),
+        delivery_ack=_parse_managed_operation_delivery_ack(
+            payload, expected_source=expected_source
+        ),
         referral_bonus_applied=_parse_referral_bonus_applied(payload),
         pass_status=_parse_talk_together_pass_status(payload),
-        delivery_ack=_parse_managed_operation_delivery_ack(payload),
     )
 
 
@@ -960,12 +972,25 @@ def _parse_managed_operation_referral(value: object) -> ManagedOperationReferral
 
 def _parse_managed_operation_delivery_ack(
     payload: Mapping[str, object],
+    *,
+    expected_source: str | None,
 ) -> ManagedKeyDeliveryAckMetadata | None:
     if payload.get("delivery_ack_required") is not True:
         return None
+    issue_source = payload.get("issue_source")
+    if not isinstance(issue_source, str) or not issue_source:
+        issue_source = expected_source
+    if issue_source not in ("discord", "qq"):
+        raise ValueError(
+            "broker returned managed operation delivery without a known issue source"
+        )
+    if expected_source is not None and issue_source != expected_source:
+        raise ValueError(
+            "broker returned managed operation delivery for an unexpected issue source"
+        )
     try:
         return ManagedKeyDeliveryAckMetadata(
-            source="discord",
+            source=issue_source,
             delivery_id=_require_text(payload, "delivery_id"),
             managed_credential_ref=_require_text(payload, "managed_credential_ref"),
             expires_at=_require_optional_text(payload, "delivery_ack_expires_at"),

@@ -141,6 +141,7 @@ describe('request network metadata extraction', () => {
     env.NETWORK_IDENTITY_HMAC_SECRET = 'new-secret';
     env.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS = 'old-secret';
     (env as unknown as Record<string, unknown>).NETWORK_IDENTITY_HMAC_KEY_VERSION = '2';
+    (env as unknown as Record<string, unknown>).NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS = '1';
     const secrets = resolveNetworkIdentitySecrets(env)!;
     expect(secrets).toMatchObject({ currentVersion: 2 });
 
@@ -161,9 +162,58 @@ describe('request network metadata extraction', () => {
     expect(identity?.keyVersion).toBe(2);
 
     delete (env as unknown as Record<string, unknown>).NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS;
+    delete (env as unknown as Record<string, unknown>).NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS;
     const rotated = resolveNetworkIdentitySecrets(env)!;
     const after = await deriveStableNetworkIdentityDigest(rotated, '203.0.113.42', 'ip');
     expect(after).toEqual([expect.objectContaining({ keyVersion: 2 })]);
+  });
+
+  it('rejects missing, malformed, and unpaired key versions without silent defaults', () => {
+    const base = {
+      NETWORK_IDENTITY_HMAC_SECRET: 'current-secret',
+      NETWORK_IDENTITY_HMAC_KEY_VERSION: '1',
+    };
+    expect(resolveNetworkIdentitySecrets({ ...base })).toMatchObject({
+      currentVersion: 1,
+      previous: null,
+      previousVersion: null,
+    });
+    for (const version of [undefined, null, '', '0', '01', 'v1', '1.5', 0, -2]) {
+      expect(
+        resolveNetworkIdentitySecrets({ ...base, NETWORK_IDENTITY_HMAC_KEY_VERSION: version }),
+        `version ${String(version)}`,
+      ).toBeNull();
+    }
+    expect(
+      resolveNetworkIdentitySecrets({
+        ...base,
+        NETWORK_IDENTITY_HMAC_KEY_VERSION: '2',
+        NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS: 'old-secret',
+      }),
+    ).toBeNull();
+    expect(
+      resolveNetworkIdentitySecrets({
+        ...base,
+        NETWORK_IDENTITY_HMAC_KEY_VERSION: '2',
+        NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS: '1',
+      }),
+    ).toBeNull();
+    expect(
+      resolveNetworkIdentitySecrets({
+        ...base,
+        NETWORK_IDENTITY_HMAC_KEY_VERSION: '2',
+        NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS: 'old-secret',
+        NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS: '2',
+      }),
+    ).toBeNull();
+    expect(
+      resolveNetworkIdentitySecrets({
+        ...base,
+        NETWORK_IDENTITY_HMAC_KEY_VERSION: '2',
+        NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS: 'old-secret',
+        NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS: '1',
+      }),
+    ).toMatchObject({ currentVersion: 2, previous: 'old-secret', previousVersion: 1 });
   });
 
   it('omits digests when the worker secret is unavailable', async () => {

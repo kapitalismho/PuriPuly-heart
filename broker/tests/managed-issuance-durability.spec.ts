@@ -106,13 +106,19 @@ describe('managed issuance durability', () => {
     env.NETWORK_IDENTITY_HMAC_SECRET = 'new-secret';
     env.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS = 'old-secret';
     (env as unknown as Record<string, unknown>).NETWORK_IDENTITY_HMAC_KEY_VERSION = '2';
+    (env as unknown as Record<string, unknown>).NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS = '1';
 
     const secrets = resolveNetworkIdentitySecrets(env);
-    expect(secrets).toMatchObject({ current: 'new-secret', previous: 'old-secret', currentVersion: 2 });
+    expect(secrets).toMatchObject({
+      current: 'new-secret',
+      previous: 'old-secret',
+      previousVersion: 1,
+      currentVersion: 2,
+    });
 
     const oldIdentity = await resolveRequestNetworkIdentity(
       '203.0.113.90',
-      { current: 'old-secret', previous: null, currentVersion: 1 },
+      { current: 'old-secret', previous: null, previousVersion: null, currentVersion: 1 },
       NOW,
     );
     expect(oldIdentity?.keyVersion).toBe(1);
@@ -375,6 +381,176 @@ describe('managed issuance durability', () => {
       referred_bonus_status: 'failed',
       referrer_bonus_status: 'failed',
       failure_reason: 'authorization_expired',
+    });
+  });
+
+  it('leaves a reserved referral intact when the delivery was acknowledged', async () => {
+    for (const terminal of ['expire', 'fail'] as const) {
+      const env = createTestBrokerEnv();
+      const { createManagedOperation, getManagedOperation, hashManagedOperationResumeToken } =
+        await import('../src/managed-operation');
+      const { expireManagedOperation, failManagedOperationTerminal } = await import(
+        '../src/managed-operation'
+      );
+      const { createManagedKeyDelivery, markManagedKeyDeliveryAcknowledged } = await import(
+        '../src/managed-key-delivery'
+      );
+      const operationId = `ph-mop-v1_referral_acked_${terminal}_01`;
+      await createManagedOperation(env.BROKER_DB, {
+        operationId,
+        resumeTokenHash: await hashManagedOperationResumeToken('resume-acked-test'),
+        issueSource: 'discord',
+        subjectRef: 'ph-discord-user-v1_acked_expiry',
+        installationId: 'install-acked-expiry',
+        devicePublicKey: 'device-acked-expiry',
+        now: NOW,
+      });
+      env.__db
+        .prepare(
+          `INSERT INTO referral_rewards (
+            referral_id, referrer_source, referrer_subject_ref, referred_source, referred_subject_ref,
+            referred_installation_id, referred_hardware_hash, referred_hardware_hash_salt_version,
+            referred_bonus_status, referrer_bonus_status, operation_id, created_at, updated_at
+          ) VALUES (?, 'discord', ?, 'discord', ?, ?, ?, 7, 'reserved', 'pending', ?, ?, ?)`,
+        )
+        .run(
+          '9ABCDX',
+          'ph-discord-user-v1_owner_acked',
+          'ph-discord-user-v1_acked_expiry',
+          'install-acked-expiry',
+          'hardware-acked-expiry',
+          operationId,
+          NOW_ISO,
+          NOW_ISO,
+        );
+      env.__db
+        .prepare(`UPDATE managed_operations SET referral_reward_id = ?, referral_status = 'reserved', updated_at = ? WHERE operation_id = ?`)
+        .run(1, NOW_ISO, operationId);
+      const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
+        issueSource: 'discord',
+        subjectRef: 'ph-discord-user-v1_acked_expiry',
+        installationId: 'install-acked-expiry',
+        managedCredentialRef: 'hash_acked_expiry_1',
+        createdAt: NOW,
+        expiresAt: new Date(NOW.getTime() + 15 * 60_000),
+        operationId,
+        attemptIndex: 1,
+      });
+      await markManagedKeyDeliveryAcknowledged(env.BROKER_DB, {
+        deliveryId: delivery.deliveryId,
+        acknowledgedAt: NOW,
+      });
+      const operation = (await getManagedOperation(env.BROKER_DB, operationId))!;
+      if (terminal === 'expire') {
+        await expireManagedOperation(env.BROKER_DB, operation, new Date(NOW.getTime() + 61 * 60_000));
+      } else {
+        await failManagedOperationTerminal(env.BROKER_DB, operation, NOW, 'terminal_provider_failure');
+      }
+      const reward = env.__db
+        .prepare(`SELECT referred_bonus_status, referrer_bonus_status FROM referral_rewards WHERE operation_id = ?`)
+        .get(operationId) as Record<string, string>;
+      expect(reward).toMatchObject({
+        referred_bonus_status: 'reserved',
+        referrer_bonus_status: 'pending',
+      });
+      expect((await getManagedOperation(env.BROKER_DB, operationId))?.referral_status).toBe('reserved');
+    }
+  });
+
+  it('reuses one skipped reservation per operation without new velocity rows', async () => {
+    const env = createTestBrokerEnv();
+    const { createManagedOperation, hashManagedOperationResumeToken } = await import(
+      '../src/managed-operation'
+    );
+    const operationId = 'ph-mop-v1_skip_reuse_test_operation_1';
+    await createManagedOperation(env.BROKER_DB, {
+      operationId,
+      resumeTokenHash: await hashManagedOperationResumeToken('resume-skip-reuse'),
+      issueSource: 'qq',
+      subjectRef: 'ph-qq-subject-v1_skip_reuse',
+      installationId: 'install-skip-reuse',
+      devicePublicKey: null,
+      now: NOW,
+    });
+    const identity = await resolveRequestNetworkIdentity('203.0.113.95', resolveNetworkIdentitySecrets(env), NOW);
+    const input = {
+      referralId: '9ZZZZZ',
+      referredSource: 'qq' as const,
+      referredSubjectRef: 'ph-qq-subject-v1_skip_reuse',
+      referredInstallationId: 'install-skip-reuse',
+      referredHardwareHash: null,
+      referredHardwareHashSaltVersion: null,
+      attemptIpDigest: identity ? { digest: identity.digest, keyVersion: identity.keyVersion, epoch: identity.epoch } : null,
+      operationId,
+      nowIso: NOW_ISO,
+    };
+    const first = await reserveIssueReferralReward(env.BROKER_DB, input);
+    expect(first.outcome).toBe('skipped');
+    const second = await reserveIssueReferralReward(env.BROKER_DB, input);
+    expect(second).toEqual(first);
+    const rows = env.__db
+      .prepare(`SELECT COUNT(*) AS count FROM referral_rewards WHERE operation_id = ?`)
+      .get(operationId) as { count: number };
+    expect(rows.count).toBe(1);
+  });
+
+  it('links the first QQ reservation to the bound operation for settlement reuse', async () => {
+    const env = createTestBrokerEnv();
+    const ownerRef = `ph-discord-user-v1_${'Q'.repeat(43)}`;
+    for (const installationId of ['install-qq-op-link-owner', 'install-qq-op-link']) {
+      env.__db
+        .prepare(
+          `INSERT INTO installations (installation_id, device_public_key, app_version, created_at, last_seen_at)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(installationId, `device-key-${installationId}`, '1.2.3', NOW_ISO, NOW_ISO);
+    }
+    env.__db
+      .prepare(
+        `INSERT INTO discord_identities (discord_user_ref, entitlement_installation_id, status, created_at, updated_at)
+         VALUES (?, ?, 'active', ?, ?)`,
+      )
+      .run(ownerRef, 'install-qq-op-link-owner', NOW_ISO, NOW_ISO);
+    env.__db
+      .prepare(
+        `INSERT INTO referral_codes (referral_id, owner_source, owner_subject_ref, owner_installation_id, status, created_at, updated_at)
+         VALUES (?, 'discord', ?, ?, 'active', ?, ?)`,
+      )
+      .run('9ABCDX', ownerRef, 'install-qq-op-link-owner', NOW_ISO, NOW_ISO);
+    const { createManagedOperation, hashManagedOperationResumeToken } = await import(
+      '../src/managed-operation'
+    );
+    const { getOperationReferralReward } = await import('../src/referral');
+    const operationId = 'ph-mop-v1_qq_op_link_test_01';
+    await createManagedOperation(env.BROKER_DB, {
+      operationId,
+      resumeTokenHash: await hashManagedOperationResumeToken('resume-qq-op-link'),
+      issueSource: 'qq',
+      subjectRef: 'ph-qq-subject-v1_op_link',
+      installationId: 'install-qq-op-link',
+      devicePublicKey: null,
+      now: NOW,
+    });
+    const identity = await resolveRequestNetworkIdentity('203.0.113.96', resolveNetworkIdentitySecrets(env), NOW);
+    const reserved = await reserveIssueReferralReward(env.BROKER_DB, {
+      referralId: '9ABCDX',
+      referredSource: 'qq',
+      referredSubjectRef: 'ph-qq-subject-v1_op_link',
+      referredInstallationId: 'install-qq-op-link',
+      referredHardwareHash: null,
+      referredHardwareHashSaltVersion: null,
+      attemptIpDigest: identity ? { digest: identity.digest, keyVersion: identity.keyVersion, epoch: identity.epoch } : null,
+      operationId,
+      nowIso: NOW_ISO,
+    });
+    expect(reserved).toMatchObject({ outcome: 'reserved' });
+    const row = env.__db
+      .prepare(`SELECT operation_id, referred_bonus_status FROM referral_rewards WHERE operation_id = ?`)
+      .get(operationId) as Record<string, string>;
+    expect(row).toMatchObject({ operation_id: operationId, referred_bonus_status: 'reserved' });
+    await expect(getOperationReferralReward(env.BROKER_DB, operationId)).resolves.toMatchObject({
+      outcome: 'reserved',
+      referralId: '9ABCDX',
     });
   });
 
@@ -662,6 +838,122 @@ describe('network identity windows and hooks', () => {
         .get() as { value: string };
       expect(JSON.parse(phase.value)).toMatchObject({ phase: 'keyed_only' });
       db.exec(readBrokerMigrationSql('0021_network_identity_purge.sql'));
+    } finally {
+      db.close();
+    }
+  });
+});
+
+describe('network identity window inventory and fail-closed finalize', () => {
+  it('keeps the purge gate and the backfill horizon on one window inventory', async () => {
+    const { NETWORK_IDENTITY_WINDOW_CONFIG_PATHS, resolveNetworkIdentityMaxWindowMinutes } =
+      await import('../src/network-identity-migration');
+    const { readBrokerMigrationSql } = await import('./test-support/migrations');
+    const sql = readBrokerMigrationSql('0021_network_identity_purge.sql');
+    const gatePaths = new Set(
+      [...sql.matchAll(/\$\.([\w.]+)\.windowMinutes/gu)].map((match) => match[1]),
+    );
+    expect(gatePaths).toEqual(new Set(NETWORK_IDENTITY_WINDOW_CONFIG_PATHS));
+    expect(NETWORK_IDENTITY_WINDOW_CONFIG_PATHS).toContain('qqAuthAssertIp');
+    expect(NETWORK_IDENTITY_WINDOW_CONFIG_PATHS).toContain('trialStatus');
+
+    const env = createTestBrokerEnv();
+    const { updateAbuseControls } = await import('./test-support/abuse-controls');
+    updateAbuseControls(env, (controls) => {
+      controls.trialStatus.windowMinutes = 10080;
+    });
+    await expect(
+      resolveNetworkIdentityMaxWindowMinutes(env.BROKER_DB),
+    ).resolves.toBe(10080);
+  });
+
+  it('fails closed instead of flipping phase when migration state cannot persist', async () => {
+    const db = new DatabaseSync(':memory:');
+    try {
+      const { BROKER_MIGRATION_FILENAMES, readBrokerMigrationSql } = await import(
+        './test-support/migrations'
+      );
+      for (const file of BROKER_MIGRATION_FILENAMES) {
+        if (file <= '0019_managed_referral_settlement.sql') {
+          db.exec(readBrokerMigrationSql(file));
+        }
+      }
+      db.prepare(
+        `INSERT INTO broker_request_events (endpoint, ip, installation_id, observed_at)
+         VALUES (?, ?, ?, ?)`,
+      ).run('POST /v1/auth/qq/assert', '203.0.113.103', null, NOW_ISO);
+      for (const file of BROKER_MIGRATION_FILENAMES) {
+        if (file === '0020_network_identity_hmac.sql') {
+          db.exec(readBrokerMigrationSql(file));
+        }
+      }
+      const { finalizeNetworkIdentityMigration } = await import(
+        '../src/network-identity-migration'
+      );
+      const wrapped = wrapDatabaseSync(db);
+      expect(await finalizeNetworkIdentityMigration(wrapped, NOW)).toBe(true);
+
+      db.prepare(`UPDATE broker_config SET value = ? WHERE key = 'network_identity_migration'`).run(
+        JSON.stringify({ phase: 'dual_write', purge_after: null }),
+      );
+      db.prepare(
+        `INSERT INTO broker_request_events (endpoint, ip, installation_id, observed_at)
+         VALUES (?, ?, ?, ?)`,
+      ).run('POST /v1/auth/qq/assert', '203.0.113.104', null, NOW_ISO);
+      db.prepare(`DELETE FROM broker_config WHERE key = 'network_identity_migration'`).run();
+      expect(await finalizeNetworkIdentityMigration(wrapped, NOW)).toBe(false);
+      const phase = db
+        .prepare(`SELECT value FROM broker_config WHERE key = 'network_identity_migration'`)
+        .get() as { value: string } | undefined;
+      expect(phase).toBeUndefined();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('blocks finalization on unparseable hooks and surfaces non-secret diagnostics', async () => {
+    const provision = createTestBrokerEnv();
+    const secrets = resolveNetworkIdentitySecrets(provision)!;
+    const db = new DatabaseSync(':memory:');
+    try {
+      const { BROKER_MIGRATION_FILENAMES, readBrokerMigrationSql } = await import(
+        './test-support/migrations'
+      );
+      for (const file of BROKER_MIGRATION_FILENAMES) {
+        if (file <= '0019_managed_referral_settlement.sql') {
+          db.exec(readBrokerMigrationSql(file));
+        }
+      }
+      db.prepare(
+        `INSERT INTO broker_velocity_cap_hooks (
+          subject_type, subject_value, max_requests, window_minutes,
+          outcome_code, outcome_class, active
+        ) VALUES ('ip', ?, 1, 60, 'rate_limited', 'retryable', 1)`,
+      ).run('not-an-ip-hook');
+      for (const file of BROKER_MIGRATION_FILENAMES) {
+        if (file === '0020_network_identity_hmac.sql') {
+          db.exec(readBrokerMigrationSql(file));
+        }
+      }
+      const wrapped = wrapDatabaseSync(db);
+      const blocked = await runNetworkIdentityBackfill(wrapped, secrets, NOW);
+      expect(blocked.finalized).toBe(false);
+      expect(blocked.rawHooks).toBe(1);
+      expect(blocked.unparseableHooks).toBe(1);
+      expect(blocked.rawHookSampleIds).toEqual([
+        expect.objectContaining({ table: 'broker_velocity_cap_hooks', id: expect.any(Number) }),
+      ]);
+      const phase = db
+        .prepare(`SELECT value FROM broker_config WHERE key = 'network_identity_migration'`)
+        .get() as { value: string };
+      expect(JSON.parse(phase.value)).toMatchObject({ phase: 'dual_write' });
+
+      db.prepare(`UPDATE broker_velocity_cap_hooks SET active = 0 WHERE subject_value = ?`).run(
+        'not-an-ip-hook',
+      );
+      const converged = await runNetworkIdentityBackfill(wrapped, secrets, NOW);
+      expect(converged.rawHooks).toBe(0);
+      expect(converged.finalized).toBe(true);
     } finally {
       db.close();
     }

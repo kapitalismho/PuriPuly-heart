@@ -329,6 +329,10 @@ async def test_close_rejects_new_auth_and_clears_callback_and_pending() -> None:
             "qq_managed_auth.error.authorization_expired",
             "qq_auth.error.authorization_expired",
         ),
+        (
+            "qq_managed_auth.error.other_source_pending",
+            "qq_auth.error.other_source_pending",
+        ),
     ],
 )
 async def test_qq_recovery_messages_map_to_finite_dialog_copy(

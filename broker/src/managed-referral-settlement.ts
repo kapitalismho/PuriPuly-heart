@@ -110,6 +110,79 @@ export async function processManagedReferralSettlementJobs(
   return { repaired, claimed, advanced, completed, retried };
 }
 
+export async function ensureReferralSettlementJobsForDelivery(
+  db: D1Database,
+  input: { source: ReferralSource; deliveryId: string; now: Date },
+): Promise<number> {
+  const nowIso = input.now.toISOString();
+  const result = await db
+    .prepare(
+      `INSERT INTO managed_referral_settlement_jobs (
+          source, referral_reward_id, delivery_id, operation_id, phase,
+          attempt_count, last_attempt_at, next_attempt_at,
+          fencing_token, lease_expires_at, last_error_code,
+          created_at, updated_at, completed_at
+        )
+        SELECT ?, reward.id, delivery.delivery_id, reward.operation_id,
+               'invitee_pending', 0, NULL, ?, NULL, NULL, NULL, ?, ?, NULL
+          FROM referral_rewards reward
+          JOIN managed_key_deliveries delivery
+            ON delivery.delivery_id = ?
+           AND delivery.issue_source = ?
+           AND delivery.subject_ref = reward.referred_subject_ref
+           AND delivery.installation_id IS reward.referred_installation_id
+           AND delivery.status = 'acknowledged'
+         WHERE reward.referred_source = ?
+           AND reward.referred_bonus_status = 'reserved'
+           AND NOT EXISTS (
+             SELECT 1 FROM managed_referral_settlement_jobs job
+              WHERE job.referral_reward_id = reward.id
+                AND job.delivery_id = delivery.delivery_id
+           )
+        ON CONFLICT(referral_reward_id) DO NOTHING`,
+    )
+    .bind(
+      input.source,
+      nowIso,
+      nowIso,
+      nowIso,
+      input.deliveryId,
+      input.source,
+      input.source,
+    )
+    .run()
+    .catch(() => null);
+  return Number(result?.meta?.changes ?? 0);
+}
+
+export async function hasUnsettledReservedRewardWithoutJob(
+  db: D1Database,
+  input: { source: ReferralSource; subjectRef: string; installationId: string | null; deliveryId: string },
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count
+         FROM referral_rewards reward
+        WHERE reward.referred_source = ?
+          AND reward.referred_subject_ref = ?
+          AND reward.referred_installation_id IS ?
+          AND reward.referred_bonus_status = 'reserved'
+          AND NOT EXISTS (
+            SELECT 1 FROM managed_referral_settlement_jobs job
+             WHERE job.referral_reward_id = reward.id
+               AND job.delivery_id = ?
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM managed_referral_settlement_jobs job
+             WHERE job.referral_reward_id = reward.id
+          )`,
+    )
+    .bind(input.source, input.subjectRef, input.installationId, input.deliveryId)
+    .first<{ count: number }>()
+    .catch(() => null);
+  return Number(row?.count ?? 0) > 0;
+}
+
 export async function scheduleManagedReferralSettlement(
   db: D1Database,
   input: { source: ReferralSource; referralRewardId: number; deliveryId: string | null; operationId: string | null; now: Date },

@@ -11,7 +11,10 @@ from puripuly_heart.app.ports.broker_client import (
 )
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
 from puripuly_heart.app.ports.secret_store import SecretStorePort
-from puripuly_heart.app.services.managed.managed_operation import clear_resume_token
+from puripuly_heart.app.services.managed.managed_operation import (
+    clear_resume_token,
+    other_source_pending_operation,
+)
 from puripuly_heart.config.provider_values import normalize_owned_referral_id
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
@@ -171,10 +174,14 @@ class ManagedKeyDeliveryAckService:
                     ack_result=ack_result,
                 )
             apply_ack_referral_to_managed_state(self.managed_state, ack_result, source)
-            self.managed_state.pending_managed_operation_id = None
-            self.managed_state.pending_managed_operation_source = None
-            self.managed_state.pending_managed_operation_installation_id = None
-            self.managed_state.pending_managed_operation_state = None
+            preserve_operation = (
+                other_source_pending_operation(self.managed_state, source=source) is not None
+            )
+            if not preserve_operation:
+                self.managed_state.pending_managed_operation_id = None
+                self.managed_state.pending_managed_operation_source = None
+                self.managed_state.pending_managed_operation_installation_id = None
+                self.managed_state.pending_managed_operation_state = None
             try:
                 self.managed_state.persist()
             except Exception:
@@ -220,10 +227,11 @@ class ManagedKeyDeliveryAckService:
                     ),
                     ack_result=ack_result,
                 )
-            try:
-                await clear_resume_token(self.secret_store)
-            except Exception:
-                pass
+            if not preserve_operation:
+                try:
+                    await clear_resume_token(self.secret_store)
+                except Exception:
+                    pass
             return ManagedKeyDeliveryAckServiceResult(
                 succeeded=True,
                 status=ack_result.status,
@@ -384,6 +392,45 @@ def apply_ack_referral_to_managed_state(
         managed_state.referral_id = acknowledged_referral_id
 
 
+@dataclass(frozen=True, slots=True)
+class PendingDeliveryAckMetadata:
+    source: str
+    delivery_id: str
+    managed_credential_ref: str
+    expires_at: str | None = None
+
+
+def read_any_pending_delivery_ack(
+    managed_state: ManagedIdentityStatePort,
+) -> PendingDeliveryAckMetadata | None:
+    source = managed_state.pending_delivery_ack_source
+    delivery_id = managed_state.pending_delivery_ack_delivery_id
+    managed_credential_ref = managed_state.pending_delivery_ack_managed_credential_ref
+    if (
+        source not in (ACK_SOURCE_DISCORD, ACK_SOURCE_QQ)
+        or not delivery_id
+        or not managed_credential_ref
+    ):
+        return None
+    return PendingDeliveryAckMetadata(
+        source=source,
+        delivery_id=delivery_id,
+        managed_credential_ref=managed_credential_ref,
+        expires_at=managed_state.pending_delivery_ack_expires_at,
+    )
+
+
+def other_source_pending_delivery_ack(
+    managed_state: ManagedIdentityStatePort,
+    *,
+    source: str,
+) -> PendingDeliveryAckMetadata | None:
+    pending = read_any_pending_delivery_ack(managed_state)
+    if pending is None or pending.source == source:
+        return None
+    return pending
+
+
 def _diagnostics(
     *,
     operation: str,
@@ -411,9 +458,12 @@ __all__ = [
     "ManagedKeyDeliveryAckServiceResult",
     "ManagedKeyDeliveryAckTokenClearError",
     "ManagedKeyDeliveryAckTokenStoreError",
+    "PendingDeliveryAckMetadata",
     "QQ_MANAGED_DELIVERY_ACK_TOKEN_SECRET",
     "clear_pending_ack_in_settings_values",
+    "other_source_pending_delivery_ack",
     "pending_ack_metadata_settings_values",
+    "read_any_pending_delivery_ack",
     "secret_key_for_ack_source",
     "store_pending_ack_in_settings_values",
 ]

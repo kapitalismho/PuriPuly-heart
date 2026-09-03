@@ -135,6 +135,8 @@ export interface TestBrokerEnv extends Record<string, unknown> {
   TELEMETRY_SUBJECT_HMAC_SECRET: string;
   NETWORK_IDENTITY_HMAC_SECRET: string;
   NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS: string;
+  NETWORK_IDENTITY_HMAC_KEY_VERSION: string;
+  NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS?: string;
   __db: DatabaseSync;
 }
 
@@ -170,6 +172,7 @@ export function createTestBrokerEnv(options: SqliteD1Hooks = {}): TestBrokerEnv 
     TELEMETRY_SUBJECT_HMAC_SECRET: 'test-telemetry-subject-hmac-secret',
     NETWORK_IDENTITY_HMAC_SECRET: 'test-network-identity-hmac-secret',
     NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS: '',
+    NETWORK_IDENTITY_HMAC_KEY_VERSION: '1',
     __db: db,
   };
 }
@@ -189,7 +192,7 @@ export function insertEntitlement(
     verified_hardware_hash?: string | null;
     verified_hardware_hash_salt_version?: number | null;
     discord_user_ref?: string | null;
-    discord_issue_status?: 'issuing' | 'active' | 'failed' | 'cleanup_required' | null;
+    discord_issue_status?: 'issuing' | 'delivery_pending' | 'active' | 'failed' | 'cleanup_required' | null;
     discord_issue_reserved_at?: string | null;
     discord_issue_delivered_at?: string | null;
   },
@@ -240,7 +243,12 @@ export async function seedRequestEvent(
   const identity = input.ip
     ? await resolveRequestNetworkIdentity(
         input.ip,
-        { current: env.NETWORK_IDENTITY_HMAC_SECRET, previous: null, currentVersion: 1 },
+        {
+          current: env.NETWORK_IDENTITY_HMAC_SECRET,
+          previous: null,
+          previousVersion: null,
+          currentVersion: 1,
+        },
         new Date(input.observedAt),
       )
     : null;
@@ -263,12 +271,14 @@ export async function seedRequestEvent(
 export function testNetworkIdentitySecrets(env: TestBrokerEnv): {
   current: string;
   previous: string | null;
+  previousVersion: number | null;
   currentVersion: number;
 } {
   return (
     resolveNetworkIdentitySecrets(env as unknown as Record<string, unknown>) ?? {
       current: '',
       previous: null,
+      previousVersion: null,
       currentVersion: 1,
     }
   );
