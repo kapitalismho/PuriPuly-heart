@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
 
 import pytest
 
@@ -9,8 +8,6 @@ from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.core.stt.rolling import (
-    GEMINI_ROLLING_SESSION_TARGET_S,
-    GeminiFreeTierEstimator,
     RollingProviderDefinition,
     RollingProviderState,
     RollingQuotaObservability,
@@ -68,19 +65,15 @@ def _definition(
     fail_times: int = 0,
     configured: bool = True,
     classifier=None,
-    estimator: GeminiFreeTierEstimator | None = None,
     session_deadline_s: float | None = None,
 ) -> tuple[RollingProviderDefinition, _ScriptedBackend]:
     backend = _ScriptedBackend(session, fail_times=fail_times)
-    if name is STTProviderName.GEMINI_TRANSCRIBE and estimator is None:
-        estimator = GeminiFreeTierEstimator(rpd_baseline=25, wall_time=lambda: time.time())
     return (
         RollingProviderDefinition(
             name=name,
             build_backend=lambda: backend,
             is_configured=lambda: configured,
             classify_error=classifier,
-            estimator=estimator,
             session_deadline_s=session_deadline_s,
         ),
         backend,
@@ -219,48 +212,35 @@ async def test_no_provider_configured_fails_closed() -> None:
 
 
 @pytest.mark.asyncio
-async def test_gemini_local_estimate_gates_selection_fail_closed() -> None:
-    estimator = GeminiFreeTierEstimator(rpd_baseline=1, wall_time=lambda: time.time())
+async def test_gemini_has_no_local_session_cap() -> None:
     gemini_session = _ScriptedSession()
-    gemini, gemini_backend = _definition(
-        STTProviderName.GEMINI_TRANSCRIBE,
-        gemini_session,
-        estimator=estimator,
-    )
+    gemini, gemini_backend = _definition(STTProviderName.GEMINI_TRANSCRIBE, gemini_session)
     scribe_session = _ScriptedSession()
     scribe, scribe_backend = _definition(STTProviderName.ELEVENLABS_SCRIBE, scribe_session)
     rolling = _make(gemini, scribe)
 
-    first = await rolling.open_session()
-    assert first.provider_name is STTProviderName.GEMINI_TRANSCRIBE
-    await first.close()
-    assert estimator.remaining_sessions() == 0
+    for _ in range(30):
+        session = await rolling.open_session()
+        assert session.provider_name is STTProviderName.GEMINI_TRANSCRIBE
+        await session.close()
 
-    status = rolling.status(STTProviderName.GEMINI_TRANSCRIBE)
-    assert status.observability is RollingQuotaObservability.ESTIMATED
-    assert status.estimate_remaining == 0
-
-    second = await rolling.open_session()
-    assert gemini_backend.open_count == 1
-    assert second.provider_name is STTProviderName.ELEVENLABS_SCRIBE
-    await second.close()
+    assert gemini_backend.open_count == 30
+    assert scribe_backend.open_count == 0
+    assert rolling.status(STTProviderName.GEMINI_TRANSCRIBE).state is (
+        RollingProviderState.AVAILABLE
+    )
 
 
 @pytest.mark.asyncio
-async def test_gemini_599_rollover_selects_gemini_again() -> None:
-    estimator = GeminiFreeTierEstimator(rpd_baseline=25, wall_time=lambda: time.time())
+async def test_gemini_without_override_uses_controller_deadline() -> None:
     gemini_session = _ScriptedSession()
-    gemini, gemini_backend = _definition(
-        STTProviderName.GEMINI_TRANSCRIBE,
-        gemini_session,
-        estimator=estimator,
-        session_deadline_s=GEMINI_ROLLING_SESSION_TARGET_S,
-    )
+    gemini, gemini_backend = _definition(STTProviderName.GEMINI_TRANSCRIBE, gemini_session)
     scribe, scribe_backend = _definition(STTProviderName.ELEVENLABS_SCRIBE, _ScriptedSession())
     rolling = _make(gemini, scribe)
 
     first = await rolling.open_session()
-    assert first.reset_deadline_s == pytest.approx(599.0)
+    with pytest.raises(AttributeError):
+        _ = first.reset_deadline_s
     await first.close()
 
     second = await rolling.open_session()
@@ -297,12 +277,10 @@ async def test_healthy_rollover_does_not_descend_on_deadline() -> None:
             await deadline_hit.wait()
             yield STTBackendTranscriptEvent(text="late", is_final=True)
 
-    estimator = GeminiFreeTierEstimator(rpd_baseline=25, wall_time=lambda: time.time())
     session = _DeadlineSession()
     gemini, gemini_backend = _definition(
         STTProviderName.GEMINI_TRANSCRIBE,
         session,
-        estimator=estimator,
         session_deadline_s=0.05,
     )
     scribe, scribe_backend = _definition(STTProviderName.ELEVENLABS_SCRIBE, _ScriptedSession())
@@ -331,17 +309,6 @@ def test_deepgram_error_classification() -> None:
     assert classify_deepgram_error(RuntimeError("payment required: no balance")) == "quota"
     assert classify_deepgram_error(RuntimeError("connection reset")) == "transient"
     assert classify_deepgram_error(RuntimeError("429 Too Many Requests")) == "transient"
-
-
-def test_gemini_estimator_resets_on_quota_day_boundary() -> None:
-    current = {"t": 1756000000.0}
-    estimator = GeminiFreeTierEstimator(rpd_baseline=2, wall_time=lambda: current["t"])
-    estimator.on_session_established()
-    estimator.on_session_established()
-    assert estimator.exhausted() is True
-    current["t"] += 24 * 3600
-    assert estimator.exhausted() is False
-    assert estimator.remaining_sessions() == 2
 
 
 def test_duplicate_providers_rejected() -> None:
@@ -386,15 +353,17 @@ def test_unsupported_provider_rejected() -> None:
         _make(definition)
 
 
-def test_gemini_without_estimator_rejected() -> None:
+def test_gemini_without_estimator_is_allowed() -> None:
     backend = _ScriptedBackend(_ScriptedSession())
     definition = RollingProviderDefinition(
         name=STTProviderName.GEMINI_TRANSCRIBE,
         build_backend=lambda: backend,
         is_configured=lambda: True,
     )
-    with pytest.raises(ValueError, match="requires a GeminiFreeTierEstimator"):
-        _make(definition)
+    rolling = _make(definition)
+    status = rolling.status(STTProviderName.GEMINI_TRANSCRIBE)
+    assert status.state is RollingProviderState.AVAILABLE
+    assert status.observability is RollingQuotaObservability.UNKNOWN
 
 
 def test_status_reports_configured_provider_available_before_first_attempt() -> None:
@@ -402,7 +371,7 @@ def test_status_reports_configured_provider_available_before_first_attempt() -> 
     rolling = _make(gemini)
     status = rolling.status(STTProviderName.GEMINI_TRANSCRIBE)
     assert status.state is RollingProviderState.AVAILABLE
-    assert status.observability is RollingQuotaObservability.ESTIMATED
+    assert status.observability is RollingQuotaObservability.UNKNOWN
 
 
 def test_scribe_and_deepgram_quota_kind_is_account_quota_not_daily() -> None:
@@ -412,16 +381,13 @@ def test_scribe_and_deepgram_quota_kind_is_account_quota_not_daily() -> None:
     assert classify_deepgram_error(RuntimeError("payment required: balance empty")) == "quota"
 
 
-def test_gemini_estimate_reset_clears_persisted_quota_state() -> None:
-    current = {"t": 1756000000.0}
-    estimator = GeminiFreeTierEstimator(rpd_baseline=1, wall_time=lambda: current["t"])
+def test_explicit_daily_quota_signal_persists_without_day_reset() -> None:
     gemini_session = _ScriptedSession()
     gemini, gemini_backend = _definition(
         STTProviderName.GEMINI_TRANSCRIBE,
         gemini_session,
         fail_times=99,
         classifier=lambda exc: "quota_day",
-        estimator=estimator,
     )
     scribe, _ = _definition(STTProviderName.ELEVENLABS_SCRIBE, _ScriptedSession())
     rolling = _make(gemini, scribe)
@@ -433,9 +399,8 @@ def test_gemini_estimate_reset_clears_persisted_quota_state() -> None:
     )
     assert gemini_backend.open_count == 1
 
-    current["t"] += 24 * 3600
     second = asyncio.run(rolling.open_session())
-    assert gemini_backend.open_count == 2
+    assert gemini_backend.open_count == 1
     assert second.provider_name is STTProviderName.ELEVENLABS_SCRIBE
     asyncio.run(second.close())
     assert rolling.status(STTProviderName.GEMINI_TRANSCRIBE).state is (
@@ -566,12 +531,9 @@ async def test_all_configured_but_excluded_reports_distinct_error() -> None:
 
 @pytest.mark.asyncio
 async def test_healthy_rollover_keeps_provider_available() -> None:
-    estimator = GeminiFreeTierEstimator(rpd_baseline=25, wall_time=lambda: time.time())
     gemini, _ = _definition(
         STTProviderName.GEMINI_TRANSCRIBE,
         _ScriptedSession(),
-        estimator=estimator,
-        session_deadline_s=GEMINI_ROLLING_SESSION_TARGET_S,
     )
     scribe, _ = _definition(STTProviderName.ELEVENLABS_SCRIBE, _ScriptedSession())
     rolling = _make(gemini, scribe)

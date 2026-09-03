@@ -173,9 +173,11 @@ def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
     merged = _merge_dataclass(default, compatible_data, path="settings")
     if not isinstance(merged, AppSettingsVNext):
         raise TypeError("vNext settings merge produced unexpected type")
+    extensions = _extract_compatible_extensions(data, default)
+    extensions = _drop_removed_rolling_enabled_extensions(extensions)
     merged = replace(
         merged,
-        compatibility_extensions=_extract_compatible_extensions(data, default),
+        compatibility_extensions=extensions,
     )
     merged = with_telemetry_enabled(
         merged,
@@ -242,6 +244,28 @@ def _merge_compatible_extensions(
         target_value = target[key]
         if isinstance(target_value, dict) and isinstance(value, Mapping):
             _merge_compatible_extensions(target_value, value)
+
+
+def _drop_removed_rolling_enabled_extensions(
+    extensions: dict[str, object],
+) -> dict[str, object]:
+    cleaned = copy.deepcopy(extensions)
+    intent = cleaned.get("intent")
+    if not isinstance(intent, dict):
+        return cleaned
+    stt = intent.get("stt")
+    if isinstance(stt, dict):
+        stt.pop("rolling_enabled", None)
+        if not stt:
+            intent.pop("stt", None)
+    peer_stt = intent.get("peer_stt")
+    if isinstance(peer_stt, dict):
+        peer_stt.pop("rolling_enabled", None)
+        if not peer_stt:
+            intent.pop("peer_stt", None)
+    if not intent:
+        cleaned.pop("intent", None)
+    return cleaned
 
 
 def _with_current_settings_version(data: Mapping[str, Any]) -> Mapping[str, Any]:

@@ -141,17 +141,32 @@ class ApplicationStartupAdapter:
 
         stt_provider = settings.intent.stt.provider
         if self.stt_requires_secret(STTProviderName(stt_provider)):
-            stt_key_map = {
-                "qwen_asr": self.alibaba_verified_key(),
-                "qwen_audio": self.alibaba_verified_key(),
-            }
-            stt_verified_key = stt_key_map.get(stt_provider, stt_provider)
-            stt_entry = getattr(
-                settings.state.provider_verification,
-                stt_verified_key,
-                None,
-            )
-            stt_verified = getattr(stt_entry, "status", None) == "verified"
+            if stt_provider == STTProviderName.ROLLING_FREE.value:
+                stt_verified = any(
+                    getattr(
+                        getattr(settings.state.provider_verification, member, None),
+                        "status",
+                        None,
+                    )
+                    == "verified"
+                    for member in (
+                        "deepgram",
+                        "gemini_transcribe",
+                        "elevenlabs_scribe",
+                    )
+                )
+            else:
+                stt_key_map = {
+                    "qwen_asr": self.alibaba_verified_key(),
+                    "qwen_audio": self.alibaba_verified_key(),
+                }
+                stt_verified_key = stt_key_map.get(stt_provider, stt_provider)
+                stt_entry = getattr(
+                    settings.state.provider_verification,
+                    stt_verified_key,
+                    None,
+                )
+                stt_verified = getattr(stt_entry, "status", None) == "verified"
             stt_needs_key = (
                 local_asr_runtime.snapshot.channel_for("self").provider_id is None
             ) or (not stt_verified)
@@ -160,17 +175,32 @@ class ApplicationStartupAdapter:
         self.presentation.set_dashboard_stt_needs_key(stt_needs_key)
         peer_stt_provider = settings.intent.peer_stt.provider
         if self.stt_requires_secret(STTProviderName(peer_stt_provider)):
-            peer_key_map = {
-                "qwen_asr": self.alibaba_verified_key(),
-                "qwen_audio": self.alibaba_verified_key(),
-            }
-            peer_verified_key = peer_key_map.get(peer_stt_provider, peer_stt_provider)
-            peer_entry = getattr(
-                settings.state.provider_verification,
-                peer_verified_key,
-                None,
-            )
-            peer_verified = getattr(peer_entry, "status", None) == "verified"
+            if peer_stt_provider == STTProviderName.ROLLING_FREE.value:
+                peer_verified = any(
+                    getattr(
+                        getattr(settings.state.provider_verification, member, None),
+                        "status",
+                        None,
+                    )
+                    == "verified"
+                    for member in (
+                        "deepgram",
+                        "gemini_transcribe",
+                        "elevenlabs_scribe",
+                    )
+                )
+            else:
+                peer_key_map = {
+                    "qwen_asr": self.alibaba_verified_key(),
+                    "qwen_audio": self.alibaba_verified_key(),
+                }
+                peer_verified_key = peer_key_map.get(peer_stt_provider, peer_stt_provider)
+                peer_entry = getattr(
+                    settings.state.provider_verification,
+                    peer_verified_key,
+                    None,
+                )
+                peer_verified = getattr(peer_entry, "status", None) == "verified"
             peer_needs_key = not peer_verified
         else:
             peer_needs_key = False

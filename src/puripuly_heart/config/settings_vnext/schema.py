@@ -431,7 +431,6 @@ class CustomSTTIntent:
 @dataclass(frozen=True, slots=True)
 class STTIntent:
     provider: str = "local_cpu_auto"
-    rolling_enabled: bool = False
     drain_timeout_s: float = 2.0
     vad_speech_threshold: float = 0.4
     low_latency_mode: bool = True
@@ -456,7 +455,6 @@ class STTIntent:
 @dataclass(frozen=True, slots=True)
 class PeerSTTIntent:
     provider: str = "local_cpu_auto"
-    rolling_enabled: bool = False
 
 
 @dataclass(frozen=True, slots=True)

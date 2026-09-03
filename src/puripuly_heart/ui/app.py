@@ -1970,6 +1970,8 @@ class TranslatorApp:
             except Exception:
                 return None
             return "alibaba_beijing" if region == QwenRegion.BEIJING.value else "alibaba_singapore"
+        if peer_provider == "rolling_free":
+            return "rolling_free"
         if peer_provider in (
             "deepgram",
             "gemini_transcribe",
@@ -1978,6 +1980,37 @@ class TranslatorApp:
         ):
             return peer_provider
         return None
+
+    def _rolling_member_verified(self) -> bool:
+        try:
+            settings = self.application.compatibility_settings()
+        except Exception:
+            return False
+        if settings is None:
+            return False
+        try:
+            verification = settings.state.provider_verification
+        except Exception:
+            return False
+        for member in ("deepgram", "gemini_transcribe", "elevenlabs_scribe"):
+            try:
+                if getattr(getattr(verification, member, None), "status", None) == "verified":
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def _is_self_rolling(self) -> bool:
+        try:
+            settings = self.application.compatibility_settings()
+        except Exception:
+            return False
+        if settings is None:
+            return False
+        try:
+            return settings.intent.stt.provider == "rolling_free"
+        except Exception:
+            return False
 
     async def _on_verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
         success, msg = await self.application.verify_api_key(provider, key)
@@ -1996,7 +2029,15 @@ class TranslatorApp:
             "alibaba_beijing",
             "alibaba_singapore",
         ):
-            self.view_dashboard.set_stt_needs_key(not success, update_ui=False)
+            if provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe"):
+                if self._is_self_rolling():
+                    self.view_dashboard.set_stt_needs_key(
+                        not self._rolling_member_verified(), update_ui=False
+                    )
+                else:
+                    self.view_dashboard.set_stt_needs_key(not success, update_ui=False)
+            else:
+                self.view_dashboard.set_stt_needs_key(not success, update_ui=False)
         if provider in (
             "google",
             "openrouter",
@@ -2006,8 +2047,17 @@ class TranslatorApp:
             "alibaba_singapore",
         ):
             self.view_dashboard.set_translation_needs_key(not success, update_ui=False)
-        if provider == self._peer_api_key_provider_tag():
-            self.view_dashboard.set_peer_needs_key(not success, update_ui=False)
+        peer_tag = self._peer_api_key_provider_tag()
+        if provider == peer_tag or (
+            peer_tag == "rolling_free"
+            and provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe")
+        ):
+            if peer_tag == "rolling_free":
+                self.view_dashboard.set_peer_needs_key(
+                    not self._rolling_member_verified(), update_ui=False
+                )
+            else:
+                self.view_dashboard.set_peer_needs_key(not success, update_ui=False)
 
         return success, msg
 
@@ -2035,7 +2085,15 @@ class TranslatorApp:
             "alibaba_beijing",
             "alibaba_singapore",
         }:
-            self.view_dashboard.set_stt_needs_key(True, update_ui=False)
+            if provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe"):
+                if self._is_self_rolling():
+                    self.view_dashboard.set_stt_needs_key(
+                        not self._rolling_member_verified(), update_ui=False
+                    )
+                else:
+                    self.view_dashboard.set_stt_needs_key(True, update_ui=False)
+            else:
+                self.view_dashboard.set_stt_needs_key(True, update_ui=False)
         if provider in {
             "google",
             "openrouter",
@@ -2045,8 +2103,20 @@ class TranslatorApp:
             "alibaba_singapore",
         }:
             self.view_dashboard.set_translation_needs_key(True, update_ui=False)
-        if provider is not None and provider == self._peer_api_key_provider_tag():
-            self.view_dashboard.set_peer_needs_key(True, update_ui=False)
+        peer_tag = self._peer_api_key_provider_tag()
+        if provider is not None and (
+            provider == peer_tag
+            or (
+                peer_tag == "rolling_free"
+                and provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe")
+            )
+        ):
+            if peer_tag == "rolling_free":
+                self.view_dashboard.set_peer_needs_key(
+                    not self._rolling_member_verified(), update_ui=False
+                )
+            else:
+                self.view_dashboard.set_peer_needs_key(True, update_ui=False)
         return True
 
     def _on_secret_cleared(self, key: str) -> None:
@@ -2078,7 +2148,15 @@ class TranslatorApp:
                 "alibaba_beijing",
                 "alibaba_singapore",
             ):
-                self.view_dashboard.set_stt_needs_key(True, update_ui=False)
+                if provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe"):
+                    if self._is_self_rolling():
+                        self.view_dashboard.set_stt_needs_key(
+                            not self._rolling_member_verified(), update_ui=False
+                        )
+                    else:
+                        self.view_dashboard.set_stt_needs_key(True, update_ui=False)
+                else:
+                    self.view_dashboard.set_stt_needs_key(True, update_ui=False)
             if provider in (
                 "google",
                 "openrouter",
@@ -2088,8 +2166,17 @@ class TranslatorApp:
                 "alibaba_singapore",
             ):
                 self.view_dashboard.set_translation_needs_key(True, update_ui=False)
-            if provider == self._peer_api_key_provider_tag():
-                self.view_dashboard.set_peer_needs_key(True, update_ui=False)
+            peer_tag = self._peer_api_key_provider_tag()
+            if provider == peer_tag or (
+                peer_tag == "rolling_free"
+                and provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe")
+            ):
+                if peer_tag == "rolling_free":
+                    self.view_dashboard.set_peer_needs_key(
+                        not self._rolling_member_verified(), update_ui=False
+                    )
+                else:
+                    self.view_dashboard.set_peer_needs_key(True, update_ui=False)
 
     def _show_snackbar(self, message: str, bgcolor, duration: int = 4000) -> None:
         """Show a snackbar above the bottom nav."""

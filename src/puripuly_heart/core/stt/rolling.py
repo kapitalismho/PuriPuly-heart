@@ -10,19 +10,16 @@ attempt only, and persists provider exclusion only for conditions that will
 not disappear on the next immediate attempt (auth failure, explicit free
 quota/credit exhaustion).
 
-Free-only invariant: routing fails closed. A provider whose free capacity
-cannot be proven to remain (local estimate exhausted, explicit quota
-exhaustion, auth failure) is skipped instead of silently creating paid usage.
+Free-only invariant: routing fails closed. A provider with explicit quota
+exhaustion or auth failure is skipped instead of silently creating paid usage.
 """
 
 from __future__ import annotations
 
 import logging
 import re
-import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import AsyncIterator
 
@@ -36,10 +33,6 @@ from puripuly_heart.core.stt.backend import (
 )
 
 logger = logging.getLogger(__name__)
-
-GEMINI_ROLLING_SESSION_TARGET_S = 599.0
-GEMINI_FREE_TIER_RPD_BASELINE = 25
-GEMINI_QUOTA_UTC_OFFSET_HOURS = -7
 
 _ERROR_KIND_AUTH = "auth"
 _ERROR_KIND_QUOTA_DAY = "quota_day"
@@ -80,63 +73,6 @@ class RollingProviderStatus:
     observability: RollingQuotaObservability
     estimate_remaining: int | None = None
     estimate_total: int | None = None
-
-
-class GeminiFreeTierEstimator:
-    """Local estimate of Gemini Live free-tier sessions remaining today.
-
-    The estimate counts only sessions successfully established by PuriPuly and
-    is explicitly not authoritative: the same Google project may be used by
-    another application. Only an explicit provider quota signal persists
-    Gemini as exhausted; the estimate gates routing by failing closed when the
-    local daily allowance is consumed.
-    """
-
-    def __init__(
-        self,
-        *,
-        rpd_baseline: int = GEMINI_FREE_TIER_RPD_BASELINE,
-        wall_time: Callable[[], float] = time.time,
-        quota_utc_offset_hours: int = GEMINI_QUOTA_UTC_OFFSET_HOURS,
-    ) -> None:
-        if rpd_baseline <= 0:
-            raise ValueError("rpd_baseline must be > 0")
-        if not -12 <= quota_utc_offset_hours <= 14:
-            raise ValueError("quota_utc_offset_hours must be within -12..14")
-        self._rpd_baseline = rpd_baseline
-        self._wall_time = wall_time
-        self._offset = timezone(timedelta(hours=quota_utc_offset_hours))
-        self._sessions_used = 0
-        self._quota_day = self._current_quota_day()
-
-    def _current_quota_day(self) -> str:
-        now = datetime.fromtimestamp(self._wall_time(), tz=timezone.utc)
-        return now.astimezone(self._offset).date().isoformat()
-
-    def _roll_quota_day(self) -> None:
-        current_day = self._current_quota_day()
-        if current_day != self._quota_day:
-            self._quota_day = current_day
-            self._sessions_used = 0
-
-    def on_session_established(self) -> None:
-        self._roll_quota_day()
-        self._sessions_used += 1
-
-    def remaining_sessions(self) -> int:
-        self._roll_quota_day()
-        return max(0, self._rpd_baseline - self._sessions_used)
-
-    def current_quota_day(self) -> str:
-        self._roll_quota_day()
-        return self._quota_day
-
-    def exhausted(self) -> bool:
-        return self.remaining_sessions() <= 0
-
-    @property
-    def rpd_baseline(self) -> int:
-        return self._rpd_baseline
 
 
 def _error_text(exc: BaseException) -> str:
@@ -190,7 +126,6 @@ class RollingProviderDefinition:
     build_backend: Callable[[], STTBackend]
     is_configured: Callable[[], bool]
     session_deadline_s: float | None = None
-    estimator: GeminiFreeTierEstimator | None = None
     classify_error: Callable[[BaseException], str] | None = None
 
     def classifier(self) -> Callable[[BaseException], str]:
@@ -214,9 +149,6 @@ class RollingSTTBackend(STTBackend):
     _states: dict[STTProviderName, RollingProviderState | None] = field(
         init=False, default_factory=dict, repr=False
     )
-    _quota_day_markers: dict[STTProviderName, str] = field(
-        init=False, default_factory=dict, repr=False
-    )
 
     def __post_init__(self) -> None:
         if not self.providers:
@@ -228,12 +160,6 @@ class RollingSTTBackend(STTBackend):
             if definition.name in seen:
                 raise ValueError(f"duplicate rolling provider: {definition.name}")
             seen.add(definition.name)
-            if definition.name is STTProviderName.GEMINI_TRANSCRIBE and (
-                definition.estimator is None
-            ):
-                raise ValueError(
-                    "gemini_transcribe rolling provider requires a GeminiFreeTierEstimator"
-                )
         object.__setattr__(
             self,
             "providers",
@@ -249,23 +175,10 @@ class RollingSTTBackend(STTBackend):
     def status(self, name: STTProviderName) -> RollingProviderStatus:
         definition = self._definition(name)
         state = self._effective_state(definition)
-        estimator = definition.estimator
-        if estimator is not None and state is RollingProviderState.AVAILABLE:
-            return RollingProviderStatus(
-                name=name,
-                state=state,
-                observability=RollingQuotaObservability.ESTIMATED,
-                estimate_remaining=estimator.remaining_sessions(),
-                estimate_total=estimator.rpd_baseline,
-            )
         return RollingProviderStatus(
             name=name,
             state=state,
-            observability=(
-                RollingQuotaObservability.ESTIMATED
-                if estimator is not None
-                else RollingQuotaObservability.UNKNOWN
-            ),
+            observability=RollingQuotaObservability.UNKNOWN,
         )
 
     def statuses(self) -> tuple[RollingProviderStatus, ...]:
@@ -308,31 +221,10 @@ class RollingSTTBackend(STTBackend):
         if raw is None:
             self._states[name] = RollingProviderState.AVAILABLE
             return RollingProviderState.AVAILABLE
-        if raw is RollingProviderState.FREE_QUOTA_EXHAUSTED and name in self._quota_day_markers:
-            estimator = definition.estimator
-            if estimator is None or estimator.current_quota_day() != self._quota_day_markers[name]:
-                logger.info(
-                    "[STT][Rolling] provider=%s quota state cleared by quota-day reset",
-                    name.value,
-                )
-                self._quota_day_markers.pop(name, None)
-                self._states[name] = RollingProviderState.AVAILABLE
-                return RollingProviderState.AVAILABLE
         return raw
 
     def _is_eligible(self, definition: RollingProviderDefinition) -> bool:
-        state = self._provider_state(definition)
-        if state is not RollingProviderState.AVAILABLE:
-            return False
-        estimator = definition.estimator
-        if estimator is not None and estimator.exhausted():
-            logger.info(
-                "[STT][Rolling] provider=%s skipped: local free-tier estimate exhausted "
-                "(fail-closed, not persisted)",
-                definition.name.value,
-            )
-            return False
-        return True
+        return self._provider_state(definition) is RollingProviderState.AVAILABLE
 
     async def open_session(self) -> STTBackendSession:
         attempt_start = self.clock.now()
@@ -348,9 +240,6 @@ class RollingSTTBackend(STTBackend):
                 self._handle_open_error(definition, exc, kind)
                 last_error = exc
                 continue
-            estimator = definition.estimator
-            if estimator is not None:
-                estimator.on_session_established()
             logger.info(
                 "[STT][Rolling] session selected provider=%s elapsed_s=%.3f",
                 definition.name.value,
@@ -369,7 +258,7 @@ class RollingSTTBackend(STTBackend):
                 [(status.name.value, status.state.value) for status in self.statuses()],
             )
             raise RuntimeError(
-                "All rolling ASR providers are excluded (quota/auth/estimate); "
+                "All rolling ASR providers are excluded (quota/auth); "
                 "see statuses() for per-provider state"
             )
         raise RuntimeError(
@@ -394,14 +283,8 @@ class RollingSTTBackend(STTBackend):
             return
         if kind in _PERSISTENT_EXHAUSTION_STATES:
             self._mark(definition.name, RollingProviderState.FREE_QUOTA_EXHAUSTED)
-            if kind == _ERROR_KIND_QUOTA_DAY:
-                estimator = definition.estimator
-                if estimator is not None:
-                    self._quota_day_markers[definition.name] = estimator.current_quota_day()
-            else:
-                self._quota_day_markers.pop(definition.name, None)
             logger.warning(
-                "[STT][Rolling] provider=%s open failed kind=%s -> excluded until " "quota reset",
+                "[STT][Rolling] provider=%s open failed kind=%s -> excluded until quota reset",
                 definition.name.value,
                 kind,
             )
@@ -424,12 +307,6 @@ class RollingSTTBackend(STTBackend):
             return
         if kind in _PERSISTENT_EXHAUSTION_STATES:
             self._mark(definition.name, RollingProviderState.FREE_QUOTA_EXHAUSTED)
-            if kind == _ERROR_KIND_QUOTA_DAY:
-                estimator = definition.estimator
-                if estimator is not None:
-                    self._quota_day_markers[definition.name] = estimator.current_quota_day()
-            else:
-                self._quota_day_markers.pop(definition.name, None)
 
 
 @dataclass(slots=True)

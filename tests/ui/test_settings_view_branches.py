@@ -2587,6 +2587,7 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
         STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
         STTProviderName.LOCAL_QWEN.value,
         STTProviderName.LOCAL_QWEN_GPU.value,
+        STTProviderName.ROLLING_FREE.value,
         STTProviderName.DEEPGRAM.value,
         STTProviderName.GEMINI_TRANSCRIBE.value,
         STTProviderName.ELEVENLABS_SCRIBE.value,
@@ -6876,14 +6877,32 @@ def test_self_stt_control_returns_single_unit_card(monkeypatch: pytest.MonkeyPat
 def test_update_api_visibility_shows_all_member_keys_when_rolling_on(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = _vnext(stt_provider=STTProviderName.GEMINI_TRANSCRIBE.value)
-    settings = replace(
-        settings,
-        intent=replace(
-            settings.intent,
-            stt=replace(settings.intent.stt, rolling_enabled=True),
-        ),
+    settings = _vnext(stt_provider=STTProviderName.ROLLING_FREE.value)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view._update_api_visibility()
+    assert view._deepgram_key.visible is True
+    assert view._gemini_transcribe_key.visible is True
+    assert view._elevenlabs_scribe_key.visible is True
+
+
+def test_rolling_free_modal_section_replaces_deepgram_in_recommended_cloud(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert STTProviderName.ROLLING_FREE in settings_view._STT_UI_PROVIDERS
+    assert (
+        settings_view._STT_SECTION_BY_PROVIDER[STTProviderName.ROLLING_FREE]
+        == "settings.stt.section.recommended_cloud"
     )
+    assert (
+        settings_view._STT_SECTION_BY_PROVIDER[STTProviderName.DEEPGRAM]
+        == "settings.stt.section.cloud"
+    )
+
+
+def test_update_api_visibility_shows_all_member_keys_when_peer_rolling(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _vnext(peer_stt_provider=STTProviderName.ROLLING_FREE.value)
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
     assert view._deepgram_key.visible is True
@@ -6894,14 +6913,7 @@ def test_update_api_visibility_shows_all_member_keys_when_rolling_on(
 def test_load_from_settings_keeps_provider_row_as_unit_cards(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = _vnext(stt_provider=STTProviderName.DEEPGRAM.value)
-    settings = replace(
-        settings,
-        intent=replace(
-            settings.intent,
-            stt=replace(settings.intent.stt, rolling_enabled=True),
-        ),
-    )
+    settings = _vnext(stt_provider=STTProviderName.ROLLING_FREE.value)
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
     assert view.self_stt_control() is view._self_stt_card

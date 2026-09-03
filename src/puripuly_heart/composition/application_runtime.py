@@ -959,6 +959,7 @@ def compose_application_runtime(
             STTProviderName.QWEN_ASR,
             STTProviderName.QWEN_AUDIO,
             STTProviderName.SONIOX,
+            STTProviderName.ROLLING_FREE,
         }
 
     def dashboard_stt_needs_key(*, stt_available: bool) -> bool:

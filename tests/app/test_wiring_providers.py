@@ -2751,6 +2751,79 @@ def test_create_stt_backend_qwen_asr_uses_legacy_alibaba_secret_key() -> None:
     assert secrets.get("alibaba_api_key_beijing") == "legacy-k4"
 
 
+def test_rolling_free_provider_resolves_directly_without_toggle() -> None:
+    settings = _vnext(stt_provider="rolling_free")
+
+    intent = self_stt_runtime_intent_from_vnext(settings)
+    assert intent.provider == "rolling_free"
+
+    resolved = resolve_self_stt_runtime_config_from_vnext(settings)
+    assert resolved.provider == "rolling_free"
+    assert resolved.provider_options.get("mode") == "rolling_free"
+
+    peer_settings = _vnext(peer_stt_provider="rolling_free")
+    peer_intent = peer_stt_runtime_intent_from_vnext(peer_settings)
+    assert peer_intent.provider == "rolling_free"
+
+
+def test_resolve_peer_stt_config_supports_rolling_free() -> None:
+    settings = _vnext(peer_stt_provider="rolling_free")
+
+    resolved = resolve_peer_stt_config(settings)
+
+    assert resolved.provider is STTProviderName.ROLLING_FREE
+    assert resolved.deepgram_model == settings.intent.stt.deepgram.model
+    assert resolved.gemini_transcribe_model == settings.intent.stt.gemini_transcribe.model
+    assert resolved.elevenlabs_scribe_model == settings.intent.stt.elevenlabs_scribe.model
+
+
+def test_peer_rolling_auto_uses_expected_languages_for_gemini_hints() -> None:
+    from puripuly_heart.core.language import (
+        GEMINI_TRANSCRIBE_MAX_LANGUAGE_HINTS,
+    )
+    from puripuly_heart.core.language import (
+        gemini_transcribe_language_hints as build_gemini_hints,
+    )
+
+    expected_languages = ["en", "ja"]
+    settings = _vnext(
+        peer_stt_provider="rolling_free",
+        peer_source_mode="auto",
+        peer_expected_languages=expected_languages,
+    )
+
+    hints = build_gemini_hints(
+        expected_languages,
+        limit=GEMINI_TRANSCRIBE_MAX_LANGUAGE_HINTS,
+    )
+    assert hints
+
+    intent = peer_stt_runtime_intent_from_vnext(settings)
+    assert intent.provider == "rolling_free"
+    assert intent.gemini_transcribe_language_codes == tuple(hints)
+
+    resolved = resolve_peer_stt_runtime_config_from_vnext(settings)
+    assert resolved.provider == "rolling_free"
+    assert resolved.provider_options.get("language_codes") == tuple(hints)
+
+
+def test_peer_rolling_manual_uses_source_language_for_gemini_hints() -> None:
+    from puripuly_heart.providers.stt.gemini_transcribe import gemini_transcribe_language_codes
+
+    settings = _vnext(
+        peer_stt_provider="rolling_free",
+        peer_source_language="ko",
+        peer_source_mode="manual",
+    )
+
+    intent = peer_stt_runtime_intent_from_vnext(settings)
+
+    assert intent.provider == "rolling_free"
+    assert intent.gemini_transcribe_language_codes == tuple(
+        gemini_transcribe_language_codes("ko")
+    )
+
+
 def test_create_stt_backend_soniox_uses_secret() -> None:
     settings = _vnext(stt_provider="soniox")
     secrets = InMemorySecretStore()

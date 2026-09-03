@@ -206,9 +206,10 @@ _STT_UI_PROVIDERS = (
     STTProviderName.LOCAL_PARAKEET_JAPANESE,
     STTProviderName.LOCAL_QWEN,
     STTProviderName.LOCAL_QWEN_GPU,
-    STTProviderName.DEEPGRAM,
+    STTProviderName.ROLLING_FREE,
     STTProviderName.GEMINI_TRANSCRIBE,
     STTProviderName.ELEVENLABS_SCRIBE,
+    STTProviderName.DEEPGRAM,
     STTProviderName.QWEN_ASR,
     STTProviderName.QWEN_AUDIO,
     STTProviderName.SONIOX,
@@ -231,7 +232,8 @@ _ROLLING_MEMBER_STT_PROVIDERS = frozenset(
     }
 )
 _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
-    STTProviderName.DEEPGRAM: "settings.stt.section.recommended_cloud",
+    STTProviderName.ROLLING_FREE: "settings.stt.section.recommended_cloud",
+    STTProviderName.DEEPGRAM: "settings.stt.section.cloud",
     STTProviderName.GEMINI_TRANSCRIBE: "settings.stt.section.cloud",
     STTProviderName.ELEVENLABS_SCRIBE: "settings.stt.section.cloud",
     STTProviderName.SONIOX: "settings.stt.section.recommended_cloud",
@@ -4411,9 +4413,7 @@ class SettingsView(ft.Column):
         fallback = settings.translation.fallback
         fallback_source = self._openrouter_fallback_source(settings)
         active_stt_providers = {stt, peer_stt}
-        if settings.stt_rolling_enabled and stt in _ROLLING_MEMBER_STT_PROVIDERS:
-            active_stt_providers |= set(_ROLLING_MEMBER_STT_PROVIDERS)
-        if settings.peer_stt_rolling_enabled and peer_stt in _ROLLING_MEMBER_STT_PROVIDERS:
+        if STTProviderName.ROLLING_FREE in active_stt_providers:
             active_stt_providers |= set(_ROLLING_MEMBER_STT_PROVIDERS)
         self._deepgram_key.visible = STTProviderName.DEEPGRAM in active_stt_providers
         gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
@@ -4433,6 +4433,7 @@ class SettingsView(ft.Column):
                 STTProviderName.SONIOX,
                 STTProviderName.QWEN_AUDIO,
                 STTProviderName.GEMINI_TRANSCRIBE,
+                STTProviderName.ROLLING_FREE,
             }
             self._sync_peer_auto_languages_editor()
             if is_control_mounted(self):

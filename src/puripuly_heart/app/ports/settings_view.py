@@ -53,8 +53,6 @@ class ProviderVerificationSnapshot:
 class ProviderSettingsSnapshot:
     stt_provider: STTProviderName
     peer_stt_provider: STTProviderName
-    stt_rolling_enabled: bool
-    peer_stt_rolling_enabled: bool
     llm_provider: LLMProviderName
     translation: TranslationSelectionSnapshot
     stt_gpu_device_id: str
@@ -274,16 +272,6 @@ class SelfSttProviderEdit:
 
 
 @dataclass(frozen=True, slots=True)
-class SttRollingEnabledEdit:
-    enabled: bool
-
-
-@dataclass(frozen=True, slots=True)
-class PeerSttRollingEnabledEdit:
-    enabled: bool
-
-
-@dataclass(frozen=True, slots=True)
 class PeerSttProviderEdit:
     provider: STTProviderName
 
@@ -366,8 +354,6 @@ class SystemPromptEdit:
 
 ProviderSettingsEdit: TypeAlias = (
     SelfSttProviderEdit
-    | SttRollingEnabledEdit
-    | PeerSttRollingEnabledEdit
     | PeerSttProviderEdit
     | SttGpuDeviceEdit
     | LlmGpuDeviceEdit
@@ -449,8 +435,6 @@ __all__ = [
     "QwenRegionEdit",
     "QwenAsrModelEdit",
     "SelfSttProviderEdit",
-    "SttRollingEnabledEdit",
-    "PeerSttRollingEnabledEdit",
     "SelfVadSettingsIntent",
     "SttGpuDeviceEdit",
     "SystemPromptEdit",
