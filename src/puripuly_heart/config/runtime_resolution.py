@@ -217,6 +217,8 @@ CREDENTIAL_REF_CEREBRAS_BYOK: Final = "cerebras:byok"
 CREDENTIAL_REF_QWEN_BEIJING: Final = "qwen:beijing"
 CREDENTIAL_REF_QWEN_SINGAPORE: Final = "qwen:singapore"
 CREDENTIAL_REF_DEEPGRAM_STT: Final = "deepgram:stt"
+CREDENTIAL_REF_GEMINI_TRANSCRIBE_STT: Final = "gemini_transcribe:stt"
+CREDENTIAL_REF_ELEVENLABS_SCRIBE_STT: Final = "elevenlabs_scribe:stt"
 CREDENTIAL_REF_SONIOX_STT: Final = "soniox:stt"
 CREDENTIAL_REF_CUSTOM_STT: Final = "custom:stt"
 
@@ -226,10 +228,13 @@ STT_PROVIDER_LOCAL_PARAKEET_JAPANESE: Final = "local_parakeet_ja"
 STT_PROVIDER_LOCAL_QWEN: Final = "local_qwen"
 STT_PROVIDER_LOCAL_QWEN_GPU: Final = "local_qwen_gpu"
 STT_PROVIDER_DEEPGRAM: Final = "deepgram"
+STT_PROVIDER_GEMINI_TRANSCRIBE: Final = "gemini_transcribe"
+STT_PROVIDER_ELEVENLABS_SCRIBE: Final = "elevenlabs_scribe"
 STT_PROVIDER_QWEN_ASR: Final = "qwen_asr"
 STT_PROVIDER_QWEN_AUDIO: Final = "qwen_audio"
 STT_PROVIDER_SONIOX: Final = "soniox"
 STT_PROVIDER_CUSTOM: Final = "custom"
+STT_PROVIDER_ROLLING_FREE: Final = "rolling_free"
 STT_PROVIDER_CUSTOM_OFFLINE: Final = "custom_offline"
 STT_PROVIDER_CUSTOM_REALTIME: Final = "custom_realtime"
 STT_CUSTOM_PROVIDERS: Final[tuple[str, ...]] = (
@@ -244,8 +249,11 @@ STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_LOCAL_QWEN,
     STT_PROVIDER_LOCAL_QWEN_GPU,
     STT_PROVIDER_DEEPGRAM,
+    STT_PROVIDER_ELEVENLABS_SCRIBE,
+    STT_PROVIDER_GEMINI_TRANSCRIBE,
     STT_PROVIDER_QWEN_ASR,
     STT_PROVIDER_SONIOX,
+    STT_PROVIDER_ROLLING_FREE,
     STT_PROVIDER_CUSTOM,
     STT_PROVIDER_CUSTOM_OFFLINE,
     STT_PROVIDER_CUSTOM_REALTIME,
@@ -253,6 +261,8 @@ STT_PROVIDERS: Final[tuple[str, ...]] = (
 PEER_AUTO_DETECTION_STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_LOCAL_QWEN_GPU,
     STT_PROVIDER_SONIOX,
+    STT_PROVIDER_GEMINI_TRANSCRIBE,
+    STT_PROVIDER_ELEVENLABS_SCRIBE,
 )
 STT_DEFAULT_SOURCE_LANGUAGE: Final = "ko"
 STT_DEFAULT_PEER_SOURCE_LANGUAGE: Final = "en"
@@ -270,6 +280,11 @@ STT_DEFAULT_LOW_LATENCY_ENABLED: Final = True
 STT_DEFAULT_LOW_LATENCY_MERGE_GAP_MS: Final = 600
 STT_DEFAULT_LOW_LATENCY_SPEC_RETRY_MAX: Final = 10
 DEEPGRAM_STT_MODEL_NOVA_3: Final = "nova-3"
+GEMINI_TRANSCRIBE_STT_MODEL: Final = "gemini-3.5-transcribe-live"
+GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS: Final = 1000
+ELEVENLABS_SCRIBE_STT_MODEL: Final = "scribe_v2_realtime"
+ELEVENLABS_SCRIBE_STT_MAX_KEYTERMS: Final = 50
+ELEVENLABS_SCRIBE_STT_MAX_KEYTERM_CHARS: Final = 20
 QWEN_ASR_STT_MODEL_REALTIME: Final = "qwen3-asr-flash-realtime"
 QWEN_ASR_STT_MODEL_AUDIO_STREAMING: Final = "qwen-audio-3.0-asr-flash-streaming"
 SONIOX_STT_MODEL_RT_V5: Final = "stt-rt-v5"
@@ -762,6 +777,12 @@ class STTRuntimeIntent:
     custom_vocabulary_enabled: bool = False
     custom_terms: Mapping[str, tuple[str, ...]] = field(default_factory=_empty_custom_terms)
     deepgram_model: str = DEEPGRAM_STT_MODEL_NOVA_3
+    gemini_transcribe_model: str = GEMINI_TRANSCRIBE_STT_MODEL
+    gemini_transcribe_language_codes: tuple[str, ...] | None = None
+    gemini_transcribe_auto_language: bool = False
+    elevenlabs_scribe_model: str = ELEVENLABS_SCRIBE_STT_MODEL
+    elevenlabs_scribe_language_code: str | None = None
+    elevenlabs_scribe_auto_language: bool = False
     qwen_asr_model: str = QWEN_ASR_STT_MODEL_REALTIME
     qwen_region: str = QWEN_REGION_BEIJING
     soniox_model: str = SONIOX_STT_MODEL_RT_V5
@@ -1265,11 +1286,51 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
     credential = _no_credential()
     provider_options: Mapping[str, object] = {}
 
-    if provider == STT_PROVIDER_DEEPGRAM:
+    if provider == STT_PROVIDER_ROLLING_FREE:
+        provider_options = {
+            "mode": "rolling_free",
+            "gemini_model": intent.gemini_transcribe_model,
+            "scribe_model": intent.elevenlabs_scribe_model,
+            "deepgram_model": intent.deepgram_model,
+        }
+    elif provider == STT_PROVIDER_DEEPGRAM:
         model = intent.deepgram_model
         credential = _required_credential(
             CREDENTIAL_SOURCE_SECRET_STORE, CREDENTIAL_REF_DEEPGRAM_STT
         )
+    elif provider == STT_PROVIDER_GEMINI_TRANSCRIBE:
+        model = intent.gemini_transcribe_model
+        credential = _required_credential(
+            CREDENTIAL_SOURCE_SECRET_STORE, CREDENTIAL_REF_GEMINI_TRANSCRIBE_STT
+        )
+        if (
+            intent.gemini_transcribe_auto_language
+            or intent.gemini_transcribe_language_codes is None
+        ):
+            provider_options = {
+                "language_codes": (),
+                "auto_language": True,
+            }
+        else:
+            provider_options = {
+                "language_codes": intent.gemini_transcribe_language_codes,
+                "auto_language": False,
+            }
+    elif provider == STT_PROVIDER_ELEVENLABS_SCRIBE:
+        model = intent.elevenlabs_scribe_model
+        credential = _required_credential(
+            CREDENTIAL_SOURCE_SECRET_STORE, CREDENTIAL_REF_ELEVENLABS_SCRIBE_STT
+        )
+        if intent.elevenlabs_scribe_auto_language or intent.elevenlabs_scribe_language_code is None:
+            provider_options = {
+                "language_code": None,
+                "auto_language": True,
+            }
+        else:
+            provider_options = {
+                "language_code": intent.elevenlabs_scribe_language_code,
+                "auto_language": False,
+            }
     elif provider == STT_PROVIDER_QWEN_ASR:
         model = intent.qwen_asr_model
         region = intent.qwen_region
@@ -1652,11 +1713,18 @@ __all__ = [
     "CREDENTIAL_REF_OPENROUTER_MANAGED_QQ",
     "CREDENTIAL_REF_CUSTOM_STT",
     "CREDENTIAL_REF_DEEPGRAM_STT",
+    "CREDENTIAL_REF_ELEVENLABS_SCRIBE_STT",
+    "CREDENTIAL_REF_GEMINI_TRANSCRIBE_STT",
     "CREDENTIAL_REF_QWEN_BEIJING",
     "CREDENTIAL_REF_QWEN_SINGAPORE",
     "CREDENTIAL_REF_SONIOX_STT",
     "DEEPSEEK_MODEL_V4_FLASH",
     "DEEPGRAM_STT_MODEL_NOVA_3",
+    "ELEVENLABS_SCRIBE_STT_MODEL",
+    "ELEVENLABS_SCRIBE_STT_MAX_KEYTERMS",
+    "ELEVENLABS_SCRIBE_STT_MAX_KEYTERM_CHARS",
+    "GEMINI_TRANSCRIBE_STT_MODEL",
+    "GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS",
     "DirectProviderRuntimeIntent",
     "CEREBRAS_MODEL_GEMMA_4_31B",
     "GEMINI_MODEL_37_FLASH",
@@ -1708,6 +1776,8 @@ __all__ = [
     "STT_DEFAULT_VAD_PRE_ROLL_MS",
     "STT_DEFAULT_VAD_SPEECH_THRESHOLD",
     "STT_PROVIDER_DEEPGRAM",
+    "STT_PROVIDER_ELEVENLABS_SCRIBE",
+    "STT_PROVIDER_GEMINI_TRANSCRIBE",
     "STT_PROVIDER_LOCAL_CPU_AUTO",
     "STT_PROVIDER_LOCAL_PARAKEET_JAPANESE",
     "STT_PROVIDER_LOCAL_PARAKEET_V3",
@@ -1716,6 +1786,7 @@ __all__ = [
     "PEER_AUTO_DETECTION_STT_PROVIDERS",
     "STT_PROVIDER_QWEN_ASR",
     "STT_PROVIDER_SONIOX",
+    "STT_PROVIDER_ROLLING_FREE",
     "STT_PROVIDER_CUSTOM",
     "STT_PROVIDERS",
     "STTRuntimeIntent",

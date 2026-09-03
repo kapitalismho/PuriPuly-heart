@@ -155,7 +155,11 @@ def test_state_from_settings_publishes_each_fallback_alias(
         (STTProviderName.CUSTOM_OFFLINE, 8),
         (STTProviderName.CUSTOM_REALTIME, 9),
         (STTProviderName.CUSTOM, 8),
-        (STTProviderName.QWEN_AUDIO, 6),
+        (STTProviderName.QWEN_ASR, 6),
+        (STTProviderName.QWEN_AUDIO, 12),
+        (STTProviderName.GEMINI_TRANSCRIBE, 10),
+        (STTProviderName.ELEVENLABS_SCRIBE, 11),
+        (STTProviderName.ROLLING_FREE, 13),
     ],
 )
 def test_state_publisher_publishes_custom_asr_ids(
@@ -175,3 +179,31 @@ def test_state_publisher_publishes_custom_asr_ids(
     OscStatePublisher(sender).start(state_from_settings(settings))
 
     assert ("/avatar/parameters/PuriPuly_SelfASR", expected_id) in sender.messages
+
+
+@pytest.mark.parametrize(
+    ("provider", "expected_id"),
+    [
+        (STTProviderName.GEMINI_TRANSCRIBE, 10),
+        (STTProviderName.ELEVENLABS_SCRIBE, 11),
+        (STTProviderName.QWEN_AUDIO, 12),
+        (STTProviderName.ROLLING_FREE, 13),
+    ],
+)
+def test_state_publisher_publishes_peer_asr_ids_for_new_providers(
+    provider: STTProviderName,
+    expected_id: int,
+) -> None:
+    baseline = AppSettingsVNext()
+    settings = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            peer_stt=replace(baseline.intent.peer_stt, provider=provider.value),
+        ),
+    )
+    sender = FakeSender()
+
+    OscStatePublisher(sender).start(state_from_settings(settings))
+
+    assert ("/avatar/parameters/PuriPuly_PeerASR", expected_id) in sender.messages

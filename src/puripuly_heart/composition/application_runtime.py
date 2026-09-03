@@ -954,6 +954,8 @@ def compose_application_runtime(
     def stt_requires_secret(provider: STTProviderName) -> bool:
         return provider in {
             STTProviderName.DEEPGRAM,
+            STTProviderName.GEMINI_TRANSCRIBE,
+            STTProviderName.ELEVENLABS_SCRIBE,
             STTProviderName.QWEN_ASR,
             STTProviderName.QWEN_AUDIO,
             STTProviderName.SONIOX,

@@ -42,6 +42,8 @@ _DIRECT_PROVIDERS = frozenset(
         "deepseek",
         "cerebras",
         "deepgram",
+        "gemini_transcribe",
+        "elevenlabs_scribe",
         "soniox",
     }
 )
