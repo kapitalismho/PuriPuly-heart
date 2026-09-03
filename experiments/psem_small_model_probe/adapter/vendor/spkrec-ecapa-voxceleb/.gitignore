@@ -1,0 +1,4 @@
+*
+!*.receipt.json
+!*.md
+!.gitignore

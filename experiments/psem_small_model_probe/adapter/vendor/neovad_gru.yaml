@@ -1,0 +1,10 @@
+# CPU-fastest baseline: small causal GRU (Silero-class control). Lowest RTF of the
+# neovad backbones; the safe production fallback.
+name: gru
+model:
+  dim: 96
+  depth: 2
+  mixer:
+    kind: gru
+    hidden: 128
+    num_layers: 1

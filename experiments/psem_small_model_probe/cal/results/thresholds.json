@@ -1,0 +1,38 @@
+[
+  {
+    "model": "stub",
+    "regime": "O",
+    "selection_reason": "a) false_cuts=0 (zero attainable: True); b) missed=2/2 (rate=1.0); c) median_total_delay=Nonems; tau=0.05 lowest on remaining ties",
+    "tau": 0.05
+  },
+  {
+    "model": "stub",
+    "regime": "C",
+    "selection_reason": "a) false_cuts=0 (zero attainable: True); b) missed=2/2 (rate=1.0); c) median_total_delay=Nonems; tau=0.05 lowest on remaining ties",
+    "tau": 0.05
+  },
+  {
+    "model": "firered",
+    "regime": "O",
+    "selection_reason": "a) false_cuts=5 (zero attainable: False); b) missed=1/2 (rate=0.5); c) median_total_delay=2700ms; tau=0.05 lowest on remaining ties",
+    "tau": 0.05
+  },
+  {
+    "model": "firered",
+    "regime": "C",
+    "selection_reason": "a) false_cuts=4 (zero attainable: False); b) missed=1/2 (rate=0.5); c) median_total_delay=2700ms; tau=0.05 lowest on remaining ties",
+    "tau": 0.05
+  },
+  {
+    "model": "neovad",
+    "regime": "O",
+    "selection_reason": "a) false_cuts=0 (zero attainable: True); b) missed=2/2 (rate=1.0); c) median_total_delay=Nonems; tau=0.05 lowest on remaining ties",
+    "tau": 0.05
+  },
+  {
+    "model": "neovad",
+    "regime": "C",
+    "selection_reason": "a) false_cuts=0 (zero attainable: True); b) missed=2/2 (rate=1.0); c) median_total_delay=Nonems; tau=0.05 lowest on remaining ties",
+    "tau": 0.05
+  }
+]
