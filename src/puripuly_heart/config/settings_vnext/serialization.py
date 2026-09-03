@@ -20,6 +20,8 @@ from puripuly_heart.config.settings_vnext.schema import (
 CANONICAL_TOP_LEVEL_KEYS: Final = frozenset({"settings_version", "intent", "state"})
 _PROVIDER_VERIFICATION_FIELDS: Final = (
     "deepgram",
+    "gemini_transcribe",
+    "elevenlabs_scribe",
     "soniox",
     "google",
     "openrouter",

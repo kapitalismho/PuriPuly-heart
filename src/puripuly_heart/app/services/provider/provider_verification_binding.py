@@ -18,6 +18,8 @@ _SECRET_KEY_BY_PROVIDER = {
     "alibaba_beijing": "alibaba_api_key_beijing",
     "alibaba_singapore": "alibaba_api_key_singapore",
     "deepgram": "deepgram_api_key",
+    "gemini_transcribe": "gemini_transcribe_api_key",
+    "elevenlabs_scribe": "elevenlabs_scribe_api_key",
     "soniox": "soniox_api_key",
 }
 _PROVIDER_BY_SECRET_KEY = {

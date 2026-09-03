@@ -40,6 +40,7 @@ from puripuly_heart.app.ports.settings_view import (
     OverlayTranslationSettingsIntent,
     PeerExpectedLanguagesIntent,
     PeerSttProviderEdit,
+    PeerSttRollingEnabledEdit,
     PeerVadHangoverIntent,
     PeerVadPreRollIntent,
     PeerVadSpeechThresholdIntent,
@@ -53,6 +54,7 @@ from puripuly_heart.app.ports.settings_view import (
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
     SttGpuDeviceEdit,
+    SttRollingEnabledEdit,
     SystemPromptEdit,
     TranslationFallbackEdit,
     TranslationFallbackSnapshot,
@@ -209,6 +211,8 @@ def settings_view_surface_snapshots(
     provider = ProviderSettingsSnapshot(
         stt_provider=STTProviderName(intent.stt.provider),
         peer_stt_provider=STTProviderName(intent.peer_stt.provider),
+        stt_rolling_enabled=intent.stt.rolling_enabled,
+        peer_stt_rolling_enabled=intent.peer_stt.rolling_enabled,
         llm_provider=LLMProviderName(
             provider_llm_for_translation(translation.model, translation.connection)
         ),
@@ -256,6 +260,8 @@ def settings_view_surface_snapshots(
         ),
         verified=ProviderVerificationSnapshot(
             deepgram=_verified(verification.deepgram),
+            gemini_transcribe=_verified(verification.gemini_transcribe),
+            elevenlabs_scribe=_verified(verification.elevenlabs_scribe),
             soniox=_verified(verification.soniox),
             google=_verified(verification.google),
             openrouter=_verified(verification.openrouter),
@@ -596,6 +602,16 @@ def materialize_provider_apply_intent(
                     updated.intent.stt,
                     provider=str(getattr(edit.provider, "value", edit.provider)),
                 ),
+            )
+        elif isinstance(edit, SttRollingEnabledEdit):
+            updated = _with_intent(
+                updated,
+                stt=replace(updated.intent.stt, rolling_enabled=edit.enabled),
+            )
+        elif isinstance(edit, PeerSttRollingEnabledEdit):
+            updated = _with_intent(
+                updated,
+                peer_stt=replace(updated.intent.peer_stt, rolling_enabled=edit.enabled),
             )
         elif isinstance(edit, PeerSttProviderEdit):
             updated = _with_intent(

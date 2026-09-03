@@ -69,6 +69,7 @@ from puripuly_heart.app.ports.settings_view import (
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
     SttGpuDeviceEdit,
+    SttRollingEnabledEdit,
     SystemPromptEdit,
     TranslationFallbackEdit,
     TranslationFallbackSnapshot,
@@ -207,6 +208,8 @@ _STT_UI_PROVIDERS = (
     STTProviderName.LOCAL_QWEN,
     STTProviderName.LOCAL_QWEN_GPU,
     STTProviderName.DEEPGRAM,
+    STTProviderName.GEMINI_TRANSCRIBE,
+    STTProviderName.ELEVENLABS_SCRIBE,
     STTProviderName.QWEN_ASR,
     STTProviderName.QWEN_AUDIO,
     STTProviderName.SONIOX,
@@ -221,8 +224,17 @@ _STT_SECTION_ORDER = (
     "settings.stt.section.cpu_inference",
     "settings.stt.section.custom",
 )
+_ROLLING_MEMBER_STT_PROVIDERS = frozenset(
+    {
+        STTProviderName.DEEPGRAM,
+        STTProviderName.GEMINI_TRANSCRIBE,
+        STTProviderName.ELEVENLABS_SCRIBE,
+    }
+)
 _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.DEEPGRAM: "settings.stt.section.recommended_cloud",
+    STTProviderName.GEMINI_TRANSCRIBE: "settings.stt.section.cloud",
+    STTProviderName.ELEVENLABS_SCRIBE: "settings.stt.section.cloud",
     STTProviderName.SONIOX: "settings.stt.section.recommended_cloud",
     STTProviderName.LOCAL_CPU_AUTO: "settings.stt.section.recommended_local",
     STTProviderName.QWEN_ASR: "settings.stt.section.cloud",
@@ -563,7 +575,21 @@ class SettingsView(ft.Column):
         self._local_cpu_auto_available = bool(available)
 
     def self_stt_control(self) -> ft.Control:
-        return self._self_stt_card
+        container = getattr(self, "_self_stt_container", None)
+        if container is None:
+            container = ft.Column(
+                [
+                    self._self_stt_card,
+                    self._stt_rolling_switch,
+                ],
+                spacing=8,
+                tight=True,
+            )
+            self._self_stt_container = container
+        return container
+
+    def stt_rolling_control(self) -> ft.Control:
+        return self._stt_rolling_switch
 
     def peer_stt_control(self) -> ft.Control:
         return self._peer_stt_card
@@ -1172,6 +1198,12 @@ class SettingsView(ft.Column):
             title=self._stt_title,
             value=self._stt_text,
         )
+        self._stt_rolling_switch = ft.Switch(
+            label=t("settings.stt_rolling"),
+            value=False,
+            active_color=COLOR_PRIMARY,
+            on_change=self._on_stt_rolling_toggle,
+        )
 
         self._llm_text = self._build_clickable_text(
             t("provider.gemini37_flash"),
@@ -1216,6 +1248,26 @@ class SettingsView(ft.Column):
             "settings.deepgram_api_key",
             "deepgram_api_key",
             "deepgram",
+            on_verify=self._verify_key,
+            on_save=self._on_secret_change,
+            show_snackbar=lambda msg, bg: (
+                self.show_snackbar(msg, bg) if self.show_snackbar else None
+            ),
+        )
+        self._gemini_transcribe_key = ApiKeyField(
+            "settings.gemini_transcribe_api_key",
+            "gemini_transcribe_api_key",
+            "gemini_transcribe",
+            on_verify=self._verify_key,
+            on_save=self._on_secret_change,
+            show_snackbar=lambda msg, bg: (
+                self.show_snackbar(msg, bg) if self.show_snackbar else None
+            ),
+        )
+        self._elevenlabs_scribe_key = ApiKeyField(
+            "settings.elevenlabs_scribe_api_key",
+            "elevenlabs_scribe_api_key",
+            "elevenlabs_scribe",
             on_verify=self._verify_key,
             on_save=self._on_secret_change,
             show_snackbar=lambda msg, bg: (
@@ -1402,6 +1454,8 @@ class SettingsView(ft.Column):
             [
                 # self._qwen_region_row removed
                 self._deepgram_key,
+                self._gemini_transcribe_key,
+                self._elevenlabs_scribe_key,
                 self._soniox_key,
                 self._google_key,
                 self._deepseek_key,
@@ -3502,6 +3556,35 @@ class SettingsView(ft.Column):
     def _record_provider_edit(self, edit: ProviderSettingsEdit) -> None:
         self._provider_edits[type(edit)] = edit
 
+    def _on_stt_rolling_toggle(self, e) -> None:
+        if self._provider_snapshot is None:
+            self._stt_rolling_switch.value = False
+            return
+        enabled = bool(e.control.value)
+        current_settings = self._build_settings_with_provider_draft()
+        if current_settings is not None and current_settings.stt_rolling_enabled == enabled:
+            return
+        snapshot_enabled = self._provider_snapshot.stt_rolling_enabled
+        draft = self._ensure_provider_settings_draft()
+        self._provider_draft = replace(draft, stt_rolling_enabled=enabled)
+        if enabled == snapshot_enabled:
+            self._provider_edits.pop(SttRollingEnabledEdit, None)
+            self.has_provider_changes = bool(self._provider_edits)
+        else:
+            self._record_provider_edit(SttRollingEnabledEdit(enabled))
+            self.has_provider_changes = True
+        self._update_api_visibility()
+        _update_control_if_mounted(self._stt_rolling_switch)
+        self._emit_runtime_basic(f"[Settings] STT rolling {'enabled' if enabled else 'disabled'}")
+
+    def sync_stt_rolling_switch(self, settings: ProviderSettingsSnapshot | None) -> None:
+        switch = getattr(self, "_stt_rolling_switch", None)
+        if switch is None or settings is None:
+            return
+        switch.value = settings.stt_rolling_enabled
+        switch.disabled = settings.stt_provider not in _ROLLING_MEMBER_STT_PROVIDERS
+        _update_control_if_mounted(switch)
+
     def _translation_selection_edit(
         self,
         selection: TranslationSelectionSnapshot,
@@ -3859,6 +3942,7 @@ class SettingsView(ft.Column):
                 qwen_asr_model=provider.qwen_asr_model,
             ),
         )
+        self.sync_stt_rolling_switch(provider)
         self._update_api_visibility()
         self._sync_gpu_device_card()
 
@@ -4206,6 +4290,14 @@ class SettingsView(ft.Column):
             self._cerebras_key.value = snapshot.cerebras_api_key
         if snapshot.deepgram_api_key is not None:
             self._deepgram_key.value = snapshot.deepgram_api_key
+        if snapshot.gemini_transcribe_api_key is not None:
+            gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
+            if gemini_transcribe_key is not None:
+                gemini_transcribe_key.value = snapshot.gemini_transcribe_api_key
+        if snapshot.elevenlabs_scribe_api_key is not None:
+            elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
+            if elevenlabs_scribe_key is not None:
+                elevenlabs_scribe_key.value = snapshot.elevenlabs_scribe_api_key
         if snapshot.soniox_api_key is not None:
             self._soniox_key.value = snapshot.soniox_api_key
         if snapshot.local_llm_api_key is not None:
@@ -4240,8 +4332,20 @@ class SettingsView(ft.Column):
         verified = settings.verified
 
         # Map field -> (has_key, is_verified)
+        gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
+        elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
         field_map = [
             (self._deepgram_key, self._deepgram_key.value, verified.deepgram),
+            (
+                gemini_transcribe_key,
+                gemini_transcribe_key.value if gemini_transcribe_key else None,
+                verified.gemini_transcribe,
+            ),
+            (
+                elevenlabs_scribe_key,
+                elevenlabs_scribe_key.value if elevenlabs_scribe_key else None,
+                verified.elevenlabs_scribe,
+            ),
             (self._soniox_key, self._soniox_key.value, verified.soniox),
             (self._google_key, self._google_key.value, verified.google),
             (self._openrouter_key, self._openrouter_key.value, verified.openrouter),
@@ -4253,6 +4357,11 @@ class SettingsView(ft.Column):
                 self._alibaba_key_singapore.value,
                 verified.alibaba_singapore,
             ),
+        ]
+        field_map = [
+            (field, has_key, is_verified)
+            for field, has_key, is_verified in field_map
+            if field is not None
         ]
 
         for field, has_key, is_verified in field_map:
@@ -4322,7 +4431,21 @@ class SettingsView(ft.Column):
         fallback = settings.translation.fallback
         fallback_source = self._openrouter_fallback_source(settings)
         active_stt_providers = {stt, peer_stt}
+        if settings.stt_rolling_enabled and stt in _ROLLING_MEMBER_STT_PROVIDERS:
+            active_stt_providers |= set(_ROLLING_MEMBER_STT_PROVIDERS)
+        if settings.peer_stt_rolling_enabled and peer_stt in _ROLLING_MEMBER_STT_PROVIDERS:
+            active_stt_providers |= set(_ROLLING_MEMBER_STT_PROVIDERS)
         self._deepgram_key.visible = STTProviderName.DEEPGRAM in active_stt_providers
+        gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
+        if gemini_transcribe_key is not None:
+            gemini_transcribe_key.visible = (
+                STTProviderName.GEMINI_TRANSCRIBE in active_stt_providers
+            )
+        elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
+        if elevenlabs_scribe_key is not None:
+            elevenlabs_scribe_key.visible = (
+                STTProviderName.ELEVENLABS_SCRIBE in active_stt_providers
+            )
         self._soniox_key.visible = STTProviderName.SONIOX in active_stt_providers
         peer_auto_languages_card = getattr(self, "_peer_auto_languages_card", None)
         if peer_auto_languages_card is not None:
@@ -4422,6 +4545,8 @@ class SettingsView(ft.Column):
                 getattr(control, "visible", False)
                 for control in (
                     self._deepgram_key,
+                    getattr(self, "_gemini_transcribe_key", None),
+                    getattr(self, "_elevenlabs_scribe_key", None),
                     self._soniox_key,
                     self._google_key,
                     self._deepseek_key,
@@ -4610,6 +4735,7 @@ class SettingsView(ft.Column):
                 qwen_asr_model=settings.qwen_asr_model,
             ),
         )
+        self.sync_stt_rolling_switch(settings)
 
     def _show_stt_selection_notice(self, message: str) -> None:
         if self.show_snackbar:
@@ -6657,6 +6783,7 @@ class SettingsView(ft.Column):
 
         # Section titles
         self._stt_title.value = t("settings.section.stt")
+        self._stt_rolling_switch.label = t("settings.stt_rolling")
         self._trans_title.value = t("settings.section.translation")
         self._api_title.value = t("settings.section.api_keys")
         self._managed_key_title.value = t("settings.managed_key.title")
@@ -6841,6 +6968,8 @@ class SettingsView(ft.Column):
 
         # Components
         self._deepgram_key.apply_locale()
+        self._gemini_transcribe_key.apply_locale()
+        self._elevenlabs_scribe_key.apply_locale()
         self._soniox_key.apply_locale()
         self._google_key.apply_locale()
         self._managed_trial_usage_bar.apply_locale()
