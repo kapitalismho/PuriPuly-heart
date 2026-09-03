@@ -522,7 +522,8 @@ class ManagedSTTProvider:
                 self._active_utterance_id = None
             return
 
-        await self._send_audio(event.pre_roll)
+        if not await self._send_audio(event.pre_roll):
+            return
         await self._send_audio(event.chunk)
 
     async def _apply_pending_session_options(self) -> None:
@@ -571,21 +572,30 @@ class ManagedSTTProvider:
             )
             self._emit_stt_input_diagnostics(event.utterance_id, finalize=True)
 
-        await session.on_speech_end(
-            trailing_silence_ms=event.trailing_silence_ms,
-            reason=event.reason,
-        )
+        try:
+            await session.on_speech_end(
+                trailing_silence_ms=event.trailing_silence_ms,
+                reason=event.reason,
+            )
+        except Exception as exc:
+            await self._handle_audio_send_failure(session, exc)
 
-    async def _send_audio(self, samples_f32: np.ndarray) -> None:
+    async def _send_audio(self, samples_f32: np.ndarray) -> bool:
         samples_f32 = np.asarray(samples_f32, dtype=np.float32).reshape(-1)
         if samples_f32.size == 0:
-            return
+            return True
         samples_f32 = self._apply_stt_input_fault(samples_f32)
         self._record_stt_input_diagnostics(samples_f32)
         self._audio_ring.append(samples_f32)  # type: ignore[union-attr]
-        if self._active_session is None:
-            raise RuntimeError("STT session is not active")
-        await self._send_audio_to_session(self._active_session, samples_f32)
+        session = self._active_session
+        if session is None:
+            return False
+        try:
+            await self._send_audio_to_session(session, samples_f32)
+        except Exception as exc:
+            await self._handle_audio_send_failure(session, exc)
+            return False
+        return True
 
     def _current_stt_fault_profile(self) -> AudioFaultProfile:
         if self.stt_input_fault_profile_provider is None:
@@ -1201,6 +1211,46 @@ class ManagedSTTProvider:
             raise
         except Exception as exc:
             await self._handle_terminal_session_failure(session, exc)
+        else:
+            await self._handle_provider_session_ended(session)
+
+    async def _handle_audio_send_failure(
+        self,
+        session: STTBackendSession,
+        exc: Exception,
+    ) -> None:
+        self._emit_basic(
+            "[STT] Audio send failed channel=%s provider=%s: %s",
+            self.channel,
+            self._provider_label(),
+            exc,
+            level=logging.WARNING,
+            fallback_level=logging.WARNING,
+        )
+        await self._handle_provider_session_ended(session)
+
+    async def _handle_provider_session_ended(self, session: STTBackendSession) -> None:
+        if session is not self._active_session or self._closing:
+            return
+        consumer = self._consumer_task
+        self._active_session = None
+        self._consumer_task = None
+        self._session_started_at = None
+        self._active_utterance_id = None
+        self._pending_final_utterance_ids.clear()
+        self._pending_final_utterance_times.clear()
+        self._last_speech_end_time = None
+        if self._reset_timer is not None:
+            self._reset_timer.cancel()
+            self._reset_timer = None
+        await self._set_state(STTSessionState.DISCONNECTED)
+        if consumer is None or consumer is asyncio.current_task():
+            with contextlib.suppress(Exception):
+                await session.stop()
+            with contextlib.suppress(Exception):
+                await session.close()
+            return
+        await self._drain_and_close(session, consumer, allow_finalize=False)
 
     async def _handle_terminal_session_failure(
         self,

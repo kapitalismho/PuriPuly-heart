@@ -485,6 +485,138 @@ class TerminalThenHealthyBackend:
         return session
 
 
+class ImmediateCloseSession:
+    def __init__(self) -> None:
+        self.closed = False
+        self.stopped = False
+        self.audio: list[bytes] = []
+
+    async def send_audio(self, pcm16le: bytes) -> None:
+        self.audio.append(pcm16le)
+
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        _ = (trailing_silence_ms, reason)
+
+    async def stop(self) -> None:
+        self.stopped = True
+
+    async def close(self) -> None:
+        self.closed = True
+
+    async def events(self):
+        if False:
+            yield STTBackendTranscriptEvent(text="", is_final=False)
+        return
+
+
+class ClosingThenHealthyBackend:
+    def __init__(self) -> None:
+        self.sessions: list[object] = []
+
+    async def open_session(self):
+        if not self.sessions:
+            session = ImmediateCloseSession()
+        else:
+            session = FakeSession()
+        self.sessions.append(session)
+        return session
+
+
+class SendFailureSession:
+    def __init__(self) -> None:
+        self.closed = False
+        self._queue: asyncio.Queue[STTBackendTranscriptEvent | None] = asyncio.Queue()
+
+    async def send_audio(self, pcm16le: bytes) -> None:
+        _ = pcm16le
+        raise RuntimeError("websocket closed")
+
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        _ = (trailing_silence_ms, reason)
+
+    async def stop(self) -> None:
+        await self._queue.put(None)
+
+    async def close(self) -> None:
+        self.closed = True
+        await self._queue.put(None)
+
+    async def events(self):
+        while True:
+            item = await self._queue.get()
+            if item is None:
+                return
+            yield item
+
+
+class SendFailureThenHealthyBackend:
+    def __init__(self) -> None:
+        self.sessions: list[object] = []
+
+    async def open_session(self):
+        if not self.sessions:
+            session = SendFailureSession()
+        else:
+            session = FakeSession()
+        self.sessions.append(session)
+        return session
+
+
+class CommitFailureSession:
+    def __init__(self) -> None:
+        self.closed = False
+        self._queue: asyncio.Queue[STTBackendTranscriptEvent | None] = asyncio.Queue()
+
+    async def send_audio(self, pcm16le: bytes) -> None:
+        _ = pcm16le
+
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        _ = (trailing_silence_ms, reason)
+        raise RuntimeError("commit failed")
+
+    async def stop(self) -> None:
+        await self._queue.put(None)
+
+    async def close(self) -> None:
+        self.closed = True
+        await self._queue.put(None)
+
+    async def events(self):
+        while True:
+            item = await self._queue.get()
+            if item is None:
+                return
+            yield item
+
+
+class CommitFailureThenHealthyBackend:
+    def __init__(self) -> None:
+        self.sessions: list[object] = []
+
+    async def open_session(self):
+        if not self.sessions:
+            session = CommitFailureSession()
+        else:
+            session = FakeSession()
+        self.sessions.append(session)
+        return session
+
+
 async def _next_event(stream, *, timeout_s: float = 0.2):
     return await asyncio.wait_for(stream.__anext__(), timeout=timeout_s)
 
@@ -2722,6 +2854,100 @@ async def test_managed_stt_provider_invokes_terminal_failure_callback_after_cons
     assert stt.state == STTSessionState.DISCONNECTED
     assert stt._active_session is None
     assert errors == ["closed"]
+
+
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_managed_stt_reopens_after_provider_closes_stream(channel: str) -> None:
+    errors: list[str] = []
+    backend = ClosingThenHealthyBackend()
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        channel=channel,
+        connect_attempts=1,
+        on_terminal_failure=lambda exc: errors.append(str(exc)),
+    )
+
+    await stt.handle_vad_event(SpeechStart(uuid4(), pre_roll=samples(0.0), chunk=samples(1.0)))
+    for _ in range(20):
+        if stt.state == STTSessionState.DISCONNECTED and stt._active_session is None:
+            break
+        await asyncio.sleep(0)
+
+    assert errors == []
+    assert stt.state == STTSessionState.DISCONNECTED
+    assert stt._active_session is None
+
+    await stt.handle_vad_event(SpeechStart(uuid4(), pre_roll=samples(0.0), chunk=samples(1.0)))
+
+    assert len(backend.sessions) == 2
+    assert stt.state == STTSessionState.STREAMING
+    assert stt._active_session is backend.sessions[1]
+    await stt.close()
+
+
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_managed_stt_send_failure_does_not_raise_and_reopens_on_next_speech(
+    channel: str,
+) -> None:
+    errors: list[str] = []
+    backend = SendFailureThenHealthyBackend()
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        channel=channel,
+        connect_attempts=1,
+        on_terminal_failure=lambda exc: errors.append(str(exc)),
+    )
+
+    await stt.handle_vad_event(SpeechStart(uuid4(), pre_roll=samples(0.0), chunk=samples(1.0)))
+
+    assert errors == []
+    assert stt.state == STTSessionState.DISCONNECTED
+    assert stt._active_session is None
+    assert backend.sessions[0].closed is True
+    assert stt._consumer_task is None
+    assert not stt._draining
+
+    await stt.handle_vad_event(SpeechStart(uuid4(), pre_roll=samples(0.0), chunk=samples(1.0)))
+
+    assert len(backend.sessions) == 2
+    assert stt.state == STTSessionState.STREAMING
+    assert stt._active_session is backend.sessions[1]
+    await stt.close()
+
+
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_managed_stt_commit_failure_does_not_raise_and_reopens_on_next_speech(
+    channel: str,
+) -> None:
+    errors: list[str] = []
+    backend = CommitFailureThenHealthyBackend()
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        channel=channel,
+        connect_attempts=1,
+        on_terminal_failure=lambda exc: errors.append(str(exc)),
+    )
+    utterance_id = uuid4()
+
+    await stt.handle_vad_event(
+        SpeechStart(utterance_id, pre_roll=samples(0.0), chunk=samples(1.0))
+    )
+    await stt.handle_vad_event(SpeechEnd(utterance_id, trailing_silence_ms=64))
+
+    assert errors == []
+    assert stt.state == STTSessionState.DISCONNECTED
+    assert stt._active_session is None
+    assert backend.sessions[0].closed is True
+
+    await stt.handle_vad_event(SpeechStart(uuid4(), pre_roll=samples(0.0), chunk=samples(1.0)))
+
+    assert len(backend.sessions) == 2
+    assert stt.state == STTSessionState.STREAMING
+    assert stt._active_session is backend.sessions[1]
+    await stt.close()
 
 
 async def test_qwen_session_failure_does_not_escalate_and_reopens_on_next_speech() -> None:
