@@ -53,6 +53,7 @@ class ProviderVerificationSnapshot:
 class ProviderSettingsSnapshot:
     stt_provider: STTProviderName
     peer_stt_provider: STTProviderName
+    cloud_free_tier_providers: tuple[STTProviderName, ...]
     llm_provider: LLMProviderName
     translation: TranslationSelectionSnapshot
     stt_gpu_device_id: str
@@ -272,6 +273,11 @@ class SelfSttProviderEdit:
 
 
 @dataclass(frozen=True, slots=True)
+class CloudFreeTierProvidersEdit:
+    providers: tuple[STTProviderName, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class PeerSttProviderEdit:
     provider: STTProviderName
 
@@ -354,6 +360,7 @@ class SystemPromptEdit:
 
 ProviderSettingsEdit: TypeAlias = (
     SelfSttProviderEdit
+    | CloudFreeTierProvidersEdit
     | PeerSttProviderEdit
     | SttGpuDeviceEdit
     | LlmGpuDeviceEdit
@@ -395,6 +402,7 @@ __all__ = [
     "AudioSettingsChange",
     "AudioSettingsIntent",
     "ChatboxSourceSettingsIntent",
+    "CloudFreeTierProvidersEdit",
     "ClipboardSettingsIntent",
     "CustomSttEndpointEdit",
     "CustomSttExtraEdit",

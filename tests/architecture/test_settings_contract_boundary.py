@@ -137,6 +137,7 @@ def test_settings_view_implements_the_explicit_contract() -> None:
         "peer_stt_control",
         "translation_provider_control",
         "translation_connection_control",
+        "cloud_free_tier_control",
         "translation_fallback_control",
         "gpu_device_control",
         "gpu_llm_control",

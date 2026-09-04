@@ -314,6 +314,37 @@ def test_settings_modal_renders_process_section_before_device_and_hides_descript
     assert "hidden" not in left_labels + right_labels
 
 
+def test_settings_modal_multi_select_toggles_without_closing() -> None:
+    closed: list[bool] = []
+    changes: list[tuple[str, ...]] = []
+    modal = SettingsModal(
+        page=SimpleNamespace(
+            pop_dialog=lambda: closed.append(True),
+            show_dialog=lambda *_a, **_k: None,
+        ),
+        title="Cloud Free Tier",
+        options=[
+            OptionItem(value="gemini_transcribe", label="Gemini 3.5 Transcribe"),
+            OptionItem(value="elevenlabs_scribe", label="ElevenLabs Scribe v2"),
+            OptionItem(value="deepgram", label="Deepgram"),
+        ],
+        on_select=lambda _value: None,
+        multi_select=True,
+        on_selection_change=lambda values: changes.append(values),
+    )
+    modal._selected = {"gemini_transcribe"}
+
+    modal._select("deepgram")
+    modal._select("gemini_transcribe")
+    modal._select("deepgram")
+
+    assert closed == []
+    assert changes == [
+        ("gemini_transcribe", "deepgram"),
+        ("deepgram",),
+    ]
+
+
 def test_settings_modal_renders_unsectioned_options_without_loading_section() -> None:
     modal = SettingsModal(
         page=SimpleNamespace(open=lambda *_a, **_k: None, close=lambda *_a, **_k: None),

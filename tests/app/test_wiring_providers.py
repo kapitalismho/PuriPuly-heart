@@ -2760,6 +2760,7 @@ def test_rolling_free_provider_resolves_directly_without_toggle() -> None:
     resolved = resolve_self_stt_runtime_config_from_vnext(settings)
     assert resolved.provider == "rolling_free"
     assert resolved.provider_options.get("mode") == "rolling_free"
+    assert resolved.provider_options.get("members") == ("gemini_transcribe",)
 
     peer_settings = _vnext(peer_stt_provider="rolling_free")
     peer_intent = peer_stt_runtime_intent_from_vnext(peer_settings)
@@ -2822,6 +2823,49 @@ def test_peer_rolling_manual_uses_source_language_for_gemini_hints() -> None:
     assert intent.gemini_transcribe_language_codes == tuple(
         gemini_transcribe_language_codes("ko")
     )
+
+
+def test_rolling_backend_includes_only_selected_cloud_free_tier_members() -> None:
+    from puripuly_heart.core.storage.secrets import InMemorySecretStore
+
+    settings = _vnext(
+        stt_provider="rolling_free",
+        cloud_free_tier_providers=["deepgram", "gemini_transcribe"],
+    )
+    resolved = resolve_self_stt_runtime_config_from_vnext(settings)
+    assert resolved.provider_options.get("members") == (
+        "gemini_transcribe",
+        "deepgram",
+    )
+    backend = create_stt_backend_from_resolved_config(
+        resolved,
+        secrets=InMemorySecretStore(),
+    )
+    assert [definition.name.value for definition in backend.providers] == [
+        "gemini_transcribe",
+        "deepgram",
+    ]
+
+
+def test_rolling_backend_accepts_list_members_in_provider_options() -> None:
+    from puripuly_heart.core.storage.secrets import InMemorySecretStore
+
+    resolved = _resolved_stt_config(
+        provider="rolling_free",
+        credential_reference=None,
+        provider_options={
+            "mode": "rolling_free",
+            "members": ["deepgram", "elevenlabs_scribe"],
+        },
+    )
+    backend = create_stt_backend_from_resolved_config(
+        resolved,
+        secrets=InMemorySecretStore(),
+    )
+    assert [definition.name.value for definition in backend.providers] == [
+        "elevenlabs_scribe",
+        "deepgram",
+    ]
 
 
 def test_create_stt_backend_soniox_uses_secret() -> None:

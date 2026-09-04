@@ -65,6 +65,37 @@ class STTProviderName(str, Enum):
     CUSTOM_REALTIME = "custom_realtime"
 
 
+CLOUD_FREE_TIER_STT_PROVIDERS: tuple[STTProviderName, ...] = (
+    STTProviderName.GEMINI_TRANSCRIBE,
+    STTProviderName.ELEVENLABS_SCRIBE,
+    STTProviderName.DEEPGRAM,
+)
+DEFAULT_CLOUD_FREE_TIER_STT_PROVIDERS: tuple[STTProviderName, ...] = (
+    STTProviderName.GEMINI_TRANSCRIBE,
+)
+
+
+def normalize_cloud_free_tier_providers(values: object) -> tuple[STTProviderName, ...]:
+    allowed = {provider.value: provider for provider in CLOUD_FREE_TIER_STT_PROVIDERS}
+    selected: list[STTProviderName] = []
+    seen: set[STTProviderName] = set()
+    if isinstance(values, list | tuple):
+        for item in values:
+            raw = getattr(item, "value", item)
+            if not isinstance(raw, str):
+                continue
+            provider = allowed.get(raw.strip())
+            if provider is None or provider in seen:
+                continue
+            selected.append(provider)
+            seen.add(provider)
+    if not selected:
+        return DEFAULT_CLOUD_FREE_TIER_STT_PROVIDERS
+    order = {provider: index for index, provider in enumerate(CLOUD_FREE_TIER_STT_PROVIDERS)}
+    selected.sort(key=lambda provider: order[provider])
+    return tuple(selected)
+
+
 _CUSTOM_STT_PROVIDER_VALUES = frozenset(
     {
         STTProviderName.CUSTOM.value,
@@ -258,6 +289,9 @@ __all__ = [
     "QwenASRSTTModel",
     "QwenRegion",
     "STTProviderName",
+    "CLOUD_FREE_TIER_STT_PROVIDERS",
+    "DEFAULT_CLOUD_FREE_TIER_STT_PROVIDERS",
+    "normalize_cloud_free_tier_providers",
     "SecretsBackend",
     "STT_INTERNAL_SAMPLE_RATE_HZ",
     "custom_stt_selection_for_provider",

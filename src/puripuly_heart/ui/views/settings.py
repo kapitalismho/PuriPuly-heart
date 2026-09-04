@@ -30,6 +30,7 @@ from puripuly_heart.app.ports.settings_view import (
     AudioSettingsIntent,
     ChatboxSourceSettingsIntent,
     ClipboardSettingsIntent,
+    CloudFreeTierProvidersEdit,
     CustomSttEndpointEdit,
     CustomSttExtraEdit,
     CustomSttModelEdit,
@@ -95,6 +96,7 @@ from puripuly_heart.config.overlay_calibration import (
 )
 from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.config.provider_values import (
+    CLOUD_FREE_TIER_STT_PROVIDERS,
     LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
     LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS,
     MAX_CUSTOM_VOCAB_TERMS,
@@ -107,6 +109,7 @@ from puripuly_heart.config.provider_values import (
     display_stt_provider,
     is_custom_stt_provider,
     is_qwen_cloud_stt_provider,
+    normalize_cloud_free_tier_providers,
     normalize_local_llm_base_url,
     normalize_owned_referral_id,
 )
@@ -601,6 +604,9 @@ class SettingsView(ft.Column):
         self._http_extension_snapshot = registry.snapshot
         self._sync_http_extension_card(force_credentials=True)
 
+    def cloud_free_tier_control(self) -> ft.Control:
+        return self._cloud_free_tier_card
+
     def translation_fallback_control(self) -> ft.Control:
         return self._openrouter_fallback_card
 
@@ -804,6 +810,7 @@ class SettingsView(ft.Column):
             self._desktop_overlay_primary_action,
             self._desktop_overlay_view_logs_action,
             self._translation_connection_text,
+            self._cloud_free_tier_text,
             self._openrouter_fallback_text,
             self._telemetry_enabled_text,
             self._http_extension_text,
@@ -2230,6 +2237,20 @@ class SettingsView(ft.Column):
             title=self._openrouter_fallback_title,
             value=self._openrouter_fallback_text,
         )
+        self._cloud_free_tier_title = ft.Text(
+            t("settings.cloud_free_tier"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._cloud_free_tier_text = self._build_clickable_text(
+            t("settings.cloud_free_tier.count", count=1),
+            self._on_cloud_free_tier_click,
+        )
+        self._cloud_free_tier_card = self._wrap_unit_card(
+            title=self._cloud_free_tier_title,
+            value=self._cloud_free_tier_text,
+        )
 
         self._local_llm_connection_title = ft.Text(
             t("settings.local_llm.connection"),
@@ -2596,7 +2617,6 @@ class SettingsView(ft.Column):
 
         self._api_surface = compose_settings_api_surface(
             SettingsApiSurfaceSlots.from_slot_provider(self),
-            placeholder_factory=self._wrap_empty_unit_card,
         )
         self._translation_connection_row = self._api_surface.translation_connection_row
         self._openrouter_routing_row = self._translation_connection_row
@@ -3918,6 +3938,7 @@ class SettingsView(ft.Column):
                 qwen_asr_model=provider.qwen_asr_model,
             ),
         )
+        self._sync_cloud_free_tier_card(provider)
         self._update_api_visibility()
         self._sync_gpu_device_card()
 
@@ -4422,18 +4443,22 @@ class SettingsView(ft.Column):
         fallback = settings.translation.fallback
         fallback_source = self._openrouter_fallback_source(settings)
         active_stt_providers = {stt, peer_stt}
-        if STTProviderName.ROLLING_FREE in active_stt_providers:
-            active_stt_providers |= set(_ROLLING_MEMBER_STT_PROVIDERS)
-        self._deepgram_key.visible = STTProviderName.DEEPGRAM in active_stt_providers
+        visible_cloud_free_tier = set(
+            normalize_cloud_free_tier_providers(settings.cloud_free_tier_providers)
+        )
+        for provider in (stt, peer_stt):
+            if provider in _ROLLING_MEMBER_STT_PROVIDERS:
+                visible_cloud_free_tier.add(provider)
+        self._deepgram_key.visible = STTProviderName.DEEPGRAM in visible_cloud_free_tier
         gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
         if gemini_transcribe_key is not None:
             gemini_transcribe_key.visible = (
-                STTProviderName.GEMINI_TRANSCRIBE in active_stt_providers
+                STTProviderName.GEMINI_TRANSCRIBE in visible_cloud_free_tier
             )
         elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
         if elevenlabs_scribe_key is not None:
             elevenlabs_scribe_key.visible = (
-                STTProviderName.ELEVENLABS_SCRIBE in active_stt_providers
+                STTProviderName.ELEVENLABS_SCRIBE in visible_cloud_free_tier
             )
         self._soniox_key.visible = STTProviderName.SONIOX in active_stt_providers
         self._google_key.visible = not is_custom_http and llm == LLMProviderName.GEMINI
@@ -4693,6 +4718,79 @@ class SettingsView(ft.Column):
             self._qwen_region_btn.update()
             self._api_keys_column.update()
         self.has_provider_changes = True
+
+    def _cloud_free_tier_display_label(
+        self,
+        providers: tuple[STTProviderName, ...],
+    ) -> str:
+        selected = normalize_cloud_free_tier_providers(providers)
+        return t("settings.cloud_free_tier.count", count=len(selected))
+
+    def _sync_cloud_free_tier_card(
+        self,
+        settings: ProviderSettingsSnapshot | None = None,
+    ) -> None:
+        if settings is None:
+            settings = self._build_settings_with_provider_draft()
+        if settings is None:
+            return
+        selected = normalize_cloud_free_tier_providers(settings.cloud_free_tier_providers)
+        self._set_unit_card_value_text(
+            self._cloud_free_tier_text,
+            self._cloud_free_tier_display_label(selected),
+        )
+        if is_control_mounted(self._cloud_free_tier_text):
+            self._cloud_free_tier_text.update()
+
+    def _on_cloud_free_tier_click(self, e) -> None:
+        if not is_control_mounted(self):
+            return
+        options = [
+            OptionItem(
+                value=provider.value,
+                label=provider_label(provider.value).replace("\n", " "),
+            )
+            for provider in CLOUD_FREE_TIER_STT_PROVIDERS
+        ]
+        display_settings = self._build_settings_with_provider_draft()
+        current = (
+            tuple(
+                provider.value
+                for provider in normalize_cloud_free_tier_providers(
+                    display_settings.cloud_free_tier_providers
+                )
+            )
+            if display_settings is not None
+            else tuple(provider.value for provider in CLOUD_FREE_TIER_STT_PROVIDERS[:1])
+        )
+        SettingsModal(
+            self.page,
+            t("settings.cloud_free_tier.modal_title"),
+            options,
+            lambda _value: None,
+            show_description=False,
+            multi_select=True,
+            on_selection_change=self._on_cloud_free_tier_changed,
+        ).open(current)
+
+    def _on_cloud_free_tier_changed(self, values: tuple[str, ...]) -> None:
+        if self._provider_snapshot is None:
+            return
+        selected = normalize_cloud_free_tier_providers(values)
+        current_settings = self._build_settings_with_provider_draft()
+        assert current_settings is not None
+        if selected == normalize_cloud_free_tier_providers(
+            current_settings.cloud_free_tier_providers
+        ):
+            return
+        draft = self._ensure_provider_settings_draft()
+        self._provider_draft = replace(draft, cloud_free_tier_providers=selected)
+        self._record_provider_edit(CloudFreeTierProvidersEdit(selected))
+        self.has_provider_changes = True
+        self._sync_cloud_free_tier_card(self._provider_draft)
+        self._update_api_visibility()
+        if is_control_mounted(self):
+            self._api_keys_column.update()
 
     def _sync_stt_provider_labels(self, settings: ProviderSettingsSnapshot) -> None:
         self._set_unit_card_value_text(
@@ -6783,6 +6881,8 @@ class SettingsView(ft.Column):
         self._peer_hangover_field.label = t("settings.vad.peer_hangover_ms")
         self._peer_pre_roll_field.label = t("settings.vad.peer_pre_roll_ms")
         self._translation_connection_title.value = t("settings.translation_connection")
+        self._cloud_free_tier_title.value = t("settings.cloud_free_tier")
+        self._sync_cloud_free_tier_card()
         self._openrouter_fallback_title.value = t("settings.fallback")
         self._local_llm_connection_title.value = t("settings.local_llm.connection")
         self._custom_stt_connection_title.value = t("settings.custom_stt.title")

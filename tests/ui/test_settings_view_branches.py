@@ -368,6 +368,7 @@ def _vnext(
     openrouter_alias: str | None = None,
     stt_provider: str | None = None,
     peer_stt_provider: str | None = None,
+    cloud_free_tier_providers: list[str] | None = None,
     source_language: str | None = None,
     target_language: str | None = None,
     peer_source_language: str | None = None,
@@ -469,6 +470,8 @@ def _vnext(
     stt = current.intent.stt
     if stt_provider is not None:
         stt = replace(stt, provider=stt_provider)
+    if cloud_free_tier_providers is not None:
+        stt = replace(stt, cloud_free_tier_providers=cloud_free_tier_providers)
     if qwen_asr_model is not None:
         stt = replace(stt, qwen_asr=replace(stt.qwen_asr, model=qwen_asr_model))
     if custom_terms is not None:
@@ -1985,7 +1988,8 @@ def test_local_llm_hides_openrouter_key_and_fallback_card_even_with_saved_fallba
     assert view._openrouter_key.visible is False
     assert view._openrouter_pkce_button_row.visible is False
     assert view._openrouter_fallback_card.visible is False
-    assert view._api_keys_card.visible is False
+    assert view._gemini_transcribe_key.visible is True
+    assert view._api_keys_card.visible is True
     assert view._managed_key_card.visible is False
 
 
@@ -5267,33 +5271,27 @@ def test_general_tab_keeps_fixed_three_slot_rows_with_vrchat_osc_card(
     assert view._osc_connection_text.content.value == t("settings.osc.mode.automatic")
 
 
-def test_api_translation_connection_row_keeps_empty_fast_translation_slot(
+def test_api_translation_connection_row_places_cloud_free_tier_card(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
-    from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 
     view, _ = _make_settings_view(monkeypatch)
     cards = _row_cards(view._translation_connection_row)
 
     assert len(cards) == 3
     assert _row_card_titles(view._translation_connection_row) == [
+        t("settings.cloud_free_tier"),
         t("settings.translation_connection"),
         t("settings.fallback"),
     ]
     assert {card.height for card in cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
     assert all(card.expand is True for card in cards)
-
-    empty_card = cards[0]
-    empty_content = _wrapped_card_column(empty_card)
-
-    assert isinstance(empty_card, SharedCardWrapper)
-    assert not isinstance(empty_card, SettingsUnitCard)
-    assert empty_card.ignore_interactions is True
-    assert empty_card.on_click is None
-    assert empty_card.on_hover is None
-    assert isinstance(empty_content, ft.Container)
-    assert empty_content.content is None
+    assert cards[0] is view._cloud_free_tier_card
+    assert view._cloud_free_tier_text.content.value == t(
+        "settings.cloud_free_tier.count",
+        count=1,
+    )
 
 
 @pytest.mark.parametrize("locale", ["en", "ko", "ja", "ru", "zh-CN"])
@@ -5316,10 +5314,11 @@ def test_general_osc_card_is_locale_independent(
             t("settings.osc.connection.title"),
         ]
         assert _row_card_titles(api_row) == [
+            t("settings.cloud_free_tier"),
             t("settings.translation_connection"),
             t("settings.fallback"),
         ]
-        assert _control_labels(_row_cards(api_row)[0]) == []
+        assert t("settings.cloud_free_tier") in _control_labels(_row_cards(api_row)[0])
     finally:
         i18n_module.set_locale(old_locale)
 
@@ -5376,6 +5375,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
         t("settings.section.translation"),
     ]
     assert _row_card_titles(api_controls[1]) == [
+        t("settings.cloud_free_tier"),
         t("settings.translation_connection"),
         t("settings.fallback"),
     ]
@@ -5415,6 +5415,7 @@ def test_api_tab_primary_value_typography_is_consistent_across_rows(
         _container_text_size(view._peer_stt_text),
         _container_text_size(view._llm_text),
         _container_text_size(view._translation_connection_text),
+        _container_text_size(view._cloud_free_tier_text),
         _container_text_size(view._openrouter_fallback_text),
     } == {28}
 
@@ -6853,15 +6854,28 @@ def test_self_stt_control_returns_single_unit_card(monkeypatch: pytest.MonkeyPat
     assert getattr(first, "expand", None) is True
 
 
-def test_update_api_visibility_shows_all_member_keys_when_rolling_on(
+def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_rolling_on(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = _vnext(stt_provider=STTProviderName.ROLLING_FREE.value)
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
-    assert view._deepgram_key.visible is True
     assert view._gemini_transcribe_key.visible is True
-    assert view._elevenlabs_scribe_key.visible is True
+    assert view._deepgram_key.visible is False
+    assert view._elevenlabs_scribe_key.visible is False
+
+    settings = _vnext(
+        stt_provider=STTProviderName.ROLLING_FREE.value,
+        cloud_free_tier_providers=[
+            STTProviderName.GEMINI_TRANSCRIBE.value,
+            STTProviderName.DEEPGRAM.value,
+        ],
+    )
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view._update_api_visibility()
+    assert view._gemini_transcribe_key.visible is True
+    assert view._deepgram_key.visible is True
+    assert view._elevenlabs_scribe_key.visible is False
 
 
 def test_cloud_modal_section_leads_with_qwen_audio_then_deepgram(
@@ -6907,15 +6921,15 @@ def test_cloud_modal_section_leads_with_qwen_audio_then_deepgram(
     assert rolling_option.label == t("provider.rolling_free").replace("\n", " ")
 
 
-def test_update_api_visibility_shows_all_member_keys_when_peer_rolling(
+def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_peer_rolling(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = _vnext(peer_stt_provider=STTProviderName.ROLLING_FREE.value)
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
-    assert view._deepgram_key.visible is True
     assert view._gemini_transcribe_key.visible is True
-    assert view._elevenlabs_scribe_key.visible is True
+    assert view._deepgram_key.visible is False
+    assert view._elevenlabs_scribe_key.visible is False
 
 
 def test_load_from_settings_keeps_provider_row_as_unit_cards(
@@ -6926,3 +6940,72 @@ def test_load_from_settings_keeps_provider_row_as_unit_cards(
     view.load_from_settings(settings, config_path=Path("settings.json"))
     assert view.self_stt_control() is view._self_stt_card
     assert not hasattr(view, "_stt_rolling_switch")
+
+
+def test_cloud_free_tier_modal_is_single_column_multi_select(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class DummyModal:
+        def __init__(self, _page, title, options, _on_select, **kwargs):
+            captured["title"] = title
+            captured["options"] = options
+            captured["kwargs"] = kwargs
+
+        def open(self, current) -> None:
+            captured["current"] = current
+
+    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
+    view, _ = _make_settings_view(monkeypatch)
+    attach_dummy_page(monkeypatch, view)
+    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+    view._on_cloud_free_tier_click(None)
+
+    assert captured["title"] == t("settings.cloud_free_tier.modal_title")
+    assert captured["kwargs"]["show_description"] is False
+    assert captured["kwargs"]["multi_select"] is True
+    assert [option.value for option in captured["options"]] == [
+        STTProviderName.GEMINI_TRANSCRIBE.value,
+        STTProviderName.ELEVENLABS_SCRIBE.value,
+        STTProviderName.DEEPGRAM.value,
+    ]
+    assert [option.label for option in captured["options"]] == [
+        t("provider.gemini_transcribe"),
+        t("provider.elevenlabs_scribe"),
+        t("provider.deepgram"),
+    ]
+    assert captured["current"] == (STTProviderName.GEMINI_TRANSCRIBE.value,)
+
+
+def test_cloud_free_tier_selection_gates_member_api_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+
+    view._on_cloud_free_tier_changed(
+        (
+            STTProviderName.GEMINI_TRANSCRIBE.value,
+            STTProviderName.ELEVENLABS_SCRIBE.value,
+        )
+    )
+
+    assert view._gemini_transcribe_key.visible is True
+    assert view._elevenlabs_scribe_key.visible is True
+    assert view._deepgram_key.visible is False
+    assert view._cloud_free_tier_text.content.value == t(
+        "settings.cloud_free_tier.count",
+        count=2,
+    )
+
+
+def test_dedicated_deepgram_stt_still_shows_deepgram_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _vnext(stt_provider=STTProviderName.DEEPGRAM.value)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view._update_api_visibility()
+
+    assert view._deepgram_key.visible is True
+    assert view._gemini_transcribe_key.visible is True

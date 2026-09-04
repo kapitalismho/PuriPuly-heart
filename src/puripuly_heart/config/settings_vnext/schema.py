@@ -11,12 +11,13 @@ from typing import Final, Literal
 
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
+from puripuly_heart.config.provider_values import normalize_cloud_free_tier_providers
 from puripuly_heart.core.translation_policy import (
     FIXED_TRANSLATION_POLICY,
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 37
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 38
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -440,6 +441,9 @@ class STTIntent:
     custom_vocabulary_enabled: bool = True
     custom_terms: dict[str, list[str]] = field(default_factory=_default_custom_terms)
     gpu_device_id: str = "auto"
+    cloud_free_tier_providers: list[str] = field(
+        default_factory=lambda: ["gemini_transcribe"]
+    )
     deepgram: DeepgramSTTIntent = field(default_factory=DeepgramSTTIntent)
     gemini_transcribe: GeminiTranscribeSTTIntent = field(default_factory=GeminiTranscribeSTTIntent)
     elevenlabs_scribe: ElevenLabsScribeSTTIntent = field(default_factory=ElevenLabsScribeSTTIntent)
@@ -450,6 +454,14 @@ class STTIntent:
     def __post_init__(self) -> None:
         device_id = self.gpu_device_id if isinstance(self.gpu_device_id, str) else "auto"
         object.__setattr__(self, "gpu_device_id", device_id.strip() or "auto")
+        object.__setattr__(
+            self,
+            "cloud_free_tier_providers",
+            [
+                provider.value
+                for provider in normalize_cloud_free_tier_providers(self.cloud_free_tier_providers)
+            ],
+        )
 
 
 @dataclass(frozen=True, slots=True)

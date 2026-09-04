@@ -20,6 +20,7 @@ from puripuly_heart.config.provider_values import (
     custom_stt_selection_for_provider,
     is_custom_stt_provider,
     is_qwen_cloud_stt_provider,
+    normalize_cloud_free_tier_providers,
     qwen_cloud_stt_model_for_provider,
 )
 from puripuly_heart.config.resolved import (
@@ -278,6 +279,12 @@ def self_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         custom_stt_endpoint=intent.stt.custom.endpoint,
         custom_stt_model=intent.stt.custom.model,
         custom_stt_extra=dict(intent.stt.custom.extra),
+        rolling_members=tuple(
+            provider.value
+            for provider in normalize_cloud_free_tier_providers(
+                intent.stt.cloud_free_tier_providers
+            )
+        ),
     )
 
 
@@ -398,6 +405,12 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         custom_stt_endpoint=intent.stt.custom.endpoint,
         custom_stt_model=intent.stt.custom.model,
         custom_stt_extra=dict(intent.stt.custom.extra),
+        rolling_members=tuple(
+            provider.value
+            for provider in normalize_cloud_free_tier_providers(
+                intent.stt.cloud_free_tier_providers
+            )
+        ),
     )
 
 
@@ -579,6 +592,7 @@ def build_self_capture_session_config_from_vnext(
 def _rolling_member_models_signature(intent: AppSettingsVNext) -> tuple[object, ...]:
     stt = intent.stt
     return (
+        tuple(stt.cloud_free_tier_providers),
         stt.deepgram.model,
         stt.gemini_transcribe.model,
         stt.elevenlabs_scribe.model,
@@ -911,33 +925,53 @@ def _create_rolling_stt_backend(
             stream_label=config.channel,
         )
 
-    definitions.append(
-        RollingProviderDefinition(
-            name=STTProviderName.GEMINI_TRANSCRIBE,
-            build_backend=build_gemini,
-            is_configured=lambda: bool(
-                _rolling_member_api_key(STTProviderName.GEMINI_TRANSCRIBE.value, secrets)
-            ),
+    enabled_members = {
+        provider.value
+        for provider in normalize_cloud_free_tier_providers(
+            config.provider_options.get("members")
         )
-    )
-    definitions.append(
-        RollingProviderDefinition(
-            name=STTProviderName.ELEVENLABS_SCRIBE,
-            build_backend=build_scribe,
-            is_configured=lambda: bool(
-                _rolling_member_api_key(STTProviderName.ELEVENLABS_SCRIBE.value, secrets)
-            ),
+    }
+
+    if STTProviderName.GEMINI_TRANSCRIBE.value in enabled_members:
+        definitions.append(
+            RollingProviderDefinition(
+                name=STTProviderName.GEMINI_TRANSCRIBE,
+                build_backend=build_gemini,
+                is_configured=lambda: bool(
+                    _rolling_member_api_key(STTProviderName.GEMINI_TRANSCRIBE.value, secrets)
+                ),
+            )
         )
-    )
-    definitions.append(
-        RollingProviderDefinition(
-            name=STTProviderName.DEEPGRAM,
-            build_backend=build_deepgram,
-            is_configured=lambda: bool(
-                _rolling_member_api_key(STTProviderName.DEEPGRAM.value, secrets)
-            ),
+    if STTProviderName.ELEVENLABS_SCRIBE.value in enabled_members:
+        definitions.append(
+            RollingProviderDefinition(
+                name=STTProviderName.ELEVENLABS_SCRIBE,
+                build_backend=build_scribe,
+                is_configured=lambda: bool(
+                    _rolling_member_api_key(STTProviderName.ELEVENLABS_SCRIBE.value, secrets)
+                ),
+            )
         )
-    )
+    if STTProviderName.DEEPGRAM.value in enabled_members:
+        definitions.append(
+            RollingProviderDefinition(
+                name=STTProviderName.DEEPGRAM,
+                build_backend=build_deepgram,
+                is_configured=lambda: bool(
+                    _rolling_member_api_key(STTProviderName.DEEPGRAM.value, secrets)
+                ),
+            )
+        )
+    if not definitions:
+        definitions.append(
+            RollingProviderDefinition(
+                name=STTProviderName.GEMINI_TRANSCRIBE,
+                build_backend=build_gemini,
+                is_configured=lambda: bool(
+                    _rolling_member_api_key(STTProviderName.GEMINI_TRANSCRIBE.value, secrets)
+                ),
+            )
+        )
     return RollingSTTBackend(providers=tuple(definitions))
 
 

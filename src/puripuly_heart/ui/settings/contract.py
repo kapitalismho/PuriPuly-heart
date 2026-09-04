@@ -150,6 +150,8 @@ class SettingsApiSlotProvider(Protocol):
 
     def http_extension_control(self) -> ft.Control: ...
 
+    def cloud_free_tier_control(self) -> ft.Control: ...
+
     def translation_fallback_control(self) -> ft.Control: ...
 
     def gpu_device_control(self) -> ft.Control: ...
@@ -173,6 +175,7 @@ class SettingsApiSurfaceSlots:
     peer_stt: ft.Control
     translation_provider: ft.Control
     translation_connection: ft.Control
+    cloud_free_tier: ft.Control
     translation_fallback: ft.Control
     gpu_device: ft.Control
     gpu_llm: ft.Control
@@ -191,6 +194,7 @@ class SettingsApiSurfaceSlots:
             peer_stt=provider.peer_stt_control(),
             translation_provider=provider.translation_provider_control(),
             translation_connection=provider.translation_connection_control(),
+            cloud_free_tier=provider.cloud_free_tier_control(),
             translation_fallback=provider.translation_fallback_control(),
             gpu_device=provider.gpu_device_control(),
             gpu_llm=provider.gpu_llm_control(),
@@ -210,7 +214,6 @@ class SettingsApiSurfaceRegions:
     provider_controls: ft.Row
     translation_connection_row: ft.Container
     translation_connection_controls: ft.Row
-    translation_connection_leading_placeholder: ft.Control
     gpu_device_row: ft.Container
     gpu_device_controls: ft.Row
 

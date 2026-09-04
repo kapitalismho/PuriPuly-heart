@@ -174,7 +174,33 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
         prepared["intent"] = intent
     if migrate_telemetry:
         _migrate_telemetry_boolean_model(prepared)
+    _migrate_cloud_free_tier_providers(prepared)
     return prepared
+
+
+def _migrate_cloud_free_tier_providers(data: dict[str, Any]) -> None:
+    intent = data.get("intent")
+    if not isinstance(intent, dict):
+        return
+    stt = intent.get("stt")
+    if not isinstance(stt, dict):
+        stt = {}
+        intent["stt"] = stt
+    if "cloud_free_tier_providers" in stt:
+        return
+    providers = ["gemini_transcribe"]
+    state = data.get("state")
+    verification = state.get("provider_verification") if isinstance(state, Mapping) else None
+    deepgram = verification.get("deepgram") if isinstance(verification, Mapping) else None
+    if _deepgram_verification_is_bound_verified(deepgram):
+        providers.append("deepgram")
+    stt["cloud_free_tier_providers"] = providers
+
+
+def _deepgram_verification_is_bound_verified(entry: object) -> bool:
+    if not isinstance(entry, Mapping) or entry.get("status") != "verified":
+        return False
+    return serialization._has_provider_verification_binding_evidence(entry)
 
 
 def _requires_telemetry_boolean_migration(data: Mapping[str, Any]) -> bool:

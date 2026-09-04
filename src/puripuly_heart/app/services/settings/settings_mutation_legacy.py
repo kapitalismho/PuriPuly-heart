@@ -76,6 +76,7 @@ ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS: Final[tuple[str, ...]] = (
     "intent.stt.custom_vocabulary_enabled",
     "intent.stt.custom_terms",
     "intent.stt.gpu_device_id",
+    "intent.stt.cloud_free_tier_providers",
     "intent.stt.deepgram.model",
     "intent.stt.gemini_transcribe.model",
     "intent.stt.elevenlabs_scribe.model",

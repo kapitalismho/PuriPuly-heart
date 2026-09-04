@@ -1992,7 +1992,13 @@ class TranslatorApp:
             verification = settings.state.provider_verification
         except Exception:
             return False
-        for member in ("deepgram", "gemini_transcribe", "elevenlabs_scribe"):
+        try:
+            selected_members = tuple(settings.intent.stt.cloud_free_tier_providers)
+        except Exception:
+            selected_members = ("gemini_transcribe",)
+        if not selected_members:
+            selected_members = ("gemini_transcribe",)
+        for member in selected_members:
             try:
                 if getattr(getattr(verification, member, None), "status", None) == "verified":
                     return True

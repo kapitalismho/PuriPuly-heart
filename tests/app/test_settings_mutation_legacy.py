@@ -83,6 +83,26 @@ def test_order22_patch_carries_a_secondary_only_target_change() -> None:
     assert patch == {"intent.languages.secondary_target_language": "ja"}
 
 
+def test_order22_patch_carries_cloud_free_tier_provider_pool() -> None:
+    previous = AppSettingsVNext()
+    next_settings = replace(
+        previous,
+        intent=replace(
+            previous.intent,
+            stt=replace(
+                previous.intent.stt,
+                cloud_free_tier_providers=["gemini_transcribe", "deepgram"],
+            ),
+        ),
+    )
+
+    patch = build_stt_language_audio_settings_path_patch(previous, next_settings)
+
+    assert patch == {
+        "intent.stt.cloud_free_tier_providers": ["gemini_transcribe", "deepgram"],
+    }
+
+
 def test_order22_stt_language_audio_patch_records_initial_covered_surface_list() -> None:
     assert set(ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS) == {
         "intent.stt.provider",
@@ -111,6 +131,7 @@ def test_order22_stt_language_audio_patch_records_initial_covered_surface_list()
         "intent.stt.custom_vocabulary_enabled",
         "intent.stt.custom_terms",
         "intent.stt.gpu_device_id",
+        "intent.stt.cloud_free_tier_providers",
         "intent.stt.deepgram.model",
         "intent.stt.gemini_transcribe.model",
         "intent.stt.elevenlabs_scribe.model",

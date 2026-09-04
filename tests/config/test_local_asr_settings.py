@@ -70,7 +70,7 @@ def test_target_schema_29_local_qwen_migration_is_backed_up_and_idempotent(
 ) -> None:
     path = tmp_path / "settings.json"
     raw = serialization.to_dict(AppSettingsVNext())
-    assert VNEXT_SETTINGS_SCHEMA_VERSION == 37
+    assert VNEXT_SETTINGS_SCHEMA_VERSION == 38
     raw["settings_version"] = 29
     raw["intent"]["stt"]["provider"] = self_provider
     raw["intent"]["stt"].pop("gpu_device_id")

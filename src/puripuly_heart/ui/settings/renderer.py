@@ -21,8 +21,6 @@ SETTINGS_ROW_SPACING = FOUNDATION_DESIGN_TOKENS.spacing.page
 
 def compose_settings_api_surface(
     slots: SettingsApiSurfaceSlots,
-    *,
-    placeholder_factory: Callable[[], ft.Control],
 ) -> SettingsApiSurfaceRegions:
     provider_controls = ft.Row(
         [slots.self_stt, slots.peer_stt, slots.translation_provider],
@@ -31,10 +29,9 @@ def compose_settings_api_surface(
     )
     provider_row = ft.Container(content=provider_controls)
 
-    translation_connection_leading_placeholder = placeholder_factory()
     translation_connection_controls = ft.Row(
         [
-            translation_connection_leading_placeholder,
+            slots.cloud_free_tier,
             slots.translation_connection,
             slots.translation_fallback,
         ],
@@ -72,7 +69,6 @@ def compose_settings_api_surface(
         provider_controls=provider_controls,
         translation_connection_row=translation_connection_row,
         translation_connection_controls=translation_connection_controls,
-        translation_connection_leading_placeholder=translation_connection_leading_placeholder,
         gpu_device_row=gpu_device_row,
         gpu_device_controls=gpu_device_controls,
     )

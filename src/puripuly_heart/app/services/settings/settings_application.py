@@ -14,6 +14,7 @@ from puripuly_heart.app.ports.settings_view import (
     AudioSettingsIntent,
     ChatboxSourceSettingsIntent,
     ClipboardSettingsIntent,
+    CloudFreeTierProvidersEdit,
     CustomSttEndpointEdit,
     CustomSttExtraEdit,
     CustomSttModelEdit,
@@ -93,6 +94,7 @@ from puripuly_heart.config.provider_values import (
     OpenRouterSelectionAlias,
     QwenRegion,
     STTProviderName,
+    normalize_cloud_free_tier_providers,
 )
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
@@ -209,6 +211,9 @@ def settings_view_surface_snapshots(
     provider = ProviderSettingsSnapshot(
         stt_provider=STTProviderName(intent.stt.provider),
         peer_stt_provider=STTProviderName(intent.peer_stt.provider),
+        cloud_free_tier_providers=normalize_cloud_free_tier_providers(
+            intent.stt.cloud_free_tier_providers
+        ),
         llm_provider=LLMProviderName(
             provider_llm_for_translation(translation.model, translation.connection)
         ),
@@ -597,6 +602,17 @@ def materialize_provider_apply_intent(
                 stt=replace(
                     updated.intent.stt,
                     provider=str(getattr(edit.provider, "value", edit.provider)),
+                ),
+            )
+        elif isinstance(edit, CloudFreeTierProvidersEdit):
+            updated = _with_intent(
+                updated,
+                stt=replace(
+                    updated.intent.stt,
+                    cloud_free_tier_providers=[
+                        provider.value
+                        for provider in normalize_cloud_free_tier_providers(edit.providers)
+                    ],
                 ),
             )
         elif isinstance(edit, PeerSttProviderEdit):

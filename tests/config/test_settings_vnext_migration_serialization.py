@@ -1603,3 +1603,53 @@ def test_older_vnext_version_is_backed_up_and_forward_migrated(
     assert json.loads(path.read_text(encoding="utf-8"))["settings_version"] == (
         VNEXT_SETTINGS_SCHEMA_VERSION
     )
+
+
+def test_missing_cloud_free_tier_defaults_to_gemini_and_keeps_verified_deepgram() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 37
+    raw["intent"]["stt"].pop("cloud_free_tier_providers", None)
+
+    loaded = migration.from_dict(raw)
+    assert loaded.intent.stt.cloud_free_tier_providers == ["gemini_transcribe"]
+
+    raw["state"]["provider_verification"]["deepgram"] = {
+        "status": "verified",
+        "provider": "deepgram",
+        "secret_key": "deepgram_api_key",
+        "secret_revision": "secret-r1",
+        "secret_fingerprint": None,
+        "verifier_context": {"flow": "settings.verify_api_key"},
+        "verifier_evidence": {"verifier": "deepgram"},
+    }
+    loaded = migration.from_dict(raw)
+    assert loaded.intent.stt.cloud_free_tier_providers == [
+        "gemini_transcribe",
+        "deepgram",
+    ]
+
+
+def test_unbound_verified_deepgram_does_not_expand_cloud_free_tier() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 37
+    raw["intent"]["stt"].pop("cloud_free_tier_providers", None)
+    raw["state"]["provider_verification"]["deepgram"] = {"status": "verified"}
+
+    loaded = migration.from_dict(raw)
+
+    assert loaded.intent.stt.cloud_free_tier_providers == ["gemini_transcribe"]
+    assert loaded.state.provider_verification.deepgram.status == "unknown"
+
+
+def test_explicit_cloud_free_tier_selection_is_preserved() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["stt"]["cloud_free_tier_providers"] = ["elevenlabs_scribe"]
+
+    loaded = migration.from_dict(raw)
+    assert loaded.intent.stt.cloud_free_tier_providers == ["elevenlabs_scribe"]

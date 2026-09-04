@@ -51,6 +51,7 @@ class _SlotProvider:
                 "peer_stt",
                 "translation_provider",
                 "translation_connection",
+                "cloud_free_tier",
                 "translation_fallback",
                 "gpu_device",
                 "gpu_llm",
@@ -73,6 +74,9 @@ class _SlotProvider:
 
     def translation_connection_control(self) -> ft.Control:
         return self.controls["translation_connection"]
+
+    def cloud_free_tier_control(self) -> ft.Control:
+        return self.controls["cloud_free_tier"]
 
     def translation_fallback_control(self) -> ft.Control:
         return self.controls["translation_fallback"]
@@ -99,26 +103,18 @@ class _SlotProvider:
         return self.controls["api_keys"]
 
 
-def _compose() -> tuple[object, _SlotProvider, list[ft.Control]]:
+def _compose() -> tuple[object, _SlotProvider]:
     provider = _SlotProvider()
-    placeholders: list[ft.Control] = []
-
-    def placeholder_factory() -> ft.Control:
-        control = ft.Container()
-        placeholders.append(control)
-        return control
-
     surface = compose_settings_api_surface(
         SettingsApiSurfaceSlots.from_slot_provider(provider),
-        placeholder_factory=placeholder_factory,
     )
-    return surface, provider, placeholders
+    return surface, provider
 
 
 def test_settings_api_rows_use_the_shared_page_spacing_token() -> None:
     assert SETTINGS_ROW_SPACING == FOUNDATION_DESIGN_TOKENS.spacing.page
 
-    surface, _, _ = _compose()
+    surface, _ = _compose()
     for row in (
         surface.provider_controls,
         surface.translation_connection_controls,
@@ -129,7 +125,7 @@ def test_settings_api_rows_use_the_shared_page_spacing_token() -> None:
 
 
 def test_settings_api_surface_preserves_the_accepted_row_order() -> None:
-    surface, provider, _ = _compose()
+    surface, provider = _compose()
 
     assert surface.rows == (
         surface.provider_row,
@@ -143,16 +139,15 @@ def test_settings_api_surface_preserves_the_accepted_row_order() -> None:
 
 
 def test_settings_api_surface_places_every_slot_in_the_accepted_position() -> None:
-    surface, provider, placeholders = _compose()
+    surface, provider = _compose()
 
-    assert len(placeholders) == 1
     assert surface.provider_controls.controls == [
         provider.controls["self_stt"],
         provider.controls["peer_stt"],
         provider.controls["translation_provider"],
     ]
     assert surface.translation_connection_controls.controls == [
-        surface.translation_connection_leading_placeholder,
+        provider.controls["cloud_free_tier"],
         provider.controls["translation_connection"],
         provider.controls["translation_fallback"],
     ]
@@ -164,7 +159,7 @@ def test_settings_api_surface_places_every_slot_in_the_accepted_position() -> No
 
 
 def test_settings_api_surface_preserves_accepted_initial_row_visibility() -> None:
-    surface, _, _ = _compose()
+    surface, _ = _compose()
 
     assert surface.provider_row.visible is True
     assert surface.translation_connection_row.visible is True

@@ -6,7 +6,7 @@ with optional descriptions for each option.
 
 from __future__ import annotations
 
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
 
 import flet as ft
 
@@ -41,6 +41,8 @@ class SettingsModal:
         show_description: bool = False,
         two_column: bool = False,
         left_column_sections: int = 1,
+        multi_select: bool = False,
+        on_selection_change: Callable[[tuple[str, ...]], None] | None = None,
     ):
         """Initialize settings modal.
 
@@ -63,14 +65,17 @@ class SettingsModal:
         self._show_description = show_description
         self._two_column = two_column
         self._left_column_sections = left_column_sections
+        self._multi_select = multi_select
+        self._on_selection_change = on_selection_change
         self._dialog: ft.AlertDialog | None = None
         self._option_list: ft.ListView | ft.Row | None = None
         self._section_lists: list[tuple[ft.ListView, list[str]]] | None = None
         self._current: str = ""
+        self._selected: set[str] = set()
         self._loading_section: str = ""
         self._partition_left_sections = left_column_sections
 
-    def open(self, current: str, *, loading_section: str = "") -> None:
+    def open(self, current: str | Sequence[str] = "", *, loading_section: str = "") -> None:
         """Open the settings selection dialog.
 
         Args:
@@ -78,7 +83,12 @@ class SettingsModal:
             loading_section: Section label to show as loading placeholder.
                 When set, a spinner is shown for that section instead of options.
         """
-        self._current = current
+        if isinstance(current, str):
+            self._current = current
+            self._selected = {current} if current else set()
+        else:
+            self._selected = {str(value) for value in current if str(value)}
+            self._current = next(iter(self._selected), "")
         self._loading_section = loading_section
         sections = self._collect_sections()
         is_two_column = self._two_column
@@ -261,7 +271,9 @@ class SettingsModal:
 
     def _build_option_card(self, option: OptionItem, current: str) -> ft.Control:
         """Build a single option card."""
-        is_selected = option.value == current and not option.disabled
+        is_selected = (
+            option.value in self._selected if self._multi_select else option.value == current
+        ) and not option.disabled
 
         if option.disabled:
             bg_color = COLOR_BACKGROUND
@@ -385,8 +397,38 @@ class SettingsModal:
 
             container.update()
 
+    def _selected_values(self) -> tuple[str, ...]:
+        return tuple(option.value for option in self._options if option.value in self._selected)
+
+    def _refresh_option_cards(self) -> None:
+        if self._section_lists is not None:
+            for list_view, assigned_sections in self._section_lists:
+                list_view.controls = self._build_column_items(self._current, assigned_sections)
+                try:
+                    list_view.update()
+                except Exception:
+                    pass
+            return
+        if self._option_list is not None and hasattr(self._option_list, "controls"):
+            self._option_list.controls = self._build_option_items(self._current)
+            try:
+                self._option_list.update()
+            except Exception:
+                pass
+
     def _select(self, value: str) -> None:
         """Handle option selection."""
+        if self._multi_select:
+            if value in self._selected:
+                if len(self._selected) <= 1:
+                    return
+                self._selected.remove(value)
+            else:
+                self._selected.add(value)
+            self._refresh_option_cards()
+            if self._on_selection_change is not None:
+                self._on_selection_change(self._selected_values())
+            return
         if self._dialog:
             self._page.pop_dialog()
         self._on_select(value)

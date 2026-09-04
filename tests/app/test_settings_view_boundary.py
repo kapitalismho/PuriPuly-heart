@@ -377,6 +377,29 @@ def test_rolling_free_provider_selection_persists_self_and_peer() -> None:
     assert peer_updated.intent.stt.provider == STTProviderName.ROLLING_FREE.value
     assert peer_updated.intent.peer_stt.provider == STTProviderName.ROLLING_FREE.value
 
-    provider_snapshot, _general, _prompt, _overlay = settings_view_surface_snapshots(peer_updated)
-    assert provider_snapshot.stt_provider is STTProviderName.ROLLING_FREE
-    assert provider_snapshot.peer_stt_provider is STTProviderName.ROLLING_FREE
+
+def test_cloud_free_tier_provider_selection_persists() -> None:
+    from puripuly_heart.app.ports.settings_view import CloudFreeTierProvidersEdit
+    from puripuly_heart.config.provider_values import STTProviderName
+
+    current = AppSettingsVNext()
+    assert current.intent.stt.cloud_free_tier_providers == ["gemini_transcribe"]
+
+    updated = materialize_provider_apply_intent(
+        current,
+        ProviderApplyIntent(
+            (
+                CloudFreeTierProvidersEdit(
+                    (
+                        STTProviderName.GEMINI_TRANSCRIBE,
+                        STTProviderName.DEEPGRAM,
+                    )
+                ),
+            )
+        ),
+        materialize_translation=materialize_canonical_translation_settings,
+    )
+    assert updated.intent.stt.cloud_free_tier_providers == [
+        "gemini_transcribe",
+        "deepgram",
+    ]

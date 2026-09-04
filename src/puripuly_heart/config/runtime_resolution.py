@@ -798,6 +798,7 @@ class STTRuntimeIntent:
     custom_stt_endpoint: str = ""
     custom_stt_model: str = ""
     custom_stt_extra: Mapping[str, ResolvedOptionValue] = field(default_factory=_empty_options)
+    rolling_members: tuple[str, ...] = (STT_PROVIDER_GEMINI_TRANSCRIBE,)
 
     def __post_init__(self) -> None:
         channel = _normalize_allowed(
@@ -909,6 +910,27 @@ class STTRuntimeIntent:
             "custom_terms",
             _freeze_custom_terms(cast(Mapping[str, object], self.custom_terms)),
         )
+        allowed_members = {
+            STT_PROVIDER_GEMINI_TRANSCRIBE,
+            STT_PROVIDER_ELEVENLABS_SCRIBE,
+            STT_PROVIDER_DEEPGRAM,
+        }
+        member_order = (
+            STT_PROVIDER_GEMINI_TRANSCRIBE,
+            STT_PROVIDER_ELEVENLABS_SCRIBE,
+            STT_PROVIDER_DEEPGRAM,
+        )
+        members: list[str] = []
+        seen_members: set[str] = set()
+        for member in self.rolling_members:
+            if member not in allowed_members or member in seen_members:
+                continue
+            members.append(member)
+            seen_members.add(member)
+        if not members:
+            members = [STT_PROVIDER_GEMINI_TRANSCRIBE]
+        members.sort(key=member_order.index)
+        object.__setattr__(self, "rolling_members", tuple(members))
 
 
 def _default_peer_stt_runtime_intent() -> STTRuntimeIntent:
@@ -1293,6 +1315,7 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
             "scribe_model": intent.elevenlabs_scribe_model,
             "deepgram_model": intent.deepgram_model,
             "language_codes": intent.gemini_transcribe_language_codes,
+            "members": intent.rolling_members,
         }
     elif provider == STT_PROVIDER_DEEPGRAM:
         model = intent.deepgram_model
