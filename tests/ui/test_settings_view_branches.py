@@ -6963,6 +6963,7 @@ def test_cloud_free_tier_modal_is_single_column_multi_select(
     view._on_cloud_free_tier_click(None)
 
     assert captured["title"] == t("settings.cloud_free_tier.modal_title")
+    assert "\n" in captured["title"]
     assert captured["kwargs"]["show_description"] is False
     assert captured["kwargs"]["multi_select"] is True
     assert [option.value for option in captured["options"]] == [
@@ -6998,6 +6999,24 @@ def test_cloud_free_tier_selection_gates_member_api_keys(
         "settings.cloud_free_tier.count",
         count=2,
     )
+
+
+def test_cloud_free_tier_change_applies_providers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+    applied: list[bool] = []
+    view.on_providers_changed = lambda: applied.append(True)
+
+    view._on_cloud_free_tier_changed(
+        (
+            STTProviderName.GEMINI_TRANSCRIBE.value,
+            STTProviderName.DEEPGRAM.value,
+        )
+    )
+
+    assert applied == [True]
 
 
 def test_dedicated_deepgram_stt_still_shows_deepgram_key(

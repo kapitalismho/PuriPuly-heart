@@ -125,7 +125,7 @@
   "settings.fallback.modal_title": "选择翻译延迟时要调用的模型",
   "settings.cloud_free_tier": "免费额度提供方选择",
   "settings.cloud_free_tier.count": "{count}个",
-  "settings.cloud_free_tier.modal_title": "请指定自动选择要考虑的提供方",
+  "settings.cloud_free_tier.modal_title": "请指定自动选择要考虑的提供方\n只填写一个密钥也能使用",
   "settings.fallback.none": "关闭",
   "settings.fallback.none.description": "继续只使用主翻译提供方",
   "settings.fallback.inactive_helper": "立即保存；1300ms 后启动首次回退。OpenRouter 主模型还会在 4500ms 后使用额外路由。",

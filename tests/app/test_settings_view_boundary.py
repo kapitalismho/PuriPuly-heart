@@ -19,6 +19,7 @@ from puripuly_heart.app.ports.settings_view import (
     AudioInputSettingsIntent,
     AudioSettingsIntent,
     ChatboxSourceSettingsIntent,
+    CloudFreeTierProvidersEdit,
     CustomSttEndpointEdit,
     CustomVocabularySettingsIntent,
     DesktopOverlayBackgroundAlphaIntent,
@@ -379,9 +380,6 @@ def test_rolling_free_provider_selection_persists_self_and_peer() -> None:
 
 
 def test_cloud_free_tier_provider_selection_persists() -> None:
-    from puripuly_heart.app.ports.settings_view import CloudFreeTierProvidersEdit
-    from puripuly_heart.config.provider_values import STTProviderName
-
     current = AppSettingsVNext()
     assert current.intent.stt.cloud_free_tier_providers == ["gemini_transcribe"]
 
@@ -403,3 +401,40 @@ def test_cloud_free_tier_provider_selection_persists() -> None:
         "gemini_transcribe",
         "deepgram",
     ]
+
+
+def test_provider_apply_merge_keeps_cloud_free_tier_pool() -> None:
+    from puripuly_heart.composition.application_runtime import (
+        _copy_provider_prompt_apply_fields,
+    )
+
+    baseline = AppSettingsVNext()
+    current = replace(
+        baseline,
+        intent=replace(
+            baseline.intent,
+            stt=replace(baseline.intent.stt, vad_speech_threshold=0.25),
+        ),
+    )
+    pending = materialize_provider_apply_intent(
+        current,
+        ProviderApplyIntent(
+            (
+                CloudFreeTierProvidersEdit(
+                    (
+                        STTProviderName.GEMINI_TRANSCRIBE,
+                        STTProviderName.DEEPGRAM,
+                    )
+                ),
+            )
+        ),
+        materialize_translation=materialize_canonical_translation_settings,
+    )
+
+    merged = _copy_provider_prompt_apply_fields(pending, current)
+
+    assert merged.intent.stt.cloud_free_tier_providers == [
+        "gemini_transcribe",
+        "deepgram",
+    ]
+    assert merged.intent.stt.vad_speech_threshold == 0.25

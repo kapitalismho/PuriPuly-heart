@@ -369,7 +369,11 @@ def _copy_provider_prompt_apply_fields(
         target,
         intent=replace(
             target.intent,
-            stt=replace(target.intent.stt, provider=source.intent.stt.provider),
+            stt=replace(
+                target.intent.stt,
+                provider=source.intent.stt.provider,
+                cloud_free_tier_providers=list(source.intent.stt.cloud_free_tier_providers),
+            ),
             peer_stt=replace(target.intent.peer_stt, provider=source.intent.peer_stt.provider),
             translation=copy.deepcopy(source.intent.translation),
             local_llm=copy.deepcopy(source.intent.local_llm),

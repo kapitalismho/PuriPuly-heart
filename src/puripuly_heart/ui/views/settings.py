@@ -4791,6 +4791,8 @@ class SettingsView(ft.Column):
         self._update_api_visibility()
         if is_control_mounted(self):
             self._api_keys_column.update()
+        if self.on_providers_changed is not None:
+            self.on_providers_changed()
 
     def _sync_stt_provider_labels(self, settings: ProviderSettingsSnapshot) -> None:
         self._set_unit_card_value_text(
