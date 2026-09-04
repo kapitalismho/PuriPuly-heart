@@ -6892,15 +6892,11 @@ def test_cloud_modal_section_leads_with_qwen_audio_then_deepgram(
         STTProviderName.GEMINI_TRANSCRIBE,
         STTProviderName.ELEVENLABS_SCRIBE,
     ):
-        assert (
-            settings_view._STT_SECTION_BY_PROVIDER[provider]
-            == "settings.stt.section.cloud"
-        )
+        assert settings_view._STT_SECTION_BY_PROVIDER[provider] == "settings.stt.section.cloud"
     cloud_providers = [
         provider
         for provider in settings_view._STT_UI_PROVIDERS
-        if settings_view._STT_SECTION_BY_PROVIDER.get(provider)
-        == "settings.stt.section.cloud"
+        if settings_view._STT_SECTION_BY_PROVIDER.get(provider) == "settings.stt.section.cloud"
     ]
     assert cloud_providers[0] is STTProviderName.QWEN_AUDIO
     assert cloud_providers[1] is STTProviderName.DEEPGRAM
@@ -6912,9 +6908,8 @@ def test_cloud_modal_section_leads_with_qwen_audio_then_deepgram(
         STTProviderName.ELEVENLABS_SCRIBE,
     ):
         assert view._stt_option_item(provider).description == ""
-    assert (
-        view._stt_option_item(STTProviderName.QWEN_AUDIO).description
-        == t("provider.qwen_audio.description")
+    assert view._stt_option_item(STTProviderName.QWEN_AUDIO).description == t(
+        "provider.qwen_audio.description"
     )
     rolling_option = view._stt_option_item(STTProviderName.ROLLING_FREE)
     assert "\n" not in rolling_option.label

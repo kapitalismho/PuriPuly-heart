@@ -2820,9 +2820,7 @@ def test_peer_rolling_manual_uses_source_language_for_gemini_hints() -> None:
     intent = peer_stt_runtime_intent_from_vnext(settings)
 
     assert intent.provider == "rolling_free"
-    assert intent.gemini_transcribe_language_codes == tuple(
-        gemini_transcribe_language_codes("ko")
-    )
+    assert intent.gemini_transcribe_language_codes == tuple(gemini_transcribe_language_codes("ko"))
 
 
 def test_rolling_backend_includes_only_selected_cloud_free_tier_members() -> None:

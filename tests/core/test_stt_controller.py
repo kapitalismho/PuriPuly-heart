@@ -2932,9 +2932,7 @@ async def test_managed_stt_commit_failure_does_not_raise_and_reopens_on_next_spe
     )
     utterance_id = uuid4()
 
-    await stt.handle_vad_event(
-        SpeechStart(utterance_id, pre_roll=samples(0.0), chunk=samples(1.0))
-    )
+    await stt.handle_vad_event(SpeechStart(utterance_id, pre_roll=samples(0.0), chunk=samples(1.0)))
     await stt.handle_vad_event(SpeechEnd(utterance_id, trailing_silence_ms=64))
 
     assert errors == []

@@ -441,9 +441,7 @@ class STTIntent:
     custom_vocabulary_enabled: bool = True
     custom_terms: dict[str, list[str]] = field(default_factory=_default_custom_terms)
     gpu_device_id: str = "auto"
-    cloud_free_tier_providers: list[str] = field(
-        default_factory=lambda: ["gemini_transcribe"]
-    )
+    cloud_free_tier_providers: list[str] = field(default_factory=lambda: ["gemini_transcribe"])
     deepgram: DeepgramSTTIntent = field(default_factory=DeepgramSTTIntent)
     gemini_transcribe: GeminiTranscribeSTTIntent = field(default_factory=GeminiTranscribeSTTIntent)
     elevenlabs_scribe: ElevenLabsScribeSTTIntent = field(default_factory=ElevenLabsScribeSTTIntent)

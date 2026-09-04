@@ -444,11 +444,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
 
     async def close(self) -> None:
         await self.stop()
-        tasks = tuple(
-            task
-            for task in (self._queue_task, self._keepalive_task)
-            if task is not None
-        )
+        tasks = tuple(task for task in (self._queue_task, self._keepalive_task) if task is not None)
         self._queue_task = None
         self._keepalive_task = None
         for task in tasks:

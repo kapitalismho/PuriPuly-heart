@@ -318,10 +318,7 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         )
 
         gemini_transcribe_language_hints = tuple(gemini_transcribe_language_codes(source_language))
-    if (
-        provider in {STT_PROVIDER_GEMINI_TRANSCRIBE, STT_PROVIDER_ROLLING_FREE}
-        and automatic_gemini
-    ):
+    if provider in {STT_PROVIDER_GEMINI_TRANSCRIBE, STT_PROVIDER_ROLLING_FREE} and automatic_gemini:
         from puripuly_heart.core.language import GEMINI_TRANSCRIBE_MAX_LANGUAGE_HINTS
         from puripuly_heart.core.language import (
             gemini_transcribe_language_hints as build_gemini_transcribe_language_hints,
@@ -927,9 +924,7 @@ def _create_rolling_stt_backend(
 
     enabled_members = {
         provider.value
-        for provider in normalize_cloud_free_tier_providers(
-            config.provider_options.get("members")
-        )
+        for provider in normalize_cloud_free_tier_providers(config.provider_options.get("members"))
     }
 
     if STTProviderName.GEMINI_TRANSCRIBE.value in enabled_members:

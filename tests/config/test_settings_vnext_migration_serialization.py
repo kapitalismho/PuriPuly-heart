@@ -345,14 +345,18 @@ def test_vnext_dict_migrates_source_name_role_and_previous_output_default() -> N
         "* Text inside `<input>` is the translation target.\n"
         "* Text inside `<context>` is background information.\n"
     )
-    stored = _prompt_with_static_optional_sections(current).replace(
-        current_role,
-        legacy_role,
-        1,
-    ).replace(
-        output_metadata_line,
-        previous_output_lines,
-        1,
+    stored = (
+        _prompt_with_static_optional_sections(current)
+        .replace(
+            current_role,
+            legacy_role,
+            1,
+        )
+        .replace(
+            output_metadata_line,
+            previous_output_lines,
+            1,
+        )
     )
     canonical = serialization.to_dict(AppSettingsVNext())
     canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1

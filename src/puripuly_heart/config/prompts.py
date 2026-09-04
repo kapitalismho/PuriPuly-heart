@@ -295,9 +295,7 @@ def build_translation_prompt_variables(
         cache.target_language_rules.get(target_rules_key, "") if target_rules_key else ""
     )
     resolved_source_name = source_name if source_specified else UNSPECIFIED_SOURCE_TEXT_REF
-    source_text_ref = (
-        f"the {source_name} text" if source_specified else UNSPECIFIED_SOURCE_TEXT_REF
-    )
+    source_text_ref = f"the {source_name} text" if source_specified else UNSPECIFIED_SOURCE_TEXT_REF
     translation_examples = (
         _select_translation_examples(cache, source_name, target_name) if source_specified else ""
     )

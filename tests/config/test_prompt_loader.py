@@ -173,8 +173,7 @@ def test_missing_rules_and_examples_omit_optional_section_headings() -> None:
     assert "## Examples" not in rendered
     assert "## Output" in rendered
     assert (
-        "* Use exclamation marks only when the source is clearly emphatic.\n\n## Output"
-        in rendered
+        "* Use exclamation marks only when the source is clearly emphatic.\n\n## Output" in rendered
     )
     assert "\n\n\n" not in rendered
 
