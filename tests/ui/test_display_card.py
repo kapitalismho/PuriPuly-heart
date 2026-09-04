@@ -57,13 +57,15 @@ def test_weighted_length_counts_cjk_as_two() -> None:
 @pytest.mark.parametrize(
     ("size", "expected_lines", "expected_capacity"),
     [
-        (48, 3, 65),
-        (44, 3, 71),
-        (40, 4, 105),
-        (36, 4, 116),
-        (32, 5, 164),
-        (28, 5, 187),
-        (24, 6, 263),
+        (48, 3, 59),
+        (44, 3, 65),
+        (40, 3, 71),
+        (36, 4, 106),
+        (32, 4, 119),
+        (28, 5, 170),
+        (24, 6, 239),
+        (20, 7, 334),
+        (16, 9, 537),
     ],
 )
 def test_smaller_sizes_are_allowed_more_lines_and_hold_more_text(
@@ -107,7 +109,7 @@ def test_layout_falls_back_to_the_smallest_size_beyond_every_capacity() -> None:
 
 
 def test_display_size_never_grows_with_length() -> None:
-    sizes = [display_card_module._display_layout_for_length(length)[0] for length in range(0, 400)]
+    sizes = [display_card_module._display_layout_for_length(length)[0] for length in range(0, 600)]
 
     assert sizes == sorted(sizes, reverse=True)
     assert max(sizes) == display_card_module.DISPLAY_SIZE_CANDIDATES[0]
@@ -341,7 +343,7 @@ def test_translation_never_grows_the_text_beyond_its_source_size(
     card.set_display("x" * 300)
     source_size = _visible_size(card)
     source_lines = card._display_text.max_lines
-    assert source_size == 24
+    assert source_size == 20
 
     card.set_display_translation("hi")
     assert _visible_size(card) == source_size
@@ -359,8 +361,8 @@ def test_translation_may_shrink_the_text_below_its_source_size(
     assert card._display_text.max_lines == 3
 
     card.set_display_translation("x" * 300)
-    assert _visible_size(card) == 24
-    assert card._display_text.max_lines == 6
+    assert _visible_size(card) == 20
+    assert card._display_text.max_lines == 7
 
 
 def test_each_turn_resets_the_size_ceiling(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -369,7 +371,7 @@ def test_each_turn_resets_the_size_ceiling(monkeypatch: pytest.MonkeyPatch) -> N
 
     card.set_display("x" * 300)
     card.set_display_translation("hi")
-    assert _visible_size(card) == 24
+    assert _visible_size(card) == 20
 
     card.set_display("hi")
     card.set_display_translation("hello")
@@ -384,7 +386,7 @@ def test_blocking_notice_does_not_lower_the_turn_size_ceiling(
 
     card.set_display("hi")
     card.set_notice("x" * 300, tone="warning")
-    assert _visible_size(card) == 24
+    assert _visible_size(card) == 20
 
     card.set_notice(None, None)
     card.set_display_translation("hello")
@@ -405,7 +407,7 @@ def test_turn_size_ceiling_survives_a_source_hidden_behind_a_notice(
     card.set_notice(None, None)
 
     assert _visible_text(card) == "hi"
-    assert _visible_size(card) == 24
+    assert _visible_size(card) == 20
 
 
 def test_turn_size_ceiling_accounts_for_the_debug_prefix(
