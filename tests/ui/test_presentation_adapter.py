@@ -246,6 +246,8 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     assert ("gpu-devices", {"llm_devices": devices}) in events
     assert ("gpu-notice", notice) in events
     assert ("stt-notice", "downloading", {"percent": 25}) in events
+    assert ("stt-model", "model") in events
+    assert ("stt-starting", True) not in events
     assert ("gemma-notice", gemma_notice) in events
     assert (
         "load-settings",

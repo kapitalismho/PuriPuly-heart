@@ -1611,6 +1611,50 @@ def test_dashboard_primary_target_change_drops_a_colliding_secondary(
     assert view._secondary_target_lang_code == ""
 
 
+def test_dashboard_language_swap_does_not_change_talk_button(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    talk_states = list(view.stt_button.states)
+
+    view._swap_languages()
+
+    assert view.is_stt_on is False
+    assert view._stt_is_starting is False
+    assert view.stt_button.states == talk_states
+
+
+def test_dashboard_language_swap_keeps_talk_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    view.set_stt_enabled(True)
+    talk_states = list(view.stt_button.states)
+
+    view._swap_languages()
+
+    assert view.is_stt_on is True
+    assert view._stt_is_starting is False
+    assert view.stt_button.states == talk_states
+
+
+def test_dashboard_talk_starting_clears_when_stt_becomes_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+
+    view._toggle_stt()
+    assert view.is_stt_on is True
+    assert view._stt_is_starting is True
+    assert view.stt_button.states[-1]["is_starting"] is True
+
+    view.set_stt_enabled(True)
+
+    assert view.is_stt_on is True
+    assert view._stt_is_starting is False
+    assert "is_starting" not in view.stt_button.states[-1]
+
+
 def test_dashboard_self_swap_keeps_the_secondary_target(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

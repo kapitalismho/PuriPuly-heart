@@ -220,10 +220,8 @@ class FletUiPresentationAdapter:
         percent: int | None,
         starting: bool,
     ) -> None:
+        _ = starting
         dashboard = getattr(self._app, "view_dashboard", None)
-        set_starting = getattr(dashboard, "set_stt_starting", None)
-        if callable(set_starting):
-            set_starting(starting)
         set_model = getattr(dashboard, "set_local_stt_notice_model", None)
         if callable(set_model):
             set_model(model_id)

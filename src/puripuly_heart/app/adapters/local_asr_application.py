@@ -273,6 +273,7 @@ class LocalASRNoticeProjector:
         )
         self_starting = bool(
             self_snapshot is not None
+            and self_snapshot.desired_active
             and self_snapshot.state
             in {
                 SelfCaptureSessionState.STARTING,
