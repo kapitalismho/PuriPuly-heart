@@ -273,7 +273,7 @@ def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
 
 def _prompt_with_static_optional_sections(prompt: str) -> str:
     return prompt.replace(
-        "${targetLanguageRulesSection}${translationExamplesSection}",
+        "${targetLanguageRulesSection}\n\n${translationExamplesSection}\n\n",
         "### Target language Rules\n"
         "${targetLanguageRules}\n"
         "\n"
@@ -364,7 +364,19 @@ def test_vnext_dict_migrates_source_name_role_and_previous_output_default() -> N
     assert migrated.intent.prompts.system_prompt == current
 
 
-def test_vnext_dict_preserves_custom_prompt_through_migration() -> None:
+def test_vnext_dict_preserves_custom_prompt_on_current_version() -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["intent"]["prompts"]["system_prompt"] = "my customized prompt"
+
+    migrated = migration.from_dict(canonical)
+
+    assert migrated.intent.prompts.system_prompt == "my customized prompt"
+
+
+def test_vnext_dict_resets_custom_prompt_before_prompt_reset_version() -> None:
+    from puripuly_heart.config.prompts import load_prompt_for_provider
     from puripuly_heart.config.settings_vnext import migration, serialization
 
     canonical = serialization.to_dict(AppSettingsVNext())
@@ -373,7 +385,7 @@ def test_vnext_dict_preserves_custom_prompt_through_migration() -> None:
 
     migrated = migration.from_dict(canonical)
 
-    assert migrated.intent.prompts.system_prompt == "my customized prompt"
+    assert migrated.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
 
 
 def test_vnext_dict_preserves_prompt_with_boundary_whitespace() -> None:
@@ -382,7 +394,6 @@ def test_vnext_dict_preserves_prompt_with_boundary_whitespace() -> None:
 
     stored_prompt = f"  {LEGACY_TIMESTAMP_PROMPT}  "
     canonical = serialization.to_dict(AppSettingsVNext())
-    canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
     canonical["intent"]["prompts"]["system_prompt"] = stored_prompt
 
     migrated = migration.from_dict(canonical)
@@ -1698,16 +1709,12 @@ def test_older_vnext_version_is_backed_up_and_forward_migrated(
     )
 
 
-def test_missing_cloud_free_tier_defaults_to_gemini_and_keeps_verified_deepgram() -> None:
+def test_missing_cloud_free_tier_defaults_to_gemini() -> None:
     migration = _migration()
     serialization = _serialization()
     raw = serialization.to_dict(AppSettingsVNext())
     raw["settings_version"] = 37
     raw["intent"]["stt"].pop("cloud_free_tier_providers", None)
-
-    loaded = migration.from_dict(raw)
-    assert loaded.intent.stt.cloud_free_tier_providers == ["gemini_transcribe"]
-
     raw["state"]["provider_verification"]["deepgram"] = {
         "status": "verified",
         "provider": "deepgram",
@@ -1717,25 +1724,11 @@ def test_missing_cloud_free_tier_defaults_to_gemini_and_keeps_verified_deepgram(
         "verifier_context": {"flow": "settings.verify_api_key"},
         "verifier_evidence": {"verifier": "deepgram"},
     }
-    loaded = migration.from_dict(raw)
-    assert loaded.intent.stt.cloud_free_tier_providers == [
-        "gemini_transcribe",
-        "deepgram",
-    ]
-
-
-def test_unbound_verified_deepgram_does_not_expand_cloud_free_tier() -> None:
-    migration = _migration()
-    serialization = _serialization()
-    raw = serialization.to_dict(AppSettingsVNext())
-    raw["settings_version"] = 37
-    raw["intent"]["stt"].pop("cloud_free_tier_providers", None)
-    raw["state"]["provider_verification"]["deepgram"] = {"status": "verified"}
 
     loaded = migration.from_dict(raw)
 
     assert loaded.intent.stt.cloud_free_tier_providers == ["gemini_transcribe"]
-    assert loaded.state.provider_verification.deepgram.status == "unknown"
+    assert loaded.intent.stt.provider != "rolling_free"
 
 
 def test_explicit_cloud_free_tier_selection_is_preserved() -> None:
@@ -1746,3 +1739,124 @@ def test_explicit_cloud_free_tier_selection_is_preserved() -> None:
 
     loaded = migration.from_dict(raw)
     assert loaded.intent.stt.cloud_free_tier_providers == ["elevenlabs_scribe"]
+
+
+def test_deepgram_self_stt_migrates_to_rolling_with_gemini_pool() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 38
+    raw["intent"]["stt"]["provider"] = "deepgram"
+    raw["intent"]["stt"]["cloud_free_tier_providers"] = ["elevenlabs_scribe"]
+    raw["intent"]["peer_stt"]["provider"] = "local_cpu_auto"
+
+    loaded = migration.from_dict(raw)
+
+    assert loaded.intent.stt.provider == "rolling_free"
+    assert loaded.intent.peer_stt.provider == "local_cpu_auto"
+    assert loaded.intent.stt.cloud_free_tier_providers == [
+        "gemini_transcribe",
+        "deepgram",
+    ]
+
+
+def test_deepgram_peer_stt_migrates_to_rolling_with_gemini_pool() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 38
+    raw["intent"]["stt"]["provider"] = "soniox"
+    raw["intent"]["peer_stt"]["provider"] = "deepgram"
+
+    loaded = migration.from_dict(raw)
+
+    assert loaded.intent.stt.provider == "soniox"
+    assert loaded.intent.peer_stt.provider == "rolling_free"
+    assert loaded.intent.stt.cloud_free_tier_providers == [
+        "gemini_transcribe",
+        "deepgram",
+    ]
+
+
+def test_current_version_keeps_standalone_deepgram() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["stt"]["provider"] = "deepgram"
+    raw["intent"]["peer_stt"]["provider"] = "deepgram"
+    raw["intent"]["stt"]["cloud_free_tier_providers"] = ["gemini_transcribe"]
+
+    loaded = migration.from_dict(raw)
+
+    assert loaded.intent.stt.provider == "deepgram"
+    assert loaded.intent.peer_stt.provider == "deepgram"
+    assert loaded.intent.stt.cloud_free_tier_providers == ["gemini_transcribe"]
+
+
+def test_load_writes_system_prompt_backup_and_resets_prompt(tmp_path: Path) -> None:
+    from puripuly_heart.config.prompts import load_prompt_for_provider
+
+    compat = _compat()
+    serialization = _serialization()
+    fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
+    path = tmp_path / "settings.json"
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    raw["intent"]["prompts"]["system_prompt"] = "keep this custom prompt"
+    original_bytes = _write_json_bytes(path, raw)
+
+    result = compat.load_vnext_settings(path, now=fixed_now)
+
+    assert result.status == compat.SettingsPersistenceStatus.SUCCESS
+    assert result.settings is not None
+    assert result.settings.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
+    prompt_backup = tmp_path / (
+        f"system_prompt.pre-v{VNEXT_SETTINGS_SCHEMA_VERSION - 1}.20260609T010203Z.txt"
+    )
+    assert prompt_backup.read_text(encoding="utf-8") == "keep this custom prompt"
+    assert result.backup_path is not None
+    assert result.backup_path.read_bytes() == original_bytes
+
+
+def test_load_skips_system_prompt_backup_when_already_default(tmp_path: Path) -> None:
+    from puripuly_heart.config.prompts import load_prompt_for_provider
+
+    compat = _compat()
+    serialization = _serialization()
+    fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
+    path = tmp_path / "settings.json"
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    raw["intent"]["prompts"]["system_prompt"] = load_prompt_for_provider("gemini")
+    _write_json_bytes(path, raw)
+
+    result = compat.load_vnext_settings(path, now=fixed_now)
+
+    assert result.status == compat.SettingsPersistenceStatus.SUCCESS
+    assert result.migrated is True
+    assert not list(tmp_path.glob("system_prompt*.txt"))
+
+
+def test_system_prompt_backup_failure_aborts_without_overwriting_settings(
+    tmp_path: Path,
+) -> None:
+    compat = _compat()
+    serialization = _serialization()
+    fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
+    path = tmp_path / "settings.json"
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    raw["intent"]["prompts"]["system_prompt"] = "keep this custom prompt"
+    original_bytes = _write_json_bytes(path, raw)
+    colliding = tmp_path / (
+        f"system_prompt.pre-v{VNEXT_SETTINGS_SCHEMA_VERSION - 1}.20260609T010203Z.txt"
+    )
+    colliding.write_text("collision", encoding="utf-8")
+
+    result = compat.load_vnext_settings(path, now=fixed_now, max_backup_attempts=1)
+
+    assert result.status == compat.SettingsPersistenceStatus.BACKUP_FAILED
+    assert result.settings is None
+    assert path.read_bytes() == original_bytes
+    assert colliding.read_text(encoding="utf-8") == "collision"
+    assert not list(tmp_path.glob("*.bak"))

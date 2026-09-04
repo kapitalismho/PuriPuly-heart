@@ -117,6 +117,17 @@ def load_vnext_settings(
 
     previous_schema_version = previous_schema_version_label(raw)
     try:
+        prompt_backup_text = (
+            migration.system_prompt_backup_text(raw) if source_shape == "canonical" else None
+        )
+        if prompt_backup_text is not None:
+            create_system_prompt_backup(
+                path.parent,
+                prompt_backup_text,
+                previous_schema_version=previous_schema_version,
+                now=now,
+                max_attempts=max_backup_attempts,
+            )
         backup_path = create_pre_migration_backup(
             path,
             original_bytes,
@@ -197,6 +208,54 @@ def _requires_canonical_save(raw: dict[str, Any], settings: AppSettingsVNext) ->
     canonical = json.loads(serialization.to_json_text(settings))
     normalized_raw = serialization.normalize_persisted_dict(raw)
     return normalized_raw != canonical
+
+
+def create_system_prompt_backup(
+    directory: Path,
+    prompt_text: str,
+    *,
+    previous_schema_version: str,
+    now: datetime | None = None,
+    max_attempts: int = 100,
+) -> Path:
+    if max_attempts < 1:
+        raise BackupCreationError("max backup attempts must be at least 1")
+    timestamp = backup_timestamp(now)
+    encoded = prompt_text.encode("utf-8")
+    for collision_index in range(max_attempts):
+        candidate = system_prompt_backup_candidate_path(
+            directory,
+            previous_schema_version=previous_schema_version,
+            timestamp=timestamp,
+            collision_index=collision_index,
+        )
+        try:
+            with candidate.open("xb") as handle:
+                try:
+                    handle.write(encoded)
+                except Exception:
+                    try:
+                        candidate.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    raise
+            return candidate
+        except FileExistsError:
+            continue
+    raise BackupCreationError(
+        f"could not create exclusive system prompt backup after {max_attempts} attempts"
+    )
+
+
+def system_prompt_backup_candidate_path(
+    directory: Path,
+    *,
+    previous_schema_version: str,
+    timestamp: str,
+    collision_index: int,
+) -> Path:
+    suffix = "" if collision_index == 0 else f".{collision_index}"
+    return directory / (f"system_prompt.pre-v{previous_schema_version}.{timestamp}{suffix}.txt")
 
 
 def create_pre_migration_backup(

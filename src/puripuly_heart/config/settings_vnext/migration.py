@@ -33,6 +33,7 @@ _MULTI_MODEL_GEMMA_MIGRATION_VERSION = 32
 _CEREBRAS_CONNECTION_MIGRATION_VERSION = 35
 _DEEPSEEK_V4_PRO_RETIREMENT_MIGRATION_VERSION = 36
 _TELEMETRY_BOOLEAN_MIGRATION_VERSION = 37
+_PROMPT_RESET_AND_DEEPGRAM_ROLLING_VERSION = 39
 _EXPLICIT_LEGACY_GEMMA_FALLBACK_ALIASES = frozenset({"openrouter_gemma4_26b_a4b"})
 
 _TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
@@ -112,6 +113,8 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     migrate_deepseek_v4_pro_retirement = _requires_deepseek_v4_pro_retirement_migration(
         data.get("settings_version")
     )
+    migrate_prompt_reset = _requires_prompt_reset_migration(data.get("settings_version"))
+    migrate_deepgram_rolling = _requires_deepgram_rolling_migration(data.get("settings_version"))
     prepared = dict(copy.deepcopy(data))
     prepared["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION
     intent = prepared.get("intent") if isinstance(prepared.get("intent"), dict) else {}
@@ -169,11 +172,16 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
         intent["desktop_audio"] = desktop_audio
         prompts = intent.get("prompts") if isinstance(intent.get("prompts"), Mapping) else {}
         if isinstance(prompts, dict):
-            _migrate_legacy_timestamp_prompt(prompts)
+            if migrate_prompt_reset:
+                _migrate_force_default_prompt(prompts)
+            else:
+                _migrate_legacy_timestamp_prompt(prompts)
             intent["prompts"] = prompts
         prepared["intent"] = intent
     if migrate_telemetry:
         _migrate_telemetry_boolean_model(prepared)
+    if migrate_deepgram_rolling:
+        _migrate_deepgram_stt_to_rolling(prepared)
     _migrate_cloud_free_tier_providers(prepared)
     return prepared
 
@@ -188,19 +196,28 @@ def _migrate_cloud_free_tier_providers(data: dict[str, Any]) -> None:
         intent["stt"] = stt
     if "cloud_free_tier_providers" in stt:
         return
-    providers = ["gemini_transcribe"]
-    state = data.get("state")
-    verification = state.get("provider_verification") if isinstance(state, Mapping) else None
-    deepgram = verification.get("deepgram") if isinstance(verification, Mapping) else None
-    if _deepgram_verification_is_bound_verified(deepgram):
-        providers.append("deepgram")
-    stt["cloud_free_tier_providers"] = providers
+    stt["cloud_free_tier_providers"] = ["gemini_transcribe"]
 
 
-def _deepgram_verification_is_bound_verified(entry: object) -> bool:
-    if not isinstance(entry, Mapping) or entry.get("status") != "verified":
-        return False
-    return serialization._has_provider_verification_binding_evidence(entry)
+def _migrate_deepgram_stt_to_rolling(data: dict[str, Any]) -> None:
+    intent = data.get("intent")
+    if not isinstance(intent, dict):
+        return
+    stt = intent.get("stt") if isinstance(intent.get("stt"), dict) else {}
+    peer_stt = intent.get("peer_stt") if isinstance(intent.get("peer_stt"), dict) else {}
+    self_is_deepgram = stt.get("provider") == "deepgram"
+    peer_is_deepgram = peer_stt.get("provider") == "deepgram"
+    if not self_is_deepgram and not peer_is_deepgram:
+        return
+    if self_is_deepgram:
+        stt["provider"] = "rolling_free"
+        intent["stt"] = stt
+    if peer_is_deepgram:
+        peer_stt["provider"] = "rolling_free"
+        intent["peer_stt"] = peer_stt
+    if not isinstance(intent.get("stt"), dict):
+        intent["stt"] = stt
+    intent["stt"]["cloud_free_tier_providers"] = ["gemini_transcribe", "deepgram"]
 
 
 def _requires_telemetry_boolean_migration(data: Mapping[str, Any]) -> bool:
@@ -403,7 +420,7 @@ def _prompt_matches_legacy_timestamp_default(prompt: str) -> bool:
         "\n"
     )
     static_sections_default = _shared_default_prompt().replace(
-        "${targetLanguageRulesSection}${translationExamplesSection}",
+        "${targetLanguageRulesSection}\n\n${translationExamplesSection}\n\n",
         static_optional_sections,
         1,
     )
@@ -434,12 +451,36 @@ def _prompt_matches_legacy_timestamp_default(prompt: str) -> bool:
     }
 
 
+def _migrate_force_default_prompt(prompts: dict[str, Any]) -> None:
+    prompts["system_prompt"] = _shared_default_prompt()
+
+
 def _migrate_legacy_timestamp_prompt(prompts: dict[str, Any]) -> None:
     raw_system_prompt = prompts.get("system_prompt")
     if isinstance(raw_system_prompt, str) and _prompt_matches_legacy_timestamp_default(
         raw_system_prompt
     ):
         prompts["system_prompt"] = _shared_default_prompt()
+
+
+def _stored_system_prompt(data: Mapping[str, Any]) -> str:
+    intent = data.get("intent")
+    if not isinstance(intent, Mapping):
+        return ""
+    prompts = intent.get("prompts")
+    if not isinstance(prompts, Mapping):
+        return ""
+    value = prompts.get("system_prompt")
+    return value if isinstance(value, str) else ""
+
+
+def system_prompt_backup_text(data: Mapping[str, Any]) -> str | None:
+    if not _requires_prompt_reset_migration(data.get("settings_version")):
+        return None
+    previous = _stored_system_prompt(data)
+    if not previous or previous == _shared_default_prompt():
+        return None
+    return previous
 
 
 def _requires_local_qwen_cpu_auto_migration(settings_version: object) -> bool:
@@ -490,6 +531,20 @@ def _requires_deepseek_v4_pro_retirement_migration(settings_version: object) -> 
     if isinstance(settings_version, str) and settings_version.strip().isdigit():
         return int(settings_version.strip()) < _DEEPSEEK_V4_PRO_RETIREMENT_MIGRATION_VERSION
     return True
+
+
+def _requires_prompt_reset_migration(settings_version: object) -> bool:
+    if isinstance(settings_version, bool):
+        return True
+    if isinstance(settings_version, int):
+        return settings_version < _PROMPT_RESET_AND_DEEPGRAM_ROLLING_VERSION
+    if isinstance(settings_version, str) and settings_version.strip().isdigit():
+        return int(settings_version.strip()) < _PROMPT_RESET_AND_DEEPGRAM_ROLLING_VERSION
+    return True
+
+
+def _requires_deepgram_rolling_migration(settings_version: object) -> bool:
+    return _requires_prompt_reset_migration(settings_version)
 
 
 def _migrate_multi_model_gemma_translation(translation: dict[str, Any]) -> None:

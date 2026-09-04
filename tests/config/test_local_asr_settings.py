@@ -56,7 +56,7 @@ def test_local_provider_identities_roundtrip_through_canonical_serialization(
 @pytest.mark.parametrize(
     ("self_provider", "peer_provider", "expected_self", "expected_peer"),
     [
-        ("local_qwen", "deepgram", "local_cpu_auto", "deepgram"),
+        ("local_qwen", "deepgram", "local_cpu_auto", "rolling_free"),
         ("soniox", "local_qwen", "soniox", "local_cpu_auto"),
         ("local_qwen", "local_qwen", "local_cpu_auto", "local_cpu_auto"),
     ],
@@ -70,7 +70,7 @@ def test_target_schema_29_local_qwen_migration_is_backed_up_and_idempotent(
 ) -> None:
     path = tmp_path / "settings.json"
     raw = serialization.to_dict(AppSettingsVNext())
-    assert VNEXT_SETTINGS_SCHEMA_VERSION == 38
+    assert VNEXT_SETTINGS_SCHEMA_VERSION == 39
     raw["settings_version"] = 29
     raw["intent"]["stt"]["provider"] = self_provider
     raw["intent"]["stt"].pop("gpu_device_id")
