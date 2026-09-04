@@ -10,7 +10,7 @@
 
 <p align="center">
 
-  <img src="https://img.shields.io/badge/version-2.5.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.6.0-blue" alt="Version" />
 
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
 

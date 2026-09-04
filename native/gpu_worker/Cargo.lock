@@ -142,7 +142,7 @@ dependencies = [
 
 [[package]]
 name = "puripuly-heart-gpu-worker"
-version = "2.5.0"
+version = "2.6.0"
 dependencies = [
  "hound",
  "serde",
