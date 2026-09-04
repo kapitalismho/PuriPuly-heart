@@ -164,8 +164,6 @@ class SettingsApiSlotProvider(Protocol):
 
     def managed_key_control(self) -> ft.Control: ...
 
-    def peer_expected_language_control(self) -> ft.Control: ...
-
     def api_keys_control(self) -> ft.Control: ...
 
 
@@ -182,7 +180,6 @@ class SettingsApiSurfaceSlots:
     local_llm_connection: ft.Control
     custom_stt_connection: ft.Control
     managed_key: ft.Control
-    peer_expected_language: ft.Control
     api_keys: ft.Control
     http_extension: ft.Control | None = None
 
@@ -201,7 +198,6 @@ class SettingsApiSurfaceSlots:
             local_llm_connection=provider.local_llm_connection_control(),
             custom_stt_connection=provider.custom_stt_connection_control(),
             managed_key=provider.managed_key_control(),
-            peer_expected_language=provider.peer_expected_language_control(),
             api_keys=provider.api_keys_control(),
             http_extension=(extension_factory() if callable(extension_factory) else None),
         )
@@ -237,6 +233,7 @@ class SettingsGeneralSurfaceSlots:
 @dataclass(frozen=True, slots=True)
 class SettingsPromptSurfaceSlots:
     custom_vocabulary: ft.Control
+    peer_expected_language: ft.Control
     persona: ft.Control
 
 

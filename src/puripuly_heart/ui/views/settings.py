@@ -622,9 +622,6 @@ class SettingsView(ft.Column):
     def managed_key_control(self) -> ft.Control:
         return self._managed_key_card
 
-    def peer_expected_language_control(self) -> ft.Control:
-        return self._peer_auto_languages_card
-
     def api_keys_control(self) -> ft.Control:
         return self._api_keys_card
 
@@ -1287,8 +1284,8 @@ class SettingsView(ft.Column):
                 spacing=12,
             ),
             height=None,
+            expand=False,
         )
-        self._peer_auto_languages_card.visible = False
         self._google_key = ApiKeyField(
             "settings.google_api_key",
             "google_api_key",
@@ -2565,8 +2562,19 @@ class SettingsView(ft.Column):
         )
         self._custom_vocab_description_text = ft.Text(
             t("settings.custom_vocabulary.description"),
-            size=16,
+            size=20,
             color=COLOR_SECONDARY,
+            text_align=ft.TextAlign.RIGHT,
+        )
+        self._custom_vocab_header = ft.Row(
+            controls=[
+                self._custom_vocab_title,
+                ft.Container(expand=True),
+                self._custom_vocab_description_text,
+            ],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=8,
         )
         self._custom_vocab_tag_editor = CustomVocabularyTagEditor(
             on_add_terms=self._on_custom_vocabulary_add_terms,
@@ -2576,9 +2584,7 @@ class SettingsView(ft.Column):
         row7 = SharedCardWrapper(
             ft.Column(
                 [
-                    self._custom_vocab_title,
-                    ft.Container(height=6),
-                    self._custom_vocab_description_text,
+                    self._custom_vocab_header,
                     ft.Container(height=12),
                     self._custom_vocab_tag_editor,
                 ],
@@ -2597,7 +2603,11 @@ class SettingsView(ft.Column):
         self._gpu_device_row = self._api_surface.gpu_device_row
 
         self._prompt_surface = compose_settings_prompt_surface(
-            SettingsPromptSurfaceSlots(custom_vocabulary=row7, persona=persona_card)
+            SettingsPromptSurfaceSlots(
+                custom_vocabulary=row7,
+                peer_expected_language=self._peer_auto_languages_card,
+                persona=persona_card,
+            )
         )
 
         self._settings_subtab_shell = self._build_settings_subtab_shell(
@@ -3250,9 +3260,6 @@ class SettingsView(ft.Column):
             provider=provider_label(self._active_prompt_key()),
         )
 
-    def _custom_vocabulary_description_copy(self) -> str:
-        return t("settings.custom_vocabulary.description")
-
     def _apply_custom_vocabulary_tag_editor_locale(self) -> None:
         self._custom_vocab_tag_editor.set_placeholder(
             t("settings.custom_vocabulary.add_placeholder")
@@ -3265,7 +3272,7 @@ class SettingsView(ft.Column):
 
     def _sync_prompt_tab_copy(self) -> None:
         self._prompt_for_text.value = self._prompt_provider_copy()
-        self._custom_vocab_description_text.value = self._custom_vocabulary_description_copy()
+        self._custom_vocab_description_text.value = t("settings.custom_vocabulary.description")
         self._apply_custom_vocabulary_tag_editor_locale()
         peer_auto_languages_title = getattr(self, "_peer_auto_languages_title", None)
         if peer_auto_languages_title is not None:
@@ -3977,6 +3984,7 @@ class SettingsView(ft.Column):
 
         _ = preserve_custom_vocab_draft
         self._sync_custom_vocabulary_editor_from_settings()
+        self._sync_peer_auto_languages_editor()
         self._sync_prompt_tab_copy()
         self._overlay_peer_contract = None
         self._sync_overlay_controls()
@@ -4034,6 +4042,7 @@ class SettingsView(ft.Column):
             self._prompt_editor.load_default_prompt(emit_change=False)
             self._prompt_snapshot = replace(prompt, system_prompt=self._prompt_editor.value)
         self._sync_custom_vocabulary_editor_from_settings()
+        self._sync_peer_auto_languages_editor()
         self._sync_prompt_tab_copy()
 
         result = (
@@ -4427,21 +4436,6 @@ class SettingsView(ft.Column):
                 STTProviderName.ELEVENLABS_SCRIBE in active_stt_providers
             )
         self._soniox_key.visible = STTProviderName.SONIOX in active_stt_providers
-        peer_auto_languages_card = getattr(self, "_peer_auto_languages_card", None)
-        if peer_auto_languages_card is not None:
-            peer_auto_languages_card.visible = peer_stt in {
-                STTProviderName.SONIOX,
-                STTProviderName.QWEN_AUDIO,
-                STTProviderName.GEMINI_TRANSCRIBE,
-                STTProviderName.ROLLING_FREE,
-            }
-            self._sync_peer_auto_languages_editor()
-            if is_control_mounted(self):
-                try:
-                    peer_auto_languages_card.update()
-                except Exception:
-                    pass
-
         self._google_key.visible = not is_custom_http and llm == LLMProviderName.GEMINI
         self._sync_managed_key_card(settings)
         if is_custom_http:

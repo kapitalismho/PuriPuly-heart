@@ -144,7 +144,6 @@ def test_settings_view_implements_the_explicit_contract() -> None:
         "local_llm_connection_control",
         "custom_stt_connection_control",
         "managed_key_control",
-        "peer_expected_language_control",
         "api_keys_control",
     ):
         assert callable(getattr(SettingsView, method)), method

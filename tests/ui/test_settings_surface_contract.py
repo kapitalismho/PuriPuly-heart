@@ -58,7 +58,6 @@ class _SlotProvider:
                 "local_llm_connection",
                 "custom_stt_connection",
                 "managed_key",
-                "peer_expected_language",
                 "api_keys",
             )
         }
@@ -95,9 +94,6 @@ class _SlotProvider:
 
     def managed_key_control(self) -> ft.Control:
         return self.controls["managed_key"]
-
-    def peer_expected_language_control(self) -> ft.Control:
-        return self.controls["peer_expected_language"]
 
     def api_keys_control(self) -> ft.Control:
         return self.controls["api_keys"]
@@ -142,7 +138,6 @@ def test_settings_api_surface_preserves_the_accepted_row_order() -> None:
         provider.controls["local_llm_connection"],
         provider.controls["custom_stt_connection"],
         provider.controls["managed_key"],
-        provider.controls["peer_expected_language"],
         provider.controls["api_keys"],
     )
 
@@ -380,13 +375,18 @@ def test_general_surface_preserves_the_accepted_row_order_and_spacing() -> None:
         assert row.content.expand is True
 
 
-def test_prompt_surface_preserves_the_accepted_two_card_order() -> None:
+def test_prompt_surface_preserves_the_accepted_card_order() -> None:
     vocabulary = ft.Text("vocabulary")
+    peer_expected_language = ft.Text("peer_expected_language")
     persona = ft.Text("persona")
     surface = compose_settings_prompt_surface(
-        SettingsPromptSurfaceSlots(custom_vocabulary=vocabulary, persona=persona)
+        SettingsPromptSurfaceSlots(
+            custom_vocabulary=vocabulary,
+            peer_expected_language=peer_expected_language,
+            persona=persona,
+        )
     )
-    assert surface.rows == (vocabulary, persona)
+    assert surface.rows == (vocabulary, peer_expected_language, persona)
 
 
 def test_overlay_surface_preserves_the_accepted_six_rows_and_recovery_visibility() -> None:

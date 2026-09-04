@@ -61,7 +61,6 @@ def compose_settings_api_surface(
         slots.local_llm_connection,
         slots.custom_stt_connection,
         slots.managed_key,
-        slots.peer_expected_language,
         slots.api_keys,
     ]
     if slots.http_extension is not None:
@@ -136,7 +135,9 @@ def compose_settings_general_surface(
 def compose_settings_prompt_surface(
     slots: SettingsPromptSurfaceSlots,
 ) -> SettingsPromptSurfaceRegions:
-    return SettingsPromptSurfaceRegions(rows=(slots.custom_vocabulary, slots.persona))
+    return SettingsPromptSurfaceRegions(
+        rows=(slots.custom_vocabulary, slots.peer_expected_language, slots.persona)
+    )
 
 
 def compose_settings_overlay_surface(

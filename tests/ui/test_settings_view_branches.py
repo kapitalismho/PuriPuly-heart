@@ -4414,55 +4414,32 @@ def test_on_peer_stt_selected_refreshes_api_visibility_and_redraws_immediately(
     assert "peer_stt_text" in api_key_updates
     assert "qwen_region_btn" in api_key_updates
     assert "api_keys_column" in api_key_updates
-    assert view._peer_auto_languages_card.visible is True
 
 
-def test_peer_auto_detection_languages_card_is_visible_for_peer_soniox(
+def test_peer_auto_detection_languages_card_stays_on_prompt_tab(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
     view, _ = _make_settings_view(monkeypatch, settings=settings)
 
-    view._update_api_visibility()
-    assert view._peer_auto_languages_card.visible is False
-
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.SONIOX)
-    settings = _vnext(settings, peer_expected_languages=["ja"])
-    view._settings = settings
-    view._update_api_visibility()
-
+    prompt_cards = _prompt_tab_cards(view)
+    assert prompt_cards[0] is _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
+    assert prompt_cards[1] is view._peer_auto_languages_card
+    assert prompt_cards[2] is _prompt_tab_card(view, t("settings.section.persona"))
     assert view._peer_auto_languages_card.visible is True
-    assert view._peer_auto_languages_editor._terms == ["ja"]
+    assert view._peer_auto_languages_card not in _subtab_controls(view, "api")
 
 
-def test_peer_auto_detection_languages_card_is_visible_for_peer_qwen_audio(
+def test_peer_auto_detection_languages_card_loads_saved_hints(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
     settings = _vnext(settings, peer_expected_languages=["ja", "zh-TW"])
-    view._settings = settings
-    view._update_api_visibility()
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert view._peer_auto_languages_card.visible is True
     assert view._peer_auto_languages_editor._terms == ["ja", "zh-TW"]
-
-
-def test_peer_auto_detection_languages_card_is_visible_for_peer_gemini_transcribe(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.GEMINI_TRANSCRIBE)
-    settings = _vnext(settings, peer_expected_languages=["ko", "en"])
-    view._settings = settings
-    view._update_api_visibility()
-
-    assert view._peer_auto_languages_card.visible is True
-    assert view._peer_auto_languages_editor._terms == ["ko", "en"]
 
 
 def test_peer_auto_languages_add_button_uses_region_tone(
@@ -5392,7 +5369,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     view, _ = _make_settings_view(monkeypatch)
     api_controls = _subtab_controls(view, "api")
 
-    assert len(api_controls) == 9
+    assert len(api_controls) == 8
     assert _row_card_titles(api_controls[0]) == [
         t("settings.section.stt"),
         t("settings.section.peer_stt"),
@@ -5422,9 +5399,8 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     assert _row_card_titles(api_controls[5]) == [t("settings.custom_stt.title")]
     assert api_controls[6] is view._managed_key_card
     assert _row_card_titles(api_controls[6]) == [t("settings.managed_key.title")]
-    assert api_controls[7] is view._peer_auto_languages_card
-    assert api_controls[8] is not view._api_keys_column
-    assert _row_card_titles(api_controls[8]) == [t("settings.section.api_keys")]
+    assert api_controls[7] is not view._api_keys_column
+    assert _row_card_titles(api_controls[7]) == [t("settings.section.api_keys")]
 
 
 def test_api_tab_primary_value_typography_is_consistent_across_rows(
@@ -6186,7 +6162,7 @@ def test_custom_vocabulary_loads_empty_tags_for_fresh_settings(
     assert view._custom_vocab_tag_editor._empty_text.visible is False  # noqa: SLF001
 
 
-def test_custom_vocabulary_card_shows_inline_helper_without_info_icon(
+def test_custom_vocabulary_card_shows_one_line_provider_support_helper(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     view, _ = _make_settings_view(monkeypatch)
@@ -6194,10 +6170,14 @@ def test_custom_vocabulary_card_shows_inline_helper_without_info_icon(
     custom_vocab_card = _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
     custom_vocab_column = _wrapped_card_column(custom_vocab_card)
 
-    assert custom_vocab_column.controls[0] is view._custom_vocab_title
-    assert view._custom_vocab_description_text in custom_vocab_column.controls
+    assert custom_vocab_column.controls[0] is view._custom_vocab_header
+    assert view._custom_vocab_header.controls[0] is view._custom_vocab_title
+    assert view._custom_vocab_header.controls[-1] is view._custom_vocab_description_text
+    assert view._custom_vocab_description_text not in custom_vocab_column.controls
     assert view._custom_vocab_description_text.value == t("settings.custom_vocabulary.description")
-    assert t("settings.custom_vocabulary.description") in _control_labels(custom_vocab_card)
+    assert "Deepgram, Soniox, Gemini Transcribe, Qwen Audio, Scribe" in (
+        view._custom_vocab_description_text.value
+    )
     assert not hasattr(view, "_custom_vocab_info_icon")
     assert t("settings.custom_vocabulary_tooltip") not in _control_tooltips(custom_vocab_card)
 
@@ -6209,7 +6189,7 @@ def test_prompt_tab_uses_shared_full_width_cards(monkeypatch: pytest.MonkeyPatch
 
     prompt_cards = _subtab_controls(view, "prompt")
 
-    assert len(prompt_cards) == 2
+    assert len(prompt_cards) == 3
     assert all(isinstance(card, SharedCardWrapper) for card in prompt_cards)
     assert all(card.height is None for card in prompt_cards)
     assert all(card.expand is False for card in prompt_cards)
@@ -6371,7 +6351,6 @@ def test_custom_vocabulary_switching_source_language_updates_tags_and_clears_add
 
     assert _custom_vocab_chip_terms(view) == ["Avatar", "OSC"]
     assert view._custom_vocab_tag_editor._input_field.value == ""  # noqa: SLF001
-    assert view._custom_vocab_description_text.value == t("settings.custom_vocabulary.description")
 
 
 def test_custom_vocabulary_preserve_reload_discards_unsubmitted_add_input(
