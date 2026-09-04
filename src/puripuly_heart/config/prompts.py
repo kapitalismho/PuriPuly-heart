@@ -258,6 +258,12 @@ def _optional_markdown_section(heading: str, body: str) -> str:
     return f"{heading}\n{text}\n\n"
 
 
+def _collapse_extra_blank_lines(text: str) -> str:
+    while "\n\n\n" in text:
+        text = text.replace("\n\n\n", "\n\n")
+    return text
+
+
 def _select_translation_examples(
     cache: PromptAssemblyCache, source_name: str, target_name: str
 ) -> str:
@@ -333,7 +339,7 @@ def render_translation_prompt_template(
     )
     for key, value in sorted(variables.items(), key=lambda item: len(item[0]), reverse=True):
         rendered = rendered.replace(f"${{{key}}}", value)
-    return rendered
+    return _collapse_extra_blank_lines(rendered)
 
 
 def get_translation_prompt_template() -> str:

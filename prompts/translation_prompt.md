@@ -38,6 +38,10 @@ Ignore context when it would cause:
 * Use conversational phrasing suitable for live social chat.
 * Use exclamation marks only when the source is clearly emphatic.
 
-${targetLanguageRulesSection}${translationExamplesSection}## Output
+${targetLanguageRulesSection}
+
+${translationExamplesSection}
+
+## Output
 * Translate only the text inside `<input>`; `<context>` and channel labels are background metadata.
 * Your response must contain ONLY the ${targetName} translation of `<input>`.
